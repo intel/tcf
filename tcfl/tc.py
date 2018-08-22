@@ -994,7 +994,7 @@ class target_c(object):
         self.rtb.rest_tb_target_active(self.rt, ticket = self.ticket)
         self.report_info("marked as active", dlevel = 2)
 
-    def property_get(self, property_name):
+    def property_get(self, property_name, default = None):
         """
         Read a property from the target
 
@@ -1005,6 +1005,8 @@ class target_c(object):
         r = self.rtb.rest_tb_property_get(
             self.rt, property_name, ticket = self.ticket)
         self.report_info("read property '%s': '%s'" % (property_name, r))
+        if r == None and default != None:
+            return default
         return r
 
     def property_set(self, property_name, value = None):

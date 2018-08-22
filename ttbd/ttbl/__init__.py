@@ -407,7 +407,7 @@ class test_target(object):
         with self.target_owned_and_locked(who):
             self.fsdb.set(prop, value)
 
-    def property_get(self, who, prop):
+    def property_get(self, who, prop, default = None):
         """
         Get a target's property
 
@@ -415,9 +415,12 @@ class test_target(object):
         :param str prop: Property name
         """
         assert isinstance(who, basestring)
-        return self.fsdb.get(prop)
+        r = self.fsdb.get(prop)
+        if r == None and default != None:
+            return default
+        return r
 
-    def property_get_locked(self, who, prop):
+    def property_get_locked(self, who, prop, default = None):
         """
         Get a target's property
 
@@ -426,7 +429,10 @@ class test_target(object):
         """
         assert isinstance(who, basestring)
         with self.target_owned_and_locked(who):
-            return self.fsdb.get(prop)
+            r = self.fsdb.get(prop)
+        if r == None and default != None:
+            return default
+        return r
 
     def thing_add(self, name, plugger):
         """
