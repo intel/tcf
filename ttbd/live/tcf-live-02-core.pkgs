@@ -1,0 +1,67 @@
+#
+# Files listing the RPM packages that have to be installed in the TCF
+# live. Note this is any RPM package available to the repositories
+# installed in the system that is running mk-liveimg.sh
+#
+# This file is input to mk-liveimg.sh along with all tcf-live-*.pkgs,
+# which will generate tcf-live-packages.ks
+#
+# Format is:
+#
+# <blank lines>
+# # optional comments
+# RPM-NAME      # Optional comment
+# RPM2-NAME
+# ...
+
+# @PACKAGE are kickstarter specific groups
+
+@standard
+@core
+@hardware-support
+
+# Explicitly specified here:
+# <notting> walters: because otherwise dependency loops cause yum issues.
+kernel
+kernel-modules
+kernel-modules-extra
+
+# Without this, initramfs generation during live image creation fails: #1242586
+dracut-live
+grub2-efi
+syslinux
+
+# We create a home partition everytime to store stuff and we have to
+# be able to create it really fast -- btrfs is the fastest one to
+# create filesystems, so we'll use that
+btrfs-progs
+
+# Remove all this things that definitely are not needed in a basic
+# TCF-Live node--whoever needs them can add them in other
+# tcf-live-*.pkgs files included after this one.
+-NetworkManager
+-aajohan-comfortaa-fonts
+-glibc-all-langpacks
+-ModemManager
+-plymouth
+
+-@anaconda
+-@anaconda-tools
+-@base-x
+-@dial-up
+-@firefox
+-@fonts
+-@gnome-desktop
+-@guest-desktop-agents
+-@input-methods
+-@libreoffice
+-@multimedia
+-@printing
+-@standard
+-@workstation-product
+
+# netcat, always useful
+nmap-ncat
+rsync
+socat
+

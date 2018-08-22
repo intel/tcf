@@ -1,0 +1,11 @@
+*.so
+.tcf
+build
+*.pyc
+*~
+.project
+.pydevproject
+dist
+MANIFEST
+repo/
+_doc/
