@@ -1,0 +1,7 @@
+Jinja2
+PyYAML
+junit_xml
+ply
+pymongo
+requests
+setuptools

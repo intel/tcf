@@ -1,0 +1,11 @@
+duplicity
+Flask
+pexpect
+ply
+pyserial
+python_ldap
+pyusb
+requests
+setuptools
+systemd
+testing
