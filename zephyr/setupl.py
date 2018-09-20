@@ -32,7 +32,6 @@ def mk_version_py(base_dir, version):
 version_string = "%s"
 """ % (__file__, time.asctime(), version))
 
-
 # Run a post-install on installed data file replacing paths as we need
 class _install_data(distutils.command.install_data.install_data):
     def run(self):
@@ -45,14 +44,18 @@ class _install_data(distutils.command.install_data.install_data):
         if 'user' in install:
             # this means --user was given
             self.prefix = site.getuserbase()
+            sysconfigdir = os.path.join(self.prefix, "etc")
         elif 'prefix' in install:
             # this means --prefix was given
             self.prefix = install.get('prefix', (None, None))[1]
+            sysconfigdir = os.path.join(self.prefix, 'etc')
         else:
             self.prefix = 'usr'
+            sysconfigdir = '/etc'
         new_data_files = []
         for entry in self.data_files:
             dest_path = entry[0].replace('@prefix@', self.prefix)
+            dest_path = entry[0].replace('@sysconfigdir@', sysconfigdir)
             new_data_files.append((dest_path,) + entry[1:])
         self.data_files = new_data_files
         distutils.command.install_data.install_data.run(self)

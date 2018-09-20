@@ -1,8 +1,11 @@
-::
+from source::
 
-  # echo insecure >> ~/.curlrc
-  # rpm -i https://RPMREPOHOST/repo/tcf-repo-v0.11-1-1.noarch.rpm
-  # dnf install -y tcf-zephyr
+   $ git clone http://github.com/intel/tcf tcf.git
+   $ pip2 install --user -r tcf.git/requirements.txt
+   $ cd tcf.git
+   $ python setup.py install --user
+   $ cd zephyr
+   $ python setup.py install --user
 
 .. note:: depending on what you are trying to build, you might
           need to install :ref:`extra dependencies

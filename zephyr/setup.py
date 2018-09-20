@@ -34,8 +34,8 @@ Dependencies and default config files for Zephyr OS
         install_data = setupl._install_data
     ),
     data_files = [
-        ('etc/tcf/', [ 'conf_zephyr.py',
-                       'sanitycheck-platform-schema.yaml',
-                       'sanitycheck-tc-schema.yaml' ]),
+        ('@sysconfigdir@/tcf/', [ 'conf_zephyr.py',
+                                  'sanitycheck-platform-schema.yaml',
+                                  'sanitycheck-tc-schema.yaml' ]),
     ],
 )

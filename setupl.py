@@ -10,9 +10,11 @@ import os
 import re
 import site
 import subprocess
+import sys
 import time
 
 import distutils.command.install_data
+import distutils.command.install_scripts
 
 def mk_version_py(base_dir, version):
     """
@@ -45,19 +47,54 @@ class _install_data(distutils.command.install_data.install_data):
         if 'user' in install:
             # this means --user was given
             self.prefix = site.getuserbase()
+            sysconfigdir = os.path.join(self.prefix, 'etc')
         elif 'prefix' in install:
             # this means --prefix was given
             self.prefix = install.get('prefix', (None, None))[1]
+            sysconfigdir = os.path.join(self.prefix, 'etc')
         else:
             self.prefix = 'usr'
+            sysconfigdir = '/etc'
         new_data_files = []
         for entry in self.data_files:
             dest_path = entry[0].replace('@prefix@', self.prefix)
+            dest_path = dest_path.replace('@sysconfigdir@', sysconfigdir)
             new_data_files.append((dest_path,) + entry[1:])
         self.data_files = new_data_files
         distutils.command.install_data.install_data.run(self)
 
-
+# Run a post-install on installed data file replacing paths as we need
+class _install_scripts(distutils.command.install_scripts.install_scripts):
+    def run(self):
+        # Workaround that install_data doesn't respect --prefix
+        #
+        # If prefix is given (via --user or via --prefix), then
+        # extract it and add it to the paths in self.data_files;
+        # otherwise, default to /usr/local.
+        install = self.distribution.command_options.get('install', {})
+        if 'user' in install:
+            # this means --user was given
+            sysconfigdir = "~/.local/etc"
+        elif 'prefix' in install:
+            # this means --prefix was given
+            prefix = install.get('prefix', (None, None))[1]
+            sysconfigdir = os.path.join(prefix, "etc")
+        else:
+            sysconfigdir = "/etc"
+        distutils.command.install_scripts.install_scripts.run(self)
+        for filename in self.outfiles:
+            try:
+                subprocess.check_call(
+                    [
+                        'sed', '-i',
+                        's|install_time_etc_tcf = "/etc/tcf"' \
+                        '|install_time_etc_tcf = "' + sysconfigdir + '"|g',
+                        filename
+                    ])
+            except subprocess.CalledProcessError as e:
+                sys.stderr.write("FAILED: sed failed\n")
+                raise
+            
 # A glob that filters symlinks
 def glob_no_symlinks(pathname):
     l = []
@@ -81,4 +118,5 @@ else:
         if re.match("^v[0-9]+.[0-9]+", version):
             version = version[1:]
     except subprocess.CalledProcessError as _e:
+        sys.stderr.write("FAILED: git failed: %s" % e.output)
         version = "vNA"

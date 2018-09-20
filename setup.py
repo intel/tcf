@@ -69,6 +69,7 @@ This is the client and meta-testcase runner for the TCF test case framework.
     # _install_data class is used.
     cmdclass = dict(
         build_py = _build_py,
+        install_scripts = setupl._install_scripts,
         install_data = setupl._install_data,
         sdist = _sdist,
     ),

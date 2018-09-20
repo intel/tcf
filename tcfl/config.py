@@ -73,12 +73,10 @@ def load(config_path = None, config_files = None,
     if urls == []:
         logger.warning(
             "No broker URLs available; please use --url or "
-            "add to ~/.tcf/conf_*.py with:\n"
+            "add to a conf_*.py in any of %s with:\n"
             "\n"
-            "  import commonl.config as commonl.config\n"
-            "  \n"
             "  tcfl.config.url_add('https://URL:PORT', ssl_ignore = True)\n"
-            "\n")
+            "\n" % ":".join(config_path))
 
     for _url in urls:		# create target broker objects
         url = _url[0]

@@ -71,14 +71,13 @@ if __name__ == "__main__":
         default = [ ],
         help = "Files to parse as configuration (this is used for testing, "
         "along with --config-path \"\"")
-    # FIXME: change the config file looking stuff so that it looks for
-    # .tcf in $PWD like git does with .git and then walks up until it
-    # finds one; then it tries ~/.tcf, then /etc/tcf or whatever.
+    # This gets replaced during install time to $PREFIX/etc (~/.local,
+    # or /, or whatever
+    install_time_etc_tcf = "/etc/tcf"
     arg_parser.add_argument(
         "--config-path",
         action = "append", dest = "config_path",
-        # FIXME: s|/etc|system prefix from installation
-        default = [ "/etc/tcf:~/.tcf:.tcf" ],
+        default = [ install_time_etc_tcf + ":~/.tcf:.tcf" ],
         help = "List of colon separated paths from where to load conf_.*.py "
         "configuration files (in alphabetic order)")
     arg_parser.add_argument(
