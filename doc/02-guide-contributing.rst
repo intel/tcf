@@ -16,6 +16,8 @@ Support & reporting issues
 
 .. include:: 02-guide-contributing-LL-issues.rst
 
+.. _tcf_run_from_source_tree:
+
 Running the TCF client from the source tree
 -------------------------------------------
 

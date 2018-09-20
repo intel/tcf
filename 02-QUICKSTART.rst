@@ -4,11 +4,20 @@
  Quickstart
 ============
 
-.. _install_tcf_client_rpms:
+.. _install_tcf_client:
 
-1. Install the client software (or :ref:`from source
-   <tcf_install_manual>`):
+1. Install the client software from source::
 
+     $ git clone http://github.com/intel/tcf tcf.git
+     $ cd tcf.git
+     $ pip2 install --user -r requirements.txt	# dependencies
+     $ python2 setup.py install --user
+     $ cd zephyr
+     $ python2 setup.py install --user
+
+   You can also run *tcf* from the :ref:`source directory
+   <tcf_run_from_source_tree>`.
+     
    .. include:: doc/02-client-setup-LL-01.rst
 
 2. :ref:`Configure it <tcf_guide_configuration>`, adding to
@@ -22,6 +31,16 @@
 3.
 
    .. include:: doc/02-client-setup-LL-04-login.rst
+
+4. If you want to run Zephyr testcases you will also need to follow
+   the `Zephyr Development Environment Setup on Linux
+   <https://docs.zephyrproject.org/latest/getting_started/installation_linux.html>`_
+   and run::
+
+     $ git clone https://github.com/zephyrproject-rtos/zephyr.git zephyr.git
+     $ source zephyr.git/zephyr-env.sh
+
+   before getting running *tcf* commands that involve Zephyr.
 
 :ref:`Contributions <tcf_contributing>` welcome!
 

@@ -1117,6 +1117,9 @@ Obtain the code
 
 **Install the TCF client**::
 
+Follow the steps on the :ref:`quickstart <install_tcf_client>` to
+install the client from source.
+
   $ cd tcf.git
   $ python setup.py install --user
 

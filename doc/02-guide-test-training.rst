@@ -7,7 +7,7 @@ Testcase training
 
 Before you get started, this training guide assumes:
 
- - You have :ref:`installed <install_tcf_client_rpms>` the client software
+ - You have :ref:`installed <install_tcf_client>` the client software
  - have access to a server (local or remote)
  - you know your way around: Linux, Git, building the Zephyr kernel
  - you know some basics of Python
