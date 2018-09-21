@@ -88,7 +88,7 @@ class _install_scripts(distutils.command.install_scripts.install_scripts):
                     [
                         'sed', '-i',
                         's|install_time_etc_tcf = "/etc/tcf"' \
-                        '|install_time_etc_tcf = "' + sysconfigdir + '"|g',
+                        '|install_time_etc_tcf = "' + sysconfigdir + '/tcf"|g',
                         filename
                     ])
             except subprocess.CalledProcessError as e:
