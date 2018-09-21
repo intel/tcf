@@ -27,7 +27,7 @@ class _healtcheck_zephyr(tcfl.tc.tc_c):
 
     @staticmethod
     def eval(target):
-        target.expect("Hello World! %s" % target.bsp_model)
+        target.expect("Hello World! %s" % target.kws['zephyr_board'])
 
 
 # Ignore QEMU Zephyr, as they cannot power on/off w/o an image -- let

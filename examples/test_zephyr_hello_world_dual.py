@@ -45,6 +45,8 @@ class _test(tcfl.tc.tc_c):
 
     def eval(self, target):
         # Wait at the same time on both
-        with target.on_console_rx_cm('Hello World! arc'), \
-             target.on_console_rx_cm('Hello World! x86'):
+        arc_board = target.kws['bsps']['arc']['zephyr_board']
+        x86_board = target.kws['bsps']['x86']['zephyr_board']
+        with target.on_console_rx_cm('Hello World! %s' % arc_board), \
+             target.on_console_rx_cm('Hello World! %s' % x86_board):
             self.expecter.run()

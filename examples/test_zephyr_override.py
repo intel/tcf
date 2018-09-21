@@ -28,4 +28,4 @@ class _test(tcfl.tc.tc_c):
 
     @staticmethod
     def eval(target):
-        target.expect("Hello World! %s" % target.bsp_model)
+        target.expect("Hello World! %s" % target.kws['zephyr_board'])
