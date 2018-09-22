@@ -1,5 +1,0 @@
-# needed to generate RPMs with setup.py bdist_rpm
-include setupl.py
-include *.rst
-include doc/*
-graft _doc/html
