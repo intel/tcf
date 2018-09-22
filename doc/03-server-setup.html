@@ -1,0 +1,1011 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>3. Server deployment guide &mdash; Test Case Framework 0.11 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../genindex.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="Test Case Framework 0.11 documentation" href="../index.html"/>
+        <link rel="next" title="4. HOWTOs" href="04-HOWTOs.html"/>
+        <link rel="prev" title="2. Guides" href="02-guides.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../README.html" class="icon icon-home"> Test Case Framework
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.11
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../02-QUICKSTART.html">1. Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02-guides.html">2. Guides</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">3. Server deployment guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#bill-of-materials">3.1. Bill of materials</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#conventions">3.2. Conventions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#server-installation">3.3. Server installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#install-and-setup-the-tcf-software">3.4. Install and setup the TCF software</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#target-networking">3.4.1. Target networking</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configure-qemu-zephyr-os-targets">3.4.2. Configure QEMU Zephyr OS targets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configure-qemu-linux-targets">3.4.3. Configure QEMU Linux targets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configure-physical-test-targets-and-power-switches">3.4.4. Configure physical test targets and power switches</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configure-a-physical-linux-target">3.4.5. Configure a physical Linux target</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configuring-things-that-get-plugged-to-the-targets">3.4.6. Configuring things that get plugged to the targets</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#best-practices-for-server-setup">3.4.6.1. Best practices for server setup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#configuration-example-1">3.4.6.2. Configuration Example 1</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="04-HOWTOs.html">4. HOWTOs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="05-RFAQs.html">5. Rationales and Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="06-troubleshooting.html">6. Support &amp; Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="07-Architecture.html">7. Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="09-api.html">8. APIs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">9. Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="10-Status.html">10. Current status and plans</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../01-CHANGELOG.html">11. TCF release v0.11</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../README.html">Test Case Framework</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../README.html">Docs</a> &raquo;</li>
+        
+      <li>3. Server deployment guide</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/doc/03-server-setup.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="ttbd-guide-deployment">
+<span id="server-deployment-guide"></span><span id="id1"></span><h1>3. Server deployment guide<a class="headerlink" href="#ttbd-guide-deployment" title="Permalink to this headline">¶</a></h1>
+<p>Deploying <em>ttbd</em> is not complicated; it can grow as large as you need
+it.</p>
+<p>Bear in mind:</p>
+<ul class="simple">
+<li>Only Fedora is supported at this point; other distros should work,
+but we do not have resources to support them.</li>
+<li>Recent kernels are needed; when deployed in full force, ttbd puts a
+lot of stress on the USB bus and interfaces and it has uncovered
+bugs that are known to be fixed around Linux kernel &gt; v4.5.</li>
+<li>Follow these instructions as verbatim as possible. The fixtures
+described here have been designed to maximize reliability and
+minimize false positives or negatives.</li>
+<li>There are security matters you <a class="reference internal" href="07-Architecture.html#security-considerations"><span class="std std-ref">should consider</span></a></li>
+</ul>
+<div class="section" id="bill-of-materials">
+<h2>3.1. Bill of materials<a class="headerlink" href="#bill-of-materials" title="Permalink to this headline">¶</a></h2>
+<p>You will need the following depending on what hardware you plan to
+test</p>
+<ul>
+<li><p class="first">A Linux machine running Fedora &gt;= v24 to run the ttbd server/s</p>
+<ul class="simple">
+<li>plenty of USB ports</li>
+<li>(optional) space to connect secondary USB cards to (<a class="reference internal" href="06-troubleshooting.html#ttbd-cannot-find-ykush-serial"><span class="std std-ref">rationale</span></a>)</li>
+<li>USB hubs, externally powered, to provide upstream connectivity to
+the server’s root USB ports</li>
+<li>More than one network interface and network switches to
+interconnect the server with your power switches and targets
+(<a class="reference internal" href="05-RFAQs.html#separated-networks"><span class="std std-ref">rationale</span></a>)</li>
+</ul>
+</li>
+<li><p class="first">Power control (to power targets up and down)</p>
+<ul class="simple">
+<li>IP controlled AC power switch <a class="reference external" href="http://www.digital-loggers.com/lpcfaqs.html">Digital Logger Web Power Switches</a>, for
+infrastructure, hubs and targets powered by AC</li>
+<li><a class="reference external" href="https://www.yepkit.com/products/ykush">YKush power-switching USB hubs</a>, for hardware that is
+USB powered</li>
+</ul>
+<p>(other power switches are possible, but drivers need to be written
+for them)</p>
+</li>
+<li><p class="first">Miscelaneous cables (it is recommended to buy in bulk to avoid
+wasting time looking for them)</p>
+<ul class="simple">
+<li>USB cables <a class="reference external" href="https://commons.wikimedia.org/wiki/File:Usb_connectors.JPG">https://commons.wikimedia.org/wiki/File:Usb_connectors.JPG</a><ul>
+<li>A male to B male</li>
+<li>A male to mini-B male</li>
+<li>A male to micro-B male</li>
+</ul>
+</li>
+<li>M/M jumper <a class="reference external" href="https://www.adafruit.com/products/1957?gclid=CKSjy5mErc0CFYiVfgod1XkK7Q">cables</a></li>
+</ul>
+</li>
+<li><p class="first">USB <a class="reference external" href="https://en.wikipedia.org/wiki/AC_adapter#Use_of_USB">power bricks</a> (2ma) at
+least (mostly for powering the YKUSH hubs)</p>
+</li>
+<li><p class="first">USB serial terminal <a class="reference external" href="https://www.adafruit.com/products/954?&amp;main_page=product_info&amp;products_id=954">adaptors</a></p>
+</li>
+<li><p class="first">MCU boards (Arduino101, Quark C1000, Quark D2000, FRDM k64f, etc)</p>
+</li>
+</ul>
+<p>It is recommended to get extra spare components, for quick replacement
+in case of failures.</p>
+</div>
+<div class="section" id="conventions">
+<span id="id2"></span><h2>3.2. Conventions<a class="headerlink" href="#conventions" title="Permalink to this headline">¶</a></h2>
+<p>To execute a <em>command</em> as a normal user we’ll use:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ command ...
+</pre></div>
+</div>
+<p>to execute a <em>comand</em> as super-user (loging in as root or using
+<em>sudo</em>), we’ll use:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># command ...</span>
+</pre></div>
+</div>
+<p>Links will come in different flavours:</p>
+<ul class="simple">
+<li>example link to a <a class="reference internal" href="#conventions"><span class="std std-ref">section</span></a></li>
+<li>example link to another <a class="reference internal" href="09-api.html#conf_00_lib.dlwps7_add" title="conf_00_lib.dlwps7_add"><code class="xref py py-func docutils literal"><span class="pre">section</span></code></a></li>
+</ul>
+</div>
+<div class="section" id="server-installation">
+<span id="system-install"></span><h2>3.3. Server installation<a class="headerlink" href="#server-installation" title="Permalink to this headline">¶</a></h2>
+<p>Any Fedora system (version &gt; 24) shall work out of the box with these
+instructions.</p>
+<p>If you need proxy support, ensure it is <a class="reference internal" href="04-HOWTOs.html#setup-proxies"><span class="std std-ref">properly setup</span></a>.</p>
+</div>
+<div class="section" id="install-and-setup-the-tcf-software">
+<span id="install-tcf-server-rpms"></span><h2>3.4. Install and setup the TCF software<a class="headerlink" href="#install-and-setup-the-tcf-software" title="Permalink to this headline">¶</a></h2>
+<p>The software is available as RPM packages with all the dependencies
+(alternatively there are the <em>not recommended</em> <a class="reference internal" href="04-HOWTOs.html#manual-install"><span class="std std-ref">manual
+installation steps</span></a>).</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># echo insecure &gt; ~/.curlrc       # Don&#39;t mind the SSL certificate for RPM</span>
+<span class="c1"># rpm -i https://RPMREPOHOST/repo/tcf-repo-v0-1-1.noarch.rpm</span>
+<span class="c1"># dnf install -y --best --allowerasing ttbd-zephyr tcf-zephyr</span>
+<span class="c1"># systemctl enable ttbd@production</span>
+<span class="c1"># systemctl start ttbd@production</span>
+</pre></div>
+</div>
+<p>Note:</p>
+<ul class="simple">
+<li><em>insecure</em> tells the <code class="docutils literal"><span class="pre">rpm</span> <span class="pre">-i</span></code> command to bypass the HTTPS
+certificate check, as we might not have it yet in our certificate
+database.</li>
+<li><code class="docutils literal"><span class="pre">--allowerasing</span></code> is needed so conflicting packages (like
+<em>ModemManager</em>) are removed.</li>
+<li>Replace <em>-v0.11</em> with <em>-master</em> in the URL to get the development
+repository instead of the stable <em>v0.11</em> tree.</li>
+</ul>
+<p id="ttbd-guide-install-default-config">The default configuration brings up an instance called <em>production</em>
+with a number of virtual networks, QEMU-based targets suitable for
+running the Zephyr OS on different architecture (<em>qz</em>*) and Cloud
+versions of Fedora Core (<em>qlf*</em>). Any local user can access.</p>
+<p>Directories for the instance are <em>/etc/ttbd-production</em> for
+configuration, <em>/var/run/ttbd-production</em> for state and
+<em>/var/cache/ttbd-production</em> for temporary data.</p>
+<p>From here you can (optional):</p>
+<ul class="simple">
+<li><a class="reference internal" href="04-HOWTOs.html#ttbd-config-bind"><span class="std std-ref">allow the server to be used remotely</span></a></li>
+<li><a class="reference internal" href="04-HOWTOs.html#ttbd-config-auth-ldap"><span class="std std-ref">configure LDAP authentication</span></a></li>
+<li><a class="reference internal" href="04-HOWTOs.html#ttbd-config-authdb"><span class="std std-ref">configure simple authentication</span></a></li>
+<li><a class="reference internal" href="04-HOWTOs.html#ttbd-config-multiple-instances"><span class="std std-ref">configure more instances</span></a></li>
+</ul>
+<p>As well, you can add</p>
+<ul class="simple">
+<li>physical targets, such as <a class="reference internal" href="#ttbd-config-mcus"><span class="std std-ref">MCUs</span></a></li>
+<li>read on for information about <a class="reference internal" href="#ttbd-config-vlan"><span class="std std-ref">networking targets</span></a>, default QEMU targets for running <a class="reference internal" href="#ttbd-config-qemu-zephyr"><span class="std std-ref">Zephyr
+OS</span></a> and <a class="reference internal" href="#ttbd-config-qemu-linux"><span class="std std-ref">Linux</span></a>.</li>
+</ul>
+<div class="section" id="target-networking">
+<span id="ttbd-config-vlan"></span><h3>3.4.1. Target networking<a class="headerlink" href="#target-networking" title="Permalink to this headline">¶</a></h3>
+<p>The default configuration in
+<code class="docutils literal"><span class="pre">/etc/ttbd-production/conf_05_default.py</span></code> is setup to create two IP
+networks for virtual (and physical) targets to intercomunicate with
+each other:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf list | grep nw
+local/nwa                 # 192.168.61.0/24 fc00::61:0/112
+local/nwb                 # 192.168.62.0/24 fc00::62:0/112
+</pre></div>
+</div>
+<p>QEMU targets defined in the default configuration are made
+members of each subnetwork. The server host is always the <em>.1</em>
+address.</p>
+<p>Note that for for two targets to be able to do IP communication, the
+network target has to be powered-on before the targets.</p>
+<p>More networks can be added by creating configuration files
+<em>/etc/ttbd-production/conf_NAME.py</em> containing:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">target_add</span><span class="p">(</span>
+    <span class="n">ttbl</span><span class="o">.</span><span class="n">tt</span><span class="o">.</span><span class="n">tt_power</span><span class="p">(</span><span class="s1">&#39;nwd&#39;</span><span class="p">,</span> <span class="n">vlan_pci</span><span class="p">()),</span>
+    <span class="n">tags</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">ipv4_addr</span> <span class="o">=</span> <span class="s1">&#39;192.168.63.1&#39;</span><span class="p">,</span>
+        <span class="n">ipv4_prefix_len</span> <span class="o">=</span> <span class="mi">24</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+<span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="s1">&#39;NAME&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tags</span><span class="p">[</span><span class="s1">&#39;interfaces&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;interconnect_c&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Be sure to not assign conflicting IP blocks, or IP blocks that route
+to the public internet or intranet–in the example the convention is
+followed to use network <em>192.168.X.0/24</em>, where X is 61 for <em>a</em> in <em>nwa</em>, 62 for
+<em>b</em> in <em>nwb</em>, 63 for <em>c</em> in <em>nwc</em>, etc … following ASCII values and
+keeping network names short (otherwise system tools might start
+cutting them off).</p>
+<p>The default configuration creates <em>virtual</em> networks for the virtual
+machines to communicate. It is possible to bridge a physical device by
+connecting it to the system and indicating so to the
+configuration. See <a class="reference internal" href="09-api.html#conf_00_lib.vlan_pci" title="conf_00_lib.vlan_pci"><code class="xref py py-class docutils literal"><span class="pre">conf_00_lib.vlan_pci</span></code></a> for setup details, but
+it basically consists on:</p>
+<ul>
+<li><p class="first">connect a network interface to the server (USB or PCI); said network
+interface shall be connected to a network switch to which all the
+physical targets we want to interconnect are also connected</p>
+</li>
+<li><p class="first">find the network interface’s MAC address (using something like <em>ip
+link show</em>)</p>
+</li>
+<li><p class="first">add the tag <em>mac_addr</em> with said address to the network to which
+said interface is to be connected; for example the network <em>nwc</em> of
+the example:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">target_add</span><span class="p">(</span>
+    <span class="n">ttbl</span><span class="o">.</span><span class="n">tt</span><span class="o">.</span><span class="n">tt_power</span><span class="p">(</span><span class="s1">&#39;nwc&#39;</span><span class="p">,</span> <span class="n">vlan_pci</span><span class="p">()),</span>
+    <span class="n">tags</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">mac_addr</span> <span class="o">=</span> <span class="s2">&quot;a0:ce:c8:00:18:73&quot;</span><span class="p">,</span>
+        <span class="n">ipv4_addr</span> <span class="o">=</span> <span class="s1">&#39;192.168.63.1&#39;</span><span class="p">,</span>
+        <span class="n">ipv4_prefix_len</span> <span class="o">=</span> <span class="mi">24</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+<span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="s1">&#39;NAME&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tags</span><span class="p">[</span><span class="s1">&#39;interfaces&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;interconnect_c&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>or for an existing network (such as the configuration’s default
+<em>nwa</em>):</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="c1"># eth dongle mac 00:e0:4c:36:40:b8 is assigned to NWA</span>
+<span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="s1">&#39;nwa&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tags_update</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">mac_addr</span> <span class="o">=</span> <span class="s1">&#39;00:e0:4c:36:40:b8&#39;</span><span class="p">))</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">for each target that is connected to said network, report it as part
+of the network <em>nwc</em>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="s1">&#39;TARGETNAME-NN&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tags_update</span><span class="p">({</span> <span class="s1">&#39;ipv4_addr&#39;</span><span class="p">:</span> <span class="s2">&quot;192.168.10.130&quot;</span> <span class="p">},</span>
+                                                 <span class="n">ic</span> <span class="o">=</span> <span class="s1">&#39;nwc&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">the network switch itself can be also power switched; if you
+connect it, for example to a Digital Loggers Web Power Switch 7
+named <em>spX</em> on port <em>N</em>, you can can add</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="s1">&#39;nwc&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">pc_impl</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+    <span class="n">ttbl</span><span class="o">.</span><span class="n">pc</span><span class="o">.</span><span class="n">dlwps7</span><span class="p">(</span><span class="s2">&quot;http://admin:1234@spX/M&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>thus, when powering up the network <em>nwc</em>, the last step will be to
+power up the network switch, and when powering it down, the first
+step done will be to power it off.</p>
+</li>
+</ul>
+<p>Be aware of the following when doing networking with TCF:</p>
+<ul>
+<li><p class="first">you can configure any number of targets to a TCF network, as long as
+you configure your IP space accordingly.</p>
+<p>Recommended space assignment (and the one followed by default) is:</p>
+<ul class="simple">
+<li>.1: is the server</li>
+<li>.2 - .10: Virtual Linux machines</li>
+<li>.30 - .45: Virtual Zephyr machines</li>
+<li>.100 - .254: Real HW targets</li>
+</ul>
+<p>likewise, target naming will go long ways on making it easy to
+identify which targets are in which networks. It is recommended to
+assign a number to each targets that matches the last nibble of
+their IP (v4/v6) address and append the letter of the network they
+are in, for example:</p>
+<ul class="simple">
+<li>a101-32a: is an Arduino 101, IP 192.168.10.132 in <em>nwa</em></li>
+<li>same70-54b: is 192.168.11.154 in <em>nwb</em></li>
+</ul>
+</li>
+<li><p class="first">a network will own the physical network interface <strong>exclusively</strong>
+(in fact, it will even rename it)</p>
+</li>
+<li><p class="first">a single testcase execution will use a network in an exclusive way,
+thus if your networks are composed of many independent targets,
+there might be low reutilization. You might be off creating smaller
+networks to improve paralellism.</p>
+<p>However, you can create targets Ta1, Ta2 and Ta3 from <em>nwa</em> in a
+testcase (including <em>nwa</em>) and target Ta4 (without netwokring) in
+another one. What cannot be shared is the <em>nwa</em> interconnect target.</p>
+</li>
+<li><p class="first">a network switch can be shared amongst many networks, but this will
+introduce noise that can alter test results. Not recommended unless
+the switch can split LANs.</p>
+</li>
+<li><p class="first">a test will try to run in many different ways in the same network</p>
+<p>For example, if your test allocates three targets A, B and C and
+there are seven T1-T7 available, it will try to run in different
+assignment permutations:</p>
+<table border="1" class="docutils">
+<colgroup>
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">A</th>
+<th class="head">B</th>
+<th class="head">C</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>T1</td>
+<td>T2</td>
+<td>T3</td>
+</tr>
+<tr class="row-odd"><td>T1</td>
+<td>T3</td>
+<td>T2</td>
+</tr>
+<tr class="row-even"><td>T2</td>
+<td>T3</td>
+<td>T1</td>
+</tr>
+<tr class="row-odd"><td>…</td>
+<td>&#160;</td>
+<td>&#160;</td>
+</tr>
+<tr class="row-even"><td>…</td>
+<td>&#160;</td>
+<td>&#160;</td>
+</tr>
+</tbody>
+</table>
+<p>how the targets are picked depends on what the test is asking for,
+but TCF is trying to ensure maximum coverage, so it might pick up
+way more combinations than you expect. Use the <em>mode</em> paramater
+to <a class="reference internal" href="09-api.html#tcfl.tc.target" title="tcfl.tc.target"><code class="xref py py-func docutils literal"><span class="pre">tcfl.tc.target()</span></code></a> in the testcase to indicate how each
+target shall be picked. Targets for which you have no interest in
+doing coverage shall be selected as <em>mode=’any’</em>, while the ones you
+want to make sure all types are covered shall be set as
+<em>mode=’one-per-type’</em>.</p>
+<p>Use the <code class="docutils literal"><span class="pre">-P</span></code> command line to limit how many permutations you want
+<em>tcf run</em> to go with.</p>
+</li>
+</ul>
+</div>
+<div class="section" id="configure-qemu-zephyr-os-targets">
+<span id="ttbd-config-qemu-zephyr"></span><h3>3.4.2. Configure QEMU Zephyr OS targets<a class="headerlink" href="#configure-qemu-zephyr-os-targets" title="Permalink to this headline">¶</a></h3>
+<p>The default installation provies a list of QEMU-based targets that are
+suitable for Zephyr OS development; they are defined in
+<code class="docutils literal"><span class="pre">/etc/ttbd-production/conf_07_zephyr.py</span></code> (you can add more or less as
+you please modifying said file).</p>
+<p>Now, <code class="docutils literal"><span class="pre">tcf</span> <span class="pre">list</span></code> should show, after you login:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># tcf list | grep ^qz</span>
+<span class="n">local</span><span class="o">/</span><span class="n">qz30a</span><span class="o">-</span><span class="n">x86</span>
+<span class="n">local</span><span class="o">/</span><span class="n">qz30b</span><span class="o">-</span><span class="n">x86</span>
+<span class="n">local</span><span class="o">/</span><span class="n">qz30c</span><span class="o">-</span><span class="n">x86</span>
+<span class="o">...</span>
+<span class="n">local</span><span class="o">/</span><span class="n">qz39c</span><span class="o">-</span><span class="n">arm</span>
+<span class="n">local</span><span class="o">/</span><span class="n">qz40a</span><span class="o">-</span><span class="n">nios2</span>
+<span class="o">..</span>
+<span class="n">local</span><span class="o">/</span><span class="n">qz45a</span><span class="o">-</span><span class="n">riscv32</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>Output may vary based on configuration, but there targets called <em>qz</em>
+(for QEMU Zephyr), five for each supported architecture (x86, ARM,
+NiosII, RiscV32).  Test cases may be run against these targets now as
+explained <a class="reference internal" href="../02-QUICKSTART.html#tcf-run-automating-intro"><span class="std std-ref">here</span></a>, but in a nutshell,
+running as a local user (never root!!), we ask TCF to run the <em>Hello
+World</em> Zephyr OS sample in all the different available targets:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ git clone http://github.com/zephyrproject-rtos/zephyr zephyr.git
+$ cd zephyr.git
+$ export ZEPHYR_BASE=$PWD
+$ tcf run -v /usr/share/tcf/examples/test_zephyr_hello_world.py
+PASS1/bfgv    /usr/share/tcf/examples/test_zephyr_hello_world.py#_test @local/qz32c-x86:x86: build passed
+PASS1/r7rf    /usr/share/tcf/examples/test_zephyr_hello_world.py#_test @local/qz46a-riscv32:riscv32: build passed
+PASS1/3opq    /usr/share/tcf/examples/test_zephyr_hello_world.py#_test @local/qz44b-nios2:nios2: build passed
+PASS1/qyjy    /usr/share/tcf/examples/test_zephyr_hello_world.py#_test @local/qz36a-arm:arm: build passed
+PASS1/bfgv    /usr/share/tcf/examples/test_zephyr_hello_world.py#_test @local/qz32c-x86:x86: evaluation passed
+PASS1/qyjy    /usr/share/tcf/examples/test_zephyr_hello_world.py#_test @local/qz36a-arm:arm: evaluation passed
+PASS1/r7rf    /usr/share/tcf/examples/test_zephyr_hello_world.py#_test @local/qz46a-riscv32:riscv32: evaluation passed
+PASS1/3opq    /usr/share/tcf/examples/test_zephyr_hello_world.py#_test @local/qz44b-nios2:nios2: evaluation passed
+PASS0/        toplevel @local: 4 tests (4 passed, 0 failed, 0 blocked, 0 skipped) - passed
+</pre></div>
+</div>
+<p>Here it is saying that for each target, it built the test image and
+then ran the steps in the test script
+<code class="docutils literal"><span class="pre">/usr/share/tcf/examples/test_zephyr_hello_world.py</span></code>, that builds
+the Zephyr OS sample in <code class="docutils literal"><span class="pre">samples/hello_world</span></code>, all of them
+evaluating succesfully, so the ran was considered a sucess (<em>PASS</em>).</p>
+</div>
+<div class="section" id="configure-qemu-linux-targets">
+<span id="ttbd-config-qemu-linux"></span><h3>3.4.3. Configure QEMU Linux targets<a class="headerlink" href="#configure-qemu-linux-targets" title="Permalink to this headline">¶</a></h3>
+<p>The default installation provies a list of QEMU-based targets that are
+suitable for running Fedora, Clear Linux and other Linux cloud OS;
+they are defined in <code class="docutils literal"><span class="pre">/etc/ttbd-production/conf_06_default.py</span></code> (you
+can add more or less in your configuration files).</p>
+<p>However, TCF provides a kickstarter configuration setup that generates
+a Fedora-based TCF Live ISO image to run Linux machines that:</p>
+<blockquote>
+<div><ul class="simple">
+<li>are continuously recycled (upon boot, they are always a fresh
+reinstall)</li>
+<li>have installed the RPMs you need (look into
+<a class="reference internal" href="09-api.html#conf_00_lib.tt_qemu_linux" title="conf_00_lib.tt_qemu_linux"><code class="xref py py-class docutils literal"><span class="pre">conf_00_lib.tt_qemu_linux</span></code></a> for details on how to add more).</li>
+<li>systemd networking is configured to work with TCF networks</li>
+<li>works on VMs and physical machines</li>
+<li>provide a serial console which autologs to root, TCF
+<em>console-read</em> and <em>console-write</em> commands can access the root
+console.</li>
+</ul>
+</div></blockquote>
+<p>To generate the Linux image from a Fedora machine, you will need sudo
+access:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ /usr/share/tcf/live/mk-liveimg.sh [OPTIONALPATHs]
+$ mv tcf-intel/tcf-intel.iso /var/lib/ttbd/
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last"><em>OPTIONALPATHS</em> are paths to directories where to find extra
+configuration; read the documentaion on
+<em>/usr/share/tcf/live/mk-liveimg.sh</em> for more information.</p>
+</div>
+<p>or download it</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ wget -O /var/lib/ttbd/tcf-live.iso http://FIXME/tcf-live.iso
+</pre></div>
+</div>
+<p>Now, <code class="docutils literal"><span class="pre">tcf</span> <span class="pre">list</span></code> should show, after you login:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># tcf list | grep ^ql</span>
+<span class="o">...</span>
+<span class="nb">locals</span><span class="o">/</span><span class="n">nwa</span>
+<span class="nb">locals</span><span class="o">/</span><span class="n">nwb</span>
+<span class="nb">locals</span><span class="o">/</span><span class="n">qlf04a</span>
+<span class="nb">locals</span><span class="o">/</span><span class="n">qlf04b</span>
+<span class="nb">locals</span><span class="o">/</span><span class="n">qlf05aH</span>
+<span class="nb">locals</span><span class="o">/</span><span class="n">qlf05bH</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>(output may vary based on configuration)</p>
+<p>There are two test networks defined (<em>nwa</em>, <em>nwb</em>), <em>qlc</em> are Clear
+Linux targets, <em>qlf</em> are Fedora. The number indicates the last part of
+their IPv4 and IPv6 addresses. The letter <em>a</em> and <em>b</em> helps to tell
+which network are they at. <em>H</em> at the end says they also have a NAT
+connection to the server’s upstream network connection.</p>
+</div>
+<div class="section" id="configure-physical-test-targets-and-power-switches">
+<h3>3.4.4. Configure physical test targets and power switches<a class="headerlink" href="#configure-physical-test-targets-and-power-switches" title="Permalink to this headline">¶</a></h3>
+<p>Everything in <em>ttbd</em> is a test target; they need to be added by
+creating Python objects that represent them in the configuration
+files. Helper functions have been created to simplify the process.</p>
+<p>Power switches are used to build power rails to power on or off the
+different test targets and other infrastructure components</p>
+<p>Create a configuration file
+<code class="docutils literal"><span class="pre">/etc/ttbd-production/conf_10_targets.py</span></code> and start adding
+configuration statements as described in the links below:</p>
+<ul class="simple">
+<li><a class="reference internal" href="09-api.html#conf_00_lib.dlwps7_add" title="conf_00_lib.dlwps7_add"><code class="xref py py-func docutils literal"><span class="pre">Digital</span> <span class="pre">Loggers</span> <span class="pre">Web</span> <span class="pre">Power</span> <span class="pre">Switch</span> <span class="pre">7</span></code></a> wall-power switch.</li>
+<li><a class="reference internal" href="09-api.html#conf_00_lib.ykush_targets_add" title="conf_00_lib.ykush_targets_add"><code class="xref py py-func docutils literal"><span class="pre">YKUSH</span> <span class="pre">USB</span> <span class="pre">power</span> <span class="pre">switches</span></code></a>
+USB data/power switchable hub</li>
+<li><a class="reference internal" href="09-api.html#conf_00_lib.usbrly08b_targets_add" title="conf_00_lib.usbrly08b_targets_add"><code class="xref py py-func docutils literal"><span class="pre">Devantech</span> <span class="pre">USB-RLY08B</span> <span class="pre">USB</span> <span class="pre">controlled</span> <span class="pre">relays</span></code></a></li>
+<li>to add targets for just controlling power to something, see
+<a class="reference internal" href="04-HOWTOs.html#tt-power"><span class="std std-ref">these instructions</span></a></li>
+<li><a class="reference internal" href="#ttbd-config-phys-linux"><span class="std std-ref">A physical Linux server</span></a> boards</li>
+</ul>
+<p id="ttbd-config-mcus">MCU boards supported by default require different fixtures which are
+described below:</p>
+<ul class="simple">
+<li><a class="reference internal" href="09-api.html#conf_00_lib.arduino101_add" title="conf_00_lib.arduino101_add"><code class="xref py py-func docutils literal"><span class="pre">Arduino</span> <span class="pre">101</span></code></a> boards</li>
+<li><a class="reference internal" href="09-api.html#conf_00_lib.arduino2_add" title="conf_00_lib.arduino2_add"><code class="xref py py-func docutils literal"><span class="pre">Arduino</span> <span class="pre">Due</span></code></a> boards</li>
+<li><a class="reference internal" href="09-api.html#conf_00_lib.sam_xplained_add" title="conf_00_lib.sam_xplained_add"><code class="xref py py-func docutils literal"><span class="pre">Atmel</span> <span class="pre">SAM</span> <span class="pre">e70</span></code></a> boards</li>
+<li><a class="reference internal" href="09-api.html#conf_00_lib.frdm_add" title="conf_00_lib.frdm_add"><code class="xref py py-func docutils literal"><span class="pre">FRDM</span> <span class="pre">k64f</span></code></a> boards</li>
+<li><a class="reference internal" href="09-api.html#conf_00_lib.nucleo_add" title="conf_00_lib.nucleo_add"><code class="xref py py-func docutils literal"><span class="pre">Nucleo</span> <span class="pre">F10</span></code></a> boards</li>
+<li><a class="reference internal" href="09-api.html#conf_00_lib.quark_c1000_add" title="conf_00_lib.quark_c1000_add"><code class="xref py py-func docutils literal"><span class="pre">Quark</span> <span class="pre">C1000</span></code></a> boards</li>
+<li><a class="reference internal" href="09-api.html#conf_00_lib.mv_add" title="conf_00_lib.mv_add"><code class="xref py py-func docutils literal"><span class="pre">Quark</span> <span class="pre">D2000</span></code></a> boards</li>
+<li><a class="reference internal" href="09-api.html#conf_00_lib.emsk_add" title="conf_00_lib.emsk_add"><code class="xref py py-func docutils literal"><span class="pre">Synopsis</span> <span class="pre">EMSK</span></code></a> boards</li>
+<li><a class="reference internal" href="09-api.html#conf_00_lib.tinytile_add" title="conf_00_lib.tinytile_add"><code class="xref py py-func docutils literal"><span class="pre">TinyTILEs</span></code></a> boards</li>
+</ul>
+<p>There are other ways they can be fixtured and you are welcome to add
+configuration scripts to support them and new hardware.</p>
+<p>Each target you add can be healhchecked with, for a basic
+functionality check:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf healthcheck TARGETNAME
+Acquiring
+...
+Power is reported correctly as 1
+power test passed
+Releasing
+Released
+TARGETNAME: healthcheck completed
+</pre></div>
+</div>
+<p>Note this concludes the server installation process; the sections that
+follow are configuration examples.</p>
+</div>
+<div class="section" id="configure-a-physical-linux-target">
+<span id="ttbd-config-phys-linux"></span><h3>3.4.5. Configure a physical Linux target<a class="headerlink" href="#configure-a-physical-linux-target" title="Permalink to this headline">¶</a></h3>
+<p>Using the same mechanism as for <a class="reference internal" href="#ttbd-config-qemu-linux"><span class="std std-ref">QEMU</span></a>,
+a physical Linux machine can be booted with the TCF-live image that
+will always boot fresh to the same state.</p>
+<p><strong>Bill of materials</strong></p>
+<ul class="simple">
+<li>a Linux machine w at least 2G RAM (harddrive optional, but recommended)</li>
+<li>a USB drive (at least 2G)</li>
+<li>a serial console to the physical Linux machine (if your machine
+doesn’t have serial ports, a <a class="reference external" href="https://www.serialgear.com/Serial-Adapters-USBG-NULL-30.html">USB null modem</a> or
+two USB serial dongles with a NULL modem adapter will do.</li>
+<li>one available port on a power switch, to turn the physical machine
+on/off (eg, a <a class="reference internal" href="09-api.html#conf_00_lib.dlwps7_add" title="conf_00_lib.dlwps7_add"><code class="xref py py-func docutils literal"><span class="pre">DLWPS7</span></code></a>)</li>
+</ul>
+<p><strong>Connecting the test target fixture</strong></p>
+<ol class="arabic">
+<li><p class="first">Initialize the USB drive with the image (assuming
+it is at <em>/dev/sdb</em>):</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># livecd-iso-to-disk --format --reset-mbr tcf-live/tcf-live.iso /dev/sdb</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Plug the USB drive to the physical Linux target, make sure it boots</p>
+</li>
+<li><p class="first">Configure the Linux machine to:</p>
+<ul class="simple">
+<li>boot USB first</li>
+<li>always power on when AC power is on</li>
+</ul>
+</li>
+<li><p class="first">Create two physical partitions for large file storage during tests
+and swap:</p>
+<ul>
+<li><p class="first">boot the image, connect via standard console or serial console</p>
+</li>
+<li><p class="first">partition the disk:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ parted DEVICE -s mklabel gpt                # make a new partition table
+$ parted DEVICE -s mkpart logical linux-swap 0% 10G # make a partition
+$ parted DEVICE -s name 1 TCF-swap            # name it
+$ parted DEVICE -s mkpart logical btrfs 10G 100% # make a partition
+$ parted DEVICE -s name 2 TCF-home            # name it
+</pre></div>
+</div>
+</li>
+</ul>
+<p><em>TCF-home</em> will be always cleaned up and mounted as <em>/home</em> and the
+swap will be activated.</p>
+</li>
+<li><p class="first">Connect the serial dongle cables to the physical target and to the
+server</p>
+</li>
+<li><p class="first">Connect the physical target to port PORT of power switch
+POWERSWITCH</p>
+</li>
+</ol>
+<p><strong>Configuring the system for the fixture</strong></p>
+<ol class="arabic">
+<li><p class="first">Choose a name for the target: <em>linux-NN</em> (where NN is a number)</p>
+</li>
+<li><p class="first">Configure <em>udev</em> to add a name for the serial device for the
+board’s serial console so it can be easily found at
+<code class="docutils literal"><span class="pre">/dev/tty-TARGETNAME</span></code>. Follow <a class="reference internal" href="04-HOWTOs.html#usb-tty-serial"><span class="std std-ref">these instructions</span></a> using the board’s <em>serial number</em>.</p>
+</li>
+<li><p class="first">Add a configuration block to the server configuration file:</p>
+<div class="code python highlight-default"><div class="highlight"><pre><span></span><span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">target_add</span><span class="p">(</span>
+     <span class="n">ttbl</span><span class="o">.</span><span class="n">tt</span><span class="o">.</span><span class="n">tt_serial</span><span class="p">(</span>
+         <span class="s2">&quot;linux-NN&quot;</span><span class="p">,</span>
+         <span class="n">power_control</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">ttbl</span><span class="o">.</span><span class="n">cm_serial</span><span class="o">.</span><span class="n">pc</span><span class="p">(),</span>
+                <span class="n">ttbl</span><span class="o">.</span><span class="n">pc</span><span class="o">.</span><span class="n">dlwps7</span><span class="p">(</span><span class="s2">&quot;http://admin:1234@POWERSWITCH/PORT&quot;</span><span class="p">),</span>
+                <span class="n">ttbl</span><span class="o">.</span><span class="n">pc</span><span class="o">.</span><span class="n">delay</span><span class="p">(</span><span class="mi">5</span><span class="p">),</span>
+         <span class="p">],</span>
+         <span class="n">serial_ports</span> <span class="o">=</span> <span class="p">[</span>
+             <span class="s2">&quot;pc&quot;</span><span class="p">,</span>
+             <span class="p">{</span> <span class="s2">&quot;port&quot;</span><span class="p">:</span> <span class="s2">&quot;/dev/tty-linux-NN&quot;</span><span class="p">,</span> <span class="s2">&quot;baudrate&quot;</span><span class="p">:</span> <span class="mi">115200</span> <span class="p">}</span>
+         <span class="p">]),</span>
+     <span class="n">tags</span> <span class="o">=</span> <span class="p">{</span>
+         <span class="s1">&#39;linux&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+         <span class="s1">&#39;bsp_models&#39;</span><span class="p">:</span> <span class="p">{</span> <span class="s1">&#39;x86_64&#39;</span><span class="p">:</span> <span class="kc">None</span> <span class="p">},</span>
+         <span class="s1">&#39;bsps&#39;</span><span class="p">:</span> <span class="p">{</span>
+             <span class="s1">&#39;x86_64&#39;</span><span class="p">:</span> <span class="p">{</span>
+                 <span class="s1">&#39;linux&#39;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                 <span class="s1">&#39;console&#39;</span><span class="p">:</span> <span class="s1">&#39;x86_64&#39;</span><span class="p">,</span>
+             <span class="p">}</span>
+         <span class="p">}</span>
+     <span class="p">},</span>
+     <span class="n">target_type</span> <span class="o">=</span> <span class="s2">&quot;linux-fedora-x86_64&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</div>
+<div class="section" id="configuring-things-that-get-plugged-to-the-targets">
+<h3>3.4.6. Configuring things that get plugged to the targets<a class="headerlink" href="#configuring-things-that-get-plugged-to-the-targets" title="Permalink to this headline">¶</a></h3>
+<p>A target can declare there are things that are connected to it and
+that the user might decide to plug or unplug from the command line
+(see <a class="reference internal" href="02-guides.html#connecting-things"><span class="std std-ref">connecting things</span></a>).</p>
+<p>For implementing this, you need:</p>
+<ul class="simple">
+<li>a target</li>
+<li>a thing (which is also a target)</li>
+<li>a plugger, which is the driver that implements the actual physical
+act of plugging one target into another, implementing the interface
+defined in <a class="reference internal" href="09-api.html#ttbl.thing_plugger_mixin" title="ttbl.thing_plugger_mixin"><code class="xref py py-class docutils literal"><span class="pre">ttbl.thing_plugger_mixin</span></code></a>.</li>
+</ul>
+<p>For this, the target to which the thing is connected has to be
+properly configured; if you are coonecting a <em>THINGNAME</em> using method
+<em>METHODNAME</em>, in your <code class="docutils literal"><span class="pre">conf_10_targets.py</span></code> you would have:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">sometarget_add</span><span class="p">(</span><span class="s1">&#39;TARGETNAME&#39;</span> <span class="o">...</span><span class="p">)</span>
+<span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="s1">&#39;TARGETNAME&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">thing_add</span><span class="p">(</span>
+    <span class="s1">&#39;THINGNAME&#39;</span><span class="p">,</span> <span class="n">someplugger</span><span class="p">(</span><span class="n">ARG1</span><span class="p">,</span> <span class="n">ARG2</span><span class="o">...</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>A plugger, such as <a class="reference internal" href="09-api.html#ttbl.usbrly08b.plugger" title="ttbl.usbrly08b.plugger"><code class="xref py py-class docutils literal"><span class="pre">ttbl.usbrly08b.plugger</span></code></a> and its
+associated physical setup (a USBRLY08b and the cables properly
+connected) is what allows the physical act of switching. Another
+example of a plugger would be one that talks to QEMU to route to the
+VM guest a USB device plugged to the server.</p>
+<p>As the things are also target, in a script you need to request both so
+they are owned by the user and then you can plug them with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">..</span> <span class="n">code</span><span class="o">-</span><span class="n">block</span><span class="p">::</span> <span class="n">python</span>
+</pre></div>
+</div>
+<blockquote>
+<div><dl class="docutils">
+<dt>def eval(self, target, thing):</dt>
+<dd>…
+target.thing_plug(thing)
+…</dd>
+</dl>
+</div></blockquote>
+<p>As well, in order to make it easy for testcases to locate them and get
+them assign, it make sense to declare an interconnect that takes both
+of them, so the target assigner will group them.</p>
+<p>For example, if <em>TARGET0</em> is an MCU that implements a USB device that
+we connect to <em>TARGET1</em> and we want to exercise plugging and
+unplugging it, in the <code class="docutils literal"><span class="pre">conf_10_target.py</span></code> file, we would add:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">interconnect_add</span><span class="p">(</span>
+    <span class="n">ttbl</span><span class="o">.</span><span class="n">test_target</span><span class="p">(</span><span class="s1">&#39;usb__TARGET1__TARGET0&quot;),</span>
+    <span class="n">ic_type</span> <span class="o">=</span> <span class="s1">&#39;usb__host__device&#39;</span><span class="p">)</span>
+
+<span class="n">SOMETARGET_add</span><span class="p">(</span><span class="s1">&#39;TARGET0&#39;</span><span class="o">...</span><span class="p">)</span>
+<span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="s1">&#39;TARGET0&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">add_to_interconnect</span><span class="p">(</span><span class="s1">&#39;usb__TARGET1__TARGET0&#39;</span><span class="p">)</span>
+
+<span class="n">SOMETARGET_add</span><span class="p">(</span><span class="s1">&#39;TARGET1&#39;</span><span class="o">...</span><span class="p">)</span>
+<span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="s1">&#39;TARGET1&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">add_to_interconnect</span><span class="p">(</span><span class="s1">&#39;usb__TARGET1__TARGET0&#39;</span><span class="p">)</span>
+<span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="s1">&#39;TARGET1&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">add_thing</span><span class="p">(</span>
+    <span class="s1">&#39;TARGET0&#39;</span><span class="p">,</span> <span class="n">ttbl</span><span class="o">.</span><span class="n">usbrly08b</span><span class="o">.</span><span class="n">plugger</span><span class="p">(</span><span class="s2">&quot;SERIALNUMBER&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+</pre></div>
+</div>
+<div class="section" id="best-practices-for-server-setup">
+<h4>3.4.6.1. Best practices for server setup<a class="headerlink" href="#best-practices-for-server-setup" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="naming-targets">
+<span id="bp-naming-targets"></span><h5>3.4.6.1.1. Naming targets<a class="headerlink" href="#naming-targets" title="Permalink to this headline">¶</a></h5>
+<p>Name targets after the type of the target, a monotonically unique
+number and in some cases, letters that indicate to which networks the
+target is connected:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">TYPE</span><span class="o">-</span><span class="n">NNx</span>
+</pre></div>
+</div>
+<ul>
+<li><p class="first"><em>TYPE</em>: name that describes the type of the target</p>
+<p>e.g.: <em>arduino2</em>, <em>minnowboard</em>, <em>genericpc</em>…</p>
+</li>
+<li><p class="first"><em>NN</em> is a number that is increased monotonically for each target
+added to the infrastructure, even of different types:</p>
+<ul class="simple">
+<li>this allows using the number to assign addresses in different
+spaces (eg: MAC addresses, IPv4 and IPv6, etc)</li>
+<li>if there are multiple servers in an infrastructure, it is
+recommended they all share the same number space, so that when a
+target is moved from one server to another or networks are shared
+between servers, the addresses don’t conflict</li>
+</ul>
+</li>
+<li><p class="first"><em>x</em>: if the target is connected to a network, append the network name
+(it is also recommended to name networks <em>nwx</em>, where x is a single
+character)–if the target is connected to multiple targets, multiple
+letters can be specified if so chosen.</p>
+</li>
+</ul>
+<p>examples:</p>
+<blockquote>
+<div><ul class="simple">
+<li><em>arduino101-03</em>:</li>
+<li><em>minnowboard-04r</em></li>
+</ul>
+</div></blockquote>
+</div>
+</div>
+<div class="section" id="configuration-example-1">
+<h4>3.4.6.2. Configuration Example 1<a class="headerlink" href="#configuration-example-1" title="Permalink to this headline">¶</a></h4>
+<p>To add an FRDM k64f board and an Arduino101 board + Flyswatter 2 JTAG,
+along with a couple of YKush hubs to control them and a DLWPS7 power switch,
+we’d use the following in <code class="docutils literal"><span class="pre">/etc/ttbd-production/conf_10_targets.py</span></code>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">dlwps7_add</span><span class="p">(</span><span class="s2">&quot;sp1&quot;</span><span class="p">)</span>
+
+<span class="n">ykush_targets_add</span><span class="p">(</span><span class="s2">&quot;YK20954&quot;</span><span class="p">,</span> <span class="s2">&quot;http://admin:1234@sp1/3&quot;</span><span class="p">)</span>
+<span class="n">ykush_targets_add</span><span class="p">(</span><span class="s2">&quot;YK20946&quot;</span><span class="p">,</span> <span class="s2">&quot;http://admin:1234@sp1/2&quot;</span><span class="p">)</span>
+
+<span class="n">frdm_add</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;frdm-06&quot;</span><span class="p">,</span>
+         <span class="n">serial_number</span> <span class="o">=</span> <span class="s2">&quot;0240022636c40e6e000000000000000000000000cb1df3d6&quot;</span><span class="p">,</span>
+         <span class="n">ykush_serial</span> <span class="o">=</span> <span class="s2">&quot;YK20946&quot;</span><span class="p">,</span>
+         <span class="n">ykush_port_board</span> <span class="o">=</span> <span class="mi">3</span><span class="p">)</span>
+
+<span class="n">arduino101_add</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;arduino101-02&quot;</span><span class="p">,</span>
+               <span class="n">fs2_serial</span> <span class="o">=</span> <span class="s2">&quot;FS20000&quot;</span><span class="p">,</span>
+               <span class="n">serial_port</span> <span class="o">=</span> <span class="s2">&quot;/dev/tty-arduino101-02&quot;</span><span class="p">,</span>
+               <span class="n">ykush_url</span> <span class="o">=</span> <span class="s2">&quot;http://admin:1234@sp1/2&quot;</span><span class="p">,</span>
+               <span class="n">ykush_serial</span> <span class="o">=</span> <span class="s2">&quot;YK20954&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This would also require some <em>udev</em> configuration that is explained in
+the setup instructions for the <a class="reference internal" href="#ttbd-config-mcus"><span class="std std-ref">MCU boards</span></a> (and
+detailed <a class="reference internal" href="04-HOWTOs.html#usb-tty"><span class="std std-ref">here</span></a>) to generate the right
+<code class="docutils literal"><span class="pre">/dev/tty-NAME</span></code> device links; in short, add to
+<code class="docutils literal"><span class="pre">/etc/udev/rules.d/90-ttbd.rules</span></code>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">SUBSYSTEM</span> <span class="o">==</span> <span class="s2">&quot;tty&quot;</span><span class="p">,</span> <span class="n">ENV</span><span class="p">{</span><span class="n">ID_SERIAL_SHORT</span><span class="p">}</span> <span class="o">==</span> <span class="s2">&quot;0240022636c40e6e000000000000000000000000cb1df3d6&quot;</span><span class="p">,</span> \
+  <span class="n">SYMLINK</span> <span class="o">+=</span> <span class="s2">&quot;tty-frdm-06&quot;</span>
+
+<span class="n">SUBSYSTEM</span> <span class="o">==</span> <span class="s2">&quot;tty&quot;</span><span class="p">,</span> \
+  <span class="n">ENV</span><span class="p">{</span><span class="n">ID_PATH</span><span class="p">}</span> <span class="o">==</span> <span class="s2">&quot;*2:1.0&quot;</span><span class="p">,</span> \
+  <span class="n">PROGRAM</span> <span class="o">=</span> <span class="s2">&quot;/usr/bin/usb-sibling-by-serial YK20954&quot;</span><span class="p">,</span> \
+  <span class="n">SYMLINK</span> <span class="o">+=</span> <span class="s2">&quot;tty-arduino101-02&quot;</span>
+</pre></div>
+</div>
+<p>(reread <em>udev</em> configuration with udevadm <code class="docutils literal"><span class="pre">control</span> <span class="pre">--reload-rules</span></code>).</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Note your serial numbers for the boards and YKush hubs will
+be different for your setup; see <a class="reference internal" href="#ttbd-config-mcus"><span class="std std-ref">here for boards</span></a> and <a class="reference internal" href="04-HOWTOs.html#ykush-serial-number"><span class="std std-ref">here for YKush hubs</span></a> of how to find them.</p>
+</div>
+<p>Likewise with the definition of the <em>sp1</em>. Add to <code class="docutils literal"><span class="pre">/etc/hosts</span></code>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="mf">192.168</span><span class="o">.</span><span class="n">x</span><span class="o">.</span><span class="n">y</span>   <span class="n">sp1</span>
+</pre></div>
+</div>
+<p>Where <em>192.168.x.y</em> is the IP address of the power switch.</p>
+<p>As well, setup the proper hardware connections:</p>
+<ul class="simple">
+<li><em>sp1</em> connected to the wall and it’s network cable to the server,
+name <em>sp1</em> defined in <code class="docutils literal"><span class="pre">/etc/hosts</span></code> to the right IP address (see
+<a class="reference internal" href="09-api.html#conf_00_lib.dlwps7_add" title="conf_00_lib.dlwps7_add"><code class="xref py py-func docutils literal"><span class="pre">here</span></code></a> for details)</li>
+<li><em>YK20954</em>’s power connected to the power switch <em>sp1</em>’s socket #3</li>
+<li><em>YK20956</em>’s power connected to the power switch <em>sp1</em>’s socket #2</li>
+<li><em>frdm-06</em> USB cable connected to <em>YK20946</em>’s port #3</li>
+<li><em>arduino101-2</em> connected as described <a class="reference internal" href="09-api.html#conf_00_lib.arduino101_add" title="conf_00_lib.arduino101_add"><code class="xref py py-func docutils literal"><span class="pre">here</span></code></a></li>
+</ul>
+<p>Restart the server and a listing should show:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf list
+local/sp1-1
+local/sp1-2
+local/sp1-3
+local/sp1-4
+local/sp1-5
+local/sp1-6
+local/sp1-7
+local/sp1-8
+local/YK20954
+local/YK20954-base
+local/YK20954-1
+local/YK20954-2
+local/YK20954-3
+local/YK20946
+local/YK20946-base
+local/YK20946-1
+local/YK20946-2
+local/YK20946-3
+local/arduino101-02
+local/frdm-06
+</pre></div>
+</div>
+<p>Giving you targets to individually control each power switch’s ports
+plus the targets themselves.</p>
+<p>Once a target is configured in, run a quick healthcheck:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf healthcheck arduino101-02
+Acquiring
+Acquired
+Powering off
+Powered off
+Querying power status
+Power is reported correctly as 0
+Powering on
+Powered on
+Querying power status
+Power is reported correctly as 1
+power test passed
+Releasing
+Released
+arduino101-02: healthcheck completed
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="04-HOWTOs.html" class="btn btn-neutral float-right" title="4. HOWTOs" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="02-guides.html" class="btn btn-neutral" title="2. Guides" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2015, Author.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'0.11',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

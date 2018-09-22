@@ -1,0 +1,299 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>9. Glossary &mdash; Test Case Framework 0.11 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../genindex.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="Test Case Framework 0.11 documentation" href="../index.html"/>
+        <link rel="next" title="10. Current status and plans" href="10-Status.html"/>
+        <link rel="prev" title="8. APIs" href="09-api.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../README.html" class="icon icon-home"> Test Case Framework
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.11
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../02-QUICKSTART.html">1. Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02-guides.html">2. Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="03-server-setup.html">3. Server deployment guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="04-HOWTOs.html">4. HOWTOs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="05-RFAQs.html">5. Rationales and Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="06-troubleshooting.html">6. Support &amp; Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="07-Architecture.html">7. Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="09-api.html">8. APIs</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">9. Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="10-Status.html">10. Current status and plans</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../01-CHANGELOG.html">11. TCF release v0.11</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../README.html">Test Case Framework</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../README.html">Docs</a> &raquo;</li>
+        
+      <li>9. Glossary</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/doc/glossary.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="glossary">
+<h1>9. Glossary<a class="headerlink" href="#glossary" title="Permalink to this headline">¶</a></h1>
+<dl class="glossary docutils">
+<dt id="term-bsp">BSP</dt>
+<dd>A board support package supported by a <a class="reference internal" href="#term-test-target"><span class="xref std std-term">test target</span></a></dd>
+<dt id="term-bsp-model">BSP model</dt>
+<dd><p class="first">A combination of BSPs on which a <a class="reference internal" href="#term-test-target"><span class="xref std std-term">test target</span></a> works.</p>
+<p class="last">For example, the Arduino 101 <cite>x86</cite> and <cite>arc</cite> BSPs that can work
+independently or together, the following BSP models would be
+supported: <cite>x86</cite>, <cite>arc</cite> and <cite>x86+arc</cite>.</p>
+</dd>
+<dt id="term-test-case">test case</dt>
+<dd><p class="first">A test case is a flow to evaluate a single requirement, feature
+or functionality.</p>
+<p class="last">A test case can be a program or a script</p>
+</dd>
+<dt id="term-test-target">test target</dt>
+<dd><p class="first">Something that can be used to run a test case; this can be a
+group of actual HW units, not just a single one. It can be a
+computer, a light switch or a toaster.</p>
+<p class="last">Each test target has a name, a type and it might support zero or
+more BSPs (think for example, a board that has an x86 and an ARC
+processor, like the Arduino 101); as well it has a list of tags
+and values that describe its capabilities.</p>
+</dd>
+<dt id="term-target-controller">target controller</dt>
+<dd>A piece of software that understands how to talk to a target</dd>
+<dt id="term-test-target-broker">test target broker</dt>
+<dd>A service/machine to which one or more <a class="reference internal" href="#term-test-target"><span class="xref std std-term">test target</span></a>s are
+connected. It offers an abstracted API to manipulate and operate
+them; the API is implemented via target-specific <a class="reference internal" href="#term-target-controller"><span class="xref std std-term">target
+controller</span></a>s.</dd>
+<dt id="term-target-broker">target broker</dt>
+<dd>See <a class="reference internal" href="#term-test-target-broker"><span class="xref std std-term">test target broker</span></a>.</dd>
+<dt id="term-target-driver">target driver</dt>
+<dd>Same as <a class="reference internal" href="#term-target-controller"><span class="xref std std-term">target controller</span></a></dd>
+<dt id="term-test-finder">test finder</dt>
+<dd>A piece of software that locates test cases by looking at tag
+strings that define them as such.</dd>
+<dt id="term-test-case-finder">test case finder</dt>
+<dd>Same as <a class="reference internal" href="#term-test-finder"><span class="xref std std-term">test finder</span></a></dd>
+<dt id="term-test-runner">test runner</dt>
+<dd>Linux machine that can drive the running and execution of test
+cases or command a target hardware to execute test cases.</dd>
+<dt id="term-test-case-driver">test case driver</dt>
+<dd><p class="first">this is the entity that runs on the <a class="reference internal" href="#term-test-runner"><span class="xref std std-term">test runner</span></a>
+that understands how different test cases can be run.</p>
+<p>eg: knows how to launch a <em>&#64;static</em> test case</p>
+<p class="last">eg: knows how to interpret the output of a cetain type of test
+cases to decide what it is</p>
+</dd>
+<dt id="term-ttbd">ttbd</dt>
+<dd>See <a class="reference internal" href="#term-test-target-broker"><span class="xref std std-term">test target broker</span></a></dd>
+<dt id="term-run-id">run ID</dt>
+<dd>An identification tag for a particular run of a sequence of test
+cases in a set of targets</dd>
+</dl>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="10-Status.html" class="btn btn-neutral float-right" title="10. Current status and plans" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="09-api.html" class="btn btn-neutral" title="8. APIs" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2015, Author.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'0.11',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

@@ -1,0 +1,881 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>6. Support &amp; Troubleshooting &mdash; Test Case Framework 0.11 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../genindex.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="Test Case Framework 0.11 documentation" href="../index.html"/>
+        <link rel="next" title="7. Architecture" href="07-Architecture.html"/>
+        <link rel="prev" title="5. Rationales and Frequently Asked Questions" href="05-RFAQs.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../README.html" class="icon icon-home"> Test Case Framework
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.11
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../02-QUICKSTART.html">1. Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02-guides.html">2. Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="03-server-setup.html">3. Server deployment guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="04-HOWTOs.html">4. HOWTOs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="05-RFAQs.html">5. Rationales and Frequently Asked Questions</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">6. Support &amp; Troubleshooting</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#tcf-client">6.1. TCF client</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tcf-just-hangs-there-nothing-happens">6.1.1. <em>tcf</em> just hangs there, nothing happens</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#client-operations-report-eof-occurred-in-violation-of-protocol">6.1.2. Client operations report <em>EOF occurred in violation of protocol</em></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tcf-run-fails-compiling-in-zephyr">6.1.3. <em>tcf run</em> fails compiling in Zephyr…</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#ttbd-server">6.2. <em>ttbd</em> server</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#restart-ttbd-watch-the-output-for-errors">6.2.1. Restart <em>ttbd</em>, watch the output for errors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#log-shows-can-t-find-hub-retrying">6.2.2. Log shows <em>can’t find hub, retrying</em></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#log-shows-errors-cannot-find-ykush-serial-yknnnnn">6.2.3. log shows errors <em>Cannot find YKUSH serial ‘YKNNNNN’</em></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tips-for-diagnosing-systemd-startup">6.2.4. Tips for diagnosing systemd startup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tips-for-configuring-systemd-startup">6.2.5. Tips for configuring systemd startup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#usb-device-powers-up-but-serial-port-does-not-come-up">6.2.6. USB device powers up, but serial port does not come up</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#multiple-failures-caused-by-selinux">6.2.7. Multiple failures caused by <em>SELinux</em></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#different-operations-fail-daemon-log-reports-connection-reset-by-peer">6.2.8. Different operations fail, daemon log reports <em>Connection reset by peer</em></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#uploading-files-to-the-daemon-fails-with-var-cache-ttbd-production-username-cannot-create-path">6.2.9. Uploading files to the daemon fails with <em>/var/cache/ttbd-production/USERNAME: cannot create path</em></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#network-qemu-target-fails-to-power-up-with-permission-denied-dev-tapnumber">6.2.10. Network QEMU target fails to power up with <em>Permission denied: ‘/dev/tapNUMBER’</em></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ldap-login-fails-with-invalid-credentials-but-the-password-is-right-i-know">6.2.11. LDAP login fails with invalid credentials, but the password is right, I know</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#freedom-board-k64f">6.2.12. Freedom Board k64f</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#freedom-board-k64f-openocd-fails-to-power-up-unable-to-open-cmsis-dap-device-0xd28-0x204">6.2.12.1. Freedom Board k64f, openocd fails to power up (unable to open CMSIS-DAP device 0xd28:0x204)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#frdm-k64f-boards-fail-to-power-up-openocd-prints-message-about-reset-wdog-loop">6.2.12.2. FRDM k64f boards fail to power up, OpenOCD prints message about RESET/WDOG loop</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#set-the-up-the-target-in-debug-mode">6.2.12.3. Set the up the target in debug mode</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#issue-openocd-commands-to-stop-the-loop">6.2.12.4. Issue OpenOCD commands to stop the loop</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#copy-a-known-firmware-image-to-its-flash-drive">6.2.12.5. Copy a known firmware image to its flash drive</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#reset-the-board-to-normal-configuration">6.2.12.6. Reset the board to normal configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#arduino101">6.2.13. Arduino101</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#arduino101-openocd-fails-to-power-up-targets-report-tap-disabled">6.2.13.1. Arduino101: openocd fails to power up (targets report tap-disabled)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="07-Architecture.html">7. Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="09-api.html">8. APIs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">9. Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="10-Status.html">10. Current status and plans</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../01-CHANGELOG.html">11. TCF release v0.11</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../README.html">Test Case Framework</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../README.html">Docs</a> &raquo;</li>
+        
+      <li>6. Support &amp; Troubleshooting</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/doc/06-troubleshooting.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="support-troubleshooting">
+<h1>6. Support &amp; Troubleshooting<a class="headerlink" href="#support-troubleshooting" title="Permalink to this headline">¶</a></h1>
+<p>For support, see the <a class="reference internal" href="02-guides.html#support-and-reporting-issues"><span class="std std-ref">contributing section</span></a>.</p>
+<div class="section" id="tcf-client">
+<h2>6.1. TCF client<a class="headerlink" href="#tcf-client" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="tcf-just-hangs-there-nothing-happens">
+<h3>6.1.1. <em>tcf</em> just hangs there, nothing happens<a class="headerlink" href="#tcf-just-hangs-there-nothing-happens" title="Permalink to this headline">¶</a></h3>
+<p>Add <code class="docutils literal"><span class="pre">-v</span></code>s, check your proxy settings are ok</p>
+</div>
+<div class="section" id="client-operations-report-eof-occurred-in-violation-of-protocol">
+<h3>6.1.2. Client operations report <em>EOF occurred in violation of protocol</em><a class="headerlink" href="#client-operations-report-eof-occurred-in-violation-of-protocol" title="Permalink to this headline">¶</a></h3>
+<p>Any client operation (such as <em>tcf list</em>):</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ ~/z/tcf.git/tcf list
+Traceback (most recent call last):
+  File &quot;~/z/tcf.git/tcf&quot;, line 350, in &lt;module&gt;
+    retval = args.func(args)
+  ...
+  File &quot;/usr/lib/python2.7/site-packages/requests/api.py&quot;, line 53, in request
+    return session.request(method=method, url=url, **kwargs)
+  File &quot;/usr/lib/python2.7/site-packages/requests/sessions.py&quot;, line 468, in request
+    resp = self.send(prep, **send_kwargs)
+  File &quot;/usr/lib/python2.7/site-packages/requests/sessions.py&quot;, line 576, in send
+    r = adapter.send(request, **kwargs)
+  File &quot;/usr/lib/python2.7/site-packages/requests/adapters.py&quot;, line 447, in send
+    raise SSLError(e, request=request)
+requests.exceptions.SSLError: EOF occurred in violation of protocol (_ssl.c:590)
+</pre></div>
+</div>
+<p>If your network needs proxy support and you are seeing
+messages from the client as <em>EOF occurred in violation of
+protocol</em>, the proxy may be cutting you off; ensure your
+proxies are properly setup as per <a class="reference external" href="setup_proxies">these instructions</a>).</p>
+<p>In a pinch, you can unset your <em>proxy</em> environment
+variables are unset:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ unset https_proxy http_proxy HTTPS_PROXY HTTP_PROXY
+</pre></div>
+</div>
+<p>if your servers are locally accesible.</p>
+</div>
+<div class="section" id="tcf-run-fails-compiling-in-zephyr">
+<h3>6.1.3. <em>tcf run</em> fails compiling in Zephyr…<a class="headerlink" href="#tcf-run-fails-compiling-in-zephyr" title="Permalink to this headline">¶</a></h3>
+<p>FIXME: update</p>
+</div>
+</div>
+<div class="section" id="ttbd-server">
+<h2>6.2. <em>ttbd</em> server<a class="headerlink" href="#ttbd-server" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="restart-ttbd-watch-the-output-for-errors">
+<h3>6.2.1. Restart <em>ttbd</em>, watch the output for errors<a class="headerlink" href="#restart-ttbd-watch-the-output-for-errors" title="Permalink to this headline">¶</a></h3>
+<p>Run:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ journalctl -feu ttbd@NAME
+</pre></div>
+</div>
+<p><cite>-f</cite> follows the output, <cite>-e</cite> goes to the end of the file as of now,
+<cite>-u</cite> means unit <cite>ttbd&#64;NAME</cite>.</p>
+<p>Ensure the targets are visible with <cite>tcf list</cite></p>
+</div>
+<div class="section" id="log-shows-can-t-find-hub-retrying">
+<h3>6.2.2. Log shows <em>can’t find hub, retrying</em><a class="headerlink" href="#log-shows-can-t-find-hub-retrying" title="Permalink to this headline">¶</a></h3>
+<p>This message:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">...</span> <span class="n">pc_ykush</span><span class="o">.</span><span class="n">_command</span><span class="p">():</span><span class="mi">139</span> <span class="n">target</span><span class="o">-</span><span class="n">TARGET</span><span class="p">:</span> <span class="n">YKXXXXX</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span> <span class="n">can</span><span class="s1">&#39;t find hub, retrying</span>
+</pre></div>
+</div>
+<p>this means that for whichever reason, when the YKUSH is powered on,
+the system is not able to find it in the list of connected devices.</p>
+<p>Most common cases:</p>
+<blockquote>
+<div><ol class="arabic">
+<li><p class="first">the configuration is not correct and it is not being powered up</p>
+<p>Accessing the infrastructure server, power-on the YKXXXX-base
+target and visually verify the YKush’s hub led is turning on.</p>
+<p>If not:</p>
+<ol class="arabic simple">
+<li>check the power-control configuration for the YKXXXX, is it
+the correct one?</li>
+<li>check the power brick</li>
+<li>check the micro-USB <em>power</em> cable</li>
+</ol>
+<p>Note sometimes it is useful to pluck out the components and
+test against a power outlet or USB power port we know to work.</p>
+</li>
+<li><p class="first">connect the hub against a wall outlet to a laptop and see if it
+enumerates, verify with <cite>lsusb.py -iu | grep YKXXXX</cite></p>
+<ol class="arabic">
+<li><p class="first">Use <cite>dmesg -w</cite> in a laptop or another machine to verify what
+happens when you plug the hub.</p>
+</li>
+<li><p class="first">if <cite>dmesg</cite> shows messages like:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">kernel</span><span class="p">:</span> <span class="n">usb</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1.2</span><span class="o">.</span><span class="mi">5</span><span class="p">:</span> <span class="n">device</span> <span class="n">descriptor</span> <span class="n">read</span><span class="o">/</span><span class="mi">64</span><span class="p">,</span> <span class="n">error</span> <span class="o">-</span><span class="mi">32</span>
+</pre></div>
+</div>
+<p>the micro USB cable for upstream connectivity might be bad;
+replace it.</p>
+</li>
+</ol>
+</li>
+<li><p class="first">If nothing shows but the led is lit, the hub might be toast
+and is time to replace it</p>
+</li>
+</ol>
+</div></blockquote>
+</div>
+<div class="section" id="log-shows-errors-cannot-find-ykush-serial-yknnnnn">
+<span id="ttbd-cannot-find-ykush-serial"></span><h3>6.2.3. log shows errors <em>Cannot find YKUSH serial ‘YKNNNNN’</em><a class="headerlink" href="#log-shows-errors-cannot-find-ykush-serial-yknnnnn" title="Permalink to this headline">¶</a></h3>
+<p>Plenty of operations randomly fail with messages such as:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">...</span> <span class="nd">@SERVER</span><span class="o">/</span><span class="n">TARGET</span><span class="p">:</span><span class="n">BSP</span><span class="p">:</span> <span class="n">error</span> <span class="n">resetting</span><span class="p">:</span> <span class="mi">400</span><span class="p">:</span> <span class="n">TARGET</span><span class="p">:</span> <span class="n">Cannot</span> <span class="n">find</span> <span class="n">YKUSH</span> <span class="n">serial</span> <span class="s1">&#39;YKNNNNN&#39;</span>
+</pre></div>
+</div>
+<p>this is usually caused by overloaded USB buses (also <a class="reference internal" href="#troubleshooting-usb-bandwidth"><span class="std std-ref">other
+symptoms</span></a>). Please spread your devices
+amongst <strong>different</strong> USB buses that are connected to <strong>different</strong>
+USB cards (root ports) in the host machine.</p>
+</div>
+<div class="section" id="tips-for-diagnosing-systemd-startup">
+<span id="systemd-tips-diagnosis"></span><h3>6.2.4. Tips for diagnosing systemd startup<a class="headerlink" href="#tips-for-diagnosing-systemd-startup" title="Permalink to this headline">¶</a></h3>
+<ul>
+<li><p class="first">if systemd fails to start the unit with a GROUP message, one or
+more of the supplemental groups in
+<cite>/etc/systemd/system/ttbd&#64;.service</cite> might not exist; verify it.</p>
+</li>
+<li><p class="first"><cite>journalctl -u ttbd&#64;NAME</cite>: to get all the log messages from the
+instance</p>
+</li>
+<li><p class="first"><cite>journalctl -feu ttbd&#64;NAME</cite>: monitor log messages from the instance
+instance</p>
+</li>
+<li><p class="first">systemd fails to start the daemon with a <em>code=203/EXEC</em>:</p>
+<p>this is most likely a permissons issue; verify your Unix permissions
+and ACLs are right. SELinux might be in the way too (check your
+system output with <em>journalctl -xe</em> and look for ttbd.</p>
+</li>
+</ul>
+</div>
+<div class="section" id="tips-for-configuring-systemd-startup">
+<span id="systemd-tips-configuring"></span><h3>6.2.5. Tips for configuring systemd startup<a class="headerlink" href="#tips-for-configuring-systemd-startup" title="Permalink to this headline">¶</a></h3>
+<p>The default integration with systemd in unit file
+<cite>/etc/systemd/system/ttbd&#64;.service</cite> can be extended and or modified;
+for example:</p>
+<ol class="arabic">
+<li><p class="first">copy <cite>/etc/systemd/system/ttbd&#64;.service</cite> to <cite>ttbd&#64;NAME.service</cite></p>
+</li>
+<li><p class="first">edit <cite>ttbd&#64;NAME.service</cite>:</p>
+<ul>
+<li><p class="first">for example change the username</p>
+</li>
+<li><p class="first">add dependencies to the <cite>[Unit]</cite> section, for example, if there
+is another daemon that should be started first, like:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Requires</span> <span class="o">=</span> <span class="n">ttbd</span><span class="nd">@NAME0</span><span class="o">.</span><span class="n">service</span>
+</pre></div>
+</div>
+<p>this would make the <cite>NAME0</cite> daemon start before the <cite>NAME</cite>
+daemon.</p>
+</li>
+</ul>
+</li>
+<li><p class="first">tell systemd to reload configuration:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># systemctl daemon-reload</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p>Note you can use the following systemd commands (for the default
+one, ommit NAME):</p>
+<ul class="simple">
+<li><dl class="first docutils">
+<dt><cite>systemctl enable ttbd&#64;NAME</cite>: enable the running of the</dt>
+<dd><em>NAME</em> ttbd instance automatically</dd>
+</dl>
+</li>
+<li><cite>systemctl start ttbd&#64;NAME</cite>: start ttbd <em>NAME</em> instance</li>
+<li><cite>systemctl stop ttbd&#64;NAME</cite>: stop ttbd <em>NAME</em> instance</li>
+<li><cite>systemctl status ttbd&#64;NAME</cite>: query status of the
+instance; add <em>-l</em> to get longer messages (without ellipsis)</li>
+</ul>
+</div>
+<div class="section" id="usb-device-powers-up-but-serial-port-does-not-come-up">
+<h3>6.2.6. USB device powers up, but serial port does not come up<a class="headerlink" href="#usb-device-powers-up-but-serial-port-does-not-come-up" title="Permalink to this headline">¶</a></h3>
+<p>Messages such as this pop from the server log:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">I</span><span class="p">[</span><span class="mi">7742</span><span class="p">]</span> <span class="n">pc</span><span class="o">.</span><span class="n">power_on_do</span><span class="p">():</span><span class="mi">284</span><span class="p">:</span> <span class="n">target</span><span class="o">-</span><span class="n">TARGETNAME</span><span class="p">[</span><span class="n">local</span><span class="p">:</span><span class="mi">5</span><span class="n">fng</span><span class="p">]:</span>\
+  <span class="o">&lt;</span><span class="n">ttbl</span><span class="o">.</span><span class="n">pc</span><span class="o">.</span><span class="n">delay_til_usb_device</span> <span class="nb">object</span> <span class="n">at</span> <span class="mh">0x7fce3611edd0</span><span class="o">&gt;</span><span class="p">:</span> \
+  <span class="n">delaying</span> <span class="n">power</span><span class="o">-</span><span class="n">on</span> <span class="mf">5.00</span><span class="n">s</span> <span class="n">until</span> <span class="n">USB</span> <span class="n">device</span> <span class="k">with</span> <span class="n">serial</span> <span class="n">SOMESERIALNUMBER</span> <span class="n">appears</span>
+<span class="o">...</span>
+<span class="n">I</span><span class="p">[</span><span class="mi">7743</span><span class="p">]</span> <span class="n">ttbd</span><span class="o">.</span><span class="n">flask_logi_abort</span><span class="p">():</span><span class="mi">104</span><span class="p">:</span> <span class="n">TARGETNAME</span><span class="p">:</span> \
+  <span class="p">[</span><span class="n">Errno</span> <span class="mi">2</span><span class="p">]</span> <span class="n">could</span> <span class="ow">not</span> <span class="nb">open</span> <span class="n">port</span> <span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">tty</span><span class="o">-</span><span class="n">TARGETNAME</span><span class="p">:</span> \
+  <span class="p">[</span><span class="n">Errno</span> <span class="mi">2</span><span class="p">]</span> <span class="n">No</span> <span class="n">such</span> <span class="n">file</span> <span class="ow">or</span> <span class="n">directory</span><span class="p">:</span> <span class="s1">&#39;/dev/tty-TARGETNAME&#39;</span>
+</pre></div>
+</div>
+<p>And <em>tcf run</em> and others report things such as:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">HTTPError</span><span class="p">:</span> <span class="mi">400</span><span class="p">:</span> <span class="n">TARGETNAME</span><span class="p">:</span> <span class="n">timeout</span> <span class="p">(</span><span class="mf">39.67</span><span class="n">s</span><span class="p">)</span> <span class="n">on</span> <span class="n">power</span><span class="o">-</span><span class="n">on</span> <span class="n">delay</span> <span class="n">waiting</span> \
+<span class="k">for</span> <span class="n">USB</span> <span class="n">device</span> <span class="k">with</span> <span class="n">serial</span> <span class="n">SOMESERIALNUMBER</span> <span class="n">to</span> <span class="n">appear</span>
+</pre></div>
+</div>
+<p>There is a long list of reasons why this can happen, but these are the
+most common:</p>
+<ul>
+<li><p class="first">The device has no firmware that allows it to expose a serial port</p>
+</li>
+<li><p class="first">The device exposes more than one USB interface and the one which
+exposes the serial port hasn’t been connected.</p>
+</li>
+<li><p class="first">The device does not have enough power to expose it’s
+functionality. Inspect the kernel log with <cite>dmesg</cite> and verify the
+kernel is able to recognize the device and report it is powering up
+properly (for example, for an FRDM k64f):</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">new</span> <span class="n">full</span><span class="o">-</span><span class="n">speed</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">number</span> <span class="mi">127</span> <span class="n">using</span> <span class="n">xhci_hcd</span>
+<span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">New</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">found</span><span class="p">,</span> <span class="n">idVendor</span><span class="o">=</span><span class="mi">0</span><span class="n">d28</span><span class="p">,</span> <span class="n">idProduct</span><span class="o">=</span><span class="mi">0204</span>
+<span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">New</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">strings</span><span class="p">:</span> <span class="n">Mfr</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">Product</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">SerialNumber</span><span class="o">=</span><span class="mi">3</span>
+<span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">Product</span><span class="p">:</span> <span class="n">MBED</span> <span class="n">CMSIS</span><span class="o">-</span><span class="n">DAP</span>
+<span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">Manufacturer</span><span class="p">:</span> <span class="n">MBED</span>
+<span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">SerialNumber</span><span class="p">:</span> <span class="mf">024002011E741</span><span class="n">E6DE38AE3D5</span>
+<span class="n">usb</span><span class="o">-</span><span class="n">storage</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span><span class="mf">1.0</span><span class="p">:</span> <span class="n">USB</span> <span class="n">Mass</span> <span class="n">Storage</span> <span class="n">device</span> <span class="n">detected</span>
+<span class="n">scsi</span> <span class="n">host3</span><span class="p">:</span> <span class="n">usb</span><span class="o">-</span><span class="n">storage</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span><span class="mf">1.0</span>
+<span class="n">cdc_acm</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span><span class="mf">1.1</span><span class="p">:</span> <span class="n">ttyACM1</span><span class="p">:</span> <span class="n">USB</span> <span class="n">ACM</span> <span class="n">device</span>
+</pre></div>
+</div>
+</li>
+</ul>
+<ul id="troubleshooting-usb-bandwidth">
+<li><p class="first">the USB bus is out of bandwidth and will refuse to configure the
+device in the USB configuration that provides the serial
+device. When trying to power up the target, look out for messages in
+the kernel log similar to (with <cite>dmesg</cite>):</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">4.2</span><span class="p">:</span> <span class="n">new</span> <span class="n">full</span><span class="o">-</span><span class="n">speed</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">number</span> <span class="mi">27</span> <span class="n">using</span> <span class="n">xhci_hcd</span>
+<span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">4.2</span><span class="p">:</span> <span class="n">New</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">found</span><span class="p">,</span> <span class="n">idVendor</span><span class="o">=</span><span class="mi">0</span><span class="n">d28</span><span class="p">,</span> <span class="n">idProduct</span><span class="o">=</span><span class="mi">0204</span>
+<span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">4.2</span><span class="p">:</span> <span class="n">New</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">strings</span><span class="p">:</span> <span class="n">Mfr</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">Product</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">SerialNumber</span><span class="o">=</span><span class="mi">3</span>
+<span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">4.1</span><span class="p">:</span> <span class="n">Product</span><span class="p">:</span> <span class="n">MBED</span> <span class="n">CMSIS</span><span class="o">-</span><span class="n">DAP</span>
+<span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">4.1</span><span class="p">:</span> <span class="n">Manufacturer</span><span class="p">:</span> <span class="n">MBED</span>                                                                                                            <span class="p">[</span><span class="mf">3199173.308138</span><span class="p">]</span> <span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">4.1</span><span class="p">:</span> <span class="n">SerialNumber</span><span class="p">:</span> <span class="mf">024002011E481</span><span class="n">E5DE3B6E3E5</span>
+<span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">4.1</span><span class="p">:</span> <span class="n">Not</span> <span class="n">enough</span> <span class="n">bandwidth</span> <span class="k">for</span> <span class="n">new</span> <span class="n">device</span> <span class="n">state</span><span class="o">.</span>
+</pre></div>
+</div>
+<p>when this happens, you need to reconfigure your setup, as you have
+probably maxed out the bandwidth of the USB bus. Posible ways to
+resolve it:</p>
+<ul>
+<li><p class="first">Move devices to another USB bus (not port, but bus). You can add
+more buses by adding new PCI-to-USB cards.</p>
+<p>Note some controllers show up as multiple buses to support
+different USB versions, but they are actually the same.</p>
+</li>
+<li><p class="first">Spread your configuration across multiple physical servers
+operating in active/active mode, which also has the benefit of
+increasing the redundancy in your setup.</p>
+</li>
+</ul>
+</li>
+<li><p class="first"><cite>udev</cite> is not properly configured and thus it does not see the event
+that will allow it to create whichever device link it has to
+create (see <a class="reference internal" href="04-HOWTOs.html#usb-tty"><span class="std std-ref">udev configuration of serial port</span></a>).</p>
+<p>Double check the configuration, use <cite>journalctl -au systemd-udevd</cite>
+to inspect the <em>udev</em> ouput. You can also increase its log level
+with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># udevadm control -l debug</span>
+</pre></div>
+</div>
+<p>power cycle the device and inspect the output from <em>udev</em> to see why
+the device link might not be created.</p>
+<p>Remember to restore the log level back when done to <cite>err</cite> to
+avoid polluting your system logs too much.</p>
+</li>
+</ul>
+</div>
+<div class="section" id="multiple-failures-caused-by-selinux">
+<h3>6.2.7. Multiple failures caused by <em>SELinux</em><a class="headerlink" href="#multiple-failures-caused-by-selinux" title="Permalink to this headline">¶</a></h3>
+<p>When the daemon is not installed system wide, <em>SELinux</em> will cause
+multiple issues, even if started via <em>systemd</em>. This is common when
+testing development versions that run from the git tree.</p>
+<p>In these cases, the system journal will report <em>SELinux</em> denials or
+interventions. In this case, sometimes the best thing is to disable
+<em>SELinux</em> for the development work–however, it is important to later
+test in a system wide deployment:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># setenforce 0</span>
+</pre></div>
+</div>
+<p>will disable <em>SELinux</em>.</p>
+</div>
+<div class="section" id="different-operations-fail-daemon-log-reports-connection-reset-by-peer">
+<h3>6.2.8. Different operations fail, daemon log reports <em>Connection reset by peer</em><a class="headerlink" href="#different-operations-fail-daemon-log-reports-connection-reset-by-peer" title="Permalink to this headline">¶</a></h3>
+<p>This is caused in most cases by <em>OpenOCD</em> crashing, making all kinds
+of operations fail. Mostly seen during retrying, where it retries and
+retries but it keeps failing, with logs in the daemon such as:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">W</span><span class="p">[</span><span class="mi">15024</span><span class="p">]</span> <span class="n">flasher</span><span class="o">.</span><span class="n">_expect_mgr</span><span class="p">():</span><span class="mi">522</span><span class="p">:</span> <span class="n">target</span><span class="o">-</span><span class="n">emsk</span><span class="o">-</span><span class="mi">27</span><span class="p">[</span><span class="n">USER</span><span class="p">:</span><span class="n">lak2</span><span class="p">]:</span> <span class="n">OpenOCD</span><span class="o">/</span><span class="n">snps_em_sk</span><span class="p">[</span><span class="mi">251634500808</span><span class="p">]:</span> <span class="n">target</span> <span class="n">reset</span><span class="o">/</span><span class="n">halt</span> <span class="k">for</span> <span class="n">image</span> <span class="n">flashing</span><span class="p">:</span> <span class="n">Error</span> <span class="n">shutting</span> <span class="n">down</span> <span class="n">socket</span><span class="p">:</span> <span class="p">[</span><span class="n">Errno</span> <span class="mi">107</span><span class="p">]</span> <span class="n">Transport</span> <span class="n">endpoint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">connected</span>
+</pre></div>
+</div>
+<p>there is no easy solution for this: <em>OpenOCD</em> is crashing, it is a
+problem in OpenOCD or how it is being used is triggering it. The
+<em>OpenOCD</em> log files in in <em>/var/run/ttbd-production/TARGETNAME/</em> will
+give a hint of what was being done, but will contain no information
+about the crash itself.</p>
+<p>You can run the whole setup with core file dumping enabled.</p>
+<p>Note however, there are valid cases where <em>ttbd</em> <strong>kills</strong> <em>OpenOCD</em>
+(when it doesn’t start properly, for example), so it might be easy to
+confuse them both. Run the daemon with increased verbosity to be able
+to tell those cases apart.</p>
+</div>
+<div class="section" id="uploading-files-to-the-daemon-fails-with-var-cache-ttbd-production-username-cannot-create-path">
+<h3>6.2.9. Uploading files to the daemon fails with <em>/var/cache/ttbd-production/USERNAME: cannot create path</em><a class="headerlink" href="#uploading-files-to-the-daemon-fails-with-var-cache-ttbd-production-username-cannot-create-path" title="Permalink to this headline">¶</a></h3>
+<p>A client operation (normally uploading files to the server), ends with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">requests</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">HTTPError</span><span class="p">:</span> <span class="mi">400</span><span class="p">:</span> <span class="o">/</span><span class="n">var</span><span class="o">/</span><span class="n">cache</span><span class="o">/</span><span class="n">ttbd</span><span class="o">-</span><span class="n">production</span><span class="o">/</span><span class="n">USERNAME</span><span class="p">:</span> <span class="n">cannot</span> <span class="n">create</span> <span class="n">path</span><span class="p">:</span> <span class="p">[</span><span class="n">Errno</span> <span class="mi">13</span><span class="p">]</span> <span class="n">Permission</span> <span class="n">denied</span><span class="p">:</span> <span class="s1">&#39;/var/cache/ttbd-production/USERNAME&#39;</span>
+</pre></div>
+</div>
+<p>if the path <code class="docutils literal"><span class="pre">/var/cache/ttbd-production</span></code> exists, it is owned by user
+<em>ttbd:ttbd</em> and the user has permissions to write, create, this might
+be a SELinux issue.</p>
+<p>If in the system’s journal, it can be found:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ journal -x
+...
+
+python3[23087]: SELinux is preventing ttbd from create access on the directory USERNAME.
+
+                *****  Plugin catchall_labels (83.8 confidence) suggests   *******************
+
+                If you want to allow ttbd to have create access on the local directory
+                Then you need to change the label on local
+                Do
+                # semanage fcontext -a -t FILE_TYPE &#39;USERNAME&#39;
+                where FILE_TYPE is one of the following: NetworkManager_unit_file_t, NetworkManager_var_run_t, abrt_unit_file_t, abrt_var_run_t, accountsd_unit_file_t, aiccu_var_run_t, ajaxterm_var_run_t, alsa_lock_t, alsa_unit_file_t, alsa_var_run_t, amanda_unit_file_t, antivirus_unit_file_t, antivirus_var_run_t, apcupsd_lock_t, apcupsd_unit_file_t, apcupsd_var_run_t, apmd_lock_t, apmd_unit_file_t, apmd_var_run_t, arpwatch_unit_file_t, arpwatch_var_run_t, asterisk_var_run_t, audisp_var_run_t, auditd_unit_file_t, auditd_var_run_t, automount_lock_t, automount_unit_file_t, automount_var_run_t, avahi_unit_file_t, avahi_var_run_t, bacula_var_run_t, bcfg2_unit_file_t, bcfg2_var_run_t, bitlbee_var_run_t, blkmapd_var_run_t, blktap_var_run_t, blueman_var_run_t, bluetooth_lock_t, bluetooth_unit_file_t, bluetooth_var_run_t, boinc_unit_file_t, bootloader_var_run_t, brltty_unit_file_t, brltty_var_run_t, bumblebee_unit_file_t, bumblebee_var_run_t, cache_home_t, cachefilesd_var_run_t, callweaver_var_run_t, canna_var_run_t, cardmgr_var_run_t, ccs_var_run_t, certmaster_var_run_t, certmonger_var_run_t, cgred_var_run_t, cgroup_t, chronyd_unit_file_t, chronyd_var_run_t, cinder_api_unit_file_t, cinder_backup_unit_file_t, cinder_scheduler_unit_file_t, cinder_var_run_t, cinder_volume_unit_file_t, clogd_var_run_t, cloud_init_unit_file_t, cluster_unit_file_t, cluster_var_run_t, clvmd_var_run_t, cmirrord_var_run_t, cockpit_unit_file_t, cockpit_var_run_t, collectd_unit_file_t, collectd_var_run_t, colord_unit_file_t, comsat_var_run_t, condor_unit_file_t, condor_var_lock_t, condor_var_run_t, config_home_t, conman_unit_file_t, conman_var_run_t, consolekit_unit_file_t, consolekit_var_run_t, container_lock_t, container_plugin_var_run_t, container_unit_file_t, container_var_run_t, couchdb_unit_file_t, couchdb_var_run_t, courier_var_run_t, cpuplug_lock_t, cpuplug_var_run_t, cpuspeed_var_run_t, cron_var_run_t, crond_unit_file_t, crond_var_run_t, ctdbd_var_run_t, cupsd_config_var_run_t, cupsd_lock_t, cupsd_lpd_var_run_t, cupsd_unit_file_t, cupsd_var_run_t, cvs_var_run_t, cyphesis_var_run_t, cyrus_var_run_t, data_home_t, dbskkd_var_run_t, dbus_home_t, dcc_var_run_t, dccd_var_run_t, dccifd_var_run_t, dccm_var_run_t, dcerpcd_var_run_t, ddclient_var_run_t, deltacloudd_var_run_t, denyhosts_var_lock_t, device_t, devicekit_var_run_t, devpts_t, dhcpc_var_run_t, dhcpd_unit_file_t, dhcpd_var_run_t, dictd_var_run_t, dirsrv_snmp_var_run_t, dirsrv_var_lock_t, dirsrv_var_run_t, dirsrvadmin_lock_t, dirsrvadmin_unit_file_t, dkim_milter_data_t, dlm_controld_var_run_t, dnsmasq_unit_file_t, dnsmasq_var_run_t, dnssec_trigger_unit_file_t, dnssec_trigger_var_run_t, dovecot_var_run_t, drbd_lock_t, drbd_var_run_t, dspam_var_run_t, entropyd_var_run_t, etc_t, eventlogd_var_run_t, evtchnd_var_run_t, exim_var_run_t, fail2ban_var_run_t, fcoemon_var_run_t, fenced_lock_t, fenced_var_run_t, fetchmail_var_run_t, fingerd_var_run_t, firewalld_unit_file_t, firewalld_var_run_t, foghorn_var_run_t, freeipmi_bmc_watchdog_unit_file_t, freeipmi_bmc_watchdog_var_run_t, freeipmi_ipmidetectd_unit_file_t, freeipmi_ipmidetectd_var_run_t, freeipmi_ipmiseld_unit_file_t, freeipmi_ipmiseld_var_run_t, fsadm_var_run_t, fsdaemon_var_run_t, ftpd_lock_t, ftpd_unit_file_t, ftpd_var_run_t, fwupd_unit_file_t, games_srv_var_run_t, gconf_home_t, gdomap_var_run_t, getty_lock_t, getty_unit_file_t, getty_var_run_t, gfs_controld_var_run_t, gkeyringd_gnome_home_t, glance_api_unit_file_t, glance_registry_unit_file_t, glance_scrubber_unit_file_t, glance_var_run_t, glusterd_var_run_t, gnome_home_t, gpm_var_run_t, gpsd_var_run_t, greylist_milter_data_t, groupd_var_run_t, gssproxy_unit_file_t, gssproxy_var_run_t, gstreamer_home_t, haproxy_unit_file_t, haproxy_var_run_t, hostapd_unit_file_t, hostapd_var_run_t, hsqldb_unit_file_t, httpd_lock_t, httpd_unit_file_t, httpd_var_run_t, hugetlbfs_t, hwloc_dhwd_unit_t, hwloc_var_run_t, hypervkvp_unit_file_t, hypervvssd_unit_file_t, icc_data_home_t, icecast_var_run_t, iceccd_var_run_t, ifconfig_var_run_t, inetd_child_var_run_t, inetd_var_run_t, init_tmp_t, init_var_lib_t, init_var_run_t, initrc_var_run_t, innd_unit_file_t, innd_var_run_t, insmod_var_run_t, iodined_unit_file_t, ipa_dnskey_unit_file_t, ipa_ods_exporter_unit_file_t, ipa_otpd_unit_file_t, ipa_var_run_t, ipmievd_lock_t, ipmievd_unit_file_t, ipmievd_var_run_t, ipsec_mgmt_lock_t, ipsec_mgmt_unit_file_t, ipsec_mgmt_var_run_t, ipsec_var_run_t, iptables_lock_t, iptables_unit_file_t, iptables_var_lib_t, iptables_var_run_t, irqbalance_var_run_t, iscsi_lock_t, iscsi_unit_file_t, iscsi_var_run_t, isnsd_var_run_t, iwhd_var_run_t, jetty_unit_file_t, jetty_var_run_t, kadmind_var_run_t, kdump_lock_t, kdump_unit_file_t, keepalived_unit_file_t, keepalived_var_run_t, keystone_unit_file_t, keystone_var_run_t, kismet_var_run_t, klogd_var_run_t, kmscon_unit_file_t, krb5kdc_lock_t, krb5kdc_var_run_t, ksmtuned_unit_file_t, ksmtuned_var_run_t, ktalkd_unit_file_t, l2tpd_var_run_t, likewise_pstore_lock_t, lircd_var_run_t, lldpad_var_run_t, local_login_lock_t, locale_t, locate_var_run_t, lockdev_lock_t, logrotate_lock_t, logwatch_lock_t, logwatch_var_run_t, lpd_var_run_t, lsassd_var_run_t, lsmd_unit_file_t, lsmd_var_run_t, lttng_sessiond_unit_file_t, lttng_sessiond_var_run_t, lvm_lock_t, lvm_unit_file_t, lvm_var_run_t, lwiod_var_run_t, lwregd_var_run_t, lwsmd_var_run_t, mailman_lock_t, mailman_var_run_t, mandb_lock_t, mcelog_var_run_t, mdadm_unit_file_t, mdadm_var_run_t, memcached_var_run_t, minidlna_var_run_t, minissdpd_var_run_t, mip6d_unit_file_t, mirrormanager_var_run_t, mock_var_run_t, modemmanager_unit_file_t, mon_statd_var_run_t, mongod_unit_file_t, mongod_var_run_t, motion_unit_file_t, motion_var_run_t, mount_var_run_t, mpd_var_run_t, mrtg_lock_t, mrtg_var_run_t, mscan_var_run_t, munin_var_run_t, mysqld_unit_file_t, mysqld_var_run_t, mysqlmanagerd_var_run_t, naemon_var_run_t, nagios_var_run_t, named_conf_t, named_unit_file_t, named_var_run_t, netlabel_mgmt_unit_file_t, netlogond_var_run_t, neutron_unit_file_t, neutron_var_run_t, nfsd_unit_file_t, ninfod_run_t, ninfod_unit_file_t, nis_unit_file_t, nmbd_var_run_t, nova_unit_file_t, nova_var_run_t, nrpe_var_run_t, nscd_unit_file_t, nscd_var_run_t, nsd_var_run_t, nslcd_var_run_t, ntop_var_run_t, ntpd_unit_file_t, ntpd_var_run_t, numad_unit_file_t, numad_var_run_t, nut_unit_file_t, nut_var_run_t, nx_server_var_run_t, oddjob_unit_file_t, oddjob_var_run_t, openct_var_run_t, opendnssec_unit_file_t, opendnssec_var_run_t, openhpid_var_run_t, openshift_var_run_t, opensm_unit_file_t, openvpn_var_run_t, openvswitch_unit_file_t, openvswitch_var_run_t, openwsman_run_t, openwsman_unit_file_t, osad_var_run_t, pads_var_run_t, pam_var_console_t, pam_var_run_t, passenger_var_run_t, pcp_var_run_t, pcscd_var_run_t, pdns_unit_file_t, pdns_var_run_t, pegasus_openlmi_storage_var_run_t, pegasus_var_run_t, pesign_unit_file_t, pesign_var_run_t, phc2sys_unit_file_t, piranha_fos_var_run_t, piranha_lvs_var_run_t, piranha_pulse_var_run_t, piranha_web_var_run_t, pkcs11proxyd_unit_file_t, pkcs11proxyd_var_run_t, pkcs_slotd_lock_t, pkcs_slotd_var_run_t, pki_ra_lock_t, pki_ra_var_run_t, pki_tomcat_lock_t, pki_tomcat_unit_file_t, pki_tomcat_var_run_t, pki_tps_lock_t, pki_tps_var_run_t, plymouthd_var_run_t, policykit_var_run_t, polipo_pid_t, polipo_unit_file_t, portmap_var_run_t, portreserve_var_run_t, postfix_var_run_t, postgresql_lock_t, postgresql_unit_file_t, postgresql_var_run_t, postgrey_var_run_t, power_unit_file_t, pppd_lock_t, pppd_unit_file_t, pppd_var_run_t, pptp_var_run_t, prelude_audisp_var_run_t, prelude_lml_var_run_t, prelude_var_run_t, print_spool_t, privoxy_var_run_t, prosody_unit_file_t, prosody_var_run_t, psad_var_run_t, ptal_var_run_t, ptp4l_unit_file_t, pulseaudio_var_run_t, puppet_var_run_t, pwauth_var_run_t, pyicqt_var_run_t, qdiskd_var_run_t, qemu_var_run_t, qpidd_var_run_t, quota_nld_var_run_t, rabbitmq_unit_file_t, rabbitmq_var_lock_t, rabbitmq_var_run_t, radiusd_unit_file_t, radiusd_var_run_t, radvd_var_run_t, rasdaemon_unit_file_t, rdisc_unit_file_t, readahead_var_run_t, redis_unit_file_t, redis_var_run_t, regex_milter_data_t, restorecond_var_run_t, rhev_agentd_unit_file_t, rhev_agentd_var_run_t, rhnsd_unit_file_t, rhnsd_var_run_t, rhsmcertd_lock_t, rhsmcertd_var_run_t, ricci_modcluster_var_run_t, ricci_modstorage_lock_t, ricci_var_run_t, rkt_unit_file_t, rlogind_var_run_t, rngd_unit_file_t, rngd_var_run_t, rolekit_unit_file_t, roundup_var_run_t, rpcbind_unit_file_t, rpcbind_var_run_t, rpcd_lock_t, rpcd_unit_file_t, rpcd_var_run_t, rpm_var_run_t, rsync_var_run_t, rtas_errd_unit_file_t, rtas_errd_var_lock_t, rtas_errd_var_run_t, samba_unit_file_t, sanlk_resetd_unit_file_t, sanlock_unit_file_t, sanlock_var_run_t, saslauthd_var_run_t, sbd_unit_file_t, sbd_var_run_t, sblim_var_run_t, screen_var_run_t, semanage_read_lock_t, semanage_trans_lock_t, sendmail_var_run_t, sensord_unit_file_t, sensord_var_run_t, setrans_var_run_t, setroubleshoot_var_run_t, shorewall_lock_t, slapd_lock_t, slapd_unit_file_t, slapd_var_run_t, slpd_var_run_t, smbd_var_run_t, smokeping_var_run_t, smsd_var_run_t, snmpd_var_run_t, snort_var_run_t, sosreport_var_run_t, soundd_var_run_t, spamass_milter_data_t, spamd_var_run_t, spc_var_run_t, speech-dispatcher_unit_file_t, squid_var_run_t, srvsvcd_var_run_t, sshd_keygen_unit_file_t, sshd_unit_file_t, sshd_var_run_t, sslh_unit_file_t, sslh_var_run_t, sssd_public_t, sssd_unit_file_t, sssd_var_run_t, stapserver_var_run_t, stunnel_var_run_t, svnserve_unit_file_t, svnserve_var_run_t, swat_var_run_t, swift_lock_t, swift_unit_file_t, swift_var_run_t, sysfs_t, syslogd_unit_file_t, syslogd_var_run_t, system_cronjob_lock_t, system_cronjob_var_run_t, system_dbusd_var_run_t, systemd_gpt_generator_unit_file_t, systemd_home_t, systemd_hwdb_unit_file_t, systemd_logind_inhibit_var_run_t, systemd_logind_sessions_t, systemd_logind_var_run_t, systemd_machined_unit_file_t, systemd_machined_var_run_t, systemd_modules_load_unit_file_t, systemd_networkd_unit_file_t, systemd_networkd_var_run_t, systemd_passwd_var_run_t, systemd_resolved_unit_file_t, systemd_resolved_var_run_t, systemd_rfkill_unit_file_t, systemd_runtime_unit_file_t, systemd_timedated_unit_file_t, systemd_unit_file_t, systemd_vconsole_unit_file_t, targetd_unit_file_t, telnetd_var_run_t, tftpd_var_run_t, tgtd_var_run_t, thin_aeolus_configserver_var_run_t, thin_var_run_t, timemaster_unit_file_t, timemaster_var_run_t, tlp_unit_file_t, tlp_var_run_t, tmp_t, tmpfs_t, tomcat_unit_file_t, tomcat_var_run_t, tor_unit_file_t, tor_var_run_t, tuned_var_run_t, udev_var_run_t, uml_switch_var_run_t, usbmuxd_unit_file_t, usbmuxd_var_run_t, user_tmp_t, useradd_var_run_t, uucpd_lock_t, uucpd_var_run_t, uuidd_var_run_t, var_lock_t, var_run_t, varnishd_var_run_t, varnishlog_var_run_t, vdagent_var_run_t, vhostmd_var_run_t, virt_lock_t, virt_lxc_var_run_t, virt_qemu_ga_var_run_t, virt_var_run_t, virtd_unit_file_t, virtlogd_unit_file_t, virtlogd_var_run_t, vmtools_unit_file_t, vmware_host_pid_t, vmware_pid_t, vnstatd_var_run_t, vpnc_var_run_t, watchdog_var_run_t, wdmd_var_run_t, winbind_var_run_t, xdm_lock_t, xdm_var_run_t, xenconsoled_var_run_t, xend_var_run_t, xenstored_var_run_t, xserver_var_run_t, ypbind_unit_file_t, ypbind_var_run_t, yppasswdd_var_run_t, ypserv_var_run_t, ypxfr_var_run_t, zabbix_var_run_t, zarafa_deliver_var_run_t, zarafa_gateway_var_run_t, zarafa_ical_var_run_t, zarafa_indexer_var_run_t, zarafa_monitor_var_run_t, zarafa_server_var_run_t, zarafa_spooler_var_run_t, zebra_unit_file_t, zebra_var_run_t, zoneminder_unit_file_t, zoneminder_var_run_t.
+                Then execute:
+                restorecon -v &#39;USERNAME&#39;
+
+
+                *****  Plugin catchall (17.1 confidence) suggests   **************************
+
+                If you believe that ttbd should be allowed create access on the local directory by default.
+                Then you should report this as a bug.
+                You can generate a local policy module to allow this access.
+                Do
+                allow this access for now by executing:
+                # ausearch -c &#39;ttbd&#39; --raw | audit2allow -M my-ttbd
+                # semodule -X 300 -i my-ttbd.pp
+</pre></div>
+</div>
+<p>where <em>USERNAME</em> is any user with access to <em>ttbd</em>.</p>
+<p>This usually happens when the daemon is being ran from an installation
+that is not installed in the system; for remediation:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># semanage fcontext -a -t var_run_t /var/cache/ttbd-staging</span>
+<span class="c1"># restorecon -v /var/cache/ttbd-staging</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="network-qemu-target-fails-to-power-up-with-permission-denied-dev-tapnumber">
+<h3>6.2.10. Network QEMU target fails to power up with <em>Permission denied: ‘/dev/tapNUMBER’</em><a class="headerlink" href="#network-qemu-target-fails-to-power-up-with-permission-denied-dev-tapnumber" title="Permalink to this headline">¶</a></h3>
+<p>Trying to power up a QEMU VM that uses <em>macvtap</em> devices for
+networking:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf power-on ql06a
+Traceback (most recent call last):
+  File &quot;/usr/bin/tcf&quot;, line 517, in &lt;module&gt;
+    retval = args.func(args)
+  File &quot;/usr/lib/python2.7/site-packages/tcfl/ttb_client.py&quot;, line 799, in rest_target_power_on
+    rtb.rest_tb_target_power_on(rt)
+  File &quot;/usr/lib/python2.7/site-packages/tcfl/ttb_client.py&quot;, line 319, in rest_tb_target_power_on
+    data = { &#39;ticket&#39;: ticket })
+  File &quot;/usr/lib/python2.7/site-packages/tcfl/ttb_client.py&quot;, line 196, in send_request
+    commonl.request_response_maybe_raise(r)
+  File &quot;/usr/lib/python2.7/site-packages/commonl/__init__.py&quot;, line 468, in request_response_maybe_raise
+    raise e
+requests.exceptions.HTTPError: 400: ql06a: [Errno 13] Permission denied: &#39;/dev/tap1023&#39;
+</pre></div>
+</div>
+<p>is usually caused by a SELinux check disallowing the daemon access to
+the <code class="docutils literal"><span class="pre">/dev/tapNUMBER</span></code> device.</p>
+<p>The system’s journal might show:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">audit</span><span class="p">[</span><span class="mi">11345</span><span class="p">]:</span> <span class="n">AVC</span> <span class="n">avc</span><span class="p">:</span>  <span class="n">denied</span>  <span class="p">{</span> <span class="nb">open</span> <span class="p">}</span> <span class="k">for</span>  <span class="n">pid</span><span class="o">=</span><span class="mi">11345</span> <span class="n">comm</span><span class="o">=</span><span class="s2">&quot;ttbd&quot;</span> <span class="n">path</span><span class="o">=</span><span class="s2">&quot;/dev/tap1023&quot;</span> <span class="n">dev</span><span class="o">=</span><span class="s2">&quot;devtmpfs&quot;</span> <span class="n">ino</span><span class="o">=</span><span class="mi">35798295</span> <span class="n">scontext</span><span class="o">=</span><span class="n">system_u</span><span class="p">:</span><span class="n">system_r</span><span class="p">:</span><span class="n">init_t</span><span class="p">:</span><span class="n">s0</span> <span class="n">tcontext</span><span class="o">=</span><span class="n">system_u</span><span class="p">:</span><span class="n">object_r</span><span class="p">:</span><span class="n">tun_tap_device_t</span><span class="p">:</span><span class="n">s0</span> <span class="n">tclass</span><span class="o">=</span><span class="n">chr_file</span> <span class="n">permissive</span><span class="o">=</span><span class="mi">0</span>
+</pre></div>
+</div>
+<p>there is no current proper fix, other than disabling SELinux:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># setenforce 0</span>
+</pre></div>
+</div>
+<p>however, this seems to only happen when running the daemon from a
+<em>$HOME</em> directory, instead of from a system installation.</p>
+</div>
+<div class="section" id="ldap-login-fails-with-invalid-credentials-but-the-password-is-right-i-know">
+<span id="ttbd-auth-ldap-invalid-creds"></span><h3>6.2.11. LDAP login fails with invalid credentials, but the password is right, I know<a class="headerlink" href="#ldap-login-fails-with-invalid-credentials-but-the-password-is-right-i-know" title="Permalink to this headline">¶</a></h3>
+<p>It’s been seeing that sometimes LDAP fails when the password is well
+known; seen when <code class="docutils literal"><span class="pre">journalctl</span> <span class="pre">-eu</span> <span class="pre">ttbd&#64;production</span> <span class="pre">|</span> <span class="pre">grep</span> <span class="pre">-i</span> <span class="pre">ldap</span></code>
+reports:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Mar</span> <span class="mi">21</span> <span class="mi">02</span><span class="p">:</span><span class="mi">08</span><span class="p">:</span><span class="mi">30</span> <span class="n">HOSTNAME</span> <span class="n">ttbd</span><span class="p">[</span><span class="mi">10041</span><span class="p">]:</span> <span class="n">I</span><span class="p">[</span><span class="mi">10217</span><span class="p">]</span> <span class="n">ttbd</span><span class="o">.</span><span class="n">login</span><span class="p">():</span><span class="mi">249</span><span class="p">:</span> \
+  <span class="n">user</span> <span class="n">USERNAME</span><span class="p">:</span> <span class="n">invalid</span> <span class="n">credentials</span> <span class="kn">from</span> <span class="nn">ldap</span><span class="p">:</span><span class="o">//</span><span class="n">LDAPSERVER</span><span class="p">:</span><span class="n">PORT</span><span class="p">:</span> \
+  <span class="n">USERNAME</span><span class="p">:</span> <span class="n">invalid</span> <span class="n">credentials</span> <span class="k">for</span> <span class="n">LDAP</span> <span class="n">ldap</span><span class="p">:</span><span class="o">//</span><span class="n">LDAPSERVER</span><span class="p">:</span><span class="n">PORT</span><span class="p">:</span> \
+  <span class="p">{</span><span class="s1">&#39;info&#39;</span><span class="p">:</span> <span class="s1">&#39;80090308: LdapErr: DSID-0C0903D9, </span><span class="se">\</span>
+<span class="s1">    comment: AcceptSecurityContext error, data 52e, v2580&#39;</span><span class="p">,</span> \
+    <span class="s1">&#39;desc&#39;</span><span class="p">:</span> <span class="s1">&#39;Invalid credentials&#39;</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>Root causing help welcome, as it’s still unknown.</p>
+<p>Restarting the daemon usually fixes it:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># systemctl restart ttbd@production</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="freedom-board-k64f">
+<h3>6.2.12. Freedom Board k64f<a class="headerlink" href="#freedom-board-k64f" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="freedom-board-k64f-openocd-fails-to-power-up-unable-to-open-cmsis-dap-device-0xd28-0x204">
+<h4>6.2.12.1. Freedom Board k64f, openocd fails to power up (unable to open CMSIS-DAP device 0xd28:0x204)<a class="headerlink" href="#freedom-board-k64f-openocd-fails-to-power-up-unable-to-open-cmsis-dap-device-0xd28-0x204" title="Permalink to this headline">¶</a></h4>
+<p>When an <em>frdm</em> target fails to power up and <em>ttbd</em> logs in
+<em>journalctl -eu ttbd&#64;production</em> show:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Info</span> <span class="p">:</span> <span class="n">auto</span><span class="o">-</span><span class="n">selecting</span> <span class="n">first</span> <span class="n">available</span> <span class="n">session</span> <span class="n">transport</span> <span class="s2">&quot;swd&quot;</span><span class="o">.</span> <span class="n">To</span> <span class="n">override</span> <span class="n">use</span> <span class="s1">&#39;transport select &lt;transport&gt;&#39;</span><span class="o">.</span>
+<span class="n">Info</span> <span class="p">:</span> <span class="n">add</span> <span class="n">flash_bank</span> <span class="n">kinetis</span> <span class="n">k60</span><span class="o">.</span><span class="n">flash</span>
+<span class="n">adapter</span> <span class="n">speed</span><span class="p">:</span> <span class="mi">1000</span> <span class="n">kHz</span>
+<span class="n">none</span> <span class="n">separate</span>
+<span class="n">cortex_m</span> <span class="n">reset_config</span> <span class="n">sysresetreq</span>
+<span class="n">Error</span><span class="p">:</span> <span class="n">unable</span> <span class="n">to</span> <span class="nb">open</span> <span class="n">CMSIS</span><span class="o">-</span><span class="n">DAP</span> <span class="n">device</span> <span class="mh">0xd28</span><span class="p">:</span><span class="mh">0x204</span>
+</pre></div>
+</div>
+<p>this usually means <em>openocd</em> is trying to open the <cite>/dev/hidrawN</cite> file
+that represents this device, but it can’t. Usually it happens because
+the way <em>udev</em> has configured it with <em>uaccess</em>, and it looks like:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># getfacl /dev/hidraw0</span>
+<span class="n">getfacl</span><span class="p">:</span> <span class="n">Removing</span> <span class="n">leading</span> <span class="s1">&#39;/&#39;</span> <span class="kn">from</span> <span class="nn">absolute</span> <span class="n">path</span> <span class="n">names</span>
+<span class="c1"># file: dev/hidraw0</span>
+<span class="c1"># owner: root</span>
+<span class="c1"># group: root</span>
+<span class="n">user</span><span class="p">::</span><span class="n">rw</span><span class="o">-</span>
+<span class="n">user</span><span class="p">:</span><span class="n">gdm</span><span class="p">:</span><span class="n">rw</span><span class="o">-</span>
+<span class="n">group</span><span class="p">::</span><span class="o">---</span>
+<span class="n">mask</span><span class="p">::</span><span class="n">rw</span><span class="o">-</span>
+<span class="n">other</span><span class="p">::</span><span class="o">---</span>
+</pre></div>
+</div>
+<p>there is no <em>group::</em> permission and because of ACL rules, even if
+there is <em>g+rw</em> in the Unix bits. The solution has been implemented
+with <em>udev</em> rule that forces any CMSIS devices to be owned by group
+<em>ttbd</em>.</p>
+<p>Make sure your <em>ttbd-zephyr</em> version is at least &gt;= <em>0.10_6_N-M</em>
+with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># rpm -qa | grep ttbd</span>
+<span class="n">ttbd</span><span class="o">-</span><span class="mf">0.10</span><span class="n">_8_g69bcfa3</span><span class="o">-</span><span class="mf">1.</span><span class="n">noarch</span>
+<span class="n">ttbd</span><span class="o">-</span><span class="n">zephyr</span><span class="o">-</span><span class="mf">0.10</span><span class="n">_8_g69bcfa3</span><span class="o">-</span><span class="mf">1.</span><span class="n">noarch</span>
+</pre></div>
+</div>
+<p>which can be quickly updated with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># dnf update --best --allowerasing ttbd ttbd-zephyr</span>
+</pre></div>
+</div>
+<p>(<a class="reference internal" href="04-HOWTOs.html#tcf-update"><span class="std std-ref">update instructions</span></a>).</p>
+</div>
+<div class="section" id="frdm-k64f-boards-fail-to-power-up-openocd-prints-message-about-reset-wdog-loop">
+<h4>6.2.12.2. FRDM k64f boards fail to power up, OpenOCD prints message about RESET/WDOG loop<a class="headerlink" href="#frdm-k64f-boards-fail-to-power-up-openocd-prints-message-about-reset-wdog-loop" title="Permalink to this headline">¶</a></h4>
+<p>An FRDM board fails to power up because OpenOCD cannot initialize,
+printing in the journal a message similar to:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">log</span><span class="p">:</span> <span class="n">Info</span> <span class="p">:</span> <span class="n">SWD</span> <span class="n">DPIDR</span> <span class="mh">0x2ba01477</span>
+<span class="n">log</span><span class="p">:</span> <span class="n">Warn</span> <span class="p">:</span> <span class="o">****</span> <span class="n">Your</span> <span class="n">Kinetis</span> <span class="n">MCU</span> <span class="ow">is</span> <span class="n">probably</span> <span class="n">locked</span><span class="o">-</span><span class="n">up</span> <span class="ow">in</span> <span class="n">RESET</span><span class="o">/</span><span class="n">WDOG</span> <span class="n">loop</span><span class="o">.</span> <span class="o">****</span>
+<span class="n">log</span><span class="p">:</span> <span class="n">Warn</span> <span class="p">:</span> <span class="o">****</span> <span class="n">Common</span> <span class="n">reason</span> <span class="ow">is</span> <span class="n">a</span> <span class="n">blank</span> <span class="n">flash</span> <span class="p">(</span><span class="n">at</span> <span class="n">least</span> <span class="n">a</span> <span class="n">reset</span> <span class="n">vector</span><span class="p">)</span><span class="o">.</span>  <span class="o">****</span>
+<span class="n">log</span><span class="p">:</span> <span class="n">Warn</span> <span class="p">:</span> <span class="o">****</span> <span class="n">Issue</span> <span class="s1">&#39;kinetis mdm halt&#39;</span> <span class="n">command</span> <span class="ow">or</span> <span class="k">if</span> <span class="n">SRST</span> <span class="ow">is</span> <span class="n">connected</span>   <span class="o">****</span>
+<span class="n">log</span><span class="p">:</span> <span class="n">Warn</span> <span class="p">:</span> <span class="o">****</span> <span class="ow">and</span> <span class="n">configured</span><span class="p">,</span> <span class="n">use</span> <span class="s1">&#39;reset halt&#39;</span>                           <span class="o">****</span>
+<span class="n">log</span><span class="p">:</span> <span class="n">Warn</span> <span class="p">:</span> <span class="o">****</span> <span class="n">If</span> <span class="n">MCU</span> <span class="n">cannot</span> <span class="n">be</span> <span class="n">halted</span><span class="p">,</span> <span class="n">it</span> <span class="ow">is</span> <span class="n">likely</span> <span class="n">secured</span> <span class="ow">and</span> <span class="n">running</span>  <span class="o">****</span>
+<span class="n">log</span><span class="p">:</span> <span class="n">Warn</span> <span class="p">:</span> <span class="o">****</span> <span class="ow">in</span> <span class="n">RESET</span><span class="o">/</span><span class="n">WDOG</span> <span class="n">loop</span><span class="o">.</span> <span class="n">Issue</span> <span class="s1">&#39;kinetis mdm mass_erase&#39;</span>         <span class="o">****</span>
+<span class="n">log</span><span class="p">:</span> <span class="n">Info</span> <span class="p">:</span> <span class="n">SWD</span> <span class="n">DPIDR</span> <span class="mh">0x2ba01477</span>
+<span class="n">log</span><span class="p">:</span> <span class="n">Error</span><span class="p">:</span> <span class="n">Failed</span> <span class="n">to</span> <span class="n">read</span> <span class="n">memory</span> <span class="n">at</span> <span class="mh">0xe000ed00</span>
+<span class="n">log</span><span class="p">:</span> <span class="n">Info</span> <span class="p">:</span> <span class="n">accepting</span> <span class="s1">&#39;tcl&#39;</span> <span class="n">connection</span> <span class="n">on</span> <span class="n">tcp</span><span class="o">/</span><span class="mi">38743</span>
+</pre></div>
+</div>
+<p>(which can be found with <code class="docutils literal"><span class="pre">journalctl</span> <span class="pre">-au</span> <span class="pre">ttbd&#64;production</span> <span class="pre">|</span> <span class="pre">grep</span> <span class="pre">BOARDNAME</span> <span class="pre">|</span> <span class="pre">less</span> <span class="pre">-S</span></code>)</p>
+<p>this means that the board cannot boot properly because it is stuck in
+a Reset/Watchdog loop. The watchdog resets the board before it can
+load the firmware. OpenOCD is not able to get in there. The green led
+next to the <em>SDAUSB</em> is on and next to it, the <em>RST</em> red light blinks.</p>
+<p>The procedure to fix, involves, in the following order:</p>
+<ul class="simple">
+<li>set the up the target in debug mode</li>
+<li>issue OpenOCD commands to stop the loop</li>
+<li>copy a known firmware image to its flash drive</li>
+<li>reset the board to normal configuration</li>
+</ul>
+<p>this is accomplished by as script in the examples directory:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run -vvt frdm-NN /usr/share/tcf/examples/test_frdm_recover.py
+</pre></div>
+</div>
+<div class="section" id="manual-execution-of-the-procedure">
+<h5>6.2.12.2.1. Manual execution of the procedure<a class="headerlink" href="#manual-execution-of-the-procedure" title="Permalink to this headline">¶</a></h5>
+</div>
+</div>
+<div class="section" id="set-the-up-the-target-in-debug-mode">
+<h4>6.2.12.3. Set the up the target in debug mode<a class="headerlink" href="#set-the-up-the-target-in-debug-mode" title="Permalink to this headline">¶</a></h4>
+<p>Disable the board so none tries to use it:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf disable frdm-NN; tcf release -f frdm-NN; tcf acquire frdm-NN
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">this might have to be done a few times, as other jobs might
+acquire the target in between; it helps to do it all in a
+single line.</p>
+</div>
+<p>Set OpenOCD to operate in relaxed mode, so it doesn’t require the
+target to be in standing order to succesfully start:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf power-off frdm-NN
+$ tcf property-set frdm-NN openocd-relaxed True
+</pre></div>
+</div>
+<p>Power cycle the target (will take a while as it will retry):</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf power-cycle frdm-NN
+</pre></div>
+</div>
+<p>it might take a while as OpenOCD tries to start. The green red light next to
+green power light is on, blinking</p>
+</div>
+<div class="section" id="issue-openocd-commands-to-stop-the-loop">
+<h4>6.2.12.4. Issue OpenOCD commands to stop the loop<a class="headerlink" href="#issue-openocd-commands-to-stop-the-loop" title="Permalink to this headline">¶</a></h4>
+<p>Issue the OpenOCD command <code class="docutils literal"><span class="pre">kinetis</span> <span class="pre">mdm</span> <span class="pre">halt</span></code>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf debug-openocd frdm-NN &quot;kinetis mdm halt&quot;
+</pre></div>
+</div>
+<p>Repeat this command until any the following things happen:</p>
+<ul>
+<li><p class="first">the following output is printed:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Halt</span> <span class="n">timed</span> <span class="n">out</span><span class="p">,</span> <span class="n">wake</span> <span class="n">up</span> <span class="n">GDB</span><span class="o">.</span>
+<span class="n">Polling</span> <span class="n">target</span> <span class="n">k60</span><span class="o">.</span><span class="n">cpu</span> <span class="n">failed</span><span class="p">,</span> <span class="n">trying</span> <span class="n">to</span> <span class="n">reexamine</span>
+<span class="n">MDM</span><span class="p">:</span> <span class="n">Chip</span> <span class="ow">is</span> <span class="n">unsecured</span><span class="o">.</span> <span class="n">Continuing</span><span class="o">.</span>
+<span class="n">k60</span><span class="o">.</span><span class="n">cpu</span><span class="p">:</span> <span class="n">hardware</span> <span class="n">has</span> <span class="mi">6</span> <span class="n">breakpoints</span><span class="p">,</span> <span class="mi">4</span> <span class="n">watchpoints</span>
+<span class="n">k60</span><span class="o">.</span><span class="n">cpu</span><span class="p">:</span> <span class="n">target</span> <span class="n">state</span><span class="p">:</span> <span class="n">halted</span>
+<span class="n">target</span> <span class="n">halted</span> <span class="n">due</span> <span class="n">to</span> <span class="n">debug</span><span class="o">-</span><span class="n">request</span><span class="p">,</span> <span class="n">current</span> <span class="n">mode</span><span class="p">:</span> <span class="n">Thread</span>
+<span class="n">xPSR</span><span class="p">:</span> <span class="mh">0x01000000</span> <span class="n">pc</span><span class="p">:</span> <span class="mh">0xfffffffe</span> <span class="n">msp</span><span class="p">:</span> <span class="mh">0xfffffffc</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">nothing is printed</p>
+</li>
+<li><p class="first">the red led stops blinking</p>
+</li>
+</ul>
+<p>Verify with the following command reporting the CPU is halted:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf debug-openocd frdm-28y &quot;targets&quot;
+TargetName         Type       Endian TapName            State
+--  ------------------ ---------- ------ ------------------ ------------
+0* k60.cpu            cortex_m   little k60.cpu            halted
+</pre></div>
+</div>
+<p>Retry otherwise, with any of:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf debug-openocd frdm-NN &quot;kinetis mdm halt&quot;
+$ tcf debug-openocd frdm-NN &quot;reset halt&quot;
+</pre></div>
+</div>
+<p>Sometimes you might have to issue a <em>kinetis mdm mass_erase</em> command
+and press the <em>RESET</em> button on the board. Follow the messages.</p>
+</div>
+<div class="section" id="copy-a-known-firmware-image-to-its-flash-drive">
+<h4>6.2.12.5. Copy a known firmware image to its flash drive<a class="headerlink" href="#copy-a-known-firmware-image-to-its-flash-drive" title="Permalink to this headline">¶</a></h4>
+<p>Flash using openocd commands:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf debug-openocd frdm-NN &quot;flash write_image erase /var/lib/ttbd/frdm_k64f_recovery.bin 0&quot;
+auto erase enabled
+Flash Configuration Field written.
+Reset or power off the device to make settings effective.
+wrote 12288 bytes from file /var/lib/ttbd/frdm_k64f_recovery.bin in 0.998723s (12.015 KiB/s)
+
+might need to retry a couple times.
+</pre></div>
+</div>
+</div>
+<div class="section" id="reset-the-board-to-normal-configuration">
+<h4>6.2.12.6. Reset the board to normal configuration<a class="headerlink" href="#reset-the-board-to-normal-configuration" title="Permalink to this headline">¶</a></h4>
+<ul>
+<li><p class="first">Remove the relaxed setting for openocd:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf property-set frdm-NN openocd-relaxed
+</pre></div>
+</div>
+</li>
+<li><p class="first">power off the target:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf power-off frdm-NN
+</pre></div>
+</div>
+</li>
+<li><p class="first">run a healtcheck on it:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf healthcheck frdm-NN
+...
+frdm-NN: healthcheck completed
+</pre></div>
+</div>
+</li>
+<li><p class="first">finally, enable the target for normal operation:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf enable frdm-NN
+</pre></div>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="arduino101">
+<h3>6.2.13. Arduino101<a class="headerlink" href="#arduino101" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="arduino101-openocd-fails-to-power-up-targets-report-tap-disabled">
+<h4>6.2.13.1. Arduino101: openocd fails to power up (targets report tap-disabled)<a class="headerlink" href="#arduino101-openocd-fails-to-power-up-targets-report-tap-disabled" title="Permalink to this headline">¶</a></h4>
+<p>When the target fails to power up and in the daemon log,
+<em>journalctl -eu ttbd&#64;production</em> shows something like:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">init</span> <span class="n">verification</span> <span class="n">JTAG</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mi">8</span><span class="p">):</span> <span class="n">Error</span> <span class="n">condition</span><span class="p">:</span> <span class="n">n</span><span class="o">/</span><span class="n">a</span>
+<span class="n">init</span> <span class="n">verification</span> <span class="n">JTAG</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mi">8</span><span class="p">):</span> <span class="n">output</span><span class="p">[</span><span class="n">before</span><span class="p">]:</span> <span class="n">TargetName</span>         <span class="n">Type</span>       <span class="n">Endian</span> <span class="n">TapName</span>            <span class="n">State</span>
+<span class="n">init</span> <span class="n">verification</span> <span class="n">JTAG</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mi">8</span><span class="p">):</span> <span class="n">output</span><span class="p">[</span><span class="n">before</span><span class="p">]:</span> <span class="o">--</span>  <span class="o">------------------</span> <span class="o">----------</span> <span class="o">------</span> <span class="o">------------------</span> <span class="o">------------</span>
+<span class="n">init</span> <span class="n">verification</span> <span class="n">JTAG</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mi">8</span><span class="p">):</span> <span class="n">output</span><span class="p">[</span><span class="n">before</span><span class="p">]:</span> <span class="mi">0</span>  <span class="n">quark_se</span><span class="o">.</span><span class="n">quark</span>     <span class="n">quark_se</span>   <span class="n">little</span> <span class="n">quark_se</span><span class="o">.</span><span class="n">quark</span>     <span class="n">tap</span><span class="o">-</span><span class="n">disabled</span>
+<span class="n">init</span> <span class="n">verification</span> <span class="n">JTAG</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mi">8</span><span class="p">):</span> <span class="n">output</span><span class="p">[</span><span class="n">before</span><span class="p">]:</span> <span class="mi">1</span><span class="o">*</span> <span class="n">quark_se</span><span class="o">.</span><span class="n">arc</span><span class="o">-</span><span class="n">em</span>    <span class="n">arc32</span>      <span class="n">little</span> <span class="n">quark_se</span><span class="o">.</span><span class="n">arc</span><span class="o">-</span><span class="n">em</span>    <span class="n">tap</span><span class="o">-</span><span class="n">disabled</span>
+<span class="n">init</span> <span class="n">verification</span> <span class="n">JTAG</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mi">8</span><span class="p">):</span> <span class="n">output</span><span class="p">[</span><span class="n">before</span><span class="p">]:</span> <span class="o">^</span><span class="n">Z</span>
+</pre></div>
+</div>
+<p>Note the <em>tap-disabled</em> part–this says that OpenOCD can talk to the
+JTAG, but they JTAG can’t talk to the CPU. There are usually the
+following reasons for it:</p>
+<ul class="simple">
+<li>the JTAG cable is not properly connected; ensure the cable is the
+right one and it is properly connected, paying close attention to
+the pinout (for example, as described in the fixture documented in
+<a class="reference internal" href="09-api.html#conf_00_lib.arduino101_add" title="conf_00_lib.arduino101_add"><code class="xref py py-func docutils literal"><span class="pre">conf_00_lib.arduino101_add()</span></code></a>).</li>
+<li>the hardware itself might have a hardware block against
+JTAGs. Disable it (if possible).</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="07-Architecture.html" class="btn btn-neutral float-right" title="7. Architecture" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="05-RFAQs.html" class="btn btn-neutral" title="5. Rationales and Frequently Asked Questions" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2015, Author.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'0.11',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

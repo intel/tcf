@@ -1,0 +1,83 @@
+# This is a generic systemd unit to run system-wide TTBD
+#
+# - run as root: systemctl enable ttbd@[tag].service
+#
+# Note it is set to user ttbd, so you will likely have permission
+# issues. For your system's deployment, you will want to copy this to
+# another name and set the ttbd user to the user who can access the
+# resources it will need.
+#
+# Requirements:
+# - Python package sdnotify (pip install sdnotify)
+#
+
+[Unit]
+Description = Test Targer Broker Daemon %I
+# We need network to be online (require) but want to start after it is
+# done starting
+Requires = network-online.target
+After = network-online.target
+# Say there is a daemon that controls the infrastructure
+#Requires = ttbd@infrastructure.service
+
+[Service]
+# Run ExcecStartPre as root
+PermissionsStartOnly = True
+# Some needed tools might configure themselves in /etc/environment
+# (-: do not fail if file does not exist)
+EnvironmentFile = -/etc/environment
+
+# The daemon needs the following capabilities enabled for its
+# operation:
+#
+# - CAP_NET_ADMIN: to be able to setup network interfaces
+#
+# For other configurations that can be enabled but haven't been yet
+# completely developed, you might need:
+#
+#  - CAP_NET_RAW: for DHCPd and tcpdump
+#  - CAP_NET_BIND_SERVICE: to start dhcpd/tftpd (port < 1024)
+#  - CAP_SYS_CHROOT: for tftpd to work
+AmbientCapabilities = CAP_NET_RAW CAP_NET_ADMIN
+
+# Allow stuff started by this daemon to access the following
+# capabilities (but the daemon doesn't need them/use them):
+#
+# - CAP_SETUID & CAP_SETGID: to be able to run sudo/suid,sgid from
+#   inside us
+#
+# - CAP_SETGID: will need for tftpd to be able to work
+#
+# - CAP_SYS_ADMIN, so sudo-launched helpers can do stuff, but the
+#   daemon itself doesn't need them. Things like re-reading partition
+#   tables, etc
+#
+# - CAP_DAC_OVERRIDE & CAP_FOWNER: access files of other users once we
+#   sudo
+#
+# - CAP_AUDIT_WRITE: so sudo can send audit messages and not die trying
+#
+CapabilityBoundingSet = CAP_NET_RAW CAP_NET_ADMIN \
+    CAP_SETGID CAP_SETUID \
+    CAP_SYS_ADMIN CAP_FOWNER CAP_DAC_OVERRIDE CAP_AUDIT_WRITE
+Type = notify
+User = ttbd
+Group = ttbd
+SupplementaryGroups = dialout root kvm
+# Clean compiled Python to avoid old files (from removed .py)
+ExecStartPre = /bin/rm -f /etc/ttbd-%i/*.pyc
+ExecStartPre = /usr/bin/install -vv -d --mode 2770 --owner ttbd --group ttbd /var/run/ttbd-%i /var/cache/ttbd-%i
+ExecStart = /usr/bin/ttbd -vv -w %i
+TimeoutSec = 300
+NotifyAccess = all
+Restart = always
+# Send SIGKILL after 5s
+TimeoutStopSec = 5
+# The cleanup thread has to ping systemd at regular internvals; we
+# give a long breather as sometimes targets get icky and
+# won't respond quick. 2m was tried but it was too short when we were
+# dealing with a recovery for a YK doing a power-{get,off} operation.
+WatchdogSec = 360
+
+[Install]
+WantedBy = multi-user.target

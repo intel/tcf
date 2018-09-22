@@ -1,0 +1,950 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>7. Architecture &mdash; Test Case Framework 0.11 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../genindex.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="Test Case Framework 0.11 documentation" href="../index.html"/>
+        <link rel="next" title="8. APIs" href="09-api.html"/>
+        <link rel="prev" title="6. Support &amp; Troubleshooting" href="06-troubleshooting.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../README.html" class="icon icon-home"> Test Case Framework
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.11
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../02-QUICKSTART.html">1. Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02-guides.html">2. Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="03-server-setup.html">3. Server deployment guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="04-HOWTOs.html">4. HOWTOs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="05-RFAQs.html">5. Rationales and Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="06-troubleshooting.html">6. Support &amp; Troubleshooting</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">7. Architecture</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#the-tcf-client">7.1. The TCF client</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#the-testcase-finder-and-runner">7.1.1. The testcase finder and runner</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#the-test-target-broker">7.2. The Test Target Broker</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#daemon-internals">7.2.1. Daemon internals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#maintaining-state">7.2.2. Maintaining state</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#interfaces">7.2.3. Interfaces</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#power-control">7.2.3.1. Power control</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#console-management">7.2.3.2. Console management</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file-deployment">7.2.3.3. File deployment</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#image-deployment">7.2.3.4. Image deployment</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#debugging">7.2.3.5. Debugging</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#things">7.2.3.6. Things</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#authentication">7.2.4. Authentication</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#security-considerations">7.3. Security considerations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#general">7.3.1. General</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#client">7.3.2. Client</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#daemon">7.3.3. Daemon</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#daemon-access-control">7.3.3.1. Daemon access control</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file-permissions">7.3.3.2. File permissions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#other-processes-started-by-the-daemon">7.3.3.3. Other processes started by the daemon</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#networking">7.3.3.4. Networking</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#taxonomy-of-test-cases">7.4. Taxonomy of test cases</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="09-api.html">8. APIs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">9. Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="10-Status.html">10. Current status and plans</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../01-CHANGELOG.html">11. TCF release v0.11</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../README.html">Test Case Framework</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../README.html">Docs</a> &raquo;</li>
+        
+      <li>7. Architecture</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/doc/07-Architecture.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="architecture">
+<h1>7. Architecture<a class="headerlink" href="#architecture" title="Permalink to this headline">¶</a></h1>
+<p>The test framework is composed of the following parts:</p>
+<blockquote>
+<div><ul class="simple">
+<li><a class="reference internal" href="glossary.html#term-test-case"><span class="xref std std-term">test case</span></a>s</li>
+<li><a class="reference internal" href="glossary.html#term-test-case-finder"><span class="xref std std-term">test case finder</span></a> and <a class="reference internal" href="glossary.html#term-test-runner"><span class="xref std std-term">test runner</span></a></li>
+<li><a class="reference internal" href="glossary.html#term-target-broker"><span class="xref std std-term">target broker</span></a></li>
+<li><a class="reference internal" href="glossary.html#term-test-target"><span class="xref std std-term">test target</span></a>s</li>
+</ul>
+</div></blockquote>
+<div class="section" id="the-tcf-client">
+<h2>7.1. The TCF client<a class="headerlink" href="#the-tcf-client" title="Permalink to this headline">¶</a></h2>
+<p>The <code class="docutils literal"><span class="pre">tcf</span></code> client is the frontend to the user; it provides commands
+for the user to locate test cases and execute them on targets, as well
+as an interface to interact with one or more target brokers and manage
+targets.</p>
+<p>The <code class="docutils literal"><span class="pre">tcf</span></code> script mainly offers the interaction to the user on the
+command line. It just loads its configuration (from
+<cite>{/etc/tcf,~/.tcf,.tcf}/conf_*.py</cite>) with pointers to the brokers to
+use and interprets the command line to execute whichever action the
+user requested. The actual functionality is implemented by modules in
+the <code class="docutils literal"><span class="pre">tcfl</span></code> subdirectory:</p>
+<ul>
+<li><p class="first"><a class="reference internal" href="09-api.html#module-tcfl.tc" title="tcfl.tc"><code class="xref py py-mod docutils literal"><span class="pre">tcfl.tc</span></code></a>: implements the backbone test case finder and runner
+and the TCF specific testcase-driver; other drivers may be created
+by subclassing <a class="reference internal" href="09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal"><span class="pre">tcfl.tc.tc_c</span></code></a> and adding them with
+<a class="reference internal" href="09-api.html#tcfl.config.tc_driver_add" title="tcfl.config.tc_driver_add"><code class="xref py py-func docutils literal"><span class="pre">tcfl.config.tc_driver_add()</span></code></a>.</p>
+</li>
+<li><p class="first"><a class="reference internal" href="09-api.html#module-tcfl.config" title="tcfl.config"><code class="xref py py-mod docutils literal"><span class="pre">tcfl.config</span></code></a>: is a quick wrapper of the configuration
+directives that can be put in TCF’s configuration files.</p>
+</li>
+<li><p class="first"><a class="reference internal" href="09-api.html#module-tcfl.ttb_client" title="tcfl.ttb_client"><code class="xref py py-mod docutils literal"><span class="pre">tcfl.ttb_client</span></code></a>: implements the the remote interaction of
+<code class="docutils literal"><span class="pre">tcf</span></code> with the target broker as an HTTP API, using the Python
+<code class="docutils literal"><span class="pre">requests</span></code> module. This API can be used by anyone, not just
+the <code class="docutils literal"><span class="pre">tcf</span></code> script. It also implements the basic glue to be able to
+execute most of those commands via the command line.</p>
+<p>For some target interfaces, those are implemented in the different
+<cite>tcfl.target_ext_*.py</cite> files that implemnt all relative to said
+interface.</p>
+</li>
+</ul>
+<div class="section" id="the-testcase-finder-and-runner">
+<h3>7.1.1. The testcase finder and runner<a class="headerlink" href="#the-testcase-finder-and-runner" title="Permalink to this headline">¶</a></h3>
+<p>The <em>tcf run</em> testcase (<cite>tcfl.tc._run()</cite>) will:</p>
+<ul>
+<li><p class="first">With <cite>tcfl.tc.testcases_discover()</cite>, find testcases on the given
+locations with all the testcase drivers registered in the system and
+filter them based on command line specification</p>
+</li>
+<li><p class="first">With <cite>tcfl.tc._targets_discover()</cite> find all the remote test targets
+available and filter them based on command line specificaton</p>
+</li>
+<li><p class="first">for each testcase, determine on which test targets or groups of test
+targets it shall (<cite>tcfl.tc._run_on_targets()</cite>).</p>
+<p>If a testcase requires no target (a <em>static</em> testcase), then it is
+assumed to work on the <em>local</em> target group.</p>
+<p>This process might include finding many permutations of the same
+group of test targets (eg: targets A, B and C on the roles of
+server, client1 and client2 will be permuted as ABC, ACB, BAC, BCA,
+CAB, CBA by default).</p>
+<p>Depending on the instructions given by the testcase, further
+simplication of the amount of permutations might happen depending on
+the types of targets (eg: if B and C are the same type and the
+testcase indicates that for the role of clients, only one of each
+type shall be considered, this would reduce the permutations to ABC,
+BAC, CAB.</p>
+</li>
+<li><p class="first">a test case is any instance of <a class="reference internal" href="09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal"><span class="pre">tcfl.tc.tc_c</span></code></a></p>
+</li>
+<li><p class="first">once a testcase is paired with a group of targets, jobs are spawned
+to a threadpool (which limits the amount of concurency) to run
+<cite>tcfl.tc.tc_c._run()</cite> which will call
+<cite>tcfl.tc.tc_c._run_on_target_group()</cite>.</p>
+<p>This method will sequentially run the six phases of a test case
+(configuration, build, target assignment, deployment to target,
+evaluation, cleanup) by invoking the testcase’s class methods
+defined with matchin name (<em>config*</em>, <em>build*</em>, <em>deploy*</em>,
+<em>cleanup*</em>). See <a class="reference internal" href="09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal"><span class="pre">tcfl.tc.tc_c</span></code></a> for more details.</p>
+<p>The testcase, in general, will build some software taking as input
+assigned target information, deploy to the target, the <em>eval*</em>
+functions will interact with the target to determine if it passes or
+fails and return a result. The <a class="reference internal" href="09-api.html#tcfl.tc.result_c" title="tcfl.tc.result_c"><code class="xref py py-class docutils literal"><span class="pre">result</span></code></a>
+object contains a count of passed, failed, blocked or skipped
+testcases that is aggregated by the main process as testcases finish
+execution.</p>
+<p>For evaluation, the system relies on the concept of expectations
+(things that have to happen to pass, things that don’t have to
+happen else it fails), implemented by a
+per-testcase/group-of-targets object (the <a class="reference internal" href="09-api.html#module-tcfl.expecter" title="tcfl.expecter"><code class="xref py py-mod docutils literal"><span class="pre">expecter</span></code></a>), a loop which ensures what is expected to
+happen happens.</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="the-test-target-broker">
+<h2>7.2. The Test Target Broker<a class="headerlink" href="#the-test-target-broker" title="Permalink to this headline">¶</a></h2>
+<p>The user configures his client to access one ore more target brokers,
+which are daemons running on different machines that provide:</p>
+<ul class="simple">
+<li>access to one or more pieces of target hardware on which runtime
+tests can be executed</li>
+<li>means to manage the target hardware (discover, reserve, power
+on/off, deploy software, debug, etc)</li>
+</ul>
+<p>Different target hardware has different capabilities and different
+ways to do operations; the broker provides abstractions over the
+differences for common operations like powering on, off, uploading
+firmware or an OS image (when said abstractions make sense), as well
+as providing access to hardware-specific details–all these are
+implemented by the different drivers that run in the server. It
+follows that other interfaces could be easily added by plugins
+(currently this is implemented by subclassing, but this is too
+limiting and will be replaced with extension by attrs).</p>
+<p>Note details about the actual drivers that implement the interfaces do
+not necessarily belong here and are detailed in the actual driver code.</p>
+<div class="section" id="daemon-internals">
+<h3>7.2.1. Daemon internals<a class="headerlink" href="#daemon-internals" title="Permalink to this headline">¶</a></h3>
+<p>The daemon is implemented in Python, using the Flask framework to
+implement the REST API to access the targets. It loosely follows the
+WSGI application mode, in which one HTTP request may be serviced by
+one process, while the next might be served by another process. The
+daemon thus is a collection of multiple processes and no state is kept
+internally in it. See <a class="reference internal" href="#maintaining-state">Maintaining state</a> below.</p>
+<p>The file <code class="docutils literal"><span class="pre">ttbd</span></code> provides handling of the command line arguments
+and setup and then deploys the main Flask loop into a web server,
+which takes care of all the HTTP request handling (currently the
+Tornado web server).</p>
+<p>Flask calls into the different functions decorated with <code class="docutils literal"><span class="pre">&#64;app.route</span></code>
+which represent calls to manipulate <code class="docutils literal"><span class="pre">ttbd</span></code>’s objects. Each of those
+functions extracts arguments and translates the call to the internal
+representation of the objects (encapsulated in <a class="reference internal" href="09-api.html#module-ttbl" title="ttbl"><code class="xref py py-mod docutils literal"><span class="pre">ttbl</span></code></a> and
+<a class="reference internal" href="09-api.html#module-ttbl.config" title="ttbl.config"><code class="xref py py-mod docutils literal"><span class="pre">ttbl.config</span></code></a>).</p>
+<p>In Linux, the daemon is set as a process reaper, so that any child
+processes that are alive while their parents died are reassigned to
+the daemon (this happens when a subprocess starts a daemon as part of
+servicing a request, like for example starting a QEMU target or a
+target that needs OpenOCD running in the background while powered up).</p>
+<p>The daemon starts two subprocesses:</p>
+<blockquote>
+<div><ul class="simple">
+<li>a cleanup thread, that will scan for idle targets to power them off</li>
+<li>a console-monitor logger, that reads from file descriptors to write
+to log files (more on <a class="reference internal" href="#console-management">Console Management</a> below).</li>
+</ul>
+</div></blockquote>
+<p>It will then parse configuration files in <code class="docutils literal"><span class="pre">~/.ttbd/conf_*.py</span></code>,
+obtaining from there more operational parameters and the list of test
+targets, which are subclasses of <a class="reference internal" href="09-api.html#ttbl.test_target" title="ttbl.test_target"><code class="xref py py-class docutils literal"><span class="pre">ttbl.test_target</span></code></a>; this
+represents the lowest common denominator of test targets: something
+that can be named, acquired (by a user) and released (by the same user
+or an admin).</p>
+<p>For a test target to be useful, it has to add interfaces (called
+<em>mixin</em>s in Python parlance)–and depending on the hardware that the
+test target implements or how it is connected, the interfaces will be
+implemented on one way or another–however, the client accessing over
+the HTTP API needs not to be concerned about those details as s/he
+always sees the same interface.</p>
+</div>
+<div class="section" id="maintaining-state">
+<h3>7.2.2. Maintaining state<a class="headerlink" href="#maintaining-state" title="Permalink to this headline">¶</a></h3>
+<p>State is maintained in a lightweight filesystem database which is
+accessed with the <a class="reference internal" href="09-api.html#ttbl.fsdb.fsdb" title="ttbl.fsdb.fsdb"><code class="xref py py-class docutils literal"><span class="pre">ttbl.fsdb.fsdb</span></code></a> class.</p>
+<p>Each target has a <a class="reference internal" href="09-api.html#ttbl.test_target.fsdb" title="ttbl.test_target.fsdb"><code class="xref py py-attr docutils literal"><span class="pre">ttbl.test_target.fsdb</span></code></a> member that implements
+<code class="docutils literal"><span class="pre">set()</span></code> and <code class="docutils literal"><span class="pre">get()</span></code> methods to store and access key/value
+pairs. They are stored in a state directory given at startup time
+(that defaults to <code class="docutils literal"><span class="pre">~/.ttbd/state/TARGETNAME/</span></code>). Target drivers shall
+use said data member to store data, bearing in mind that their code
+might be called again by <em>another</em> process and thus the data they need
+has to be accessed from the filesystem.</p>
+<p>A good rule of thumb is: if a method of a driver for target <em>T</em> would
+store <em>X</em> in <code class="docutils literal"><span class="pre">self.x</span></code> to use it later in another method of the same
+driver for target <em>T</em>, that <em>has</em> to be stored in the file system
+database, so instead use:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="bp">self</span><span class="o">.</span><span class="n">fsdb</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;KEY&#39;</span><span class="p">,</span> <span class="s1">&#39;VALUE&#39;</span><span class="p">)</span> <span class="c1"># To store</span>
+<span class="bp">self</span><span class="o">.</span><span class="n">fsdb</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s1">&#39;KEY&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>            <span class="c1"># To delete</span>
+<span class="n">value</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fsdb</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;KEY&#39;</span><span class="p">)</span>  <span class="c1"># To retrieve</span>
+</pre></div>
+</div>
+<p>Note this database is:</p>
+<ul class="simple">
+<li>atomic (so multiple processes can set/get without interfering with
+each other)</li>
+<li>geared towards storing small pieces of text</li>
+</ul>
+<p>The current implementation uses the target of symbolic links to store
+the value, as it is a POSIXly atomic operation that requires very
+little overhead. The file name of the symbolic link is the key.
+As of such, the data is very much accesible to anyone
+that has read access to the directory.</p>
+<p>The <em>mutex</em> that describes who currently owns a target works
+similarly; we could not use POSIX advisory locking because it is tied
+to running processes and the daemon works as a loose collection of
+processes with undertermined life cycles.</p>
+</div>
+<div class="section" id="interfaces">
+<h3>7.2.3. Interfaces<a class="headerlink" href="#interfaces" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="power-control">
+<h4>7.2.3.1. Power control<a class="headerlink" href="#power-control" title="Permalink to this headline">¶</a></h4>
+<p>Allows powering on, off resetting or power cycling hardware
+(<a class="reference internal" href="09-api.html#ttbl.tt_power_control_mixin" title="ttbl.tt_power_control_mixin"><code class="xref py py-class docutils literal"><span class="pre">ttbl.tt_power_control_mixin</span></code></a>).</p>
+<p>This interface can be implemented by:</p>
+<ul>
+<li><p class="first">subclassing <a class="reference internal" href="09-api.html#ttbl.tt_power_control_mixin" title="ttbl.tt_power_control_mixin"><code class="xref py py-class docutils literal"><span class="pre">ttbl.tt_power_control_mixin</span></code></a> and overloading
+the methods <code class="docutils literal"><span class="pre">*_do_*()</span></code>.</p>
+</li>
+<li><p class="first">implementing a power control driver as a subclass of
+<a class="reference internal" href="09-api.html#ttbl.tt_power_control_impl" title="ttbl.tt_power_control_impl"><code class="xref py py-class docutils literal"><span class="pre">ttbl.tt_power_control_impl</span></code></a> and passing that to
+<a class="reference internal" href="09-api.html#ttbl.tt_power_control_mixin" title="ttbl.tt_power_control_mixin"><code class="xref py py-class docutils literal"><span class="pre">ttbl.tt_power_control_mixin</span></code></a>, who will call the
+implementation’s <code class="docutils literal"><span class="pre">*_do_*()</span></code>’s methods.</p>
+<p>Note these drivers normally interface with physical devices, but
+are also be used to alter the power up sequence (like delay until
+a file or USB device appears in the file system (eg: a serial
+ports’ node), start/stop a program (eg: QEMU, OpenOCD), etc…</p>
+</li>
+<li><p class="first">same as before, but passing a list of them; this is called a <em>power
+control rail</em> and it is very useful when many objects have to be
+powered on or off in order to fire up a target.</p>
+<p>For example: power up a power brick, a device that is connected to
+the target to measure temperature, start a daemon
+process needed to be able to connect to the</p>
+</li>
+</ul>
+<p>There are currently a few implementations:</p>
+<ul class="simple">
+<li>QEMU targets (<a class="reference internal" href="09-api.html#ttbl.tt_qemu.tt_qemu" title="ttbl.tt_qemu.tt_qemu"><code class="xref py py-class docutils literal"><span class="pre">ttbl.tt_qemu.tt_qemu</span></code></a>) implement power
+control by starting/stopping QEMU daemons.</li>
+<li><a class="reference external" href="http://www.digital-loggers.com/lpc.html">Digital Logger’s Web Power Switch 7</a>
+(<a class="reference internal" href="09-api.html#ttbl.pc.dlwps7" title="ttbl.pc.dlwps7"><code class="xref py py-class docutils literal"><span class="pre">ttbl.pc.dlwps7</span></code></a>): network connected controllers, are
+implemented by .</li>
+<li><a class="reference external" href="https://www.yepkit.com/products/ykush">YKush power-switch USB hub</a> (<a class="reference internal" href="09-api.html#module-ttbl.pc_ykush" title="ttbl.pc_ykush"><code class="xref py py-class docutils literal"><span class="pre">ttbl.pc_ykush</span></code></a>):
+These are USB hubs that can completely cut off a USB connected
+device, thus useful for USB-powered devices.</li>
+<li>Manual (<a class="reference internal" href="09-api.html#ttbl.pc.manual" title="ttbl.pc.manual"><code class="xref py py-class docutils literal"><span class="pre">ttbl.pc.manual</span></code></a>): used for testing, allows the user
+to manually power on/off the device based on daemon’s printed
+messages.</li>
+<li>Miscellaneous delays: <a class="reference internal" href="09-api.html#ttbl.pc.delay" title="ttbl.pc.delay"><code class="xref py py-class docutils literal"><span class="pre">ttbl.pc.delay</span></code></a> ,
+<a class="reference internal" href="09-api.html#ttbl.pc.delay_til_file_appears" title="ttbl.pc.delay_til_file_appears"><code class="xref py py-class docutils literal"><span class="pre">ttbl.pc.delay_til_file_appears</span></code></a>,
+<a class="reference internal" href="09-api.html#ttbl.pc.delay_til_file_gone" title="ttbl.pc.delay_til_file_gone"><code class="xref py py-class docutils literal"><span class="pre">ttbl.pc.delay_til_file_gone</span></code></a>,
+<a class="reference internal" href="09-api.html#ttbl.pc.delay_til_usb_device" title="ttbl.pc.delay_til_usb_device"><code class="xref py py-class docutils literal"><span class="pre">ttbl.pc.delay_til_usb_device</span></code></a></li>
+</ul>
+</div>
+<div class="section" id="console-management">
+<h4>7.2.3.2. Console management<a class="headerlink" href="#console-management" title="Permalink to this headline">¶</a></h4>
+<p>This interface is used to list serial consoles, read from them
+(logging their output) and writing to them. It is implemented by
+<a class="reference internal" href="09-api.html#ttbl.test_target_console_mixin" title="ttbl.test_target_console_mixin"><code class="xref py py-class docutils literal"><span class="pre">ttbl.test_target_console_mixin</span></code></a>.</p>
+<p>To log, the daemon starts a logger process
+(<a class="reference internal" href="09-api.html#ttbl.cm_logger.setup" title="ttbl.cm_logger.setup"><code class="xref py py-func docutils literal"><span class="pre">ttbl.cm_logger.setup()</span></code></a>). When a target is powered up, the
+driver instructs the logger process to read from ports attached to the
+thread (using <a class="reference internal" href="09-api.html#ttbl.cm_logger.spec_add" title="ttbl.cm_logger.spec_add"><code class="xref py py-func docutils literal"><span class="pre">ttbl.cm_logger.spec_add()</span></code></a>). The output is stored
+in a log file named after the <em>console</em> name in the target’s state
+dir. When a client requests to read from the serial port, it is
+actually given the log file.</p>
+<p>Writing is currently not implemented, it remains a missing feature.</p>
+<p>The class <a class="reference internal" href="09-api.html#ttbl.cm_serial.cm_serial" title="ttbl.cm_serial.cm_serial"><code class="xref py py-class docutils literal"><span class="pre">ttbl.cm_serial.cm_serial</span></code></a> implements a driver for
+serial ports (over serial, TCP and others as supported by the PySerial
+submodule).</p>
+</div>
+<div class="section" id="file-deployment">
+<h4>7.2.3.3. File deployment<a class="headerlink" href="#file-deployment" title="Permalink to this headline">¶</a></h4>
+<p>A user can upload files to a TTBD daemon which are stored in a user’s
+specifc area. This is used for the image deployment interface, for
+example, so the user can upload a file than then is going to be
+flashed or deployed into a target.</p>
+<p>This interface is not target-specific and provides three primitives:
+- file upload
+- file removal
+- file list</p>
+<p><em>ttbd</em> implements it directly in Flask routing methods
+<code class="docutils literal"><span class="pre">_file_upload</span></code>, <code class="docutils literal"><span class="pre">_file_delete</span></code> and <code class="docutils literal"><span class="pre">_files_list</span></code>.</p>
+</div>
+<div class="section" id="image-deployment">
+<h4>7.2.3.4. Image deployment<a class="headerlink" href="#image-deployment" title="Permalink to this headline">¶</a></h4>
+<p>This interface is used to deploy files available to the daemon into a
+target.</p>
+<p>The implementation takes image types (eg: kernel, initram, rom, …)
+and a file (previously uploaded with the <em>file deployment</em> interface)
+and how the driver flashes/uploads/deploys said file is target
+specific, as well as the interpretation of the image type.</p>
+<p>The current target types that are commonly recognized are:</p>
+<blockquote>
+<div><ul class="simple">
+<li><em>kernel[-CORENAME]</em>: a zephyr kernel that is flashed to the core
+(or when more than one core is available, flashed so <em>CORENAME</em>
+would execute it.</li>
+<li><em>rom</em>: the ROM/bootloader</li>
+</ul>
+</div></blockquote>
+</div>
+<div class="section" id="debugging">
+<h4>7.2.3.5. Debugging<a class="headerlink" href="#debugging" title="Permalink to this headline">¶</a></h4>
+<p>This interface is used to start and stop debugging support in the
+target, so a debugger can be connected to it to single step, examine
+etc. It is implemented by <a class="reference internal" href="09-api.html#ttbl.tt_debug_mixin" title="ttbl.tt_debug_mixin"><code class="xref py py-class docutils literal"><span class="pre">ttbl.tt_debug_mixin</span></code></a>.</p>
+<p>Most commonly this will start some sort of a GDB server for which a
+GDB can connect.</p>
+<p>The driver implementations can be done subclassing
+<a class="reference internal" href="09-api.html#ttbl.tt_debug_mixin" title="ttbl.tt_debug_mixin"><code class="xref py py-class docutils literal"><span class="pre">ttbl.tt_debug_mixin</span></code></a> and overriding the <code class="docutils literal"><span class="pre">*_do_*()</span></code> functions
+or suclassing <a class="reference internal" href="09-api.html#ttbl.tt_debug_impl" title="ttbl.tt_debug_impl"><code class="xref py py-class docutils literal"><span class="pre">ttbl.tt_debug_impl</span></code></a> and feeding that to
+<a class="reference internal" href="09-api.html#ttbl.tt_debug_mixin" title="ttbl.tt_debug_mixin"><code class="xref py py-class docutils literal"><span class="pre">ttbl.tt_debug_mixin</span></code></a>’s constructor as implementation.</p>
+<p>Execution details will vary but they usually open a TCP port per core
+in the host that is left open for GDB to connect to (most commonly
+OpenOCD and QEMU).</p>
+<p>There is then three primitives:</p>
+<ul class="simple">
+<li>debug-start: start the debugging support (when this is required);
+when started before powering up the target, the debugger would hold
+the target stopped until the debugger connects and lets it run,
+effectively starting execution. Otherwise, the target will start
+free and when the debugger connects, it will stop.</li>
+<li>debug-stop: stop the debugging support</li>
+<li>debug-info: print information about how to connect to the debugging
+interface (eg: host name and TCP ports, etc).</li>
+</ul>
+</div>
+<div class="section" id="things">
+<h4>7.2.3.6. Things<a class="headerlink" href="#things" title="Permalink to this headline">¶</a></h4>
+<p>Things are entities that can be connected to a target, for example:</p>
+<ul class="simple">
+<li>a USB device to a host</li>
+<li>an ejectable drive</li>
+<li>a cable to a receptacle</li>
+</ul>
+<p>each driver is responsible to implement the different thing
+plug/unplug methods by adding methods and their handling functions to
+the <a class="reference internal" href="09-api.html#ttbl.test_target.thing_methods" title="ttbl.test_target.thing_methods"><code class="xref py py-attr docutils literal"><span class="pre">ttbl.test_target.thing_methods</span></code></a> dictionary.</p>
+<p>Then the target client can plug or unplug those things using the
+API <a class="reference internal" href="09-api.html#tcfl.tc.target_c.thing_plug" title="tcfl.tc.target_c.thing_plug"><code class="xref py py-meth docutils literal"><span class="pre">tcfl.tc.target_c.thing_plug()</span></code></a> or
+<a class="reference internal" href="09-api.html#tcfl.tc.target_c.thing_plug" title="tcfl.tc.target_c.thing_plug"><code class="xref py py-meth docutils literal"><span class="pre">tcfl.tc.target_c.thing_plug()</span></code></a>.</p>
+</div>
+</div>
+<div class="section" id="authentication">
+<span id="id1"></span><h3>7.2.4. Authentication<a class="headerlink" href="#authentication" title="Permalink to this headline">¶</a></h3>
+<p>There are currently three different authenticating modules that can be
+used:</p>
+<ul class="simple">
+<li><a class="reference internal" href="09-api.html#ttbl.auth_localdb.authenticator_localdb_c" title="ttbl.auth_localdb.authenticator_localdb_c"><code class="xref py py-mod docutils literal"><span class="pre">ttbl.auth_localdb.authenticator_localdb_c</span></code></a>: for creating a local
+database of users to authenticate against</li>
+<li><a class="reference internal" href="09-api.html#ttbl.auth_ldap.authenticator_ldap_c" title="ttbl.auth_ldap.authenticator_ldap_c"><code class="xref py py-mod docutils literal"><span class="pre">ttbl.auth_ldap.authenticator_ldap_c</span></code></a>: for authenticating against an
+LDAP server (use HTTPS!)</li>
+<li><a class="reference internal" href="09-api.html#ttbl.auth_party.authenticator_party_c" title="ttbl.auth_party.authenticator_party_c"><code class="xref py py-mod docutils literal"><span class="pre">ttbl.auth_party.authenticator_party_c</span></code></a>: for authenticating
+anybody coming from a certain host (used for localhost
+authentication)</li>
+</ul>
+</div>
+</div>
+<div class="section" id="security-considerations">
+<span id="id2"></span><h2>7.3. Security considerations<a class="headerlink" href="#security-considerations" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="general">
+<h3>7.3.1. General<a class="headerlink" href="#general" title="Permalink to this headline">¶</a></h3>
+<ul>
+<li><p class="first">It is not safe or recommended to run this on the open internet:</p>
+<ul class="simple">
+<li>random ports will be opened for access to GDB, OpenOCD, QEMU and
+other daemons who will listen on all interfaces of the server with
+no way to perform access control (as the daemons do not implement
+it). Firewalling can be used to avoid access to that, but it will
+also reduce/kill target-debugging capabilities.</li>
+<li>to ease diagnosing of issues, the server will send the client
+diagnosis information which will include things such as paths in
+the server, output of server side processes, timing information,
+etc (never authentication data or keys).</li>
+</ul>
+</li>
+<li><p class="first">Default deployment has HTTPS enabled and any setup should work like
+this</p>
+</li>
+<li><p class="first">The default configuration allows no access to hardware as it just
+instantiates targets implemented by virtual machines to run Zephyr
+and Linux on them (furthermore, Linux VMs need extra configuration
+work to enable).</p>
+<p>To enable physical hardware access, configuration has to be done as
+per the steps in the <a class="reference internal" href="03-server-setup.html#server-deployment-guide"><span class="std std-ref">server deplyment guide</span></a>.</p>
+</li>
+<li><p class="first">The default configuration allows any user coming from the local
+machine over the 127.0.0.1 (loopback interface) to connect and
+manage.</p>
+<p><strong>Why?</strong></p>
+<p>The server(s) available to implement the daemon do not support unix
+sockets, which would allow a simple way to tell if a user is local
+and thus, already authenticated into the system.</p>
+<p>Otherwise, to authenticate using PAM we’d have to hook up in the PAM
+rules for the system, which are distro/site specific and we can’t
+know them ahead of time.</p>
+<p>So we defer to leave it to your deployment to configure different
+(more strict / less strict) authentication mechanisms as described
+in <a class="reference internal" href="#authentication"><span class="std std-ref">Authentication</span></a> and removing
+<cite>/etc/ttbd-production/conf_05_auth_local.py</cite>.</p>
+<p>As described in the point before, all the resources exported in the
+default configuration are virtual targets, which furthermore, have
+very strict invocation command lines that are sanitized, so a user
+has way more power to DoS the machine from their own account than
+by trying to subvert TCF.</p>
+</li>
+<li><p class="first">TCF will not protect or police the flow of data from the client to
+test targets in the daemon, and viceversa–the daemon basically
+gives you the same access to the target you would have physically,
+with the added onus of it being shared by anyone with login access to
+the server.</p>
+<p>Thus, assume that if you store a piece of information in a target by
+flashing it, other people can read it.</p>
+<p>Compartimentalization can be done by instantiating other servers
+(even in the same physical machine, but different port) with
+different login controls.</p>
+</li>
+</ul>
+</div>
+<div class="section" id="client">
+<h3>7.3.2. Client<a class="headerlink" href="#client" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li>TCF client will run whichever code given wiht the same privilege as
+the user invoking it. No attempts at sandboxing are done. Assume the
+same risk level as running a Makefile from a source package you
+download off the Internet.</li>
+</ul>
+</div>
+<div class="section" id="daemon">
+<h3>7.3.3. Daemon<a class="headerlink" href="#daemon" title="Permalink to this headline">¶</a></h3>
+<p>The daemon runs as non-root user <em>ttbd</em> with the following elevated privileges:</p>
+<ul class="simple">
+<li>group <em>ttbd</em>: to be able to access files in <code class="docutils literal"><span class="pre">/etc/ttbd*</span></code> and have
+write access to anything in
+<code class="docutils literal"><span class="pre">{/var/run,/var/lib/,/var/cache}/ttbd*</span></code> created by other <em>ttbd</em>
+admins</li>
+<li>group <em>dialout</em>: to be able to access serial ports</li>
+<li>group <em>root</em>: to be able to access USB device nodes in
+<code class="docutils literal"><span class="pre">/dev/bus/usb</span></code></li>
+<li>capability <em>CAP_NET_ADMIN</em>: to be able to manipulate network
+interfaces (needed to setup IP test networks)</li>
+<li>When instantiating networks for testing networking amongst targets,
+it is crucial to keep them separated from any networking
+infrastructure used to control the targets (<a class="reference internal" href="05-RFAQs.html#separated-networks"><span class="std std-ref">rationale</span></a>).</li>
+</ul>
+<div class="section" id="daemon-access-control">
+<h4>7.3.3.1. Daemon access control<a class="headerlink" href="#daemon-access-control" title="Permalink to this headline">¶</a></h4>
+<p>Access to the daemon main interface is over HTTP (S), controlled by
+authentication, with most of the operations requiring active
+authentication. Authentication control inside the daemon is
+plugin-based, allowing different user mapping mechanisms to be used
+(currently LDAP, local database, IP-based).</p>
+<p>The different targets can be acquired by a single user at a time. A
+single user can acquire using tickets, which allows the user to have
+multiple threads of execution mutually excluding each other from the
+same resource.</p>
+</div>
+<div class="section" id="file-permissions">
+<h4>7.3.3.2. File permissions<a class="headerlink" href="#file-permissions" title="Permalink to this headline">¶</a></h4>
+<p>The daemon is designed to run under a dedicated user and group
+(<em>ttbd</em>) and will create all its files with Unix permission bits set
+to allow any member of the group to read and write.</p>
+<p>Exception to this rule are the crypto key for cookie handling
+(<cite>/var/lib/ttbd/INSTANCE/session.key</cite>) and the ad-hoc SSL certificates
+in <cite>/var/run-ttbd/INSTANCE</cite>.</p>
+</div>
+<div class="section" id="other-processes-started-by-the-daemon">
+<h4>7.3.3.3. Other processes started by the daemon<a class="headerlink" href="#other-processes-started-by-the-daemon" title="Permalink to this headline">¶</a></h4>
+<p>The daemon starts several daemons and runs certain utilities under it
+to implement functionality and control targets.</p>
+<p>These might open TCP ports that will be accessible in the machine
+outside of the daemon’s auth control and in some cases can enable
+remote execution, and thus have to be firewalled accordingly in
+non-trusted environments (future releases will implement a safe way to
+redirect ports taking authentication into consideration):</p>
+<div class="section" id="bossac">
+<h5>7.3.3.3.1. <em>bossac</em><a class="headerlink" href="#bossac" title="Permalink to this headline">¶</a></h5>
+<p>This is a tool used to flash Arduino Due MCU boards, which is accessed
+using the USB TTY interface it provides.</p>
+<p><strong>Privilege needed</strong></p>
+<ul class="simple">
+<li><em>dialout</em> group to access <code class="docutils literal"><span class="pre">/dev/tty/*</span></code></li>
+</ul>
+<p><strong>Attack vectors</strong></p>
+<p>n/a</p>
+<p><strong>Mitigation</strong></p>
+<p>n/a</p>
+<p>FIXME: drop CAP_NET_ADMIN, group <em>root</em></p>
+</div>
+<div class="section" id="dfu-util">
+<h5>7.3.3.3.2. <em>dfu-util</em><a class="headerlink" href="#dfu-util" title="Permalink to this headline">¶</a></h5>
+<p>This is a tool used to flash USB DFU (Device Firmware Update)
+compliant devices over a well-defined standard USB protocol.</p>
+<p><strong>Privilege needed</strong></p>
+<ul class="simple">
+<li><em>root</em> group to access <code class="docutils literal"><span class="pre">/dev/bus/usb/*</span></code></li>
+</ul>
+<p><strong>Attack vectors</strong></p>
+<p>n/a</p>
+<p><strong>Mitigation</strong></p>
+<p>n/a</p>
+<p>FIXME: drop CAP_NET_ADMIN, group <em>dialout</em></p>
+</div>
+<div class="section" id="genisoimage">
+<h5>7.3.3.3.3. <em>genisoimage</em><a class="headerlink" href="#genisoimage" title="Permalink to this headline">¶</a></h5>
+<p>Invoked by the QEMU target driver to generate transient ISO
+filesystems to use as cloud-init data sources at target
+powers-up time.</p>
+<p><strong>Privilege needed</strong></p>
+<ul class="simple">
+<li><em>ttbd</em> user/group to access <code class="docutils literal"><span class="pre">/var/run/ttbd-*/*</span></code></li>
+</ul>
+<p><strong>Attack vectors</strong></p>
+<p>n/a</p>
+<p><strong>Mitigation</strong></p>
+<p>n/a</p>
+<p>FIXME: drop CAP_NET_ADMIN, group <em>dialout</em>, <em>root</em></p>
+</div>
+<div class="section" id="ip">
+<h5>7.3.3.3.4. <em>ip</em><a class="headerlink" href="#ip" title="Permalink to this headline">¶</a></h5>
+<p>This tool is used to configure the system’s network interfaces and
+networking routes.</p>
+<p>The daemon’s configuration uses it to add virtual network devices,
+virtual bridges and tie them up to physical network devices, as well
+as to assign IPv4 and IPv6 addresses and routes.</p>
+<p><strong>Privilege needed</strong></p>
+<ul class="simple">
+<li>capability <em>CAP_NET_ADMIN</em> to manipulate network interfaces</li>
+</ul>
+<p><strong>Attack vectors</strong></p>
+<ul class="simple">
+<li>a set of interconnect and target names could be crafted that would
+result in an interface name that overrides the configuration of an
+existing network interface. However, this requires the admin’s
+intervention, so it is moot.</li>
+</ul>
+<p><strong>Mitigation</strong></p>
+<p>n/a</p>
+<p>FIXME: group <em>dialout</em>, <em>root</em></p>
+</div>
+<div class="section" id="qemu">
+<h5>7.3.3.3.5. <em>QEMU</em><a class="headerlink" href="#qemu" title="Permalink to this headline">¶</a></h5>
+<p><strong>Privilege needed</strong></p>
+<ul class="simple">
+<li>capability <em>CAP_NET_ADMIN</em> to manipulate and access network interfaces</li>
+</ul>
+<p><strong>Attack vectors</strong></p>
+<ul class="simple">
+<li>TCP socket for GDB interface is open with no access control</li>
+<li>Multiple UDP ports opened/closed as a result of implementing
+networking with the <em>-user</em> option
+(<a class="reference external" href="https://stackoverflow.com/questions/22161240/why-qemu-open-a-lot-of-udp-port">https://stackoverflow.com/questions/22161240/why-qemu-open-a-lot-of-udp-port</a>).</li>
+</ul>
+<p><strong>Mitigation</strong></p>
+<p>Firewalling is the only option to limit access to these ports.</p>
+<p><strong>Consequences of mitigation</strong></p>
+<p>No GDB-based debugging of target</p>
+<p>FIXME: drop group <em>dialout</em>, <em>root</em></p>
+</div>
+<div class="section" id="qemu-img">
+<h5>7.3.3.3.6. <em>qemu-img</em><a class="headerlink" href="#qemu-img" title="Permalink to this headline">¶</a></h5>
+<p>Tool used to generate copy-on-write images of QEMU virtual machine
+disks upon target power-on.</p>
+<p><strong>Privilege needed</strong></p>
+<ul class="simple">
+<li>user/group <em>ttbd</em> to access <code class="docutils literal"><span class="pre">/var/run/ttbd*</span></code></li>
+</ul>
+<p><strong>Attack vectors</strong></p>
+<p>n/a</p>
+<p><strong>Mitigation</strong></p>
+<p>n/a</p>
+<p>FIXME: drop CAP_NET_ADMIN, group <em>dialout</em>, <em>root</em></p>
+</div>
+<div class="section" id="openocd">
+<h5>7.3.3.3.7. <em>OpenOCD</em><a class="headerlink" href="#openocd" title="Permalink to this headline">¶</a></h5>
+<p><em>OpenOCD</em> is used to control and flash some MCU boards, providing
+also a GDB interface. It will be always running as each of those MCU
+boards is turned on.</p>
+<p><strong>Privilege needed</strong></p>
+<ul class="simple">
+<li>group <em>dialout</em> to access <code class="docutils literal"><span class="pre">/dev/tty*</span></code></li>
+<li>group <em>root</em> to access <code class="docutils literal"><span class="pre">/dev/bus/usb</span></code></li>
+</ul>
+<p><strong>Attack vectors</strong></p>
+<ul class="simple">
+<li>TCP sockets for command execution and GDB are exposed.</li>
+<li>telnet script interface offers multiple vectors of
+attack, such as the commands:<ul>
+<li>add_script_search_dir: scan arbitrary directories</li>
+<li>dump_image: potentially write files</li>
+<li><em>image</em>, <em>load</em>, script and program: read arbitrary files</li>
+<li>find: locate files in OpenOCD’s tree structure</li>
+<li>*_port: set ports where the daemon listens to</li>
+<li>shutdown: stop the daemon</li>
+<li>different commadns that can alter the system and are sometimes
+enabled or not (<a class="reference external" href="http://openocd.org/doc/html/General-Commands.html">http://openocd.org/doc/html/General-Commands.html</a>)</li>
+</ul>
+</li>
+</ul>
+<p><strong>Mitigation</strong></p>
+<p>There is no way to make OpenOCD behave properly form a security
+standpoint without major modifications that are not feasible; thus, a
+site operator will have to consider firewalling if trusting clients
+cannot happen. Definitely access to anyone in a open deployment on the
+Internet is discouraged.</p>
+<p><strong>Consequences of mitigation</strong></p>
+<ul class="simple">
+<li>Inability to run GDB against the taget</li>
+<li>Inability to run <em>debug-openocd</em> command</li>
+</ul>
+<p>FIXME: drop CAP_NET_ADMIN</p>
+</div>
+<div class="section" id="socat">
+<h5>7.3.3.3.8. <em>socat</em><a class="headerlink" href="#socat" title="Permalink to this headline">¶</a></h5>
+<p>Tool used to create tunnels from the server to a target using TCP, UDP
+or SCTP.</p>
+<p>None; tunnels are made on demand and only to ports belonging to a
+given target. Destination is verified upon creation and can’t be
+subverted.</p>
+<p>Tunnels are torn down upon target release from a user, so a new
+acquirer has to recreate them as neeed.</p>
+<p><strong>Attack vectors</strong></p>
+<p>n/a</p>
+<p><strong>Mitigation</strong></p>
+<p>n/a</p>
+<p>FIXME: drop CAP_NET_ADMIN, group <em>root</em> <em>dialout</em></p>
+</div>
+<div class="section" id="tunslip6">
+<h5>7.3.3.3.9. <em>tunslip6</em><a class="headerlink" href="#tunslip6" title="Permalink to this headline">¶</a></h5>
+<p>Tool used to implement networking on QEMU Zephyr virtual machines
+using the SLIP protocol; a virtual char device is created to speak the
+SLIP protocol and this daemon converts the frames sent/received over
+the virtual char device and sends them to a macvlan interface.</p>
+<p><strong>Privilege needed</strong></p>
+<ul class="simple">
+<li>access to <code class="docutils literal"><span class="pre">/dev/tap*</span></code> devices, configured with udev to allow group
+<em>ttbd</em></li>
+</ul>
+<p><strong>Attack vectors</strong></p>
+<p>The code for the <em>tunslip6</em> daemon could have issues that can be
+subverted by crafting packets from the test target that crash the
+daemon or drive buffer overflow attacks.</p>
+<p><strong>Mitigation</strong></p>
+<p>n/a</p>
+<p>FIXME: drop CAP_NET_ADMIN, group <em>root</em> <em>dialout</em>, run as user with
+access to /dev/tap* but nothing else</p>
+</div>
+</div>
+<div class="section" id="networking">
+<h4>7.3.3.4. Networking<a class="headerlink" href="#networking" title="Permalink to this headline">¶</a></h4>
+<p>Networks used by targets have to be strictly separated from networks
+used for accessing the server where the daemon is or those dedicated
+to infrastructure, as described in the <a class="reference internal" href="05-RFAQs.html#separated-networks"><span class="std std-ref">rationale</span></a>.</p>
+</div>
+</div>
+</div>
+<div class="section" id="taxonomy-of-test-cases">
+<h2>7.4. Taxonomy of test cases<a class="headerlink" href="#taxonomy-of-test-cases" title="Permalink to this headline">¶</a></h2>
+<p>To test, the test case has to be <em>executed</em>, and based on where they
+can execute, they are divided in two main categories:</p>
+<blockquote>
+<div><ul class="simple">
+<li><em>static</em>: do no require a target system, can be executed anywhere</li>
+</ul>
+<blockquote>
+<div>Examples of this would be code scans, binary object size checks,
+syntax verifiers, etc</div></blockquote>
+<ul>
+<li><p class="first"><em>dynamic</em>: require target hardware to run (the <a class="reference internal" href="glossary.html#term-test-target"><span class="xref std std-term">test target</span></a>)</p>
+<p>Examples of this would be API functionality check, integration and
+end-to-end tests, performance tests, stress tests, etc</p>
+<ul class="simple">
+<li><em>test image</em>: a OS + test code that conforms a whole image that
+gets loaded onto the target hardware for the sole purpose of
+testing</li>
+<li><em>image + test script</em>: a script interacts with the image
+(combination of a program and OS) loaded on the test hardware;
+the program’s purpose is other than just testing, but it is
+assumed that its features can be tested and it might have
+interfaces for testing/debugging</li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="09-api.html" class="btn btn-neutral float-right" title="8. APIs" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="06-troubleshooting.html" class="btn btn-neutral" title="6. Support &amp; Troubleshooting" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2015, Author.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'0.11',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

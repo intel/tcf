@@ -1,0 +1,357 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>5. Rationales and Frequently Asked Questions &mdash; Test Case Framework 0.11 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../genindex.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="Test Case Framework 0.11 documentation" href="../index.html"/>
+        <link rel="next" title="6. Support &amp; Troubleshooting" href="06-troubleshooting.html"/>
+        <link rel="prev" title="4. HOWTOs" href="04-HOWTOs.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../README.html" class="icon icon-home"> Test Case Framework
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.11
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../02-QUICKSTART.html">1. Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02-guides.html">2. Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="03-server-setup.html">3. Server deployment guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="04-HOWTOs.html">4. HOWTOs</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">5. Rationales and Frequently Asked Questions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#tcf-is-os-and-test-target-agnostic">5.1. TCF is OS and test target agnostic</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#separated-networks-for-infrastructure-and-test-target-hardware">5.2. Separated networks for infrastructure and test target hardware</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mcu-test-fixture-for-highest-reliabiltiy">5.3. MCU test fixture for highest reliabiltiy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#high-cost-of-fixtures">5.4. High cost of fixtures</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="06-troubleshooting.html">6. Support &amp; Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="07-Architecture.html">7. Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="09-api.html">8. APIs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">9. Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="10-Status.html">10. Current status and plans</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../01-CHANGELOG.html">11. TCF release v0.11</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../README.html">Test Case Framework</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../README.html">Docs</a> &raquo;</li>
+        
+      <li>5. Rationales and Frequently Asked Questions</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/doc/05-RFAQs.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="rationales-and-frequently-asked-questions">
+<h1>5. Rationales and Frequently Asked Questions<a class="headerlink" href="#rationales-and-frequently-asked-questions" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="tcf-is-os-and-test-target-agnostic">
+<h2>5.1. TCF is OS and test target agnostic<a class="headerlink" href="#tcf-is-os-and-test-target-agnostic" title="Permalink to this headline">¶</a></h2>
+<p>Whatever your test target is (an MCU, a PC, a toaster), TCF doesn’t
+care.</p>
+<p>All the functionality is implemented by interfaces and drivers. The
+only thing TCF does is (on the server side) manage access to the
+targets and proxy requests via HTTP. On the client side, it just
+launches tests however you tell him to do via the markup language of
+choice to describe test cases.</p>
+</div>
+<div class="section" id="separated-networks-for-infrastructure-and-test-target-hardware">
+<span id="separated-networks"></span><h2>5.2. Separated networks for infrastructure and test target hardware<a class="headerlink" href="#separated-networks-for-infrastructure-and-test-target-hardware" title="Permalink to this headline">¶</a></h2>
+<p>If you have test targets connected to the same network switch as (for
+example) your power controllers, security issues are introduced.</p>
+<p>An attacker could deploy a rogue image to a test node, sniff the
+traffic in the network and gather access to the power switches (which
+don’t have, in general, good security), thus disrupting the operation
+and creating potential hazards.</p>
+<p>Thus, the best deployment practice is to keep them in two separate and
+isolate networks. This can also be accomplished with smart switches,
+but it is out of the scope of this document.</p>
+</div>
+<div class="section" id="mcu-test-fixture-for-highest-reliabiltiy">
+<span id="arduino101-rationale"></span><h2>5.3. MCU test fixture for highest reliabiltiy<a class="headerlink" href="#mcu-test-fixture-for-highest-reliabiltiy" title="Permalink to this headline">¶</a></h2>
+<p>The fixture described in <a class="reference internal" href="09-api.html#conf_00_lib.arduino101_add" title="conf_00_lib.arduino101_add"><code class="xref py py-func docutils literal"><span class="pre">conf_00_lib.arduino101_add()</span></code></a> can be
+considered complicated, but it is designed for maximum reliability
+when running thousands of test cases. These same points apply to other
+(most) MCUs under test.</p>
+<ul>
+<li><p class="first">Current leaks</p>
+<p>The board is so sensitive to current leakage that it will be
+residually powered on even when just connecting the serial
+console. This will charge some capacitors. Then it will work for a few
+millisecs, enough to print some trash to the serial console and die.</p>
+<p>All the components have to be connected to the same ground to avoid
+derivations, which means to the same YKUSH switchable USB hub and
+then powered up and down in an specific order via a power rail.</p>
+</li>
+<li><p class="first">Why power off everthing? Why not just power off the board?</p>
+<p>It has been found via experimentation that sometimes the only way to
+fully reset an Arduino 101 (and any MCU for that matter) is to
+completely disconnect every cable and let it sit for a few seconds.</p>
+<p>This is related to the previous point, current leakage can disallow
+the board ressetting properly.</p>
+<p>Humans can do this by disconnecting all the cables; the automation
+system does it by having all this power cutters completely isolating
+the board.</p>
+</li>
+<li><p class="first">Question: (on Zephyr) I’m a little confused why I actually need to
+power cycle the Arduino, when I compile zephyr and flash using <code class="docutils literal"><span class="pre">make</span>
+<span class="pre">BOARD=Arduino_101_factory</span> <span class="pre">flash</span></code> I don’t need [any hardware] to
+power it down…  Zephyr <code class="docutils literal"><span class="pre">make</span> <span class="pre">flash</span></code> seems to be using OpenOCD just
+like TCF.</p>
+<p>It does, and it is misleadingly simple.</p>
+<p>When doing <code class="docutils literal"><span class="pre">make</span> <span class="pre">flash</span></code>, there is an OpenOCD-driven reset that is
+done there; if it doesn’t work, a human retries, if it doesn’t work
+again, the mailing list wisdom has been <cite>disconnect every single
+cable to the board, let it rest a few seconds, reconnect again,
+retry</cite>.</p>
+<p>TCF does the same, but faster and without your intervention, but for
+that it needs hardware.</p>
+<p>TCF is designed to run tests cases with no human intervention, one
+after another as fast as possible. If it fails, it recovers. In
+order to do that, reliably, the board has to be fully reset. And for
+that it uses that hardware.</p>
+</li>
+<li><p class="first">Why power off the USB bus versus the barrel?</p>
+<p>The choice to use USB is that in most setups, power comes from USB
+anyway and there is no real reason to use the barrel.</p>
+<p>It simplifies the cabling too. Using the barrel you have to make
+sure that the power is connected to the same power switch as the hub
+where the MCU is connected to avoid ground power derivation.</p>
+<p>As well, if you choose to use the barrel and USB, then note either
+will power it, so when the power rail powers up the target,
+whichever USB power controller or the barrel power controller is
+turned on first will power the whole board up.</p>
+</li>
+</ul>
+</div>
+<div class="section" id="high-cost-of-fixtures">
+<h2>5.4. High cost of fixtures<a class="headerlink" href="#high-cost-of-fixtures" title="Permalink to this headline">¶</a></h2>
+<p>All the extra hardware needed to run the fixtures can get expensive:</p>
+<blockquote>
+<div><ul class="simple">
+<li>~$40 for an YKUSH hub and cables</li>
+<li>~$130 for a DLWPs7 if deciding to implement full power control</li>
+</ul>
+</div></blockquote>
+<p>however, it needs to be put inperspective:</p>
+<ul class="simple">
+<li>the cost of the infrastructure is spread across the test targets</li>
+<li>humans take a long time to do things: reconnecting all cables for a
+solid power cycle a few times a day will add up to a lot of time</li>
+<li>removal of the human error factor: which can lead to false positives
+and negatives which will cause extra resource consumption on
+diagnosis</li>
+<li>reduce wear and tear: plugging and unplugging wears the boards down,
+loosens connectors and deceases the life expectancy of the hardware</li>
+</ul>
+<p>The cost of investing full automation is rapidly offset by the
+savings in human time (and their burn rate) and increased efficiency.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">time spent looking around for cables is wasted money; order
+in bulk and have spares.</p>
+</div>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="06-troubleshooting.html" class="btn btn-neutral float-right" title="6. Support &amp; Troubleshooting" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="04-HOWTOs.html" class="btn btn-neutral" title="4. HOWTOs" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2015, Author.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'0.11',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

@@ -1,0 +1,1961 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>4. HOWTOs &mdash; Test Case Framework 0.11 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../genindex.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="Test Case Framework 0.11 documentation" href="../index.html"/>
+        <link rel="next" title="5. Rationales and Frequently Asked Questions" href="05-RFAQs.html"/>
+        <link rel="prev" title="3. Server deployment guide" href="03-server-setup.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../README.html" class="icon icon-home"> Test Case Framework
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.11
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../02-QUICKSTART.html">1. Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02-guides.html">2. Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="03-server-setup.html">3. Server deployment guide</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">4. HOWTOs</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#general-linux-system">4.1. General Linux system</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#setup-proxies">4.1.1. Setup proxies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#how-do-i-update-my-tcf-installation">4.1.2. How do I update my TCF installation?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configuring-a-usb-or-other-network-adapter-for-an-internal-network">4.1.3. Configuring a USB or other network adapter for an internal network</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#disabling-networkmanager-from-controlling-the-interface">4.1.3.1. Disabling NetworkManager from controlling the interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#configuring-a-static-interface-via-networkmanager">4.1.3.2. Configuring a static interface Via NetworkManager</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#generating-an-ssl-certificate">4.1.4. Generating an SSL certificate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#finding-usb-device-information">4.1.5. Finding USB device information</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#finding-usb-device-information-with-dmesg">4.1.5.1. Finding USB device information with dmesg</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#finding-usb-device-information-with-lsusb-py">4.1.5.2. Finding USB device information with lsusb.py</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#finding-usb-device-information-with-udevadm">4.1.5.3. Finding USB device information with udevadm</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#udev-configuration-of-serial-port">4.1.6. udev configuration of serial port</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#udev-configuration-of-serial-port-based-on-serial-number">4.1.6.1. udev configuration of serial port based on serial number</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#udev-configuration-of-serial-port-without-serial-number-based-on-path">4.1.6.2. udev configuration of serial port without serial number based on path</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#udev-configuration-of-serial-port-based-on-sibling-s-serial-number">4.1.6.3. udev configuration of serial port based on sibling’s serial number</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#finding-the-serial-number-of-a-devantech-usbrly08b-relay-controller">4.1.7. Finding the serial number of a Devantech USBRLY08B relay controller</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#finding-the-serial-number-of-an-ykush-hub">4.1.8. Finding the serial number of an YKUSH hub</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#ttbd-tcf-server-configuration-and-tricks">4.2. <em>ttbd</em>: TCF server configuration and tricks</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#starting-more-that-one-instance">4.2.1. Starting more that one instance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configure-authentication-for-local-users-optional">4.2.2. Configure authentication for local users (optional)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configure-simple-authentication-for-jenkins-jobs-optional">4.2.3. Configure simple authentication / for Jenkins jobs (optional)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configure-authentication-against-ldap">4.2.4. Configure authentication against LDAP</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configuring-a-target-for-just-controlling-power-to-something">4.2.5. Configuring a target for just controlling power to something</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#adding-tags-to-a-target">4.2.6. Adding tags to a target</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#how-do-i-disable-a-target-by-default">4.2.7. How do I disable a target by default?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#allowing-the-server-to-be-used-remotely">4.2.8. Allowing the server to be used remotely</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#increasing-the-verbosity-of-the-server">4.2.9. Increasing the verbosity of the server</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#tcf-client-tricks">4.3. TCF client tricks</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#how-do-i-release-a-target-i-don-t-own">4.3.1. How do I release a target I don’t own?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#how-can-i-debug-a-target">4.3.2. How can I debug a target?</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#zephyr-debugging-with-tcf-run">4.3.2.1. Zephyr debugging with TCF run</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#how-can-i-quickly-build-and-deploy-an-image-to-a-target">4.3.3. How can I quickly build and deploy an image to a target?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tcf-s-run-says-something-failed-can-i-get-more-detail">4.3.4. TCF’s <cite>run</cite> says something failed, can I get more detail?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#how-do-i-send-ctrl-c-to-a-target">4.3.5. How do I send Ctrl-C to a target?</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#how-do-i-send-a-linux-command-to-a-linux-target-s-console">4.3.6. How do I send a Linux command to a Linux target’s console</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#manual-installation-of-tcf-from-source">4.4. Manual installation of TCF from source</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#creation-and-setup-of-user-ttbd">4.4.1. Creation and setup of user <em>ttbd</em></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#install-required-software">4.4.2. Install required software</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#remove-conflicting-packages">4.4.3. Remove conflicting packages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#install-tcf">4.4.4. Install TCF</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#manual-installation-of-support-packages">4.5. Manual installation of support packages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#bossac-arduino-due-flasher">4.5.1. Bossac: Arduino Due flasher</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#zephyr-sdk">4.5.2. Zephyr SDK</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#arduino-builder-1-6-13">4.5.3. Arduino Builder 1.6.13</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tunslip6">4.5.4. tunslip6</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#xtensa-esp32">4.5.5. Xtensa ESP32</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#libcoap">4.5.6. libcoap</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#fpm-fast-package-manager">4.5.7. FPM, fast package manager</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#platform-firmware-bios-update-procedures">4.6. Platform firmware / BIOS update procedures</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#updating-the-firmware-in-an-arduino101-to-factory-settings">4.6.1. Updating the firmware in an Arduino101 to factory settings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#updating-the-firmware-in-an-quark-c1000-reference-boards">4.6.2. Updating the firmware in an Quark C1000 reference boards</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#remediation-steps">4.6.2.1. Remediation steps</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#updating-the-firmware-in-an-quark-d2000-reference-boards">4.6.3. Updating the firmware in an Quark D2000 reference boards</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#updating-the-fpga-image-in-synopsys-emsk-boards">4.6.4. Updating the FPGA image in Synopsys EMSK boards</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#updating-the-serial-number-and-or-description-of-a-ftdi-flyswatter">4.6.5. Updating the serial number and / or description of a FTDI / Flyswatter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#updating-the-serial-number-and-or-description-of-a-cp210x-serial-device">4.6.6. Updating the serial number and / or description of a CP210x serial device</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="05-RFAQs.html">5. Rationales and Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="06-troubleshooting.html">6. Support &amp; Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="07-Architecture.html">7. Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="09-api.html">8. APIs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">9. Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="10-Status.html">10. Current status and plans</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../01-CHANGELOG.html">11. TCF release v0.11</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../README.html">Test Case Framework</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../README.html">Docs</a> &raquo;</li>
+        
+      <li>4. HOWTOs</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/doc/04-HOWTOs.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="howtos">
+<h1>4. HOWTOs<a class="headerlink" href="#howtos" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="general-linux-system">
+<h2>4.1. General Linux system<a class="headerlink" href="#general-linux-system" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="setup-proxies">
+<span id="id1"></span><h3>4.1.1. Setup proxies<a class="headerlink" href="#setup-proxies" title="Permalink to this headline">¶</a></h3>
+<p>If your network requires proxy support:</p>
+<ul>
+<li><p class="first">From the GUI: log in as a normal user to the graphical interface</p>
+<ol class="arabic">
+<li><p class="first">On the top right click the configuration arrow, select * →
+configuration icon → select network → select proxies*</p>
+</li>
+<li><p class="first">Set:</p>
+<ul class="simple">
+<li>Method <em>Manual</em></li>
+</ul>
+<ul class="simple">
+<li>Ignore Hosts: 127.0.0.1, localhost, 192.168.0.0/16</li>
+</ul>
+</li>
+</ol>
+</li>
+<li><p class="first">From the terminal, (when remotedly logged in, optional) add to
+<code class="docutils literal"><span class="pre">~/.bashrc</span></code> or to <code class="docutils literal"><span class="pre">/etc/bashrc</span></code> (for system wide, headless
+machines):</p>
+<blockquote>
+<div><div class="highlight-shell"><div class="highlight"><pre><span></span><span class="nb">export</span> <span class="nv">NO_PROXY</span><span class="o">=</span><span class="si">${</span><span class="nv">NO_PROXY</span><span class="k">:-</span><span class="s1">&#39;localhost,192.168.0.0/16,127.0.0.0/8,::1&#39;</span><span class="si">}</span>
+<span class="nb">export</span> <span class="nv">no_proxy</span><span class="o">=</span><span class="nv">$NO_PROXY</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>(note the <code class="docutils literal"><span class="pre">${VAR:-DEFAULT}</span></code> syntax is so to avoid these settings
+to interfere with those that might be set when you login via the GUI).</p>
+</li>
+</ul>
+<p>Configure <em>sudo</em> to pass proxy configuration:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># cat &lt;&lt;EOF &gt; /etc/sudoers.d/proxy</span>
+<span class="c1"># Keep proxy configuration through sudo, so we don&#39;t need to specify -E</span>
+<span class="c1"># to carry it</span>
+<span class="n">Defaults</span> <span class="n">env_keep</span> <span class="o">+=</span> <span class="s2">&quot;ALL_PROXY FTP_PROXY HTTP_PROXY HTTPS_PROXY NO_PROXY&quot;</span>
+<span class="n">Defaults</span> <span class="n">env_keep</span> <span class="o">+=</span> <span class="s2">&quot;all_proxy ftp_proxy http_proxy https_proxy no_proxy&quot;</span>
+<span class="n">EOF</span>
+</pre></div>
+</div>
+<p>This ensures the proxy configuration is kept by <em>sudo</em> (versus having
+torun <em>sudo -E</em>) so tools that use the network don’t get stuck with
+network access.</p>
+<p>Why?</p>
+<ul class="simple">
+<li><em>127.0.0.1/8</em> and <em>192.168.0.0/16</em> will be all networks we’ll use
+internally from our server, so they don’t need to be proxyed.</li>
+</ul>
+</div>
+<div class="section" id="how-do-i-update-my-tcf-installation">
+<span id="tcf-update"></span><h3>4.1.2. How do I update my TCF installation?<a class="headerlink" href="#how-do-i-update-my-tcf-installation" title="Permalink to this headline">¶</a></h3>
+<p>You can check if there is a new version available with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># dnf check-update --refresh | grep TCF</span>
+</pre></div>
+</div>
+<p>if so, you can update to it with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># dnf update --best ttbd ttbd-zephyr tcf tcf-zephyr</span>
+<span class="c1"># systemctl restart ttbd@production</span>
+</pre></div>
+</div>
+<p>Note that if there is a major version change (from <em>v0</em> to <em>v1</em>, or
+<em>v1</em> to <em>v2</em>, etc), more steps have to be done, which will be like
+(example is from <em>v0</em> to <em>v1</em>)</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># rpm -e tcf-repo-v0</span>
+<span class="c1"># rpm -i https://RPMREPOHOST/repo/tcf-repo-v0.11-1-1.noarch.rpm</span>
+<span class="c1"># dnf update --best</span>
+</pre></div>
+</div>
+<p>This is so because we release the TCF stable branches as separate RPM
+repositories, for simplicity.</p>
+<p>Note you might need to clean the metadata caches with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># dnf clean all</span>
+</pre></div>
+</div>
+<p>to force an update of the metadata to be pulled from the servers.</p>
+</div>
+<div class="section" id="configuring-a-usb-or-other-network-adapter-for-an-internal-network">
+<span id="internal-network"></span><h3>4.1.3. Configuring a USB or other network adapter for an internal network<a class="headerlink" href="#configuring-a-usb-or-other-network-adapter-for-an-internal-network" title="Permalink to this headline">¶</a></h3>
+<p>Test targets or infrastructure (like power control switches) that
+require IP connectivity can be connected to your server via a
+dedicated network interface and switch.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">do not connect infrastructure and test devices to the
+same network! You have to <a class="reference internal" href="05-RFAQs.html#separated-networks"><span class="std std-ref">keep them separated</span></a>.</p>
+</div>
+<p>You will need:</p>
+<ul class="simple">
+<li>a network interface</li>
+<li>its MAC address</li>
+<li>an IP address range (recommended <em>192.168.X.0/24</em>)</li>
+<li>a name for the interface (recommended <em>ngX</em>, with X matching the
+network range above)</li>
+</ul>
+<p>Once a new interface is identified (builtin, PCI card or USB),
+identify its name and MAC address:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ ifconfig -a         # to list all interfaces
+</pre></div>
+</div>
+<p>Once you have identified the interface which is to be used, find out
+it’s MAC address:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ ifconfig enp0s29u1u3        # To list information about an  specific interface
+enp0s29u1u3: flags=4163&lt;UP,BROADCAST,RUNNING,MULTICAST&gt;  mtu 1500
+      inet 192.168.0.1  netmask 255.255.255.0  broadcast 192.168.0.255
+      inet6 fe80::210:60ff:fe31:a4ba  prefixlen 64  scopeid 0x20&lt;link&gt;
+      ether 00:10:60:31:a4:ba  txqueuelen 1000  (Ethernet)
+      RX packets 68626  bytes 3156948 (3.0 MiB)
+      RX errors 0  dropped 0  overruns 0  frame 0
+      TX packets 76284  bytes 13537889 (12.9 MiB)
+      TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+</pre></div>
+</div>
+<p>in this case, the fourth line of output, <em>ether 00:10:60:31:a4:ba</em>.</p>
+<p>Now if we are going to assing it the network range <em>192.168.3.0/24</em>,
+we assign it name <em>ng3</em>.</p>
+<p>With the MAC address (<em>00:10:60:31:a4:ba</em>), a name (<em>ng3</em>), an IP
+network (<em>192.168.3.0</em>) and it’s range (<em>24</em>), we can create a
+configuration file:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># cat &gt; /etc/sysconfig/network-scripts/ifcfg-ng3 &lt;&lt;EOF</span>
+<span class="n">TYPE</span><span class="o">=</span><span class="n">Ethernet</span>
+<span class="n">BOOTPROTO</span><span class="o">=</span><span class="n">none</span>
+<span class="n">ONBOOT</span><span class="o">=</span><span class="n">yes</span>
+<span class="n">PREFIX</span><span class="o">=</span><span class="mi">24</span>
+<span class="n">IPADDR</span><span class="o">=</span><span class="mf">192.168</span><span class="o">.</span><span class="mf">3.1</span>
+<span class="n">HWADDR</span><span class="o">=</span><span class="mi">00</span><span class="p">:</span><span class="mi">10</span><span class="p">:</span><span class="mi">60</span><span class="p">:</span><span class="mi">31</span><span class="p">:</span><span class="n">a4</span><span class="p">:</span><span class="n">ba</span>
+<span class="n">EOF</span>
+</pre></div>
+</div>
+<p>Note the server is give address <strong>.1</strong> in the <em>192.168.3.0/24</em> network.</p>
+<p>And start it:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># ifup ng3</span>
+</pre></div>
+</div>
+<p>Now you can connect this adaptor to a network switch and connect
+clients to said switch.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">Keep this switch isolated from upstream routers; connect
+only test-targets OR infrastructure elements to it.</p>
+</div>
+<div class="section" id="disabling-networkmanager-from-controlling-the-interface">
+<span id="howto-nm-disable-control"></span><h4>4.1.3.1. Disabling NetworkManager from controlling the interface<a class="headerlink" href="#disabling-networkmanager-from-controlling-the-interface" title="Permalink to this headline">¶</a></h4>
+<p>NetworkManager needs to be told to ignore the network device; for
+that and our current example, run:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ sudo tee /etc/NetworkManager/conf.d/disabled.conf &lt;&lt;EOF
+[keyfile]
+unmanaged-devices=mac:00:10:60:31:a4:ba
+EOF
+</pre></div>
+</div>
+<p>Or edit said file and add <em>mac:MACADDR</em> statements
+separated by semicolons to the <em>unmanaged-devices</em> line.</p>
+</div>
+<div class="section" id="configuring-a-static-interface-via-networkmanager">
+<span id="howto-nm-config-static"></span><h4>4.1.3.2. Configuring a static interface Via NetworkManager<a class="headerlink" href="#configuring-a-static-interface-via-networkmanager" title="Permalink to this headline">¶</a></h4>
+<p>For example, to configure an internal network interface <em>IFNAME</em> for
+internal network for infrastructure control <em>192.168.2.0/24</em> with IP
+<em>.205</em> (for testcase execution we need Network Manager <a class="reference internal" href="#howto-nm-disable-control"><span class="std std-ref">off the
+interface</span></a>), run:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># nmcli con add type ethernet con-name tcf-internal-2 ifname IFNAME ip4 192.168.2.205/24</span>
+<span class="c1"># nmcli con up tcf-internal-2</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="generating-an-ssl-certificate">
+<span id="generate-ssl-certificate"></span><h3>4.1.4. Generating an SSL certificate<a class="headerlink" href="#generating-an-ssl-certificate" title="Permalink to this headline">¶</a></h3>
+<p>To use secure layers HTTPS connections between daemon and client, you
+must have a valid certificate and key, or use an autosigned
+certificate. This can be fed to the broker server with the options
+<code class="docutils literal"><span class="pre">--ssl-crt</span></code> and <code class="docutils literal"><span class="pre">--ssl-key</span></code>.</p>
+<p>If  you want to create your own certificate you must have installed
+OpenSSL:</p>
+<ol class="arabic">
+<li><p class="first">Generate a private key:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ openssl genrsa -des3 -out server.key 1024
+</pre></div>
+</div>
+</li>
+<li><p class="first">Generate a CSR:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ openssl req -new -key server.key -out server.csr
+</pre></div>
+</div>
+</li>
+<li><p class="first">Remove Passphrase from key:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ cp server.key server.key.org
+$ openssl rsa -in server.key.org -out server.key
+</pre></div>
+</div>
+</li>
+<li><p class="first">Generate self signed certificate:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ openssl x509 -req -days 365 -in server.csr -signkey server.key -out server.crt
+</pre></div>
+</div>
+</li>
+</ol>
+<blockquote>
+<div>Instructions taken from:
+<a class="reference external" href="http://kracekumar.com/post/54437887454/ssl-for-flask-local-development">http://kracekumar.com/post/54437887454/ssl-for-flask-local-development</a></div></blockquote>
+</div>
+<div class="section" id="finding-usb-device-information">
+<span id="find-usb-info"></span><h3>4.1.5. Finding USB device information<a class="headerlink" href="#finding-usb-device-information" title="Permalink to this headline">¶</a></h3>
+<p>To find information about USB devices (serial numbers, paths) use any
+of these methods.</p>
+<p>Note it is also possible that a device declares a serial number but it
+is all the same for every device (for example, in the FlySwatter2 and
+other FTDI based hardware). In FTDI based case, it is possible to
+re-flash a new serial number with <a class="reference internal" href="#fs2-serial-update"><span class="std std-ref">these instructions</span></a></p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">use these methods in a Linux machine that is not running
+<em>TTBD</em> actively, as it will keep producing messages in the
+kernel output and it will be difficult to tell which device
+is the right one.</p>
+</div>
+<div class="section" id="finding-usb-device-information-with-dmesg">
+<h4>4.1.5.1. Finding USB device information with dmesg<a class="headerlink" href="#finding-usb-device-information-with-dmesg" title="Permalink to this headline">¶</a></h4>
+<ol class="arabic">
+<li><p class="first">disconnect the device</p>
+</li>
+<li><p class="first">run <cite>dmesg -w</cite> in a console to see the kernel log, hit <code class="docutils literal"><span class="pre">enter</span></code> a
+few times to create space</p>
+</li>
+<li><p class="first">plug the device, see a message pop up with device data from the
+kernel</p>
+</li>
+<li><p class="first">Note the device data, along:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">usb</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1.4</span><span class="o">.</span><span class="mf">4.4</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">new</span> <span class="n">full</span><span class="o">-</span><span class="n">speed</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">number</span> <span class="mi">62</span> <span class="n">using</span> <span class="n">ehci</span><span class="o">-</span><span class="n">pci</span>
+<span class="n">usb</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1.4</span><span class="o">.</span><span class="mf">4.4</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">New</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">found</span><span class="p">,</span> <span class="n">idVendor</span><span class="o">=</span><span class="mi">2</span><span class="n">a03</span><span class="p">,</span> <span class="n">idProduct</span><span class="o">=</span><span class="mi">003</span><span class="n">d</span>
+<span class="n">usb</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1.4</span><span class="o">.</span><span class="mf">4.4</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">New</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">strings</span><span class="p">:</span> <span class="n">Mfr</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">Product</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">SerialNumber</span><span class="o">=</span><span class="mi">220</span>
+<span class="n">usb</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1.4</span><span class="o">.</span><span class="mf">4.4</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">Product</span><span class="p">:</span> <span class="n">Arduino</span> <span class="n">Due</span> <span class="n">Prog</span><span class="o">.</span> <span class="n">Port</span>
+<span class="n">usb</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1.4</span><span class="o">.</span><span class="mf">4.4</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">Manufacturer</span><span class="p">:</span> <span class="n">Arduino</span> <span class="p">(</span><span class="n">www</span><span class="o">.</span><span class="n">arduino</span><span class="o">.</span><span class="n">org</span><span class="p">)</span>
+<span class="n">usb</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1.4</span><span class="o">.</span><span class="mf">4.4</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">SerialNumber</span><span class="p">:</span> <span class="mf">85439303033351E06162</span>
+</pre></div>
+</div>
+<p>in this example, ignore the <em>SerialNumber</em> where it says <em>New USB
+device Strings</em> and focus on the following one.</p>
+<p>If there is no serial number, there will be something like:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">New</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">strings</span><span class="p">:</span> <span class="n">Mfr</span><span class="o">=</span><span class="n">XYZ</span><span class="p">,</span> <span class="n">Product</span><span class="o">=</span><span class="n">XYZ</span><span class="p">,</span> <span class="n">SerialNumber</span><span class="o">=</span><span class="mi">0</span>
+</pre></div>
+</div>
+<p>and no line with just <em>SerialNumber</em> on its own will appear.</p>
+</li>
+</ol>
+</div>
+<div class="section" id="finding-usb-device-information-with-lsusb-py">
+<h4>4.1.5.2. Finding USB device information with lsusb.py<a class="headerlink" href="#finding-usb-device-information-with-lsusb-py" title="Permalink to this headline">¶</a></h4>
+<p><code class="docutils literal"><span class="pre">lsusb.py</span> <span class="pre">-iu</span></code> provides a tree display of the USB connected devices:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">usb1</span>            <span class="mi">1</span><span class="n">d6b</span><span class="p">:</span><span class="mi">0002</span> <span class="mi">09</span>  <span class="mf">2.00</span>  <span class="mi">480</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">0</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IFs</span> <span class="p">(</span><span class="n">ehci_hcd</span> <span class="mi">0000</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">1</span><span class="n">a</span><span class="o">.</span><span class="mi">7</span><span class="p">)</span> <span class="n">hub</span>
+ <span class="mi">1</span><span class="o">-</span><span class="mi">1</span>            <span class="mf">05e3</span><span class="p">:</span><span class="mi">0608</span> <span class="mi">09</span>  <span class="mf">2.00</span>  <span class="mi">480</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">100</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IFs</span> <span class="p">(</span><span class="n">Genesys</span> <span class="n">Logic</span><span class="p">,</span> <span class="n">Inc</span><span class="o">.</span> <span class="n">Hub</span><span class="p">)</span> <span class="n">hub</span>
+  <span class="mi">1</span><span class="o">-</span><span class="mf">1.1</span>         <span class="mi">2001</span><span class="p">:</span><span class="n">f103</span> <span class="mi">09</span>  <span class="mf">2.00</span>  <span class="mi">480</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">0</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IFs</span> <span class="p">(</span><span class="n">D</span><span class="o">-</span><span class="n">Link</span> <span class="n">Corp</span><span class="o">.</span> <span class="n">DUB</span><span class="o">-</span><span class="n">H7</span> <span class="mi">7</span><span class="o">-</span><span class="n">port</span> <span class="n">USB</span> <span class="mf">2.0</span> <span class="n">hub</span><span class="p">)</span> <span class="n">hub</span>
+   <span class="mi">1</span><span class="o">-</span><span class="mf">1.1</span><span class="o">.</span><span class="mi">1</span>      <span class="mi">0424</span><span class="p">:</span><span class="mi">2514</span> <span class="mi">09</span>  <span class="mf">2.00</span>  <span class="mi">480</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">2</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IFs</span> <span class="p">(</span><span class="n">Standard</span> <span class="n">Microsystems</span> <span class="n">Corp</span><span class="o">.</span> <span class="n">USB</span> <span class="mf">2.0</span> <span class="n">Hub</span><span class="p">)</span> <span class="n">hub</span>
+    <span class="mi">1</span><span class="o">-</span><span class="mf">1.1</span><span class="o">.</span><span class="mf">1.1</span>   <span class="mi">2</span><span class="n">a03</span><span class="p">:</span><span class="mi">003</span><span class="n">d</span> <span class="mi">02</span>  <span class="mf">1.10</span>   <span class="mi">12</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">100</span><span class="n">mA</span> <span class="mi">2</span><span class="n">IFs</span> <span class="p">(</span><span class="n">Arduino</span> <span class="p">(</span><span class="n">www</span><span class="o">.</span><span class="n">arduino</span><span class="o">.</span><span class="n">org</span><span class="p">)</span> <span class="n">Arduino</span> <span class="n">Due</span> <span class="n">Prog</span><span class="o">.</span> <span class="n">Port</span> <span class="mf">85439303033351E01192</span><span class="p">)</span>
+   <span class="mi">1</span><span class="o">-</span><span class="mf">1.1</span><span class="o">.</span><span class="mi">2</span>      <span class="mi">0424</span><span class="p">:</span><span class="mi">2514</span> <span class="mi">09</span>  <span class="mf">2.00</span>  <span class="mi">480</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">2</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IFs</span> <span class="p">(</span><span class="n">Standard</span> <span class="n">Microsystems</span> <span class="n">Corp</span><span class="o">.</span> <span class="n">USB</span> <span class="mf">2.0</span> <span class="n">Hub</span><span class="p">)</span> <span class="n">hub</span>
+    <span class="mi">1</span><span class="o">-</span><span class="mf">1.1</span><span class="o">.</span><span class="mf">2.4</span>   <span class="mi">04</span><span class="n">d8</span><span class="p">:</span><span class="n">f2f7</span> <span class="mi">00</span>  <span class="mf">2.00</span>   <span class="mi">12</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">100</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IFs</span> <span class="p">(</span><span class="n">Yepkit</span> <span class="n">Lda</span><span class="o">.</span> <span class="n">YKUSH</span> <span class="n">YK20946</span><span class="p">)</span>
+     <span class="mi">1</span><span class="o">-</span><span class="mf">1.1</span><span class="o">.</span><span class="mf">2.4</span><span class="p">:</span><span class="mf">1.0</span><span class="p">(</span><span class="n">IF</span><span class="p">)</span> <span class="mi">03</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mi">00</span> <span class="mi">2</span><span class="n">EPs</span> <span class="p">(</span><span class="n">Human</span> <span class="n">Interface</span> <span class="n">Device</span><span class="p">:</span><span class="n">No</span> <span class="n">Subclass</span><span class="p">:</span><span class="kc">None</span><span class="p">)</span>
+   <span class="mi">1</span><span class="o">-</span><span class="mf">1.1</span><span class="o">.</span><span class="mi">5</span>      <span class="mi">0403</span><span class="p">:</span><span class="mi">6001</span> <span class="mi">00</span>  <span class="mf">2.00</span>   <span class="mi">12</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">90</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IFs</span> <span class="p">(</span><span class="n">FTDI</span> <span class="n">FT232R</span> <span class="n">USB</span> <span class="n">UART</span> <span class="n">A5026SO1</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>if we know the brand of our device, we can look it up; in the excerpt
+tree below, we can see, for example, a YKUSH on <em>1-1.1.2.4</em>; next to
+the name of the device is the serial number (if available), <em>YK20946</em>
+(in this example).</p>
+</div>
+<div class="section" id="finding-usb-device-information-with-udevadm">
+<h4>4.1.5.3. Finding USB device information with udevadm<a class="headerlink" href="#finding-usb-device-information-with-udevadm" title="Permalink to this headline">¶</a></h4>
+<p>Once we know a device node of any time has been established (eg:
+<code class="file docutils literal"><span class="pre">/dev/ttyUSB9</span></code>), use <code class="docutils literal"><span class="pre">udevadm</span> <span class="pre">info</span></code> to find information about
+it:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># udevadm info /dev/ttyUSB0   # or whichever device node it is</span>
+<span class="n">P</span><span class="p">:</span> <span class="o">/</span><span class="n">devices</span><span class="o">/</span><span class="n">pci0000</span><span class="p">:</span><span class="mi">00</span><span class="o">/</span><span class="mi">0000</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mf">14.0</span><span class="o">/</span><span class="n">usb1</span><span class="o">/</span><span class="mi">1</span><span class="o">-</span><span class="mi">2</span><span class="o">/</span><span class="mi">1</span><span class="o">-</span><span class="mi">2</span><span class="p">:</span><span class="mf">1.0</span><span class="o">/</span><span class="n">ttyUSB0</span><span class="o">/</span><span class="n">tty</span><span class="o">/</span><span class="n">ttyUSB0</span>
+<span class="n">N</span><span class="p">:</span> <span class="n">ttyUSB0</span>
+<span class="n">S</span><span class="p">:</span> <span class="n">serial</span><span class="o">/</span><span class="n">by</span><span class="o">-</span><span class="nb">id</span><span class="o">/</span><span class="n">pci</span><span class="o">-</span><span class="n">Prolific_Technology_Inc</span><span class="o">.</span><span class="n">_USB</span><span class="o">-</span><span class="n">Serial_Controller</span><span class="o">-</span><span class="n">if00</span><span class="o">-</span><span class="n">port0</span>
+<span class="n">S</span><span class="p">:</span> <span class="n">serial</span><span class="o">/</span><span class="n">by</span><span class="o">-</span><span class="n">path</span><span class="o">/</span><span class="n">pci</span><span class="o">-</span><span class="mi">0000</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mf">14.0</span><span class="o">-</span><span class="n">usb</span><span class="o">-</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">:</span><span class="mf">1.0</span><span class="o">-</span><span class="n">port0</span>
+<span class="o">...</span>
+<span class="n">E</span><span class="p">:</span> <span class="n">ID_SERIAL_SHORT</span><span class="o">=</span><span class="n">OR0497598</span>
+<span class="n">E</span><span class="p">:</span> <span class="n">ID_PATH</span><span class="o">=</span><span class="n">pci</span><span class="o">-</span><span class="mi">0000</span><span class="p">:</span><span class="mi">00</span><span class="p">:</span><span class="mf">14.0</span><span class="o">-</span><span class="n">usb</span><span class="o">-</span><span class="mi">0</span><span class="p">:</span><span class="mi">2</span><span class="p">:</span><span class="mf">1.0</span>
+<span class="n">E</span><span class="p">:</span> <span class="n">ID_PATH_TAG</span><span class="o">=</span><span class="n">pci</span><span class="o">-</span><span class="mi">0000</span><span class="n">_00_14_0</span><span class="o">-</span><span class="n">usb</span><span class="o">-</span><span class="mi">0</span><span class="n">_2_1_0</span>
+<span class="n">E</span><span class="p">:</span> <span class="n">ID_PCI_CLASS_FROM_DATABASE</span><span class="o">=</span><span class="n">Serial</span> <span class="n">bus</span> <span class="n">controller</span>
+<span class="n">E</span><span class="p">:</span> <span class="n">ID_PCI_INTERFACE_FROM_DATABASE</span><span class="o">=</span><span class="n">XHCI</span>
+<span class="n">E</span><span class="p">:</span> <span class="n">ID_PCI_SUBCLASS_FROM_DATABASE</span><span class="o">=</span><span class="n">USB</span> <span class="n">controller</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+<p>those values can be used to match in udev</p>
+</div>
+</div>
+<div class="section" id="udev-configuration-of-serial-port">
+<span id="usb-tty"></span><h3>4.1.6. udev configuration of serial port<a class="headerlink" href="#udev-configuration-of-serial-port" title="Permalink to this headline">¶</a></h3>
+<p>Methods for configuring a serial port by name. When a USB serial port
+is connected to the system, it is assigned a non-predictable name (eg:
+<em>/dev/ttyUSB14</em> or <em>/dev/ttyACM3</em>) which will change each time is
+plugged (or not).</p>
+<p>In order to have an stable name that consistently represents the
+device we are connecting, follow any of the following recipes, based
+on the capabilities of the USB device you are plugging to the system.</p>
+<div class="section" id="udev-configuration-of-serial-port-based-on-serial-number">
+<span id="usb-tty-serial"></span><h4>4.1.6.1. udev configuration of serial port based on serial number<a class="headerlink" href="#udev-configuration-of-serial-port-based-on-serial-number" title="Permalink to this headline">¶</a></h4>
+<p>Given a target name (TARGETNAME) we are going to name a serial port
+assigned to it <cite>/dev/tty-TARGETNAME</cite> based on the <em>serial number</em> of
+the USB device (that can be found using the <a class="reference internal" href="#find-usb-info"><span class="std std-ref">tricks above</span></a>) in <code class="file docutils literal"><span class="pre">/etc/udev/rules.d/90-ttbd.rules</span></code>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">SUBSYSTEM</span> <span class="o">==</span> <span class="s2">&quot;tty&quot;</span><span class="p">,</span> <span class="n">ENV</span><span class="p">{</span><span class="n">ID_SERIAL_SHORT</span><span class="p">}</span> <span class="o">==</span> <span class="s2">&quot;SERIALNUMBER&quot;</span><span class="p">,</span> \
+  <span class="n">SYMLINK</span> <span class="o">+=</span> <span class="s2">&quot;tty-TARGETNAME&quot;</span>
+</pre></div>
+</div>
+<p>Remember to update udev:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># udevadm control --reload-rules</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="udev-configuration-of-serial-port-without-serial-number-based-on-path">
+<span id="usb-tty-path"></span><h4>4.1.6.2. udev configuration of serial port without serial number based on path<a class="headerlink" href="#udev-configuration-of-serial-port-without-serial-number-based-on-path" title="Permalink to this headline">¶</a></h4>
+<p>This is used for USB serial dongles that have no unique USB serial number.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">This approach is very risky–any physical changes in the
+positions of cables or logical changes in enumeration
+order when kernel boots will change the path and might
+render your configuration inoperative or working incorrectly.</p>
+</div>
+<p>Given a target name (TARGETNAME) we are going to name a serial port
+assigned to it <cite>/dev/tty-TARGETNAME</cite> based on the <em>path</em> the USB
+device is connected, as most serial cables have no serial number; in
+<code class="file docutils literal"><span class="pre">/etc/udev/rules.d/90-ttbd.rules</span></code>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">SUBSYSTEM</span> <span class="o">==</span> <span class="s2">&quot;tty&quot;</span><span class="p">,</span> <span class="n">ENV</span><span class="p">{</span><span class="n">ID_PATH</span><span class="p">}</span> <span class="o">==</span> <span class="s2">&quot;*-usb-0:1.2.2:1.0&quot;</span><span class="p">,</span> \
+  <span class="n">SYMLINK</span> <span class="o">+=</span> <span class="s2">&quot;tty-TARGETNAME&quot;</span>
+</pre></div>
+</div>
+<p>find the path by plugging the device, using <cite>dmesg -w</cite> to find which
+<cite>/dev/ttyUSBX</cite> (or <cite>/dev/ttyACMX</cite>) name is given and then running:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># udevadm info /dev/ttyUSBX | grep ID_PATH=</span>
+<span class="n">ID_PATH</span><span class="o">=</span><span class="n">pciblahblah</span><span class="o">-</span><span class="n">usb</span><span class="o">-</span><span class="mi">0</span><span class="p">:</span><span class="mf">1.2</span><span class="o">.</span><span class="mi">2</span><span class="p">:</span><span class="mf">1.0</span>
+</pre></div>
+</div>
+<p>reload udev configuration:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># udevadm control --reload-rules</span>
+</pre></div>
+</div>
+<p>replug the USB dongle or device and verify the symlink
+<cite>/dev/tty-TARGETNAME</cite> is there.</p>
+<p>If not found, use syslog or <cite>journalctl -r</cite> and <cite>udevadm
+control –log-level debug</cite> to find our what is going on when the
+device is plugged.</p>
+</div>
+<div class="section" id="udev-configuration-of-serial-port-based-on-sibling-s-serial-number">
+<span id="usb-tty-sibling"></span><h4>4.1.6.3. udev configuration of serial port based on sibling’s serial number<a class="headerlink" href="#udev-configuration-of-serial-port-based-on-sibling-s-serial-number" title="Permalink to this headline">¶</a></h4>
+<p>This is used for USB-to-TTY serial dongles that have no unique USB
+serial number.</p>
+<p>Given a target name (TARGETNAME) we are going to name a USB-to-TTY
+serial port assigned to it <cite>/dev/tty-TARGETNAME</cite> based on the USB
+serial number of another device (the sibling) connected to the same
+USB hub.</p>
+<p>The sibling USB device has to have a unique USB serial number. By
+knowing in which port our the USB-to-TTY serial dongle is, we can
+piggy back on the other sibling device’s USB serial number.</p>
+<p>Thus, if we move the USB hub around, it’ll still have the same name,
+as long as we don’t change the port to which it is connected.</p>
+<p>In <code class="file docutils literal"><span class="pre">/etc/udev/rules.d/90-ttbd.rules</span></code>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># When the USB-TTL port is connected to the hub with serial number</span>
+<span class="c1"># YKXXXXX</span>
+<span class="n">SUBSYSTEM</span> <span class="o">==</span> <span class="s2">&quot;tty&quot;</span><span class="p">,</span> \
+    <span class="n">PROGRAM</span> <span class="o">=</span> <span class="s2">&quot;/usr/bin/usb-sibling-by-serial YKXXXXX&quot;</span><span class="p">,</span> \
+    <span class="n">ENV</span><span class="p">{</span><span class="n">ID_PATH</span><span class="p">}</span> <span class="o">==</span> <span class="s2">&quot;*2:1.0&quot;</span><span class="p">,</span> \
+    <span class="n">SYMLINK</span> <span class="o">+=</span> <span class="s2">&quot;tty-TARGETNAME&quot;</span>
+</pre></div>
+</div>
+<p>note the <code class="docutils literal"><span class="pre">*2:1.0</span></code>; that selects port 2, where we connect the
+serial port adapter. Port 1 would be <code class="docutils literal"><span class="pre">*1:1.0</span></code>, etc.</p>
+<p>Remember to update udev:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># udevadm control --reload-rules</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="finding-the-serial-number-of-a-devantech-usbrly08b-relay-controller">
+<span id="usbrly08b-serial-number"></span><h3>4.1.7. Finding the serial number of a Devantech USBRLY08B relay controller<a class="headerlink" href="#finding-the-serial-number-of-a-devantech-usbrly08b-relay-controller" title="Permalink to this headline">¶</a></h3>
+<p>Plug your board to the system and list:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ lsusb.py | grep -i Devantech
+ 1-1.1.1       04d8:ffee 02  2.00   12MBit/s 100mA 2IFs (Devantech Ltd. USB-RLY08 00023456)
+</pre></div>
+</div>
+<p><em>00023456</em> is the serial number; if there are multiple devices and you
+are not sure which one is it, disconnect the one you care for and run:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ lsusb.py | grep -i Devantech &gt; before
+</pre></div>
+</div>
+<p>now reconnect it and run:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ lsusb.py | grep -i Devantech &gt; after
+</pre></div>
+</div>
+<p>diff the files <em>before</em> and <em>after</em>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ diff before after
+3d2
+&lt;  1-1.1.1       04d8:ffee 02  2.00   12MBit/s 100mA 2IFs (Devantech Ltd. USB-RLY08 00023456)
+</pre></div>
+</div>
+<p>or run <cite>dmesg -w</cite> on the terminal, unplug and plug the device, see the
+kernel message about the new USB device, note the serial number.</p>
+</div>
+<div class="section" id="finding-the-serial-number-of-an-ykush-hub">
+<span id="ykush-serial-number"></span><h3>4.1.8. Finding the serial number of an YKUSH hub<a class="headerlink" href="#finding-the-serial-number-of-an-ykush-hub" title="Permalink to this headline">¶</a></h3>
+<p>Methods to find the serial number of an YKUSH hub:</p>
+<ul>
+<li><p class="first">plug your YKush hub to the system and list:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># lsusb.py | grep YKUSH | tee before</span>
+  <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">1.4</span>    <span class="mi">04</span><span class="n">d8</span><span class="p">:</span><span class="n">f2f7</span> <span class="mi">00</span>  <span class="mf">2.00</span>   <span class="mi">12</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">100</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IF</span>  <span class="p">(</span><span class="n">Yepkit</span> <span class="n">Lda</span><span class="o">.</span> <span class="n">YKUSH</span> <span class="n">YK21297</span><span class="p">)</span>
+  <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">2.4</span>    <span class="mi">04</span><span class="n">d8</span><span class="p">:</span><span class="n">f2f7</span> <span class="mi">00</span>  <span class="mf">2.00</span>   <span class="mi">12</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">100</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IF</span>  <span class="p">(</span><span class="n">Yepkit</span> <span class="n">Lda</span><span class="o">.</span> <span class="n">YKUSH</span> <span class="n">YK21292</span><span class="p">)</span>
+  <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">3.4</span>    <span class="mi">04</span><span class="n">d8</span><span class="p">:</span><span class="n">f2f7</span> <span class="mi">00</span>  <span class="mf">2.00</span>   <span class="mi">12</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">100</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IF</span>  <span class="p">(</span><span class="n">Yepkit</span> <span class="n">Lda</span><span class="o">.</span> <span class="n">YKUSH</span> <span class="n">YK21290</span><span class="p">)</span>
+  <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">4.4</span>    <span class="mi">04</span><span class="n">d8</span><span class="p">:</span><span class="n">f2f7</span> <span class="mi">00</span>  <span class="mf">2.00</span>   <span class="mi">12</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">100</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IF</span>  <span class="p">(</span><span class="n">Yepkit</span> <span class="n">Lda</span><span class="o">.</span> <span class="n">YKUSH</span> <span class="n">YK21294</span><span class="p">)</span>
+ <span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">4</span>       <span class="mi">04</span><span class="n">d8</span><span class="p">:</span><span class="n">f2f7</span> <span class="mi">00</span>  <span class="mf">2.00</span>   <span class="mi">12</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">100</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IF</span>  <span class="p">(</span><span class="n">Yepkit</span> <span class="n">Lda</span><span class="o">.</span> <span class="n">YKUSH</span> <span class="n">YK21293</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>you might have many; to tell which one is the one in your hand, you
+can just unplug it and list again:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># lsusb.py | grep YKUSH | tee after</span>
+ <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">1.4</span>    <span class="mi">04</span><span class="n">d8</span><span class="p">:</span><span class="n">f2f7</span> <span class="mi">00</span>  <span class="mf">2.00</span>   <span class="mi">12</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">100</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IF</span>  <span class="p">(</span><span class="n">Yepkit</span> <span class="n">Lda</span><span class="o">.</span> <span class="n">YKUSH</span> <span class="n">YK21297</span><span class="p">)</span>
+ <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">2.4</span>    <span class="mi">04</span><span class="n">d8</span><span class="p">:</span><span class="n">f2f7</span> <span class="mi">00</span>  <span class="mf">2.00</span>   <span class="mi">12</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">100</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IF</span>  <span class="p">(</span><span class="n">Yepkit</span> <span class="n">Lda</span><span class="o">.</span> <span class="n">YKUSH</span> <span class="n">YK21292</span><span class="p">)</span>
+ <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">4.4</span>    <span class="mi">04</span><span class="n">d8</span><span class="p">:</span><span class="n">f2f7</span> <span class="mi">00</span>  <span class="mf">2.00</span>   <span class="mi">12</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">100</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IF</span>  <span class="p">(</span><span class="n">Yepkit</span> <span class="n">Lda</span><span class="o">.</span> <span class="n">YKUSH</span> <span class="n">YK21294</span><span class="p">)</span>
+<span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">4</span>       <span class="mi">04</span><span class="n">d8</span><span class="p">:</span><span class="n">f2f7</span> <span class="mi">00</span>  <span class="mf">2.00</span>   <span class="mi">12</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">100</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IF</span>  <span class="p">(</span><span class="n">Yepkit</span> <span class="n">Lda</span><span class="o">.</span> <span class="n">YKUSH</span> <span class="n">YK21293</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>to (quickly) find out which one was unplugged, diff the files
+<em>before</em> and <em>after</em>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># diff before after</span>
+<span class="mi">3</span><span class="n">d2</span>
+<span class="o">&lt;</span>     <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">3.4</span>    <span class="mi">04</span><span class="n">d8</span><span class="p">:</span><span class="n">f2f7</span> <span class="mi">00</span>  <span class="mf">2.00</span>   <span class="mi">12</span><span class="n">MBit</span><span class="o">/</span><span class="n">s</span> <span class="mi">100</span><span class="n">mA</span> <span class="mi">1</span><span class="n">IF</span>  <span class="p">(</span><span class="n">Yepkit</span> <span class="n">Lda</span><span class="o">.</span> <span class="n">YKUSH</span> <span class="n">YK21290</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>the line that was removed when we unplugged was the one for <em>YK21290</em>,
+which is the serial number of the hub.</p>
+</li>
+<li><p class="first">run <cite>dmesg -w</cite> on a terminal and plug the device, see the kernel
+message about the new USB device, note the serial number</p>
+</li>
+</ul>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">the hub itself has no serial number, but an internal device
+connected to its downstream port number 4 does have the
+<em>YK34567</em> serial number.</p>
+</div>
+</div>
+</div>
+<div class="section" id="ttbd-tcf-server-configuration-and-tricks">
+<h2>4.2. <em>ttbd</em>: TCF server configuration and tricks<a class="headerlink" href="#ttbd-tcf-server-configuration-and-tricks" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="starting-more-that-one-instance">
+<span id="ttbd-config-multiple-instances"></span><h3>4.2.1. Starting more that one instance<a class="headerlink" href="#starting-more-that-one-instance" title="Permalink to this headline">¶</a></h3>
+<p>Most setups will only have one instance, the <em>production</em> instance;
+however, two more are recommended:</p>
+<ul class="simple">
+<li><em>infrastructure</em>: handles power to USB hubs, equipment, normal and
+power switching to reset them in case) of issues, individual raw
+access to all the power switching units connected throughout the
+system, network switches, etc</li>
+<li><em>staging</em>: targets whose drivers are being developed before moving
+into production (optional)</li>
+</ul>
+<p>To bring up an instance (repeat these steps replacing <em>production</em> with
+<em>INSTANCENAME</em> for other instances):</p>
+<ol class="arabic">
+<li><p class="first">Create the instance’s configuration directory:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># install -d -m 2775 -o ttbd -g ttbd /etc/ttbd-production</span>
+</pre></div>
+</div>
+<p>systemd will create the runtime directories needed when starting
+<em>ttbd</em> in <cite>/var/run/ttbd-production</cite> and
+<cite>/var/cache/ttbd-production</cite> as they will be wiped by the system
+on restart.</p>
+</li>
+<li><p class="first">Each instance listens on a different port, so we create the initial
+server configuration <cite>/etc/ttbd-production/conf_00_bind.py</cite>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">host</span> <span class="o">=</span> <span class="s2">&quot;0.0.0.0&quot;</span>           <span class="c1"># Listen on all interfaces</span>
+<span class="n">port</span> <span class="o">=</span> <span class="mi">5000</span>
+</pre></div>
+</div>
+<p><em>infrastructure</em> is usually assigned 4999, <em>staging</em> 5001. Enable
+access through the firewall to said ports:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># firewall-cmd --add-port=4999-5001/tcp --permanent</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<ol class="arabic" start="4">
+<li><p class="first">Enable and start the instance:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># systemctl enable ttbd@production</span>
+<span class="c1"># systemctl start ttbd@production</span>
+</pre></div>
+</div>
+<p><em>systemd</em> runs the daemon run as user <em>ttbd</em>, group <em>ttbd</em> and
+the following supplemental groups:</p>
+<blockquote>
+<div><ul class="simple">
+<li><em>root</em>: to be able to scan USB devices</li>
+<li><em>dialout</em>: to be able to access serial devices and USB connected
+serial devices (for consoles, JTAGs, etc)</li>
+<li><em>ttbd</em>: to access configuration and other files</li>
+</ul>
+</div></blockquote>
+<p>See log output with <code class="docutils literal"><span class="pre">journalctl</span> <span class="pre">-fu</span> <span class="pre">ttbd&#64;NAME</span></code>. Diagnose issues
+starting with systemd in <a class="reference internal" href="06-troubleshooting.html#systemd-tips-diagnosis"><span class="std std-ref">troubleshooting</span></a>. Further configuration <a class="reference internal" href="06-troubleshooting.html#systemd-tips-configuring"><span class="std std-ref">tips</span></a>.</p>
+</li>
+<li><p class="first">At this point you could create or copy existing <code class="docutils literal"><span class="pre">conf_*.py</span></code>
+configuration files to <code class="docutils literal"><span class="pre">/etc/ttbd-production</span></code> and restart the
+service with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># systemctl restart ttbd@production</span>
+</pre></div>
+</div>
+<p>If you have none, that is ok, we’ll add them in the next sections.</p>
+</li>
+</ol>
+<p>Note that now, none can access the server yet because there is no way
+to authenticate with it :) Let’s add some configuration.</p>
+</div>
+<div class="section" id="configure-authentication-for-local-users-optional">
+<span id="ttbd-config-auth-local"></span><h3>4.2.2. Configure authentication for local users (optional)<a class="headerlink" href="#configure-authentication-for-local-users-optional" title="Permalink to this headline">¶</a></h3>
+<p>A quick way to allow any user in the local machine to use the server
+without authenticating is to request local authentication for
+127.0.0.1; run:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># echo &#39;local_auth.append(&quot;127.0.0.1&quot;)&#39; \</span>
+  <span class="o">&gt;</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">ttbd</span><span class="o">-</span><span class="n">production</span><span class="o">/</span><span class="n">conf_00_auth_local</span><span class="o">.</span><span class="n">py</span>
+<span class="c1"># systemctl restart ttbd@production</span>
+</pre></div>
+</div>
+<p>Now login in should work with no need to input anything (in this case,
+there will be no output either):</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf -iu https://localhost:5000 login
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>feel free to ignore the error message about <cite>ZEPHYR_BASE not
+being defined</cite>; it is a glitch that will be fixed. You can
+work around it by running:</p>
+<div class="last highlight-default"><div class="highlight"><pre><span></span>$ export ZEPHYR_BASE=
+</pre></div>
+</div>
+</div>
+<p>You can configure local TCF clients to access the local instance
+by default (<a class="reference internal" href="02-guides.html#tcf-configuring"><span class="std std-ref">more</span></a>):</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># mkdir -p /etc/tcf</span>
+<span class="c1"># echo &quot;tcfl.config.url_add(&#39;https://localhost:5000&#39;, ssl_ignore = True)&quot; \</span>
+  <span class="o">&gt;&gt;</span> <span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">tcf</span><span class="o">/</span><span class="n">conf_local</span><span class="o">.</span><span class="n">py</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="configure-simple-authentication-for-jenkins-jobs-optional">
+<span id="ttbd-config-authdb"></span><h3>4.2.3. Configure simple authentication / for Jenkins jobs (optional)<a class="headerlink" href="#configure-simple-authentication-for-jenkins-jobs-optional" title="Permalink to this headline">¶</a></h3>
+<p>You can setup static accounts for users or Jenkins autobuilders with
+hardcoded passwords by creating a file
+<code class="docutils literal"><span class="pre">/etc/ttbd-production/conf_00_auth_localdb.py</span></code> with the contents:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">ttbl.auth_localdb</span>
+
+<span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">add_authenticator</span><span class="p">(</span><span class="n">ttbl</span><span class="o">.</span><span class="n">auth_localdb</span><span class="o">.</span><span class="n">authenticator_localdb_c</span><span class="p">(</span>
+     <span class="s2">&quot;Jenkins and other&quot;</span><span class="p">,</span>
+     <span class="p">[</span>
+         <span class="p">[</span> <span class="s1">&#39;usera&#39;</span><span class="p">,</span> <span class="s1">&#39;PASSWORDA&#39;</span><span class="p">,</span> <span class="s1">&#39;user&#39;</span><span class="p">,</span> <span class="p">],</span>
+         <span class="p">[</span> <span class="s1">&#39;superuserB&#39;</span><span class="p">,</span> <span class="s1">&#39;PASSWORDB&#39;</span><span class="p">,</span> <span class="s1">&#39;user&#39;</span><span class="p">,</span> <span class="s1">&#39;admin&#39;</span><span class="p">,</span> <span class="p">],</span>
+         <span class="p">[</span> <span class="s1">&#39;jenkins1&#39;</span><span class="p">,</span> <span class="s1">&#39;PASSWORD1&#39;</span><span class="p">,</span> <span class="s1">&#39;user&#39;</span><span class="p">,</span> <span class="p">],</span>
+         <span class="p">[</span> <span class="s1">&#39;jenkins2&#39;</span><span class="p">,</span> <span class="s1">&#39;PASSWORD2&#39;</span><span class="p">,</span> <span class="s1">&#39;user&#39;</span><span class="p">,</span> <span class="p">],</span>
+         <span class="o">...</span>
+     <span class="p">]))</span>
+</pre></div>
+</div>
+<p>Restart to read the configuration:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># systemctl restart ttbd@production</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="configure-authentication-against-ldap">
+<span id="ttbd-config-auth-ldap"></span><h3>4.2.4. Configure authentication against LDAP<a class="headerlink" href="#configure-authentication-against-ldap" title="Permalink to this headline">¶</a></h3>
+<p>Copy the configuration example
+<cite>/etc/ttbd/production/example_conf_05_auth_ldap.py</cite> and modify it to
+suit your LDAP setup:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># cp /etc/ttbd-production/example_conf_05_auth_ldap.py /etc/ttbd-production/conf_05_auth_ldap.py</span>
+<span class="c1"># &lt;edit away&gt;</span>
+<span class="c1"># systemctl restart ttbd@production</span>
+</pre></div>
+</div>
+<p>Authorized users (users in the declared LDAP groups in the
+configurtion file) should now be able to login with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf login LDAPLOGIN
+</pre></div>
+</div>
+<p>This file can be tweaked to fit your authentication needs. For
+example, you might want to change the name of the LDAP groups your
+users need to be members off.</p>
+<p>If this does not work, most likely the configuration files where not
+loaded properly; check the daemon output (<a class="reference internal" href="06-troubleshooting.html#systemd-tips-diagnosis"><span class="std std-ref">troubleshooting</span></a> and <a class="reference internal" href="06-troubleshooting.html#ttbd-auth-ldap-invalid-creds"><span class="std std-ref">troubleshooting LDAP</span></a>).</p>
+</div>
+<div class="section" id="configuring-a-target-for-just-controlling-power-to-something">
+<span id="tt-power"></span><h3>4.2.5. Configuring a target for just controlling power to something<a class="headerlink" href="#configuring-a-target-for-just-controlling-power-to-something" title="Permalink to this headline">¶</a></h3>
+<p>In your <em>ttbd</em>’s <cite>conf_SOMETHING.py</cite> config file, add:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">target_add</span><span class="p">(</span>
+    <span class="n">ttbl</span><span class="o">.</span><span class="n">tt</span><span class="o">.</span><span class="n">tt_power</span><span class="p">(</span>
+      <span class="s2">&quot;TARGETNAME&quot;</span><span class="p">,</span>
+      <span class="n">power_control</span> <span class="o">=</span> <span class="n">PC_OBJECT</span><span class="p">,</span>
+      <span class="n">power</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="p">),</span>
+    <span class="n">tags</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">idle_poweroff</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>this creates a target called <em>TARGETNAME</em> that you can power on, off
+or cycle. The <em>power</em> argument indicates what do do with the power at
+startup (<em>True</em> turn it on, <em>False</em> turn it off, <em>None</em>–or omitting
+this argument, leave it as is). <em>tags = dict(idle_poweroff = 32)</em> is
+used to have <em>TARGETNAME</em> not being powered off when idle.</p>
+<p>Now, <em>PC_OBJECT</em> is the actual implementation of power control and you
+can make it be things like:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">ttbl</span><span class="o">.</span><span class="n">pc</span><span class="o">.</span><span class="n">dlwps7</span><span class="p">(</span><span class="s2">&quot;http://admin:1234@sp3/5&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This would make <em>TARGETNAME</em>’s power be controlled by plug #5 of the
+<em>Digital Logger Web Power Switch 7</em> named <em>sp3</em> (<a class="reference internal" href="09-api.html#conf_00_lib.dlwps7_add" title="conf_00_lib.dlwps7_add"><code class="xref py py-func docutils literal"><span class="pre">setup</span>
+<span class="pre">instructions</span></code></a>). Because this is a normal,
+120V plug, if a light bulb were connected to it:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">target_add</span><span class="p">(</span>
+  <span class="n">ttbl</span><span class="o">.</span><span class="n">tt</span><span class="o">.</span><span class="n">tt_power</span><span class="p">(</span>
+    <span class="s2">&quot;Entrance_light&quot;</span><span class="p">,</span>
+    <span class="n">power_control</span> <span class="o">=</span> <span class="n">ttbl</span><span class="o">.</span><span class="n">pc</span><span class="o">.</span><span class="n">dlwps7</span><span class="p">(</span><span class="s2">&quot;http://admin:1234@sp3/5&quot;</span><span class="p">),</span>
+    <span class="n">power</span> <span class="o">=</span> <span class="kc">True</span>
+  <span class="p">),</span>
+  <span class="n">tags</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">idle_poweroff</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>and like this, the target <em>Entrance_light</em> can be switched on or off
+with <em>tcf power-on Entrance_light</em> and <em>tcf power-off Entrance_light</em>.</p>
+<p>It could also be:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">ttbl</span><span class="o">.</span><span class="n">pc_ykush</span><span class="o">.</span><span class="n">ykush</span><span class="p">(</span><span class="s2">&quot;YK21080&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>which means that power to <em>TARGETNAME</em> would be implemented by
+powering on or off port #3 of the YKush power-switching hub with
+serial number <em>YK21080</em> (<a class="reference internal" href="09-api.html#conf_00_lib.ykush_targets_add" title="conf_00_lib.ykush_targets_add"><code class="xref py py-func docutils literal"><span class="pre">setup</span> <span class="pre">instructions</span></code></a>).</p>
+<p>Other power controller implementations are possible, of course, by
+subclassing <a class="reference internal" href="09-api.html#ttbl.tt_power_control_impl" title="ttbl.tt_power_control_impl"><code class="xref py py-class docutils literal"><span class="pre">ttbl.tt_power_control_impl</span></code></a>.</p>
+</div>
+<div class="section" id="adding-tags-to-a-target">
+<span id="target-tag"></span><h3>4.2.6. Adding tags to a target<a class="headerlink" href="#adding-tags-to-a-target" title="Permalink to this headline">¶</a></h3>
+<p>Once a target is configured, new tags can be added to it using
+<a class="reference internal" href="09-api.html#ttbl.test_target.tags_update" title="ttbl.test_target.tags_update"><code class="xref py py-meth docutils literal"><span class="pre">ttbl.test_target.tags_update()</span></code></a> in any configuration file
+(preferrably next to the target definition); for example, if in
+<code class="docutils literal"><span class="pre">/etc/ttbd-production/conf_10_targets.py</span></code> you had the statement:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">arduino101_add</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;a101-15&quot;</span><span class="p">,</span>
+               <span class="n">fs2_serial</span> <span class="o">=</span> <span class="s2">&quot;a101-15-fs2&quot;</span><span class="p">,</span>
+               <span class="n">ykush_url</span> <span class="o">=</span> <span class="s2">&quot;http://admin:1234@HOSTNAME/PORT&quot;</span><span class="p">,</span>
+               <span class="n">ykush_serial</span> <span class="o">=</span> <span class="s2">&quot;YK24439&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>you can add the tags <code class="docutils literal"><span class="pre">fixture_spi_basic_0</span></code> (as a boolean that
+defaults to <em>True</em> and  <code class="docutils literal"><span class="pre">tempsetting</span></code> (as an integer) with:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">arduino101_add</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;a101-15&quot;</span><span class="p">,</span>
+               <span class="n">fs2_serial</span> <span class="o">=</span> <span class="s2">&quot;a101-15-fs2&quot;</span><span class="p">,</span>
+               <span class="n">ykush_url</span> <span class="o">=</span> <span class="s2">&quot;http://admin:1234@HOSTNAME/PORT&quot;</span><span class="p">,</span>
+               <span class="n">ykush_serial</span> <span class="o">=</span> <span class="s2">&quot;YK24439&quot;</span><span class="p">)</span>
+<span class="n">tcfl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="s1">&#39;a101-15&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">tags_update</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span>
+    <span class="n">fixture_spi_basic_0</span> <span class="o">=</span> <span class="bp">True</span><span class="p">,</span>
+    <span class="n">tempsetting</span> <span class="o">=</span> <span class="mi">32</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="how-do-i-disable-a-target-by-default">
+<span id="target-disable-default"></span><h3>4.2.7. How do I disable a target by default?<a class="headerlink" href="#how-do-i-disable-a-target-by-default" title="Permalink to this headline">¶</a></h3>
+<p>When a target has to be disabled by default, add this to the
+configuration file:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="s1">&#39;TARGETNAME&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">disable</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>the target will be loaded and the configuration will be accesible,
+however, <em>tcf</em> clients that select targets automatically (<em>list</em>,
+<em>run</em>) will not use it unless <em>-a</em> is given.</p>
+<p>This is used for targets that are misbehaving for any reason but still
+need to be connected to debug. They can be manually enabled/disabled
+with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf disable TARGETNAME
+$ tcf enable TARGETNAME
+</pre></div>
+</div>
+<p>The user has to have <em>admin</em> capabilities in the <em>TTBD</em> server to run
+this operation.</p>
+</div>
+<div class="section" id="allowing-the-server-to-be-used-remotely">
+<span id="ttbd-config-bind"></span><h3>4.2.8. Allowing the server to be used remotely<a class="headerlink" href="#allowing-the-server-to-be-used-remotely" title="Permalink to this headline">¶</a></h3>
+<p>By default, the server is configured to only listen on local ports,
+thus only accessible from the server itself.</p>
+<p>To allow the server to be accessible on all the network interfaces of
+the machine on TCP port 5000, create
+<code class="docutils literal"><span class="pre">/etc/ttbd-production/conf_00_bind.py</span></code> with the content:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">host</span> <span class="o">=</span> <span class="s2">&quot;0.0.0.0&quot;</span>
+<span class="n">port</span> <span class="o">=</span> <span class="mi">5000</span>
+</pre></div>
+</div>
+<p>Now restart the daemon and verify it restarted properly:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># systemctl restart ttbd@production</span>
+<span class="c1"># journalctl -eu ttbd@production</span>
+</pre></div>
+</div>
+<p>As well, ensure the server’s firewall allows the given ports to be
+accessible. In Fedora 25:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span># dnf install -y firewall-config
+$ firewall-config
+</pre></div>
+</div>
+<p>In the current firewall zone, add in <em>Ports</em> a range <em>4999-5001</em>, type
+TCP.</p>
+<p>Now select in the menu <em>Options</em> &gt; <em>Runtime to permanent</em> to ensure
+the changes are permanent and next time the server restarts they are
+applied.</p>
+</div>
+<div class="section" id="increasing-the-verbosity-of-the-server">
+<h3>4.2.9. Increasing the verbosity of the server<a class="headerlink" href="#increasing-the-verbosity-of-the-server" title="Permalink to this headline">¶</a></h3>
+<p>When debugging issues with the server, you might have to increase its
+verbosity; for that, more <em>-v</em> have to be given to the command
+line. For that, edit <code class="docutils literal"><span class="pre">/etc/systemd/system/ttbd&#64;.service</span></code> to add more
+<code class="docutils literal"><span class="pre">-v</span></code> to the <code class="docutils literal"><span class="pre">ExecStart</span></code> line.</p>
+<p>Reread <em>systemd</em>’s configuration and restart the server:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># systemctl daemon-reload</span>
+<span class="c1"># systemctl restart ttbd@production</span>
+</pre></div>
+</div>
+<p>Remember to toggle it back to the default <code class="docutils literal"><span class="pre">-vv</span></code>–it gets chatty.</p>
+</div>
+</div>
+<div class="section" id="tcf-client-tricks">
+<h2>4.3. TCF client tricks<a class="headerlink" href="#tcf-client-tricks" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="how-do-i-release-a-target-i-don-t-own">
+<h3>4.3.1. How do I release a target I don’t own?<a class="headerlink" href="#how-do-i-release-a-target-i-don-t-own" title="Permalink to this headline">¶</a></h3>
+<p>Someone owns the target and they have gone home…:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf release -f TARGETNAME
+</pre></div>
+</div>
+<p>But this only works if you have admin permissions.</p>
+<p>The exception is if you have locked yourself the target with a
+<em>ticket</em> (used by <em>tcf run</em> and others so that the same user running
+different processes in parallel can still exclude itself from
+overusing a target). It will say something like:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">requests</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">HTTPError</span><span class="p">:</span> <span class="mi">400</span><span class="p">:</span> <span class="n">TARGETNAME</span><span class="p">:</span> <span class="n">tried</span> <span class="n">to</span> <span class="n">use</span> <span class="n">busy</span> <span class="n">target</span> <span class="p">(</span><span class="n">owned</span> <span class="n">by</span> <span class="s1">&#39;MYUSERNAME:TICKETSTRING&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>As a user, you can always force release any of your own locks with
+<cite>-f</cite>.</p>
+</div>
+<div class="section" id="how-can-i-debug-a-target">
+<h3>4.3.2. How can I debug a target?<a class="headerlink" href="#how-can-i-debug-a-target" title="Permalink to this headline">¶</a></h3>
+<p>TCF provides for means to connect remote debuggers to targets that
+support them; if the target supports the
+<a class="reference internal" href="09-api.html#ttbl.tt_debug_mixin" title="ttbl.tt_debug_mixin"><code class="xref py py-class docutils literal"><span class="pre">ttbl.tt_debug_mixin</span></code></a> (which you can find with <cite>tcf list -vv
+TARGETNAME | grep interfaces</cite>).</p>
+<p>How it is done and what are the capabilities depends on the target,
+but in general, assuming you have a target with an image deployed:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf acquire TARGETNAME
+$ tcf debug-start TARGETNAME
+$ tcf power-on TARGETNAME
+$ tcf debug-info TARGETNAME
+GDB server: tcp:myhostname:3744 (when target is on; currently ON)
+</pre></div>
+</div>
+<p>at this point, the target is waiting for the debugger to connect
+before powering up, so start (in this case) GDB pointing it to the
+<em>elf</em> version of the image file uploaded and issue:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">gdb</span><span class="o">&gt;</span> <span class="n">target</span> <span class="n">remote</span> <span class="n">tcp</span><span class="p">:</span><span class="n">myhostname</span><span class="p">:</span><span class="mi">3744</span>
+</pre></div>
+</div>
+<p>Some targets might support starting debugging after power up.</p>
+<p>Find more:</p>
+<ul class="simple">
+<li><cite>tcf –help | grep debug-</cite></li>
+<li>the <a class="reference internal" href="09-api.html#tcfl.target_ext_debug.debug" title="tcfl.target_ext_debug.debug"><code class="xref py py-class docutils literal"><span class="pre">debug</span> <span class="pre">extension</span> <span class="pre">API</span></code></a> to
+<a class="reference internal" href="09-api.html#tcfl.tc.target_c" title="tcfl.tc.target_c"><code class="xref py py-class docutils literal"><span class="pre">target</span> <span class="pre">objects</span></code></a> for use inside Python testcases</li>
+<li>the <a class="reference internal" href="09-api.html#ttbl.tt_debug_mixin" title="ttbl.tt_debug_mixin"><code class="xref py py-class docutils literal"><span class="pre">*ttbd*'s</span> <span class="pre">Debug</span> <span class="pre">interface</span></code></a></li>
+</ul>
+<div class="section" id="zephyr-debugging-with-tcf-run">
+<h4>4.3.2.1. Zephyr debugging with TCF run<a class="headerlink" href="#zephyr-debugging-with-tcf-run" title="Permalink to this headline">¶</a></h4>
+<p>When using targets in a high usage environment, it is easier to use
+TCF run and a few switches:</p>
+<ul>
+<li><p class="first">Make sure the target is acquired for a max of 30min while you work with it:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ for ((count = 0; count &lt; 240; count++)); do tcf -t 1234 acquire TARGETNAME; sleep 15s; done &amp;
+</pre></div>
+</div>
+<p>be sure to kill this process when done, to free it for other people;
+every 15s this re-acquires, as a way to tell the daemon you are
+still using it, to not free it from you.</p>
+<p>Note <cite>-t 1234</cite>; this says <em>use ticket 1234</em> to reserve this target;
+we’ll use it later.</p>
+</li>
+<li><p class="first">Create a temporary directory:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ mkdir tmp
+</pre></div>
+</div>
+</li>
+<li><p class="first">Build and deploy:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf -t 1234 run -vvvv -E --tmpdir tmp -t TARGETNAME --no-release PATH-TO-TC
+</pre></div>
+</div>
+<p>note the following:</p>
+<ul>
+<li><p class="first"><cite>-t 1234</cite> says to use ticket 1234, as the one we used for the reservation</p>
+</li>
+<li><p class="first"><cite>-E</cite> tells it not to evaluate – it will just build and deploy / flash</p>
+</li>
+<li><p class="first"><cite>–no-release</cite> says do not release the target when done (because
+you want to do other stuff, like debug)</p>
+</li>
+<li><p class="first">In the case of Zephyr, the ELF file will be in
+<cite>tmp/1234/outdir-1234-SOMETHING/zephyr/zephyr.elf</cite>, which you can
+find with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ find tmp/1234/ -iname zephyr.elf
+tmp/1234/outdir-1234-j38h-quark_d2000_crb/zephyr/zephyr.elf
+</pre></div>
+</div>
+</li>
+</ul>
+</li>
+<li><p class="first">Tell the target to start debugging:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf -t 1234 debug-start TARGETNAME
+</pre></div>
+</div>
+</li>
+<li><p class="first">Now reset / power cycle it, so it goes fresh to start. Because we
+told it to start debugging, it will start but stop the CPU until you
+attach a debugger (only for OpenOCD targets or targets that support
+debugging, anyway):</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf -t 1234 reset TARGETNAME
+$ tcf -t 1234 debug-info TARGETNAME
+OpenOCD telnet server: srrsotc03.iind.intel.com 20944
+GDB server: x86: tcp:srrsotc03.iind.intel.com:20946
+Debugging available as target is ON
+</pre></div>
+</div>
+</li>
+<li><p class="first">Note we now can start the debugger; find it first:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ find /opt/zephyr-sdk-0.9.3/ -iname \*gdb
+...
+/opt/zephyr-sdk-0.9.3/sysroots/x86_64-pokysdk-linux/usr/bin/i586-zephyr-elf/i586-zephyr-elf-gdb
+...
+</pre></div>
+</div>
+<p>run the debugger to the ELF file we found above:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ /opt/zephyr-sdk-0.9.3/sysroots/x86_64-pokysdk-linux/usr/bin/i586-zephyr-elf/i586-zephyr-elf-gdb \
+    tmp/1234/outdir-1234-j38h-quark_d2000_crb/zephyr/zephyr.elf
+...
+Reading symbols from tmp/1234/outdir-1234-j38h-quark_d2000_crb/zephyr/zephyr.elf...done.
+</pre></div>
+</div>
+<p>tell the debugger to connect to the GDB server found by running
+<cite>debug-info</cite> before:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>(gdb) target remote tcp:srrsotc03.iind.intel.com:20946
+Remote debugging using tcp:srrsotc03.iind.intel.com:20946
+0x0000fff0 in ?? ()
+</pre></div>
+</div>
+<p>Debug away!:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="p">(</span><span class="n">gdb</span><span class="p">)</span> <span class="n">b</span> <span class="n">_main</span>
+<span class="n">Breakpoint</span> <span class="mi">1</span> <span class="n">at</span> <span class="mh">0x180f71</span><span class="p">:</span> <span class="n">file</span> <span class="o">/</span><span class="n">home</span><span class="o">/</span><span class="n">inaky</span><span class="o">/</span><span class="n">z</span><span class="o">/</span><span class="n">kernel</span><span class="o">.</span><span class="n">git</span><span class="o">/</span><span class="n">kernel</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">c</span><span class="p">,</span> <span class="n">line</span> <span class="mf">182.</span>
+<span class="p">(</span><span class="n">gdb</span><span class="p">)</span> <span class="n">c</span>
+<span class="n">Continuing</span><span class="o">.</span>
+<span class="n">target</span> <span class="n">running</span>
+<span class="n">redirect</span> <span class="n">to</span> <span class="n">PM</span><span class="p">,</span> <span class="n">tapstatus</span><span class="o">=</span><span class="mh">0x08302c1c</span>
+<span class="n">hit</span> <span class="n">software</span> <span class="n">breakpoint</span> <span class="n">at</span> <span class="mh">0x00180f71</span>
+
+<span class="n">Breakpoint</span> <span class="mi">1</span><span class="p">,</span> <span class="n">_main</span> <span class="p">(</span><span class="n">unused1</span><span class="o">=</span><span class="mh">0x0</span><span class="p">,</span> <span class="n">unused2</span><span class="o">=</span><span class="mh">0x0</span><span class="p">,</span> <span class="n">unused3</span><span class="o">=</span><span class="n">unused3</span><span class="nd">@entry</span><span class="o">=</span><span class="mh">0x0</span><span class="p">)</span> <span class="n">at</span> <span class="o">/</span><span class="n">home</span><span class="o">/</span><span class="n">inaky</span><span class="o">/</span><span class="n">z</span><span class="o">/</span><span class="n">kernel</span><span class="o">.</span><span class="n">git</span><span class="o">/</span><span class="n">kernel</span><span class="o">/</span><span class="n">init</span><span class="o">.</span><span class="n">c</span><span class="p">:</span><span class="mi">182</span>
+<span class="mi">182</span> <span class="p">{</span>
+<span class="p">(</span><span class="n">gdb</span><span class="p">)</span>
+<span class="o">...</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">on a separate terminal, you can:</p>
+<ul>
+<li><p class="first">read the target’s console output with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf console-read --follow TARGETNAME
+</pre></div>
+</div>
+</li>
+<li><p class="first">issue CPU resets, halts, resumes or OpenOCD commands (for targets
+that support it):</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf debug-reset TARGETNAME
+$ tcf debug-halt TARGETNAME
+$ tcf debug-resume TARGETNAME
+$ tcf debug-openocd TARGETNAME OPENOCDCOMMAND
+</pre></div>
+</div>
+</li>
+</ul>
+</li>
+</ul>
+<p>Note that resetting or power-cycling the board will create a new GDB
+target with a different port, so you will have to reconnect that GDB
+wo the new target remote reported by <em>tcf debug-info</em>.</p>
+</div>
+</div>
+<div class="section" id="how-can-i-quickly-build-and-deploy-an-image-to-a-target">
+<h3>4.3.3. How can I quickly build and deploy an image to a target?<a class="headerlink" href="#how-can-i-quickly-build-and-deploy-an-image-to-a-target" title="Permalink to this headline">¶</a></h3>
+<p>You can use the boilerplate testcase <a class="reference download internal" href="../_downloads/test_zephyr_boots.py" download=""><code class="xref download docutils literal"><span class="pre">test_zephyr_boots.py</span></code></a>, which will build any Zephyr app
+and try to boot it and see if it prints the Zephyr boot banner:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ ZEPHYR_APP=path/to/source tcf run -t TARGETNAME /usr/share/tcf/examples/test_zephyr_boots.py
+$ tcf acquire TARGENAME
+$ &lt;work on it&gt; ...
+</pre></div>
+</div>
+<p>TCF will build your code configuring it properly for the chosen target
+and deploy it. You want to inmediately acquire so it is not
+powered-off by the daemon.</p>
+</div>
+<div class="section" id="tcf-s-run-says-something-failed-can-i-get-more-detail">
+<h3>4.3.4. TCF’s <cite>run</cite> says something failed, can I get more detail?<a class="headerlink" href="#tcf-s-run-says-something-failed-can-i-get-more-detail" title="Permalink to this headline">¶</a></h3>
+<p>FIXME: update</p>
+<p>TCF’s <code class="docutils literal"><span class="pre">run</span></code> tries to be quiet to the console, so when you run a lot
+of tests on a lot of targets, the forest lets you see the trees.</p>
+<p>When you need more detail, you can:</p>
+<ul>
+<li><p class="first">add <cite>-v</cite>s after <code class="docutils literal"><span class="pre">run</span></code> (but then it gives you detail everywhere)</p>
+</li>
+<li><p class="first">log to a file with <cite>–log-file=FILENAME</cite> and when something fails,
+grep for it:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">FAIL0</span><span class="o">/</span><span class="n">kaoe</span> <span class="o">../</span><span class="n">Makefile</span><span class="p">[</span><span class="n">quark</span><span class="p">]</span><span class="o">@.../</span><span class="n">frankie</span><span class="p">:</span> <span class="p">(</span><span class="n">dynamic</span><span class="p">)</span> <span class="n">build</span> <span class="n">failed</span>
+<span class="n">PASS1</span><span class="o">/</span><span class="n">tctp</span> <span class="o">../</span><span class="n">Makefile</span><span class="p">[</span><span class="n">x86</span><span class="p">]</span><span class="o">@.../</span><span class="n">mv</span><span class="o">-</span><span class="mi">03</span><span class="p">:</span> <span class="p">(</span><span class="n">dynamic</span><span class="p">)</span> <span class="n">build</span> <span class="n">passed</span>
+</pre></div>
+</div>
+<p>that build failed; take those four letters next to the <code class="docutils literal"><span class="pre">FAIL0</span></code>
+message (<cite>kaoe</cite>) – that’s a unique identifier for each message, and
+look for it with <cite>grep</cite>, printing 30 lines of context before the match:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ grep -B 100 kaoe FILENAME
+....
+FAIL3/iigx ../Makefile[quark]@.../frankie: @build failed [2] (&#39;make -j -C samples/hello_world/nanokernel BOARD=quark_se_sss_ctb  O=outdir-httpsSERVER5000ttb-v0targetsfrankie-quark_se_sss_ctb-quark_se_sss_ctb&#39; from /home/inaky/z/kernel.git/samples/.tcdefaults:48)
+FAIL3/iigx ../Makefile[quark]@.../frankie: output: FF make: Entering directory &#39;/home/inaky/z/kernel.git/samples/hello_world/nanokernel&#39;
+FAIL3/iigx ../Makefile[quark]@.../frankie: output: FF make[1]: Entering directory &#39;/home/inaky/z/kernel.git&#39;
+...
+</pre></div>
+</div>
+<p>most likely, the complete failure message will be right before the
+final failure message – and you can now tell what happened. In this
+case, there is no good configuration for the chosen target</p>
+<p>The output driver can be changed to lay out the information
+diferently; look at <a class="reference internal" href="09-api.html#tcfl.report.report_c" title="tcfl.report.report_c"><code class="xref py py-class docutils literal"><span class="pre">tcfl.report.report_c</span></code></a>.</p>
+</li>
+</ul>
+</div>
+<div class="section" id="how-do-i-send-ctrl-c-to-a-target">
+<span id="linux-c-c"></span><h3>4.3.5. How do I send Ctrl-C to a target?<a class="headerlink" href="#how-do-i-send-ctrl-c-to-a-target" title="Permalink to this headline">¶</a></h3>
+<p>Trick over the serial console is that it is a pure pipe, there is no
+special characters. So a quick way to do it is:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf console-write TARGETNAME $(echo -e \\x03)
+</pre></div>
+</div>
+<p>where that <em>\x03</em> is the hex code of Ctrl-C. <em>man ascii</em> can tell you
+the quick shortcuts for others.</p>
+</div>
+<div class="section" id="how-do-i-send-a-linux-command-to-a-linux-target-s-console">
+<h3>4.3.6. How do I send a Linux command to a Linux target’s console<a class="headerlink" href="#how-do-i-send-a-linux-command-to-a-linux-target-s-console" title="Permalink to this headline">¶</a></h3>
+<p>Try:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf console-write TARGETNAME &quot;ping 192.168.1.1&quot;
+</pre></div>
+</div>
+<p>Note that once the command is sent, the console, for whatever the
+target cares, is still connected, even if the <em>console-write</em> command
+returned for you. <a class="reference internal" href="#linux-c-c"><span class="std std-ref">Sending a Ctrl-C</span></a> is not as in a
+usual Linux console.</p>
+</div>
+</div>
+<div class="section" id="manual-installation-of-tcf-from-source">
+<span id="manual-install"></span><h2>4.4. Manual installation of TCF from source<a class="headerlink" href="#manual-installation-of-tcf-from-source" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="creation-and-setup-of-user-ttbd">
+<h3>4.4.1. Creation and setup of user <em>ttbd</em><a class="headerlink" href="#creation-and-setup-of-user-ttbd" title="Permalink to this headline">¶</a></h3>
+<p>The <em>ttbd</em> user is used to store TCF’s software and files, and the
+<em>ttbd</em> group to give normal user access to said files.</p>
+<p>To create it (if not yet created):</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># useradd -G kvm ttbd</span>
+</pre></div>
+</div>
+<p>Allow members of group <em>ttbd</em> access to <em>ttbd</em>’s home so they can
+write files needed for the deployment in there; never shall need to
+login as the <em>ttbd</em> user:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># chmod g+ws ~ttbd</span>
+</pre></div>
+</div>
+<p>Allow other users access to <em>ttbd</em>’s files:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># usermod -aG ttbd USER1 USER2 ….  # Make USERs members of ttbdgroup</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="install-required-software">
+<h3>4.4.2. Install required software<a class="headerlink" href="#install-required-software" title="Permalink to this headline">¶</a></h3>
+<p>Run:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># dnf install -y openocd make gcc-c++ python-ldap pyserial \</span>
+  <span class="n">python</span><span class="o">-</span><span class="n">requests</span> <span class="n">git</span> <span class="n">python</span><span class="o">-</span><span class="n">werkzeug</span> <span class="n">python</span><span class="o">-</span><span class="n">tornado</span> <span class="n">python</span><span class="o">-</span><span class="n">flask</span> \
+  <span class="n">python</span><span class="o">-</span><span class="n">flask</span><span class="o">-</span><span class="n">login</span> <span class="n">python</span><span class="o">-</span><span class="n">flask</span><span class="o">-</span><span class="n">principal</span> <span class="n">pyusb</span> <span class="n">python</span><span class="o">-</span><span class="n">pexpect</span> \
+  <span class="n">pyOpenSSL</span>
+</pre></div>
+</div>
+<p>to install software packages required by TCF’s server:</p>
+<ul class="simple">
+<li>openocd is used to interact with targets</li>
+<li>gcc-c++ and make are used to build</li>
+<li>Git is a source control manager we’ll use to obtain TCF’s source</li>
+<li>python-ldap, pyserial and python-requests are Python libraries TCF relies on</li>
+<li>python-werkzeug, python-flask* and python-tornado are the HTTP
+server framework TTBD uses to serve data.</li>
+<li>pyusb is the library used to access USB devices from Python</li>
+<li>python-pexpect is a expect-like language implementation in Python</li>
+</ul>
+<p>You might need to <a class="reference internal" href="#install-support-pkgs"><span class="std std-ref">install support packages</span></a> that are not in distributions dependning on
+what you want to run with TCF.</p>
+</div>
+<div class="section" id="remove-conflicting-packages">
+<h3>4.4.3. Remove conflicting packages<a class="headerlink" href="#remove-conflicting-packages" title="Permalink to this headline">¶</a></h3>
+<p>Remove <em>Modem Manager</em>, as it interferes with the serial ports:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># dnf remove -y ModemManager</span>
+</pre></div>
+</div>
+<p>this won’t be needed if you will only use QEMU devices.</p>
+</div>
+<div class="section" id="install-tcf">
+<h3>4.4.4. Install TCF<a class="headerlink" href="#install-tcf" title="Permalink to this headline">¶</a></h3>
+<p>Obtain the code</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ git clone git://GITHOST/tcf tcf.git
+</pre></div>
+</div>
+<p id="tcf-install-manual"><strong>Install the TCF client</strong>:</p>
+<p>Follow the steps on the <a class="reference internal" href="../02-QUICKSTART.html#install-tcf-client"><span class="std std-ref">quickstart</span></a> to
+install the client from source.</p>
+<blockquote>
+<div>$ cd tcf.git
+$ python setup.py install –user</div></blockquote>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>you will also need to install the <a class="reference external" href="https://www.zephyrproject.org/downloads/tools">Zephyr SDK 0.9</a> to
+<code class="docutils literal"><span class="pre">/opt/zephyr-sdk-0.9.3</span></code> if you want to build Zephyr OS
+apps and other dependencies:</p>
+<p>Fedora:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># dnf install -y make python-requests python-ply cmake \</span>
+  <span class="n">PyYAML</span> <span class="n">python2</span><span class="o">-</span><span class="n">junit_xml</span> <span class="n">python2</span><span class="o">-</span><span class="n">jinja2</span>
+</pre></div>
+</div>
+<p>Ubuntu:</p>
+<div class="last highlight-default"><div class="highlight"><pre><span></span><span class="c1"># apt-get install -y python-ply python-requests make \</span>
+  <span class="n">python</span><span class="o">-</span><span class="n">junit</span><span class="o">.</span><span class="n">xml</span> <span class="n">python</span><span class="o">-</span><span class="n">jinja2</span>
+</pre></div>
+</div>
+</div>
+<p><strong>Install the server</strong></p>
+<p>Install requirements: sdnotify, a library to help TCF’s server TTBD
+integrate with systemd:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ sudo pip install sdnotify
+</pre></div>
+</div>
+<p>Now the server itself:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ cd tcf.git/ttbd
+$ sudo python setup.py install
+</pre></div>
+</div>
+<p>Note the server needs configuration of SELinux, kernel credentials,
+UIDs and GIDs for operation – so running it off the RPM package can
+get complicated.</p>
+</div>
+</div>
+<div class="section" id="manual-installation-of-support-packages">
+<span id="install-support-pkgs"></span><h2>4.5. Manual installation of support packages<a class="headerlink" href="#manual-installation-of-support-packages" title="Permalink to this headline">¶</a></h2>
+<p>These are dependencies needed when certain kind of test hardware is
+going to be connected or certain OSes / testcases are to be used:</p>
+<ul class="simple">
+<li>Arduino Due boards: <a class="reference internal" href="#bossac"><span class="std std-ref">Bossa command line</span></a></li>
+<li>Zephyr SDK for Arduino 101, Intel Quark, FRDM, SAM e70, others:
+<a class="reference internal" href="#zephyr-sdk"><span class="std std-ref">Zephyr SDK</span></a></li>
+<li><a class="reference internal" href="#xtensa-esp32"><span class="std std-ref">ESP32</span></a></li>
+<li>NiosII on Altera MAX10: <a class="reference internal" href="09-api.html#ttbl.tt.tt_max10.quartus_path" title="ttbl.tt.tt_max10.quartus_path"><code class="xref py py-data docutils literal"><span class="pre">Quartus</span> <span class="pre">programmer</span></code></a> and <a class="reference internal" href="09-api.html#ttbl.tt.tt_max10.input_sof" title="ttbl.tt.tt_max10.input_sof"><code class="xref py py-data docutils literal"><span class="pre">NiosII</span> <span class="pre">CPU</span> <span class="pre">image</span></code></a></li>
+</ul>
+<div class="section" id="bossac-arduino-due-flasher">
+<span id="bossac"></span><h3>4.5.1. Bossac: Arduino Due flasher<a class="headerlink" href="#bossac-arduino-due-flasher" title="Permalink to this headline">¶</a></h3>
+<p>If Arduino Due is going to be used, a special tool for flashing has to
+be installed–this has to be built from source as the branch that
+supports the Arduino Due hasn’t been merged into mainline as of
+writing these instructions:</p>
+<ol class="arabic">
+<li><p class="first">Get the requiements and the code:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span># sudo dnf install -y gcc-c++ wxGTK-devel
+$ git clone https://github.com/shumatech/BOSSA.git bossac.git
+$ cd bossac.git
+$ git checkout -f 1.6.1-arduino-19-gae08c63
+</pre></div>
+</div>
+</li>
+<li><p class="first">Build and install:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ make bin/bossac
+$ sudo install -o root -g root -m 0755 bin/bossac /usr/local/bin
+</pre></div>
+</div>
+</li>
+<li><p class="first">(optional) Create a fast RPM with <a class="reference internal" href="#fpm"><span class="std std-ref">FPM</span></a>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ chmod 0755 bin/bossac
+$ fpm  -n bossac -v $(git describe --tags) -s dir -t rpm bin/bossac
+</pre></div>
+</div>
+</li>
+</ol>
+</div>
+<div class="section" id="zephyr-sdk">
+<span id="id2"></span><h3>4.5.2. Zephyr SDK<a class="headerlink" href="#zephyr-sdk" title="Permalink to this headline">¶</a></h3>
+<p>To build some Zephyr OS apps/testcases or to flash certain hardware,
+you will need this SDK:</p>
+<ol class="arabic">
+<li><p class="first">Download the Zephyr SDK from
+<a class="reference external" href="https://www.zephyrproject.org/downloads/tools">https://www.zephyrproject.org/downloads/tools</a></p>
+</li>
+<li><p class="first">Install in <em>/opt/zephyr-sdk-VERSION</em>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># chmod a+x zephyr-sdk-0.9.3-setup.run</span>
+<span class="c1"># ./zephyr-sdk-0.9.3-setup.run -- -y -d /opt/zephyr-sdk-0.9.3</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">(optional) Create a fast RPM with <a class="reference internal" href="#fpm"><span class="std std-ref">FPM</span></a>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ fpm -n zephyr-sdk-0.9.3 -v 0.9.3 \
+&gt;     --rpm-rpmbuild-define &#39;_build_id_links alldebug&#39; \
+&gt;     -s dir -C / -t rpm opt/zephyr-sdk-0.9.3
+</pre></div>
+</div>
+<p><em>_build_id_links alldebug</em> is needed to disable generation of build
+symlinks in <em>/usr/lib/.build-id</em>. Because the SDK packs a lot of
+files that are similar/identical to those present in the system, it
+will conflict.</p>
+</li>
+</ol>
+</div>
+<div class="section" id="arduino-builder-1-6-13">
+<span id="arduino-builder"></span><h3>4.5.3. Arduino Builder 1.6.13<a class="headerlink" href="#arduino-builder-1-6-13" title="Permalink to this headline">¶</a></h3>
+<p>The Arduino Builder will be needed by the TCF client to build <em>.ino</em>
+files into appplications that can be flashed into targets for test.</p>
+<ol class="arabic">
+<li><p class="first">Download the Arduino IDE package from
+<a class="reference external" href="https://www.arduino.cc/download_handler.php?f=/arduino-1.6.13-linux64.tar.xz">https://www.arduino.cc/download_handler.php?f=/arduino-1.6.13-linux64.tar.xz</a></p>
+</li>
+<li><p class="first">Extract:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># tar xf arduino-1.6.13-linux64.tar.xz -C /opt</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">(optional) Create a fast RPM with <a class="reference internal" href="#fpm"><span class="std std-ref">FPM</span></a>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ fpm -n tcf-arduino-builder-1.6.13 -v 1.6.13 -s dir -C / -t rpm opt/arduino-1.6.13/
+</pre></div>
+</div>
+</li>
+</ol>
+</div>
+<div class="section" id="tunslip6">
+<h3>4.5.4. tunslip6<a class="headerlink" href="#tunslip6" title="Permalink to this headline">¶</a></h3>
+<p><em>tunslip6</em> is used to create a SLIP interface for a QEMU virtual
+machine and connecting it to a TAP interface. This code has been
+floating around for different small OSes that also run in QEMU, so
+there is a few versions.</p>
+<p>The one we currently use is the one used by the Zephyr project at the
+<em>net-tools</em> repository:</p>
+<blockquote>
+<div><a class="reference external" href="http://github.com/zephyrproject-rtos/net-tools">http://github.com/zephyrproject-rtos/net-tools</a></div></blockquote>
+<p>which has added functionality to defer configuration to external
+parties (<em>ttbd</em> in this case) and some strenghtening to deal with race
+conditions.</p>
+<ol class="arabic">
+<li><p class="first">Clone:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ git clone http://github.com/zephyrproject-rtos/net-tools
+</pre></div>
+</div>
+</li>
+<li><p class="first">Build:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ cd net-tools
+$ make tunslip6
+# make install
+</pre></div>
+</div>
+</li>
+<li><p class="first">(optional) Create a fast RPM with <a class="reference internal" href="#fpm"><span class="std std-ref">FPM</span></a>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ install -m 0755 tunslip6 -D root/usr/bin/tunslip6
+$ fpm -n tunslip6 -v $(git describe --always) -s dir -C root -t rpm usr/bin
+</pre></div>
+</div>
+</li>
+</ol>
+</div>
+<div class="section" id="xtensa-esp32">
+<span id="id3"></span><h3>4.5.5. Xtensa ESP32<a class="headerlink" href="#xtensa-esp32" title="Permalink to this headline">¶</a></h3>
+<p>In order to build (TCF client) and deploy/flash (ttbd server) for
+ESP32 boards, you will need the <em>xtensa-esp32</em> SDK and the ESP-IDF
+libraries:</p>
+<ul>
+<li><p class="first"><em>xtensa-esp32 SDK</em></p>
+<ol class="arabic">
+<li><p class="first">Download from
+<a class="reference external" href="https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-59.tar.gz">https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-59.tar.gz</a></p>
+</li>
+<li><p class="first">Extract to <em>/opt/xtensa-esp32-elf</em></p>
+<p># tar xf xtensa-esp32-elf-linux64-1.22.0-59.tar.gz -C /opt</p>
+</li>
+<li><p class="first">Add to <em>/etc/environment</em>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">ESPRESSIF_TOOLCHAIN_PATH</span><span class="o">=/</span><span class="n">opt</span><span class="o">/</span><span class="n">xtensa</span><span class="o">-</span><span class="n">esp32</span><span class="o">-</span><span class="n">elf</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</li>
+<li><p class="first"><em>ESP-IDF</em>: This is Xtensa’s IOT framework that is used by Zephyr and others</p>
+<ol class="arabic">
+<li><p class="first">Clone to <em>/opt/esp-idf.git</em>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ rm -rf /opt/esp-idf.git
+$ git clone --recursive https://github.com/espressif/esp-idf.git /opt/esp-idf.git
+$ (cd /opt/esp-idf.git &amp;&amp; git checkout -f $(ESP_IDF_REV))
+</pre></div>
+</div>
+</li>
+<li><p class="first">Add to <em>/etc/environment</em>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">ESP_IDF_PATH</span><span class="o">=/</span><span class="n">opt</span><span class="o">/</span><span class="n">esp</span><span class="o">-</span><span class="n">idf</span><span class="o">.</span><span class="n">git</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</li>
+</ul>
+</div>
+<div class="section" id="libcoap">
+<h3>4.5.6. libcoap<a class="headerlink" href="#libcoap" title="Permalink to this headline">¶</a></h3>
+<p>Use the following script to create the RPM:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">..</span> <span class="n">code</span><span class="o">-</span><span class="n">block</span><span class="p">::</span> <span class="n">sh</span>
+</pre></div>
+</div>
+<blockquote>
+<div><p># Use absolute dirs, libtool needs it
+dir=$PWD/libcoap.git
+rootdir=$PWD/root-libcoap.git</p>
+<p>rm -rf $dir
+git clone –recursive -b dtls <a class="reference external" href="https://github.com/obgm/libcoap.git">https://github.com/obgm/libcoap.git</a> $dir</p>
+<p>rm -rf $rootdir
+mkdir -p $rootdir</p>
+<p>(cd $dir; ./autogen.sh)
+sed -i ‘s|prefix = &#64;prefix&#64;|prefix = $(DESTDIR)/&#64;prefix&#64;|g’ $(find $dir/ext/tinydtls -iname Makefile.in)
+(cd $dir; ./configure –disable-shared –disable-documentation –prefix=/usr)
+make -C $dir all
+make -C $dir DESTDIR=$rootdir install
+rm -rf $rootdir/usr/share
+ver=${ver:-$(git -C $dir describe –tags)}
+fpm  -n libcoap -v $ver -s dir -t rpm -C $rootdir</p>
+</div></blockquote>
+<p>Invoke as:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ ./mklibcoap.sh
+</pre></div>
+</div>
+</div>
+<div class="section" id="fpm-fast-package-manager">
+<span id="fpm"></span><h3>4.5.7. FPM, fast package manager<a class="headerlink" href="#fpm-fast-package-manager" title="Permalink to this headline">¶</a></h3>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">this is only optional and only needed if you are building
+RPMs for distribution; please ignore otherwise</p>
+</div>
+<ol class="arabic">
+<li><p class="first">Install dependencies, clone the code, build and install:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ sudo dnf install -y ruby-devel rpm-build
+$ git clone https://github.com/jordansissel/fpm fpm.git
+$ make -C fpm.git install
+</pre></div>
+</div>
+</li>
+</ol>
+</div>
+</div>
+<div class="section" id="platform-firmware-bios-update-procedures">
+<h2>4.6. Platform firmware / BIOS update procedures<a class="headerlink" href="#platform-firmware-bios-update-procedures" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="updating-the-firmware-in-an-arduino101-to-factory-settings">
+<span id="a101-fw-upgrade"></span><h3>4.6.1. Updating the firmware in an Arduino101 to factory settings<a class="headerlink" href="#updating-the-firmware-in-an-arduino101-to-factory-settings" title="Permalink to this headline">¶</a></h3>
+<p>This is needed to operate with Zephyr OS &gt; v1.5.0-349-gecf96d2, which
+dropped support for the older Arduino101 Zephyr boot ROM.</p>
+<ul>
+<li><p class="first">Download from <a class="reference external" href="https://software.intel.com/en-us/node/675552">https://software.intel.com/en-us/node/675552</a> the
+package <code class="docutils literal"><span class="pre">arduino101-factory_recovery-flashpack.tar.bz2</span></code> and
+decompress to your home directory:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ cd
+$ tar xf LOCATION/arduino101-factory_recovery-flashpack.tar.bz2
+</pre></div>
+</div>
+</li>
+<li><p class="first">Ensure your TTBD server is &gt;= v0.10 (dated 9/21/16 or later)</p>
+</li>
+<li><p class="first">Disable you Arduino101 target (to avoid it being used by other
+automated runs) and acquire it:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf disable arduino101-NN
+$ tcf acquire arduino101-NN
+</pre></div>
+</div>
+</li>
+<li><p class="first">Flash the new Boot ROM and bootloader:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf images-upload-set arduino101-NN \
+  rom:$HOME/arduino101-factory_recovery-flashpack/images/firmware/FSRom.bin \
+  bootloader:$HOME/arduino101-factory_recovery-flashpack/images/firmware/bootloader_quark.bin
+</pre></div>
+</div>
+</li>
+<li><p class="first">Release the target and enable it:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf release arduino101-NN
+$ tcf enable arduino101-NN
+</pre></div>
+</div>
+</li>
+<li><p class="first">Test with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ cd LOCATION/OF/ZEPHYR/KERNEL
+$ export ZEPHYR_BASE=$PWD
+$ tcf run -v -t arduino101-NN samples/hello_world
+</pre></div>
+</div>
+</li>
+</ul>
+</div>
+<div class="section" id="updating-the-firmware-in-an-quark-c1000-reference-boards">
+<h3>4.6.2. Updating the firmware in an Quark C1000 reference boards<a class="headerlink" href="#updating-the-firmware-in-an-quark-c1000-reference-boards" title="Permalink to this headline">¶</a></h3>
+<p>This updates to the QSMI v1.3 bootrom support, needed to operate with
+Zephyr OS &gt; v1.5.0, which dropps support older ROMs.</p>
+<ul>
+<li><p class="first">Download from <a class="reference external" href="https://github.com/quark-mcu/qmsi/releases/tag/v1.3.0">https://github.com/quark-mcu/qmsi/releases/tag/v1.3.0</a> the
+file <code class="docutils literal"><span class="pre">quark_se_rom-v1.3.0.bin</span></code> to your home directory:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ wget https://github.com/quark-mcu/qmsi/releases/download/v1.3.0/quark_se_rom.bin \
+    -O ~/quark_se_rom-v1.3.0.bin
+</pre></div>
+</div>
+</li>
+<li><p class="first">Ensure your TTBD server is &gt;= v0.10 (dated 11/01/16 or later)</p>
+</li>
+<li><p class="first">Disable you Quark C1000 target (to avoid it being used by other
+automated runs), maybe wait for no still-running jobs are using it
+(use <cite>tcf list -v qc1000-NN</cite> to see if it is acquired by anyone):</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf disable qc1000-NN
+</pre></div>
+</div>
+</li>
+</ul>
+<p>For the actual flashing process, there is a list of steps that have to
+be performed that are needed to wipe the flash and reset the board in
+such a way that it puts it in a receptive state. This implies running
+specific OpenOCD commands and modifying the way the OpenOCD driver
+operates on the board to maintain those settings.</p>
+<ol class="arabic">
+<li><p class="first">Use the script <cite>tcf-qc1000-fw-upload.sh TARGETNAME FWFILE</cite> to
+update the Boot ROM:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf-qc1000-fw-upload.sh qc1000-NN $HOME/quark_se_rom.bin
+</pre></div>
+</div>
+<p>In case of failure, retry one or two times, as some commands get
+stuck. If after the retries it still fails, it might be time to try
+remediation steps as described below.</p>
+</li>
+<li><p class="first">Verify operation with running a Zephyr test case:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ cd LOCATION/OF/ZEPHYR/KERNEL
+$ export ZEPHYR_BASE=$PWD
+$ tcf run -vat qc1000-NN  /usr/share/tcf/examples/test_healtcheck.py
+</pre></div>
+</div>
+<p>Testcase should <cite>PASS</cite>. Note the <cite>-a</cite>, so TCF can use a disabled
+target. If they fail and <cite>tcf console-read qc1000-NN</cite> reports
+garbage instead of some ASCII text, it is possible board timings
+are messed up. Go back to flashing the Boot ROM and maybe use the
+remediation steps described below.</p>
+</li>
+<li><p class="first">Re-enable the target:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf enable qc1000-NN
+</pre></div>
+</div>
+</li>
+</ol>
+<p>The process is thus concluced</p>
+<div class="section" id="remediation-steps">
+<h4>4.6.2.1. Remediation steps<a class="headerlink" href="#remediation-steps" title="Permalink to this headline">¶</a></h4>
+<p>In some situations it has been seen that the stock OpenOCD version
+distributed with the Zephyr SDK or most system cannot flash properly
+the QC1000.</p>
+<p>In said case, we can try with the ISSM version of OpenOCD:</p>
+<ol class="arabic">
+<li><p class="first">obtain the ISSM toolchain package for Linux from
+<a class="reference external" href="https://software.intel.com/en-us/articles/issm-toolchain-only-download">https://software.intel.com/en-us/articles/issm-toolchain-only-download</a></p>
+</li>
+<li><p class="first">Install in your system in path opt with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># tar xf PATH/TO/issm-toolchain-linux-2016-05-12-pub.tar.gz  -C /opt</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Disable ISSM’s OpenOCD using a TCL port, otherwise the TCF server,
+TTBD, will not be able to talk to it:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># sed -i &#39;s/tcl_port/#tcl_port/&#39; \</span>
+  <span class="o">/</span><span class="n">opt</span><span class="o">/</span><span class="n">issm</span><span class="o">-</span><span class="n">toolchain</span><span class="o">-</span><span class="n">linux</span><span class="o">-</span><span class="mi">2016</span><span class="o">-</span><span class="mi">05</span><span class="o">-</span><span class="mi">12</span><span class="o">/</span><span class="n">tools</span><span class="o">/</span><span class="n">debugger</span><span class="o">/</span><span class="n">openocd</span><span class="o">/</span><span class="n">scripts</span><span class="o">/</span><span class="n">board</span><span class="o">/</span><span class="n">quark</span><span class="o">*.</span><span class="n">cfg</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Alter the TCF’s configuration of each QC1000 target to be updated
+so it uses the OpenOCD from ISSM; in file
+<cite>/etc/ttbd-production/conf_FILE.py</cite>:</p>
+<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">quark_c1000_add</span><span class="p">(</span>
+    <span class="s2">&quot;TARGETNAME&quot;</span><span class="p">,</span>
+    <span class="n">serial_number</span> <span class="o">=</span> <span class="s2">&quot;SERIALNUMBER&quot;</span><span class="p">,</span>
+    <span class="n">ykush_serial</span> <span class="o">=</span> <span class="s2">&quot;YKUSHHUBSERIALNUMBER&quot;</span><span class="p">,</span>
+    <span class="n">ykush_port_board</span> <span class="o">=</span> <span class="n">YKUSHHUBPORT</span><span class="p">,</span>
+    <span class="n">openocd_path</span> <span class="o">=</span> <span class="s2">&quot;/opt/issm-toolchain-linux-2016-05-12/tools/debugger/openocd/bin/openocd&quot;</span><span class="p">,</span>
+    <span class="n">openocd_scripts</span> <span class="o">=</span> <span class="s2">&quot;/opt/issm-toolchain-linux-2016-05-12/tools/debugger/openocd/scripts&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Restart the server:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># systemctl restart ttbd@production</span>
+</pre></div>
+</div>
+</li>
+<li><p class="first">Run a healthcheck on the target:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run -vat TARGETNAME  /usr/share/tcf/examples/test_healtcheck.py
+</pre></div>
+</div>
+<p>In case of trouble, diagnose by looking at the <a class="reference internal" href="06-troubleshooting.html#systemd-tips-diagnosis"><span class="std std-ref">journal</span></a>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ journalctl -aeu ttbd@production
+</pre></div>
+</div>
+</li>
+</ol>
+<ol class="arabic simple" start="6">
+<li>Retry the firmware update script</li>
+<li>Upon success, revert the configuration change and restart the server</li>
+</ol>
+</div>
+</div>
+<div class="section" id="updating-the-firmware-in-an-quark-d2000-reference-boards">
+<span id="fw-update-d2000"></span><h3>4.6.3. Updating the firmware in an Quark D2000 reference boards<a class="headerlink" href="#updating-the-firmware-in-an-quark-d2000-reference-boards" title="Permalink to this headline">¶</a></h3>
+<p>This is needed to operate with Zephyr OS.</p>
+<ul>
+<li><p class="first">Download from
+<a class="reference external" href="https://github.com/quark-mcu/qm-bootloader/releases/tag/v1.3.0">https://github.com/quark-mcu/qm-bootloader/releases/tag/v1.3.0</a> the
+file <code class="docutils literal"><span class="pre">quark_d2000_rom.bin</span></code> to your home directory:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ wget https://github.com/quark-mcu/qm-bootloader/releases/download/v1.4.0/quark_d2000_rom_fm_hmac.bin
+</pre></div>
+</div>
+</li>
+<li><p class="first">Ensure your TTBD server is &gt;= v0.10 (dated 9/21/16 or later)</p>
+</li>
+<li><p class="first">Disable you Quark D2000 target (to avoid it being used by other
+automated runs) and acquire it:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf disable qd2000-NN
+$ tcf acquire qd2000-NN
+</pre></div>
+</div>
+</li>
+<li><p class="first">Flash the new Boot ROM and bootloader:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf images-upload-set qd2000-NN rom:quark_d2000_rom_fm_hmac.bin
+</pre></div>
+</div>
+</li>
+<li><p class="first">Release the target:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf release qd2000-NN
+</pre></div>
+</div>
+</li>
+<li><p class="first">Verify operation with running a Zephyr test case:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>  $ export ZEPHYR_BASE=LOCATION/OF/ZEPHYR/KERNEL
+  $ tcf run -vat qd2000-NN  /usr/share/tcf/examples/test_healtcheck.py
+
+Testcase should `PASS`. Note the `-a`, so TCF can use a disabled
+target. If they fail and `tcf console-read qc1000-NN` reports
+garbage instead of some ASCII text, it is possible board timings
+are messed up. Go back to flashing the Boot ROM and maybe use the
+remediation steps described below.
+</pre></div>
+</div>
+</li>
+<li><p class="first">Enable the target:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf enable qd2000-NN
+</pre></div>
+</div>
+</li>
+</ul>
+</div>
+<div class="section" id="updating-the-fpga-image-in-synopsys-emsk-boards">
+<h3>4.6.4. Updating the FPGA image in Synopsys EMSK boards<a class="headerlink" href="#updating-the-fpga-image-in-synopsys-emsk-boards" title="Permalink to this headline">¶</a></h3>
+<ol class="arabic">
+<li><p class="first">You will need a Synopsys account; <a class="reference external" href="https://www.synopsys.com/cgi-bin/dwarcsw/req1.cgi">register</a> and wait for
+them to accept you</p>
+</li>
+<li><p class="first">Use this account to <a class="reference external" href="https://www.synopsys.com/cgi-bin/dwarcsw/arcemsk/menu.cgi">download their newest firmware</a>. Currently
+set to v2.2.</p>
+</li>
+<li><p class="first">Now download the <cite>Lab Tools 14.7</cite> or newer (You may have to create
+a Xilinx account <a class="reference external" href="https://www.xilinx.com/support/download/index.html/content/xilinx/en/downloadNav/design-tools.html">here</a>
+to access this download)</p>
+<p>If you need installation instruction you can find them here under
+Appendix: C (page 86) of
+<a class="reference external" href="https://www.embarc.org/pdf/ARC_EM_Starter_Kit_UserGuide.pdf">https://www.embarc.org/pdf/ARC_EM_Starter_Kit_UserGuide.pdf</a>
+(important note, when running this it seems you have to use Windows
+and the Impact 32 bit version. The 64 bit version seems to fail out
+on certain steps you need to use).</p>
+</li>
+<li><p class="first">Now just go through the flashing instructions located on page 93
+towards the bottom, called SPI Flash-Programming Sequence
+<a class="reference external" href="https://www.embarc.org/pdf/ARC_EM_Starter_Kit_UserGuide.pdf">https://www.embarc.org/pdf/ARC_EM_Starter_Kit_UserGuide.pdf</a></p>
+<p>If you need another resource the synopsys instructions can be found
+here under (page 86) Appendix: C for installing the tools, and
+(page 93 bottom) under SPI Flash-Programming Sequence.
+<a class="reference external" href="https://www.embarc.org/pdf/ARC_EM_Starter_Kit_UserGuide.pdf">https://www.embarc.org/pdf/ARC_EM_Starter_Kit_UserGuide.pdf</a></p>
+</li>
+</ol>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>the switch configuration we are currently using is ARC_EM9D for the 9D model.</p>
+<p>Here is the switch configuration for SW1 (bit 1 is switch one; bit 2 is switch 2)</p>
+<table border="1" class="last docutils">
+<colgroup>
+<col width="23%" />
+<col width="18%" />
+<col width="59%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td>Bit 1</td>
+<td>Bit2</td>
+<td>Configuration</td>
+</tr>
+<tr class="row-even"><td>OFF</td>
+<td>OFF</td>
+<td>ARC_EM7D</td>
+</tr>
+<tr class="row-odd"><td>ON</td>
+<td>OFF</td>
+<td>ARC_EM9D</td>
+</tr>
+<tr class="row-even"><td>OFF</td>
+<td>ON</td>
+<td>ARC_EM11D</td>
+</tr>
+<tr class="row-odd"><td>ON</td>
+<td>ON</td>
+<td>Reserved</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="section" id="updating-the-serial-number-and-or-description-of-a-ftdi-flyswatter">
+<span id="fs2-serial-update"></span><h3>4.6.5. Updating the serial number and / or description of a FTDI / Flyswatter<a class="headerlink" href="#updating-the-serial-number-and-or-description-of-a-ftdi-flyswatter" title="Permalink to this headline">¶</a></h3>
+<p>FlySwatter2 come all with the same serial number (usually <em>FS20000</em>).</p>
+<p>The system needs to be able to tell all the different FlySwatter2s
+apart; for that we update the serial to <em>TARGETNAME-fs2</em> (to simplify
+the configuration process).</p>
+<p>Flash a new serial number or description on any FTDI based USB-to-TTY
+cable/adapter (like a Flyswatter2, Quark D2000 CRB, Quark C10000 CRB,
+etc) using <code class="docutils literal"><span class="pre">ftdi_eeprom</span></code> on your laptop:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ sudo dnf install -y libftdi-devel
+$ cat &gt; file.conf &lt;&lt;EOF
+vendor_id=0x0403
+product_id=0x6010
+product=&quot;Flyswatter2&quot;
+serial=&quot;NEWSERIALNUMBER&quot;
+use_serial=true
+EOF
+</pre></div>
+</div>
+<p>Now plug the USB cable to your server or laptop, making sure it is the
+only one and run, as super user:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># ftdi_eeprom --flash-eeprom file.conf</span>
+</pre></div>
+</div>
+<p>Reconnect it to have the system read the new serial number / description.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>if you have the unit you are re-flashing connected to a USB
+power switching hub (like a YKush), make sure to power it on and to
+power off any other device that has a 0x0403/6010 USB vendor ID /
+product ID code, which you can find with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ lsusb.py  | grep 0403:6010
+  1-1.2.1      0403:6010 00  2.00  480MBit/s 0mA 2IFs (Acme Inc. Flyswatter2 Flyswatter2-galileo-04)
+</pre></div>
+</div>
+<p class="last">it might be easier to do this process in a separate system.</p>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>make <em>NEWSERIALNUMBER</em> shorter if you receive this error
+message:</p>
+<div class="last highlight-default"><div class="highlight"><pre><span></span><span class="n">FTDI</span> <span class="n">eeprom</span> <span class="n">generator</span> <span class="n">v0</span><span class="o">.</span><span class="mi">17</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="n">Intra2net</span> <span class="n">AG</span> <span class="ow">and</span> <span class="n">the</span> <span class="n">libftdi</span> <span class="n">developers</span> <span class="o">&lt;</span><span class="n">opensource</span><span class="nd">@intra2net</span><span class="o">.</span><span class="n">com</span> <span class="p">(</span><span class="n">opensource</span><span class="o">%</span><span class="mi">40</span><span class="n">intra2net</span><span class="o">.</span><span class="n">com</span><span class="p">)</span><span class="o">&gt;</span>
+<span class="n">FTDI</span> <span class="n">read</span> <span class="n">eeprom</span><span class="p">:</span> <span class="mi">0</span>
+<span class="n">EEPROM</span> <span class="n">size</span><span class="p">:</span> <span class="mi">128</span>
+<span class="n">Sorry</span><span class="p">,</span> <span class="n">the</span> <span class="n">eeprom</span> <span class="n">can</span> <span class="n">only</span> <span class="n">contain</span> <span class="mi">128</span> <span class="nb">bytes</span> <span class="p">(</span><span class="mi">100</span> <span class="nb">bytes</span> <span class="k">for</span> <span class="n">your</span> <span class="n">strings</span><span class="p">)</span><span class="o">.</span>
+<span class="n">You</span> <span class="n">need</span> <span class="n">to</span> <span class="n">short</span> <span class="n">your</span> <span class="n">string</span> <span class="n">by</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span> <span class="nb">bytes</span>
+<span class="n">FTDI</span> <span class="n">close</span><span class="p">:</span> <span class="mi">0</span>
+</pre></div>
+</div>
+</div>
+<div class="admonition-rationales admonition">
+<p class="first admonition-title">Rationales</p>
+<p class="last">The <em>product=”Flyswatter2”</em> line is necessary so the default
+OpenOCD configuration finds the device.</p>
+</div>
+</div>
+<div class="section" id="updating-the-serial-number-and-or-description-of-a-cp210x-serial-device">
+<span id="cp210x-serial-update"></span><h3>4.6.6. Updating the serial number and / or description of a CP210x serial device<a class="headerlink" href="#updating-the-serial-number-and-or-description-of-a-cp210x-serial-device" title="Permalink to this headline">¶</a></h3>
+<p>Some hardware use serial-to-USB converters based on the CP210x series
+by <a class="reference external" href="http://www.silabs.com/">Silicon Labs</a>.</p>
+<p>If the serial number programed on it is not unique enough, it can be
+programmed with the tool <code class="docutils literal"><span class="pre">cp120x-program</span></code>, available from
+<a class="reference external" href="http://cp210x-program.sourceforge.net/">http://cp210x-program.sourceforge.net/</a>.</p>
+<p>Once installed:</p>
+<ol class="arabic">
+<li><p class="first">identify the device to operate with:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ lsusb | grep -i CP210x
+Bus 002 Device 085: ID 10c4:ea60 Cygnal Integrated Products, Inc. CP210x UART Bridge / myAVR mySmartUSB light
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">your device might show differnt vendor or product ID and
+strings, in such case, adjust your grepping.</p>
+</div>
+</li>
+<li><p class="first">take the bus and device numbers (<cite>002/085</cite> in the example) and feed
+it to the <cite>cp219x-program</cite> tool with the new serial number you
+want:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># cp210x-program -m 002/085 -w --set-serial-number &quot;NEWSERIALNUMBER&quot;</span>
+</pre></div>
+</div>
+<p>it is always a good idea to set as new serial number the name of
+the target it is going to be assigned to.</p>
+</li>
+<li><p class="first">Reconnect the device and verify the new serial number is set with
+<code class="docutils literal"><span class="pre">lsusb.py</span></code>:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span>$ lsusb.py -ciu
+...
+  2-2.4          10c4:ea60 00  1.10   12MBit/s 100mA 1IF  (Silicon Labs CP2102 USB to UART Bridge Controller esp32-39)
+    2-2.4:1.0      (IF) ff:00:00 2EPs (Vendor Specific Class) cp210x ttyUSB0
+..
+</pre></div>
+</div>
+<p>in this case, we set <em>esp32-39</em> as new serial number, which is
+displayed at the end of the line.</p>
+</li>
+</ol>
+</div>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="05-RFAQs.html" class="btn btn-neutral float-right" title="5. Rationales and Frequently Asked Questions" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="03-server-setup.html" class="btn btn-neutral" title="3. Server deployment guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2015, Author.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'0.11',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>

@@ -1,0 +1,323 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>10. Current status and plans &mdash; Test Case Framework 0.11 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+        <link rel="index" title="Index"
+              href="../genindex.html"/>
+        <link rel="search" title="Search" href="../search.html"/>
+    <link rel="top" title="Test Case Framework 0.11 documentation" href="../index.html"/>
+        <link rel="next" title="11. TCF release v0.11" href="../01-CHANGELOG.html"/>
+        <link rel="prev" title="9. Glossary" href="glossary.html"/> 
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+   
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="../README.html" class="icon icon-home"> Test Case Framework
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.11
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../02-QUICKSTART.html">1. Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="02-guides.html">2. Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="03-server-setup.html">3. Server deployment guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="04-HOWTOs.html">4. HOWTOs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="05-RFAQs.html">5. Rationales and Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="06-troubleshooting.html">6. Support &amp; Troubleshooting</a></li>
+<li class="toctree-l1"><a class="reference internal" href="07-Architecture.html">7. Architecture</a></li>
+<li class="toctree-l1"><a class="reference internal" href="09-api.html">8. APIs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">9. Glossary</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">10. Current status and plans</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#challenges">10.1. Challenges</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#the-code">10.2. The code</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../01-CHANGELOG.html">11. TCF release v0.11</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../README.html">Test Case Framework</a>
+        
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../README.html">Docs</a> &raquo;</li>
+        
+      <li>10. Current status and plans</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/doc/10-Status.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="current-status-and-plans">
+<span id="status"></span><h1>10. Current status and plans<a class="headerlink" href="#current-status-and-plans" title="Permalink to this headline">¶</a></h1>
+<p>TCF is currently being used to drive HW testing of the <a class="reference external" href="https://zephyrproject.org">Zephyr OS</a> inside Intel; while it was desigined with
+it in mind, it is by no means restricted to running Zephyr
+testcases.</p>
+<p>Our current deployment looks like:</p>
+<ul class="simple">
+<li>six target servers spread around two continents</li>
+<li>Jenkins launching the runs on six different slaves in a matrix build</li>
+<li>around 70 MCU targets of 16 different types, covering x86, ARC,
+ARM and NIOS2 architectures plus PC-class machines, network
+(ethernet and bluetooth setups)</li>
+<li>power switches, <a class="reference external" href="https://www.yepkit.com/products/ykush">YKUSH</a>
+power switching hubs, serial consoles, etc</li>
+<li>ansible used to keep all the servers setup correctly</li>
+</ul>
+<p>Depending on how many runs are competing for the hardware, it usually
+runs all of Zephyr Sanity Check plus a bunch of other internal
+testcases, samples and combinations (totalling about 14000 testcases)
+in 95min (~150 TCs/min).</p>
+<p>This allows us to get almost realtime feedback on a continuous
+integration manner. We are looking into extending this to commit
+verification to provide feedback to developers on their proposed
+changes.</p>
+<div class="section" id="challenges">
+<h2>10.1. Challenges<a class="headerlink" href="#challenges" title="Permalink to this headline">¶</a></h2>
+<p>Achieving high target-per-server density to reduce cost is possible,
+the main problems being:</p>
+<ul>
+<li><p class="first">USB bandwidth gets consumed rapidly, so more USB Host Controllers
+need to be added to the system</p>
+</li>
+<li><p class="first">these rates speed places huge strain on the USB host controllers (as
+the system is basically plugging/unplugging/resetting multiple
+devices way many times per minute) and some of them will just die
+and provide no feedback to the matter.  All that is left is a USB
+serial port that seems connected but provides no output, no signs in
+the kernel to tell what is going on.</p>
+<p>when this happens, a driver reenumeration sometimes helps, others
+just a server power-cycle will fix it. Enterprise class USB Host
+Controller hardware seems to take it better, but YMMV. Or reduce
+density…</p>
+</li>
+</ul>
+</div>
+<div class="section" id="the-code">
+<h2>10.2. The code<a class="headerlink" href="#the-code" title="Permalink to this headline">¶</a></h2>
+<p>The code base has evolved a lot over time and has multiple places
+where it can use improvements, refactoring and rethought.</p>
+<p>Main areas of improvement:</p>
+<ul>
+<li><p class="first">the web server (Tornado) is hardwired to start N servers and
+requests bounce on them across targets; it’d be a good idea to have
+N be dynamic and even bound to a single target, as most usage models
+do sequential access on a target.</p>
+</li>
+<li><p class="first">the target acquisition mechanism is currently based on a very
+simplistic random poll mechanism, which puts a unnecesary strain on
+the network when there is a lot of contention. As well, there is no
+way to configure prioritization (a developer over Jenkins, for
+example). [tbdl.tt.targets_assign]</p>
+<p>This needs to be replaced with a simple queue and event mechanism
+that lets the client known when their request for assignment is
+completed and can start operating on the target. This will require
+changes in both server and client.</p>
+</li>
+<li><p class="first">the code that generates target groups for testcases / testgroup
+pairing needs to be broken up and extended to take more advantage of
+more possibilities (in the case of target groups with
+interconnects) [tcfl.tt._run_on_targets]</p>
+</li>
+<li><p class="first">it will make sense also to abstract the ttbd_client access layer
+into something that would allow other target servers to be used by
+the client to run testcases on, not just the ttbd server.</p>
+</li>
+</ul>
+</div>
+</div>
+
+
+           </div>
+           <div class="articleComments">
+            
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../01-CHANGELOG.html" class="btn btn-neutral float-right" title="11. TCF release v0.11" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="glossary.html" class="btn btn-neutral" title="9. Glossary" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2015, Author.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'../',
+            VERSION:'0.11',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
+        };
+    </script>
+      <script type="text/javascript" src="../_static/jquery.js"></script>
+      <script type="text/javascript" src="../_static/underscore.js"></script>
+      <script type="text/javascript" src="../_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
