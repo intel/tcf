@@ -188,7 +188,7 @@ A github-based workflow can be:
 
    Configure *git* to know about the upstream repo::
 
-     $ git remote add upstream https://github.com/FIXME/tcf.git
+     $ git remote add upstream https://github.com/intel/tcf
      $ git remote -v
 
 3. Create a topic branch (off of master or anyother branch) for your
@@ -259,7 +259,7 @@ A github-based workflow can be:
    c. Click on the *submit* button and your pull request is sent and
       awaits review. Email will be sent as review comments are made, or
       you can check on your pull request at
-      https://github.com/FIXME/pulls.
+      https://github.com/intel/tcf/pulls.
 
    While you’re waiting for your pull request to be accepted and
    merged, you can create another branch to work on another issue (be
