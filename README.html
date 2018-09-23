@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>&lt;no title&gt; &mdash; Test Case Framework 0.11 documentation</title>
+  <title>TCF &mdash; Test Case Framework 0.11 documentation</title>
   
 
   
@@ -35,8 +35,7 @@
         <link rel="index" title="Index"
               href="genindex.html"/>
         <link rel="search" title="Search" href="search.html"/>
-    <link rel="top" title="Test Case Framework 0.11 documentation" href="index.html"/>
-        <link rel="next" title="1. Quickstart" href="02-QUICKSTART.html"/> 
+    <link rel="top" title="Test Case Framework 0.11 documentation" href="index.html"/> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
@@ -55,7 +54,7 @@
           
 
           
-            <a href="#" class="icon icon-home"> Test Case Framework
+            <a href="index.html" class="icon icon-home"> Test Case Framework
           
 
           
@@ -115,7 +114,7 @@
       <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="#">Test Case Framework</a>
+          <a href="index.html">Test Case Framework</a>
         
       </nav>
 
@@ -143,9 +142,9 @@
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="#">Docs</a> &raquo;</li>
+      <li><a href="index.html">Docs</a> &raquo;</li>
         
-      <li>&lt;no title&gt;</li>
+      <li>TCF</li>
     
     
       <li class="wy-breadcrumbs-aside">
@@ -164,7 +163,9 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <p>TCF is a system that simplifies the creation and execution of test
+  <div class="section" id="tcf">
+<h1>TCF<a class="headerlink" href="#tcf" title="Permalink to this headline">¶</a></h1>
+<p>TCF is a system that simplifies the creation and execution of test
 cases (automation, for that matter) with minimal setup effort by
 engineers (SW, QA and release) and autobuilders alike across a wide
 amount of hardware platforms. It is distributed under the terms of the
@@ -174,9 +175,9 @@ Apache 2.0 license.</p>
 <div><ul class="simple">
 <li>Discover and run one or many unit, integration, end-to-end automated
 test cases or samples with a single command line; these test cases
-may need no <a class="reference internal" href="doc/glossary.html#term-test-target"><span class="xref std std-term">test target</span></a>s (run in the local host) or one or
+may need no target (run in the local host) or one or
 more targets on which to operate.</li>
-<li>Locate, manage and share <a class="reference internal" href="doc/glossary.html#term-test-target"><span class="xref std std-term">test target</span></a> hardware to maximize
+<li>Locate, manage and share target hardware to maximize
 resource efficiency</li>
 </ul>
 </div></blockquote>
@@ -211,356 +212,18 @@ of users.</li>
 etc, to other tools, providing means to feed data into them. It is
 designed with the goal of having a small footprint and little
 dependencies.</p>
-<p>Report issues and contact the authors <a class="reference internal" href="doc/02-guides.html#support-and-reporting-issues"><span class="std std-ref">here</span></a>.</p>
-<p>Status and plans available <a class="reference internal" href="doc/10-Status.html#status"><span class="std std-ref">here</span></a></p>
-<div class="toctree-wrapper compound">
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="02-QUICKSTART.html">1. Quickstart</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="02-QUICKSTART.html#playing-around-with-a-server">1.1. <em>Playing around with a server</em></a></li>
-<li class="toctree-l2"><a class="reference internal" href="02-QUICKSTART.html#running-zephyr-os-testcases">1.2. Running Zephyr OS testcases</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="02-QUICKSTART.html#running-in-multiple-targets">1.2.1. Running in multiple targets</a></li>
-<li class="toctree-l3"><a class="reference internal" href="02-QUICKSTART.html#running-many-testcases">1.2.2. Running many testcases</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="02-QUICKSTART.html#automating-test-case-building-and-execution">1.3. Automating test case building and execution</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="doc/02-guides.html">2. Guides</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="doc/02-guides.html#configuring-the-tcf-client">2.1. Configuring the TCF client</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#configuring-access-to-ttbd-servers">2.1.1. Configuring access to <em>ttbd</em> servers</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#configuring-for-zephyr-os-development">2.1.2. Configuring for Zephyr OS development</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#configuring-for-arduino-sketch-development">2.1.3. Configuring for Arduino Sketch development</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#other-configuration-settings">2.1.4. Other configuration settings</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/02-guides.html#running-test-cases-with-tcf-run">2.2. Running test cases with <em>tcf run</em></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#running-zephyr-os-testcases-and-samples">2.2.1. Running Zephyr OS testcases and samples</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#options-to-tcf-run">2.2.2. Options to <em>tcf run</em></a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#target-and-tag-filter-specifications">2.2.3. Target and tag filter specifications</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/02-guides.html#examples-of-specifications">2.2.3.1. Examples of specifications</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#interpreting-the-output-of-tcf-run">2.2.4. Interpreting the output of <em>tcf run</em></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/02-guides.html#creating-testcases">2.3. Creating testcases</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#zephyr-os-s-hello-world">2.3.1. Zephyr OS’s <em>Hello World!</em></a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#a-test-case-with-multiple-targets">2.3.2. A test case with multiple targets</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#connecting-to-network-ports">2.3.3. Connecting to network ports</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#network-test-cases">2.3.4. Network test cases</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#capturing-tcpdumps-of-network-traffic">2.3.5. Capturing <em>tcpdumps</em> of network traffic</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#saving-data-and-files-to-a-location">2.3.6. Saving data and files to a location</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#connecting-things">2.3.7. Connecting things</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/02-guides.html#testcase-training">2.4. Testcase training</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#a-basic-testcase">2.4.1. A basic testcase</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#what-s-in-a-testcase">2.4.2. What’s in a testcase</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#breaking-it-up">2.4.3. Breaking it up</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#give-me-a-target">2.4.4. Give me a target</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#give-me-a-target-that-can-run-zephyr">2.4.5. Give me a target that can run Zephyr</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#give-me-a-target-that-can-run-zephyr-and-is-x86">2.4.6. Give me a target that can run Zephyr and is x86</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#but-put-some-zephyr-into-it">2.4.7. But put some Zephyr into it?</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#now-we-are-building-all-the-time-some-time-savers">2.4.8. Now we are building all the time, some time savers</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#so-is-zephyr-booting">2.4.9. So, is Zephyr booting?</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#and-is-the-code-doing-what-i-want-hello-world">2.4.10. And is the code doing what I want? Hello World?</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#what-happens-when-it-fails-let-s-make-it-fail">2.4.11. What happens when it fails? Let’s make it fail</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#running-a-zephyr-sanity-check-testcase">2.4.12. Running a Zephyr sanity check testcase</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#double-down">2.4.13. Double down</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#double-down-more-efficiently">2.4.14. Double down more efficiently</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#double-down-catchas">2.4.15. Double down catchas</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#two-interconnected-targets">2.4.16. Two interconnected targets?</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#networking-and-the-zephyr-echo-server">2.4.17. Networking and the Zephyr echo server</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#add-on-the-zephyr-echo-client">2.4.18. Add on the Zephyr echo client</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#cover-more-bases-on-the-zephyr-echo-server-client">2.4.19. Cover more bases on the Zephyr echo server/client</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#but-let-s-test-zephyr-s-echo-server-client-better">2.4.20. But let’s test Zephyr’s echo server/client better</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#developing-zephyr-apps-with-the-tcf-s-help">2.4.21. Developing Zephyr apps with the TCF’s help</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/02-guides.html#evolving-into-a-tc-test-case">2.4.21.1. Evolving into a TC test case</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/02-guides.html#evolving-into-a-ztest-test-case">2.4.21.2. Evolving into a ztest test case</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#change-of-pace-input-to-a-zephyr-test-case">2.4.22. Change of pace, input to a Zephyr test case</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#fixme-missing">2.4.23. FIXME: Missing</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/02-guides.html#report-drivers">2.5. Report Drivers</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#example-1-reporting-completion-of-testcase-execution">2.5.1. Example 1: reporting completion of testcase execution</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#example-2-reporting-failures">2.5.2. Example 2: reporting failures</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/02-guides.html#app-builders">2.6. App Builders</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#overriding-actions">2.6.1. Overriding actions</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/02-guides.html#contributing">2.7. Contributing</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#support-reporting-issues">2.7.1. Support &amp; reporting issues</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#running-the-tcf-client-from-the-source-tree">2.7.2. Running the TCF client from the source tree</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#running-the-tcf-server-ttbd-from-the-source-tree">2.7.3. Running the TCF server (ttbd) from the source tree</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/02-guides.html#workflow-for-contributions">2.7.4. Workflow for contributions</a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="doc/03-server-setup.html">3. Server deployment guide</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="doc/03-server-setup.html#bill-of-materials">3.1. Bill of materials</a></li>
-<li class="toctree-l2"><a class="reference internal" href="doc/03-server-setup.html#conventions">3.2. Conventions</a></li>
-<li class="toctree-l2"><a class="reference internal" href="doc/03-server-setup.html#server-installation">3.3. Server installation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="doc/03-server-setup.html#install-and-setup-the-tcf-software">3.4. Install and setup the TCF software</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/03-server-setup.html#target-networking">3.4.1. Target networking</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/03-server-setup.html#configure-qemu-zephyr-os-targets">3.4.2. Configure QEMU Zephyr OS targets</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/03-server-setup.html#configure-qemu-linux-targets">3.4.3. Configure QEMU Linux targets</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/03-server-setup.html#configure-physical-test-targets-and-power-switches">3.4.4. Configure physical test targets and power switches</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/03-server-setup.html#configure-a-physical-linux-target">3.4.5. Configure a physical Linux target</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/03-server-setup.html#configuring-things-that-get-plugged-to-the-targets">3.4.6. Configuring things that get plugged to the targets</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/03-server-setup.html#best-practices-for-server-setup">3.4.6.1. Best practices for server setup</a><ul>
-<li class="toctree-l5"><a class="reference internal" href="doc/03-server-setup.html#naming-targets">3.4.6.1.1. Naming targets</a></li>
-</ul>
-</li>
-<li class="toctree-l4"><a class="reference internal" href="doc/03-server-setup.html#configuration-example-1">3.4.6.2. Configuration Example 1</a></li>
-</ul>
-</li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="doc/04-HOWTOs.html">4. HOWTOs</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="doc/04-HOWTOs.html#general-linux-system">4.1. General Linux system</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#setup-proxies">4.1.1. Setup proxies</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#how-do-i-update-my-tcf-installation">4.1.2. How do I update my TCF installation?</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#configuring-a-usb-or-other-network-adapter-for-an-internal-network">4.1.3. Configuring a USB or other network adapter for an internal network</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/04-HOWTOs.html#disabling-networkmanager-from-controlling-the-interface">4.1.3.1. Disabling NetworkManager from controlling the interface</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/04-HOWTOs.html#configuring-a-static-interface-via-networkmanager">4.1.3.2. Configuring a static interface Via NetworkManager</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#generating-an-ssl-certificate">4.1.4. Generating an SSL certificate</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#finding-usb-device-information">4.1.5. Finding USB device information</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/04-HOWTOs.html#finding-usb-device-information-with-dmesg">4.1.5.1. Finding USB device information with dmesg</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/04-HOWTOs.html#finding-usb-device-information-with-lsusb-py">4.1.5.2. Finding USB device information with lsusb.py</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/04-HOWTOs.html#finding-usb-device-information-with-udevadm">4.1.5.3. Finding USB device information with udevadm</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#udev-configuration-of-serial-port">4.1.6. udev configuration of serial port</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/04-HOWTOs.html#udev-configuration-of-serial-port-based-on-serial-number">4.1.6.1. udev configuration of serial port based on serial number</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/04-HOWTOs.html#udev-configuration-of-serial-port-without-serial-number-based-on-path">4.1.6.2. udev configuration of serial port without serial number based on path</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/04-HOWTOs.html#udev-configuration-of-serial-port-based-on-sibling-s-serial-number">4.1.6.3. udev configuration of serial port based on sibling’s serial number</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#finding-the-serial-number-of-a-devantech-usbrly08b-relay-controller">4.1.7. Finding the serial number of a Devantech USBRLY08B relay controller</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#finding-the-serial-number-of-an-ykush-hub">4.1.8. Finding the serial number of an YKUSH hub</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/04-HOWTOs.html#ttbd-tcf-server-configuration-and-tricks">4.2. <em>ttbd</em>: TCF server configuration and tricks</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#starting-more-that-one-instance">4.2.1. Starting more that one instance</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#configure-authentication-for-local-users-optional">4.2.2. Configure authentication for local users (optional)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#configure-simple-authentication-for-jenkins-jobs-optional">4.2.3. Configure simple authentication / for Jenkins jobs (optional)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#configure-authentication-against-ldap">4.2.4. Configure authentication against LDAP</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#configuring-a-target-for-just-controlling-power-to-something">4.2.5. Configuring a target for just controlling power to something</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#adding-tags-to-a-target">4.2.6. Adding tags to a target</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#how-do-i-disable-a-target-by-default">4.2.7. How do I disable a target by default?</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#allowing-the-server-to-be-used-remotely">4.2.8. Allowing the server to be used remotely</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#increasing-the-verbosity-of-the-server">4.2.9. Increasing the verbosity of the server</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/04-HOWTOs.html#tcf-client-tricks">4.3. TCF client tricks</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#how-do-i-release-a-target-i-don-t-own">4.3.1. How do I release a target I don’t own?</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#how-can-i-debug-a-target">4.3.2. How can I debug a target?</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/04-HOWTOs.html#zephyr-debugging-with-tcf-run">4.3.2.1. Zephyr debugging with TCF run</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#how-can-i-quickly-build-and-deploy-an-image-to-a-target">4.3.3. How can I quickly build and deploy an image to a target?</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#tcf-s-run-says-something-failed-can-i-get-more-detail">4.3.4. TCF’s <cite>run</cite> says something failed, can I get more detail?</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#how-do-i-send-ctrl-c-to-a-target">4.3.5. How do I send Ctrl-C to a target?</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#how-do-i-send-a-linux-command-to-a-linux-target-s-console">4.3.6. How do I send a Linux command to a Linux target’s console</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/04-HOWTOs.html#manual-installation-of-tcf-from-source">4.4. Manual installation of TCF from source</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#creation-and-setup-of-user-ttbd">4.4.1. Creation and setup of user <em>ttbd</em></a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#install-required-software">4.4.2. Install required software</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#remove-conflicting-packages">4.4.3. Remove conflicting packages</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#install-tcf">4.4.4. Install TCF</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/04-HOWTOs.html#manual-installation-of-support-packages">4.5. Manual installation of support packages</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#bossac-arduino-due-flasher">4.5.1. Bossac: Arduino Due flasher</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#zephyr-sdk">4.5.2. Zephyr SDK</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#arduino-builder-1-6-13">4.5.3. Arduino Builder 1.6.13</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#tunslip6">4.5.4. tunslip6</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#xtensa-esp32">4.5.5. Xtensa ESP32</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#libcoap">4.5.6. libcoap</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#fpm-fast-package-manager">4.5.7. FPM, fast package manager</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/04-HOWTOs.html#platform-firmware-bios-update-procedures">4.6. Platform firmware / BIOS update procedures</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#updating-the-firmware-in-an-arduino101-to-factory-settings">4.6.1. Updating the firmware in an Arduino101 to factory settings</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#updating-the-firmware-in-an-quark-c1000-reference-boards">4.6.2. Updating the firmware in an Quark C1000 reference boards</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/04-HOWTOs.html#remediation-steps">4.6.2.1. Remediation steps</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#updating-the-firmware-in-an-quark-d2000-reference-boards">4.6.3. Updating the firmware in an Quark D2000 reference boards</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#updating-the-fpga-image-in-synopsys-emsk-boards">4.6.4. Updating the FPGA image in Synopsys EMSK boards</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#updating-the-serial-number-and-or-description-of-a-ftdi-flyswatter">4.6.5. Updating the serial number and / or description of a FTDI / Flyswatter</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/04-HOWTOs.html#updating-the-serial-number-and-or-description-of-a-cp210x-serial-device">4.6.6. Updating the serial number and / or description of a CP210x serial device</a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="doc/05-RFAQs.html">5. Rationales and Frequently Asked Questions</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="doc/05-RFAQs.html#tcf-is-os-and-test-target-agnostic">5.1. TCF is OS and test target agnostic</a></li>
-<li class="toctree-l2"><a class="reference internal" href="doc/05-RFAQs.html#separated-networks-for-infrastructure-and-test-target-hardware">5.2. Separated networks for infrastructure and test target hardware</a></li>
-<li class="toctree-l2"><a class="reference internal" href="doc/05-RFAQs.html#mcu-test-fixture-for-highest-reliabiltiy">5.3. MCU test fixture for highest reliabiltiy</a></li>
-<li class="toctree-l2"><a class="reference internal" href="doc/05-RFAQs.html#high-cost-of-fixtures">5.4. High cost of fixtures</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="doc/06-troubleshooting.html">6. Support &amp; Troubleshooting</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="doc/06-troubleshooting.html#tcf-client">6.1. TCF client</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#tcf-just-hangs-there-nothing-happens">6.1.1. <em>tcf</em> just hangs there, nothing happens</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#client-operations-report-eof-occurred-in-violation-of-protocol">6.1.2. Client operations report <em>EOF occurred in violation of protocol</em></a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#tcf-run-fails-compiling-in-zephyr">6.1.3. <em>tcf run</em> fails compiling in Zephyr…</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/06-troubleshooting.html#ttbd-server">6.2. <em>ttbd</em> server</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#restart-ttbd-watch-the-output-for-errors">6.2.1. Restart <em>ttbd</em>, watch the output for errors</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#log-shows-can-t-find-hub-retrying">6.2.2. Log shows <em>can’t find hub, retrying</em></a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#log-shows-errors-cannot-find-ykush-serial-yknnnnn">6.2.3. log shows errors <em>Cannot find YKUSH serial ‘YKNNNNN’</em></a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#tips-for-diagnosing-systemd-startup">6.2.4. Tips for diagnosing systemd startup</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#tips-for-configuring-systemd-startup">6.2.5. Tips for configuring systemd startup</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#usb-device-powers-up-but-serial-port-does-not-come-up">6.2.6. USB device powers up, but serial port does not come up</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#multiple-failures-caused-by-selinux">6.2.7. Multiple failures caused by <em>SELinux</em></a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#different-operations-fail-daemon-log-reports-connection-reset-by-peer">6.2.8. Different operations fail, daemon log reports <em>Connection reset by peer</em></a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#uploading-files-to-the-daemon-fails-with-var-cache-ttbd-production-username-cannot-create-path">6.2.9. Uploading files to the daemon fails with <em>/var/cache/ttbd-production/USERNAME: cannot create path</em></a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#network-qemu-target-fails-to-power-up-with-permission-denied-dev-tapnumber">6.2.10. Network QEMU target fails to power up with <em>Permission denied: ‘/dev/tapNUMBER’</em></a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#ldap-login-fails-with-invalid-credentials-but-the-password-is-right-i-know">6.2.11. LDAP login fails with invalid credentials, but the password is right, I know</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#freedom-board-k64f">6.2.12. Freedom Board k64f</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/06-troubleshooting.html#freedom-board-k64f-openocd-fails-to-power-up-unable-to-open-cmsis-dap-device-0xd28-0x204">6.2.12.1. Freedom Board k64f, openocd fails to power up (unable to open CMSIS-DAP device 0xd28:0x204)</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/06-troubleshooting.html#frdm-k64f-boards-fail-to-power-up-openocd-prints-message-about-reset-wdog-loop">6.2.12.2. FRDM k64f boards fail to power up, OpenOCD prints message about RESET/WDOG loop</a><ul>
-<li class="toctree-l5"><a class="reference internal" href="doc/06-troubleshooting.html#manual-execution-of-the-procedure">6.2.12.2.1. Manual execution of the procedure</a></li>
-</ul>
-</li>
-<li class="toctree-l4"><a class="reference internal" href="doc/06-troubleshooting.html#set-the-up-the-target-in-debug-mode">6.2.12.3. Set the up the target in debug mode</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/06-troubleshooting.html#issue-openocd-commands-to-stop-the-loop">6.2.12.4. Issue OpenOCD commands to stop the loop</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/06-troubleshooting.html#copy-a-known-firmware-image-to-its-flash-drive">6.2.12.5. Copy a known firmware image to its flash drive</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/06-troubleshooting.html#reset-the-board-to-normal-configuration">6.2.12.6. Reset the board to normal configuration</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="doc/06-troubleshooting.html#arduino101">6.2.13. Arduino101</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/06-troubleshooting.html#arduino101-openocd-fails-to-power-up-targets-report-tap-disabled">6.2.13.1. Arduino101: openocd fails to power up (targets report tap-disabled)</a></li>
-</ul>
-</li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="doc/07-Architecture.html">7. Architecture</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="doc/07-Architecture.html#the-tcf-client">7.1. The TCF client</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/07-Architecture.html#the-testcase-finder-and-runner">7.1.1. The testcase finder and runner</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/07-Architecture.html#the-test-target-broker">7.2. The Test Target Broker</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/07-Architecture.html#daemon-internals">7.2.1. Daemon internals</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/07-Architecture.html#maintaining-state">7.2.2. Maintaining state</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/07-Architecture.html#interfaces">7.2.3. Interfaces</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/07-Architecture.html#power-control">7.2.3.1. Power control</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/07-Architecture.html#console-management">7.2.3.2. Console management</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/07-Architecture.html#file-deployment">7.2.3.3. File deployment</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/07-Architecture.html#image-deployment">7.2.3.4. Image deployment</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/07-Architecture.html#debugging">7.2.3.5. Debugging</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/07-Architecture.html#things">7.2.3.6. Things</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="doc/07-Architecture.html#authentication">7.2.4. Authentication</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/07-Architecture.html#security-considerations">7.3. Security considerations</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/07-Architecture.html#general">7.3.1. General</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/07-Architecture.html#client">7.3.2. Client</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/07-Architecture.html#daemon">7.3.3. Daemon</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/07-Architecture.html#daemon-access-control">7.3.3.1. Daemon access control</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/07-Architecture.html#file-permissions">7.3.3.2. File permissions</a></li>
-<li class="toctree-l4"><a class="reference internal" href="doc/07-Architecture.html#other-processes-started-by-the-daemon">7.3.3.3. Other processes started by the daemon</a><ul>
-<li class="toctree-l5"><a class="reference internal" href="doc/07-Architecture.html#bossac">7.3.3.3.1. <em>bossac</em></a></li>
-<li class="toctree-l5"><a class="reference internal" href="doc/07-Architecture.html#dfu-util">7.3.3.3.2. <em>dfu-util</em></a></li>
-<li class="toctree-l5"><a class="reference internal" href="doc/07-Architecture.html#genisoimage">7.3.3.3.3. <em>genisoimage</em></a></li>
-<li class="toctree-l5"><a class="reference internal" href="doc/07-Architecture.html#ip">7.3.3.3.4. <em>ip</em></a></li>
-<li class="toctree-l5"><a class="reference internal" href="doc/07-Architecture.html#qemu">7.3.3.3.5. <em>QEMU</em></a></li>
-<li class="toctree-l5"><a class="reference internal" href="doc/07-Architecture.html#qemu-img">7.3.3.3.6. <em>qemu-img</em></a></li>
-<li class="toctree-l5"><a class="reference internal" href="doc/07-Architecture.html#openocd">7.3.3.3.7. <em>OpenOCD</em></a></li>
-<li class="toctree-l5"><a class="reference internal" href="doc/07-Architecture.html#socat">7.3.3.3.8. <em>socat</em></a></li>
-<li class="toctree-l5"><a class="reference internal" href="doc/07-Architecture.html#tunslip6">7.3.3.3.9. <em>tunslip6</em></a></li>
-</ul>
-</li>
-<li class="toctree-l4"><a class="reference internal" href="doc/07-Architecture.html#networking">7.3.3.4. Networking</a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/07-Architecture.html#taxonomy-of-test-cases">7.4. Taxonomy of test cases</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="doc/09-api.html">8. APIs</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="doc/09-api.html#module-tcfl.tc">8.1. <em>TCF run</em>: testcase API and target manipulation during testcases</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#tcf-s-backbone-test-case-finder-and-runner">8.1.1. TCF’s backbone test case finder and runner</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/09-api.html#testcase-run-identification">8.1.1.1. Testcase run identification</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#module-tcfl.tl">8.1.2. Test library (utilities for testcases)</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#module-tcfl.target_ext_console">8.1.3. Extensions to <code class="docutils literal"><span class="pre">tcfl.tc.target_c</span></code> types</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#module-tcfl.app">8.1.4. <em>TCF run</em> Application builders</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#module-tcfl.report">8.1.5. <em>TCF run</em> report drivers</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/09-api.html#report-infrastructure">8.1.5.1. Report infrastructure</a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/09-api.html#module-tcfl.config">8.2. <em>TCF</em> client configuration</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#configuration-api-for-tcf">8.2.1. Configuration API for <em>tcf</em></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/09-api.html#module-tcfl">8.3. <em>TCF</em> client internals</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#expecting-things-that-have-to-happen">8.3.1. Expecting things that have to happen</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#client-api-for-accessing-ttbd-s-rest-api">8.3.2. Client API for accessing <em>ttbd</em>’s REST API</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#zephyr-s-sanitycheck-testcase-ini-driver-for-testcase-integration">8.3.3. Zephyr’s SanityCheck testcase.ini driver for testcase integration</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/09-api.html#target-metadata">8.4. Target metadata</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#common-metadata">8.4.1. Common metadata</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#interface-specific-metadata">8.4.2. Interface specific metadata</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#driver-targe-type-specific-metadata">8.4.3. Driver / targe type specific metadata</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="doc/09-api.html#module-conf_00_lib">8.5. <em>ttbd</em> Configuration API for targets</a></li>
-<li class="toctree-l2"><a class="reference internal" href="doc/09-api.html#module-ttbl.config">8.6. <em>ttbd</em> Configuration API</a></li>
-<li class="toctree-l2"><a class="reference internal" href="doc/09-api.html#module-ttbl">8.7. <em>ttbd</em> internals</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#module-ttbl.tt">8.7.1. Target types drivers</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#module-ttbl.user_control">8.7.2. User access control and authentication</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#console-management-interface">8.7.3. Console Management Interface</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#debugging-interface">8.7.4. Debugging Interface</a></li>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#power-control-interface">8.7.5. Power Control Interface</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/09-api.html#module-ttbl.target">8.7.5.1. Miscelaneous</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="doc/09-api.html#module-commonl.expr_parser">8.7.6. Common helper library</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="doc/09-api.html#tcob-fixture-setup-instructions">8.7.6.1. TCOB Fixture setup instructions</a></li>
-</ul>
-</li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="doc/glossary.html">9. Glossary</a></li>
-<li class="toctree-l1"><a class="reference internal" href="doc/10-Status.html">10. Current status and plans</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="doc/10-Status.html#challenges">10.1. Challenges</a></li>
-<li class="toctree-l2"><a class="reference internal" href="doc/10-Status.html#the-code">10.2. The code</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="01-CHANGELOG.html">11. TCF release v0.11</a></li>
-</ul>
+<p>Report issues and contact the authors by filling issues in
+<a class="reference external" href="https://github.com/intel/tcf/issues">https://github.com/intel/tcf/issues</a>.</p>
+<div class="section" id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
+<p>Visit the quickstart <a class="reference external" href="https://intel.github.io/tcf/02-QUICKSTART.html">instructions</a>.</p>
 </div>
-<p><strong>Indexes</strong></p>
-<ul class="simple">
-<li><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></li>
-<li><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></li>
-<li><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></li>
-</ul>
+<div class="section" id="documentation">
+<h2>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h2>
+<p>Available at <a class="reference external" href="http://intel.github.io/tcf">http://intel.github.io/tcf</a></p>
+<p>Best practices for contributing available at the <a class="reference external" href="https://intel.github.io/tcf/doc/02-guides.html#contributing">guide</a>.</p>
+</div>
+</div>
 
 
            </div>
@@ -569,13 +232,6 @@ dependencies.</p>
            </div>
           </div>
           <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="02-QUICKSTART.html" class="btn btn-neutral float-right" title="1. Quickstart" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-    </div>
   
 
   <hr/>
