@@ -32,6 +32,11 @@
 
    .. include:: doc/02-client-setup-LL-04-login.rst
 
+   For login in with the same *username* and *password* to all servers
+   at the same time::
+
+     $ TCF_USER=<USERNAME> TCF_PASSWORD=<PASSWORD> tcf login -q
+
 4. If you want to run Zephyr testcases you will also need to follow
    the `Zephyr Development Environment Setup on Linux
    <https://docs.zephyrproject.org/latest/getting_started/installation_linux.html>`_
