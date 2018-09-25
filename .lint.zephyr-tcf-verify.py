@@ -148,21 +148,6 @@ def lint_zephyr_tcfverify_run(_repo, cf):
             else:
                 cwd = os.getcwd()
 
-            level_number = log.getEffectiveLevel()
-
-            tcf_verbose = []
-            tcf_run_verbose = []
-            level = -1
-            # Python levels are 50, 40, 30, 20, 10 ... (debug) 9 8 7 6 5 ... :)
-            if level_number <= 9:
-                tcf_verbose = [ "-" + "v" * (10 - level_number) ]
-                tcf_run_verbose = [ "-vvv" + "v" * (10 - level_number) ]
-            elif level_number > 9 and level_number <= 30:
-                # No -v or plain -v will give us 30, -vvv, so we
-                # append -vs to TCF if we appended -vs to lint-all
-                level = 3 - int(level_number / 10)
-                tcf_run_verbose = [ "-v" + "v" * level ]
-
             if 'TCFCONFIG' in os.environ:
                 tcf_config = [ os.environ['TCFCONFIG'] ]
             else:
@@ -171,16 +156,17 @@ def lint_zephyr_tcfverify_run(_repo, cf):
             # pass that as command line arguments
             if 'TCF_CMDLINE_ARGS' in os.environ:
                 tcf_config += os.environ['TCF_CMDLINE_ARGS'].split()
+            tcf_run_cmdline_args = \
+                os.environ.get('TCF_RUN_CMDLINE_ARGS', '').split()
 
             cmdline = [ LINT_ALL_TCF_CMD ] \
-                      + tcf_verbose \
                       + tcf_config \
                       + [
                           "--traces",
                           "run",
-                          "--log-dir", os.path.relpath(tmpdir)
+                          "--tmpdir", os.environ.get('TMPDIR', tmpdir)
                       ] \
-                      + tcf_run_verbose
+                      + tcf_run_cmdline_args
             specs = []
             tests = []
             for change, data in tcs.items():
