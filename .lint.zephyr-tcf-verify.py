@@ -167,6 +167,11 @@ def lint_zephyr_tcfverify_run(_repo, cf):
                 tcf_config = [ os.environ['TCFCONFIG'] ]
             else:
                 tcf_config = []
+            # split whatever is given in TCF_CMDLINE_ARGS with spaces and
+            # pass that as command line arguments
+            if 'TCF_CMDLINE_ARGS' in os.environ:
+                tcf_config += os.environ['TCF_CMDLINE_ARGS'].split()
+
             cmdline = [ LINT_ALL_TCF_CMD ] \
                       + tcf_verbose \
                       + tcf_config \
