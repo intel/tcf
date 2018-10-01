@@ -144,11 +144,11 @@ class ssh(tc.target_extension_c):
         elif result == 'blck':
             exception = tc.blocked_e
         else:
-            raise AssertionError("unknown 'result': "
-                                 "expected errr, fail, skip, blck")
+            raise AssertionError("unknown result '%s': "
+                                 "expected errr, fail, skip, blck" % result)
         return exception
 
-    def check_call(self, cmd, result_on_failure = "error"):
+    def check_call(self, cmd, result_on_failure = "errr"):
         """
         Run a shell command over SSH, substituting any %(KEYWORD)[ds]
         field from the target's keywords in
@@ -179,7 +179,7 @@ class ssh(tc.target_extension_c):
                                 dlevel = 1)
         return r
 
-    def check_output(self, cmd, result_on_failure = "error"):
+    def check_output(self, cmd, result_on_failure = "errr"):
         """
         Run a shell command over SSH, substituting any %(KEYWORD)[ds]
         field from the target's keywords in
@@ -213,7 +213,7 @@ class ssh(tc.target_extension_c):
         return s
 
     def copy_to(self, src, dst = "", recursive = False,
-                result_on_failure = "error"):
+                result_on_failure = "errr"):
         """
         Copy a file or tree with *SCP* to the target from the client
 
@@ -249,7 +249,7 @@ class ssh(tc.target_extension_c):
 
 
     def copy_from(self, src, dst = ".", recursive = False,
-                  result_on_failure = "error"):
+                  result_on_failure = "errr"):
         """
         Copy a file or tree with *SCP* from the target to the client
 

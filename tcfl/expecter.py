@@ -465,7 +465,7 @@ def console_rx_eval(expecter, target,
                     % (what, target.fullid, console_id_name,
                        ts - expecter.ts0),
                     { 'target': target, "console output": of })
-            elif result == "error":
+            elif result == "error" or result == "errr":
                 of.seek(offset)	# so we report console from where searched
                 raise tc.error_e(
                     "found expected (for error) `%s` in console "
