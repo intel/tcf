@@ -45,8 +45,9 @@ class tunnel(tc.target_extension_c):
             return ip_addr
         raise RuntimeError(
             "Cannot identify any IPv4 or IPv6 address to use; "
-            "please set it in `TARGET.tunnel.ip_addr` or pass "
-            "it explicitly")
+            "please set it in "
+            "`TARGET.tunnel.ip_addr = TARGET.addr_get(ic, \"ipv4\")` "
+            "or pass it explicitly")
 
 
     def add(self, port, ip_addr = None, proto = None):
