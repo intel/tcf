@@ -313,22 +313,6 @@ class file_c(report_c):
 
     """
 
-    #: (str) URL to where to obtain more help
-    #:
-    #: Note you can use any *%(FIELD)TYPE* Python codes to replace
-    #: values from the testcase dictionary.
-    #:
-    #: For available values, run::
-    #:
-    #:   $ tcf run /usr/share/tcf/examples/test_dump_kws.py
-    helpurl = "http://HELP-URL-NOT-CONFIGURED"
-    #: (str) Text to be inserted at the beginning of the
-    #: error/failure/skip/blockage report, after the summary.
-    #:
-    #: Note you can use any *%(FIELD)TYPE* Python codes to replace
-    #: values from the testcase dictionary. See :data:`helpurl`
-    report_header = None
-
     #: (str) Text to be inserted as reproduction instructions (e.g.:
     #: to checkout the code at the right versions and locations).
     #:
@@ -341,11 +325,46 @@ class file_c(report_c):
     #: - *{{ t_option }}* a value that indicates what has to be given to
     #:   *tcf* to select the targets where the testcase was run.
     #:
+    #: - FIXME: how to find about more kws
+    #:
     #: See http://jinja.pocoo.org/docs/2.10/templates/# for more
     #: information.
-    #:
-    #: See :data:`helpurl`
-    reproduction = """\
+    text_template = """\
+FIXME: pending
+
+ - move junit to use this
+ - support having this being a file in the filesystem
+ - support specifying multiple templates w/ filenames that would
+   generate multiple files (eg: one .txt, one .html, one junit_.xml)
+   via a templates = { 
+         "report-%(runid)s:%(tc_hash)s.txt": templatespec1,
+         "report-%(runid)s:%(tc_hash)s.html": templatespec2,
+         "junit_%(DOMAINWHATEVER)...:%(tc_hash)s.txt": templatespec3,
+    }
+ - support layering, do it the proper jinja2 way
+
+
+TCF: {{ tc_name_short }} @ {{ target_group_info }} **{{ result }}**
+
+Target Name         Remote ID                     Type
+------------------- ----------------------------- -------------------------\
+{% for target_info in targets %}
+{{ "%-19s %-29s %-25s"
+   | format(target_info.want_name, target_info.fullid,
+            target_info.type) }}
+{% endfor %}
+
+Execution log
+=============
+
+- console output in lines tagged 'console output'
+- the target might have produced none; GDB might be needed at this point
+- information for all testcase build, deployment and execution phases
+  is included; filter by the first column
+
+{% for ident, tgname, message in log %}\
+{{ "%-10s %-30s %s" | format(ident, tgname, message) }}
+{% endfor %}
 
 Reproduce it [*]:
 
@@ -355,7 +374,7 @@ Find more information about targets:
 
   tcf list -vv TARGETNAME1 TARGETNAME2 ...
 
-Acquire them for exclusive useoo
+Acquire them for exclusive use:
 
   tcf acquire TARGETNAME1 TARGETNAME2 ...
 
@@ -384,7 +403,6 @@ Release when done
 
 [*] Make sure your TCF configuration in ~/.tcf is set to access the servers
     used in this run:
-
 {% for server_url, ssl_ignore, server_aka, ca_path in tcfl_config_urls %}
      tcfl.config.url_add("{{ server_url }}", ssl_ignore = {{ ssl_ignore }}\
 {{ ', aka = \"' + server_aka + '\"' if server_aka }}\
@@ -392,19 +410,26 @@ Release when done
 {% endfor %}
 
 
+Testcase Tag        Value + Origin
+------------------- -------------------------------------------------------\
+{% for tag in tags %}
+{{ "%-19s %s" | format(tag, tags[tag]['value']) }}
+{{ "                    @" + tags[tag]['origin'] }}\
+{% endfor %}
+
+
 How do I install TCF?
 =====================
-Go to {{ helpurl }}
+Go to http://intel.github.com/tcf/02-QUICKSTART.html
 
-(You can configure this text by setting the parameter
- tcfl.report.reproduction to a Jinja2 template)
+(You can configure this text by modifying the Jinja2 template
+tcfl.report.text_template in any of TCF's conf_*.py configuration
+files)
+
 """
 
     #: (str) Overrides :data:`reproduction` for JUnit reports
     junit_reproduction = None
-
-    #: (str) Overrides :data:`reproduction` for text reports
-    text_reproduction = None
 
     #: (bool) produce Junit reports (default False) to *junit.xml*
     junit = False
@@ -416,7 +441,7 @@ Go to {{ helpurl }}
     #: where *DOMAIN* is extracted from this variable.
     #:
     #: Note you can use any *%(FIELD)TYPE* Python codes to replace
-    #: values from the testcase dictionary. See :data:`helpurl`. This
+    #: values from the testcase dictionary. See :data:`text_template`. This
     #: allows you to use something like :data:`tcfl.tc.tc_c.hook_pre`
     #: to scan testcases and assign them a keyword (see the example in
     #: there) and then use the keyword to generate a domain:
@@ -459,23 +484,23 @@ Go to {{ helpurl }}
     #: (str) Classname for the JUnit testcase
     #:
     #: Note you can use any *%(FIELD)TYPE* Python codes to replace
-    #: values from the testcase dictionary. See :data:`helpurl`
+    #: values from the testcase dictionary. See :data:`text_template`
     junit_name = "%(tc_name)s"
     #: (str) Classname for the JUnit testcase
     #:
     #: Note you can use any *%(FIELD)TYPE* Python codes to replace
-    #: values from the testcase dictionary. See :data:`helpurl`
+    #: values from the testcase dictionary. See :data:`text_template`
     junit_classname = "%(target_group_types)s:%(tc_name_short)s"
 
     #: (str) Name of the JUnit test suite.
     #:
     #: Note you can use any *%(FIELD)TYPE* Python codes to replace
-    #: values from the testcase dictionary. See :data:`helpurl`
+    #: values from the testcase dictionary. See :data:`text_template`
     junit_suite_name = "TCF test suite"
     #: (str) Name of the JUnit test suite package field.
     #:
     #: Note you can use any *%(FIELD)TYPE* Python codes to replace
-    #: values from the testcase dictionary. See :data:`helpurl`
+    #: values from the testcase dictionary. See :data:`text_template`
     junit_suite_package = "n/a"
     #: (dict) Properties of the JUnit test suite.
     #:
@@ -502,15 +527,10 @@ Go to {{ helpurl }}
     def __init__(self, log_dir):
         assert isinstance(log_dir, basestring)
 
-        assert self.helpurl == None or isinstance(self.helpurl, basestring)
-        assert self.report_header == None \
-            or isinstance(self.report_header, basestring)
-        assert self.reproduction == None \
-            or isinstance(self.reproduction, basestring)
+        assert self.text_template == None \
+            or isinstance(self.text_template, basestring)
         assert self.junit_reproduction == None \
             or isinstance(self.junit_reproduction, basestring)
-        assert self.text_reproduction == None \
-            or isinstance(self.text_reproduction, basestring)
 
         assert isinstance(self.junit, bool)
         assert self.junit_domain == None \
@@ -668,7 +688,7 @@ Go to {{ helpurl }}
                 commonl.rm_f(self.fs[code])
                 del self.fs[code]
 
-    def _log_filter(self, fo, fi, kws):
+    def _log_filter(self):
         """
         Filter from the log file things we are interested in (maybe
         everything)
@@ -718,13 +738,7 @@ Go to {{ helpurl }}
                 # This is just so it aligns well; <snip> comes from
                 # _report() above.
                 ident = "   "
-            self._write(
-                fo,
-                u"{ident:8s} {tgname:{tgname_len}s}  {message:s}\n".format(
-                    ident = ident,
-                    tgname = tgname,
-                    tgname_len = max_fullid_len + 1,
-                    message = message))
+            yield ident, tgname, message
 
     def _mkreport_junit(self, _tc, kws, header, output,
                         tag_info, reproduction):
@@ -874,6 +888,59 @@ Execution log
         outputf.flush()
         return outputf.getvalue()
 
+    def _log_iterator(self, code):
+        """
+        Filter from the log file things we are interested in (maybe
+        everything)
+        """
+        with codecs.open(self.fs[code], "a+b",
+                         encoding = 'utf-8', errors = 'ignore') as fi:
+            # FIXME: can't we just pickle this?
+            for line in fi:
+                if line == "":
+                    break
+                # Note this might be we read a "^M" (\r)
+                line = line.rstrip()
+                if line == "":
+                    continue
+                token = line.split(None, 4)
+                # Tokens are TAG LEVEL IDENT TGNAME MESSAGE
+                if not token:
+                    continue
+                if len(token) < 3:
+                    continue
+                tag = token[0]
+                level_s = token[1]
+                ident = token[2]
+                if not tag in [ "DATA", "INFO", "PASS", "ERRR",
+                                "FAIL", "SKIP", "BLCK" ]:
+                    continue
+                if len(token) == 3:
+                    # Bad line, ignore it
+                    continue
+                if len(token) > 3:
+                    tgname = token[3]
+                else:
+                    tgname = "BUG:tgname-MISSING"
+                    logging.error("BUG: missing tgname in line: %s", line)
+                if len(token) > 4:
+                    message = token[4]
+                else:
+                    logging.error("BUG: missing message in line: %s", line)
+                    message = "BUG:message-MISSING"
+                try:
+                    level = int(level_s)
+                except ValueError:
+                    logging.error("BUG: bad level in line: %s", line)
+                    level = 0
+                if tag == "INFO" and level > 2:
+                    continue
+                if ident == "<snip>":
+                    # This is just so it aligns well; <snip> comes from
+                    # _report() above.
+                    ident = "   "
+                yield ident, tgname, message
+
     def _mkreport(self, msg_tag, code, _tc, message, f):
         """
         Generate a failure report
@@ -884,88 +951,60 @@ Execution log
 
         kws = commonl.dict_missing_c(_tc.kws)
         kws['msg_tag'] = msg_tag
+        kws['result'] = _tc.valid_results.get(
+            msg_tag, ( None, "BUG-RESULT-%s" % msg_tag))[1]
         kws['message'] = message
+        tfids = []
+        for target_want_name, target in _tc.targets.iteritems():
+            if len(target.rt.get('bsp_models', {})) > 1:
+                tfids.append(
+                    '(' + target.fullid
+                    + ' and bsp_model == "%s")' % target.bsp_model)
+            else:
+                tfids.append(target.fullid)
+        if tfids:
+            kws['t_option'] = " -t '" + " or ".join(tfids) + "'"
+        else:
+            kws['t_option'] = ""
 
         # Once the rest of the keys are available, generate the
         # user-provided ones
-        if self.helpurl:
-            kws['helpurl'] = self.helpurl % kws
-        else:
-            kws['heluprl'] = ""
-        if self.report_header:
-            kws['report_header'] = self.report_header % kws
-        else:
-            kws['report_header'] = ""
 
         # Seriously, I can't get right the Unicode and Python misterious ways
         # without getting thrown exceptions in the middle, so open the output
         # file normally and we just forcibly write unicode/utf-8 to it in
         # _fwrite(). As well, re-open the input file in utf-8 mode to
         # avoid doing manual conversion.
-        kws['t_option'] = " "
-        with self.lock:
-            header = self._mkreport_header(_tc, kws)
+        kws['tcfl_config_urls'] = tcfl.config.urls
 
-            output = self._mkreport_output(kws, f)
-
-            tag_info = u"""
-Testcase tags
-=============
-
-"""
-            col_tags = [ 'Tag' ]
-            col_values = [ 'Value' ]
-            col_origins = [ 'Origin' ]
-            for tag in _tc._tags:
-                (value, origin) = _tc.tag_get(tag, None, None)
-                if value == None:
-                    continue
-                col_tags.append(tag)
-                col_values.append(str(value))	# in case int/bool, etc..
-                col_origins.append(str(origin))
-
-            width_tag = max([ len(tag) for tag in col_tags ]) + 1
-            width_value = max([ len(value) for value in col_values ]) + 1
-            width_origin = max([ len(origin) for origin in col_origins ]) + 1
-
-            for (index, tag) in enumerate(col_tags):
-                tag_info += u"{tag:{width_tag}} {value:{width_value}} " \
-                    "{origin:{width_origin}}\n".format(
-                        tag = tag, width_tag = width_tag,
-                        value = col_values[index], width_value = width_value,
-                        origin = col_origins[index],
-                        width_origin = width_origin)
-                if index == 0:		# print a header separator
-                    tag_info += u"{tag:{width_tag}} {value:{width_value}} " \
-                        "{origin:{width_origin}}\n".format(
-                            tag = "-" * (width_tag - 1), width_tag = width_tag,
-                            value = "-" * (width_value - 1),
-                            width_value = width_value,
-                            origin = "-" * (width_origin - 1),
-                            width_origin = width_origin)
-            tag_info += "\n"
+        # FIXME: initialize this in the core, so it shows in test_dump_kws*.py
+        kws['targets'] = []
+        for target_want_name, target in _tc.targets.iteritems():
+            entry = {}
+            entry['want_name'] = target_want_name
+            entry['fullid'] = target.fullid
+            entry['type'] = _tc.type_map.get(target.type, target.type)
+            kws['targets'].append(entry)
+        kws['tags'] = {}
+        kws['log'] = self._log_iterator(code)
+        for tag in _tc._tags:
+            (value, origin) = _tc.tag_get(tag, None, None)
+            kws['tags'][tag] = dict(value = value, origin = origin)
 
         # Write to report file
+        # FIXME: consider compiling the template as we'll keep reusing it
         if self.text and (
                 msg_tag == "PASS" and self.text_report_pass
                 or msg_tag != "PASS"):
             with codecs.open(os.path.join(self.log_dir,
                                           "report-" + code + ".txt"), "w",
                              encoding = 'utf-8', errors = 'ignore') as fo:
-                fo.write(header)
-                fo.write(output)
-                fo.write(tag_info)
-
-                if self.text_reproduction != None:
-                    template = jinja2.Template(self.text_reproduction)
-                elif self.reproduction != None:
-                    template = jinja2.Template(self.reproduction)
-                else:
-                    template = None
+                template = jinja2.Template(self.text_template)
                 if template:
-                    fo.write(template.render(
-                        tcfl_config_urls = tcfl.config.urls,
-                        **kws))
+                    # FIXME: the log records will be too long to load
+                    # in KWS -- read on how to do it
+                    for text in template.generate(**kws):
+                        fo.write(text)
         if self.junit:
             if self.junit_reproduction != None:
                 template = jinja2.Template(self.junit_reproduction)

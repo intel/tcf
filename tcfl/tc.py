@@ -2436,7 +2436,13 @@ class tc_c(object):
     #
 
     #:
-    valid_results = ("PASS", "ERRR", "FAIL", "BLCK", "SKIP")
+    valid_results = dict(
+        PASS = ( 'pass', 'passed' ),
+        ERRR = ( 'error', 'errored' ),
+        FAIL = ( 'fail', 'failed' ),
+        BLCK = ( 'block', 'blocked' ),
+        SKIP = ( 'skip', 'skipped' ),
+    )
 
     #: List of places where we declared this testcase is build only
     build_only = []
