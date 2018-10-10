@@ -17,12 +17,13 @@ import re
 import urlparse
 
 import commonl
-import report
-import tc
 import ttb_client
 
 logger = logging.getLogger("tcfl.config")
-
+#: The list of paths where we find configuration information
+path = []
+#: Path where shared files are stored
+share_path = None
 urls = []
 
 # FIXME: need to figure out a way to tag this as configuration language
@@ -65,8 +66,10 @@ def load(config_path = None, config_files = None,
     if not config_files:
         config_files = []
     if config_path != "":
-        logger.info("configuration path %s", config_path)
-        commonl.config_import(config_path, re.compile("^conf[-_].*.py$"))
+        global path
+        path = commonl.path_expand(config_path)
+        logger.info("configuration path %s", path)
+        commonl.config_import(path, re.compile("^conf[-_].*.py$"))
     for config_file in config_files:
         commonl.config_import_file(config_file, "__main__")
 
@@ -87,43 +90,3 @@ def load(config_path = None, config_files = None,
             aka = None
         ttb_client.rest_init(os.path.expanduser(state_path),
                              url, ssl_ignore, aka)
-
-def tc_driver_add(_cls):
-    """Add a testcase driver
-
-    A testcase driver is a subclass of :class:`tcfl.tc.tc_c` which
-    overrides the methods used to locate testcases and implements the
-    different testcase configure/build/evaluation functions.
-
-    >>> import tcfl.tc
-    >>> class my_tc_driver(tcfl.tc.tc_c)
-    >>> tcfl.config.tc_driver_add(my_tc_driver)
-
-    :param _cls: subclass of :class:`tcfl.tc.tc_c` that implements the
-      driver
-    """
-    o = inspect.stack()[1]
-    origin = "%s:%s" % (o[1], o[2])
-    tc.tc_c.driver_add(_cls, origin)
-
-def report_driver_add(obj):
-    """Add a reporting driver
-
-    A report driver is used by *tcf run*, the meta test runner, to
-    report information about the execution of testcases.
-
-    A driver implements the reporting in whichever way it decides it
-    needs to suit the application, uploading information to a server,
-    writing it to files, printing it to screen, etc.
-
-    >>> import tcfl.report
-    >>> class my_report_driver(tcfl.report.report_c)
-    >>> tcfl.config.report_driver_add(my_report_driver)
-
-    :param _cls: subclass :class:`tcfl.report.report_c` of type that
-      implements the driver
-
-    """
-    o = inspect.stack()[1]
-    origin = "%s:%s" % (o[1], o[2])
-    report.report_c.driver_add(obj, origin)

@@ -2816,7 +2816,16 @@ class tc_c(object):
         """
         Add a driver to handle test cases (a subclass of :class:tc_c)
 
-        :param str origin:
+        A testcase driver is a subclass of :class:`tcfl.tc.tc_c` which
+        overrides the methods used to locate testcases and implements the
+        different testcase configure/build/evaluation functions.
+
+        >>> import tcfl.tc
+        >>> class my_tc_driver(tcfl.tc.tc_c)
+        >>> tcfl.tc.tc_c.driver_add(my_tc_driver)
+
+        :param tcfl.tc.tc_c _cls: testcase driver
+        :param str origin: (optional) origin of this call
         """
         assert issubclass(_cls, tc_c)
         if origin == None:

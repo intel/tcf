@@ -27,7 +27,7 @@ the ``tcfl`` subdirectory:
 - :mod:`tcfl.tc`: implements the backbone test case finder and runner
   and the TCF specific testcase-driver; other drivers may be created
   by subclassing :class:`tcfl.tc.tc_c` and adding them with
-  :func:`tcfl.config.tc_driver_add`.
+  :func:`tcfl.tc.tc_c.driver_add`.
 
 - :mod:`tcfl.config`: is a quick wrapper of the configuration
   directives that can be put in TCF's configuration files.

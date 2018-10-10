@@ -73,7 +73,23 @@ class report_c(object):
         """
         Add a driver to handle other report mechanisms
 
-        :param str origin:
+        A report driver is used by *tcf run*, the meta test runner, to
+        report information about the execution of testcases.
+
+        A driver implements the reporting in whichever way it decides
+        it needs to suit the application, uploading information to a
+        server, writing it to files, printing it to screen, etc.
+
+        >>> import tcfl.report
+        >>> class my_report_driver(tcfl.report.report_c)
+        >>> tcfl.report.report_c.driver_add(my_report_driver)
+
+        :param tcfl.report.report_c obj: object subclasss of
+          :class:tcfl.report.report_c that implements the reporting.
+
+        :param str origin: (optional) where is this being registered;
+          defaults to the caller of this function.
+
         """
         assert isinstance(obj, cls)
         if origin == None:
