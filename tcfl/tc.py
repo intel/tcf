@@ -2599,6 +2599,9 @@ class tc_c(object):
         self._kw_set("tmpdir", self.tmpdir)
         self._kw_set("tc_hash", self.ticket)
 
+        self.ts_start = time.time()
+        self.ts_end = None
+
         # Always before we start, run the site hook
         for hook in self.hook_pre:
             hook(self)
@@ -4970,6 +4973,18 @@ class tc_c(object):
                 if e.errno != errno.ENOENT:
                     raise
 
+    def finalize(self, result):
+        assert isinstance(result, result_c)
+        self.ts_end = time.time()
+        self.report_tweet(
+            "COMPLETION", result,
+            extra_report = self._extra_report(self.kws),
+            # Trick: won't see this, report driver will
+            level = 1000,
+            ignore_nothing = False
+        )
+        self._cleanup()
+
     def mkticket(self):
         # Note we use this msgid's string as tc_hash for subsitution,
         # it is a unique name based on target name and BSP model, test
@@ -5035,14 +5050,7 @@ class tc_c(object):
                         alevel = 1)
                     result = result_c(0, 0, 0, 1, 0)
                 finally:
-                    self.report_tweet(
-                        "COMPLETION", result,
-                        extra_report = self._extra_report(self.kws),
-                        # Trick: won't see this, report driver will
-                        level = 1000,
-                        ignore_nothing = False
-                    )
-                    self._cleanup()
+                    self.finalize(result)
         except Exception as e:
             # This msgid_c context is a hack so that this exception
             # report has a proper RUNID and HASH prefix
@@ -5536,14 +5544,8 @@ class tc_c(object):
                 with msgid_c(tc_fake.ticket, depth = 1, l = 4) as _msgid:
                     tc_fake._ident = msgid_c.ident()
                     retval = result_c.report_from_exception(tc_fake, e)
-                    tc_fake.report_tweet(
-                        "COMPLETION", retval,
-                        extra_report = tc_fake._extra_report(tc_fake.kws),
-                        # Trick: won't see this, report driver will
-                        level = 1000,
-                        ignore_nothing = False
-                    )
-                result += retval
+                    tc_fake.finalize(retval)
+                    result += retval
                 continue
 
             if not tc_instances:
@@ -6115,11 +6117,7 @@ def _run(args):
                result.blocked, result.skipped,
                (datetime.timedelta(0, time_end - time_start))),
             result)
-        tc_global.report_tweet(
-            "COMPLETION", result,
-            level = 1000,	# Trick: won't see this, report driver will
-            ignore_nothing = False
-        )
+        tc_global.finalize(result)
 
         if result.errors or result.failed:
             return 1
