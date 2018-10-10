@@ -75,20 +75,27 @@ class _install_scripts(distutils.command.install_scripts.install_scripts):
         if 'user' in install:
             # this means --user was given
             sysconfigdir = "~/.local/etc"
+            sharedir = "~/.local/share"
         elif 'prefix' in install:
             # this means --prefix was given
             prefix = install.get('prefix', (None, None))[1]
             sysconfigdir = os.path.join(prefix, "etc")
+            sharedir = os.path.join(prefix, "etc")
         else:
             sysconfigdir = "/etc"
+            sharedir = "/usr/share"
         distutils.command.install_scripts.install_scripts.run(self)
         for filename in self.outfiles:
             try:
                 subprocess.check_call(
                     [
                         'sed', '-i',
-                        's|install_time_etc_tcf = "/etc/tcf"' \
+                        '-e',
+                        's|install_time_etc_tcf = .*$' \
                         '|install_time_etc_tcf = "' + sysconfigdir + '/tcf"|g',
+                        '-e',
+                        's|install_time_share_tcf = .*$' \
+                        '|install_time_share_tcf = "' + sharedir + '/tcf"|g',
                         filename
                     ])
             except subprocess.CalledProcessError as e:
