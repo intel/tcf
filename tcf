@@ -71,9 +71,13 @@ if __name__ == "__main__":
         default = [ ],
         help = "Files to parse as configuration (this is used for testing, "
         "along with --config-path \"\"")
+    bindir = os.path.dirname(__file__)
     # This gets replaced during install time to $PREFIX/etc (~/.local,
-    # or /, or whatever
-    install_time_etc_tcf = "/etc/tcf"
+    # or /, or whatever -- see setupl.py -- yes, maybe we should use
+    # package resources, but this is simpler...for now.
+    # DO NOT MAKE THESE LINES MULTILINES!
+    install_time_etc_tcf = bindir + ":" + bindir + "/zephyr"
+    install_time_share_tcf = bindir
     arg_parser.add_argument(
         "--config-path",
         action = "append", dest = "config_path",
@@ -524,10 +528,11 @@ tcf-jobserver-run:
             ssl_ignore = _url[1]
         tcfl.config.urls.append((url, ssl_ignore,))
 
-    state_path = os.path.expanduser(args.state_path)
+    tcfl.config.state_path = os.path.expanduser(args.state_path)
+    tcfl.config.share_path = install_time_share_tcf
     tcfl.config.load(config_path = args.config_path,
                      config_files = args.config_files,
-                     state_path = state_path,
+                     state_path = tcfl.config.state_path,
                      ignore_ssl = args.ignore_ssl)
 
     if 'func' in args:
@@ -575,5 +580,5 @@ tcf-jobserver-run:
         logw("Don't know how to interpret retval %s (%s) as exit code"
              % (retval, type(retval)))
         retval = 1
-    ttb_client.rest_shutdown(state_path)
+    ttb_client.rest_shutdown(tcfl.config.state_path)
     sys.exit(retval)
