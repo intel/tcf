@@ -773,6 +773,9 @@ class file_c(report_c):
             file_name = template_entry['output_file_name'] % kws
             if not os.path.isabs(file_name):
                 file_name = os.path.join(self.log_dir, file_name)
+            # the template might specify a new directory path that
+            # still does not exist
+            commonl.makedirs_p(os.path.dirname(file_name))
             with codecs.open(file_name, "w", encoding = 'utf-8',
                              errors = 'ignore') as fo:
                 for text in template.generate(**kws):
