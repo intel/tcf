@@ -252,6 +252,15 @@ class skip_e(exception):
     """
     pass
 
+#: list of valid results and translations in present and past tense
+valid_results = dict(
+    PASS = ( 'pass', 'passed' ),
+    ERRR = ( 'error', 'errored' ),
+    FAIL = ( 'fail', 'failed' ),
+    BLCK = ( 'block', 'blocked' ),
+    SKIP = ( 'skip', 'skipped' ),
+)
+
 #
 # I dislike globals, but sometimes they are needed
 #
@@ -913,20 +922,20 @@ class target_c(object):
         r = False
         if result.failed > 0:
             tag = "FAIL"
-            msg = "failed"
+            msg = valid_results[tag][1]
         elif result.errors > 0:
             tag = "ERRR"
-            msg = "error"
+            msg = valid_results[tag][1]
         elif result.blocked > 0:
             tag = "BLCK"
-            msg = "blocked"
+            msg = valid_results[tag][1]
         elif result.passed > 0:
             tag = "PASS"
-            msg = "passed"
+            msg = valid_results[tag][1]
             r = True
         elif result.skipped > 0:
             tag = "SKIP"
-            msg = "skipped"
+            msg = valid_results[tag][1]
             r = True
         else:            # When here, nothing was run, all the counts are zero
             if ignore_nothing == True:
@@ -1768,23 +1777,23 @@ class result_c():
             force_result = tc.exception_to_result.get(type(e), None)
         if isinstance(e, pass_e) or force_result == pass_e:
             report_fn = reporter.report_pass
-            tag = 'pass'
+            tag = valid_results['PASS'][1]
             result = result_c(1, 0, 0, 0, 0)
         elif isinstance(e, error_e) or force_result == error_e:
             report_fn = reporter.report_error
-            tag = 'error'
+            tag = valid_results['ERRR'][1]
             result = result_c(0, 1, 0, 0, 0)
         elif isinstance(e, failed_e) or force_result == failed_e:
             report_fn = reporter.report_fail
-            tag = 'failed'
+            tag = valid_results['FAIL'][1]
             result = result_c(0, 0, 1, 0, 0)
         elif isinstance(e, blocked_e) or force_result == blocked_e:
             report_fn = reporter.report_blck
-            tag = 'blocked'
+            tag = valid_results['BLCK'][1]
             result = result_c(0, 0, 0, 1, 0)
         elif isinstance(e, skip_e) or force_result == skip_e:
             report_fn = reporter.report_skip
-            tag = 'skipped'
+            tag = valid_results['SKIP'][1]
             result = result_c(0, 0, 0, 0, 1)
         else:
             report_fn = reporter.report_blck
@@ -2435,15 +2444,6 @@ class tc_c(object):
     # Public testcase interface
     #
 
-    #:
-    valid_results = dict(
-        PASS = ( 'pass', 'passed' ),
-        ERRR = ( 'error', 'errored' ),
-        FAIL = ( 'fail', 'failed' ),
-        BLCK = ( 'block', 'blocked' ),
-        SKIP = ( 'skip', 'skipped' ),
-    )
-
     #: List of places where we declared this testcase is build only
     build_only = []
 
@@ -2727,24 +2727,24 @@ class tc_c(object):
         r = False
         if result.failed > 0:
             tag = "FAIL"
-            msg = "failed"
+            msg = valid_results[tag][1]
             level += dlevel_failed
         elif result.errors > 0:
             tag = "ERRR"
-            msg = "error"
+            msg = valid_results[tag][1]
             level += dlevel_error
         elif result.blocked > 0:
             tag = "BLCK"
-            msg = "blocked"
+            msg = valid_results[tag][1]
             level += dlevel_blocked
         elif result.passed > 0:
             tag = "PASS"
-            msg = "passed"
+            msg = valid_results[tag][1]
             r = True
             level += dlevel_passed
         elif result.skipped > 0:
             tag = "SKIP"
-            msg = "skipped"
+            msg = valid_results[tag][1]
             level += dlevel_skipped
             r = True
         else:            # When here, nothing was run, all the counts are zero

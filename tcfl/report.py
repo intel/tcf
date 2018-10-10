@@ -967,7 +967,7 @@ Execution log
 
         kws = commonl.dict_missing_c(_tc.kws)
         kws['msg_tag'] = msg_tag
-        kws['result'] = _tc.valid_results.get(
+        kws['result'] = tcfl.tc.valid_results.get(
             msg_tag, ( None, "BUG-RESULT-%s" % msg_tag))[1]
         kws['message'] = message
         tfids = []
