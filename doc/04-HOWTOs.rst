@@ -1046,6 +1046,128 @@ target cares, is still connected, even if the *console-write* command
 returned for you. :ref:`Sending a Ctrl-C <linux_c_c>` is not as in a
 usual Linux console.
 
+.. _finding_testcase_metadata:
+
+Finding testcase's keywords / metadata available for templating
+---------------------------------------------------------------
+
+Use the `test_dump_kws.py` script::
+
+  $ tcf run /usr/share/tcf/examples/test_dump_kws.py
+  INFO0/h3ydB	/usr/share/tcf/examples/test_dump_kws.py#_print_kws @localic-localtg: Keywords for testcase:
+  {'runid': '',
+   'srcdir': '../../../../../usr/share/tcf/examples',
+   'srcdir_abs': '/usr/share/tcf/examples',
+   'target_group_info': 'localic-localtg',
+   'target_group_name': 'localic-localtg',
+   'target_group_servers': '',
+   'target_group_targets': '',
+   'target_group_types': 'static',
+   'tc_hash': 'h3yd',
+   'tc_name': '/usr/share/tcf/examples/test_dump_kws.py#_print_kws',
+   'tc_name_short': '/usr/share/tcf/examples/test_dump_kws.py#_print_kws',
+   'tc_origin': '/usr/share/tcf/examples/test_dump_kws.py:12',
+   'thisfile': '/usr/share/tcf/examples/test_dump_kws.py',
+   'tmpdir': '/tmp/tcf.run-xRPr_j/h3yd',
+   'type': 'static'}
+  PASS0/	toplevel @local: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:00:00.318177) - passed
+
+These fields can be used in multiple places of TCF configuration
+Python templates with fields such as `%(tc_name)s`.
+
+If there was a target, the keywords extend to::
+
+
+  $ tcf run -y /usr/share/tcf/examples/test_dump_kws_one_target.py
+  INFO0/crfvByd1h	/usr/share/tcf/examples/test_dump_kws_one_target.py#_print_kws @localhost/qz37a-riscv32: Keywords for testcase:
+  ... < abbreviated, similar to above > ...
+  INFO0/crfvByd1h	/usr/share/tcf/examples/test_dump_kws_one_target.py#_print_kws @localhost/qz37a-riscv32: Keywords for target 0:
+  {u'board': u'qemu_riscv32',
+   'bsp': u'riscv32',
+   u'bsp_models': {u'riscv32': [u'riscv32']},
+   u'bsps': {u'riscv32': {u'board': u'qemu_riscv32',
+                          u'console': u'riscv32',
+                          u'kernelname': u'zephyr.elf',
+                          u'quark_se_stub': False,
+                          u'zephyr_board': u'qemu_riscv32',
+                          u'zephyr_kernelname': u'zephyr.elf'}},
+   u'console': u'riscv32',
+   u'consoles': [],
+   u'disabled': False,
+   'fullid': u'localhost/qz37a-riscv32',
+   u'id': u'qz37a-riscv32',
+   u'interconnects': {u'nwa': {u'ic_index': 37,
+                               u'ipv4_addr': u'192.168.97.37',
+                               u'ipv4_prefix_len': 24,
+                               u'ipv6_addr': u'fc00::61:25',
+                               u'ipv6_prefix_len': 112,
+                               u'mac_addr': u'02:61:00:00:00:25'}},
+   u'interfaces': [u'tt_power_control_mixin',
+                   u'test_target_images_mixin',
+                   u'test_target_console_mixin',
+                   u'tt_debug_mixin'],
+   u'interfaces_names': u'tt_power_control_mixin test_target_images_mixin test_target_console_mixin tt_debug_mixin',
+   u'kernelname': u'zephyr.elf',
+   u'localhost/qz37a-riscv32': True,
+   u'owner': '',
+   u'path': u'/var/run/ttbd-production/qz37a-riscv32',
+   u'powered': False,
+   u'quark_se_stub': False,
+   u'qz37a-riscv32': True,
+   'rtb': <tcfl.ttb_client.rest_target_broker object at 0x7f61687dc490>,
+   'runid': '',
+   'srcdir': '../../../../../usr/share/tcf/examples',
+   'srcdir_abs': '/usr/share/tcf/examples',
+   'target': u'localhostqz37a-riscv32',
+   'target_group_info': u'target=localhost/qz37a-riscv32:riscv32',
+   'target_group_name': 'pupv',
+   'target_group_servers': 'localhost',
+   'target_group_targets': u'localhost/qz37a-riscv32:riscv32',
+   'target_group_types': u'qemu-zephyr-riscv32',
+   'tc_hash': 'crfv',
+   'tc_name': '/usr/share/tcf/examples/test_dump_kws_one_target.py#_print_kws',
+   'tc_name_short': '/usr/share/tcf/examples/test_dump_kws_one_target.py#_print_kws',
+   'tc_origin': '/usr/share/tcf/examples/test_dump_kws_one_target.py:13',
+   'tg_hash': 'z5ao',
+   u'things': [],
+   'thisfile': '/usr/share/tcf/examples/test_dump_kws_one_target.py',
+   'tmpdir': '/tmp/tcf.run-JowSyh/crfv',
+   'type': u'qemu-zephyr-riscv32',
+   'url': u'https://localhost:5000/ttb-v1/targets/qz37a-riscv32',
+   u'zephyr_board': u'qemu_riscv32',
+   u'zephyr_kernelname': u'zephyr.elf'}
+  PASS0/	toplevel @local: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:00:00.314833) - passed
+
+note how the keywords for the first target are a superset of those for
+the testcase and will be only available when on target context.
+
+.. _report_domain_breakup:
+
+Splitting report files by domain
+--------------------------------
+
+You could want to break your testcases by a domain, mapping to any
+categories and you can want the report files to be stored in specific
+subdirectories.
+
+You can define a hook that calculates that domain and generates
+metadata for it, so the templating engine can use it
+
+>>> ...
+>>> tcfl.tc.tc_c.hook_pre.append(_my_hook_fn)
+>>> filename = tcfl.report.templates["text"]["output_file_name"]
+>>> tcfl.report.templates["text"]["output_file_name"] = \
+>>>     "%(category)s/" + file_name
+
+The `_my_hook_fn()` would look as:
+
+>>> def _my_hook_fn(testcase):
+>>>     # define some calculations that generates category
+>>>     testcase.tag_set("category", categoryvalue)
+
+If the data needed is not available until after the testcase executes,
+you can use :ref:`reporting hooks <tcfl.report.file_c.hooks>`.
+
 .. _manual_install:
 
 Manual installation of TCF from source
@@ -1115,7 +1237,7 @@ Obtain the code
 
 .. _tcf_install_manual:
 
-**Install the TCF client**::
+**Install the TCF client**
 
 Follow the steps on the :ref:`quickstart <install_tcf_client>` to
 install the client from source.

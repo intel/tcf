@@ -1,0 +1,78 @@
+{#- Macro for formatting a testcase output in different sections -#}
+{%- macro format_log() -%}
+{% for ident, tgname, message in log -%}
+{{ "%-10s %-25s %s" | format(ident, tgname, message) }}
+{% endfor %}
+{%- endmacro -%}
+<testsuites tests = "1"
+            errors = "{{ count_errored + count_blocked }}"
+            failures = "{{ count_failed }}"
+            time = "{{ ts_end_h }}">
+<testsuite name = "{{ junit_testsuite_name | default('n/a') }}"
+           package = "{{ junit_testsuite_package | default('n/a') }}"
+           tests = "1"
+           errors = "{{ count_errored + count_blocked }}"
+           failures = "{{ count_failed }}"
+           skipped = "{{ count_skipped }}"
+           time = "{{ duration_s }}"
+           timestamp = "{{ ts_end_h }}">
+<testcase classname = "{{ target_group_types }}:{{ tc_name_short }}"
+          name = "{{ tc_name}}"
+          time = "{{ duration_s }}">
+{# figure out which junit tag we need to use #}
+{%- if result == 'pass' %}
+{{ format_log() }}
+{%- elif result == "fail" -%}
+<error message = "Failure" type = "errored">
+{{ format_log() }}
+</error>
+{%- elif result == 'error' -%}
+<error message = "Errored" type = "errored">
+{{ format_log() }}
+</error>
+{%- elif result == 'block' -%}
+<error message = "Infrastructure error" type = "blockage">
+{{ format_log() }}
+</error>
+{%- elif result == 'skip'  -%}
+<skipped message = "Skipped" type = "skipped">
+{{ format_log() }}
+</skipped>
+{%- else -%}
+<error message = "BUG: unknown" type = "bug">
+{{ format_log() }}
+</error>
+{%- endif %}
+<system-out>
+{%- block TARGET_INFORMATION %}
+{%- if targets %}
+Target Name         Remote ID                     Type
+------------------- ----------------------------- -------------------------
+{% for target_info in targets -%}
+{{ "%-19s %-29s %-25s"
+   | format(target_info.want_name, target_info.fullid,
+            target_info.type) }}
+{% endfor -%}
+{% else %}
+(this testcase used no remote targets and ran locally)
+{% endif %}
+{% endblock -%}
+
+{# This is left empty to other templates to expand as needed #}
+{%- block HEADER_PREFIX -%}
+{%- endblock -%}
+
+{% block TAG_INFO -%}
+Testcase Tag        Value + Origin
+------------------- -------------------------------------------------------
+{% for tag in tags -%}
+{{ "%-19s %s" | format(tag, tags[tag]['value']) }}
+{{ "                    @" + tags[tag]['origin'] }}
+{% endfor %}
+{%- endblock %}
+
+TCF information at http://intel.github.com/tcf/02-QUICKSTART.html
+</system-out>
+</testcase>
+</testsuite>
+</testsuites>

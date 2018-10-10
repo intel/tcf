@@ -24,6 +24,14 @@ logger = logging.getLogger("tcfl.config")
 path = []
 #: Path where shared files are stored
 share_path = None
+#: List of URLs to servers we are working with
+#:
+#: each entry is a tuple of:
+#:
+#: - URL (str): the location of the server
+#: - SSL verification (bool): if we are obeying SSL certificate verification
+#: - aka (str): short name for the server
+#: - ca_path (str): path to certificates
 urls = []
 
 # FIXME: need to figure out a way to tag this as configuration language

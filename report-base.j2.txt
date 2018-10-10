@@ -1,0 +1,120 @@
+{#
+This is a Jinja2 template which can be extended to suit your reporting
+needs
+
+report.j2.txt expands this; you can define a report.j2.txt this in
+.tcf:~/.tcf:/etc/tcf to override it. You can also override this file
+in any of those locations.
+
+See FIXME: location
+
+TIPS:
+
+- Note {%- and -%}, they are used to avoid adding vertcal whitespace;
+  see http://jinja.pocoo.org/docs/2.10/templates/#whitespace-control
+  Adding - basically eats out the emtpy vertical whitespace.
+
+-#}
+
+{%- block TITTLE -%}
+TCF: {{ tc_name_short }} @ {{ target_group_info }} **{{ result_past }}**
+{% endblock -%}
+
+{%- block TARGET_INFORMATION %}
+{%- if targets %}
+Target Name         Remote ID                     Type
+------------------- ----------------------------- -------------------------
+{% for target_info in targets -%}
+{{ "%-19s %-29s %-25s"
+   | format(target_info.want_name, target_info.fullid,
+            target_info.type) }}
+{% endfor -%}
+{% else %}
+(this testcase used no remote targets and ran locally)
+{% endif %}
+{% endblock -%}
+
+{# This is left empty to other templates to expand as needed #}
+{%- block HEADER_PREFIX -%}
+{%- endblock -%}
+
+Execution log
+=============
+
+- console output in lines tagged 'console output'
+- the target might have produced none; GDB might be needed at this point
+- information for all testcase build, deployment and execution phases
+  is included; filter by the first column
+
+{% for ident, tgname, message in log -%}
+{{ "%-10s %-25s %s" | format(ident, tgname, message) }}
+{% endfor %}
+
+{% block REPRODUCTION_STEPS -%}
+Reproduce it [*]:
+
+  tcf run -vvv{{ t_option }} -s 'name:".*{{ tc_name }}$"' {{ thisfile }}
+
+{% if targets -%}
+Find more information about targets:
+
+  tcf list -vv TARGETNAME1 TARGETNAME2 ...
+
+Acquire them for exclusive use:
+
+  tcf acquire TARGETNAME1 TARGETNAME2 ...
+
+(note the daemon will relinquish them after 5min of inactivity)
+
+Start debugging with
+
+  tcf debug-start TARGETNAME
+  tcf debug-info TARGETNAME
+
+Power on
+
+  tcf power-on TARGETNAME1 TARGETNAME2 ...
+
+Reset with
+
+  tcf reset TARGETNAME1 TARGETNAME2 ...
+
+Read the console with
+
+  tcf console-read -a TARGETNAME
+
+Release when done
+
+  tcf release TARGETNAME1 TARGETNAME2 ...
+{% endif -%}
+{% endblock -%}
+
+{%- if targets %}
+{%- block TCF_CONFIGURATION %}
+[*] Make sure your TCF configuration in ~/.tcf is set to access the servers
+    used in this run:
+
+{% for server_url, ssl_ignore, server_aka, ca_path in tcfl_config_urls -%}
+     tcfl.config.url_add("{{ server_url }}", ssl_ignore = {{ ssl_ignore }}{{ ', aka = \"' + server_aka + '\"' if server_aka }}{{ ', ca_path = \"' + ca_path + '\"' if ca_path }})
+{% endfor %}
+{%- endblock %}
+{%- endif %}
+
+{% block TAG_INFO -%}
+Testcase Tag        Value + Origin
+------------------- -------------------------------------------------------
+{% for tag in tags -%}
+{{ "%-19s %s" | format(tag, tags[tag]['value']) }}
+{{ "                    @" + tags[tag]['origin'] }}
+{% endfor %}
+{%- endblock %}
+
+How do I install TCF?
+=====================
+Go to http://intel.github.com/tcf/02-QUICKSTART.html
+
+(You can configure this text by modifying the Jinja2 template
+FIXME
+tcfl.report.text_template in any of TCF's conf_*.py configuration
+files)
+
