@@ -1,7 +1,9 @@
-{#- Macro for formatting a testcase output in different sections -#}
+{#- Macro for formatting a testcase output in different sections
+    Note we escape (|e) for safe XML
+-#}
 {%- macro format_log() -%}
 {% for ident, tgname, message in log -%}
-{{ "%-10s %-25s %s" | format(ident, tgname, message) }}
+{{ "%-10s %-25s %s" | format(ident, tgname, message) | e }}
 {% endfor %}
 {%- endmacro -%}
 <testsuites tests = "1"
@@ -21,28 +23,39 @@
           time = "{{ duration_s }}">
 {# figure out which junit tag we need to use #}
 {%- if result == 'pass' %}
+{%- block LOG_PASS %}
 {{ format_log() }}
+{% endblock -%}
 {%- elif result == "fail" -%}
 <error message = "Failure" type = "errored">
+{%- block LOG_FAIL -%}
 {{ format_log() }}
+{%- endblock -%}
 </error>
 {%- elif result == 'error' -%}
 <error message = "Errored" type = "errored">
+{%- block LOG_ERRR -%}
 {{ format_log() }}
+{%- endblock -%}
 </error>
 {%- elif result == 'block' -%}
 <error message = "Infrastructure error" type = "blockage">
+{%- block LOG_BLCK -%}
 {{ format_log() }}
+{%- endblock -%}
 </error>
 {%- elif result == 'skip'  -%}
 <skipped message = "Skipped" type = "skipped">
+{%- block LOG_SKIP -%}
 {{ format_log() }}
+{%- endblock -%}
 </skipped>
 {%- else -%}
 <error message = "BUG: unknown" type = "bug">
 {{ format_log() }}
 </error>
 {%- endif %}
+{%- block SYSTEM_OUT %}  
 <system-out>
 {%- block TARGET_INFORMATION %}
 {%- if targets %}
@@ -73,6 +86,7 @@ Testcase Tag        Value + Origin
 
 TCF information at http://intel.github.com/tcf/02-QUICKSTART.html
 </system-out>
+{% endblock -%}  
 </testcase>
 </testsuite>
 </testsuites>
