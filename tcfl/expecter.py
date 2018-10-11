@@ -492,5 +492,5 @@ def console_rx_eval(expecter, target,
             else:
                 of.seek(offset)	# so we report console from where searched
                 raise tc.blocked_e(
-                    "BUG: invalid result requested (%s)", result)
+                    "BUG: invalid result requested (%s)" % result)
     return None
