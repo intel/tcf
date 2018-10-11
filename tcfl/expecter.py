@@ -356,6 +356,12 @@ def console_rx_poller(expecter, target, console = None):
     return None
 
 def console_rx_flush(expecter, target, console = None, truncate = False):
+    """
+    Reset all the console read markers to 0
+
+    When we (for example) power cycle, we start capturing from zero,
+    so we need to reset all the buffers of what we read.
+    """
     console_rx_poller(expecter, target, console)
     _, console_code = console_mk_code(target, console)
     of = expecter.buffers.get(console_code, None)
@@ -363,9 +369,11 @@ def console_rx_flush(expecter, target, console = None, truncate = False):
         return
     if truncate:
         of.truncate(0)
-    ofd = of.fileno()
+        new_offset = 0
+    else:
+        ofd = of.fileno()
+        new_offset = os.fstat(ofd).st_size
     offset_code = "offset_" + console_code
-    new_offset = os.fstat(ofd).st_size
     expecter.buffers_persistent[offset_code] = new_offset
 
 def console_rx_eval(expecter, target,
