@@ -1162,6 +1162,21 @@ class target_c(object):
                 f.seek(offset)
             return f.read()
 
+    def console_rx_size(self, console = None):
+        """
+        Return how many bytes have returned for a console
+
+        :param str console: (optional) name of console on which the
+           the data was received (otherwie use the default one).
+        """
+        _, console_code = expecter.console_mk_code(self, console)
+        of = self.testcase.expecter.buffers.get(console_code, None)
+        if of == None:
+            return 0
+        with open(of.name) as f:
+            stat_info = os.fstat(of.fileno())
+            return stat_info.st_size
+
     def on_console_rx(self, regex_or_str, timeout = None, console = None,
                       result = "pass"):
         """Set up an action to perform (pass, fail, block or skip)
