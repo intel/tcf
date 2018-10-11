@@ -11,8 +11,6 @@ import re
 import tc
 from . import msgid_c
 
-# FIXME: make this global for all to use?
-_linux_shell_prompt_regex = re.compile(r"[0-9]+ \$")
 
 class shell(tc.target_extension_c):
     """
@@ -27,11 +25,10 @@ class shell(tc.target_extension_c):
 
     Waits for the shell to be up and ready; sets it up so that if an
     error happens, it will print an error message and raise a block
-    exception.
+    exception. Note you can change what is expected as a :ref:`shell
+    prompt <linux_shell_prompt_regex>`.
 
     >>> target.shell.run("some command")
-
-
 
     Remove remote files (if the target supports it) with:
 
@@ -51,20 +48,58 @@ class shell(tc.target_extension_c):
             raise self.unneeded
         tc.target_extension_c.__init__(self, target)
 
-    def up(self):
+    #: What do we look for into a shel prompt
+    #:
+    #: This is a Python regex that can be set to recognize what the
+    #: shell prompt looks like. Multiple catchas here:
+    #:
+    #:  - use a fixed string or compile the regex
+    #:
+    #:  - if using ^ and/or $, even with re.MULTILINE, things tend not
+    #:    to work so well because of \r\n line conventions vs \n
+    #:
+    #: Examples:
+    #:
+    #: >>> target.shell.linux_shell_prompt_regex = re.compile(r'root@.*# ')
+
+    linux_shell_prompt_regex = re.compile(r"[0-9]+ \$")
+
+    def up(self, tempt = None):
         """
         Giving it ample time to boot, wait for a shell prompt and set
         up the shell so that if an error happens, it will print an error
         message and raise a block exception.
         """
+        # This is a Linux machine, we use \r only, not \r\n
+        self.target.crlf = "\r"
         self.target.testcase.expecter.timeout = 120
-        self.target.expect(_linux_shell_prompt_regex)
+        if tempt:
+            assert isinstance(tempt, basestring)
+            tries = 0
+            while tries < self.target.testcase.expecter.timeout:
+                try:
+                    self.target.send(tempt)
+                    self.target.expect(self.linux_shell_prompt_regex,
+                                       timeout = 1)
+                    break
+                except tc.error_e as _e:
+                    if tries == self.target.testcase.expecter.timeout:
+                        raise tc.error_e(
+                            "Waited too long (%ds) for shell to come up "
+                            "(did not receive '%s')" %
+                            (self.target.testcase.expecter.timeout,
+                             self.linux_shell_prompt_regex.pattern))
+                    continue
+        else:
+            self.target.expect(self.linux_shell_prompt_regex)
 
         # Trap the shell to complain loud if a command fails, and catch it
-        self.target.send("trap 'echo ERROR-IN-SHELL' ERR")
+        self.target.send("true")
+        # See that '' in the middle, is so the catcher later doesn't
+        # get tripped by the command we sent to set it up
+        self.target.send("trap 'echo ERROR''-IN-SHELL' ERR")
         # Flush a couple of commands so the next sequence of
         # on_console_rx does not trip on our trap definition.
-        self.target.send("true")
         self.target.send("true")
         self.target.on_console_rx("ERROR-IN-SHELL", result = 'errr',
                                   timeout = False)
@@ -123,7 +158,7 @@ class shell(tc.target_extension_c):
             else:
                 self.target.expect(expect)
         if prompt_regex == None:
-            self.target.expect(_linux_shell_prompt_regex)
+            self.target.expect(self.linux_shell_prompt_regex)
         else:
             self.target.expect(prompt_regex)
 
