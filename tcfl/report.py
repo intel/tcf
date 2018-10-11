@@ -318,8 +318,8 @@ class file_c(report_c):
     error/failure/blockage. To enable it for passed or skipped test
     cases:
 
-    >> tcfl.report.file_c.templates['junit'].report_pass = False
-    >> tcfl.report.file_c.templates['junit'].report_skip = False
+    >>> tcfl.report.file_c.templates['junit']['report_pass'] = False
+    >>> tcfl.report.file_c.templates['junit']['report_skip'] = False
 
     The junit template (disabled by default) will generate
     ``junit-[RUNID:]ID.xml`` files with information from all the
@@ -328,11 +328,11 @@ class file_c(report_c):
     To enable it for all conditions (or disable any replacing *True*
     with *False*):
 
-    >> tcfl.report.file_c.templates['junit'].report_pass = True
-    >> tcfl.report.file_c.templates['junit'].report_skip = True
-    >> tcfl.report.file_c.templates['junit'].report_error = True
-    >> tcfl.report.file_c.templates['junit'].report_fail = True
-    >> tcfl.report.file_c.templates['junit'].report_block = True
+    >>> tcfl.report.file_c.templates['junit']['report_pass'] = True
+    >>> tcfl.report.file_c.templates['junit']['report_skip'] = True
+    >>> tcfl.report.file_c.templates['junit']['report_error'] = True
+    >>> tcfl.report.file_c.templates['junit']['report_fail'] = True
+    >>> tcfl.report.file_c.templates['junit']['report_block'] = True
 
     See :data:`templates` for more information.
 
@@ -406,8 +406,12 @@ class file_c(report_c):
     #: - *{{ message }}*: message that came with the top level report
     #:   (``COMPLETION passed|failed|error|failed|skip|block``)
     #:
-    #: - *{{ tcfl_config_urls }}* which maps to
-    #:   :data:`tcfl.config.urls`
+    #: - any variable defined in the the ``tcfl.config`` space is
+    #:   mapped to ``tcfl_config_``; for example *{{
+    #:   tcfl_config_urls }}* which maps to :data:`tcfl.config.urls`
+    #:
+    #:   Only variables of the following types are exported: integers,
+    #:   strings, lists, dictionaries and tuples.
     #:
     #: - *{{ t_option }}* a value that indicates what has to be given to
     #:   *tcf* to select the targets where the testcase was run.
@@ -693,15 +697,22 @@ class file_c(report_c):
         else:
             kws['t_option'] = ""
 
-        # Once the rest of the keys are available, generate the
-        # user-provided ones
-
-        # Seriously, I can't get right the Unicode and Python misterious ways
-        # without getting thrown exceptions in the middle, so open the output
-        # file normally and we just forcibly write unicode/utf-8 to it in
-        # _fwrite(). As well, re-open the input file in utf-8 mode to
-        # avoid doing manual conversion.
-        kws['tcfl_config_urls'] = tcfl.config.urls
+        # tcfl.config.VARNAME -> tcfl_config_VARNAME
+        # this makes it easy to publish configuration items into the
+        # tcfl.config space that then can be used in templates. It's a
+        # hack, but makes configuration later on way easier
+        tcfl_config = sys.modules['tcfl.config']
+        for symbol in dir(tcfl_config):
+            value = getattr(tcfl_config, symbol)
+            if symbol.startswith("__"):
+                continue
+            elif callable(value):
+                continue
+            elif any([ isinstance(value, i)
+                       for i in (list, dict, tuple, basestring, int)]):
+                kws['tcfl_config_%s' % symbol] = value
+            else:
+                pass
 
         kws['targets'] = []
         for target_want_name, target in _tc.targets.iteritems():
