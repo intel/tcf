@@ -4971,6 +4971,7 @@ class tc_c(object):
                 retval = self._methods_call("clean")
             self.report_tweet("clean", retval,
                               extra_report = self._extra_report(self.kws),
+                              ignore_nothing = True,
                               dlevel_passed = 1)
             # cleanup success does not count, only if it fails
             # or blocks, so it is noticed and can be addressed
