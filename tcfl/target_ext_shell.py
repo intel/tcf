@@ -94,13 +94,9 @@ class shell(tc.target_extension_c):
             self.target.expect(self.linux_shell_prompt_regex)
 
         # Trap the shell to complain loud if a command fails, and catch it
-        self.target.send("true")
         # See that '' in the middle, is so the catcher later doesn't
         # get tripped by the command we sent to set it up
-        self.target.send("trap 'echo ERROR''-IN-SHELL' ERR")
-        # Flush a couple of commands so the next sequence of
-        # on_console_rx does not trip on our trap definition.
-        self.target.send("true")
+        self.run("trap 'echo ERROR''-IN-SHELL' ERR")
         self.target.on_console_rx("ERROR-IN-SHELL", result = 'errr',
                                   timeout = False)
 
