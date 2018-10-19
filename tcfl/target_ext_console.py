@@ -63,6 +63,15 @@ class console(tc.target_extension_c):
                                    offset, l))
         return ret
 
+    def size(self, console_id = None):
+        """
+        Return the amount of bytes so far read from the console
+
+        :param str console_id: (optional) console to read from
+        """
+        return int(self.target.rtb.rest_tb_target_console_size(
+            self.target.rt, console_id, ticket = self.target.ticket))
+
     def write(self, data, console_id = None):
         """
         Write data received to a console

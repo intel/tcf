@@ -503,6 +503,19 @@ class tt_qemu(
         else:
             return iter(())
 
+    def console_do_size(self, console_id = None):
+        if console_id != None and not console_id in self.bsps:
+            raise RuntimeError("console ID '%s' not found" % console_id)
+        if console_id == None:
+            console_id = self.bsps[0]
+        # Reading is simple -- QEMU is designed to leave a logfile
+        # with anything that comes from each console, named
+        # BSP-console.read. We just read that, because our console IDs
+        # are just the BSP names.
+        consolefname = os.path.join(self.state_dir,
+                                    "%s-console.read" % console_id)
+        return os.stat(consolefname).st_size
+
     def console_do_write(self, data, console_id = None):
         if console_id != None and not console_id in self.bsps:
             raise ValueError

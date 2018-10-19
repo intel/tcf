@@ -566,6 +566,16 @@ class rest_target_broker(object):
         return self.send_request("GET", url, data = data,
                                  stream = False, raw = True)
 
+    def rest_tb_target_console_size(self, rt, console, ticket = ''):
+        r = self.send_request(
+            'GET', "targets/%s/console_size" % rt['id'],
+            data = {
+                'console': console,
+                'ticket': ticket
+            }
+        )
+        return r['byte_count']
+
     def rest_tb_target_console_read_to_fd(self, fd, rt, console, offset,
                                           max_size = 0, ticket = ''):
         url = "targets/%s/console/" % rt['id']

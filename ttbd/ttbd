@@ -811,6 +811,29 @@ def _target_console_read(target_id, console = None):
     return flask.Response(g, direct_passthrough = True)
 
 
+@app.route(API_PREFIX + 'targets/<string:target_id>/console_size',
+           methods = ['GET'])
+@flask_login.login_required
+def _target_console_size(target_id, console = None):
+    with ttbl.config.targets_lock:
+        target = ttbl.config.targets[target_id]
+    ticket = flask.request.form.get('ticket', "")
+    if not isinstance(target, ttbl.test_target_console_mixin):
+        return flask.abort(400, "%s: target does not implement the "
+                           "console interface" % target_id)
+    console = flask.request.form.get('console', None)
+    try:
+        byte_count = target.console_size(who_make(ticket), console)
+        if who_make(ticket) == target.owner_get():
+            # when this is the owner, this marks the target as active
+            target.timestamp()
+    except ttbl.test_target_e as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    except Exception as e:
+        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
+    return flask.jsonify(dict(byte_count = byte_count))
+
+
 @app.route(API_PREFIX + 'targets/<string:target_id>/console/',
            methods = ['POST'])
 @flask_login.login_required

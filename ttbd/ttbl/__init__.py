@@ -1300,6 +1300,9 @@ class test_target_console_mixin(object):
         """
         raise NotImplementedError
 
+    def console_do_size(self, console_id = None):
+        raise NotImplementedError
+
     def console_do_write(self, data, console_id = None):
         """
         :param data: byte string to write to the console
@@ -1330,6 +1333,15 @@ class test_target_console_mixin(object):
         console. FIXME: makes sense?
         """
         return self.console_do_read(console_id, offset)
+
+    def console_size(self, _who, console_id = None):
+        """
+        Return how many bytes have been read from the console so far
+
+        :param str console_id: (optional) name of the console
+        :returns: number of bytes read
+        """
+        return self.console_do_size(console_id)
 
     def console_write(self, who, data, console_id = None):
         """
