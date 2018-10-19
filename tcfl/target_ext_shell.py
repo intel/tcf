@@ -91,6 +91,10 @@ class shell(tc.target_extension_c):
         else:
             self.target.expect(self.linux_shell_prompt_regex)
 
+        # disable line editing for proper recording of command line
+        # when running bash; otherwise the scrolling readline does
+        # messes up the output
+        self.run('test ! -z "$BASH" && set +o vi +o emacs')
         # Trap the shell to complain loud if a command fails, and catch it
         # See that '' in the middle, is so the catcher later doesn't
         # get tripped by the command we sent to set it up
@@ -101,9 +105,10 @@ class shell(tc.target_extension_c):
         # Now commands should timeout fast
         self.target.testcase.expecter.timeout = 30
 
-    def run(self, cmd = None, expect = None, prompt_regex = None):
-        """
-        Runs *some command* as a shell command and wait for the shell
+
+    def run(self, cmd = None, expect = None, prompt_regex = None,
+            output = False, output_filter_crlf = True):
+        """Runs *some command* as a shell command and wait for the shell
         prompt to show up.
 
         If it fails, it will raise an exception. If you want to get
@@ -122,6 +127,13 @@ class shell(tc.target_extension_c):
         >>> that I want
         >>> EOF\"\"\")
 
+        or collecting the output:
+
+        >>> target.shell.run("ls -1 /etc/", output = True)
+        >>> for file in output.split("\r\n"):
+        >>>     target.report_info("file %s" % file)
+        >>>     target.shell.run("md5sum %s" % file)
+
         :param str cmd: (optional) command to run; if none, only the
           expectations are waited for (if *expect* is not set, then
           only the prompt is expected).
@@ -131,6 +143,25 @@ class shell(tc.target_extension_c):
         :param prompt_regex: (optional) output to expect (string or
           regex) as a shell prompt, which is always to be found at the
           end. Defaults to the preconfigured shell prompt (NUMBER $).
+        :param bool output: (optional, default False) return the
+          output of the command to the console; note the output
+          includes the execution of the command itself.
+        :param bool output_filter_crlf: (optional, default True) if we
+          are returning output, filter out \r\n to whatever our CRLF
+          convention is.
+        :returns str: if ``output`` is true, a string with the output
+          of the command.
+
+          .. warning:: if ``output_filter_crlf`` is False, this output
+             will be \r\n terminated and it will be confusing because
+             regex won't work right away. A quick, dirty, fix
+
+             >>> output = output.replace("\r\n", "\n")
+
+             ``output_filter_crlf`` enabled replaces this output with
+
+             >>> output = output.replace("\r\n", target.crlf)
+
         """
         if cmd:
             assert isinstance(cmd, basestring)
@@ -141,6 +172,10 @@ class shell(tc.target_extension_c):
         assert prompt_regex == None \
             or isinstance(prompt_regex, basestring) \
             or isinstance(prompt_regex, re._pattern_type)
+
+        if output:
+            offset = self.target.console.size()
+
         if cmd:
             self.target.send(cmd)
         if expect:
@@ -155,6 +190,12 @@ class shell(tc.target_extension_c):
             self.target.expect(self.linux_shell_prompt_regex)
         else:
             self.target.expect(prompt_regex)
+        if output:
+            output = self.target.console.read(offset = offset)
+            if output_filter_crlf:
+                return output.replace("\r\n", self.target.crlf)
+            return output
+        return None
 
     def file_remove(self, remote_filename):
         """
