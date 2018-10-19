@@ -1322,14 +1322,19 @@ WARNING: This is a very limited interactive console
                 if not chars:
                     continue
                 for char in chars:
+                    # if the terminal sends a \r (user hit enter),
+                    # translate to crlf
+                    if char == "\r":
+                        chars = crlf
                     if char == '\x1b':
                         if one_escape:
                             raise _done_c()
                         one_escape = True
                     else:
                         one_escape = False
-                rtb.rest_tb_target_console_write(rt, console, chars,
-                                                 ticket = ticket)
+                rtb.rest_tb_target_console_write(
+                    rt, console, chars,
+                    ticket = ticket)
             except _done_c:
                 break
             except IOError as e:
@@ -1358,8 +1363,8 @@ def rest_target_console_write(args):
     else:
         for line in args.data:
             logger.warning("cmdline: read '%s'", line)
-            rtb.rest_tb_target_console_write(rt, args.console, line + '\r\n',
-                                             ticket = args.ticket)
+            rtb.rest_tb_target_console_write(
+                rt, args.console, line + args.crlf, ticket = args.ticket)
 
 def rest_target_debug_info(args):
     """

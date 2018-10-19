@@ -1091,7 +1091,7 @@ class target_c(object):
         # pylint gets confused
         self.console.write(data, console)	# pylint: disable = no-member
 
-    _crlf = '\r\n'
+    _crlf = '\n'
 
     @property
     def crlf(self):

@@ -70,8 +70,6 @@ class shell(tc.target_extension_c):
         up the shell so that if an error happens, it will print an error
         message and raise a block exception.
         """
-        # This is a Linux machine, we use \r only, not \r\n
-        self.target.crlf = "\r"
         self.target.testcase.expecter.timeout = 120
         if tempt:
             assert isinstance(tempt, basestring)

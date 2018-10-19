@@ -412,17 +412,17 @@ if __name__ == "__main__":
     ap.add_argument("--no-local-echo", "-E",
                     action = "store_false", default = True,
                     help = "Do not local echo (%(default)s)")
-    ap.add_argument("-r", dest = "crlf", default = "\r",
+    ap.add_argument("-r", dest = "crlf",
                     action = "store_const", const = "\r",
-                    help = "CRLF lines with \\r (default)")
+                    help = "CRLF lines with \\r")
     ap.add_argument("-n", dest = "crlf",
                     action = "store_const", const = "\n",
-                    help = "CRLF lines with \\n")
+                    help = "CRLF lines with \\n (default)")
     ap.add_argument("-R", dest = "crlf",
                     action = "store_const", const = "\r\n",
                     help = "CRLF lines with \\r\\n")
     ap.add_argument("-N", dest = "crlf",
-                    action = "store_const", const = "\r\n",
+                    action = "store_const", const = "",
                     help = "Don't add anything to CRLF lines")
     ap.add_argument("-f", "--filter-ansi",
                     action = "store_true", default = False,
@@ -435,7 +435,8 @@ if __name__ == "__main__":
                     action = "store", default = None, nargs = '*',
                     help = "Data to write; if none given, "
                     "read from stdin")
-    ap.set_defaults(func = ttb_client.rest_target_console_write)
+    ap.set_defaults(func = ttb_client.rest_target_console_write,
+                    crlf = "\n")
 
     ap = arg_subparsers.add_parser(
         "debug-start", help = "Start debugging bridge")
@@ -468,7 +469,6 @@ if __name__ == "__main__":
 
     global args
     args = arg_parser.parse_args()
-
     log_format = "%(levelname)s %(module)s.%(funcName)s():%(lineno)d: %(message)s"
     log_format = commonl.log_format_compose(log_format, False, False)
     logging.basicConfig(format = log_format, level = args.level)
