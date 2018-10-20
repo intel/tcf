@@ -60,6 +60,15 @@ class tunnel(tc.target_extension_c):
         If the tunnel already exists, it is not recreated, but the
         port it uses is returned.
 
+        Redirects targets TCP4 port 3000 to server_port in the server
+        that provides ``target`` (target.kws['server']).
+
+        >>> server_name = target.rtb.parsed_url.hostname
+        >>> server_port = target.tunnel.add(3000)
+
+        Now connecting to ``server_name:server_port`` takes you to the
+        target's port 3000.
+
         :param int port: port to redirect to
         :param str ip_addr: (optional) target's IP address to use (it
           must be listed on the targets's tags *ipv4_address* or
