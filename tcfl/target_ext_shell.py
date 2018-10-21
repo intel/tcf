@@ -64,12 +64,22 @@ class shell(tc.target_extension_c):
 
     linux_shell_prompt_regex = re.compile(r"[0-9]+ \$")
 
-    def up(self, tempt = None):
+    def up(self, tempt = None,
+           user = None, login_regex = re.compile('login:'),
+           password = None, password_regex = re.compile('Password:')):
         """
         Giving it ample time to boot, wait for a shell prompt and set
         up the shell so that if an error happens, it will print an error
         message and raise a block exception.
         """
+        def _login(target):
+            # If we have login info, login to get a shell prompt
+            target.expect(login_regex)
+            target.send(user)
+            if password:
+                target.expect(password_regex)
+                target.send(password)
+                    
         self.target.testcase.expecter.timeout = 120
         if tempt:
             assert isinstance(tempt, basestring)
@@ -77,6 +87,8 @@ class shell(tc.target_extension_c):
             while tries < self.target.testcase.expecter.timeout:
                 try:
                     self.target.send(tempt)
+                    if user:
+                        _login(self.target)
                     self.target.expect(self.linux_shell_prompt_regex,
                                        timeout = 1)
                     break
@@ -89,6 +101,8 @@ class shell(tc.target_extension_c):
                              self.linux_shell_prompt_regex.pattern))
                     continue
         else:
+            if user:
+                _login(self.target)
             self.target.expect(self.linux_shell_prompt_regex)
 
         # disable line editing for proper recording of command line
