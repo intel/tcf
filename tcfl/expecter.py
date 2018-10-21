@@ -132,6 +132,7 @@ class expecter_c(object):
         #: run(), we reinitialized it, but we also set it here for when
         #: we call the poller outside of run()
         self.ts0 = time.time()
+        self._consoles = set()
 
     @property
     def timeout(self):
@@ -282,6 +283,13 @@ class expecter_c(object):
                 _active_ts = ts
             time.sleep(self._poll_period)
 
+    def power_on_post(self, target = None):
+        """
+        Reinitialize things that need flushing for a new power on
+        """
+        for _target, _console in self._consoles:
+            if target == None or target == _target:
+                console_rx_flush(self, _target, _console, True)
 
 def console_mk_code(target, console):
     # This mimics console_rx_eval
@@ -348,6 +356,8 @@ def console_rx_poller(expecter, target, console = None):
                            dlevel = 3)
         # FIXME: do we want to print some debug of what we read? how
         # do we do it for huge files anyway?
+        expecter._consoles.add(( target, console ))
+
     except requests.exceptions.HTTPError as e:
         raise tc.blocked_e("error reading console %s: %s\n"
                            % (console_id_name, e),
