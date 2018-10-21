@@ -71,6 +71,8 @@ import sys
 import urlparse
 import glob
 
+#import prctl
+
 # Run the encoding on UTF-8; sometimes when started in background
 # Python gets confused about what is the default encoding.
 reload(sys)	# need this reload to get setdefaultencoding()
@@ -1325,6 +1327,21 @@ local_auth = []
 # documentation generator with no side effects.
 #
 if __name__ == "__main__":
+
+    # Drop the capabilities we don't really need but that we enabled
+    # in the Ambient set so our helpers can inherit them. I might be
+    # doing something wrong here, but I can't figure out how to
+    # specify in systemd an inheritable set different than the ambient
+    # set
+
+    # Actually can't drop this -- I am definitely doing something
+    # wrong and not sure what. If we drop this, then we can't read
+    # /proc/PID/exe, which we need in commonl.process_alive() to
+    # determine if the daemons have started properly -- instead it
+    # will fail where 'Usually this means it has died while we
+    # checked', which it shouldn't -- because we are running with the
+    # same user/gid. Puzzled.
+    #prctl.cap_effective.dac_read_search = False
 
     # Defaults
     # We want them here because we want these defaults to be overriden
