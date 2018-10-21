@@ -604,6 +604,13 @@ class test_target(object):
                 itr_ip_addr = ipaddress.ip_address(unicode(value))
                 if ip_addr == itr_ip_addr:
                     return
+        # if this is an interconnect, the IP addresses are at the top level
+        for key, value in self.tags.iteritems():
+            if not key.endswith("_addr"):
+                continue
+            itr_ip_addr = ipaddress.ip_address(unicode(value))
+            if ip_addr == itr_ip_addr:
+                return
         raise ValueError('Cannot setup IP tunnel to IP "%s" which is '
                          'not owned by this target' % ip_addr)
 
