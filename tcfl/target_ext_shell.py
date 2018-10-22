@@ -7,6 +7,7 @@
 # pylint: disable = missing-docstring
 
 import binascii
+import collections
 import re
 import tc
 from . import msgid_c
@@ -216,7 +217,16 @@ class shell(tc.target_extension_c):
         Remove a remote file (if the target supports it)
         """
         assert isinstance(remote_filename, basestring)
+        
         self.run("rm -f " + remote_filename)
+
+    def files_remove(self, *remote_filenames):
+        """
+        Remove a multiple remote files (if the target supports it)
+        """
+        assert isinstance(remote_filenames, collections.Iterable)
+        
+        self.run("rm -f " + " ".join(remote_filenames))
 
     def file_copy_to(self, local_filename, remote_filename):
         """\
@@ -240,6 +250,7 @@ class shell(tc.target_extension_c):
         """
         assert isinstance(local_filename, basestring)
         assert isinstance(remote_filename, basestring)
+        self.files_remove(remote_filename, "/tmp/file.b64")
         with open(local_filename, "rb") as f:
             s = binascii.b2a_base64(f.read())
             for i in range(0, len(s), 64):
@@ -252,7 +263,6 @@ class shell(tc.target_extension_c):
         # Now we do a python3 command in there (as cloud
         # versions don't include python2. good) to regenerate
         # it from base64 to bin
-        self.file_remove(remote_filename)
         self.run(
             'python3 -c "import sys, binascii; '
             'sys.stdout.buffer.write(binascii.a2b_base64(sys.stdin.read()))"'
