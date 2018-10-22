@@ -219,7 +219,16 @@ class exception(Exception):
     Have to use a dictionary (vs using kwargs) so the name of the
     keys can contain spaces, for better reporting.
     """
-    pass
+    def __init__(self, description, attachments = None):
+        if attachments:
+            assert isinstance(attachments, dict)
+        Exception.__init__(self, description, attachments)
+
+    def attachments_get(self):
+        if len(self.args) < 1:
+            return {}
+        assert isinstance(self.args[1], dict)
+        return self.args[1]
 
 class pass_e(exception):
     """
@@ -1732,15 +1741,10 @@ class result_c():
         # dictionary are attachments passed to report_*()
         # functions. In said case, update the attachments and
         # return the message. See :py:class:`exception`.
-        if hasattr(e, "args") and isinstance(e.args, tuple) \
-           and len(e.args) > 0 \
-           and isinstance(e.args[0], basestring) \
-           and len(e.args) > 1 \
-           and isinstance(e.args[1], dict):
-            attachments.update(e.args[1])
+        if isinstance(e, tcfl.tc.exception):
+            attachments.update(e.attachments_get())
             return e.args[0]
-        else:
-            return e
+        return e
 
     @staticmethod
     def report_from_exception(_tc, e, attachments = None,
