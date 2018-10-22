@@ -1160,13 +1160,28 @@ class tc_zephyr_sanity_c(tc.tc_c):
             # into the build. We can do this because sanity check TCs are
             # ALWAYS one target, one core BSP model.
             target = self.targets["target"]
-            target.expect("RunID: %(runid)s:%(tg_hash)s" % target.kws,
-                          console = target.kws.get("console", None))
-            target.expect(
+            
+            # So set three things we need to see out the console
+            # before we can say we have passed:
+            #
+            # - Runid: RUNID:HASH
+            # - ***** Booting Zephyr OS BLAHBLAH delayed boot Nms ******
+            # - PROJECT EXECUTION SUCCESSFUL
+            #
+            # Do it like this instead of tree expect sequences in a
+            # row to minimize the chances of timing blips causing a
+            # timeout (eg: first expect passes, thr process is put to
+            # sleep for a long time before the next expect can run and
+            # decide it was a timeout, when it wasn't).
+            target.on_console_rx("RunID: %(runid)s:%(tg_hash)s" % target.kws,
+                                 console = target.kws.get("console", None))
+            target.on_console_rx(
                 re.compile("\*\*\*\*\* Booting Zephyr OS .* \(delayed boot [0-9]+ms\) *\*\*\*\*\*"),
                 console = target.kws.get("console", None))
-            target.expect("PROJECT EXECUTION SUCCESSFUL",
-                          console = target.kws.get("console", None))
+            target.on_console_rx("PROJECT EXECUTION SUCCESSFUL",
+                                 console = target.kws.get("console", None))
+            # And wait for them to happen
+            self.expecter.run()
 
     _data_parse_regexs = {}
 
