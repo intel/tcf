@@ -225,9 +225,10 @@ class exception(Exception):
         Exception.__init__(self, description, attachments)
 
     def attachments_get(self):
-        if len(self.args) < 1:
+        if len(self.args) < 1 or not self.args[1]:
             return {}
-        assert isinstance(self.args[1], dict)
+        assert isinstance(self.args[1], dict), \
+            "expected dict, got type %s" % type(self.args[1]).__name__
         return self.args[1]
 
 class pass_e(exception):
