@@ -4939,6 +4939,7 @@ class tc_c(object):
                 with self._targets_assign():
                     if not deploy_skip:
                         with msgid_c("D", phase = "deploy"):
+                            self._eval_prepare(0, "deploy")
                             retval = self._methods_call("deploy")
                         result += retval
                         # We don't report deploy as much as build/eval
