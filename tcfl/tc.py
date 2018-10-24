@@ -1095,7 +1095,7 @@ class target_c(object):
         # console_rx_eval function that will get it's offset
         # to be zero and thus it'll initialize to the offset from the
         # poller, which this _flush() call is resetting.
-        expecter.console_rx_flush(self.testcase.expecter, self, console)
+        expecter.console_rx_flush(self.testcase.tls.expecter, self, console)
         # the console member is only present if the member extension has
         # been loaded for the target (determined at runtime), hence
         # pylint gets confused
@@ -1162,7 +1162,7 @@ class target_c(object):
            data received.
         """
         _, console_code = expecter.console_mk_code(self, console)
-        of = self.testcase.expecter.buffers.get(console_code, None)
+        of = self.testcase.tls.expecter.buffers.get(console_code, None)
         if of == None:
             return None
         with open(of.name) as f:
@@ -1180,7 +1180,7 @@ class target_c(object):
            the data was received (otherwie use the default one).
         """
         _, console_code = expecter.console_mk_code(self, console)
-        of = self.testcase.expecter.buffers.get(console_code, None)
+        of = self.testcase.tls.expecter.buffers.get(console_code, None)
         if of == None:
             return 0
         with open(of.name) as f:
@@ -1196,7 +1196,7 @@ class target_c(object):
         Note this does not wait for said string; you need to run the
         testcase's *expecter* loop with::
 
-        >>>  self.expecter.run()
+        >>>  self.tls.expecter.run()
 
         Als well, those actions will be performed when running
         :meth:`expect` or :meth:`wait` for blocking versions.
@@ -1230,7 +1230,7 @@ class target_c(object):
           actions are added indicating they are expected to pass, the
           seven of them must have raised a pass exception (or
           indicated passage somehow) before the loop will consider it
-          a full pass. See :py:meth:`tcfl.expecter.expecter_c.run`.
+          a full pass. See :py:meth:`tcfl.tls.expecter.expecter_c.run`.
 
         :raises: :py:exc:`tcfl.tc.pass_e`,
           :py:exc:`tcfl.tc.blocked_e`, :py:exc:`tcfl.tc.failed_e`,
@@ -1242,12 +1242,12 @@ class target_c(object):
 
         """
         # Won't be re-added if already there
-        added = self.testcase.expecter.add(False, expecter.console_rx_poller,
-                                           (self, console),)
+        added = self.testcase.tls.expecter.add(
+            False, expecter.console_rx_poller, (self, console),)
         has_to_pass = True if result == "pass" else False
-        self.testcase.expecter.add(has_to_pass, expecter.console_rx_eval,
-                                   (self, regex_or_str, console, timeout,
-                                    result))
+        self.testcase.tls.expecter.add(has_to_pass, expecter.console_rx_eval,
+                                       (self, regex_or_str, console, timeout,
+                                        result))
         return added
 
     def wait(self, regex_or_str, timeout = None, console = None):
@@ -1278,7 +1278,7 @@ class target_c(object):
             with self.on_console_rx_cm(regex_or_str, timeout = timeout,
                                        console = console, result = "pass"):
                 # Run the expect loop
-                self.testcase.expecter.run()
+                self.testcase.tls.expecter.run()
         except pass_e:
             return True
         except error_e:
@@ -1318,12 +1318,12 @@ class target_c(object):
                                        console = console, result = "pass",
                                        uid = uid):
                 # Run the expect loop
-                self.testcase.expecter.run()
+                self.testcase.tls.expecter.run()
         except pass_e:
             pass
         finally:
-            if uid in self.testcase.expecter.buffers_persistent:
-                del self.testcase.expecter.buffers_persistent[uid]
+            if uid in self.testcase.tls.expecter.buffers_persistent:
+                del self.testcase.tls.expecter.buffers_persistent[uid]
 
     @contextlib.contextmanager
     def on_console_rx_cm(self, regex_or_str, timeout = None, console = None,
@@ -1357,28 +1357,28 @@ class target_c(object):
         has_to_pass = True if result == "pass" else False
         _tc = self.testcase
         if isinstance(timeout, numbers.Number) \
-           and timeout > _tc.expecter.timeout:
+           and timeout > _tc.tls.expecter.timeout:
             raise ValueError(
                 "Asked for a timeout of %s that is higher than the "
                 "testcase's timeout of %s; you can adjust the testcases's "
-                "global timeout with `self.expecter.timeout = VALUE`"
-                % (timeout, _tc.expecter.timeout))
+                "global timeout with `self.tls.expecter.timeout = VALUE`"
+                % (timeout, _tc.tls.expecter.timeout))
         added = False
         try:
-            added = _tc.expecter.add(False, expecter.console_rx_poller,
-                                     (self, console))
+            added = _tc.tls.expecter.add(False, expecter.console_rx_poller,
+                                         (self, console))
             has_to_pass = True if result == "pass" else False
-            _tc.expecter.add(has_to_pass, expecter.console_rx_eval,
-                             (self, regex_or_str, console, timeout,
-                              result, uid))
+            _tc.tls.expecter.add(has_to_pass, expecter.console_rx_eval,
+                                 (self, regex_or_str, console, timeout,
+                                  result, uid))
             yield
         finally:
-            _tc.expecter.remove(expecter.console_rx_eval,
-                                (self, regex_or_str, console, timeout,
-                                 result, uid))
+            _tc.tls.expecter.remove(expecter.console_rx_eval,
+                                    (self, regex_or_str, console, timeout,
+                                     result, uid))
             if added:
-                _tc.expecter.remove(expecter.console_rx_poller,
-                                    (self, console))
+                _tc.tls.expecter.remove(expecter.console_rx_poller,
+                                        (self, console))
 
     def stub_app_add(self, bsp, _app, app_src, app_src_options = ""):
         """\
@@ -2557,9 +2557,11 @@ class tc_c(object):
         self._kw_set("srcdir_abs",
                      os.path.dirname(os.path.abspath(tc_file_path)))
         self._kw_set("thisfile", thisfile)
+
+        self.tls = threading.local()
         #: Expect loop to wait for things to happen
-        self.expecter = expecter.expecter_c(self._expecter_log, self,
-                                            timeout = 60)
+        self.tls.expecter = expecter.expecter_c(self._expecter_log, self,
+                                                timeout = 60)
         # Ticket ID for this testcase / target group
         self.ticket = None
         # The group of targets where the TC is running
@@ -2627,6 +2629,18 @@ class tc_c(object):
         # Always before we start, run the site hook
         for hook in self.hook_pre:
             hook(self)
+
+    def __thread_init__(self, expecter_parent):
+        """
+        When we run some methods of this object in a different thread,
+        we need to initialize some parts first.
+
+        This is currently quite a dirty hack, but it is what we
+        have. We use it when we clone the object to run in a target
+        group or when we spawn thredas to run methods in parallel.
+        """
+        self.tls.expecter = expecter.expecter_c(
+            self._expecter_log, self, timeout = expecter_parent.timeout)
 
     def is_static(self):
         """
@@ -3570,14 +3584,25 @@ class tc_c(object):
                 % (type(self).__name__, fn.__name__,
                    type(r).__name))
 
-    def __method_trampoline(self, msgid, fname, fn, _type, targets):
+    def __method_trampoline_thread(self, msgid, fname, fn, _type, targets,
+                                   thread_init_args):
         # runs a function and returns a tuple (result, exception
         # info). If there was no exception, [1] will be None;
         # otherwise it will contain the exception information so it
         # can be re-raised when called from a thread.
+        #
+        # Because we are in the context of a newly initialized thread,
+        # we need to initialize some things
+        if thread_init_args == None:
+            thread_init_args = {}
+        else:
+            assert isinstance(thread_init_args, dict)
         try:
             with msgid_c(parent = msgid, l = 2):
-                return (self.__method_trampoline_call(fname, fn, _type, targets), None)
+                self.__thread_init__(**thread_init_args)
+                return (
+                    self.__method_trampoline_call(fname, fn, _type, targets),
+                    None)
         except:
             return (None, sys.exc_info())
 
@@ -3629,8 +3654,9 @@ class tc_c(object):
             for fname, fn, _type, args in parallel_list:
                 targets = self._mk_target_args_for_fn(fn, args)
                 threads[fname] = thread_pool.apply_async(
-                    self.__method_trampoline,
-                    (msgid_c(l = 2), fname, fn, _type, targets,))
+                    self.__method_trampoline_thread,
+                    (msgid_c(l = 2), fname, fn, _type, targets,
+                     dict(expecter_parent = self.tls.expecter)))
             thread_pool.close()
             thread_pool.join()
             for thread in threads.values():
@@ -4806,9 +4832,10 @@ class tc_c(object):
     # _run_on_target_group()
 
     def _eval_prepare(self, cnt1, name):
-        self.buffers.clear()	# Make each run a fresh run
-        self.expecter.buffers.clear()	# Make each run a fresh run
-        self.expecter.buffers_persistent.clear()	# Make each run a fresh run
+        # Make each run a fresh run
+        self.buffers.clear()
+        self.tls.expecter.buffers.clear()
+        self.tls.expecter.buffers_persistent.clear()
         self.buffersdir = os.path.join(self.tmpdir,
                                        "eval-buffers-%02d-%s" % (cnt1, name))
         # Wipe the directory (if it exists, and recreate it fresh)
@@ -5023,17 +5050,20 @@ class tc_c(object):
         else:
             self.ticket = self._ident
 
-    def _run(self, msgid = None):
+    def _run(self, msgid, thread_init_args):
         """
         High level executor for the five phases of the testcase
 
         Note that self.target_group contains the names of the targets
         and their description
+
+        Note seems the msgid is overriden, but context is obtaiend via
+        TLS.
         """
         try:
+            self.__thread_init__(**thread_init_args)
             result = result_c(0, 0, 0, 0, 0)
             self.mkticket()
-
             # temporary directory specialization for this TC
             self.tmpdir = os.path.join(tc_c.tmpdir, self.ticket)
             if not os.path.isdir(self.tmpdir):
@@ -5099,7 +5129,8 @@ class tc_c(object):
             tc._kw_set("type", self.kws['type'])
             tc._methods_prepare()	# setup phase running methods
             # remember this returns a list, so we have to concatenate them
-            results += tc._run(msgid_c.parent())
+            results += tc._run(msgid_c.parent(),
+                               dict(expecter_parent = self.tls.expecter))
 
         # Undo the hack from before, as we might need these values to
         # be proper for reporting later on
@@ -5182,8 +5213,7 @@ class tc_c(object):
         c.kws_origin = dict(self.kws_origin)
         c.log = tc_logadapter_c(logging, None)
         c._prefix_update()
-        c.expecter = expecter.expecter_c(self._expecter_log, c,
-                                         timeout = self.expecter.timeout)
+        c.tls = threading.local()
         c._cleanup_files = set()
         return c
 
@@ -5441,8 +5471,14 @@ class tc_c(object):
                     # this just updates the core keys, but later calls
                     # to kw_set() and company will refresh the main
                     # target.kws dict.
-                threads.append(tp.apply_async(tc_for_tg._run,
-                                              (msgid_c.current(),)))
+                thread = tp.apply_async(
+                    tc_for_tg._run,
+                    (
+                        msgid_c.current(),
+                        dict(expecter_parent = self.tls.expecter)
+                    )
+                )
+                threads.append(thread)
             self.log.info("%d jobs launched" % len(threads))
             return threads
         finally:

@@ -81,11 +81,11 @@ class shell(tc.target_extension_c):
                 target.expect(password_regex)
                 target.send(password)
                     
-        self.target.testcase.expecter.timeout = 120
+        self.target.testcase.tls.expecter.timeout = 120
         if tempt:
             assert isinstance(tempt, basestring)
             tries = 0
-            while tries < self.target.testcase.expecter.timeout:
+            while tries < self.target.testcase.tls.expecter.timeout:
                 try:
                     self.target.send(tempt)
                     if user:
@@ -94,11 +94,11 @@ class shell(tc.target_extension_c):
                                        timeout = 1)
                     break
                 except tc.error_e as _e:
-                    if tries == self.target.testcase.expecter.timeout:
+                    if tries == self.target.testcase.tls.expecter.timeout:
                         raise tc.error_e(
                             "Waited too long (%ds) for shell to come up "
                             "(did not receive '%s')" %
-                            (self.target.testcase.expecter.timeout,
+                            (self.target.testcase.tls.expecter.timeout,
                              self.linux_shell_prompt_regex.pattern))
                     continue
         else:
@@ -118,7 +118,7 @@ class shell(tc.target_extension_c):
                                   timeout = False)
 
         # Now commands should timeout fast
-        self.target.testcase.expecter.timeout = 30
+        self.target.testcase.tls.expecter.timeout = 30
 
 
     def run(self, cmd = None, expect = None, prompt_regex = None,

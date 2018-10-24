@@ -290,7 +290,7 @@ class _harness_console_c(harness_c):	# pylint: disable = too-few-public-methods
         target = testcase.targets['target']
         for regex in self.regexs:
             target.on_console_rx(regex)
-        testcase.expecter.run()
+        testcase.tls.expecter.run()
 
     def evaluate(self, testcase):
         if self.repeat == 1:
@@ -841,7 +841,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
 
 
         if 'timeout' in tc_dict:
-            self.expecter.timeout = int(tc_dict['timeout'])
+            self.tls.expecter.timeout = int(tc_dict['timeout'])
 
         self.zephyr_filter = tc_dict.get("filter", None)
         self.zephyr_filter_origin = origin
@@ -1283,7 +1283,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
             f = codecs.open(self.unit_test_output, 'r', encoding = 'utf-8')
         else:
             console_id = target.kws.get('console', None)
-            f = self.expecter.console_get_file(target, console_id)
+            f = self.tls.expecter.console_get_file(target, console_id)
         main_triggered = set()
         triggered = set()
         # Note the triggers; each regex might depend on a trigger and
@@ -1367,7 +1367,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
             console = target.kws.get('console', None)
             _console_id_name, console_code = expecter.console_mk_code(
                 target, console)
-            outputf = self.expecter.buffers.get(console_code, None)
+            outputf = self.tls.expecter.buffers.get(console_code, None)
             if not outputf:
                 return	# *shrug* no output to parse
         results = collections.defaultdict(dict)
