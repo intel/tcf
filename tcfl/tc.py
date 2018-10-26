@@ -1935,14 +1935,32 @@ def tags(*args, **kwargs):
 
 def serially():
     """
-    Force a testcase method to run serially
+    Force a testcase method to run serially (vs :func:`concurrently`).
+
+    Remember methods that are ran serially are run first and by
+    default are those that
+     - take more than one target as arguments
+     - are evaluation methods
     """
     def decorate_fn(fn):
-        """
-        Wrap function to add a serially = True attribute that
-        indicates this function has to be run serially
-        """
-        setattr(fn, "serially", True)
+        setattr(fn, "execution_mode", 'serial')
+        return fn
+    return decorate_fn
+
+def concurrently():
+    """
+    Force a testcase method to run concurrently after all the serial
+    methods (vs decorator :func:`serially`).
+
+    Remember methods that are ran concurrently are run after the
+    serial methods and by default those that:
+     - are not evaluation methods
+     - take only one target as argument (if you force two methods that
+       share a target to run in parallel, it is your responsiblity to
+       ensure proper synchronization
+    """
+    def decorate_fn(fn):
+        setattr(fn, "execution_mode", 'parallel')
         return fn
     return decorate_fn
 
@@ -2401,7 +2419,7 @@ class tc_c(object):
     that take different targets will be called in parallel (to
     maximize multiple cores, unless decorated with
     :func:`tcfl.tc.serially`). Evaluation functions are always called
-    sequentially.
+    sequentially, except if decorated with :func:
 
     The testcase methods use the APIs exported by this class and module:
 
@@ -3363,14 +3381,42 @@ class tc_c(object):
                     % (self.name, cls.__name__, fname, cls._origin_fn(fn),
                        argname,
                        " ".join([i for i in sorted(self._targets.keys())])))
+
+        # what kind of execution can we do for this method? serial or
+        # parallel?
+        if len(argnames) == 0:
+            # not target specification, so it might use all
+            # of them--force serial
+            execution_mode = 'serial'
+        elif len(argnames) == 1:
+            # methods that use only one target can be parallelized
+            execution_mode = 'parallel'
+        else:
+            # methods that use more than one target have to be serial
+            execution_mode = 'serial'
+
+        # our guess is overriden by the function's decoration with
+        # :func:`tcfl.tc.serially` or :func:`tcfl.tc.concurrently`
+        decorated_execution_mode = getattr(fn, "execution_mode", None)
+        if decorated_execution_mode:
+            # overriden by the user
+            execution_mode = decorated_execution_mode
+
+        # the final override comes from...taxaaaan an argument to this
+        # function overriding it all?
+        if do_serially:
+            execution_mode = 'serial'
+
         # Do not transform into a set, we want to keep the order
         if len(argnames) == 0:
-            serial.append((fname, fn, _type, None))
-        elif do_serially or getattr(fn, "serially", False):
+            argnames = None
+        if execution_mode == 'serial':
             serial.append((fname, fn, _type, argnames))
-        else:
+        elif execution_mode == 'parallel':
             parallel.append((fname, fn, _type, argnames))
-
+        else:
+            raise AssertionError("unknown execution mode '%s'"
+                                 % execution_mode)
 
     @classmethod
     def _origin_fn(cls, fn):
@@ -3477,6 +3523,14 @@ class tc_c(object):
                     if fn == fn2:
                         continue
                     common_argnames = set(argnames) & set(argnames2)
+                    decorated_execution_mode1 = getattr(fn, 'execution_mode', None)
+                    decorated_execution_mode2 = getattr(fn2, 'execution_mode', None)
+                    if decorated_execution_mode1 == 'parallel' \
+                       and decorated_execution_mode2 == 'parallel':
+                        # do not bother checking, as both has been
+                        # decorated as 'have to execute concurrently'
+                        # even if they share targets.
+                        continue
                     if common_argnames:
                         raise blocked_e(               # FIXME: add origin
                             "%s.%s() (%s) and %s.%s() (%s) conflict in using "
