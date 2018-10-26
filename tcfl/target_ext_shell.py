@@ -67,11 +67,15 @@ class shell(tc.target_extension_c):
 
     def up(self, tempt = None,
            user = None, login_regex = re.compile('login:'),
-           password = None, password_regex = re.compile('Password:')):
+           password = None, password_regex = re.compile('Password:'),
+           timeout = 120):
         """
         Giving it ample time to boot, wait for a shell prompt and set
         up the shell so that if an error happens, it will print an error
         message and raise a block exception.
+
+        :param int timeout: [optional] seconds to wait for the login
+          prompt to appear
         """
         def _login(target):
             # If we have login info, login to get a shell prompt
@@ -80,31 +84,35 @@ class shell(tc.target_extension_c):
             if password:
                 target.expect(password_regex)
                 target.send(password)
-                    
-        self.target.testcase.tls.expecter.timeout = 120
-        if tempt:
-            assert isinstance(tempt, basestring)
-            tries = 0
-            while tries < self.target.testcase.tls.expecter.timeout:
-                try:
-                    self.target.send(tempt)
-                    if user:
-                        _login(self.target)
-                    self.target.expect(self.linux_shell_prompt_regex,
-                                       timeout = 1)
-                    break
-                except tc.error_e as _e:
-                    if tries == self.target.testcase.tls.expecter.timeout:
-                        raise tc.error_e(
-                            "Waited too long (%ds) for shell to come up "
-                            "(did not receive '%s')" %
-                            (self.target.testcase.tls.expecter.timeout,
-                             self.linux_shell_prompt_regex.pattern))
-                    continue
-        else:
-            if user:
-                _login(self.target)
-            self.target.expect(self.linux_shell_prompt_regex)
+
+        try:
+            original_timeout = self.target.testcase.tls.expecter.timeout
+            self.target.testcase.tls.expecter.timeout = timeout
+            if tempt:
+                assert isinstance(tempt, basestring)
+                tries = 0
+                while tries < self.target.testcase.tls.expecter.timeout:
+                    try:
+                        self.target.send(tempt)
+                        if user:
+                            _login(self.target)
+                        self.target.expect(self.linux_shell_prompt_regex,
+                                           timeout = 1)
+                        break
+                    except tc.error_e as _e:
+                        if tries == self.target.testcase.tls.expecter.timeout:
+                            raise tc.error_e(
+                                "Waited too long (%ds) for shell to come up "
+                                "(did not receive '%s')" %
+                                (self.target.testcase.tls.expecter.timeout,
+                                 self.linux_shell_prompt_regex.pattern))
+                        continue
+            else:
+                if user:
+                    _login(self.target)
+                self.target.expect(self.linux_shell_prompt_regex)
+        finally:
+            self.target.testcase.tls.expecter.timeout = original_timeout
 
         # disable line editing for proper recording of command line
         # when running bash; otherwise the scrolling readline does
