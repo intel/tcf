@@ -12,6 +12,7 @@ import serial
 import serial.tools.list_ports
 
 import ttbl
+import ttbl.buttons
 
 class rly08b(object):
     """
@@ -93,7 +94,7 @@ class rly08b(object):
                and port.serial_number == self.serial_number:
                 break
         else:
-            raise self.not_found_e("Cannot find USB-RELY8B with serial %s"
+            raise self.not_found_e("Cannot find USB-RLY8B with serial %s"
                                    % self.serial_number)
 
         with serial.Serial(port.device, baudrate = 9600,
@@ -187,6 +188,22 @@ class pc(rly08b, ttbl.tt_power_control_impl):
                            "#%d powered off"
                            % (self.serial_number, self.relay))
             return False
+
+
+class button(pc, ttbl.buttons.impl):
+
+    def __init__(self, serial_number, relay):
+        ttbl.buttons.impl.__init__(self)
+        pc.__init__(self, serial_number, relay)
+
+    def press(self, target, _button):
+        self.power_on_do(target)
+
+    def release(self, target, _button):
+        self.power_off_do(target)
+
+    def get(self, target, _button):
+        return self.power_get_do(target)
 
 
 class plugger(rly08b,		 # pylint: disable = abstract-method

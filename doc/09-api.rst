@@ -25,6 +25,7 @@ Extensions to :class:`tcfl.tc.target_c` types
 .. automodule:: tcfl.target_ext_tags
 .. automodule:: tcfl.target_ext_tcob
 .. automodule:: tcfl.target_ext_tunnel
+.. automodule:: tcfl.target_ext_buttons
 
 *TCF run* Application builders
 ------------------------------
