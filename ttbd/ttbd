@@ -756,6 +756,31 @@ def _target_ip_tunnel(target_id):
     return flask.jsonify(r)
 
 
+@app.route(API_PREFIX + 'targets/<string:target_id>/' \
+           + '<string:interface>/<string:call>',
+           methods = [ 'POST', 'DELETE', 'GET' ])
+@flask_login.login_required
+def _target_interface(target_id, interface, call):
+    with ttbl.config.targets_lock:
+        target = ttbl.config.targets[target_id]
+    ticket = flask.request.form.get('ticket', "")
+    try:
+        if not interface in target.tags['interfaces']:
+            flask_logi_abort(400, "%s: unavailable interface" % interface)
+        iface = getattr(target, interface, None)
+        if iface == None:
+            flask_logi_abort(400, "%s: interface broken" % interface)
+        assert isinstance(iface, ttbl.tt_interface)
+        r = iface.request_process(target, who_make(ticket),
+                                  flask.request.method,
+                                  call, flask.request.form)
+    except ttbl.test_target_e as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    except Exception as e:
+        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
+    return flask.jsonify(r)
+
+
 # FIXME: rewrite to pass the data in the body as a binary sequence
 # (like read does) to remove file size limitations. This will require
 # a protocol roll up or a new call.

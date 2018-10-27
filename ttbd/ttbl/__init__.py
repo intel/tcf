@@ -123,6 +123,44 @@ class thing_plugger_mixin(object):
         raise NotImplementedError
 
 
+class tt_interface(object):
+    def __init__(self):
+        pass
+
+    def request_process(self, target, who, method, call, args):
+        """
+        Process a request into this interface from a proxy / brokerage
+
+        When the ttbd daemon is exporting access to a target via any
+        interface (e.g: REST over Flask or D-Bus or whatever), this
+        implements a brige to pipe those requests in to this
+        interface.
+
+        :param test_target target: target upon which we are operating
+        :param str who: user who is making the request
+        :param str method: 'POST', 'GET', 'DELETE' or 'PUT' (mapping
+          to HTTP requests)
+        :param str call: interface's operation to perform (it'd map to
+          the different methods the interface exposes)
+        :param dict args: dictionary of key/value with the arguments
+          to the call, some might be JSON encoded.
+
+        For an example, see :class:`ttbl.buttons.interface`.
+        """
+        assert isinstance(target, test_target)
+        assert isinstance(who, basestring)
+        assert isinstance(method, basestring) \
+            and method in ( 'POST', 'GET', 'DELETE', 'PUT' )
+        assert isinstance(call, basestring)
+        assert isinstance(args, dict)
+        raise NotImplementedError
+
+    def _release_hook(self, target, force):
+        """
+        Called when the target is released
+        """
+        raise NotImplementedError
+
 # FIXME: generate a unique ID; has to be stable across reboots, so it
 #        needs to be generated from whichever path we are connecting
 #        it to
@@ -243,6 +281,9 @@ class test_target(object):
         #: Said functions take as arguments the thing name and the
         #: thing desciptor from the target's tags.
         self.thing_methods = {}
+
+        #: Keep places where interfaces were registered from
+        self.interface_origin = {}
 
     @property
     def type(self):
@@ -692,7 +733,7 @@ class test_target(object):
         for _, (target, plugger) in self.thing_to.iteritems():
             target._thing_unplug(self, plugger)
         for release_hook in self.release_hooks:
-            release_hook(force)
+            release_hook(self, force)
         # Any property set in target.user_properties gets cleared when
         # releasing.
         for prop in self.user_properties:
@@ -754,6 +795,30 @@ class test_target(object):
             return False
         return True
 
+    def interface_add(self, name, obj):
+        """
+        Adds object as an interface to the target accessible as ``self.name``
+
+        :param str name: interface name, must be not existing already
+          and a valid Python identifier as we'll be calling functions
+          as ``target.name.function()``
+
+        :param tt_interface obj: interface implementation, an instance
+          of :class:`tt_interface`` which provides the details and
+          methods to call plus
+          :meth:`ttbl.tt_interface.request_process` to handle calls
+          from proxy/brokerage layers.
+        """
+        assert isinstance(obj, tt_interface)
+        if name in self.tags['interfaces']:
+            raise RuntimeError(
+                "An interface of type %s has been already "
+                "registered for target %s at %s" %
+                (name, self.id, self.interface_origin[name]))
+        self.tags['interfaces'].append(name)
+        self.interface_origin[name] = commonl.origin_get()
+        setattr(self, name, obj)
+        self.release_hooks.add(obj._release_hook)
 
 class interconnect_impl_c(object):
     pass
@@ -1730,7 +1795,7 @@ class tt_debug_mixin(tt_debug_impl):
         else:
             self.debug_do_stop(self)
 
-    def _debug_release_hook(self, force):
+    def _debug_release_hook(self, _target, _force):
         # When the target is released, stop debugging, so the next
         # acquirer doesn't have surprises
         self._debug_stop()

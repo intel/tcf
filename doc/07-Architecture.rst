@@ -118,10 +118,19 @@ ways to do operations; the broker provides abstractions over the
 differences for common operations like powering on, off, uploading
 firmware or an OS image (when said abstractions make sense), as well
 as providing access to hardware-specific details--all these are
-implemented by the different drivers that run in the server. It
-follows that other interfaces could be easily added by plugins
-(currently this is implemented by subclassing, but this is too
-limiting and will be replaced with extension by attrs).
+implemented by the different drivers that run in the server.
+
+It follows that other interfaces can be easily added by plugins. This
+is implemented by either:
+
+- subclassing, which is limited to targets of which all instances will
+  share the same interfaces
+
+- dynamic addition of interfaces to each target instance
+  (:meth:`ttbl.test_target.interface_add`). See
+  (:meth:`ttbl.buttons.interface` as an example of an interface
+  implemented on the daemon and it's counterpart,
+  :meth:`tcfl.target_ext_buttons.buttons` for the client side).
 
 Note details about the actual drivers that implement the interfaces do
 not necessarily belong here and are detailed in the actual driver code.
