@@ -663,16 +663,18 @@ def process_terminate(pid, pidfile = None, tag = None,
             return None
         if os.path.abspath(_path) != os.path.abspath(path):
             return None	            # Not our binary
-    os.kill(_pid, signal.SIGTERM)
-    time.sleep(wait_to_kill)
     try:
+        signal_name = "SIGTERM"
+        os.kill(_pid, signal.SIGTERM)
+        time.sleep(wait_to_kill)
+        signal_name = "SIGKILL"
         os.kill(_pid, signal.SIGKILL)
     except OSError as e:
-        if e.errno != errno.ESRCH:
-            raise RuntimeError("%scan't SIGKILL: %s"
-                               % (tag, e.message))
-        if e.errno == errno.ESRCH:	# killed
+        if e.errno == errno.ESRCH:	# killed already
             return
+        else:
+            raise RuntimeError("%scan't %s: %s"
+                               % (tag, signal_name, e.message))
     finally:
         if _pidfile:
             rm_f(_pidfile)
