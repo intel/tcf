@@ -425,15 +425,13 @@ class test_target(object):
         """
         self.fsdb.set('disabled', "True")
 
-    def property_set(self, who, prop, value):
+    def property_set(self, prop, value):
         """
         Set a target's property
 
-        :param str who: User that is claiming the target
         :param str prop: Property name
         :param str value: Value for the property (None for deleting)
         """
-        assert isinstance(who, basestring)
         self.fsdb.set(prop, value)
 
     def property_set_locked(self, who, prop, value):
