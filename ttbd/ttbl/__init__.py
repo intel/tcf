@@ -29,6 +29,7 @@ import tempfile
 import threading
 import time
 import traceback
+import types
 import urlparse
 
 import __main__
@@ -1065,12 +1066,18 @@ class tt_power_control_mixin(object):
     def _power_on_pre(self):
         self.log.debug("pre-on fns %s" % self.power_on_pre_fns)
         for f in self.power_on_pre_fns:
-            f()
+            if type(f) == types.MethodType:	# instance needed
+                f()
+            else:
+                f(self)
 
     def _power_on_post(self):
         self.log.debug("post-on fns %s" % self.power_on_post_fns)
         for f in self.power_on_post_fns:
-            f()
+            if type(f) == types.MethodType:	# instance needed
+                f()
+            else:
+                f(self)
 
     def _power_on_do(self):
         if getattr(self, "power_on_do", None) != None:
@@ -1195,12 +1202,18 @@ class tt_power_control_mixin(object):
     def _power_off_pre(self):
         self.log.debug("pre-off fns %s" % self.power_off_pre_fns)
         for f in self.power_off_pre_fns:
-            f()
+            if type(f) == types.MethodType:	# instance needed
+                f()
+            else:
+                f(self)
 
     def _power_off_post(self):
         self.log.debug("post-off fns %s" % self.power_off_post_fns)
         for f in self.power_off_post_fns:
-            f()
+            if type(f) == types.MethodType:	# instance needed
+                f()
+            else:
+                f(self)
 
     def _power_off_do(self):
         if getattr(self, "power_off_do", None) != None:
