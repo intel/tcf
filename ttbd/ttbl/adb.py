@@ -62,11 +62,9 @@ class pci(ttbl.tt_power_control_impl):
         if self.target_serial_number:
             # If the thing is connected via USB
             cmdline += [ "-s", self.target_serial_number ]
-        else:
-            # connected via IP
-            cmdline += [ "-a" ]
         cmdline += [
             # we are going to listen on this port on all interfaces
+            "-a",
             "-P", str(self.server_port),
             "nodaemon",
             "server"
