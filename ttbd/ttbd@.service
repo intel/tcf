@@ -63,13 +63,16 @@ AmbientCapabilities = \
 # - CAP_AUDIT_WRITE: so sudo can send audit messages and not die trying
 #
 CapabilityBoundingSet = \
-    CAP_NET_RAW \
-    CAP_NET_ADMIN \
-    CAP_SETGID CAP_SETUID \
-    CAP_SYS_ADMIN \
-    CAP_FOWNER \
+    CAP_AUDIT_WRITE \
+    CAP_DAC_READ_SEARCH \
     CAP_DAC_OVERRIDE \
-    CAP_AUDIT_WRITE
+    CAP_FOWNER \
+    CAP_NET_ADMIN \
+    CAP_NET_RAW \
+    CAP_SETGID \
+    CAP_SETUID \
+    CAP_SYS_ADMIN \
+
 Type = notify
 User = ttbd
 Group = ttbd
