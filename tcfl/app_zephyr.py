@@ -285,33 +285,20 @@ CONFIG_BOOT_DELAY=0
         # Newer Zephyr SDKs provide prebuilt host tools we can use; if
         # we don't have access to it, then we re-build them
         if target.kws['zephyr_is_cmake']:
-            prebuilt_host_tools = os.environ.get('PREBUILT_HOST_TOOLS', None)
             zephyr_sdk_install_dir = os.environ.get('ZEPHYR_SDK_INSTALL_DIR', None)
-            import logging
-            if prebuilt_host_tools:
-                target.kw_set('PREBUILT_HOST_TOOLS', prebuilt_host_tools,
-                              bsp = target.bsp)
-            elif zephyr_sdk_install_dir \
-               and os.path.exists(os.path.join(
-                   zephyr_sdk_install_dir,
-                   "sysroots/x86_64-pokysdk-linux/usr/bin/kconfig")):
-                path = os.path.join(zephyr_sdk_install_dir,
-                                    "sysroots/x86_64-pokysdk-linux/usr/bin")
-                target.kw_set('PREBUILT_HOST_TOOLS', path, bsp = target.bsp)
-            else:
-                target.shcmd_local(
-                    'cmake -B%(zephyr_objdir)s/kconfig -H$ZEPHYR_BASE/scripts')
-                target.shcmd_local(
-                    '%(MAKE)s -C %(zephyr_objdir)s/kconfig')
-                target.kw_set('PREBUILT_HOST_TOOLS',
-                              os.path.join(target.kws['zephyr_objdir'],
-                                           'kconfig'),
-                              bsp = target.bsp)
-        # Generate initial config, so we can filter on it
-        if target.kws['zephyr_is_cmake']:
+            if zephyr_sdk_install_dir == None:
+                raise tcfl.tc.blocked_e(
+                    "Need ZEPHYR_SDK_INSTALL_DIR exported pointing to "
+                    "Zephyr SDK location, to obtain kconfig tool")
+            path = os.path.join(zephyr_sdk_install_dir,
+                                "sysroots/x86_64-pokysdk-linux/usr/bin")
+            if not os.path.exists(path):
+                raise tcfl.tc.blocked_e(
+                    "Can't find kconfig tool in ZEPHYR_SDK_INSTALL_DIR (%s)"
+                    % zephyr_sdk_install_dir)
+            # Generate initial config, so we can filter on it
             target.shcmd_local(
                 'cmake'
-                ' -DPREBUILT_HOST_TOOLS=%(PREBUILT_HOST_TOOLS)s'
                 ' -DBOARD=%(zephyr_board)s -DARCH=%(bsp)s'
                 ' -DEXTRA_CPPFLAGS="-DTC_RUNID=%(runid)s:%(tg_hash)s"'
                 ' -DEXTRA_CFLAGS="-Werror -Wno-error=deprecated-declarations"'

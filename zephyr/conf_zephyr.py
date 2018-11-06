@@ -23,10 +23,7 @@ tcfl.tc.tc_c.dir_ignore_add_regex("^doc$")
 tcfl.tc.tc_c.dir_ignore_add_regex("^outdir.*$")
 
 # Set Zephyr's build environment (use .setdefault() to inherit existing values)
-os.environ.setdefault('ZEPHYR_GCC_VARIANT', 'zephyr')	# deprecated as of 2/18
 os.environ.setdefault('ZEPHYR_TOOLCHAIN_VARIANT', 'zephyr')
-os.environ.setdefault('ZEPHYR_SDK_INSTALL_DIR',
-                      os.path.expanduser('/opt/zephyr-sdk-0.9.3'))
 os.environ.setdefault('USE_CCACHE', "1")
 
 #: SDK mapping table
