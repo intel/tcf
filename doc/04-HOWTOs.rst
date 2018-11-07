@@ -694,6 +694,187 @@ serial number *YK21080* (:py:func:`setup instructions
 Other power controller implementations are possible, of course, by
 subclassing :py:class:`ttbl.tt_power_control_impl`.
 
+.. _tt_linux_simple:
+
+Configuring a Linux target to power on/off with serial console
+--------------------------------------------------------------
+
+Building on the previous example, we can use the :class:`tt_serial`
+object to create a target that provides serial consoles, can be
+powered on or off and we can interact with the target over the serial
+console.
+
+If we have a Linux machine which is installed with a distro that
+provides serial console access, then this will work:
+
+**Bill of materials**
+
+- a Linux machine
+- a serial console to the physical Linux machine (if your machine
+  doesn't have serial ports, a `USB null modem
+  <https://www.serialgear.com/Serial-Adapters-USBG-NULL-30.html>`_ or
+  two USB serial dongles with a NULL modem adapter will do.
+- one available port on a power switch, to turn the physical machine
+  on/off (eg, a :func:`DLWPS7 <conf_00_lib.dlwps7_add>`)
+
+**Connecting the test target fixture**
+
+1. Configure the Linux machine to:
+
+   - always power on when AC power is on
+
+   - provide a serial console on the serial port; this can be done by
+     adding ``console=ttyS0,115200`` and/or ``console=ttyUSB0,115200``
+     to the kernel command line.
+
+     In modern systemd-enable distributions, also with::
+
+       # systemd enable agetty@ttyUSB0
+       # systemd enable agetty@ttyS0
+
+3. Connect the serial dongle cables to the physical target and to the
+   server
+
+4. Connect the physical target to port PORT of power switch
+   POWERSWITCH
+
+**Configuring the system for the fixture**
+
+1. Choose a name for the target: *linux-NN* (where NN is a number)
+
+2. Configure *udev* to add a name for the serial device for the
+   board's serial console so it can be easily found at
+   ``/dev/tty-TARGETNAME``. Follow :ref:`these instructions
+   <usb_tty_serial>` using the serial dongle's *serial number*.
+
+3. Add a configuration block to the server configuration file:
+
+   .. code:: python
+
+      ttbl.config.target_add(
+           ttbl.tt.tt_serial(
+               "linux-NN",
+               power_control = [
+                      ttbl.cm_serial.pc(),
+                      ttbl.pc.dlwps7("http://admin:1234@POWERSWITCH/PORT"),
+                      ttbl.pc.delay(5),
+               ],
+               serial_ports = [
+                   "pc",
+                   { "port": "/dev/tty-linux-NN", "baudrate": 115200 }
+               ]),
+           tags = {
+               'linux': True,
+               'bsp_models': { 'x86_64': None },
+               'bsps': {
+                   'x86_64': {
+                       'linux': True,
+                       'console': 'x86_64',
+                   }
+               }
+           },
+           target_type = "linux-DISTRONAME-VERSION")
+
+   where of course, ``DISTRONAME-VERSION`` matches the linux
+   distribution and verison installed.
+           
+.. _ttbd_config_phys_linux_live:
+
+
+Configure physical Linux targets with a fixed Live filesystem
+-------------------------------------------------------------
+
+Using the same mechanism as for :ref:`QEMU <ttbd_config_qemu_linux>`,
+a physical Linux machine can be booted with the TCF-live image that
+will always boot fresh to the same state.
+
+This builds on the :ref:`previous section <tt_linux_simple>`.
+
+**Bill of materials**
+
+- a Linux machine w at least 2G RAM (harddrive optional, but recommended)
+- a USB drive (at least 2G)
+- a serial console to the physical Linux machine (if your machine
+  doesn't have serial ports, a `USB null modem
+  <https://www.serialgear.com/Serial-Adapters-USBG-NULL-30.html>`_ or
+  two USB serial dongles with a NULL modem adapter will do.
+- one available port on a power switch, to turn the physical machine
+  on/off (eg, a :func:`DLWPS7 <conf_00_lib.dlwps7_add>`)
+
+**Connecting the test target fixture**
+
+1. Initialize the USB drive with the image (assuming
+   it is at */dev/sdb*)::
+
+     # livecd-iso-to-disk --format --reset-mbr tcf-live/tcf-live.iso /dev/sdb
+
+2. Plug the USB drive to the physical Linux target, make sure it boots
+
+3. Configure the Linux machine to:
+
+   - boot USB first
+
+   - always power on when AC power is on
+
+4. Create two physical partitions for large file storage during tests
+   and swap:
+
+   - boot the image, connect via standard console or serial console
+
+   - partition the disk::
+
+       $ parted DEVICE -s mklabel gpt	             # make a new partition table
+       $ parted DEVICE -s mkpart logical linux-swap 0% 10G # make a partition
+       $ parted DEVICE -s name 1 TCF-swap            # name it
+       $ parted DEVICE -s mkpart logical btrfs 10G 100% # make a partition
+       $ parted DEVICE -s name 2 TCF-home            # name it
+
+   *TCF-home* will be always cleaned up and mounted as */home* and the
+   swap will be activated.
+
+5. Connect the serial dongle cables to the physical target and to the
+   server
+
+6. Connect the physical target to port PORT of power switch
+   POWERSWITCH
+
+**Configuring the system for the fixture**
+
+1. Choose a name for the target: *linux-NN* (where NN is a number)
+
+2. Configure *udev* to add a name for the serial device for the
+   board's serial console so it can be easily found at
+   ``/dev/tty-TARGETNAME``. Follow :ref:`these instructions
+   <usb_tty_serial>` using the board's *serial number*.
+
+3. Add a configuration block to the server configuration file:
+
+   .. code:: python
+
+      ttbl.config.target_add(
+           ttbl.tt.tt_serial(
+               "linux-NN",
+               power_control = [
+                      ttbl.cm_serial.pc(),
+                      ttbl.pc.dlwps7("http://admin:1234@POWERSWITCH/PORT"),
+                      ttbl.pc.delay(5),
+               ],
+               serial_ports = [
+                   "pc",
+                   { "port": "/dev/tty-linux-NN", "baudrate": 115200 }
+               ]),
+           tags = {
+               'linux': True,
+               'bsp_models': { 'x86_64': None },
+               'bsps': {
+                   'x86_64': {
+                       'linux': True,
+                       'console': 'x86_64',
+                   }
+               }
+           },
+           target_type = "linux-fedora-x86_64")
+
 .. _target_tag:
 
 Adding tags to a target

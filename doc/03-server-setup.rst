@@ -453,7 +453,7 @@ configuration statements as described in the links below:
   <conf_00_lib.usbrly08b_targets_add>`
 - to add targets for just controlling power to something, see
   :ref:`these instructions<tt_power>`
-- :ref:`A physical Linux server <ttbd_config_phys_linux>` boards
+- :ref:`physical Linux servers <ttbd_config_phys_linux>` boards
 
 .. _ttbd_config_mcus:
 
@@ -490,100 +490,25 @@ functionality check::
 Note this concludes the server installation process; the sections that
 follow are configuration examples.
 
-
 .. _ttbd_config_phys_linux:
 
-Configure a physical Linux target
----------------------------------
+Configure physical Linux targets
+--------------------------------
 
-Using the same mechanism as for :ref:`QEMU <ttbd_config_qemu_linux>`,
-a physical Linux machine can be booted with the TCF-live image that
-will always boot fresh to the same state.
+There are multiple ways a Linux target can be connected as a target to
+a TCF server. However, dependending on the intended use, different
+configuration steps can be followed:
 
-**Bill of materials**
 
-- a Linux machine w at least 2G RAM (harddrive optional, but recommended)
-- a USB drive (at least 2G)
-- a serial console to the physical Linux machine (if your machine
-  doesn't have serial ports, a `USB null modem
-  <https://www.serialgear.com/Serial-Adapters-USBG-NULL-30.html>`_ or
-  two USB serial dongles with a NULL modem adapter will do.
-- one available port on a power switch, to turn the physical machine
-  on/off (eg, a :func:`DLWPS7 <conf_00_lib.dlwps7_add>`)
+- A Linux target can be setup to :ref:`just power on and off
+  <tt_linux_simple>`.
+       
+- A Linux target can be setup to boot off a read-only live filesystem
+  (to avoid modifications to the root filesystem) following
+  :ref:`these steps <ttbd_config_phys_linux_live>`.
 
-**Connecting the test target fixture**
-
-1. Initialize the USB drive with the image (assuming
-   it is at */dev/sdb*)::
-
-     # livecd-iso-to-disk --format --reset-mbr tcf-live/tcf-live.iso /dev/sdb
-
-2. Plug the USB drive to the physical Linux target, make sure it boots
-
-3. Configure the Linux machine to:
-
-   - boot USB first
-
-   - always power on when AC power is on
-
-4. Create two physical partitions for large file storage during tests
-   and swap:
-
-   - boot the image, connect via standard console or serial console
-
-   - partition the disk::
-
-       $ parted DEVICE -s mklabel gpt	             # make a new partition table
-       $ parted DEVICE -s mkpart logical linux-swap 0% 10G # make a partition
-       $ parted DEVICE -s name 1 TCF-swap            # name it
-       $ parted DEVICE -s mkpart logical btrfs 10G 100% # make a partition
-       $ parted DEVICE -s name 2 TCF-home            # name it
-
-   *TCF-home* will be always cleaned up and mounted as */home* and the
-   swap will be activated.
-
-5. Connect the serial dongle cables to the physical target and to the
-   server
-
-6. Connect the physical target to port PORT of power switch
-   POWERSWITCH
-
-**Configuring the system for the fixture**
-
-1. Choose a name for the target: *linux-NN* (where NN is a number)
-
-2. Configure *udev* to add a name for the serial device for the
-   board's serial console so it can be easily found at
-   ``/dev/tty-TARGETNAME``. Follow :ref:`these instructions
-   <usb_tty_serial>` using the board's *serial number*.
-
-3. Add a configuration block to the server configuration file:
-
-   .. code:: python
-
-      ttbl.config.target_add(
-           ttbl.tt.tt_serial(
-               "linux-NN",
-               power_control = [
-                      ttbl.cm_serial.pc(),
-                      ttbl.pc.dlwps7("http://admin:1234@POWERSWITCH/PORT"),
-                      ttbl.pc.delay(5),
-               ],
-               serial_ports = [
-                   "pc",
-                   { "port": "/dev/tty-linux-NN", "baudrate": 115200 }
-               ]),
-           tags = {
-               'linux': True,
-               'bsp_models': { 'x86_64': None },
-               'bsps': {
-                   'x86_64': {
-                       'linux': True,
-                       'console': 'x86_64',
-                   }
-               }
-           },
-           target_type = "linux-fedora-x86_64")
+  Serial access to a console can be provided and through it networking
+  can be configured.
 
 
 Configuring things that get plugged to the targets
