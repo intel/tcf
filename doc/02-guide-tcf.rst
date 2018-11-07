@@ -64,7 +64,7 @@ with these settings:
   import os
   os.environ.setdefault('ZEPHYR_TOOLCHAIN_VARIANT', 'zephyr')
   os.environ.setdefault('ZEPHYR_SDK_INSTALL_DIR',
-                        os.path.expanduser('/opt/zephyr-sdk-0.9.3'))
+                        os.path.expanduser('/opt/zephyr-sdk-0.9.5'))
 
 .. _tcf_configure_sketch:
 

@@ -669,7 +669,11 @@ class file_c(report_c):
                     # This is just so it aligns well; <snip> comes from
                     # _report() above.
                     ident = "   "
-                yield ident, tgname, message
+                # in Jinja2 templates, you can use the escape() or e()
+                # filter to automatically escape anything that might
+                # not be *ML kosher...but 0x00. So as we only need
+                # this for reporting, we'll make an ugly exception.
+                yield ident, tgname, message.replace("\x00", "<NULL>")
 
     def _mkreport(self, msg_tag, code, _tc, message):
         """

@@ -43,7 +43,7 @@ zephyr_sdks = {
     "zephyr": {
         "default": {
             "call_conv": "zephyr-elf",
-            # ZEPHYR-SDK-0.9.3/sysroots/x86_64-pokysdk-linux/usr/bin/riscv32-zephyr-elf/riscv32-zephyr-elf-gcc-nm
+            # zephyr-sdk-0.9.5/sysroots/x86_64-pokysdk-linux/usr/bin/riscv32-zephyr-elf/riscv32-zephyr-elf-gcc-nm
             "prefix": os.environ.get('ZEPHYR_SDK_INSTALL_DIR', 'ZEPHYR_SDK_NOT_INSTALLED') + \
                       "/sysroots/x86_64-pokysdk-linux" \
                       "/usr/bin/%(arch)s-%(call_conv)s" \
