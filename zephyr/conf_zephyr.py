@@ -26,7 +26,7 @@ tcfl.tc.tc_c.dir_ignore_add_regex("^outdir.*$")
 os.environ.setdefault('ZEPHYR_GCC_VARIANT', 'zephyr')	# deprecated as of 2/18
 os.environ.setdefault('ZEPHYR_TOOLCHAIN_VARIANT', 'zephyr')
 os.environ.setdefault('ZEPHYR_SDK_INSTALL_DIR',
-                      os.path.expanduser('/opt/zephyr-sdk-0.9.3'))
+                      os.path.expanduser('/opt/zephyr-sdk-0.9.5'))
 os.environ.setdefault('USE_CCACHE', "1")
 
 #: SDK mapping table
@@ -46,7 +46,7 @@ zephyr_sdks = {
     "zephyr": {
         "default": {
             "call_conv": "zephyr-elf",
-            # ZEPHYR-SDK-0.9.3/sysroots/x86_64-pokysdk-linux/usr/bin/riscv32-zephyr-elf/riscv32-zephyr-elf-gcc-nm
+            # ZEPHYR-SDK-0.9.5/sysroots/x86_64-pokysdk-linux/usr/bin/riscv32-zephyr-elf/riscv32-zephyr-elf-gcc-nm
             "prefix": os.environ.get('ZEPHYR_SDK_INSTALL_DIR', 'ZEPHYR_SDK_NOT_INSTALLED') + \
                       "/sysroots/x86_64-pokysdk-linux" \
                       "/usr/bin/%(arch)s-%(call_conv)s" \

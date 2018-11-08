@@ -4,6 +4,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+#
+# This file has been received under an NDA
+#
 
 import copy
 import errno
@@ -24,7 +27,7 @@ import ttbl.pc_ykush
 import ttbl.tt
 
 # OpenOCD paths -- multiple versions
-sdk_path = "/opt/zephyr-sdk-0.9.3/sysroots/x86_64-pokysdk-linux"
+sdk_path = "/opt/zephyr-sdk-0.9.5/sysroots/x86_64-pokysdk-linux"
 # From the Zephyr SDK
 openocd_sdk_path = os.path.join(sdk_path, "usr/bin/openocd")
 openocd_sdk_scripts = os.path.join(sdk_path, "usr/share/openocd/scripts")
@@ -3191,8 +3194,7 @@ class tt_qemu_zephyr(ttbl.tt_qemu.tt_qemu):
         # adding the networking interface information, depending on
         # what the tag say on _slip_pty_pre_on()
         self._qemu_cmdlines = dict(
-            x86 = \
-            "/opt/zephyr-sdk-0.9.3/sysroots/x86_64-pokysdk-linux"
+            x86 = sdk_path + \
             "/usr/bin/qemu-system-i386 "
             "-m 8 -cpu qemu32,+nx,+pae "
 	    "-device isa-debug-exit,iobase=0xf4,iosize=0x04 "
@@ -3207,8 +3209,7 @@ class tt_qemu_zephyr(ttbl.tt_qemu.tt_qemu):
             # Zephyr kernel boot
             "-kernel %(qemu-image-kernel-x86)s "
             "-nodefaults ",
-            arm = \
-            "/opt/zephyr-sdk-0.9.3/sysroots/x86_64-pokysdk-linux"
+            arm = sdk_path + \
             "/usr/bin/qemu-system-arm "
             "-cpu cortex-m3 "
             "-machine lm3s6965evb -display none "
@@ -3218,8 +3219,7 @@ class tt_qemu_zephyr(ttbl.tt_qemu.tt_qemu):
             # Zephyr kernel boot
             "-kernel %(qemu-image-kernel-arm)s "
             "-nodefaults -net none ",
-            nios2 = \
-            "/opt/zephyr-sdk-0.9.3/sysroots/x86_64-pokysdk-linux"
+            nios2 = sdk_path + \
             "/usr/bin/qemu-system-nios2 "
             "-machine altera_10m50_zephyr -display none "
             # Serial console tt_qemu.py can grok
@@ -3228,18 +3228,16 @@ class tt_qemu_zephyr(ttbl.tt_qemu.tt_qemu):
             # Zephyr kernel boot
             "-kernel %(qemu-image-kernel-nios2)s "
             "-nodefaults -net none ",
-            riscv32 = \
-            "/opt/zephyr-sdk-0.9.3/sysroots/x86_64-pokysdk-linux"
+            riscv32 = sdk_path + \
             "/usr/bin/qemu-system-riscv32 "
-            "-machine sifive -nographic -m 32 "
+            "-machine sifive_e -nographic "
             # Serial console tt_qemu.py can grok
             "-chardev socket,id=ttyS0,server,nowait,path=%(path)s/%(bsp)s-console.write,logfile=%(path)s/%(bsp)s-console.read "
             "-serial chardev:ttyS0 "
             # Zephyr kernel boot
             "-kernel %(qemu-image-kernel-riscv32)s "
             "-nodefaults -net none ",
-            xtensa = \
-            "/opt/zephyr-sdk-0.9.3/sysroots/x86_64-pokysdk-linux"
+            xtensa = sdk_path + \
             "/usr/bin/qemu-system-xtensa "
             "-cpu sample_controller -machine sim -semihosting -nographic "
             # Serial console tt_qemu.py can grok

@@ -68,7 +68,7 @@ build the Zephyr OS you can run one of its test cases on it::
   $ git clone http://github.com/zephyrproject-rtos/zephyr
   $ export ZEPHYR_BASE=$HOME/zephyr
   $ export ZEPHYR_TOOLCHAIN_VARIANT=zephyr
-  $ export ZEPHYR_SDK_INSTALL_DIR=/opt/zephyr-sdk-0.9.3
+  $ export ZEPHYR_SDK_INSTALL_DIR=/opt/zephyr-sdk-0.9.5
 
   $ cd $ZEPHYR_BASE/samples/hello_world
   $ make BOARD=qemu_x86

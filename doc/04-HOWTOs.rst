@@ -917,14 +917,14 @@ TCF run and a few switches:
 
 - Note we now can start the debugger; find it first::
 
-    $ find /opt/zephyr-sdk-0.9.3/ -iname \*gdb
+    $ find /opt/zephyr-sdk-0.9.5/ -iname \*gdb
     ...
-    /opt/zephyr-sdk-0.9.3/sysroots/x86_64-pokysdk-linux/usr/bin/i586-zephyr-elf/i586-zephyr-elf-gdb
+    /opt/zephyr-sdk-0.9.5/sysroots/x86_64-pokysdk-linux/usr/bin/i586-zephyr-elf/i586-zephyr-elf-gdb
     ...
 
   run the debugger to the ELF file we found above::
 
-    $ /opt/zephyr-sdk-0.9.3/sysroots/x86_64-pokysdk-linux/usr/bin/i586-zephyr-elf/i586-zephyr-elf-gdb \
+    $ /opt/zephyr-sdk-0.9.5/sysroots/x86_64-pokysdk-linux/usr/bin/i586-zephyr-elf/i586-zephyr-elf-gdb \
         tmp/1234/outdir-1234-j38h-quark_d2000_crb/zephyr/zephyr.elf
     ...
     Reading symbols from tmp/1234/outdir-1234-j38h-quark_d2000_crb/zephyr/zephyr.elf...done.
@@ -1122,7 +1122,7 @@ Obtain the code
 
 .. note:: you will also need to install the `Zephyr SDK 0.9
           <https://www.zephyrproject.org/downloads/tools>`_ to
-          ``/opt/zephyr-sdk-0.9.3`` if you want to build Zephyr OS
+          ``/opt/zephyr-sdk-0.9.5`` if you want to build Zephyr OS
           apps and other dependencies:
 
           Fedora::
@@ -1207,14 +1207,14 @@ you will need this SDK:
 
 2. Install in */opt/zephyr-sdk-VERSION*::
 
-     # chmod a+x zephyr-sdk-0.9.3-setup.run
-     # ./zephyr-sdk-0.9.3-setup.run -- -y -d /opt/zephyr-sdk-0.9.3
+     # chmod a+x zephyr-sdk-0.9.5-setup.run
+     # ./zephyr-sdk-0.9.5-setup.run -- -y -d /opt/zephyr-sdk-0.9.5
 
 3. (optional) Create a fast RPM with :ref:`FPM <fpm>`::
 
-     $ fpm -n zephyr-sdk-0.9.3 -v 0.9.3 \
+     $ fpm -n zephyr-sdk-0.9.5 -v 0.9.5 \
      >     --rpm-rpmbuild-define '_build_id_links alldebug' \
-     >     -s dir -C / -t rpm opt/zephyr-sdk-0.9.3
+     >     -s dir -C / -t rpm opt/zephyr-sdk-0.9.5
 
    *_build_id_links alldebug* is needed to disable generation of build
    symlinks in */usr/lib/.build-id*. Because the SDK packs a lot of
