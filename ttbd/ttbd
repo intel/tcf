@@ -1450,18 +1450,24 @@ if __name__ == "__main__":
     ttbl.config.target_max_idle = args.target_max_idle
 
     if args.system_wide == None:
+        ttbl.config.instance_suffix = ""
+        ttbl.config.instance = ""
         # args.VAR stuff comes from settings on the argparser
         pass
     elif args.system_wide == "":
+        ttbl.config.instance_suffix = ""
+        ttbl.config.instance = ""
         args.config_path = "/etc/ttbd"
         args.files_path = "/var/cache/ttbd"
         args.state_path = "/var/run/ttbd"
         # State that stays through reboots
         args.var_lib_path = "/var/lib/ttbd"
     else:
-        args.config_path = "/etc/ttbd-" + args.system_wide
-        args.files_path = "/var/cache/ttbd-" + args.system_wide
-        args.state_path = "/var/run/ttbd-" + args.system_wide
+        ttbl.config.instance = args.system_wide
+        ttbl.config.instance_suffix = "-" + args.system_wide
+        args.config_path = "/etc/ttbd" + ttbl.config.instance_suffix
+        args.files_path = "/var/cache/ttbd" + ttbl.config.instance_suffix
+        args.state_path = "/var/run/ttbd" + ttbl.config.instance_suffix
         # State that stays through reboots
         args.var_lib_path = os.path.join("/var/lib/ttbd", args.system_wide)
 

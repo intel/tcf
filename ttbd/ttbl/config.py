@@ -48,6 +48,21 @@ defaults_enabled = True
 #: spawn them more dynamically).
 processes = 20
 
+#: Name of the current *ttbd* instance
+#:
+#: Multiple separate instances of the daemon can be started, each
+#: named differently (or nothing).
+instance = ""
+
+#: Filename suffix for the current *ttbd* instance
+#:
+#: Per :var:`instance`, this defines the string that is appended to
+#: different configuration files/paths that have to be instance
+#: specific but cannot be some sort of directory. Normally this is
+#: *-INSTANCE* (unless INSTANCE is empty).
+instance_suffix = ""
+
+
 def _nested_list_flatten(l):
     for e in l:
         if isinstance(e, collections.Iterable):
