@@ -959,12 +959,12 @@ def version_get(module, name):
     try:
         git_version = subprocess.check_output(
             "git describe --tags --always --abbrev=7 --dirty".split(),
-            cwd = _srcdir, stderr = subprocess.PIPE)
+            cwd = _srcdir, stderr = subprocess.STDOUT)
         return git_version.strip()
     except subprocess.CalledProcessError as _e:
         # At this point, logging is still not initialized
-        raise RuntimeError("Unable to determine %s version: %s"
-                           % (name, _e.output))
+        raise RuntimeError("Unable to determine %s (%s) version: %s"
+                           % (name, _srcdir, _e.output))
 
 def tcp_port_busy(port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
