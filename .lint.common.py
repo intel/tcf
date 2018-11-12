@@ -3,26 +3,22 @@
 Misc common lint checks
 """
 import contextlib
-import logging
 import os
 import pty
 import re
 import subprocess
 
-def lint_run_gitlint(repo, cf):
-    """
-    Run gitlint on the commit message
-    """
-    log = logging.getLogger("gitlint")
-    if cf != None:	# We only operate on the whole repository
-        return
-    # If we are checking on the working tree (not HEAD), then there
-    # will be no commit message (FIXME: fix to enable pre-commit hook)
-    if repo.is_dirty(untracked_files = False):
-        log.warning("Skipping gitlint, repo is dirty so there is "
-                    "no commit message")
-        return
 
+def lint_gitlint_filter(repo, cf):
+    if cf != None:	# We only operate on the whole repository
+        return False
+    # If we are checking on the working tree (not HEAD), then there
+    # will be no commit message
+    if repo.is_dirty(untracked_files = False):
+        return False
+    return True
+
+def lint_gitlint(repo, _cf):
     #
     # Verify commit message
     #
@@ -44,7 +40,7 @@ def lint_run_gitlint(repo, cf):
                 '--target',
                 repo.working_tree_dir
             ]
-            log.debug("Running %s", " ".join(cmdline))
+            repo.log.debug("Running %s", " ".join(cmdline))
             output = subprocess.check_output(cmdline,
                                              stdin = slave,
                                              stderr = subprocess.STDOUT,
@@ -66,13 +62,14 @@ E: your commit message needs fixing, see https://securewiki.ith.intel.com/displa
             repo.error("   " + line)
 
 
-def lint_ws_at_eol(_repo, cf):
-    """
-    Warn if we find that any line of text the commit modified
-    finish with whitespace.
-    """
+lint_ws_at_eol_name = "white space at end of lines"
+
+def lint_ws_at_eol_filter(_repo, cf):
     if not cf or cf.binary or cf.deleted:
-        return
+        return False
+    return True
+
+def lint_ws_at_eol(_repo, cf):
     with open(cf.name, "r") as f:
         # Heaven's sake, indexes start at zero ZERO ZERO
         # https://i.imgur.com/zAjk1xs.jpg ... but most
@@ -83,6 +80,6 @@ def lint_ws_at_eol(_repo, cf):
             line = str.rstrip(line, "\n")
             if regex.match(line):
                 if line_cnt in cf.lines or _repo.wide:
-                    _repo.warning("%s:%d: W: whitespace at end of line"
-                                  % (cf.name, line_cnt))
+                    _repo.error("%s:%d: E: whitespace at end of line"
+                                % (cf.name, line_cnt))
             line_cnt += 1

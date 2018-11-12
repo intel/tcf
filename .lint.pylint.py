@@ -2,20 +2,23 @@
 """
 Runs Python's lint under lint-all
 """
-import logging
 import os
 import shutil
 import re
 import __main__
 
-def lint_50_pylint(repo, cf):	# pylint: disable = too-many-branches
+def lint_pylint_filter(repo, cf):	# pylint: disable = too-many-branches
     if not cf or cf.binary or cf.deleted:
-        return
-    log = logging.getLogger("pylint")
-    if not cf.name.endswith(".py"):
-        log.info("%s: skipping, not a Python file", cf.name)
-        return
+        return False
 
+    with open(cf.name, 'r') as f:
+        firstline = f.readline()
+    if not cf.name.endswith(".py") and not 'python' in firstline:
+        repo.log.info("%s: skipping, not a Python file", cf.name)
+        return False
+    return True
+
+def lint_pylint(repo, cf):	# pylint: disable = too-many-branches
     cmdline = [ 'pylint' ]
     with open(cf.name, 'r') as f:
         firstline = f.readline()
@@ -48,7 +51,7 @@ def lint_50_pylint(repo, cf):	# pylint: disable = too-many-branches
     ]
 
     __main__.generic_line_linter(
-        repo, cf, cmdline, log,
+        repo, cf, cmdline,
         regex_error = re.compile(r":(?P<line_number>[0-9]+): \[E[0-9]+\("),
         regex_warning = re.compile(
             r":(?P<line_number>[0-9]+): \[[WCR][0-9]+\(")

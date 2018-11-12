@@ -2,22 +2,28 @@
 """
 Implement TCF specificy lints
 """
-import logging
 import re
 
+lint_py_check_per_line_name = "misc Python checks"
 
-log = logging.getLogger("tcfpylint")
+def lint_py_check_per_line_filter(_repo, cf):
+    """
+    Run multiple line-by-line checks
+    """
+    if not cf or cf.binary or cf.deleted:
+        return False
+
+    with open(cf.name, 'r') as f:
+        firstline = f.readline()
+    if not cf.name.endswith(".py") and not 'python' in firstline:
+        _repo.log.info("%s: skipping, not a Python file", cf.name)
+        return False
+    return True
 
 def lint_py_check_per_line(_repo, cf):
     """
     Run multiple line-by-line checks
     """
-    if not cf or cf.binary or cf.deleted:
-        return
-    if not cf.name.endswith(".py"):
-        log.info('%s: skipping, not a python file', cf.name)
-        return
-
     with open(cf.name, "r") as f:
         line_cnt = 0
         regex_import = re.compile(r"\s*from\s+.*\s+import\s+.*")

@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /usr/bin/python3   
 #
 # Copyright (c) 2017 Intel Corporation
 #
@@ -20,8 +20,11 @@ import os
 import re
 import subprocess
 import sys
+import traceback
+import urllib.parse
 
 import git
+import github
 
 help_epilog = """
 To use with git commit hook:
@@ -45,22 +48,35 @@ To write lint integration scripts:
   - create a Python file .lint.NAME.py
 
   - have it declare one or more functions called lint_SOMETHING that take
-    two arguments, a Git Repo object and a changedfile object.
+    two arguments, a Git Repo object and a changedfile
+    object.
 
-  - have it print to stdout lines in the form FILENAME:[LINE:]
-    MESSAGE, make filenames relative to os.getpwd()
+    Optionally declare a lint_SOMETHING_filter(repo, cf) that returns
+    True if it will handle the file described by cf (or if None, the
+    whole tree), so the lint_SOMETHING() function is only called for
+    the files filtered.
 
-    Note: only whatever the scriptlet prints with Python's print()
-    will be used--if you fork a process, capture its output and print
-    it with print() or sys.stdout.write()
+    Optionally declare a variable lint_SOMETHING_name with a string
+    naming the linter.
 
-  - return a 3-tuple NUMBER-OF-ERRORS, WARNINGS, BLOCKAGES
+  - have the linter function call cf.warning() or cf.error() to report
+    lines of concern [eg: from the output of linter programs] in the
+    form FILENAME:[LINE:] MESSAGE; make filenames relative to
+    os.getpwd()
 
+    for whole tree checks (when cf == None), use repo.warning(),
+    repo.error()
+
+    each call to warning() / error(), tallies up the warnings and errors
 
 
 """
 
 lint_functions = {}
+
+
+def default_filter(_repo, _cf):
+    return True
 
 def config_import_file(filename, raise_on_fail = True):
     """
@@ -77,12 +93,19 @@ def config_import_file(filename, raise_on_fail = True):
         sys.stderr.flush()
         logging.debug("%s: configuration file imported", filename)
         for symbol in module.__dict__:
+            obj = module.__dict__[symbol]
             if callable(module.__dict__[symbol]) \
-               and symbol.startswith("lint_"):
-                _symbol = symbol.replace("lint_run_", "")
-                _symbol = _symbol.replace("lint_", "")
-                _symbol = _symbol.replace("_py", "")
-                lint_functions[_symbol] = module.__dict__[symbol]
+               and symbol.startswith("lint_") \
+               and not symbol.endswith("_name") \
+               and not symbol.endswith("_filter"):
+                obj_filter = getattr(module, symbol + "_filter",
+                                     default_filter)
+                shortname =  symbol.replace("lint_run_", "")
+                shortname = shortname.replace("lint_", "")
+                _symbol = getattr(module, symbol + "_name", shortname)
+                config = getattr(module, shortname + "_config", {})
+                lint_functions[_symbol] = (obj, obj_filter, shortname, config)
+
     except Exception as e:	# pylint: disable = W0703
         # throw a wide net to catch any errors in filename
         logging.exception("%s: can't load config file: %s", filename, e)
@@ -159,13 +182,14 @@ def config_import(path_list, file_regex, namespace = "__main__",
         paths_done.add(abs_path)
 
 def generic_line_linter(
-        _repo, cf, cmdline, log,
+        _repo, cf, cmdline,
         regex_error = re.compile(
             r":(?P<line_number>[0-9]+)(:(?P<column_number>[0-9]+))?:"
             r" \[(E\w+[0-9]+|error)\] "),
         regex_warning = re.compile(
             r":(?P<line_number>[0-9]+)(:(?P<column_number>[0-9]+))?: "
-            r"\[([WCR]\w+[0-9]+|warning)\] ")):
+            r"\[([WCR]\w+[0-9]+|warning)\] "),
+        log = None):
     """Run a generic linter that outputs in standarized way and report
 
     Most linters can be made to report in the format::
@@ -193,7 +217,10 @@ def generic_line_linter(
     assert isinstance(_repo, git.Repo)
     assert isinstance(cf, changedfile_c)
     assert isinstance(cmdline, list)
-    assert isinstance(log, logging.Logger)
+    if log:
+        assert isinstance(log, logging.Logger)
+    else:
+        log = _repo.log
     assert isinstance(regex_error, re._pattern_type)
     assert isinstance(regex_warning, re._pattern_type)
 
@@ -207,7 +234,8 @@ def generic_line_linter(
             cmdline, stderr = subprocess.STDOUT, universal_newlines = True,
             cwd = cwd)
     except FileNotFoundError:
-        _repo.error("Can't find linter? [%s]", cmdline[0])
+        _repo.error("Can't find linter? [%s]" % cmdline[0])
+        output = ""
     except subprocess.CalledProcessError as e:
         output = e.output
 
@@ -218,9 +246,9 @@ def generic_line_linter(
         me = regex_error.search(line)
         mw = regex_warning.search(line)
         if me:
-            cf.warning(line, int(me.groupdict()["line_number"]))
+            cf.error(line, int(me.groupdict()["line_number"]))
         elif mw:
-            cf.error(line, int(mw.groupdict()["line_number"]))
+            cf.warning(line, int(mw.groupdict()["line_number"]))
 
 
 def _gerrit_feedback(_args, _errors, _warnings, _blockage, message):
@@ -294,6 +322,23 @@ def _gerrit_feedback(_args, _errors, _warnings, _blockage, message):
     if output:
         logging.error("gerrit review output: %s", output)
 
+def linter_config_get(lintername):
+    """
+    Return the configuration object for linter @lintername
+
+    The type of this object is specific to each linter. Best thing is
+    to make it a dictionary.
+
+    To access this function from a scriptlet:
+
+    >>> import __main__
+    >>>
+    >>> __main__.linter_config_get('somename')
+
+    FIXME: yep, there have to be a better way than __main__
+    """
+    return lint_functions[lintername][3]
+
 class tee_c(object):
     """
     Duplicate stdout to a file, so we can collect that output to send
@@ -319,6 +364,7 @@ class changedfile_c(object):	# pylint: disable = too-few-public-methods
     def __init__(self, repo, filename):
 
         self.repo = repo
+        self.log = logging.getLogger(filename)
 
         self.name = os.path.normpath(filename)
         self.name_rel_repo = os.path.relpath(self.name, repo.working_tree_dir)
@@ -343,7 +389,7 @@ class changedfile_c(object):	# pylint: disable = too-few-public-methods
         self.lines = []
         if not self.binary:
             if self.repo.is_dirty(untracked_files = True):
-                logging.debug("%s: blaming", self.name)
+                self.log.info("blaming")
                 output = repo.git.blame('-p', '--', self.name_rel_repo)
             else:
                 output = repo.git.blame('-p', changedfile_c.gitrev_blame, '--',
@@ -353,18 +399,17 @@ class changedfile_c(object):	# pylint: disable = too-few-public-methods
                     _, line_start, _ = line.split(" ", 2)
                     self.lines.append(int(line_start))
 
-        logging.debug("%s: binary:%s deleted:%s lines-changed:%s",
-                      self.name, self.binary, self.deleted,
-                      ",".join([ str(i) for i in self.lines ]))
+        self.log.debug("binary:%s deleted:%s lines-changed:%s",
+                       self.binary, self.deleted,
+                       ",".join([ str(i) for i in self.lines ]))
 
-    @staticmethod
-    def message(message):
+    def message(self, message, line_number = None):
         """
         Report a message
 
         :param str message: line with the message
         """
-        print(message)
+        self.repo.message(message, line_number)
 
     def warning(self, message, line_number = None):
         """
@@ -380,9 +425,9 @@ class changedfile_c(object):	# pylint: disable = too-few-public-methods
           reported. Otherwise, it will be ignored (unless -W was
           given).
         """
-        if line_number in self.lines or self.repo.wide:
+        if line_number in self.lines or args.wide:
             context.warnings += 1
-            self.message(message)
+            self.message(message, line_number)
 
     def error(self, message, line_number = None):
         """
@@ -398,9 +443,9 @@ class changedfile_c(object):	# pylint: disable = too-few-public-methods
           reported. Otherwise, it will be ignored (unless -W was
           given).
         """
-        if line_number in self.lines or self.repo.wide:
+        if line_number in self.lines or args.wide:
             context.errors += 1
-            self.message(message)
+            self.message(message, line_number)
 
     def blockage(self, message, line_number = None):
         """
@@ -416,9 +461,9 @@ class changedfile_c(object):	# pylint: disable = too-few-public-methods
           reported. Otherwise, it will be ignored (unless -W was
           given).
         """
-        if line_number in self.lines or self.repo.wide:
+        if line_number in self.lines or args.wide:
             context.blockage += 1
-            self.message(message)
+            self.message(message, line_number)
 
 class _action_increase_level(argparse.Action):	# pylint: disable = too-few-public-methods
     def __init__(self, option_strings, dest, default = None, required = False,
@@ -460,7 +505,8 @@ ap.add_argument(
 ap.add_argument(
     "-p", "--scripts-path",
     action = "append",
-    help = "Add a find where to find .lint.*.py scripts")
+    help = "Add a find where to find .lint.*.py scripts; if "
+    "empty, it will clear the current list and start a new one")
 ap.add_argument(
     "-s", "--script",
     action = "append", default = [],
@@ -508,6 +554,63 @@ ap.add_argument(
     action = "store_true", default = False,
     help = "Get Gerrit parameters from environment setup by Jenkins")
 ap.add_argument(
+    "--github-repo",
+    action = "store", default = None,
+    help = "Github repository the commit we are checking is a pull request")
+ap.add_argument(
+    "--github-baseurl",
+    action = "store", default = None,
+    help = "Github API URL (will be autogenerated if based on "
+    "--github-repo, but can be overriden with this")
+ap.add_argument(
+    "--github-commit",
+    action = "store", default = None,
+    help = "Github commit in --github-repo, update status")
+ap.add_argument(
+    "--github-token",
+    action = "store", default = None,
+    help = "Github token to access the API")
+ap.add_argument(
+    "--github-from-jenkins",
+    action = "store_true", default = False,
+    help = "Get github values repo and commit from Jenkins environment "
+    "(from the pull request builder plugin exporting env vars "
+    "ghprbActualCommit and ghprbAuthorRepoGitUrl); token still has "
+    "to be passed in the command line")
+ap.add_argument(
+    "--status-detail-url",
+    action = "store", default = None,
+    help = "Provide an URL with where the user can go to get details "
+    "about the execution of a scriptlet; this would be usually the "
+    "full output of the scriplet stored in, for example, some jenkins "
+    "artifact area. This can use %%(FIELD)s codes to replace the "
+    "following fields: context_name, context_shortname, capture_path, "
+    "capture_filename "
+)
+ap.add_argument(
+    "--status-pending-url",
+    action = "store", default = None,
+    help = "Provide an URL with where the user can go to get details "
+    "about the execution of a scriptlet; this would be usually the "
+    "full output of the scriplet stored in, for example, some jenkins "
+    "artifact area. This can use %%(FIELD)s codes to replace the "
+    "following fields: context_name, context_shortname, capture_path, "
+    "capture_filename "
+)
+ap.add_argument(
+    "--capture",
+    action = "store_true", default = False,
+    help = "Capture the output of each linter in a file named "
+    "by the --capture-template argument"
+)
+ap.add_argument(
+    "--capture-path",
+    action = "store", default = "output-%(context_shortname)s.txt",
+    help = "Provide an path / filename to which to capture the output "
+    "of each linter; the following %%(FIELD)s are available: "
+    "context_name, context_shortname"
+)
+ap.add_argument(
     "--use-head",
     action = "store_const", const = 'HEAD', dest = 'use',
     help = "Override smart detection, use HEAD")
@@ -549,7 +652,15 @@ logging.addLevelName(6, "D5")
 local_path = os.path.expanduser(args.path)
 logging.debug("local path: %s", local_path)
 abspath = os.path.abspath(local_path)
-args.scripts_path.append(abspath)
+args.scripts_path.insert(0, abspath)
+# iterate the scripts path and prune it; if there is an empty path,
+# delete anything in the list and start fresh; used to reset the defaults
+new_path = []
+for path in args.scripts_path:
+    if path == "" or path == None:
+        new_path = []
+    new_path.append(path)
+args.scripts_path = new_path
 logging.debug("script paths: %s", " ".join(args.scripts_path))
 
 # Find all lint scripts in args.path
@@ -564,19 +675,36 @@ lint_function_names_sorted = [x[0] for x in lint_functions_sorted]
 logging.debug("lint functions: %s", ",".join(lint_function_names_sorted))
 
 class repo_c(git.Repo):
+
     def __init__(self, path):
         git.Repo.__init__(self, path)
+        self.relpath = None
+        self.context = None
+        self.log = None
+        self.wide = None
 
-    @staticmethod
-    def message(message):
+    def message(self, message, line_number = None):
         """
         Report a message
 
         :param str message: line with the message
         """
-        print(message)
+        if line_number:
+            line_number_s = str(line_number) + ":"
+            # ok, hack, many messages already contain the line number,
+            # so do a dirty check and ignore it if so
+            if line_number_s in message:
+                line_number_s = ""
+        else:
+            line_number_s = ""
+        print(line_number_s + message)
+        _context = self.context
+        if args.capture and not _context.capturef:
+            _context.capturef = open(_context.kws['capture_path'], "w")
+        if _context.capturef:
+            _context.capturef.write(line_number_s + message + '\n')
 
-    def warning(self, message):
+    def warning(self, message, line_number = None):
         """
         Report a warning line
 
@@ -591,9 +719,9 @@ class repo_c(git.Repo):
           given).
         """
         context.warnings += 1
-        self.message(message)
+        self.message(message, line_number)
 
-    def error(self, message):
+    def error(self, message, line_number = None):
         """
         Report an error line
 
@@ -608,9 +736,9 @@ class repo_c(git.Repo):
           given).
         """
         context.errors += 1
-        self.message(message)
+        self.message(message, line_number)
 
-    def blockage(self, message):
+    def blockage(self, message, line_number = None):
         """
         Report a blockage line
 
@@ -619,7 +747,7 @@ class repo_c(git.Repo):
           FILE:LINE[:COLUMN] MESSAGE
         """
         context.blockage += 1
-        self.message(message)
+        self.message(message, line_number)
 
 git_repo = repo_c(abspath)
 git_repo.relpath = local_path
@@ -657,7 +785,11 @@ logging.debug("Files affected: %s", " ".join(git_repo.filenames))
 
 files = {}
 
+# We overload the git repository structure to contain global
+# parameters we'll use
 git_repo.wide = args.wide
+git_repo.context = None
+git_repo.log = None
 
 if args.gerrit_ssh_host or args.gerrit_from_jenkins:
     sys.stdout = tee_c()	# capture print's output
@@ -665,76 +797,217 @@ if args.gerrit_ssh_host or args.gerrit_from_jenkins:
 class context_c(object):	# pylint: disable = too-few-public-methods
     inventory = {}
 
-    def __init__(self, name):
+    gh_commit = None
+
+    def __init__(self, name, shortname = None):
         self.name = name
+        if shortname:
+            self.shortname = shortname
+        else:
+            self.shortname = name
         self.errors = 0
         self.warnings = 0
         self.blockage = 0
         self.inventory[name] = self
+        self.capturef = None
+        self.kws = dict(
+            context_name = self.name,
+            context_shortname = self.shortname,
+        )
+        self.kws['capture_path'] = args.capture_path % self.kws
+        self.kws['capture_filename'] = \
+            os.path.basename(self.kws['capture_path'])
+
+    @staticmethod
+    def _add_s(n):
+        if n == 1:
+            return ""
+        return "s"
+
+    def description(self, cfs_n = -1, cf_tree = False):
+        descriptionl = []
+        if cfs_n > 0:
+            descriptionl.append("%d file%s checked"
+                                % (cfs_n, self._add_s(cfs_n)))
+        if cf_tree:
+            descriptionl.append("tree checked")
+        if self.blockage:
+            descriptionl.append("%d error%s" %
+                                (self.blockage, self._add_s(self.blockage)))
+        if self.errors:
+            descriptionl.append("%d failure%s" %
+                                (self.errors, self._add_s(self.errors)))
+        if self.warnings:
+            descriptionl.append("%d warning%s" %
+                                (self.warnings, self._add_s(self.warnings)))
+        if not self.blockage and not self.errors and not self.warnings:
+            descriptionl.append("LGTM")
+
+        return ", ".join(descriptionl)
+
+    def github_status_set(self, git_repo, status, description, url):
+        # commit and repo, if not specified default to Jenkins'
+        # environment if --github-from-jenkins was given
+        if args.github_commit == None and args.github_from_jenkins:
+            args.github_commit = os.environ.get('ghprbActualCommit', None)
+        if args.github_repo == None and args.github_from_jenkins:
+            args.github_repo = os.environ.get('ghprbAuthorRepoGitUrl', None)
+        if not args.github_commit or not args.github_repo:
+            git_repo.log.debug("Not reporting to github")
+            return		# Nah, we don't care for it
+        # Set the commit description only once, we don't need to do it for
+        # every call
+        cls = type(self)
+        if cls.gh_commit == None:
+            gh_baseurl = args.github_baseurl
+            gh_url = urllib.parse.urlparse(args.github_repo)
+            if not gh_baseurl:
+                if gh_url.hostname == "github.com":
+                    gh_baseurl = "https://api.github.com"
+                else:
+                    gh_baseurl = "https://" + gh_url.hostname + "/api/v3"
+                git_repo.log.info("github: inferred API url %s", gh_baseurl)
+            gh = github.Github(timeout = 120,
+                               base_url = gh_baseurl,
+                               login_or_token = args.github_token)
+
+            gh_repo = gh.get_repo(str(gh_url.path[1:]), lazy = False)
+            cls.gh_commit = gh_repo.get_commit(args.github_commit)
+
+        if url == None:
+            url = github.GithubObject.NotSet
+        cls.gh_commit.create_status(status, url, description, self.name)
+
+    def status_set(self, git_repo, status, description, url):
+        if url:
+            git_repo.log.info("status %s: %s [%s]", status, description, url)
+        else:
+            git_repo.log.info("status %s: %s", status, description)
+        self.github_status_set(git_repo, status, description, url)
+
+    def status_final_set(self, git_repo, url, cfs_n, cf_tree):
+        if self.name.startswith("__"):
+            return
+
+        description = context.description(cfs_n, cf_tree)
+        # Github commit are pending, success, failure, error
+        if context.errors:
+            # First this, if there is a confirmed failure we want to
+            # see it
+            status = "failure"
+        elif context.blockage:
+            status = "error"
+        elif context.warnings:
+            status = "success"
+        else:
+            status = "success"
+
+        self.status_set(git_repo, status, description, url)
 
 context = None
 context_global = context_c('global')
 
-def _lint_run(_context, function, repo, _cf):
+def _lint_run(function, repo, _cf):
     if _cf:
         s = "%s: " % _cf.name
     else:
         s = ""
     # So we can access it from multiple places, especially for the name
-    global context
-    context = _context
-    logging.debug("%srunning %s", s, context.name)
     try:
+        context.errors = 0
+        context.warnings = 0
+        context.blockage = 0
+        repo.log.debug("%srunning", s)
         r = function(repo, _cf)
         if r != None:
             context.errors += r[0]
             context.warnings += r[1]
             context.blockage += r[2]
+    except StopIteration as e:
+        # Doesn't apply to this one
+        repo.log.info(e)
     except Exception as e:	# pylint: disable = broad-except
-        logging.exception("%s: raised exception: %s", context._name, e)
+        repo.log.error("%s: raised exception: %s: %s", context.name, e,
+                       traceback.format_exc())
         context.blockage += 1
-    context_global.errors += context.errors
-    context_global.warnings += context.warnings
-    context_global.blockage += context.blockage
+    finally:
+        context_global.errors += context.errors
+        context_global.warnings += context.warnings
+        context_global.blockage += context.blockage
 
-for _name, _function in lint_functions_sorted:
-    context = context_c(_name)
-    # First run the checkers on each file, then later run them on the
-    # commit itself
-    for _filename in git_repo.filenames:
-        _lint_run(context, _function, git_repo,
-                  changedfile_c(git_repo, _filename))
 
-    # Now run them on the full commit
-    # We do this after the files because we might have found files that
-    # activate some decissions on what to run
-    _lint_run(context, _function, git_repo, None)
+cfs_all = {}
+for _filename in git_repo.filenames:
+    cfs_all[_filename] = changedfile_c(git_repo, _filename)
+        
+for _name, (lint_function, lint_filter, _shortname, _config) \
+    in lint_functions_sorted:
+    try:
+        context = context_c(_name, _shortname)
+        git_repo.context = context
+        git_repo.log = logging.getLogger(context.name)
 
-lst = []
-if context_global.errors:
-    lst.append('errors')
-if context_global.warnings:
-    lst.append('warnings')
-if context_global.blockage:
-    lst.append('blockages (some tools missing?)')
-if lst:
-    msg = " There are " + " and ".join(lst) + ".\n\n"
-    if args.url:
-        msg += " (" + args.url + ")\n\n"
-else:
-    msg = " All checks passed"
+        cfs = []
+        for _filename in git_repo.filenames:
+            cf = cfs_all[_filename]
+            # get a logger with more context
+            cf.log = logging.getLogger(git_repo.context.shortname
+                                       + ":" + _filename)
+            if lint_filter(git_repo, cf):
+                cfs.append(cf)
+        cf_tree = lint_filter(git_repo, None)
+
+        if not cfs and not cf_tree:
+            git_repo.log.info("skipping, no need")
+            continue
+
+        cfs_n = len(cfs)
+        if args.status_pending_url:
+            pending_url = args.status_pending_url % context.kws
+        else:
+            pending_url = None
+        if args.status_detail_url:
+            url = args.status_detail_url % context.kws
+        else:
+            url = None
+        # Run the linter on on each file then on the full commit
+        #
+        # We do this after the files because we might have found files that
+        # activate some decissions on what to run
+        for cf in cfs:
+            context.status_set(git_repo, "pending",
+                               "checking file " + cf.name_rel_repo,
+                               pending_url)
+            _lint_run(lint_function, git_repo, cf)
+        if cf_tree:
+            context.status_set(git_repo, "pending", "checking tree",
+                               pending_url)
+            _lint_run(lint_function, git_repo, None)
+        context.status_final_set(git_repo, url, cfs_n, cf_tree)
+
+    finally:
+        del context
+        context = None
+        git_repo.context = None
+        git_repo.log = None
+
+msg = context_global.description()
+if args.url and ( context_global.errors or context_global.warnings or
+                  context_global.blockage ):
+    msg += " [" + args.url + "]"
 del files	# close/delete all tempfiles
+
 if args.gerrit_ssh_host or args.gerrit_from_jenkins:
     # feedback via gerrit
     sys.stdout.flush()
     sys.stdout.fp.seek(0)
     _gerrit_feedback(args, context_global.errors, context_global.warnings,
                      context_global.blockage,
-                     msg + sys.stdout.fp.read())
+                     msg + "\n" + sys.stdout.fp.read())
     sys.exit(0)
 else:
     # Shell usage, returns something to tell what happened
-    print(__file__ + ":" + msg)
+    print(__file__ + ": " + msg)
     if context_global.blockage:
         sys.exit(255)
     if context_global.errors:
