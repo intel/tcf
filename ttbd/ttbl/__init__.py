@@ -298,6 +298,44 @@ class test_target(object):
     def get_id(self):
         return self.id
 
+    def _tags_verify_interconnect(self, name, data):
+        ic = ttbl.config.targets.get(name, None)
+        if ic == None:
+            self.log.warning("target declares connectivity to interconnect "
+                             "'%s' that is not local, cannot verify; "
+                             "if it is local, declare it before the targets "
+                             "using it" % name)
+        for key, val in data.iteritems():
+            # FIXME: verify duped addresses
+            if key in ["ipv4_addr", "ipv6_addr"]:
+                proto = key.replace("_addr", "")
+                # Just to verify if it checks as an address
+                _ic_addr = ipaddress.ip_address(unicode(val))
+                net = ipaddress.ip_network(
+                    unicode(val + "/" + str(data[proto + "_prefix_len"])),
+                    strict = False)
+                if ic:
+                    _ic_addr = ic.tags[key]
+                    ic_net = ipaddress.ip_network(
+                        unicode(_ic_addr + "/"
+                                + str(ic.tags[proto + "_prefix_len"])),
+                        strict = False)
+                    if ic_net != net:
+                        raise ValueError(
+                            "%s: IP address %s for interconnect %s is outside "
+                            "of the interconnect's network %s" %(
+                                self.id, val, name, ic_net))
+            if key == "ipv4_prefix_len":
+                val = int(val)
+                assert val > 0 and val < 32, \
+                    "%s: invalid IPv4 prefix len %d for interconnect %s " \
+                    "(valid valuess are 1-31)" % (self.id, val, name)
+            if key == "ipv6_prefix_len":
+                val = int(val)
+                assert val > 0 and val < 128, \
+                    "%s: invalid IPv6 prefix len %s for interconnect %s " \
+                    "(valid values are 1-127)" % (self.id, val, name)
+
     def _tags_verify(self):
         if 'bsp_models' in self.tags:
             assert isinstance(self.tags['bsp_models'], dict), \
@@ -317,6 +355,8 @@ class test_target(object):
         if 'idle_poweroff' in self.tags:
             # must be an integer
             assert self.tags['idle_poweroff'] >= 0
+        for name, data in  self.tags['interconnects'].iteritems():
+            self._tags_verify_interconnect(name, data)
 
     def add_to_interconnect(self, ic_id, ic_tags = None):
         """
