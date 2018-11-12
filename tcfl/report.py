@@ -29,6 +29,32 @@ import tcfl
 import tcfl.tc
 import tcfl.config
 
+def jinja2_xml_escape(data):
+    """
+    Lame filter to XML-escape any characters that are allowed in XML
+    according to https://www.w3.org/TR/xml/#charsets
+
+    That'd be:
+
+    #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF]
+
+    The rest need to be escaped as &#HHHH;
+    """
+    new = type(data)()
+    for c in data:
+        point = ord(c)
+        if point in [ 0x9, 0xa, 0xd ] \
+           or (point >= 0x20 and point < 0xfffd) \
+           or (point >= 0x10000 and point < 0x10ffff):
+            #print "char %s VALID point %x" % (c, point)
+            new += c
+        else:
+            #print "char %s INVALID point %x" % (c, point)
+            new += type(data)("&#%x;" % point)
+    return new
+
+
+
 class report_c(object):
     """
     Report driver to write to stdout (for human consumption) and to a
@@ -428,6 +454,22 @@ class file_c(report_c):
     #:     {{ "%-10s %-25s %s" | format(ident, tgname, message) }}
     #:     {% endfor %}
     #:
+    #:   Depending on the destination format, you can pipe this
+    #:   through Jinja2 `filters
+    #:   <http://jinja.pocoo.org/docs/2.10/templates/#filters>`_ to
+    #:   escape certain characters. For example, there is:
+    #:
+    #:   - :func:`escape <jinja2.escape>` which escapes suitable for HTML
+    #:
+    #:   - :func:`xml_escape <jinja2_xml_escape>` which escapes
+    #:     suitable for XML
+    #:
+    #:   which can be used as::
+    #:
+    #:     {% for ident, tgname, message in log -%}
+    #:     {{ "%-10s %-25s %s" | format(ident, tgname, message) | xml_escape }}
+    #:     {% endfor %}
+    #:
     #: - *{{ targets }}*: list of targets used for the testcases, with
     #:   fields:
     #:
@@ -444,7 +486,6 @@ class file_c(report_c):
     #: :data:`Hook <hooks>` functions can be configured to execute
     #: before the testcase is launched, they can be used to extend the
     #: keywords available to the templates or any other things.
-
     templates = {
         "text" : dict(
             name = 'report.j2.txt',
@@ -751,6 +792,7 @@ class file_c(report_c):
                         + [ tcfl.config.share_path ]
         j2_env = jinja2.Environment(
             loader = jinja2.FileSystemLoader(template_path))
+        j2_env.filters['xml_escape'] = jinja2_xml_escape
         for entry_name, template_entry in self.templates.iteritems():
             template_name = template_entry['name']
             if message.startswith("COMPLETION failed") \

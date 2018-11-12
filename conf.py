@@ -43,11 +43,12 @@ autodoc_member_order = 'bysource'
 
 # Bring in documentation from other packages
 intersphinx_mapping = {
+    'jinja2': ('http://jinja.pocoo.org/docs/dev', None),
+    'pexpect': ('http://pexpect.readthedocs.io/en/stable', None ),
+    'pymongo': ('http://api.mongodb.com/python/current/', None ),
     'python': ( 'https://docs.python.org/2.7', None ),
     'requests': ( 'http://docs.python-requests.org/en/master/', None ),
     'serial': ('http://pythonhosted.org/pyserial/', None ),
-    'pexpect': ('http://pexpect.readthedocs.io/en/stable', None ),
-    'pymongo': ('http://api.mongodb.com/python/current/', None ),
 }
 
 # Add any paths that contain templates here, relative to this directory.

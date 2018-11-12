@@ -3,7 +3,7 @@
 -#}
 {%- macro format_log() -%}
 {% for ident, tgname, message in log -%}
-{{ "%-10s %-25s %s" | format(ident, tgname, message) | e }}
+{{ "%-10s %-25s %s" | format(ident, tgname, message) | xml_escape }}
 {% endfor %}
 {%- endmacro -%}
 <testsuites tests = "1"
