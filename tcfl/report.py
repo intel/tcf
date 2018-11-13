@@ -23,6 +23,7 @@ import time
 import traceback
 
 import jinja2
+import jinja2.filters
 
 import commonl
 import tcfl
@@ -40,7 +41,9 @@ def jinja2_xml_escape(data):
 
     The rest need to be escaped as &#HHHH;
     """
-    new = type(data)()
+    # run also the HTML scaper, as it does the rest (<>&, etc...)
+    _data = jinja2.filters.do_forceescape(data)
+    new = type(_data)()
     for c in data:
         point = ord(c)
         if point in [ 0x9, 0xa, 0xd ] \
@@ -51,8 +54,8 @@ def jinja2_xml_escape(data):
         else:
             #print "char %s INVALID point %x" % (c, point)
             new += type(data)("&#%x;" % point)
+    # run also the HTML scaper, as it does the rest (<>&, etc...)
     return new
-
 
 
 class report_c(object):
