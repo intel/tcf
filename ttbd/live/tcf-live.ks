@@ -322,7 +322,7 @@ touch /etc/machine-id
 
 # Ensure the consoles are logged in automatically
 sed -i 's|bin/agetty|bin/agetty --autologin root|' /usr/lib/systemd/system/getty@.service
-sed -i 's|bin/agetty|bin/agetty --autologin root|' /usr/lib/systemd/system/serial-getty@.service
+sed -i 's|bin/agetty .*$|bin/agetty --autologin root -o "-p -- \\u" 115200 %I $TERM|' /usr/lib/systemd/system/serial-getty@.service
 
 passwd --delete root
 # Make sure SSH can login w/o password
