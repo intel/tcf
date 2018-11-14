@@ -27,31 +27,31 @@
 {{ format_log() }}
 {% endblock -%}
 {%- elif result == "fail" -%}
-<error message = "Failure" type = "errored">
+<error message = "Failed" type = "failure">
 {%- block LOG_FAIL -%}
 {{ format_log() }}
 {%- endblock -%}
 </error>
 {%- elif result == 'error' -%}
-<error message = "Errored" type = "errored">
+<error message = "Error" type = "error">
 {%- block LOG_ERRR -%}
 {{ format_log() }}
 {%- endblock -%}
 </error>
 {%- elif result == 'block' -%}
-<error message = "Infrastructure error" type = "blockage">
+<error message = "Infrastructure" type = "error">
 {%- block LOG_BLCK -%}
 {{ format_log() }}
 {%- endblock -%}
 </error>
 {%- elif result == 'skip'  -%}
-<skipped message = "Skipped" type = "skipped">
+<skipped message = "Skip" type = "skip">
 {%- block LOG_SKIP -%}
 {{ format_log() }}
 {%- endblock -%}
 </skipped>
 {%- else -%}
-<error message = "BUG: unknown" type = "bug">
+<error message = "BUG: unknown" type = "error">
 {{ format_log() }}
 </error>
 {%- endif %}
