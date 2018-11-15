@@ -45,7 +45,7 @@
 {%- endblock -%}
 </error>
 {%- elif result == 'skip'  -%}
-<skipped message = "Skip" type = "skip">
+<skipped message = "Skipped" type = "skipped">
 {%- block LOG_SKIP -%}
 {{ format_log() }}
 {%- endblock -%}
