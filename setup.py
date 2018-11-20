@@ -93,6 +93,14 @@ This is the client and meta-testcase runner for the TCF test case framework.
         ('@prefix@/share/tcf/lint',
          setupl.glob_no_symlinks(".lint.*.py")
          + [ "lint-all.py" ]
+        ),
+        ('@prefix@/share/tcf/',
+         [
+             "report-base.j2.txt",
+             "report.j2.txt",
+             "junit-base.j2.xml",
+             "junit.j2.xml",
+         ]
         )
     ],
 )

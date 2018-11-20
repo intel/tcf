@@ -531,7 +531,8 @@ tcf-jobserver-run:
         tcfl.config.urls.append((url, ssl_ignore,))
 
     tcfl.config.state_path = os.path.expanduser(args.state_path)
-    tcfl.config.share_path = install_time_share_tcf
+    tcfl.config.share_path = os.path.expanduser(install_time_share_tcf)
+    logi("share path: %s" % install_time_share_tcf)
     tcfl.config.load(config_path = args.config_path,
                      config_files = args.config_files,
                      state_path = tcfl.config.state_path,
