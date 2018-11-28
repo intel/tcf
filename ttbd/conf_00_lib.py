@@ -2069,43 +2069,44 @@ def dlwps7_add(hostname, powered_on_start = None,
                       configuration. Limitations of HTTP Basic Auth
 
        e. Hit enter to refresh link redirecting to
-          *192.168.0.100/index.htm*, scroll down to *Setup* and page down
-          to *IP address*.
+          *192.168.0.100/index.htm*, scroll down to *Setup*,
+          select. On all this steps, make sure to hit submit for each
+          individual change.
 
-       f. Lookup setup of IP address, change to *192.168.N.M* (where *x*
-          matches *spM*), gateway *192.168.N.1*; hit the *submit* next to
-          it.
+          1. Lookup setup of IP address, change to *192.168.N.M* (where *x*
+             matches *spM*), gateway *192.168.N.1*; hit the *submit* next to
+             it.
+
+          2. Disable the security lockout
+
+             *Delay Wrong password lockout* set to zero minutes
+
+          3. Turn on setting power after power loss:
+
+             *Power Loss Recovery Mode > When recovering after power
+             loss* select *Turn all outlets on*
+
+          4. Extra steps needed for newer units
+             (https://dlidirect.com/products/new-pro-switch)
+
+             The new refreshed unit looks the same, but has wifi
+             connectivity and pleny of new features, some of which
+             need tweaking; login to the setup page again and for each
+             of this, set the value/s and hit *submit* before going to
+             the next one:
+
+             - Access setings (quite important, as this allows the
+               driver to access the same way for the previous
+               generation of the product too):
+
+               ENABLE: *allow legacy plaintext login methods*
+
+               Note in (3) below it is explained why this is not a
+               security problem in this kind of deployments.
 
        g. remove the routing hack::
 
             # ifconfig nsN:2 down
-
-       e. Extra steps needed for newer units
-          (https://dlidirect.com/products/new-pro-switch)
-
-          The new refreshed unit looks the same, but has wifi
-          connectivity and pleny of new features, some of which need
-          tweaking; login to the setup page again and for each of
-          this, set the value/s and hit *submit* before going to the
-          next one:
-
-          - Disable the security lockout
-
-            *Delay> Wrong password lockout* set to zero minutes
-
-          - Turn on setting power after power loss:
-
-            *Power Loss Recovery Mode > When recovering after power
-            loss* select *Turn all outlets on*
-
-          - Access setings (quite important, as this allows the driver
-            to access the same way for the previous generation of the
-            product too):
-
-            ENABLE: *allow legacy plaintext login methods*
-
-            Note in (3) below it is explained why this is not a
-            security problem in this kind of deployments.
 
     3. The unit's default admin username and password are kept per
        original (admin, 1234):
