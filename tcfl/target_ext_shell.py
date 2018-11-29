@@ -153,7 +153,7 @@ class shell(tc.target_extension_c):
         or collecting the output:
 
         >>> target.shell.run("ls -1 /etc/", output = True)
-        >>> for file in output.split("\r\n"):
+        >>> for file in output.split('\\r\\n'):
         >>>     target.report_info("file %s" % file)
         >>>     target.shell.run("md5sum %s" % file)
 
@@ -179,11 +179,11 @@ class shell(tc.target_extension_c):
              will be \r\n terminated and it will be confusing because
              regex won't work right away. A quick, dirty, fix
 
-             >>> output = output.replace("\r\n", "\n")
+             >>> output = output.replace('\\r\\n', '\\n')
 
              ``output_filter_crlf`` enabled replaces this output with
 
-             >>> output = output.replace("\r\n", target.crlf)
+             >>> output = output.replace('\\r\\n', target.crlf)
 
         """
         if cmd:
