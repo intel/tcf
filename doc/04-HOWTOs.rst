@@ -699,7 +699,7 @@ subclassing :py:class:`ttbl.tt_power_control_impl`.
 Configuring a Linux target to power on/off with serial console
 --------------------------------------------------------------
 
-Building on the previous example, we can use the :class:`tt_serial`
+Building on the previous example, we can use the :class:`ttbl.tt.tt_serial`
 object to create a target that provides serial consoles, can be
 powered on or off and we can interact with the target over the serial
 console.
@@ -1347,7 +1347,7 @@ The `_my_hook_fn()` would look as:
 >>>     testcase.tag_set("category", categoryvalue)
 
 If the data needed is not available until after the testcase executes,
-you can use :ref:`reporting hooks <tcfl.report.file_c.hooks>`.
+you can use :class:`reporting hooks <tcfl.report.file_c.hooks>`.
 
 .. _manual_install:
 

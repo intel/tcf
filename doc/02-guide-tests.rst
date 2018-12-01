@@ -184,7 +184,7 @@ Setup some hooks -- if when receiving from the console on any target
 it prints a fatal fault, fail the test (this will be evaluated when
 calling :meth:`tcfl.tc.target_c.expect` or the full testcase expect
 loop calling :meth:`run() <tcfl.expecter.expecter_c.run>` on
-:attr:`tcfl.tc.tc_c.expecter`
+:class:`tcfl.tc.tc_c.tls.expecter <tcfl.expecter.expecter_c>`
 
 >>>     def setup(self, target, target1):
 >>>         target.on_console_rx("FAILURE", result = 'fail')
@@ -237,10 +237,10 @@ heartbeats, it will consider it a failure:
 >>>         target1.on_console_rx(re.compile("heartbeat #[0-9]+ ok"))
 >>>         self.expecter.run(10)
 
-The :attr:`tcfl.tc.tc_c.expecter` is a generic expectation loop to
-which anything can be attach to poll and check while the loop
-runs. It will run until all the things it has been asked to expect
-have ocurred or fail with a timeout.
+The :class:`tcfl.tc.tc_c.tls.expecter <tcfl.expecter.expecter_c>` is a
+generic expectation loop to which anything can be attach to poll and
+check while the loop runs. It will run until all the things it has
+been asked to expect have ocurred or fail with a timeout.
 
 It can be also used with context managers:
 
