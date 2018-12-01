@@ -809,7 +809,7 @@ class test_target(object):
           as ``target.name.function()``
 
         :param tt_interface obj: interface implementation, an instance
-          of :class:`tt_interface`` which provides the details and
+          of :class:`tt_interface` which provides the details and
           methods to call plus
           :meth:`ttbl.tt_interface.request_process` to handle calls
           from proxy/brokerage layers.
@@ -1225,7 +1225,7 @@ class tt_power_control_mixin(object):
         Power cycle the target, guaranteeing that at the end, it is
         powered on.
 
-        :param tuple who: Identity of the user
+        :param str who: Identity of the user
         :param float wait: how much time to wait before powering on
           after powering off.
         """

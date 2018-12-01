@@ -26,7 +26,7 @@ class shell(tc.target_extension_c):
 
     Waits for the shell to be up and ready; sets it up so that if an
     error happens, it will print an error message and raise a block
-    exception. Note you can change what is expected as a :ref:`shell
+    exception. Note you can change what is expected as a :data:`shell
     prompt <linux_shell_prompt_regex>`.
 
     >>> target.shell.run("some command")
@@ -49,7 +49,7 @@ class shell(tc.target_extension_c):
             raise self.unneeded
         tc.target_extension_c.__init__(self, target)
 
-    #: What do we look for into a shel prompt
+    #: What do we look for into a shell prompt
     #:
     #: This is a Python regex that can be set to recognize what the
     #: shell prompt looks like. Multiple catchas here:
@@ -62,7 +62,6 @@ class shell(tc.target_extension_c):
     #: Examples:
     #:
     #: >>> target.shell.linux_shell_prompt_regex = re.compile(r'root@.*# ')
-
     linux_shell_prompt_regex = re.compile(r"[0-9]+ \$")
 
     def up(self, tempt = None,
@@ -170,13 +169,13 @@ class shell(tc.target_extension_c):
           output of the command to the console; note the output
           includes the execution of the command itself.
         :param bool output_filter_crlf: (optional, default True) if we
-          are returning output, filter out \r\n to whatever our CRLF
+          are returning output, filter out ``\\r\\n`` to whatever our CRLF
           convention is.
         :returns str: if ``output`` is true, a string with the output
           of the command.
 
           .. warning:: if ``output_filter_crlf`` is False, this output
-             will be \r\n terminated and it will be confusing because
+             will be ``\\r\\n`` terminated and it will be confusing because
              regex won't work right away. A quick, dirty, fix
 
              >>> output = output.replace('\\r\\n', '\\n')

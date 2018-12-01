@@ -471,7 +471,7 @@ class target_c(object):
         #: find where to put stuff.
         self.tmpdir = testcase.tmpdir
 
-        #: Keywords for *%(KEY)[sd]* substitution specific to this
+        #: Keywords for ``%(KEY)[sd]`` substitution specific to this
         #: target and current active :term:`BSP model` and BSP as set
         #: with :meth:`bsp_set`.
         #:
@@ -490,8 +490,19 @@ class target_c(object):
         #:
         #: The testcase will provide also other fields, in
         #: :data:`tcfl.tc.tc_c.kws`, which are rolled in in this variable
-        #: too.
-
+        #: too. See how to more available keywords :ref:`here
+        #: <finding_testcase_metadata>`
+        #:
+        #: Note that testcases might be setting more keywords in the
+        #: target or the testcase with:
+        #:
+        #: >>> target.kw_set("keywordname", "somevalue")
+        #: >>> self.kw_set("keywordname", "somevalue")
+        #:
+        #: as well, any of the target's properties set with
+        #: :meth:`TARGET.property_set<tcfl.tc.target_c.property_set>`
+        #: (or it's command line equivalent ``tcf property-set TARGET
+        #: PROPERTY VALUE``) will show up as keywords.
         self.kws = {}
         #: Origin of keys defined in self.kws
         self.kws_origin = {}
@@ -1230,7 +1241,7 @@ class target_c(object):
           actions are added indicating they are expected to pass, the
           seven of them must have raised a pass exception (or
           indicated passage somehow) before the loop will consider it
-          a full pass. See :py:meth:`tcfl.tls.expecter.expecter_c.run`.
+          a full pass. See :py:meth:`tcfl.expecter.expecter_c.run`.
 
         :raises: :py:exc:`tcfl.tc.pass_e`,
           :py:exc:`tcfl.tc.blocked_e`, :py:exc:`tcfl.tc.failed_e`,
@@ -1939,8 +1950,10 @@ def serially():
 
     Remember methods that are ran serially are run first and by
     default are those that
-     - take more than one target as arguments
-     - are evaluation methods
+
+    - take more than one target as arguments
+
+    - are evaluation methods
     """
     def decorate_fn(fn):
         setattr(fn, "execution_mode", 'serial')
@@ -1954,10 +1967,12 @@ def concurrently():
 
     Remember methods that are ran concurrently are run after the
     serial methods and by default those that:
-     - are not evaluation methods
-     - take only one target as argument (if you force two methods that
-       share a target to run in parallel, it is your responsiblity to
-       ensure proper synchronization
+
+    - are not evaluation methods
+
+    - take only one target as argument (if you force two methods that
+      share a target to run in parallel, it is your responsiblity to
+      ensure proper synchronization
     """
     def decorate_fn(fn):
         setattr(fn, "execution_mode", 'parallel')
@@ -5205,7 +5220,7 @@ class tc_c(object):
 
         - reporting subtestcases of a main testcase (relying only on
           the output of the main testcase execution, such as in
-          :class:`tc_zephyr_sanity.tc_zephyr_subsanity_c`.
+          :class:`tcfl.tc_zephyr_sanity.tc_zephyr_subsanity_c`.
 
         :param tc_c tc: [instance of a] testcase to append; note this
           testcase will be executed in the same target group as this

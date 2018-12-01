@@ -220,8 +220,8 @@ class tt_arduino2(
         """Just validates the image types are ok. The flashing happens in
         images_do_set().
 
-        :param string image_type: Type of the image supported
-        :param string image_name: Name of image file in the daemon
+        :param str image_type: Type of the image supported
+        :param str image_name: Name of image file in the daemon
           storage space for the user
         :raises: Any exception on failure
 
@@ -372,8 +372,8 @@ class tt_esp32(
         """Just validates the image types are ok. The flashing happens in
         images_do_set().
 
-        :param string image_type: Type of the image supported
-        :param string image_name: Name of image file in the daemon
+        :param str image_type: Type of the image supported
+        :param str image_name: Name of image file in the daemon
           storage space for the user
         :raises: Any exception on failure
 
@@ -865,8 +865,8 @@ class tt_dfu(
         """Just validates the image types are ok. The flashing happens in
         images_do_set().
 
-        :param string image_type: Type of the image supported
-        :param string image_name: Name of image file in the daemon
+        :param str image_type: Type of the image supported
+        :param str image_name: Name of image file in the daemon
           storage space for the user
         :raises: Any exception on failure
 

@@ -104,7 +104,7 @@ class SanityConfigParser:
     def __init__(self, filename):
         """Instantiate a new SanityConfigParser object
 
-        @param filename Source .ini file to read
+        :param str filename: Source .ini file to read
         """
         cp = ConfigParser.SafeConfigParser()
         cp.readfp(open(filename))
@@ -154,19 +154,20 @@ class SanityConfigParser:
     def sections(self):
         """Get the set of sections within the .ini file
 
-        @return a list of string section names"""
+        :returns: a list of string section names"""
         return self.cp.sections()
 
     def get_section(self, section, valid_keys):
         """Get a dictionary representing the keys/values within a section
 
-        @param section The section in the .ini file to retrieve data from
+        :param str section: The section in the .ini file to retrieve data from
 
-        @param valid_keys A dictionary representing the intended semantics
-            for this section. Each key in this dictionary is a key that could
-            be specified, if a key is given in the .ini file which isn't in
-            here, it will generate an error. Each value in this dictionary
-            is another dictionary containing metadata:
+        :param dict valid_keys: A dictionary representing the intended
+            semantics for this section. Each key in this dictionary is
+            a key that could be specified, if a key is given in the
+            .ini file which isn't in here, it will generate an
+            error. Each value in this dictionary is another dictionary
+            containing metadata:
 
                 "default" - Default value if not given
 
@@ -182,7 +183,7 @@ class SanityConfigParser:
                     and "default" isn't specified, a type conversion will be
                     done on an empty string
 
-        @return A dictionary containing the section key-value pairs with
+        :returns: A dictionary containing the section key-value pairs with
             type conversion and default values filled in per valid_keys
         """
 

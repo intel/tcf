@@ -56,7 +56,7 @@ instance = ""
 
 #: Filename suffix for the current *ttbd* instance
 #:
-#: Per :var:`instance`, this defines the string that is appended to
+#: Per :data:`instance`, this defines the string that is appended to
 #: different configuration files/paths that have to be instance
 #: specific but cannot be some sort of directory. Normally this is
 #: *-INSTANCE* (unless INSTANCE is empty).
@@ -75,17 +75,14 @@ def target_add(target, _id = None, tags = None, target_type = None):
     """
     Add a target to the list of managed targets
 
-    :param target: target to add
-    :type target: subtype of :class:`ttbl.test_target`
+    :param ttbl.test_target target: target to add
     :param dict tags: Dictionary of tags that apply to the target (all
       tags are strings)
-    :param name: name of the target, by default taken from the target
+    :param str name: name of the target, by default taken from the target
       object
-    :type name: string
 
-    :param target_type: string describing type of the target; by
+    :param str target_type: string describing type of the target; by
       default it's taken from the object's type.
-    :type target_type: string
 
     """
     assert isinstance(target, ttbl.test_target)

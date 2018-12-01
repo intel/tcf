@@ -680,7 +680,8 @@ def rest_login(args):
     """
     Login into remote servers.
 
-    :param argparse args: login arguments like -q (quiet) or userid.
+    :param argparse.Namespace args: login arguments like -q (quiet) or
+      userid.
     :returns: True if it can be logged into at least 1 remote server.
     """
     logged = False
@@ -959,8 +960,8 @@ def rest_target_find_all(all_targets = False):
 
 def rest_target_acquire(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :returns: dictionary of tags
     :raises: IndexError if target not found
     """
@@ -970,8 +971,8 @@ def rest_target_acquire(args):
 
 def rest_target_enable(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     for target in args.target:
@@ -980,8 +981,8 @@ def rest_target_enable(args):
 
 def rest_target_disable(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     for target in args.target:
@@ -990,8 +991,8 @@ def rest_target_disable(args):
 
 def rest_target_property_set(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     rtb, rt = _rest_target_find_by_id(args.target)
@@ -1000,8 +1001,8 @@ def rest_target_property_set(args):
 
 def rest_target_property_get(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     rtb, rt = _rest_target_find_by_id(args.target)
@@ -1011,8 +1012,8 @@ def rest_target_property_get(args):
 
 def rest_target_release(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     for target in args.target:
@@ -1022,8 +1023,8 @@ def rest_target_release(args):
 
 def rest_target_power_on(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     for target in args.target:
@@ -1032,8 +1033,8 @@ def rest_target_power_on(args):
 
 def rest_target_power_off(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     for target in args.target:
@@ -1042,8 +1043,8 @@ def rest_target_power_off(args):
 
 def rest_target_reset(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     for target in args.target:
@@ -1052,8 +1053,8 @@ def rest_target_reset(args):
 
 def rest_target_debug_halt(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     for target in args.target:
@@ -1062,8 +1063,8 @@ def rest_target_debug_halt(args):
 
 def rest_target_debug_reset(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     for target in args.target:
@@ -1072,8 +1073,8 @@ def rest_target_debug_reset(args):
 
 def rest_target_debug_reset_halt(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     for target in args.target:
@@ -1082,8 +1083,8 @@ def rest_target_debug_reset_halt(args):
 
 def rest_target_debug_resume(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     for target in args.target:
@@ -1092,8 +1093,8 @@ def rest_target_debug_resume(args):
 
 def rest_target_debug_openocd(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     rtb, rt = _rest_target_find_by_id(args.target)
@@ -1103,8 +1104,8 @@ def rest_target_debug_openocd(args):
 
 def rest_target_power_cycle(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     if args.wait != None:
@@ -1117,8 +1118,8 @@ def rest_target_power_cycle(args):
 
 def rest_target_images_set(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     rtb, rt = _rest_target_find_by_id(args.target)
@@ -1190,8 +1191,8 @@ def rest_tb_target_images_upload_set(rtb, rt, _images, ticket = ''):
 
 def rest_target_images_upload_set(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     rtb, rt = _rest_target_find_by_id(args.target)
@@ -1199,8 +1200,8 @@ def rest_target_images_upload_set(args):
 
 def rest_target_power_get(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     rtb, rt = _rest_target_find_by_id(args.target)
@@ -1378,8 +1379,8 @@ def rest_target_console_write(args):
 
 def rest_target_debug_info(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     for target in args.target:
@@ -1388,8 +1389,8 @@ def rest_target_debug_info(args):
 
 def rest_target_debug_start(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     for target in args.target:
@@ -1398,8 +1399,8 @@ def rest_target_debug_start(args):
 
 def rest_target_debug_stop(args):
     """
-    :param args: object containing the processed command line
-      arguments; need args.target
+    :param argparse.Namespace args: object containing the processed
+      command line arguments; need args.target
     :raises: IndexError if target not found
     """
     for target in args.target:

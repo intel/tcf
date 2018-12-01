@@ -303,9 +303,10 @@ Power Control Interface
 .. automodule:: ttbl.usbrly08b
 
 
-Miscelaneous
-~~~~~~~~~~~~
+Miscelaneous and other interfaces
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. automodule:: ttbl.buttons
 .. automodule:: ttbl.target
 
 Common helper library

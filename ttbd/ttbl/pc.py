@@ -220,10 +220,12 @@ class delay_til_usb_device(ttbl.tt_power_control_impl):
     :param bool want_connected: when checking, we want the device to
       be connected (True) or disconnected (False)
 
-    :param callable action: action to execute when the device is not
-      found, before waiting. Note the first parameter passed to the
-      action is the target itself and then any other parameter given
-      in action)_args
+    :param collections.Callable action: action to execute when the
+      device is not found, before waiting. Note the first parameter
+      passed to the action is the target itself and then any other
+      parameter given in ``action_args``
+
+    :param action_args: tuple of parameters to pass to ``action``.
     """
     def __init__(self, serial, when_powering_on = True, want_connected = True,
                  poll_period = 0.25, timeout = 25,
@@ -383,7 +385,7 @@ class dlwps7(ttbl.tt_power_control_impl):
     Implement a power control interface to the Digital Logger's Web
     Power Switch 7
 
-    :param string _url: URL describing the unit and outlet number, in
+    :param str _url: URL describing the unit and outlet number, in
       the form::
 
         http://USER:PASSWORD@HOST:PORT/OUTLETNUMBER
