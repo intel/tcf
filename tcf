@@ -463,8 +463,9 @@ if __name__ == "__main__":
     # FIXME: ugly
     import tcfl.target_ext_tunnel
     tcfl.target_ext_tunnel.cmdline_setup(arg_subparsers)
-    import tcfl.target_ext_buttons
-    tcfl.target_ext_buttons.cmdline_setup(arg_subparsers)
+    # imported by tcfl.tc
+    tcfl.tc.target_ext_buttons.cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_ioc_flash_server_app.cmdline_setup(arg_subparsers)
 
 
     global args

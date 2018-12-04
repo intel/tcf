@@ -26,6 +26,7 @@ Extensions to :class:`tcfl.tc.target_c` types
 .. automodule:: tcfl.target_ext_tcob
 .. automodule:: tcfl.target_ext_tunnel
 .. automodule:: tcfl.target_ext_buttons
+.. automodule:: tcfl.target_ext_ioc_flash_server_app
 
 *TCF run* Application builders
 ------------------------------
@@ -307,6 +308,7 @@ Miscelaneous and other interfaces
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: ttbl.buttons
+.. automodule:: ttbl.ioc_flash_server_app
 .. automodule:: ttbl.target
 
 Common helper library
