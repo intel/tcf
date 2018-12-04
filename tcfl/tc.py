@@ -6471,3 +6471,5 @@ import target_ext_ssh
 target_c.extension_register(target_ext_ssh.ssh)
 import target_ext_ioc_flash_server_app
 target_c.extension_register(target_ext_ioc_flash_server_app.extension)
+import target_ext_buttons
+target_c.extension_register(target_ext_buttons.buttons)
