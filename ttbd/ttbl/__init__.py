@@ -127,7 +127,7 @@ class tt_interface(object):
     def __init__(self):
         pass
 
-    def request_process(self, target, who, method, call, args):
+    def request_process(self, target, who, method, call, args, user_path):
         """
         Process a request into this interface from a proxy / brokerage
 
@@ -144,6 +144,7 @@ class tt_interface(object):
           the different methods the interface exposes)
         :param dict args: dictionary of key/value with the arguments
           to the call, some might be JSON encoded.
+        :param str user_path: Path to where user files are located
 
         For an example, see :class:`ttbl.buttons.interface`.
         """
@@ -153,6 +154,7 @@ class tt_interface(object):
             and method in ( 'POST', 'GET', 'DELETE', 'PUT' )
         assert isinstance(call, basestring)
         assert isinstance(args, dict)
+        assert user_path != None and isinstance(user_path, basestring)
         raise NotImplementedError
 
     def _release_hook(self, target, force):

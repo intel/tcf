@@ -157,7 +157,7 @@ class interface(ttbl.tt_interface):
             impl.release(target, button)
 
 
-    def request_process(self, target, who, method, call, args):
+    def request_process(self, target, who, method, call, args, _user_path):
         ticket = args.get('ticket', "")
         if method == "POST" and call == "sequence":
             if not 'sequence' in args:
