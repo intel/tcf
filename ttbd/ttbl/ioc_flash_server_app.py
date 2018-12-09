@@ -106,12 +106,13 @@ class interface(ttbl.tt_interface):
                 target.log.warning("ran: %s" % " ".join(cmdline))
                 for line in output.split('\n'):
                     target.log.debug("output: " + line)
+                return {}
             except subprocess.CalledProcessError as e:
                 msg = "error %d: %s" % (e.returncode, " ".join(cmdline))
                 target.log.error(msg)
                 for line in e.output.split('\n'):
-                    msg += "\n" + "error output: " + line
                     target.log.warning("error output: " + line)
+                    msg += "\n" + "error output: " + line
                 raise RuntimeError(msg)
 
     def request_process(self, target, who, method, call, args, user_path):
@@ -125,9 +126,8 @@ class interface(ttbl.tt_interface):
             else:
                 _filename = None
             generic_id = args.get('generic_id', None)
-            self.run(who, target, baudrate, mode, filename, _filename,
-                     generic_id)
-            return {}
+            return self.run(who, target, baudrate, mode, filename, _filename,
+                            generic_id)
         else:
             raise RuntimeError("%s|%s: unsuported" % (method, call))
 

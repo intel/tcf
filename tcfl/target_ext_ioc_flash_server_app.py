@@ -12,14 +12,15 @@ def _rest_tb_target_ioc_flash_server_app(
         rtb, rt,
         mode, filename, generic_id, baudrate,
         ticket = ''):
-    rtb.send_request("POST", "targets/%s/ioc_flash_server_app/run" % rt['id'],
-                     data = {
-                         'baudrate': baudrate,
-                         'mode': mode,
-                         'filename': filename,
-                         'generic_id': generic_id,
-                         'ticket': ticket
-                     })
+    return rtb.send_request("POST",
+                            "targets/%s/ioc_flash_server_app/run" % rt['id'],
+                            data = {
+                                'baudrate': baudrate,
+                                'mode': mode,
+                                'filename': filename,
+                                'generic_id': generic_id,
+                                'ticket': ticket
+                            })
 
 class extension(tc.target_extension_c):
     """
@@ -35,7 +36,7 @@ class extension(tc.target_extension_c):
     def __init__(self, target):
         if not 'ioc_flash_server_app' in target.rt.get('interfaces', []):
             raise self.unneeded
-        tc.target_extension_c.__init__(self)
+        tc.target_extension_c.__init__(self, target)
 
     def run(self, mode, filename, generic_id = None, baudrate = None):
         """
@@ -51,11 +52,13 @@ class extension(tc.target_extension_c):
         :param str baudrate: (optional)
         """
         self.target.report_info("running", dlevel = 1)
-        _rest_tb_target_ioc_flash_server_app(
+        r = _rest_tb_target_ioc_flash_server_app(
             self.target.rtb, self.target.rt,
             mode, filename, generic_id, baudrate,
             ticket = self.target.ticket)
-        self.target.report_info("ran")
+        self.target.report_info("ran",
+                                { 'diagnostics': r['diagnostics'] },
+                                dlevel = 2)
 
 
 def cmdline_ioc_flash_server_app(args):
@@ -64,7 +67,6 @@ def cmdline_ioc_flash_server_app(args):
         rtb, rt,
         args.mode, args.filename, args.id, args.baudrate,
         ticket = args.ticket)
-
 
 def cmdline_setup(argsp):
     ap = argsp.add_parser("ioc_flash_server_app",
