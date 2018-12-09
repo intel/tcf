@@ -2553,6 +2553,7 @@ class tc_c(object):
         self.buffers_lock = threading.Lock()
         self.name = name
         self.kw_set('tc_name', self.name)
+        self.kw_set('cwd', os.getcwd())
         # This one is left for drivers to do their thing in here
         self.kw_set('tc_name_short', self.name)
         self.origin = origin
