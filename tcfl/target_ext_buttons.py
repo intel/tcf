@@ -108,10 +108,10 @@ class buttons(tc.target_extension_c):
 
     def list(self):
         self.target.report_info("listing", dlevel = 1)
-        buttons = _rest_tb_target_buttons_get(self.target.rtb, self.target.rt,
+        data = _rest_tb_target_buttons_get(self.target.rtb, self.target.rt,
                                               ticket = self.target.ticket)
         self.target.report_info("listed: %s" % buttons)
-        return buttons
+        return data['buttons']
 
         
 def cmdline_button_press(args):
@@ -138,8 +138,8 @@ def cmdline_button_click(args):
 
 def cmdline_button_list(args):
     rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    buttons = _rest_tb_target_buttons_get(rtb, rt, ticket = args.ticket)
-    for name, state in buttons.iteritems():
+    data = _rest_tb_target_buttons_get(rtb, rt, ticket = args.ticket)
+    for name, state in data['buttons'].iteritems():
         if state:
             _state = 'pressed'
         else:

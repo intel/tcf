@@ -146,6 +146,14 @@ class tt_interface(object):
           to the call, some might be JSON encoded.
         :param str user_path: Path to where user files are located
 
+        :returns: dictionary of results, call specific
+          e.g.:
+
+          >>> dict(
+          >>>    output = "something",
+          >>>    value = 43
+          >>> )
+
         For an example, see :class:`ttbl.buttons.interface`.
         """
         assert isinstance(target, test_target)
@@ -156,6 +164,9 @@ class tt_interface(object):
         assert isinstance(args, dict)
         assert user_path != None and isinstance(user_path, basestring)
         raise NotImplementedError
+        # Note that upon return, the calling layer will add a field
+        # 'diagnostics', so don't use that
+        #return {}
 
     def _release_hook(self, target, force):
         """

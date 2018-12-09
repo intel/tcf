@@ -150,7 +150,7 @@ class interface(ttbl.tt_interface):
         res = {}
         for name, impl in self.impls.iteritems():
             res[name] = impl.get(target, name)
-        return res
+        return dict(buttons = res)
 
     def _release_hook(self, target, _force):
         for button, impl in self.impls.iteritems():
