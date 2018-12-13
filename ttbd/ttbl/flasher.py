@@ -1096,7 +1096,7 @@ source [find board/snps_em_sk.cfg]
                                     [ "downloaded [0-9]+ bytes",
                                       "wrote [0-9]+ bytes from file"],
                                     timeout)
-                if verify == True:
+                if verify == True and self.board.get("verify", True):
                     # Same comment about sizes here
                     r = self.__send_command(
                         "verify image",
