@@ -464,7 +464,7 @@ described below:
 - :py:func:`Arduino Due <conf_00_lib.arduino2_add>` boards
 - :py:func:`Atmel SAM e70 <conf_00_lib.sam_xplained_add>` boards
 - :py:func:`FRDM k64f <conf_00_lib.frdm_add>` boards
-- :py:func:`Nucleo F10 <conf_00_lib.nucleo_add>` boards
+- :py:func:`STM32 / Nucleo <conf_00_lib.stm32_add>` boards
 - :py:func:`Quark C1000 <conf_00_lib.quark_c1000_add>` boards
 - :py:func:`Quark D2000 <conf_00_lib.mv_add>` boards
 - :py:func:`Synopsis EMSK <conf_00_lib.emsk_add>` boards

@@ -1437,18 +1437,126 @@ def nios2_max10_add(name,
         },
         target_type = "max10")
 
+#
+# Configurations settings for STM32
+#
+# FIXME: move to conf_00_lib_stm32.py for clarity?
+#
 
-def nucleo_add(name = None,
-               serial_number = None,
-               serial_port = None,
-               ykush_serial = None,
-               ykush_port_board = None,
-               openocd_path = openocd_path,
-               openocd_scripts = openocd_scripts,
-               debug = False):
-    """**Configure an Nucleo F10 board for the fixture described below**
+stm32_models = dict()
 
-    The Nucleo F10 is an ARM-based development board. Includes a
+ttbl.flasher.openocd_c._addrmaps['stm32f7'] = dict(
+    arm = dict(load_addr = 0x08000000)
+)
+ttbl.flasher.openocd_c._addrmaps['unneeded'] = dict(
+    # FIXME: we need this so the mappings in flasher.c don't get all
+    # confused
+    arm = dict()
+)
+
+ttbl.flasher.openocd_c._boards['stm32f746'] = dict(
+    addrmap = 'stm32f7',
+    targets = [ 'arm' ],
+    target_id_names = { 0: 'stm32f7x.cpu' },
+    write_command = "flash write_image erase %(file)s %(address)s",
+    config = """\
+#
+# openocd.cfg configuration from zephyr.git/boards/arm/stm32f746g_disco/support/openocd.cfg
+#
+source [find board/stm32f7discovery.cfg]
+
+$_TARGETNAME configure -event gdb-attach {
+	echo "Debugger attaching: halting execution"
+	reset halt
+	gdb_breakpoint_override hard
+}
+
+$_TARGETNAME configure -event gdb-detach {
+	echo "Debugger detaching: resuming execution"
+	resume
+}
+
+"""
+)
+
+stm32_models['stm32f746'] = dict(zephyr = "stm32f746g_disco")
+
+ttbl.flasher.openocd_c._boards['stm32f429'] = dict(
+    addrmap = 'unneeded',	# unneeded
+    targets = [ 'arm' ],
+    target_id_names = { 0: 'stm32f4x.cpu' },
+    write_command = "flash write_image erase %(file)s",
+    # FIXME: until we can set a verify_command that doesn't do
+    # addresses, we can't enable this
+    verify = False,
+    config = """\
+#
+# openocd.cfg configuration from zephyr.git/boards/arm/stm32f429i_disc1/support/openocd.cfg
+#
+source [find board/st_nucleo_f4.cfg]
+
+$_TARGETNAME configure -event gdb-attach {
+	echo "Debugger attaching: halting execution"
+	reset halt
+	gdb_breakpoint_override hard
+}
+
+$_TARGETNAME configure -event gdb-detach {
+	echo "Debugger detaching: resuming execution"
+	resume
+}
+
+"""
+)
+
+stm32_models['stm32f429'] = dict(zephyr = "stm32f429i_disc1")
+
+
+ttbl.flasher.openocd_c._boards['stm32f207'] = dict(
+    addrmap = 'unneeded',	# unneeded
+    targets = [ 'arm' ],
+    target_id_names = { 0: 'stm32f2x.cpu' },
+    write_command = "flash write_image erase %(file)s",
+    # FIXME: until we can set a verify_command that doesn't do
+    # addresses, we can't enable this
+    verify = False,
+    config = """\
+#
+# openocd.cfg configuration from zephyr.git/boards/arm/nucleo_f207zg/support/openocd.cfg
+#
+source [find interface/stlink-v2-1.cfg]
+source [find target/stm32f2x.cfg]
+
+$_TARGETNAME configure -event gdb-attach {
+        echo "Debugger attaching: halting execution"
+        reset halt
+        gdb_breakpoint_override hard
+}
+
+$_TARGETNAME configure -event gdb-detach {
+        echo "Debugger detaching: resuming execution"
+        resume
+}
+
+"""
+)
+
+stm32_models['stm32f207'] = dict(zephyr = "nucleo_f207zg")
+
+
+def stm32_add(name = None,
+              serial_number = None,
+              serial_port = None,
+              ykush_serial = None,
+              ykush_port_board = None,
+              openocd_path = openocd_path,
+              openocd_scripts = openocd_scripts,
+              model = None,
+              zephyr_board = None,
+              debug = False):
+    """**Configure an Nucleo/STM32 board**
+
+    The Nucleo / STM32 are ARM-based development board. Includes a
     builting JTAG which allows flashing, debugging; it only requires
     one upstream connection to a YKUSH power-switching hub for power,
     serial console and JTAG.
@@ -1457,28 +1565,54 @@ def nucleo_add(name = None,
 
     .. code-block:: python
 
-       nucleo_add(name = "nucleo-NN",
-                  serial_number = "SERIALNUMBER",
-                  ykush_serial = "YKXXXXX",
-                  ykush_port_board = N)
+       stm32_add(name = "stm32f746-67",
+                 serial_number = "066DFF575251717867114355",
+                 ykush_serial = "YK23406",
+                 ykush_port_board = 3,
+                 model = "stm32f746")
 
     restart the server and it yields::
 
       $ tcf list
-      local/nucleo-NN
+      local/stm32f746-67
 
     :param str name: name of the target
 
     :param str serial_number: USB serial number for the board
 
-    :param str serial_port: name of the serial port (defaults to
-      /dev/tty-TARGETNAME).
+    :param str serial_port: (optional) name of the serial port
+      (defaults to /dev/tty-TARGETNAME).
 
     :param str ykush_serial: :ref:`USB serial number
       <ykush_serial_number>` of the YKUSH hub
 
     :param int ykush_port_board: number of the YKUSH downstream port
-      where the board power is connected.
+      where the board is connected.
+
+    :param str openocd_path: (optional) path to where the OpenOCD
+      binary is installed (defaults to system's).
+
+      .. warning:: Zephyr SDK 0.9.5's version of OpenOCD is not able
+                   to flash some of these boards.
+
+    :param str openocd_scripts: (optional) path to where the OpenOCD
+      scripts are installed (defaults to system's).
+
+    :param str model: String which describes this model to the OpenOCD
+      configuration. This matches the model of the board in the
+      packaging. E.g:
+
+      - stm32f746
+      - stm32f103
+
+      see below for the mechanism to add more via configuration
+
+    :param str zephyr_board: (optional) string to configure as the
+      board model used for Zephyr builds. In most cases it will be
+      inferred automatically.
+
+    :param bool debug: (optional) operate in debug mode (more verbose
+      log from OpenOCD) (defaults to false)
 
     **Overview**
 
@@ -1488,14 +1622,14 @@ def nucleo_add(name = None,
 
     **Bill of materials**
 
-    - a Nucleo F10 board
+    - one STM32* board
     - a USB A-Male to micro-B male cable (for board power, flashing
       and console)
     - one available port on an YKUSH power switching hub (serial *YKNNNNN*)
 
     **Connecting the test target fixture**
 
-    1. connect the Nucleo F10's micro USB port with the USB A-male
+    1. connect the STM32 micro USB port with the USB A-male
        to B-micro to YKUSH downstream port *N*
 
     2. connect the YKUSH to the server system and to power as
@@ -1503,7 +1637,7 @@ def nucleo_add(name = None,
 
     **Configuring the system for the fixture**
 
-    1. Choose a name for the target: *nucleo-NN* (where NN is a number)
+    1. Choose a name for the target: *stm32MODEL-NN* (where NN is a number)
 
     2. (if needed) Find the YKUSH's serial number *YKNNNNN* [plug it and
        run *dmesg* for a quick find], see :py:func:`ykush_targets_add`.
@@ -1515,11 +1649,56 @@ def nucleo_add(name = None,
        ``/dev/tty-TARGETNAME``. Follow :ref:`these instructions
        <usb_tty_serial>` using the boards' *serial number*.
 
+    5. Add the configuration block described at the top of this
+       documentation and restart the server
+
+    **Extending configuration for new models**
+
+    Models not supported by current configuration can be expanded by
+    adding a configuration block such as:
+
+    .. code-block:: python
+
+       import ttbl.flasher
+       ttbl.flasher.openocd_c._addrmaps['stm32f7'] = dict(
+           arm = dict(load_addr = 0x08000000)
+       )
+
+       ttbl.flasher.openocd_c._boards['stm32f746'] = dict(
+           addrmap = 'stm32f7',
+           targets = [ 'arm' ],
+           target_id_names = { 0: 'stm32f7x.cpu' },
+           write_command = "flash write_image erase %(file)s %(address)s",
+           config = \"\""\
+       #
+       # openocd.cfg configuration from zephyr.git/boards/arm/stm32f746g_disco/support/openocd.cfg
+       #
+       source [find board/stm32f7discovery.cfg]
+
+       $_TARGETNAME configure -event gdb-attach {
+	echo "Debugger attaching: halting execution"
+	reset halt
+	gdb_breakpoint_override hard
+       }
+
+       $_TARGETNAME configure -event gdb-detach {
+	echo "Debugger detaching: resuming execution"
+	resume
+       }
+
+       \"\"\"
+       )
+
+       stm32_models['stm32f746'] = dict(zephyr = "stm32f746g_disco")
+
+
     """
     if serial_port == None:
         serial_port = "/dev/tty-" + name
 
-    flasher = ttbl.flasher.openocd_c("nucleo_f103rb", serial_number,
+    if zephyr_board == None:
+        zephyr_board = stm32_models[model]['zephyr']
+    flasher = ttbl.flasher.openocd_c(model, serial_number,
                                      openocd_path, openocd_scripts, debug)
     pc_board = ttbl.pc_ykush.ykush(ykush_serial, ykush_port_board)
 
@@ -1552,21 +1731,38 @@ def nucleo_add(name = None,
         tags = {
             'bsp_models' : { 'arm': None },
             'bsps' : {
-                "arm":  dict(zephyr_board = "nucleo_f103rb",
+                "arm":  dict(zephyr_board = zephyr_board,
                              zephyr_kernelname = 'zephyr.bin',
-                             board = "nucleo_f103rb",
-                             kernelname = 'zephyr.bin',
                              soc = "stm32",
-                             kernel = [ "unified", "micro", "nano" ],
                              console = ""),
             },
-            'quark_se_stub': "no",
-            # Flash verification is really slow, give it more time
-            'slow_flash_factor': 5,
-            'flash_verify': 'False',
         },
-        target_type = "nucleof10")
+        target_type = model)
 
+
+def nucleo_add(name = None,
+               serial_number = None,
+               serial_port = None,
+               ykush_serial = None,
+               ykush_port_board = None,
+               openocd_path = openocd_path,
+               openocd_scripts = openocd_scripts,
+               debug = False):
+    """
+    **Configure an Nucleo F10 board**
+
+    This is a backwards compatiblity function, please use :func:`stm32_add`.
+    """
+    stm32_add(name,
+              serial_number,
+              serial_port,
+              ykush_serial,
+              ykush_port_board,
+              openocd_path,
+              openocd_scripts,
+              "nucleo_f103rb",
+              "nucleo_f103rb",
+              debug)
 
 
 def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
