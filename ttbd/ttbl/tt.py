@@ -717,6 +717,7 @@ class tt_flasher(
             try:
                 self.flasher.image_write(it, n, timeout_factor, verify)
             except ValueError as e:
+                self.log.exception("flashing got exception: %s", e)
                 raise self.unsupported_image_e(e.message)
 
 class tt_dfu(
