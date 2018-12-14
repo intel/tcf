@@ -84,8 +84,8 @@ to force an update of the metadata to be pulled from the servers.
 
 .. _internal_network:
 
-Configuring a USB or other network adapter for an internal network
-------------------------------------------------------------------
+Configuring a USB or other network adapter for an infrastructure network
+------------------------------------------------------------------------
 
 Test targets or infrastructure (like power control switches) that
 require IP connectivity can be connected to your server via a
@@ -97,88 +97,77 @@ dedicated network interface and switch.
 
 You will need:
 
-- a network interface
+- a network interface (USB, PCI, etc)
 - its MAC address
 - an IP address range (recommended *192.168.X.0/24*)
-- a name for the interface (recommended *ngX*, with X matching the
-  network range above)
 
-Once a new interface is identified (builtin, PCI card or USB),
-identify its name and MAC address::
+1. Identify the network interface you will use, using tools such as::
 
-  $ ifconfig -a		# to list all interfaces
+     # ifconfig -a
+     # ip addr
 
-Once you have identified the interface which is to be used, find out
-it's MAC address::
+2. Now configure it as described in :ref:`Configuring a static interface
+   Via NetworkManager's nmcli <howto_nm_config_static>`::
 
-  $ ifconfig enp0s29u1u3	# To list information about an  specific interface
-  enp0s29u1u3: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
-        inet 192.168.0.1  netmask 255.255.255.0  broadcast 192.168.0.255
-        inet6 fe80::210:60ff:fe31:a4ba  prefixlen 64  scopeid 0x20<link>
-        ether 00:10:60:31:a4:ba  txqueuelen 1000  (Ethernet)
-        RX packets 68626  bytes 3156948 (3.0 MiB)
-        RX errors 0  dropped 0  overruns 0  frame 0
-        TX packets 76284  bytes 13537889 (12.9 MiB)
-        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+     # nmcli con add type ethernet con-name TCF-infrastructure ifname IFNAME ip4 192.168.0.20X/24
+     # nmcli con up TCF-infrastructure
 
-in this case, the fourth line of output, *ether 00:10:60:31:a4:ba*.
+Conventions for assignment of addresses in the infastructure network:
 
-Now if we are going to assing it the network range *192.168.3.0/24*,
-we assign it name *ng3*.
+- use IPv4 (easier)
 
-With the MAC address (*00:10:60:31:a4:ba*), a name (*ng3*), an IP
-network (*192.168.3.0*) and it's range (*24*), we can create a
-configuration file::
+- use a local network (eg: 192.168.x.0/24)
 
-  # cat > /etc/sysconfig/network-scripts/ifcfg-ng3 <<EOF
-  TYPE=Ethernet
-  BOOTPROTO=none
-  ONBOOT=yes
-  PREFIX=24
-  IPADDR=192.168.3.1
-  HWADDR=00:10:60:31:a4:ba
-  EOF
+- servers get IP addresses > 192.168.x.200 (try to establish a server
+  naming conventions where numbers are assigned, *server1*, *server2*,
+  etc) and thus their IP addresses are *.201*, *.202*, etc...
 
-Note the server is give address **.1** in the *192.168.3.0/24* network.
-
-And start it::
-
-  # ifup ng3
-
-Now you can connect this adaptor to a network switch and connect
-clients to said switch.
+- PDUs and other equipment use IP addresses > 192.168.x.100
 
 .. warning:: Keep this switch isolated from upstream routers; connect
              only test-targets OR infrastructure elements to it.
 
+Configuring network interfaces with NetworkManager and nmcli
+------------------------------------------------------------
+
+NetworkManager will by default take control of most network interfaces
+in the system; some adjustments might be needed.
+
 .. _howto_nm_disable_control:
 
-Disabling NetworkManager from controlling the interface
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Disabling NetworkManager from controlling an interface
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-NetworkManager needs to be told to ignore the network device; for
-that and our current example, run::
+Network interfaces which connect the server to a NUT (network under
+test) need to be left alone by NetworkManager. NetworkManager can be
+told to ignore a network device in two ways:
 
- $ sudo tee /etc/NetworkManager/conf.d/disabled.conf <<EOF
- [keyfile]
- unmanaged-devices=mac:00:10:60:31:a4:ba
- EOF
+- run the command::
 
-Or edit said file and add *mac:MACADDR* statements
-separated by semicolons to the *unmanaged-devices* line.
+    # nmcli dev set IFNAME managed no
+
+- or create a configuration file::
+
+    $ sudo tee /etc/NetworkManager/conf.d/disabled.conf <<EOF
+    [keyfile]
+    unmanaged-devices=mac:00:10:60:31:a4:ba
+    EOF
+
+  Or edit said file and add *mac:MACADDR* statements separated by
+  semicolons to the *unmanaged-devices* line.
+
 
 .. _howto_nm_config_static:
 
-Configuring a static interface Via NetworkManager
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Configuring a static interface Via NetworkManager's nmcli
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For example, to configure an internal network interface *IFNAME* for
-internal network for infrastructure control *192.168.2.0/24* with IP
-*.205* (for testcase execution we need Network Manager :ref:`off the
-interface <howto_nm_disable_control>`), run::
+To configure an internal network interface *IFNAME* for internal
+network for infrastructure control *192.168.2.0/24* with IP *.205* ,
+run::
 
-  # nmcli con add type ethernet con-name tcf-internal-2 ifname IFNAME ip4 192.168.2.205/24
-  # nmcli con up tcf-internal-2
+  # nmcli con add type ethernet con-name NETWORKNAME ifname IFNAME ip4 192.168.2.205/24
+  # nmcli con up NETWORKNAME
 
 .. _generate_ssl_certificate:
 
@@ -777,7 +766,7 @@ provides serial console access, then this will work:
 
    where of course, ``DISTRONAME-VERSION`` matches the linux
    distribution and verison installed.
-           
+
 .. _ttbd_config_phys_linux_live:
 
 
@@ -1149,7 +1138,7 @@ TCF run and a few switches:
 Note that resetting or power-cycling the board will create a new GDB
 target with a different port, so you will have to reconnect that GDB
 wo the new target remote reported by *tcf debug-info*.
-      
+
 How can I quickly build and deploy an image to a target?
 --------------------------------------------------------
 
