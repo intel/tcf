@@ -1191,10 +1191,13 @@ When you need more detail, you can:
   The output driver can be changed to lay out the information
   diferently; look at :class:`tcfl.report.report_c`.
 
+Linux targets: Common tricks
+----------------------------
+
 .. _linux_c_c:
 
-How do I send Ctrl-C to a target?
----------------------------------
+Linux targets: sending Ctrl-C to a target
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Trick over the serial console is that it is a pure pipe, there is no
 special characters. So a quick way to do it is::
@@ -1204,17 +1207,147 @@ special characters. So a quick way to do it is::
 where that *\\x03* is the hex code of Ctrl-C. *man ascii* can tell you
 the quick shortcuts for others.
 
-How do I send a Linux command to a Linux target's console
----------------------------------------------------------
+.. _linux_send_command_target:
+
+Linux targets: running a Linux shell command
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Try::
 
-  $ tcf console-write TARGETNAME "ping 192.168.1.1"
+  $ tcf console-write TARGETNAME "ping -c 3 localhost"
 
 Note that once the command is sent, the console, for whatever the
 target cares, is still connected, even if the *console-write* command
-returned for you. :ref:`Sending a Ctrl-C <linux_c_c>` is not as in a
-usual Linux console.
+returned for you. The command might still be executing; see
+:ref:`Sending a Ctrl-C <linux_c_c>` is not as in a usual, synchronous,
+Linux console.
+
+From a script, you can use :func:`tcfl.tc.target_c.shell.run
+<tcfl.target_ext_shell.shell.run>` or :func:`tcfl.tc.target_c.send`:
+
+.. code-block:: python
+
+   ...
+   @tcfl.tc.target("linux")
+   class some_test(tcfl.tc.tc_c):
+
+       def eval_something(self, target):
+           ...
+           target.shell.send("ping localhost")
+           target.shell.expect("3 packets transmitted, 3 received")
+           ...
+           # better to use
+           ...
+           target.shell.run("ping -c 3 localhost",
+                            "3 packets transmitted, 3 received")
+
+
+Linux targets: ssh login from a testcase / client
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The :term:`ttbd` server can create tunnels that allow you to reach the
+target's ports, assuming the target is
+
+- connected to a network to which the server is also connected
+- on and listening on a port
+
+In your test scripts, use the :class:`tunnel
+<tcfl.target_ext_tunnel.tunnel>` extension to create a port
+redirection, adding to your script:
+
+.. code-block:: python
+
+   ...
+   @tcfl.tc.interconnect("ipv4_addr")
+   @tcfl.tc.target(...)
+   class some_test(tcfl.tc.tc_c):
+
+       def eval_something(self, ic, target):
+           ...
+           # ensure target and interconnect is powered up and the
+           # script is logged in.
+           # Indicate to the tunnel system the target's address in the
+           # interconnect
+           target.tunnel.ip_addr = target.addr_get(ic, "ipv4")
+
+           # create a tunnel from server_name:server_port -> to target:22
+           server_name = target.rtb.parsed_url.hostname
+           server_port = target.tunnel.add(22)
+
+           # use SSH to get the content's of the target's /etc/passwd
+           output = subprocess.check_output("ssh -p %d root@%s cat /etc/passwd"
+                                            % (server_port, server_name))
+
+Tunnels can also be created with the command line::
+
+  $ tcf tunnel-add TARGETNAME 22 tcp TARGETADDR
+  SERVERNAME:19893
+  $ ssh -p 19893 SERVERNAME cat /etc/passwd
+  root:x:0:0:root:/root:/bin/bash
+  bin:x:1:1:bin:/bin:/sbin/nologin
+  daemon:x:2:2:daemon:/sbin:/sbin/nologin
+  adm:x:3:4:adm:/var/adm:/sbin/nologin
+  ...
+
+Note you might need first the steps in the next section to allow SSH
+to login with a passwordless root.
+
+Linux targets: removing the root password
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If your target is not connected to any networks or to an isolated
+network, you can remove the root password.
+
+.. code-block:: python
+
+   ...
+   @tcfl.tc.interconnect("ipv4_addr")
+   @tcfl.tc.target("linux")
+   class some_test(tcfl.tc.tc_c):
+
+       # ensure target is powered up and the script is logged in
+       def eval_something(self, ic, target):
+           ...
+           target.shell.run("passwd -d root")
+           ...
+
+or from the console::
+
+  $ tcf console-write TARGETNAME "passwd -d root"
+  $ tcf console-read TARGETNAME
+  ...
+  # passwd -d root
+  Removing password for user root.
+  passwd: Success
+
+Linux targets: allowing SSH as root with no passwords
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Most Linux deployments default configure SSH to be very conservative;
+for testing, you might want to open it up.
+
+To allow login in with SSH, add to your test script:
+
+.. code-block:: python
+
+   ...
+   @tcfl.tc.interconnect("ipv4_addr")
+   @tcfl.tc.target("linux")
+   class some_test(tcfl.tc.tc_c):
+
+       # ensure target is powered up and the script is logged in
+       def eval_something(self, ic, target):
+           target.shell.run("""\
+   cat <<EOF >> /etc/ssh/sshd_config
+   PermitRootLogin yes
+   PermitEmptyPasswords yes
+   EOF""")
+           target.shell.run("systemctl restart sshd")
+
+or from the shell::
+
+  $ tcf console-write TARGETNAME "echo PermitRootLogin yes >> /etc/ssh/sshd_config"
+  $ tcf console-write TARGETNAME "echo PermitEmptyPasswords yes >> /etc/ssh/sshd_config"
 
 .. _finding_testcase_metadata:
 
