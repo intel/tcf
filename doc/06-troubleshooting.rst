@@ -52,6 +52,55 @@ if your servers are locally accesible.
 
 FIXME: update
 
+target power on fails with *timed out waiting for udev to set permissions*
+--------------------------------------------------------------------------
+
+Targets implemented with QEMU virtual machines do networking using
+Linux's TAP interfaces, which need proper permissions being set.
+
+*ttbd* relies on file :file:`ttbd/80-udev.rules` being installed in
+``/usr/lib/udev/rules.d`` to perform this function. When a power on
+fails with a message looking like::
+
+  qlf04a: /dev/tapNNN: timed out waiting for udev to set permissions in /usr/lib/udev/rules.d/80-ttbd.rules
+
+this usually means said file is not installed; RPM installation should
+have put it in ``/usr/lib/udev/rules.d``; if running from source, make
+sure to install it manually and ask *udev* to reload::
+
+  # install tcf.git/ttbd/80-udev.rules /usr/lib/udev/rules.d
+  # udevadm control --reload-rules
+
+Sometimes instead this might be SELinux issue::
+
+  $ tcf power-on ql06a
+  Traceback (most recent call last):
+    File "/usr/bin/tcf", line 517, in <module>
+      retval = args.func(args)
+    File "/usr/lib/python2.7/site-packages/tcfl/ttb_client.py", line 799, in rest_target_power_on
+      rtb.rest_tb_target_power_on(rt)
+    File "/usr/lib/python2.7/site-packages/tcfl/ttb_client.py", line 319, in rest_tb_target_power_on
+      data = { 'ticket': ticket })
+    File "/usr/lib/python2.7/site-packages/tcfl/ttb_client.py", line 196, in send_request
+      commonl.request_response_maybe_raise(r)
+    File "/usr/lib/python2.7/site-packages/commonl/__init__.py", line 468, in request_response_maybe_raise
+      raise e
+  requests.exceptions.HTTPError: 400: ql06a: [Errno 13] Permission denied: '/dev/tap1023'
+
+is usually caused by a SELinux check disallowing the daemon access to
+the ``/dev/tapNUMBER`` device.
+
+The system's journal might show::
+
+  audit[11345]: AVC avc:  denied  { open } for  pid=11345 comm="ttbd" path="/dev/tap1023" dev="devtmpfs" ino=35798295 scontext=system_u:system_r:init_t:s0 tcontext=system_u:object_r:tun_tap_device_t:s0 tclass=chr_file permissive=0
+
+there is no current proper fix, other than disabling SELinux::
+
+  # setenforce 0
+
+however, this seems to only happen when running the daemon from a
+*$HOME* directory, instead of from a system installation.
+
 *ttbd* server
 =============
 
@@ -380,40 +429,6 @@ that is not installed in the system; for remediation::
 
   # semanage fcontext -a -t var_run_t /var/cache/ttbd-staging
   # restorecon -v /var/cache/ttbd-staging
-
-Network QEMU target fails to power up with *Permission denied: '/dev/tapNUMBER'*
---------------------------------------------------------------------------------
-
-Trying to power up a QEMU VM that uses *macvtap* devices for
-networking::
-
-  $ tcf power-on ql06a
-  Traceback (most recent call last):
-    File "/usr/bin/tcf", line 517, in <module>
-      retval = args.func(args)
-    File "/usr/lib/python2.7/site-packages/tcfl/ttb_client.py", line 799, in rest_target_power_on
-      rtb.rest_tb_target_power_on(rt)
-    File "/usr/lib/python2.7/site-packages/tcfl/ttb_client.py", line 319, in rest_tb_target_power_on
-      data = { 'ticket': ticket })
-    File "/usr/lib/python2.7/site-packages/tcfl/ttb_client.py", line 196, in send_request
-      commonl.request_response_maybe_raise(r)
-    File "/usr/lib/python2.7/site-packages/commonl/__init__.py", line 468, in request_response_maybe_raise
-      raise e
-  requests.exceptions.HTTPError: 400: ql06a: [Errno 13] Permission denied: '/dev/tap1023'
-
-is usually caused by a SELinux check disallowing the daemon access to
-the ``/dev/tapNUMBER`` device.
-
-The system's journal might show::
-
-  audit[11345]: AVC avc:  denied  { open } for  pid=11345 comm="ttbd" path="/dev/tap1023" dev="devtmpfs" ino=35798295 scontext=system_u:system_r:init_t:s0 tcontext=system_u:object_r:tun_tap_device_t:s0 tclass=chr_file permissive=0
-
-there is no current proper fix, other than disabling SELinux::
-
-  # setenforce 0
-
-however, this seems to only happen when running the daemon from a
-*$HOME* directory, instead of from a system installation.
 
 .. _ttbd_auth_ldap_invalid_creds:
 
