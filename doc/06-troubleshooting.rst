@@ -147,6 +147,29 @@ Tips for diagnosing systemd startup
   and ACLs are right. SELinux might be in the way too (check your
   system output with *journalctl -xe* and look for ttbd.
 
+- systemctl fails with *service not found*
+
+  Besides the unit not existing, this might happen when you run the
+  daemon from a :ref:`source directory <running_server_source>` and
+  SELinux is not allowing access::
+
+    $ sudo systemctl restart ttbd@afapli.service
+    Failed to restart ttbd@afapli.service: Unit ttbd@afapli.service not found.
+
+  Look in the *journalctl* for lines like::
+
+    $ sudo systemctl restart ttbd@production.service
+    Failed to restart ttbd@production.service: Unit ttbd@production.service not found.
+    $ journalctl -S -2min | grep -B4
+
+    ...audit[1]: AVC avc:  denied  { read } for  pid=1 comm="systemd" name="ttbd@.service" dev="dm-2" ino=48627844 scontext=system_u:system_r:init_t:s0 tcontext=unconfined_u:object_r:user_home_t:s0 tclass=file permissive=0
+    ...systemd[1]: Cannot access "(null)": Permission denied
+    ...systemd[1]: ttbd@production.service: Failed to load configuration: No such file or directory
+
+  A quick way to fix this is to disable SELinux with::
+
+    # setenforce
+
 .. _systemd_tips_configuring:
 
 Tips for configuring systemd startup

@@ -64,6 +64,9 @@ S2):
   production servers, another `staging/.tcf`, with all the test servers,
   `local/.tcf`, for my local server, etc...
 
+  
+.. _running_server_source:
+  
 Running the TCF server (ttbd) from the source tree
 --------------------------------------------------
 
