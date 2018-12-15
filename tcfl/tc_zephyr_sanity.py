@@ -1182,7 +1182,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
             target.on_console_rx("PROJECT EXECUTION SUCCESSFUL",
                                  console = target.kws.get("console", None))
             # And wait for them to happen
-            self.expecter.run()
+            self.tls.expecter.run()
 
     _data_parse_regexs = {}
 
