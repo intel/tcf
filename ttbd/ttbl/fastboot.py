@@ -54,7 +54,8 @@ class interface(ttbl.tt_interface):
     this allows to control which commands can be executed in the sever
     using fastboot, allowing access to the server's user storage area
     (to which files can be uploaded using the *tcf broker-upload*
-    command or :func:`tcfl.tc.target_c.broker_file.upload`).
+    command or :func:`tcfl.tc.target_c.broker_files.upload
+    <tcfl.target_ext_broker_files.broker_files.upload>`).
 
     The server configuration will decide which commands can be
     executed or not (a quick list can be obtained with *tcf
@@ -78,7 +79,7 @@ class interface(ttbl.tt_interface):
 
       The entry can be a tuple *( STR|REGEX, REPLACEMENT )* that
       allows to replace what the user sends (using
-      :func:`python.re.sub`). In the example above:
+      :func:`re.sub`). In the example above:
 
       >>> ( re.compile("^(.+)$"), "%USERPATH%/\\g<1>" )
 

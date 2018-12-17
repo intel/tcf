@@ -19,6 +19,7 @@ Extensions to :class:`tcfl.tc.target_c` types
 .. automodule:: tcfl.target_ext_buttons
 .. automodule:: tcfl.target_ext_console
 .. automodule:: tcfl.target_ext_debug
+.. automodule:: tcfl.target_ext_fastboot
 .. automodule:: tcfl.target_ext_images
 .. automodule:: tcfl.target_ext_ioc_flash_server_app
 .. automodule:: tcfl.target_ext_power
@@ -308,6 +309,7 @@ Miscelaneous and other interfaces
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. automodule:: ttbl.buttons
+.. automodule:: ttbl.fastboot
 .. automodule:: ttbl.ioc_flash_server_app
 .. automodule:: ttbl.target
 
