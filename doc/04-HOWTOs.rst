@@ -974,6 +974,26 @@ Remember to toggle it back to the default ``-vv``--it gets chatty.
 TCF client tricks
 =================
 
+.. _tcf_client_configuration:
+
+Where is the TCF client configuration taken from?
+-------------------------------------------------
+
+*tcf* reads configuration files from (in this order):
+
+- *.tcf* (a subdirectory of the current working directory)
+- *~/.tcf*
+- */etc/tcf* (if installed globally)
+- *~/.local/etc/tcf* (if installed in user's home only)
+
+Configuration files are called *conf_WHATEVER.py* and imported in
+**alphabetical** order from each directory before proceeding to the
+next one. They are written in plain Python code, so you can do
+anything, even extend TCF from them. The module :mod:`tcfl.config`
+provides access to functions to set TCF's configuration.
+
+You can add new paths to parse with ``--config-path`` and force
+specific files to be read with ``--config-file``. See *tcf --help*.
 
 How do I release a target I don't own?
 --------------------------------------
@@ -1443,6 +1463,23 @@ If there was a target, the keywords extend to::
 
 note how the keywords for the first target are a superset of those for
 the testcase and will be only available when on target context.
+
+.. _report_always:
+
+Making the client always generate report files
+----------------------------------------------
+
+*tcf run* will normally generate a report file if a testcase does not
+*pass*. If you want report files generated always, you can add to any
+:ref:`configuration file <tcf_client_configuration>`:
+
+.. code-block:: python
+
+   tcfl.report.file_c.templates['text']['report_pass'] = True
+
+Reporting is handled by the :mod:`reporting API <tcfl.report>` and the
+*report* files are created by the Jinja2 :class:`reporter
+<tcfl.report.file_c>` based on a template called *text*.
 
 .. _report_domain_breakup:
 

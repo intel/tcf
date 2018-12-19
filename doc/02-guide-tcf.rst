@@ -5,17 +5,8 @@
 Configuring the TCF client
 ==========================
 
-The client looks for configuration files named `conf_*.py` in the
-following directories:
-
-- `.tcf/` subdirectory of the current working directory
-- `~/.tcf/`, a per-user configuration directory
-- `/etc/tcf/`, a system wide configuration directory
-
-The `conf_*.py` files are parsed in alphabetical order, written in
-plain Python code, so you can do anything, even extend TCF from
-them. The module :mod:`tcfl.config` provides access to functions to
-set TCF's configuration.
+The client looks for configuration files in :ref:`multiple places
+<tcf_client_configuration>`.
 
 .. _tcf_config_servers:
 
