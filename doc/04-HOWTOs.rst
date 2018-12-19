@@ -1369,6 +1369,34 @@ or from the shell::
   $ tcf console-write TARGETNAME "echo PermitRootLogin yes >> /etc/ssh/sshd_config"
   $ tcf console-write TARGETNAME "echo PermitEmptyPasswords yes >> /etc/ssh/sshd_config"
 
+.. _tcf_client_timetout:
+
+How do I change the default timeout in my test scripts
+------------------------------------------------------
+
+The default timeout different parts of the *tcf run* engines wait for
+the target to respond can be changed by setting the variable
+*self.tls.expecter.timeout* (note *self* is a testcase class):
+
+.. code-block:: python
+
+   class some_tc(tcfl.tc.tc_c):
+       ...
+       def eval_some(self):
+           # wait a max of 40 seconds
+           self.tls.expecter.timeout = 40
+           ...
+
+It is a bit awkward and we'll make a better way to do it. Other places
+that take a *timeout* parameter that has to be less than
+*self.tls.expecter.timeout*:
+
+- :func:`target.shell.up <tcfl.target_ext_shell.shell.up>`
+- :func:`target.on_console_rx <tcfl.tc.target_c.on_console_rx>`
+  and :func:`target.on_console_rx_cm <tcfl.tc.target_c.on_console_rx_cm>`
+- :func:`target.wait <tcfl.tc.target_c.wait>`
+- :func:`target.expect <tcfl.tc.target_c.expect>`
+  
 .. _finding_testcase_metadata:
 
 Finding testcase's keywords / metadata available for templating
