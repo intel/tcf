@@ -1660,6 +1660,17 @@ Note that if the availability of targets to run the shards doesn't
 allow them to run testcases in parallel, you might not gain much by
 the paralallelization of *tcf run*.
 
+Controlling output location
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+*tcf run* can be given ``--log-dir`` to specify the location where
+most default output files will be placed, including:
+
+- failure/error/block/skip reports
+- tcpdump outputs
+
+this defaults to the directory where *tcf run* was invoked from.
+
 .. _manual_install:
 
 Manual installation of TCF from source
