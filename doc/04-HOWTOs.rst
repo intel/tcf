@@ -1637,6 +1637,10 @@ testcase. e.g.::
   $ tcf run --hash-salt PROJECT-BRANCH-YYMMDD-HHMM-BBB \
       --runid PROJECT-BRANCH-YYMMDD-HHMM-BBB -v path/to/testcases
 
+add to the hash salt any other factors that might contribute to the
+same testcase/target combination being run as the same but that shall
+be considered different (eg: using a different toolchain).
+
 Splitting in multiple shards
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
