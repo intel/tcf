@@ -656,6 +656,15 @@ class zephyr(tc.target_extension_c):
 
 """ % (commonl.origin_get(), commonl.origin_get(2)))
             f.write(data)
+            # report the config file we wrote, so reproduction
+            # instructions will carry it in the report file; we report
+            # the data without the header to make it easier -- note we
+            # use report_pass() [vs report_info()] as _info might get
+            # filtered as too verbose info, where as pass is
+            # information important for passing.
+            target.report_pass("enabled Zephyr config file %s at %s"
+                               % (name, outdir),
+                               { 'config file': data })
         if not os.path.exists(existing_filename):
             shutil.move(new_filename, existing_filename)
         else:
