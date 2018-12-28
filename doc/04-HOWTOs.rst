@@ -10,6 +10,10 @@ General Linux system
 Setup proxies
 -------------
 
+.. note:: this applies to setting the proxy for the server; if you
+          need to set proxies during testcase execution, see
+          :ref:`here <tcf_testcase_proxy>`
+
 If your network requires proxy support:
 
 - From the GUI: log in as a normal user to the graphical interface
@@ -43,7 +47,7 @@ Configure *sudo* to pass proxy configuration::
   EOF
 
 This ensures the proxy configuration is kept by *sudo* (versus having
-torun *sudo -E*) so tools that use the network don't get stuck with
+to run *sudo -E*) so tools that use the network don't get stuck with
 network access.
 
 Why?
@@ -1311,6 +1315,60 @@ Tunnels can also be created with the command line::
 
 Note you might need first the steps in the next section to allow SSH
 to login with a passwordless root.
+
+.. _tcf_testcase_proxy:
+
+Linux targets: using proxies
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:term:`NUT`\s to which targets are connected are usually setup very
+isolated from upstream or other networks; there is a common practice
+to declare a proxy availability in an interconnect by it exporting any
+of the following variables::
+
+  $ tcf list -vv nwb | grep -i proxy
+  ftp_proxy: http://192.168.98.1:911
+  http_proxy: http://192.168.98.1:911
+  https_proxy: http://192.168.98.1:911
+
+so in a test script running a Linux target, one could do:
+
+.. code-block:: python
+
+   @tcfl.tc.interconnect("ipv4_addr")
+   @tcfl.tc.target('pos_capable')
+   class _test(tcfl.tc.tc_c):
+
+       def eval_something(self, ic, target):
+           ...
+           if 'http_proxy' in ic.kws:
+              target.shell.run("export http_proxy=%s" % ic.kws.get('http_proxy'))
+              target.shell.run("export HTTP_PROXY=%s" % ic.kws.get('http_proxy'))
+           if 'https_proxy' in ic.kws:
+              target.shell.run("export https_proxy=%s" % ic.kws.get('https_proxy'))
+              target.shell.run("export HTTPS_PROXY=%s" % ic.kws.get('https_proxy'))
+           ...
+
+note however, that those settings will apply only to the shell being
+run in that console. You can make more permanent settings in the
+target by for example, modifying ``/etc/bashrc``::
+
+   @tcfl.tc.interconnect("ipv4_addr")
+   @tcfl.tc.target('pos_capable')
+   class _test(tcfl.tc.tc_c):
+
+       def eval_something(self, ic, target):
+           ...
+           if 'http_proxy' in ic.kws:
+              target.shell.run("echo http_proxy=%s >> /etc/bashrc" % ic.kws.get('http_proxy'))
+              target.shell.run("echo HTTP_PROXY=%s >> /etc/bashrc" % ic.kws.get('http_proxy'))
+           if 'https_proxy' in ic.kws:
+              target.shell.run("echo https_proxy=%s >> /etc/bashrc" % ic.kws.get('https_proxy'))
+              target.shell.run("echo HTTPS_PROXY=%s >> /etc/bashrc" % ic.kws.get('https_proxy'))
+           ...
+
+and those will also apply if your script logs in via SSH or other methods.
+
 
 Linux targets: removing the root password
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
