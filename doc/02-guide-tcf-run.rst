@@ -117,11 +117,13 @@ There are many options to *tcf run* which you can find with *tcf run
 * **-v** Increases the verbosity of the console output, can be
   repeated for more information
 
-* **-i** adds a `Run ID` (``-i RUNID``), which will be prefixed in
+.. _tcf_run_runid:
+
+* **-i** adds a :term:`RunID` (``-i RUNID``), which will be prefixed in
   most messages and reports; it'll also generate a logfile called
   ``RUNID.log`` with lots of low-level details about the
   process. Failure reports will be created in files called
-  ``report-RUNID:HASH.txt``, where `HASH` is the code that uniquely
+  ``report-RUNID:HASH.txt``, where :term:`hash` is the code that uniquely
   identifies the test case name and the target where it ran.
 
   This is very useful when running *tcf* from a continuous integration

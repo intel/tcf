@@ -1594,6 +1594,68 @@ The `_my_hook_fn()` would look as:
 If the data needed is not available until after the testcase executes,
 you can use :class:`reporting hooks <tcfl.report.file_c.hooks>`.
 
+.. _tcf_ci:
+
+Continuous Integration
+----------------------
+
+*TCF run* can be used in a CI system to run testcases as part of the
+continuous integration process. A few helpful tricks:
+
+Generate a unique ID for each run and feed it to TCF
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+It is common practice to generate a unique ID for each build or
+continuous integration run. It should include:
+
+- timestamp (YYMMDD-HHMM): allows to tell when the build happened and
+  to map to logs in other parts of the system; might not be sufficient
+  if more than one build can be started in the same hour/minute/second
+
+- monotonic counter (BBB): CI engines like Jenkins will refer to
+  builds by their internal build monotonic counter--it also helps
+  distinguish in the unlikely case two builds were started on the same
+  second (or minute)
+
+- branch/project identifier (PROJECT-BRANCH): if a single build might
+  be running on multiple branches or projects, it helps to add a short
+  version of it -- thus, when the Unique ID is propagated to other
+  parts of the CI system, we can see who is causing whatever action.
+
+*tcf run* supports the concept of a :ref:`RunID <tcf_run_runid>`,
+which will be then used in all the reports.
+
+A good RunID specification for *TCF run* would be something like::
+
+  PROJECT-BRANCH-YYMMDD-HHMM-BBB
+
+it is a good idea to also give it to the hashing engine as salt so
+that the :term:`hash` identifiers used to acquire targets don't
+conflict with other projects that might be using the same
+testcase. e.g.::
+
+  $ tcf run --hash-salt PROJECT-BRANCH-YYMMDD-HHMM-BBB \
+      --runid PROJECT-BRANCH-YYMMDD-HHMM-BBB -v path/to/testcases
+
+Splitting in multiple shards
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When running CI in multiple slaves in parallel, the CI engine can tell
+*tcf run* to only run an specific shard of the whole list of
+testcases. Assuming all the slaves have the same list of testcases,
+the list will be evenly split::
+
+  slave1$ tcf run --shard 1-3 --runid X path/to/testcases
+  slave2$ tcf run --shard 2-3 --runid X path/to/testcases
+  slave3$ tcf run --shard 3-3 --runid X path/to/testcases
+
+will split the deck of testcases in 3 shards and run one on each slave
+in parallel.
+
+Note that if the availability of targets to run the shards doesn't
+allow them to run testcases in parallel, you might not gain much by
+the paralallelization of *tcf run*.
+
 .. _manual_install:
 
 Manual installation of TCF from source

@@ -8,9 +8,9 @@ TCF
    
 TCF is a system that simplifies the creation and execution of test
 cases (automation, for that matter) with minimal setup effort by
-engineers (SW, QA and release) and autobuilders alike across a wide
-amount of hardware platforms. It is distributed under the terms of the
-Apache 2.0 license.
+engineers (SW, QA and release) and :ref:`autobuilders/CI <tcf_ci>`
+alike across a wide amount of hardware platforms. It is distributed
+under the terms of the Apache 2.0 license.
 
 The test framework provides means to:
 

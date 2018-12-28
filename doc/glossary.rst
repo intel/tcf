@@ -16,6 +16,17 @@ Glossary
      independently or together, the following BSP models would be
      supported: `x86`, `arc` and `x86+arc`.
 
+   hash
+
+     In the context of *tcf run*, a hash is a four character code that
+     uniquely identifies the test case name and the target where it ran.
+
+   RunID
+
+     A unique identifier for a run of testcases that groups the output
+     and results of testcases. When specified, it will be prefixed to
+     testcase output to clarify when it was generated.
+
    test case
 
      A test case is a flow to evaluate a single requirement, feature
