@@ -26,7 +26,7 @@ import ttbl.tt
 # OpenOCD paths -- multiple versions
 sdk_path = os.path.join(
     os.environ.get("ZEPHYR_SDK_INSTALL_DIR", "/opt/zephyr-sdk-0.9.5"),
-    "/sysroots/x86_64-pokysdk-linux")
+    "sysroots/x86_64-pokysdk-linux")
 # From the Zephyr SDK
 openocd_sdk_path = os.path.join(sdk_path, "usr/bin/openocd")
 openocd_sdk_scripts = os.path.join(sdk_path, "usr/share/openocd/scripts")
