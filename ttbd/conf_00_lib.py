@@ -1447,71 +1447,39 @@ def nios2_max10_add(name,
 
 stm32_models = dict()
 
-ttbl.flasher.openocd_c._addrmaps['stm32f7'] = dict(
-    arm = dict(load_addr = 0x08000000)
-)
 ttbl.flasher.openocd_c._addrmaps['unneeded'] = dict(
     # FIXME: we need this so the mappings in flasher.c don't get all
     # confused
     arm = dict()
 )
 
-ttbl.flasher.openocd_c._boards['stm32f746'] = dict(
-    addrmap = 'stm32f7',
-    targets = [ 'arm' ],
-    target_id_names = { 0: 'stm32f7x.cpu' },
-    write_command = "flash write_image erase %(file)s %(address)s",
-    config = """\
-#
-# openocd.cfg configuration from zephyr.git/boards/arm/stm32f746g_disco/support/openocd.cfg
-#
-source [find board/stm32f7discovery.cfg]
 
-$_TARGETNAME configure -event gdb-attach {
-	echo "Debugger attaching: halting execution"
-	reset halt
-	gdb_breakpoint_override hard
-}
-
-$_TARGETNAME configure -event gdb-detach {
-	echo "Debugger detaching: resuming execution"
-	resume
-}
-
-"""
-)
-
-stm32_models['stm32f746'] = dict(zephyr = "stm32f746g_disco")
-
-ttbl.flasher.openocd_c._boards['stm32f429'] = dict(
+ttbl.flasher.openocd_c._boards['nucleo_f103rb'] = dict(
     addrmap = 'unneeded',	# unneeded
     targets = [ 'arm' ],
-    target_id_names = { 0: 'stm32f4x.cpu' },
+    target_id_names = { 0: 'stm32f2x.cpu' },
     write_command = "flash write_image erase %(file)s",
     # FIXME: until we can set a verify_command that doesn't do
     # addresses, we can't enable this
     verify = False,
     config = """\
 #
-# openocd.cfg configuration from zephyr.git/boards/arm/stm32f429i_disc1/support/openocd.cfg
+# openocd.cfg configuration from zephyr.git/boards/arm/nucleo_f103rb/support/openocd.cfg
 #
-source [find board/st_nucleo_f4.cfg]
+source [find board/st_nucleo_f103rb.cfg]
 
 $_TARGETNAME configure -event gdb-attach {
-	echo "Debugger attaching: halting execution"
-	reset halt
-	gdb_breakpoint_override hard
+        echo "Debugger attaching: halting execution"
+        reset halt
+        gdb_breakpoint_override hard
 }
 
 $_TARGETNAME configure -event gdb-detach {
-	echo "Debugger detaching: resuming execution"
-	resume
+        echo "Debugger detaching: resuming execution"
+        resume
 }
-
 """
 )
-
-stm32_models['stm32f429'] = dict(zephyr = "stm32f429i_disc1")
 
 ttbl.flasher.openocd_c._boards['nucleo_f207zg'] = dict(
     addrmap = 'unneeded',	# unneeded
@@ -1542,19 +1510,19 @@ $_TARGETNAME configure -event gdb-detach {
 """
 )
 
-ttbl.flasher.openocd_c._boards['nucleo_f103rb'] = dict(
+ttbl.flasher.openocd_c._boards['nucleo_f429zi'] = dict(
     addrmap = 'unneeded',	# unneeded
     targets = [ 'arm' ],
-    target_id_names = { 0: 'stm32f2x.cpu' },
+    target_id_names = { 0: 'stm32f4x.cpu' },
     write_command = "flash write_image erase %(file)s",
     # FIXME: until we can set a verify_command that doesn't do
     # addresses, we can't enable this
     verify = False,
     config = """\
 #
-# openocd.cfg configuration from zephyr.git/boards/arm/nucleo_f103rb/support/openocd.cfg
+# openocd.cfg configuration from zephyr.git/boards/arm/nucleo_f429zi/support/openocd.cfg
 #
-source [find board/st_nucleo_f103rb.cfg]
+source [find board/st_nucleo_f4.cfg]
 
 $_TARGETNAME configure -event gdb-attach {
         echo "Debugger attaching: halting execution"
@@ -1568,6 +1536,31 @@ $_TARGETNAME configure -event gdb-detach {
 }
 """
 )
+
+ttbl.flasher.openocd_c._boards['nucleo_f746zg'] = dict(
+    addrmap = 'unneeded',	# unneeded
+    targets = [ 'arm' ],
+    target_id_names = { 0: 'stm32f7x.cpu' },
+    write_command = "flash write_image erase %(file)s %(address)s",
+    config = """\
+#
+# openocd.cfg configuration from zephyr.git/boards/arm/nucleo_f746zg/support/openocd.cfg
+#
+source [find board/st_nucleo_f7.cfg]
+
+$_TARGETNAME configure -event gdb-attach {
+        echo "Debugger attaching: halting execution"
+        reset halt
+        gdb_breakpoint_override hard
+}
+
+$_TARGETNAME configure -event gdb-detach {
+        echo "Debugger detaching: resuming execution"
+        resume
+}
+"""
+)
+
 
 def stm32_add(name = None,
               serial_number = None,
