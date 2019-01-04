@@ -759,10 +759,10 @@ def nrf5x_add(name,
 
     .. code-block:: python
 
-       frdm_add(name = "nrf51-NN",
-                serial_number = "SERIALNUMBER",
-                ykush_serial = "YKXXXXX",
-                ykush_port_board = N)
+       nrf5x_add(name = "nrf51-NN",
+                 serial_number = "SERIALNUMBER",
+                 ykush_serial = "YKXXXXX",
+                 ykush_port_board = N)
 
     restart the server and it yields::
 
