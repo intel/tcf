@@ -1699,7 +1699,9 @@ def stm32_add(name = None,
         serial_port = "/dev/tty-" + name
 
     if zephyr_board == None:
-        zephyr_board = stm32_models[model]['zephyr']
+        # default to the same as model if there is no entry in the
+        # dict or no 'zephyr' tag on it
+        zephyr_board = stm32_models.get(model, {}).get('zephyr', model)
     flasher = ttbl.flasher.openocd_c(model, serial_number,
                                      openocd_path, openocd_scripts, debug)
     pc_board = ttbl.pc_ykush.ykush(ykush_serial, ykush_port_board)
