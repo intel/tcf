@@ -420,45 +420,6 @@ ftdi_layout_signal nTRST -data 0x0100 -oe 0x0100
         ),
 
         #
-        # FIXME: for this guy (and seemingly for others), the flash
-        # address can be specified as a .config -- we need to be able
-        # to route it -- so this kinda begs for a way to extract
-        # values from the build to use into deploy and evaluation,
-        # which kinda makes sense.
-        #
-        'nucleo_f103rb': dict(
-            addrmap = 'stm32f1',
-            targets = [ 'arm' ],
-            target_id_names = { 0: 'stm32f1x.cpu'},
-            interface = None,
-            board = None,
-            write_command = "flash write_image erase %(file)s %(address)s",
-            config = """\
-interface hla
-hla_layout stlink
-hla_serial "%(serial_string)s"
-# Always needed, or openocd fails -100
-hla_vid_pid 0x0483 0x374b
-
-#
-# openocd.cfg configuration from Zephyr
-#
-source [find target/stm32f1x.cfg]
-
-$_TARGETNAME configure -event gdb-attach {
-        echo "Debugger attaching: halting execution"
-        reset halt
-        gdb_breakpoint_override hard
-}
-
-$_TARGETNAME configure -event gdb-detach {
-        echo "Debugger detaching: resuming execution"
-        resume
-}
-"""
-        ),
-
-        #
         # This requires openocd v0.10.0 (pre-development as of 5/9/16)
         #
         'frdm_k64f': dict(

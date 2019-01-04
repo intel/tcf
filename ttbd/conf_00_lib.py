@@ -1513,8 +1513,7 @@ $_TARGETNAME configure -event gdb-detach {
 
 stm32_models['stm32f429'] = dict(zephyr = "stm32f429i_disc1")
 
-
-ttbl.flasher.openocd_c._boards['stm32f207'] = dict(
+ttbl.flasher.openocd_c._boards['nucleo_f207zg'] = dict(
     addrmap = 'unneeded',	# unneeded
     targets = [ 'arm' ],
     target_id_names = { 0: 'stm32f2x.cpu' },
@@ -1543,8 +1542,32 @@ $_TARGETNAME configure -event gdb-detach {
 """
 )
 
-stm32_models['stm32f207'] = dict(zephyr = "nucleo_f207zg")
+ttbl.flasher.openocd_c._boards['nucleo_f103rb'] = dict(
+    addrmap = 'unneeded',	# unneeded
+    targets = [ 'arm' ],
+    target_id_names = { 0: 'stm32f2x.cpu' },
+    write_command = "flash write_image erase %(file)s",
+    # FIXME: until we can set a verify_command that doesn't do
+    # addresses, we can't enable this
+    verify = False,
+    config = """\
+#
+# openocd.cfg configuration from zephyr.git/boards/arm/nucleo_f103rb/support/openocd.cfg
+#
+source [find board/st_nucleo_f103rb.cfg]
 
+$_TARGETNAME configure -event gdb-attach {
+        echo "Debugger attaching: halting execution"
+        reset halt
+        gdb_breakpoint_override hard
+}
+
+$_TARGETNAME configure -event gdb-detach {
+        echo "Debugger detaching: resuming execution"
+        resume
+}
+"""
+)
 
 def stm32_add(name = None,
               serial_number = None,
