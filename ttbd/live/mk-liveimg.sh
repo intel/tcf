@@ -153,5 +153,6 @@ done
 
 rm -f tcf-live.iso
 # note tcf-live.ks will include the files we created here
-sudo livecd-creator -vvv --config=$dirname/tcf-live.ks --fslabel=tcf-live \
+# give -E to sudo so the proxy environment we have set is included
+sudo -E livecd-creator -vvv --config=$dirname/tcf-live.ks --fslabel=tcf-live \
      --cache=$PWD/cache --tmpdir=$PWD/tmp
