@@ -1,0 +1,4 @@
+# to be able to mkfs.vfat /boot
+dosfstools
+efibootmgr
+wget
