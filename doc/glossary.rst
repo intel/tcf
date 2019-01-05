@@ -27,6 +27,17 @@ Glossary
      and results of testcases. When specified, it will be prefixed to
      testcase output to clarify when it was generated.
 
+   NUT
+
+     Network Under Test or test network, to which :term:`test target`\s
+     are connected. Usually isolated from the test infrastructure
+     itself.
+
+   POS
+
+     Provisioning OS; operating system running on the :term:`test
+     target` that is used to provision the target's drive.
+
    test case
 
      A test case is a flow to evaluate a single requirement, feature

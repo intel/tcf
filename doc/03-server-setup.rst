@@ -492,8 +492,8 @@ follow are configuration examples.
 
 .. _ttbd_config_phys_linux:
 
-Configure physical Linux targets
---------------------------------
+Configure physical Linux (or other) targets
+-------------------------------------------
 
 There are multiple ways a Linux target can be connected as a target to
 a TCF server. However, dependending on the intended use, different
@@ -502,7 +502,9 @@ configuration steps can be followed:
 
 - A Linux target can be setup to :ref:`just power on and off
   <tt_linux_simple>`.
-       
+
+  This provides no control over the OS installed in the target
+
 - A Linux target can be setup to boot off a read-only live filesystem
   (to avoid modifications to the root filesystem) following
   :ref:`these steps <ttbd_config_phys_linux_live>`.
@@ -510,6 +512,17 @@ configuration steps can be followed:
   Serial access to a console can be provided and through it networking
   can be configured.
 
+- A PC-class machine can be setup so that via the control of a
+  Provisioning OS, it can be imaged to partition disks or install
+  whichever operating systems in the disks.
+
+  This allows testcases to start by ensuring the machine is properly
+  imaged to a well known setup before starting.
+
+  POS imaging can allow for very fast deployment times (below 1
+  minute) to fresh OS versions. It requires a more complex setup that
+  depends on the characteristics of the machines to support and it is
+  described :ref:`here <pos_setup>`.
 
 Configuring things that get plugged to the targets
 --------------------------------------------------
@@ -589,9 +602,9 @@ target is connected::
 
   TYPE-NNx
 
-- *TYPE*: name that describes the type of the target
+- *TYPE*: a short name that describes the type of the target
 
-  e.g.: *arduino2*, *minnowboard*, *genericpc*...
+  e.g.: *arduino2*, *minnowboard*, *arduino101*, *nuc*, *genericpc*...
 
 - *NN* is a number that is increased monotonically for each target
   added to the infrastructure, even of different types:
@@ -611,8 +624,9 @@ target is connected::
 
 examples:
 
-  - *arduino101-03*:
+  - *arduino101-03*
   - *minnowboard-04r*
+  - *nuc-58a*
 
 
 Configuration Example 1
@@ -761,3 +775,744 @@ Once a target is configured in, run a quick healthcheck::
 
       place links to configuration of network infrastructure (switches
       and interfaces)
+
+.. _pos_setup:
+
+Configuring Provisioning OS support
+-----------------------------------
+
+POS allows for a method to provision/flash/image certain devices using
+a :mod:`Provisioning OS <tcfl.pos>` which is faster than imaging using
+standard OS installation procedures.
+
+POS needs, depending on the setup:
+
+- targets able to UEFI boot via PXE to the network
+
+  these targets will boot POS over PXE, with the root filesystem in an
+  NFS drive
+
+- a network interconnect to which the target(s) have to be connected,
+  as well as the server
+
+- a server acting as an rsync server to provide images to flash into
+  targets; this is usually the same as the TTBD server (for
+  simplicity) the interconnect between the rsync server and the
+  targets needs to be at least 1Gbps to provide the needed performance
+  that will allow to flash a 1G image in less than one minute on a
+  normal harddrive.
+
+  Optional: use glusterfs to coordinate the distribution of images to
+  all the servers FIXME
+
+- A server providing:
+
+  - the POS linux kernel and initrd over HTTP for targets to boot from
+    PXE
+  - the POS image over NFS root for the targets to boot
+
+  this can also be the TTBD server for simplicity and scalability.
+
+Current known POS limitations:
+
+- Only UEFI PXE boot supported
+- Single partitioning scheme supported
+
+POS: Server setup
+^^^^^^^^^^^^^^^^^
+
+These instructions are for Fedora only; other distributions have not
+been tested yet, shall be similar.
+
+1. Install the auxiliary package ``ttbd-pos`` to bring in all the
+   required dependencies::
+
+     # dnf install -y --allowerasing ttbd-pos
+
+2. Ensure your user is member of the ``ttbd`` group::
+
+     # usermod -aG ttbd YOURUSER
+
+   you will have to re-login for changes to take effect.
+
+3. Configure an image repository (FIXME: add in glusterfs steps); we
+   choose ``/home/ttbd/images`` but any other location will do::
+
+     # install -o ttbd -g ttbd -m 2775 -d /home/ttbd /home/ttbd/images /home/ttbd/public_html
+
+
+4. Disable the firewall (FIXME: do not require this)::
+
+     # systemctl stop firewalld
+     # systemctl disable firewalld
+
+5. Enable required services:
+
+   - Apache: to serve the POS Linux kernel and initrd::
+
+       # tee /etc/httpd/conf.d/ttbd.conf <<EOF
+       Alias "/ttbd-pos" "/home/ttbd/public_html"
+
+       <Directory "/home/ttbd/public_html">
+       AllowOverride FileInfo AuthConfig Limit Indexes
+       Options MultiViews Indexes SymLinksIfOwnerMatch IncludesNoExec
+       Require method GET POST OPTIONS
+       </Directory>
+       EOF
+
+     SELinux requires setting a few more things to enable serving from
+     home directories::
+
+       # setsebool -P httpd_enable_homedirs true
+       # chcon -R -t httpd_sys_content_t /home/ttbd/public_html
+
+     Test this is working::
+
+       # systemctl restart httpd
+       # echo "it works" > /home/ttbd/public_html/testfile
+
+     from any other browser try to access
+     http://YOURSERVERNAME/ttbd-pos/testfile and check it succeeds.
+
+     FIXME: move ttbd.conf file as a config file in package
+     ``ttbd-pos``.
+
+   - NFS server: provides the POS root filesystem.
+
+     Ensure UDP support is enabled::
+
+       # sed -i 's|RPCNFSDARGS="|RPCNFSDARGS="--udp |' /etc/sysconfig/nfs
+       # systemctl enable nfs-server
+       # systemctl restart nfs-server
+
+POS: deploy PXE boot image to HTTP and NFS server locations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Currently the Provisioning OS is implemented with a derivative of
+Fedora Linux.
+
+a. Generate TCF-live on the fly::
+
+     $ /usr/share/tcf/live/mk-liveimg.sh
+
+   Note:
+
+   - needs sudo access; will ask for your password to gain *sudo* when
+     needed
+
+   - downloads ~300 packages to create a Fedora-based image, so make
+     sure you have a good connection and plenty of disk space free.
+
+     It will be cached in directory *tcf-live* so next time you run
+     less needs to be downloaded.
+
+     To use a closer mirror to you or add extra RPM repositories::
+
+       $ mdkir tcf-live
+       $ cat > tcf-live/tcf-live-mirror.ks <<EOF
+       # Repos needed to pick up TCF internal RPMs
+       repo --name=EXTRAREPO --baseurl=https://LOCATION/SOMEWHERE
+       # internal mirrors for getting RPMs
+       repo --name=fedora-local --cost=-100 --baseurl=http://MIRROR/fedora/linux/releases/$releasever/Everything/$basearch/os/
+       repo --name=updates-local --cost=-100 --baseurl=http://MIRROR/fedora/linux/releases/$releasever/Everything/$basearch/os/
+       EOF
+
+b. Extract the root file system from the ISO image to the
+   ``/home/ttbd/images`` directory; this is where the NFS server
+   will read-only root serve it from and also we'll be able to use
+   it to flash targets::
+
+     $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/tcf-live tcf-live/tcf-live.iso
+     I: loop device /dev/loop0
+     NAME      MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+     loop0       7:0    0  419M  0 loop
+     └─loop0p1 259:0    0  419M  0 loop
+     mount: /home/LOGIN/tcf-image-setup.sh-XEqBHG/iso: WARNING: device write-protected, mounted read-only.
+     I: mounted /dev/loop0p1 in tcf-image-setup.sh-XEqBHG/iso
+     I: mounted tcf-image-setup.sh-XEqBHG/iso/LiveOS/squashfs.img in tcf-image-setup.sh-XEqBHG/squashfs
+     I: mounted tcf-image-setup.sh-XEqBHG/squashfs/LiveOS/ext3fs.img in tcf-image-setup.sh-XEqBHG/root
+     I: created tcf-live, transferring
+     I: tcf-live: diffing verification
+     File tcf-image-setup.sh-XEqBHG/root/./dev/full is a character special file while file tcf-live/.
+     /dev/full is a character special file
+     ...
+     File tcf-image-setup.sh-XEqBHG/root/./dev/zero is a character special file while file tcf-live/.
+     /dev/zero is a character special file
+     I: unmounting tcf-image-setup.sh-XEqBHG/root
+     I: unmounting tcf-image-setup.sh-XEqBHG/squashfs
+     I: unmounting tcf-image-setup.sh-XEqBHG/iso
+     I: unmounting tcf-image-setup.sh-XEqBHG/root
+     umount: tcf-image-setup.sh-XEqBHG/root: not mounted.
+
+   (most of those warning messages during verification can be ignored)
+
+c. Make the kernel and initrd for POS available via Apache for
+   PXE-over-HTTP booting:
+
+   i. Copy the kernel::
+
+        # ln /home/ttbd/images/tcf-live/boot/vmlinuz-* /home/ttbd/public_html/vmlinuz-tcf-live
+
+   ii. Regenerate the *initrd* with nfs-root support, as the initrd
+       generated does not have nfs-root enabled (FIXME: figure out
+       the configuration to enable it straight up)::
+
+         # dracut -v -H --kver $(ls /home/ttbd/images/tcf-live/lib/modules) \
+                -k /home/ttbd/images/tcf-live/lib/modules/* \
+               --kernel-image /home/ttbd/images/tcf-live/boot/vmlinuz-* \
+               -m "nfs base network kernel-modules kernel-network-modules" \
+               /home/ttbd/public_html/initramfs-tcf-live
+
+       .. warning:: ``--kver`` is needed to not default to the kernel
+                    version of the system running the command.
+                    ``-H`` is needed to ensure a generic initrd that
+                    works with multiple machines is created.
+
+   iii. Make everything readable to the public::
+
+          # chmod 0644 /home/ttbd/public_html/*
+          # chcon -R -t httpd_sys_content_t /home/ttbd/public_html
+
+   Ensure those two files work by pointing a browser to
+   http://YOURSERVERNAME/ttbd-pos/ and verifying they can be downloaded.
+
+d. Make the POS root image available over NFS as read-only (note we
+   only export those images only, not all)::
+
+     # tee /etc/exports.d/ttbd-pos.exports <<EOF
+     /home/ttbd/images/tcf-live *(ro,no_root_squash)
+     EOF
+     # systemctl reload nfs-server
+
+   Verify the directory is exported::
+
+     $ showmount -e SERVERNAME
+     Export list for localhost:
+     /home/ttbd/images/tcf-live *
+
+.. _ttbd_pos_deploying_images:
+
+POS:Deploying other images
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Image naming follows the format::
+
+ DISTRO:SPIN:VERSION:SUBVERSION:ARCH
+
+it is valid to leave any fields empty except for the DISTRO and ARCH
+fields; valid examples::
+
+  - clear:live:25930::x86_64
+  - yocto:core-image-minimal:2.5.1::x86_64
+  - fedora:live:29::x86_64
+  - fedora:workstation:29::x86_64
+
+The script ``/usr/share/tcf/tcf-image-setup.sh`` will take an image
+from different OSes and extract it so it can be used to be flashed via
+POS; for example:
+
+- Clearlinux::
+
+    $ wget https://download.clearlinux.org/releases/25930/clear/clear-25930-live.img.xz
+    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/clear:live:25930::x86_64 clear-25930-live.img.xz
+
+- Yocto::
+
+    $ wget http://downloads.yoctoproject.org/releases/yocto/yocto-2.5.1/machines/genericx86-64/core-image-minimal-genericx86-64.wic
+    $ /usr/share/tcf/tcf-image-setup.sh yocto:core-image-minimal:2.5.1::x86_64 core-image-minimal-genericx86-64.wic
+
+- (others coming)
+
+Otherewise, an image can be extracted and or setup manually and it
+consists of:
+
+- the full root filesystem that shall be deployed
+
+  Note it is important to respect not only the user/group and
+  permisisons of each file, but also any extended attributes (ACLs,
+  SELinux contexts, etc). Look at the insides of
+  ``tcf-image-setup.sh`` for a methodology to do it.
+
+- basic configuration so it starts a serial console on the serial
+  device/s given in the kernel command line
+
+- (recommended) remove the root password, so it needs no extra steps
+  to login (after all, this is not protecting any infrastructure or
+  access, since the target will be in a silo; as well, the cleartext
+  password would have to be in a test script so it can be entered, so
+  it would make no sense).
+
+.. _ttbd_pos_network_config:
+
+POS: Configuring networks
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+For a target to be able to be provisoned via POS, it needs to be
+connected to an (IPv4) network to the server, which provides DHCP,
+TFTP and HTTP (for PXE), NFS and rsync support.
+
+TTBD will start the rsync and DHCP servers on demand, TFTP, HTTP and
+NFS services have been enabled by installing the *ttbd-pos* package.
+
+To enable the system to know what to use, the network the target is
+connected to (which is another target) needs to have certain
+configuration settings.
+
+a. A network is usually defined, in a ``conf_10_NAME.py``
+   configuration file in ``/etc/ttbd-production`` (or any other
+   instance) with a block such as:
+
+   .. code-block:: python
+
+      ttbl.config.interconnect_add(
+          ttbl.tt.tt_power('nwa',
+                           [
+                               vlan_pci()
+                           ]),
+          tags = dict(
+              ipv6_addr = 'fc00::61:1',
+              ipv6_prefix_len = 112,
+              ipv4_addr = '192.168.97.1',
+              ipv4_prefix_len = 24,
+          ),
+          ic_type = "ethernet"
+      )
+
+   This defines a target representing an interconnect, called ``nwa``,
+   of type *ethernet* (vs let's way WiFi). It is sometimes also called
+   a NUT (Network Under Test). This network defines a single power
+   control implementation, a :class:`conf_00_lib.vlan_pci` which will
+   upon power on/off create/teardown the internal piping for virtual
+   macines to be able to access said interconnect.
+
+   Note how we have assigned IP addresses to the network, which will
+   be the ones the server connection to it will have. By setting the
+   prefix lengths, we also know the network mask.
+
+   .. _ttbd_pos_network_config_numbers:
+
+   Note also the nomenclature: *nwa*, letter *a* )(ASCII 97 / 0x61)
+   which we use in the *network* part of the IP address (*192.168.97.x*
+   and *fc00::61:x*).
+
+b. Since we know we are using a physical network, in the form of one of
+   the server's network interfaces connected to a network switch, we
+   ask ttbd to use said network interface by adding a *mac_addr* tag
+   describing the interface's MAC address:
+
+   .. code-block:: python
+
+           ....
+           tags = dict(
+               mac_addr =  'a0:ce:c8:00:18:73',
+               ipv6_addr = 'fc00::61:1',
+               ....
+
+   Now, powering on or off the *nwa* target will bring up or
+   down the interface.
+
+c. If we want to control the power to the network switch, we would add a
+   power control implementation to the target's power rail after
+   ``vlan_pci()``:
+
+   .. code-block:: python
+
+          ...
+          ttbl.tt.tt_power('nwa',
+                           [
+                               vlan_pci(),
+                               ttbl.pc.dlwps7('http://admin:1234@sp5/8')
+                           ]),
+          ...
+
+   .. warning:: Do not do this if you are using a shared switch split
+                in multiple port groups, as you would power off the
+                switch for other users while they need it.
+
+   This is assuming we have the power to the network switch connected
+   to socket #5 of a :class:`Digital Weblogger Switch
+   7<ttbl.pc.dlwps7>` which the server can reach through the
+   infrastructure network as hostname *sp5* (see :py:func:`configuring
+   Digital Loggers Web Power Switch 7 <conf_00_lib.dlwps7_add>`) --
+   note other power switches can be used too as long as a driver class
+   is available for them.
+
+d. Now we need to add DHCP support to the network; we do that by using
+   a :class:`DHCP power control interface <ttbl.dhcp.pci>`, that will
+   configure and start a DHCP daemon when the *nwa* interconnect is
+   powered on, or stop it when is powered off:
+
+   .. code-block:: python
+
+          ...
+          ttbl.tt.tt_power('nwa',
+                           [
+                               vlan_pci(),
+                               ttbl.pc.dlwps7('http://admin:1234@sp5/8'),
+                               ttbl.dhcp.pci("192.168.97.1", "192.168.97.0", 24,
+                                             "192.168.97.10", "192.168.97.20"),
+                               ttbl.dhcp.pci("fc00::61:1", "fc00::61:0", 112,
+                                             "fc00::61:2", "fc00::61:fe", ip_mode = 6),
+                           ]),
+          ...
+
+   note how we added one for IPv4 and one for IPv6; they both specify
+   the server address as .1, net 'network" as .0, the prefix len and
+   the range of IP addresses than can be served (note these addresses
+   will be hardcoded--the same IP address will be given always to the
+   same target based on the target's configuration -- more below).
+
+e. POS can do very fast and efficient imaging by using rsync; the
+   images installed in ``/home/ttbd/images`` will be exported by an rsync
+   server daemon controlled by a :class:`rsync power control interface
+   <ttbl.rsync.pci>`, that will configured to start/stop an rsync daemon when
+   the *nwa* interconnect is powered on/off:
+
+   .. code-block:: python
+
+          ...
+          ttbl.tt.tt_power('nwa',
+                           [
+                               vlan_pci(),
+                               ttbl.pc.dlwps7('http://admin:1234@sp5/8'),
+                               ttbl.dhcp.pci("192.168.97.1", "192.168.97.0", 24,
+                                             "192.168.97.10", "192.168.97.20"),
+                               ttbl.dhcp.pci("fc00::61:1", "fc00::61:0", 112,
+                                             "fc00::61:2", "fc00::61:fe", ip_mode = 6),
+                               ttbl.rsync.pci("192.168.97.1", 'images',
+                                              '/home/ttbd/images'),
+                           ]),
+          ...
+
+   this rsync server binds to IP address 192.168.97.1, exports a
+   read-only rsync share called *images* which is anything in
+   */home/ttbd/images*
+
+f. Optionally, you can implement port redirection.
+
+   The NUT *nwa* is completely isolated from any other networks in
+   your server (unless you have munged with the forwarding rules in
+   the server).
+
+   However, with the :class:`socat power control implementation
+   <ttbl.socat.pci>`, you can configure one or more port redirections
+   -- like a proxy, so that oyur test systems have controlled access
+   to the outside world:
+
+   .. code-block:: python
+
+          ...
+          ttbl.tt.tt_power('nwa',
+                           [
+                               vlan_pci(),
+                               ttbl.pc.dlwps7('http://admin:1234@sp5/8'),
+                               ttbl.dhcp.pci("192.168.97.1", "192.168.97.0", 24,
+                                             "192.168.97.2", "192.168.97.254"),
+                               ttbl.dhcp.pci("fc00::61:1", "fc00::61:0", 112,
+                                             "fc00::61:2", "fc00::61:fe", ip_mode = 6),
+                               ttbl.rsync.pci("192.168.97.1", 'images',
+                                              '/home/ttbd/images'),
+                               ttbl.socat.pci('tcp', "192.168.97.1", 8080,
+                                              'http_proxy.mydomain.com', 8080)
+                               ttbl.socat.pci('tcp', "192.168.97.1", 1080,
+                                              'socks_proxy.mydomain.com', 1080)
+                           ]),
+          ...
+
+
+g. Finally, we need to specify a few more tags that the clients and
+   server will use to drive operation:
+
+   .. code-block:: python
+
+          ...
+          tags = dict(
+              ipv6_addr = 'fc00::61:1',
+              ipv6_prefix_len = 112,
+              ipv4_addr = '192.168.97.1',
+              ipv4_prefix_len = 24,
+
+              ftp_proxy = "http://192.168.97.1:8080",
+              http_proxy = "http://192.168.97.1:8080",
+              https_proxy =  "http://192.168.97.1:8080",
+
+              # Provisioning OS support to boot off PXE on nfs root
+              pos_http_url_prefix = "http://192.168.97.1/ttbd-pos/",
+              pos_nfs_server = "192.168.97.1",
+              pos_nfs_path = "/home/ttbd/images/tcf-live",
+              pos_rsync_server = "192.168.97.1::images",
+          ),
+          ic_type = "ethernet"
+      )
+
+All together, it shall look like:
+
+.. code-block:: python
+
+   import ttbl.config
+   import ttbl.tt
+   import ttbl.dhcp
+   import ttbl.rsync
+   import ttbl.socat
+
+   # Delete existing definition of the 'nwa' target created by the
+   # default initialization
+   del ttbl.config.targets['nwa']
+
+   ttbl.config.interconnect_add(
+       ttbl.tt.tt_power(
+           'nwa',
+           [
+               vlan_pci(),
+               # optional, to power control the network switch
+               #ttbl.pc.dlwps7('http://admin:1234@sp5/8'),
+               ttbl.dhcp.pci("192.168.97.1", "192.168.97.0", 24,
+                             "192.168.97.10", "192.168.97.20"),
+               ttbl.dhcp.pci("fc00::61:1", "fc00::61:0", 112,
+                             "fc00::61:2", "fc00::61:fe", ip_mode = 6),
+               ttbl.rsync.pci("192.168.97.1", 'images',
+                              '/home/ttbd/images'),
+               ttbl.socat.pci('tcp', "192.168.97.1", 8080,
+                              'http_proxy.mydomain.com', 8080),
+               ttbl.socat.pci('tcp', "192.168.97.1", 1080,
+                              'socks_proxy.mydomain.com', 1080),
+           ]),
+       tags = dict(
+           ipv6_addr = 'fc00::61:1',
+           ipv6_prefix_len = 112,
+           ipv4_addr = '192.168.97.1',
+           ipv4_prefix_len = 24,
+
+           ftp_proxy = "http://192.168.97.1:8080",
+           http_proxy = "http://192.168.97.1:8080",
+           https_proxy =  "http://192.168.97.1:8080",
+
+           # Provisioning OS support to boot off PXE on nfs root
+           pos_http_url_prefix = "http://192.168.97.1/ttbd-pos/",
+           pos_nfs_server = "192.168.97.1",
+           pos_nfs_path = "/home/ttbd/images/tcf-live",
+           pos_rsync_server = "192.168.97.1::images",
+       ),
+       ic_type = "ethernet"
+   )
+
+Restart the server and verify *nwa* works as expected::
+
+  # systemctl restart ttbd@production
+
+Diagnose issues reported by systemd in :ref:`troubleshooting
+<systemd_tips_diagnosis>`
+
+Now the configuration is loaded and you can run::
+
+  $ tcf list -vv nwa
+  https://localhost:5000/ttb-v1/targets/nwa
+    disabled: False
+    ftp_proxy: http://192.168.97.1:8080
+    fullid: local/nwa
+    http_proxy: http://192.168.97.1:8080
+    https_proxy: http://192.168.97.1:8080
+    id: nwa
+    ipv4_addr: 192.168.97.1
+    ipv4_prefix_len: 24
+    ipv6_addr: fc00::61:1
+    ipv6_prefix_len: 112
+    pos_http_url_prefix: http://192.168.97.1/ttbd-pos/
+    pos_nfs_path: /home/ttbd/images/tcf-live
+    pos_nfs_server: 192.168.97.1
+    pos_rsync_server: 192.168.97.1::images
+    powered: False
+    things: []
+    type: ethernet
+
+Note some values from the *tcf list* output were omitted for clarity.
+
+Check it can power on and off::
+
+  $ tcf acquire nwa
+  $ tcf power-off nwa
+  $ tcf power-on nwa
+  $ tcf power-off nwa
+
+POS: Configuring targets
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+This example connects an Intel NUC5i5425OU called nuc-58 to the
+network *nwa* so it can be flashed with POS.
+
+**Overview**
+
+
+**Bill of Materials**
+
+- A PC-class machine (the *target*):
+
+  - able to UEFI boot over the network
+
+  - serial port available (and it's cable) or USB port available (and
+    USB-to-USB null modem cable or similar)
+
+  - power cable
+
+  - network cable
+
+  - Monitor, keyboard and mouse for initial configuration, will be
+    disconnected once setup.
+
+- a free outlet on a PDU unit supported by TCF
+
+**Setup the test target fixture**
+
+1. connect the target to a normal power outlet, monitor, keyboard and
+   mouse
+
+2. start the target, go into the BIOS setup menu
+
+   a. navigate to the *boot* section:
+
+      - set UEFI to boot off network IPv4 as primary boot source
+
+      - remove any other boot methods (TCF will tell it to boot to
+        local disk via the network boot) [USB, Optical, etc]
+
+      - disable unlimited amount of netwbot boots
+
+   b. navigate to the *Power* section and enable *Power on after AC
+      power loss / power failure*.
+
+      This ensures that the target will power on when power is applied
+      via the power controller instead of waiting for the user to
+      press the power button.
+
+   c. From the top level menu or advanced config menus, find the MAC
+      address of the target.
+
+      Alternative, this also can be found by booting any OS in the
+      target (eg: a Linux installation image).
+
+3. Power off the target, disconnect the power, keep the monitor,
+   keyboard and mouse for now
+
+
+**Connecting the target**
+
+1. connect the target's power cable to the port selected in the PDU
+   (for this example our PDU is a :class:`DLWPS7 <ttbl.pc.dlwps7>`
+   named *sp6* and we'll use port #6)
+
+   Label the cable with the target's name.
+
+2. connect the serial cable to the target and the other end to the
+   server.
+
+   Find :ref:`the serial number <find_usb_info>` of the USB serial
+   port connected to the server. We will need it later.
+
+
+**Configuring the system for the target**
+
+1. Pick up a :ref:`target name <bp_naming_targets>`.
+
+   For this example, we picked ``nuc5-58a``, the number 58 is then
+   used to decide the IP address that is assigned to this target
+   (192.168.97.58) on network *a* (as :ref:`defined
+   above<ttbd_pos_network_config_numbers>`).
+
+2. Configure *udev* to add a name for the serial device for the
+   target's serial console USB cable so it can be easily found at
+   ``/dev/tty-TARGETNAME``. Follow :ref:`these instructions
+   <usb_tty_serial>` using the cable's *serial number* we found in
+   the previous section.
+
+3. Add a configuration block to the configuration file
+   ``/etc/ttbd-production/conf_10_targets.py``
+
+   .. note:: we'll simplify this or template it at some point, it is too
+             long and most things are repetitive
+
+   .. code-block:: python
+
+      ttbl.config.target_add(
+           ttbl.tt.tt_serial(
+               "nuc-58a",
+               power_control = [
+                   ttbl.cm_serial.pc(),
+                   ttbl.pc.dlwps7("http://admin:1234@sp10/6"),
+                   ttbl.pc.delay(5),
+               ],
+               serial_ports = [
+                   "pc",
+                   { "port": "/dev/tty-nuc-58a", "baudrate": 115200 }
+               ]),
+          tags = {
+              'linux': True,
+              'bsp_models': { 'x86_64': None },
+              'bsps': {
+                  'x86_64': {
+                      'linux': True,
+                      'console': 'x86_64',
+                  },
+              },
+          },
+          target_type = "Intel NUC5i5425OU")
+
+      # plug the target to the interconnect and assign IP addresses
+      # that DHCP will always assign
+      ttbl.config.targets['nuc-58a'].add_to_interconnect(
+          'nwa', dict(
+              mac_addr = "c0:3f:5d:63:51:1d",
+              ipv4_addr = '192.168.97.158', ipv4_prefix_len = 24,
+              ipv6_addr = 'fc00::61:9e', ipv6_prefix_len = 112
+          )
+      )
+
+      # Configure POS support in the tags
+      ttbl.config.targets["nuc-58a"].tags_update(dict(
+          pos_capable = True,
+          pos_boot_interconnect = "nwa",
+          pos_boot_dev = "sda",
+          pos_partsizes = "1:15:30:10",
+          linux_serial_console_default = 'ttyUSB0'
+      ))
+
+      # activate the POS driver for this target
+      # FIXME: this needs to be hidden
+      ttbl.config.targets["nuc-58a"].power_on_pre_fns.append(
+          ttbl.dhcp.power_on_pre_pos_setup)
+
+Restart the server and verify *nuc-58a* works as expected::
+
+  # systemctl restart ttbd@production
+  # tcf healtcheck
+
+will try to power on and off the target; observe in the monitor if the
+target is coming up or not. FIXME: diagose issues
+
+**Smoke test**
+
+From another machine (or within the server) with TCF installed, flash
+the POS image itself in the system as an initial smoke test, using
+``/usr/share/tcf/examples/test_pos_deploy.py``::
+
+  $ IMAGE=tcf:live tcf run -vvvt 'nwa or nuc-58a' /usr/share/tcf/examples/test_pos_deploy.py
+
+FIXME: this will fail now because we don't have the right regex to
+catch tcf:live's root prompt (``[0-9]+ $``).
+
+List available images::
+
+  $ tcf run /usr/share/tcf/examples/test_pos_list_images.py
+  server10/nwa clear:live:25550::x86_64
+  server10/nwa clear:live:25890::x86_64
+  server10/nwa fedora:cloud-base:28::x86_64
+  server10/nwa yocto:core-minimal:2.5.1::x86_64
+  PASS0/	toplevel @local: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:00:06.635452) - passed
+
+and flash other images by passing the right image name to the IMAGE
+environment variable::
+
+  $ IMAGE=clear:live:25890::x86_64 tcf run -vvvt 'nwa or nuc-58a' /usr/share/tcf/examples/test_pos_deploy.py
+
+
+(of course, this assumes that image is available in your system; see
+:ref:`how to add more <ttbd_pos_deploying_images>`).
