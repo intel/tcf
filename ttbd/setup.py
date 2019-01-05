@@ -131,7 +131,8 @@ targets over HTTP to be controlled by the TCF client.
             'live/mk-liveimg.sh',
             'live/tcf-live-02-core.pkgs',
             'live/tcf-live-extra-network.ks',
-            'live/tcf-live.ks'
+            'live/tcf-live.ks',
+            'tcf-live-pos.pkgs'
         ]),
         ('@prefix@/lib/udev/rules.d', [ '80-ttbd.rules' ]),
         ('var/lib/ttbd', [ 'frdm_k64f_recovery.bin' ]),
