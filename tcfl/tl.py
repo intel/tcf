@@ -10,6 +10,7 @@ Common utilities for test cases
 """
 
 import os
+import re
 
 import tcfl.tc
 
@@ -204,3 +205,17 @@ def tcpdump_collect(ic, filename = None):
     ic.power.off()		# ensure tcpdump flushes
     ic.broker_files.dnload(ic.kws['tc_hash'] + ".cap", filename)
     ic.report_info("tcpdump available in file %s" % filename)
+
+def linux_os_release_get(target, prefix = ""):
+    """
+    Return in a dictionary the contents of a file /etc/os-release (if
+    it exists)
+    """
+    output = target.shell.run(
+        "cat %s/etc/os-release || true" % prefix, output = True)
+    matches = re.findall(r"^(?P<field>\S+)=(?P<valur>\S+)$", output,
+                         re.MULTILINE)
+    os_release = {}
+    for match in matches:
+        os_release[match[0]] = match[1]
+    return os_release
