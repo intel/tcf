@@ -3,5 +3,6 @@ PyYAML
 junit_xml
 ply
 pymongo
+python-Levenshtein
 requests
 setuptools
