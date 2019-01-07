@@ -81,7 +81,7 @@ class pci(ttbl.tt_power_control_impl):
             with open(pidfile, "w+") as pidf:
                 pidf.write("%s" % p.pid)
         except OSError as e:
-            raise self.dhcpd_start_e("socat failed to start: %s", e)
+            raise self.start_e("socat failed to start: %s", e)
         pid = commonl.process_started(
             pidfile, self.path,
             verification_f = commonl.tcp_port_busy,
