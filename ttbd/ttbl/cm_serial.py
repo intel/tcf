@@ -210,16 +210,17 @@ class pc(ttbl.tt_power_control_impl):
     # main target. We just return it as the same as the target's
     def __init__(self):
         ttbl.tt_power_control_impl.__init__(self)
+        self.powered = False
 
     def power_on_do(self, target):
         target.log.debug("serial ports power on / start")
         target.consoles_open()
+        self.powered = True
 
     def power_off_do(self, target):
+        self.powered = False
         target.log.debug("serial ports power off / stop")
         target.consoles_close()
 
     def power_get_do(self, target):
-        # This always returns that is powered on, as it is a fake
-        # power controller meant to be used in composition with others.
-        return True
+        return self.powered
