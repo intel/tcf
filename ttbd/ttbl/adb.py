@@ -109,7 +109,7 @@ class pci(ttbl.tt_power_control_impl):
         target.property_set("adb.port", None)
         pidfile = os.path.join(target.state_dir, "adb-" + self._id + ".pid")
         try:
-            commonl.process_terminate(pidfile, self.path, tag = "adb")
+            commonl.process_terminate(pidfile, path = self.path, tag = "adb")
         except OSError as e:
             # adb might have died already
             if e != errno.EPROCESS:

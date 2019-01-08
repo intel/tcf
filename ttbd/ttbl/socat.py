@@ -100,7 +100,7 @@ class pci(ttbl.tt_power_control_impl):
     def power_off_do(self, target):
         pidfile = os.path.join(target.state_dir,
                                "socat-" + self.tunnel_id + ".pid")
-        commonl.process_terminate(pidfile, self.path, tag = "socat")
+        commonl.process_terminate(pidfile, path = self.path, tag = "socat")
 
     def power_get_do(self, target):
         pidfile = os.path.join(target.state_dir,

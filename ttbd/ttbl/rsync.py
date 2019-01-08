@@ -123,7 +123,7 @@ timeout = 300
     def power_off_do(self, target):
         pidfile = os.path.join(
             target.state_dir, "rsync-%s:%d.pid" % (self.address, self.port))
-        commonl.process_terminate(pidfile, self.path, tag = "socat")
+        commonl.process_terminate(pidfile, path = self.path, tag = "rsync")
 
     def power_get_do(self, target):
         pidfile = os.path.join(
