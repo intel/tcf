@@ -1265,6 +1265,16 @@ From a script, you can use :func:`tcfl.tc.target_c.shell.run
            target.shell.run("ping -c 3 localhost",
                             "3 packets transmitted, 3 received")
 
+you can also get the output by adding ``output = True``:
+  
+.. code-block:: python
+
+           ...
+           output = target.shell.run("ping -c 3 localhost",
+                                     "3 packets transmitted, 3 received",
+                                     output = True)
+           ...
+                            
 
 Linux targets: ssh login from a testcase / client
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
