@@ -1752,7 +1752,10 @@ def stm32_add(name = None,
             'bsp_models' : { 'arm': None },
             'bsps' : {
                 "arm":  dict(zephyr_board = zephyr_board,
-                             zephyr_kernelname = 'zephyr.bin',
+                             # STM32 loads, in most cases, with no
+                             # destination address; they are obtained
+                             # from the ELF file, so we use the ELF file.
+                             zephyr_kernelname = 'zephyr.elf',
                              soc = "stm32",
                              console = ""),
             },
