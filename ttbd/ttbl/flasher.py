@@ -280,6 +280,19 @@ class openocd_c(flasher_c, ttbl.tt_power_control_impl):
         "nrf52_pca10040": "nrf52",
     }
 
+    #: Board description dictionary
+    #:
+    #: This is a dictionary keyed by board / MCU name; when the
+    #: OpenOCD driver is loaded, it is given this name and the entry
+    #: is opened to get some operation values.
+    #:
+    #: Each entry is another dictionary of key/value where key is a
+    #: string, value is whatever.
+    #:
+    #: FIXME: many missing
+    #:
+    #: - :data:`hack_reset_halt_after_init
+    #:   <ttbl.flasher.openocd_c.hack_reset_halt_after_init>`
     _boards = {
         'arduino_101': dict(
             addrmap = 'quark_se_a101',
@@ -740,7 +753,8 @@ source [find board/snps_em_sk.cfg]
         on ``__send_command`` for the reason.
 
         :param str board_name: name of the board to use, to select
-          proper configuration parameters
+          proper configuration parameters. Needs to be declared in
+          :data:`ttbl.flasher.openocd_c._boards` [FIXME: link broken].
 
         """
         flasher_c.__init__(self)
@@ -769,6 +783,18 @@ source [find board/snps_em_sk.cfg]
         self.openocd_scripts = openocd_scripts
         self.pid = None
         self.pid_s = None
+        #: Inmediately after running the OpenOCD initialization
+        #: sequence, reset halt the board.
+        #:
+        #: This is meant to be used when we know we are power cycling
+        #: before flashing. The board will start running as soon as we
+        #: power it on, thus we ask OpenOCD to stop it inmediately
+        #: after initializing. There is still a big window of time on
+        #: which the board can get itself in a bad state by running
+        #: its own code.
+        #:
+        #: (bool, default False)
+        self.hack_reset_halt_after_init = False
 
     def _test_target_link(self, tt):
         if self.serial:
@@ -895,6 +921,9 @@ source [find board/snps_em_sk.cfg]
                         # This board needs this hack because we are
                         # power cycling to flash
                         self._power_on_reset_hack(count, top)
+                    if self.board.get("hack_reset_after_power_on", False) \
+                       or self.hack_reset_halt_after_init:
+                        self.__target_reset_halt("for reset/halt after init")
                     r = self.__send_command(
                         "init verification JTAG (%d/%d)" % (count + 1, top),
                         "targets",
@@ -1160,30 +1189,34 @@ source [find board/snps_em_sk.cfg]
                     self.addrmap[target].get('target_id', None),
                     for_what)
 
-    def _target_reset_halt(self, for_what = ""):
+    def __target_reset_halt(self, for_what = ""):
+        # this assumes we are inside a 'with self._expect_mgr():' block
         self.log.action = "target reset halt init"
+        command = self.board.get('reset_halt_command', "reset halt")
+        r = self.__send_command(
+            "target reset/halt %s" % for_what,
+            command,
+            [
+                "target state: halted",
+                "target halted due",
+                # ARC (seen w/ EM Starter Kit's) driver reports this
+                "JTAG tap: arc-em.cpu tap/device found:",
+                # Freedom Boards k64f
+                "MDM: Chip is unsecured. Continuing.",
+                # Errors
+                "could not halt target",
+                "timed out while waiting for target halted",
+                "Not halted",
+            ])
+        if r > 3:
+            msg = "Cannot reset/halt %s (r %d)" % (for_what, r)
+            self._log_error_output(msg)
+            raise self.error("Cannot reset/halt %s (r %d)" % (for_what, r))
+
+    def _target_reset_halt(self, for_what = ""):
+        # this assumes we are outside a 'with self._expect_mgr():' block
         with self._expect_mgr():
-            command = self.board.get(
-                'reset_halt_command', "reset halt")
-            r = self.__send_command(
-                "target reset/halt %s" % for_what,
-                command,
-                [
-                    "target state: halted",
-                    "target halted due",
-                    # ARC (seen w/ EM Starter Kit's) driver reports this
-                    "JTAG tap: arc-em.cpu tap/device found:",
-                    # Freedom Boards k64f
-                    "MDM: Chip is unsecured. Continuing.",
-                    # Errors
-                    "could not halt target",
-                    "timed out while waiting for target halted",
-                    "Not halted",
-                ])
-            if r > 3:
-                msg = "Cannot reset/halt %s (r %d)" % (for_what, r)
-                self._log_error_output(msg)
-                raise self.error("Cannot reset/halt %s (r %d)" % (for_what, r))
+            return self.__target_reset_halt(for_what = "")
 
     def _target_reset(self, for_what = ""):
         self.log.action = "target reset init"
