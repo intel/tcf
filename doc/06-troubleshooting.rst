@@ -101,6 +101,58 @@ there is no current proper fix, other than disabling SELinux::
 however, this seems to only happen when running the daemon from a
 *$HOME* directory, instead of from a system installation.
 
+PXE POS provisioning target fails to PXE boot: Unable to locate configuration file
+----------------------------------------------------------------------------------
+
+When a system is configured to boot targets to Provisioning OS over
+PXE, a target fails to boot with a message on the BIOS console such
+as::
+
+  >>Start PXE over IPv4.
+  Station IP address is 192.168.97.101
+  Server IP address is 192.168.97.1
+  NBP filename is ttbd-production/efi-x86_64/syslinux.efi
+  NBP filesize is 176328 Bytes
+  Downloading NBP file...
+  NBP file downloaded successfully.
+  Getting cached packet
+  My IP is 192.168.97.101
+  Unable to locate configuration file
+
+There might be multiple causes for this, but here are the most common:
+
+- there is a typo in the target's MAC address
+
+  The target is given, via TFTP, the *syslinux PXE bootloader*, who
+  will look for configuration files with multiple names (see
+  https://www.syslinux.org/wiki/index.php?title=PXELINUX#Configuration_filename)
+  on the TFTP server, but relies in one named after the target's MAC
+  address.
+
+  The TTBD server's :ref:`POS <pos_setup>` environment generates the
+  configuration file when the network to which the target is attached
+  is powered up.
+
+  Thus, the target's MAC address listed in the configuration has to
+  match the one the target actually uses on the network:
+
+  >>> ttbl.config.targets['TARGETNAME'].add_to_interconnect(
+  >>>   NETWORKNAME, dict(
+  >>>       mac_addr = "00:07:32:4b:36:87",
+  >>>       ipv4_addr = '192.168.98.160', ipv4_prefix_len = 24,
+  >>>       ipv6_addr = 'fc00::62:a0', ipv6_prefix_len = 112)
+  >>>   )
+
+  ensure the *mac_addr* value is the MAC address of the network
+  interface the target is using to PXE boot from (*_addr* fields will
+  vary from the example to your configuration).
+
+- mismatch in IP addresses
+
+  It is frequent to create typos in the network configuration and
+  target configuration so that the target's IP address won't be in the
+  network's address range. Ensure this is correct.
+
 *ttbd* server
 =============
 
