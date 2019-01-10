@@ -1604,6 +1604,51 @@ The `_my_hook_fn()` would look as:
 If the data needed is not available until after the testcase executes,
 you can use :class:`reporting hooks <tcfl.report.file_c.hooks>`.
 
+Capturing network traffic
+-------------------------
+
+TCF servers (*ttbd*) can capture the traffic in a :term:NUT network if
+they are connected to it.
+
+For this to happen, when the network is powered up, it must contain a
+property called *tcpdump* set to a file name where to capture it::
+
+  $ tcf property-set nwb tcpdump somename.cap
+  $ tcf power-cycle nwb
+
+when all the network traffic is done, it can be downloaded::
+
+  $ tcf power-off nwb
+  $ tcf broker-file-dnload nwb somename.cap local_somename.cap
+
+which now can be opened with wireshark to see what happened (or
+analyzed with other tools).
+
+In a script, ensure your start routine contains:
+
+>>> class sometest(tcfl.tc.tc_c):
+>>>
+>>>     def start_something(self, ic, ...):
+>>>         ...
+>>>         # before powering up the interconnect
+>>>         ic.property_set('tcpdump', self.kws['tc_hash'] + ".cap")
+>>>         ...
+>>>         ic.power.cycle()
+
+and on teardown:
+
+>>>
+>>>     def teardown_whatever(self, ic, ...):
+>>>         ic.broker_files.dnload(
+>>>              self.kws['tc_hash'] + ".cap",
+>>>              "report-%(runid)s:%(tc_hash)s.tcpdump" % self.kws)
+>>>         self.report_info("tcpdump available in file "
+>>>                          "report-%(runid)s:%(tc_hash)s.tcpdump" % self.kws)
+
+the file will be made available in the same directory where *tcf run*
+was executed from.
+
+
 .. _tcf_ci:
 
 Continuous Integration
