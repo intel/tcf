@@ -155,6 +155,17 @@ class expecter_c(object):
         self._poll_period = poll_period
 
     def console_get_file(self, target, console = None):
+        """
+        :returns: file descriptor for the file that contains the
+          currently read console.
+
+        Note the pointer in this file descriptor shall not be modified
+        as it might be being used by expectations. If you need to read
+        from the file, dup it:
+
+        >>> f_existing = self.tls.expecter.console_get_file(target, console_id)
+        >>> f = open(f_existing.name)
+        """
         _, console_code = console_mk_code(target, console)
         return self.buffers.get(console_code, None)
 

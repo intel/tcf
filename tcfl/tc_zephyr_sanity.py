@@ -1299,7 +1299,12 @@ class tc_zephyr_sanity_c(tc.tc_c):
             f = codecs.open(self.unit_test_output, 'r', encoding = 'utf-8')
         else:
             console_id = target.kws.get('console', None)
-            f = self.tls.expecter.console_get_file(target, console_id)
+            f_existing = self.tls.expecter.console_get_file(target, console_id)
+            # this gives a file descriptor whose pointer might be in
+            # any location, so we are going to reopen a new one to
+            # read from the start--because we don't want to modify the
+            # file pointer
+            f = open(f_existing.name)
         main_triggered = set()
         triggered = set()
         # Note the triggers; each regex might depend on a trigger and
