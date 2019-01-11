@@ -1467,6 +1467,7 @@ ttbl.flasher.openocd_c._boards['nucleo_f103rb'] = dict(
 # openocd.cfg configuration from zephyr.git/boards/arm/nucleo_f103rb/support/openocd.cfg
 #
 source [find board/st_nucleo_f103rb.cfg]
+hla_serial "%(serial_string)s"
 
 $_TARGETNAME configure -event gdb-attach {
         echo "Debugger attaching: halting execution"
@@ -1494,6 +1495,7 @@ ttbl.flasher.openocd_c._boards['nucleo_f207zg'] = dict(
 # openocd.cfg configuration from zephyr.git/boards/arm/nucleo_f207zg/support/openocd.cfg
 #
 source [find interface/stlink-v2-1.cfg]
+hla_serial "%(serial_string)s"
 source [find target/stm32f2x.cfg]
 
 $_TARGETNAME configure -event gdb-attach {
@@ -1523,6 +1525,7 @@ ttbl.flasher.openocd_c._boards['nucleo_f429zi'] = dict(
 # openocd.cfg configuration from zephyr.git/boards/arm/nucleo_f429zi/support/openocd.cfg
 #
 source [find board/st_nucleo_f4.cfg]
+hla_serial "%(serial_string)s"
 
 $_TARGETNAME configure -event gdb-attach {
         echo "Debugger attaching: halting execution"
@@ -1547,6 +1550,7 @@ ttbl.flasher.openocd_c._boards['nucleo_f746zg'] = dict(
 # openocd.cfg configuration from zephyr.git/boards/arm/nucleo_f746zg/support/openocd.cfg
 #
 source [find board/st_nucleo_f7.cfg]
+hla_serial "%(serial_string)s"
 
 $_TARGETNAME configure -event gdb-attach {
         echo "Debugger attaching: halting execution"
