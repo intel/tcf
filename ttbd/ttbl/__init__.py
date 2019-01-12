@@ -92,6 +92,17 @@ class test_target_logadapter_c(logging.LoggerAdapter):
         else:
             return 'target-%s: %s ' % (target.id, msg), kwargs
 
+def who_split(who):
+    """
+    Returns a tuple with target owner specification split in two parts, the
+    userid and the ticket. The ticket will be None if the orders
+    specification doesn't contain it.
+    """
+    if ":" in who:
+        return who.split(":", 2)
+    return who, None
+
+
 class thing_plugger_mixin(object):
     """
     Define how to plug things (targets) into other targets
@@ -312,6 +323,20 @@ class test_target(object):
     def get_id(self):
         return self.id
 
+    @classmethod
+    def _user_files_create(cls, who):
+        """
+        Ensures the directory where the user can create files exists
+        """
+        userdir = os.path.join(cls.files_path, who_split(who)[0])
+        try:
+            os.makedirs(userdir)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise RuntimeError("%s: cannot create user storage path: %s"
+                                   % (userdir, e))
+
+
     def _tags_verify_interconnect(self, name, data):
         ic = ttbl.config.targets.get(name, None)
         if ic == None:
@@ -458,6 +483,10 @@ class test_target(object):
                 self._state_cleanup(True)
         except _mutex.mutex_busy_e:
             raise test_target_busy_e(self)
+        # different operations in the system might require the user
+        # storage area to exist, so ensure it is there when the user
+        # acquires a target -- as he might need it.
+        self._user_files_create(who)
         self.log.log(9, "acquired by '%s'", who)
 
     def enable(self, who = None):

@@ -199,6 +199,8 @@ def who_make(ticket = None, user = None):
     # convention across this daemon (see
     # ttbl.user_control.who_is_admin) is that we name owners of
     # resources USERNAME[:TICKET].
+    #
+    # see ttbl.who_split()
     if user == None:
         user = flask_login.current_user
     else:
@@ -1060,15 +1062,10 @@ def _file_upload(filepath):
             userdir = os.path.join(app.config['files_path'], userid, path)
         else:
             userdir = os.path.join(app.config['files_path'], userid)
-        try:
-            os.makedirs(userdir)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                return flask.abort(400, "%s: cannot create path: %s"
-                                   % (userdir, e))
         filepath_final = os.path.join(
             app.config['files_path'], userid, filepath_normalized)
         try:
+            ttbl.test_target._user_files_create(userid)
             file.save(filepath_final)
         except Exception as e:
             return flask.abort(400, "%s: can't save: %s" % (filepath, e))
