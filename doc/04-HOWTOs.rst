@@ -1326,6 +1326,43 @@ Tunnels can also be created with the command line::
 Note you might need first the steps in the next section to allow SSH
 to login with a passwordless root.
 
+.. _linux_target_pos_kernel_options:
+
+Linux targets: POS: setting default linux kernel options
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When a Linux target is botted using :term:`POS`, default kernel
+options can be fed to the POS scripts for bootloader consumption by
+setting the following tags or properties (all optional):
+
+- ``linux_serial_console_default``: sets which is the default serial
+  console. For */dev/NAME*, specify *NAME*, as this will be given as
+  the Linux kernel command line option *console=NAME,115200*
+
+- ``linux_options_append``: a space separated string with any other
+  Linux kernel command line options to add.
+
+For example, when adding the target:
+
+>>> ttbl.config.target_add(
+>>>     ...
+>>>     tags = {
+>>>         ...
+>>>         'linux_serial_console_default': 'ttyS2',
+>>>         'linux_options_append': 'rw foo=bar',
+>>>         ...
+>>>     })
+
+which can also be done once the target is added with
+:meth:`tags_update <ttbl.test_target.tags_update>`::
+
+>>> ttbl.config.targets['TARGETNAME'].tags_update({
+>>>         ...
+>>>         'linux_serial_console_default': 'ttyS2',
+>>>         'linux_options_append': 'rw foo=bar',
+>>>         ...
+>>>     })
+
 .. _tcf_testcase_proxy:
 
 Linux targets: using proxies
