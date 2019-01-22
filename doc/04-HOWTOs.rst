@@ -1788,6 +1788,60 @@ most default output files will be placed, including:
 
 this defaults to the directory where *tcf run* was invoked from.
 
+.. _general_catchas:
+   
+General catchas
+===============
+
+Some common issues that make it automating hard
+
+Hidden characters in console output
+-----------------------------------
+
+This happens very commonly when console prompts or text produce ANSI
+escape sequences to colorize output; as a human on the console, we see
+clearly the *root@hostname:DIR* prompt, but our regex for the console
+is expecting:
+
+``root@SOMETHING:DIR``
+
+however, the chain of bytes that the serial port is reading might be
+
+``ESC[ 38;5;2rootESC[ 38;5;2SOMETHING:DIR``
+
+(where ESC is the escape character, ASCII 0x1b dev 27) and hence why
+the regular expression is not working.
+
+Parsing ANSI escape sequences is quite tricky and if this is a command
+prompt, a more simple sollution is to remove them from the prompt
+configuration.
+
+Newlines when reading output of a command
+-----------------------------------------
+
+Let's say we are reading the top level tree of a git directory:
+
+>>> tree = subprocess.check_output(
+>>>      [
+>>>          'git', 'rev-parse', '--flags', '--show-toplevel',
+>>>          'SOMEFILENAME'
+>>>      ],
+>>>      stderr = subprocess.STDOUT,
+>>>      cwd = os.path.dirname('SOMEFILENAME')
+>>> )
+
+then we try to use *tree* and it does not exist. Why? because::
+
+  $ git rev-parse --flags --show-toplevel SOMEFILENAME
+  SOMEPATH
+  $
+
+which means that after *SOMEPATH* there is a newline and thus the
+output we are getting is *SOMEPATH\\n*. So :func:`strip
+<string.strip>` it:
+
+>>> tree = tree.strip()
+
 .. _manual_install:
 
 Manual installation of TCF from source
