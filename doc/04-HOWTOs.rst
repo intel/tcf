@@ -1326,6 +1326,31 @@ Tunnels can also be created with the command line::
 Note you might need first the steps in the next section to allow SSH
 to login with a passwordless root.
 
+.. _target_pos_manually:
+
+How do I boot a target to PXE boot mode manually?
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A target can be told to boot to PXE Provisioning OS by issuing the
+following commands::
+
+  $ while tcf acquire NETWORKNAME TARGETNAME; do sleep 10s; done &
+  $ tcf power-on NETWORKNAME
+  $ tcf property-set TARGETNAME pos_mode pxe
+  $ tcf power-cycle TARGETNAME
+
+.. FIXME: make an entry explaining well the while loop thing
+
+The *while* loop in the background keeps the target acquired, do not
+forget to release them by killing it. Then we ensure the network is on
+and finally, we set the target to *POS mode* PXE and we power cycle
+the target.
+
+To have it boot back in local mode::
+
+  $ tcf property-set TARGETNAME pos_mode
+  $ tcf power-cycle TARGETNAME
+
 .. _linux_target_pos_kernel_options:
 
 Linux targets: POS: setting default linux kernel options
