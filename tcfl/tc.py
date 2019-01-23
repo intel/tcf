@@ -1779,6 +1779,43 @@ class result_c():
             return e.args[0]
         return e
 
+    def report(self, tc, message, attachments = None,
+               level = None, dlevel = 0, alevel = 2):
+        assert isinstance(tc, tcfl.tc.tc_c)
+        assert isinstance(message, basestring)
+        if attachments:
+            assert isinstance(attachments, dict)
+        if level:
+            assert level >= 0
+        assert dlevel >= 0
+        assert alevel >= 0
+
+        if 'target' in attachments:
+            reporter = attachments['target']
+            assert isinstance(reporter, tcfl.tc.target_c), \
+                "attachment 'target' does not point to a " \
+                "tcfl.tc.target_c but to a type %s" % type(reporter).__name__
+        else:
+            reporter = tc
+
+        if self.blocked:
+            report_fn = reporter.report_blck
+        elif self.failed:
+            report_fn = reporter.report_fail
+        elif self.errors:
+            report_fn = reporter.report_error
+        elif self.passed:
+            report_fn = reporter.report_pass
+        elif self.skipped:
+            report_fn = reporter.report_skip
+        else:
+            report_fn = reporter.report_blck
+            message = '(nothing ran) ' + message
+
+        report_fn(message, attachments,
+                  level = level, dlevel = dlevel, alevel = alevel)
+
+
     @staticmethod
     def report_from_exception(_tc, e, attachments = None,
                               force_result = None):
