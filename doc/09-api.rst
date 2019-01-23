@@ -70,7 +70,45 @@ Target metadata
 
 Each target has associated a list of metadata, some of them common to
 all targets, some of them driver or target type specific that you can
-get on the command line with ``tcf list -vvv TARGETNAME``
+get on the command line with ``tcf list -vvv TARGETNAME`` or in a test
+script in the dictionary :data:`tcfl.tc.target_c.rt` (for Remote
+Target), or more generally in the keywor dictionary
+:data:`tcfl.tc.target_c.kws`.
+
+Metada is specified:
+
+- in the server's read only configuration by setting tags to the
+  target during creation of the :class:`ttbl.test_target` object, by
+  passing a dictionary to :func:`ttbl.config.target_add`
+
+  >>> ttbl.config.target_add(
+  >>>     ttbl.tt.tt_serial(....),
+  >>>     tags = {
+  >>>         'linux': True,
+  >>>         ...
+  >>>         'pos_capable': True,
+  >>>         'pos_boot_interconnect': "nwb",
+  >>>         'pos_boot_dev': "sda",
+  >>>         'pos_partsizes': "1:20:50:15",
+  >>>         'linux_serial_console_default': 'ttyUSB0'
+  >>>     },
+  >>>     target_type = "Intel NUC5i5425OU")
+
+  or by calling :func:`ttbl.test_target.tags_update` on an already
+  created target
+
+  >>> ttbl.config.targets['nwb'].tags_update({
+  >>>     'mac_addr': '00:50:b6:27:4b:77'
+  >>> })
+
+- during runtime, from the client with *tcf
+  property-set*::
+
+    $ tcf property-set TARGETNAME PROPERTY VALUE
+
+  or calling :func:`tcfl.tc.target_c.property_set`:
+
+  >>> target.property_set("PROPERTY", "VALUE")
 
 Common metadata
 ---------------
@@ -252,6 +290,37 @@ Driver / targe type specific metadata
 - *ram_megs* (int): Megs of RAM supported by the target
 
 - *ssh_client* (bool): True if the target supports SSH
+
+Provisioning OS specific metadata
+---------------------------------
+
+- *linux_serial_console_default*: which device is the system's serial
+  console connected to TCF's first console.
+
+  If *DEVICE* (eg: ttyS0) is given, Linux will be booted with the
+  argument *console=DEVICE,115200*.
+
+- *linux_options_append*: string describing options to append to a
+  Linux kernel boot command line.
+
+.. _uefi_boot_manager_ipv4_regex:
+
+- *uefi_boot_manager_ipv4_regex*: allows specifying a Python regular
+  expression that describes the format/name of the UEFI boot entry
+  that will PXE boot off the network. For example:
+
+  >>> ttbl.config.targets['PC-43j'].tags_update({
+  >>>     'uefi_boot_manager_ipv4_regex': 'UEFI Network'
+  >>> })
+
+  :func:`ttbl.pos.efibootmgr_setup` can use this if the defaults do
+  not work :func:`tcfl.pos.deploy_image` reports::
+
+    Cannot find IPv4 boot entry, enable manually
+
+  even after the PXE boot entry has been enabled manually.
+
+  Note this will be compiled into a Python regex.
 
 *ttbd* Configuration API for targets
 ====================================
