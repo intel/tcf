@@ -11,3 +11,4 @@ dist
 MANIFEST
 repo/
 _doc/
+ttbd/ttbl/version.py
