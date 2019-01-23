@@ -724,6 +724,25 @@ class target_c(object):
         self._kws_update(self.bsp)
         self._report_mk_prefix()
 
+    def kw_unset(self, kw, bsp = None):
+        """
+        Unset a target's string keyword
+
+        :param str kw: keyword name
+        :param str bsp: (optional) BSP for which we want to unset the
+          keyword; if omitted, we are setting the keyword for the whole
+          target
+        """
+        assert isinstance(kw, basestring)
+        if bsp == None:
+            if kw in self._kws:
+                del self._kws[kw]
+        else:
+            if kw in self._kws_bsp[bsp]:
+                del self._kws_bsp[bsp][kw]
+        self._kws_update(self.bsp)
+        self._report_mk_prefix()
+
     def kws_required_verify(self, kws):
         """
         Verify if a target exports required keywords, raise blocked
@@ -4032,6 +4051,18 @@ class tc_c(object):
         :param str origin: (optional) where this comes from
         """
         self._kw_set(key, value, origin)
+
+    def kw_unset(self, kw):
+        """
+        Unset a string keyword for later substitution in commands
+
+        :param str kw: keyword name
+        """
+        assert isinstance(kw, basestring)
+        if kw in self.kws:
+            del self.kws[kw]
+        if kw in self.kws_origin:
+            del self.kws_origin[kw]
 
     def kws_set(self, d, origin = None):
         """
