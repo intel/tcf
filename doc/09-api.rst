@@ -74,14 +74,14 @@ get on the command line with ``tcf list -vvv TARGETNAME``
 
 Common metadata
 ---------------
-        
+
 - *id* (str): name of the target
-  
+
 - *fullid* (str): Full name of the target that includes the server's
   short name (*AKA*); *SERVERAKA/ID*.
-  
+
 - *TARGETNAME* (bool) True
-  
+
 - *bsp_models* (list of str): ways in which the BSPs in a target
   (described in the *bsps* dictionary) can be used.
 
@@ -109,17 +109,17 @@ Common metadata
   - *zephyr_board* (str): [Zephyr capable targets] identifier to use
     for building Zephyr OS applications for this board as the *BOARD*
     parameter to the Zephyr build process.
-    
+
   - *zephyr_kernelname* (str): [Zephyr capable targets] name of the
     file to use as Zephyr image resulting from the Zephyr OS build
     process.
-    
+
   - *sketch_fqbn* (str): [Sketch capable targets] identifier to use
     for building Arduino applications for this board.
-    
+
   - *sketch_kernelname* (str): [Sketch capable targets] name of the
     file to use as image resulting from the Sketch build process.
-  
+
 - *disabled* (bool): True if the target is disabled, False otherwise.
 
 - *fixture_XYZ* (bool): when present and True, the target exposes
@@ -138,25 +138,25 @@ Common metadata
   - *bt_addr* (str): Bluetooth Address (48bits HH:HH:HH:HH:HH:HH,
     where HH are two hex digits) that will be assigned to this target
     in this interconnect (when describing a Bluetooth interconnect)
-  
+
   - *mac_addr* (str): Ethernet Address (48bits HH:HH:HH:HH:HH:HH,
     where HH are two hex digits) that will be assigned to this target
     in this interconnect (when describing ethernet or similar
     interconnects)
-  
+
   - *ipv4_addr* (str): IPv4 Address (32bits, DDD.DDD.DDD.DDD, where
     DDD are decimal integers 0-255) that will be assigned to this
     target in this interconnect
-  
+
   - *ipv4_prefix_len* (int): length in bits of the network portion of
     the IPv4 address
-  
+
   - *ipv6_addr* (str): IPv6 Address (128bits, standard ipv6 colon
     format) that will be assigned to this target in this interconnect
-  
+
   - *ipv4_prefix_len* (int): length in bits of the network portion of
     the IPv6 address
-  
+
 - *idle_poweroff* (int): seconds the target will be idle before the
   system will automatically power it off (if 0, it will never be
   powered off).
@@ -167,7 +167,7 @@ Common metadata
   separated by spaces
 
 - *mutex* (str): who is the current owner of the target
-  
+
 - *owner* (str): who is the current owner of the target
 
 - *path* (str): path where the target state is maintained
@@ -176,17 +176,17 @@ Common metadata
   plugged/unplugged to/from this target.
 
 - *type* (str): type of the target
-  
+
 Interface specific metadata
 ---------------------------
-  
+
 - *consoles* (list of str): [console interface] names of serial
   consoles supported by the target
 
 - *debug-BSP-gdb-tcp-port* (int): [debug interface] TCF port on which
   to reach a GDB remote stub for the given BSP (depending on target
   capability).
-  
+
 - *images-TYPE-QUALIFIER* (str): [imaging interface] File name of
   image that was flashed of a given type and qualifier; eg
   *images-kernel-arc* with a value of
@@ -227,13 +227,13 @@ Driver / targe type specific metadata
 
 - *qemu_bios_image* (str): [QEMU driver] file name used for the
   target's BIOS (depending on configuration)
-  
+
 - *qemu_ro_image* (str): [QEMU driver] file name used for the target's
   read-only image (depending on configuration)
 
 - *qemu-image-kernel-ARCH* (str): [QEMU driver] file used as a kernel to
   boot a QEMU target (depending on configuration)
-  
+
 - *qemu-cmdline-ARCH* (str): [QEMU driver] command line used to launch
   the QEMU process implementing the target (depending on configuration)
 
@@ -248,12 +248,11 @@ Driver / targe type specific metadata
 
 - *tunslip-ARCH-pid* (int): [QEMU driver] PID of the process
   implementing tunslip for a QEMU target.
-  
+
 - *ram_megs* (int): Megs of RAM supported by the target
-  
+
 - *ssh_client* (bool): True if the target supports SSH
 
-                
 *ttbd* Configuration API for targets
 ====================================
 
