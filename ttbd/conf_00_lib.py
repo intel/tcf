@@ -1459,6 +1459,7 @@ ttbl.flasher.openocd_c._boards['nucleo_f103rb'] = dict(
     targets = [ 'arm' ],
     target_id_names = { 0: 'stm32f2x.cpu' },
     write_command = "flash write_image erase %(file)s",
+    hack_reset_halt_after_init = True,
     # FIXME: until we can set a verify_command that doesn't do
     # addresses, we can't enable this
     verify = False,
@@ -1487,6 +1488,8 @@ ttbl.flasher.openocd_c._boards['nucleo_f207zg'] = dict(
     targets = [ 'arm' ],
     target_id_names = { 0: 'stm32f2x.cpu' },
     write_command = "flash write_image erase %(file)s",
+    hack_reset_after_init = True,
+    hack_reset_halt_after_init = True,
     # FIXME: until we can set a verify_command that doesn't do
     # addresses, we can't enable this
     verify = False,

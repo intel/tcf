@@ -795,6 +795,14 @@ source [find board/snps_em_sk.cfg]
         #:
         #: (bool, default False)
         self.hack_reset_halt_after_init = False
+        #: Inmediately after running the OpenOCD initialization
+        #: sequence, reset the board.
+        #:
+        #: This is meant to be used for hacking some boards that don't
+        #: start properly OpenOCD unless this is done.
+        #:
+        #: (bool, default False)
+        self.hack_reset_after_init = False
 
     def _test_target_link(self, tt):
         if self.serial:
@@ -921,7 +929,10 @@ source [find board/snps_em_sk.cfg]
                         # This board needs this hack because we are
                         # power cycling to flash
                         self._power_on_reset_hack(count, top)
-                    if self.board.get("hack_reset_after_power_on", False) \
+                    if self.board.get("hack_reset_after_init", False) \
+                       or self.hack_reset_after_init:
+                        self.__target_reset("for reset after init")
+                    if self.board.get("hack_reset_halt_after_init", False) \
                        or self.hack_reset_halt_after_init:
                         self.__target_reset_halt("for reset/halt after init")
                     r = self.__send_command(
@@ -1216,23 +1227,27 @@ source [find board/snps_em_sk.cfg]
     def _target_reset_halt(self, for_what = ""):
         # this assumes we are outside a 'with self._expect_mgr():' block
         with self._expect_mgr():
-            return self.__target_reset_halt(for_what = "")
+            return self.__target_reset_halt(for_what = for_what)
+
+    def __target_reset(self, for_what = ""):
+        r = self.__send_command("target reset/run %s" % for_what,
+                                "reset run",
+                                [
+                                    "could not halt target",
+                                    # Freedom Boards k64f
+                                    "MDM: Chip is unsecured. Continuing.",
+                                    "target running",
+                                    "",   # nucleo-f103rb
+                                ])
+        if r == 0:
+            self._log_error_output()
+            raise self.error("Cannot reset %s (r %d)" % (for_what, r))
 
     def _target_reset(self, for_what = ""):
         self.log.action = "target reset init"
+        # this assumes we are outside a 'with self._expect_mgr():' block
         with self._expect_mgr():
-            r = self.__send_command("target reset/run %s" % for_what,
-                                    "reset run",
-                                    [
-                                        "could not halt target",
-                                        # Freedom Boards k64f
-                                        "MDM: Chip is unsecured. Continuing.",
-                                        "target running",
-                                        "",   # nucleo-f103rb
-                                    ])
-            if r == 0:
-                self._log_error_output()
-                raise self.error("Cannot reset %s (r %d)" % (for_what, r))
+            return self.__target_reset(for_what = for_what)
 
     def __target_id_resume(self, target_id, for_what = ""):
         try:
