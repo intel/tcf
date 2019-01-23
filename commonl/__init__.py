@@ -429,6 +429,28 @@ class subpython(object):
         return self.output_str
 
 
+def name_make_safe(name, safe_chars = None):
+    """
+    Given a filename, return the same filename will all characters not
+    in the set [-_.0-9a-zA-Z] replaced with _.
+
+    :param str name: name to make *safe*
+    :param set safe_chars: (potional) set of characters that are
+      considered safe. Defaults to ASCII letters and digits plus - and
+      _.
+    """
+    if safe_chars == None:
+        safe_chars = set('-_' + string.ascii_letters + string.digits)
+    # We don't use string.translate()'s deletions because it doesn't
+    # take them for Unicode strings.
+    r = ""
+    for c in name:
+        if c not in safe_chars:
+            c = '_'
+        r += c
+    return r
+
+
 def file_name_make_safe(file_name, extra_chars = ":/"):
     """
     Given a filename, return the same filename will all characters not
