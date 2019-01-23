@@ -913,7 +913,10 @@ def deploy_image(ic, target, image,
                  mkfs_cmd = "mkfs.ext4 -Fj %(root_part_dev)s",
                  pos_prompt = None,
                  # plenty to boot to an nfsroot, hopefully
-                 timeout = 60):
+                 timeout = 60,
+                 # When flushing to USB drives, it can be slow
+                 timeout_sync = 240,
+):
 
     """Deploy an image to a target using the Provisioning OS
 
@@ -1167,6 +1170,7 @@ def deploy_image(ic, target, image,
             # Make sure we have all the entries for systemd-loader
             target.report_info("POS: configuring bootloader")
             boot_config(target, root_part_dev_base, image_final)
+        testcase.tls.expecter.timeout = timeout_sync
         target.shell.run("sync")
         # Kill any processes left over here
         target.shell.run("which lsof && kill -9 `lsof -Fp  /home | sed -n '/^p/{s/^p//;p}'`")
