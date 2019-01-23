@@ -1025,8 +1025,10 @@ def deploy_image(ic, target, image,
             if output == None or output == "" or output == "\x00":
                 target.report_error("POS: no console output, retrying")
                 continue
-            target.report_error("POS: unexpected console output")
-            raise
+            # sometimes the BIOS has been set to boot local directly,
+            # so we might as well retry
+            target.report_error("POS: unexpected console output, retrying")
+            continue
         break
     else:
         raise tcfl.tc.blocked_e(
