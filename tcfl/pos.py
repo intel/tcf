@@ -435,18 +435,31 @@ def _linux_boot_guess(target, image):
         return kernel, initrd, options
     return None, None, None
 
-def _efibootmgr_setup(target):
-    # Now make sure the new entry is after IPv4, as we use IPv4's boot
-    # to redirect to the POS or to localboot
-    #
-    # $ efibootmgr
-    # BootCurrent: 0006
-    # Timeout: 0 seconds
-    # BootOrder: 0000,0006,0004,0005
-    # Boot0000* Linux Boot Manager
-    # Boot0004* UEFI : Built-in EFI Shell
-    # Boot0005* UEFI : LAN : IP6 Intel(R) Ethernet Connection (3) I218-V
-    # Boot0006* UEFI : LAN : IP4 Intel(R) Ethernet Connection (3) I218-V
+
+def efibootmgr_setup(target):
+    """
+    Ensure EFI Boot Manager boots first to IPv4 and then to an entry
+    we are creating called Linux Boot Manager.
+
+    We do this because the configuration file the server drops in TFTP
+    for syslinux to pick up for the MAC address of the target will
+    tell it if the target boots to POS mode or to local boot. So we
+    don't have to mess with BIOS menus.
+
+    General efibootmgr output::
+
+      $ efibootmgr
+      BootCurrent: 0006
+      Timeout: 0 seconds
+      BootOrder: 0000,0006,0004,0005
+      Boot0000* Linux Boot Manager
+      Boot0004* UEFI : Built-in EFI Shell
+      Boot0005* UEFI : LAN : IP6 Intel(R) Ethernet Connection (3) I218-V
+      Boot0006* UEFI : LAN : IP4 Intel(R) Ethernet Connection (3) I218-V
+
+    Note the server can configure :ref:`how the UEFI network entry
+    looks over the defaults <uefi_boot_manager_ipv4_regex>`.
+    """
     output = target.shell.run("efibootmgr", output = True)
     bo_regex = re.compile(r"^BootOrder: "
                           "(?P<boot_order>([a-fA-F0-9]{4},)*[a-fA-F0-9]{4})$",
@@ -455,10 +468,22 @@ def _efibootmgr_setup(target):
     # install"
     lbm_regex = re.compile(r"^Boot(?P<entry>[a-fA-F0-9]{4})\*? "
                            "(?P<name>Linux Boot Manager$)", re.MULTILINE)
+
+    # this allows getting metadata from the target that tells us what
+    # to look for in the UEFI thing
+    uefi_bm_ipv4_entries = [
+        "U?EFI Network.*$",
+        "UEFI PXEv4.*$",
+        ".*IPv?4.*$",
+    ]
+    # FIXME: validate better
+    if 'uefi_boot_manager_ipv4_regex' in target.kws:
+        uefi_bm_ipv4_entries.append(target.kws["uefi_boot_manager_ipv4_regex"])
     ipv4_regex = re.compile(r"^Boot(?P<entry>[a-fA-F0-9]{4})\*? "
                             # PXEv4 is QEMU's UEFI
                             # .*IPv4 are some NUCs I've found
-                            "(?P<name>(UEFI PXEv4|.*IPv?4).*$)", re.MULTILINE)
+                            "(?P<name>(" + "|".join(uefi_bm_ipv4_entries) + "))",
+                            re.MULTILINE)
     bom_m = bo_regex.search(output)
     if bom_m:
         boot_order = bom_m.groupdict()['boot_order'].split(",")
@@ -655,7 +680,7 @@ EOF
     # Now mess with the EFIbootmgr
     # FIXME: make this a function and a configuration option (if the
     # target does efibootmgr)
-    _efibootmgr_setup(target)
+    efibootmgr_setup(target)
     # umount only if things go well
     # Shall we try to unmount in case of error? nope, we are going to
     # have to redo the whole thing anyway, so do not touch it, in case
