@@ -911,7 +911,9 @@ def deploy_image(ic, target, image,
                  extra_deploy_fns = None,
                  # mkfs has to have -F to avoid it asking questions
                  mkfs_cmd = "mkfs.ext4 -Fj %(root_part_dev)s",
-                 pos_prompt = None):
+                 pos_prompt = None,
+                 # plenty to boot to an nfsroot, hopefully
+                 timeout = 60):
 
     """Deploy an image to a target using the Provisioning OS
 
@@ -1015,8 +1017,7 @@ def deploy_image(ic, target, image,
         if pos_prompt:
             target.shell.linux_shell_prompt_regex = pos_prompt
         try:
-            # plenty to boot to an nfsroot, hopefully
-            target.shell.up(timeout = 60)
+            target.shell.up(timeout = timeout)
         except tcfl.tc.error_e as e:
             outputf = e.attachments_get().get('console output', None)
             if outputf:
