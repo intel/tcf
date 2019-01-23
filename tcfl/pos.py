@@ -492,9 +492,12 @@ def _efibootmgr_setup(target):
     target.report_info("Changing boot order to %s followed by %s"
                        % (ipv4_name, lbm_name))
     target.shell.run("efibootmgr -o " + ",".join(boot_order))
-    # Next time we reboot we want to go straight to our deployment
-    target.report_info("Setting next boot to be Linux Boot Manager")
-    target.shell.run("efibootmgr -n " + lbm)
+    if False:
+        # DISABLED: seems to get the system confused when it has to do
+        # it, so let's use syslinux to always control it
+        # Next time we reboot we want to go straight to our deployment
+        target.report_info("Setting next boot to be Linux Boot Manager")
+        target.shell.run("efibootmgr -n " + lbm)
 
 
 def boot_config(target, root_part_dev, image,
