@@ -835,7 +835,7 @@ class file_c(report_c):
                 file_name = os.path.join(self.log_dir, file_name)
             # the template might specify a new directory path that
             # still does not exist
-            commonl.makedirs_p(os.path.dirname(file_name))
+            commonl.makedirs_p(os.path.dirname(file_name), 0o750)
             with codecs.open(file_name, "w", encoding = 'utf-8',
                              errors = 'ignore') as fo:
                 for text in template.generate(**kws):

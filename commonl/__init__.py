@@ -570,17 +570,32 @@ def rm_f(filename):
         if e.errno != errno.ENOENT:
             raise
 
-def makedirs_p(dirname, *args):
+def makedirs_p(dirname, mode):
     """
     Create a directory tree, ignoring an error if it already exists
 
     :param str pathname: directory tree to crate
-    :param int mode: (optional) mode to pass to :python:`os.mkdir`
+    :param int mode: mode set the directory to
     """
     try:
-        os.makedirs(dirname, *args)
+        os.makedirs(dirname)
+        # yes, this is a race condition--but setting the umask so
+        # os.makedirs() gets the right mode would interfere with other
+        # threads and processes.
+        os.chmod(dirname, mode)
     except OSError:
         if not os.path.isdir(dirname):
+            raise
+
+def symlink_f(source, dest):
+    """
+    Create a symlink, ignoring an error if it already exists
+
+    """
+    try:
+        os.symlink(source, dest)
+    except OSError as e:
+        if e.errno != errno.EEXIST or not os.path.islink(dest):
             raise
 
 def _pid_grok(pid):
