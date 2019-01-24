@@ -36,8 +36,8 @@ logger = logging.getLogger("tcfl.tc_clear_bbt")
 
 def tap_parse_output(output):
     """
-    Parse :ref:`TAP
-    <https://testanything.org/tap-version-13-specification.html)>`
+    Parse `TAP
+    <https://testanything.org/tap-version-13-specification.html>`_
     into a dictionary
 
     :param str output: TAP formatted output
@@ -204,8 +204,8 @@ class tc_taps_subcase_c_base(tcfl.tc.tc_c):
 class tc_clear_bbt_c(tcfl.tc.tc_c):
     """Driver to load Clear Linux BBT test cases
 
-    A BBT test case is specified in :ref:`bats
-    <https://github.com/sstephenson/bats>` format in a ``FILENAME.t``
+    A BBT test case is specified in `bats
+    <https://github.com/sstephenson/bats>_` format in a ``FILENAME.t``
 
     This driver gets called by the core testcase scanning system
     through the entry point :meth:`is_testcase`--in quite a simplistic
@@ -239,6 +239,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
       2. :func:`parse the output <tap_parse_output>` into subcases to
          report their results individually using
          :class:`tc_taps_subcase_c_base`
+
     """
 
     def __init__(self, t_file_path):
