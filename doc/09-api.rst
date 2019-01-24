@@ -63,6 +63,7 @@ Extensions to :class:`tcfl.tc.target_c` types
 .. automodule:: tcfl.util
 
 .. automodule:: tcfl.tc_zephyr_sanity
+.. automodule:: tcfl.tc_clear_bbt
 
                 
 Target metadata
