@@ -20,6 +20,95 @@ tftp_dir = "/var/lib/tftpboot"
 #: Directory where the syslinux tree is located
 syslinux_path = "/usr/share/syslinux"
 
+
+#:
+#: List of PXE architectures we support
+#:
+#: This is a dictionary keyed by architecture name (ARCHNAME); the
+#: value is a dictionary keyed by the following keywords
+#:
+#: - ``rfc_code`` (str) a hex string in the format "HH:HH",
+#:   documenting a PXE architecture as described in
+#:   https://datatracker.ietf.org/doc/rfc4578/?include_text=1 (section 2.1).
+#:
+#:   This is used directly for the ISC DHCP configuration of the
+#:   *option architecture-type*::
+#:
+#:     Code  Arch Name   Description
+#:     ----- ----------- --------------------
+#:     00:00 x86         Intel x86PC
+#:     00:01             NEC/PC98
+#:     00:02             EFI Itanium
+#:     00:03             DEC Alpha
+#:     00:04             Arc x86
+#:     00:05             Intel Lean Client
+#:     00:06             EFI IA32
+#:     00:07 efi-bc      EFI BC	 (byte code)
+#:     00:08             EFI Xscale
+#:     00:09 efi-x86_64  EFI x86-64
+#:
+#: - ``boot_filename`` (str): name of the file sent over PXE to a
+#:   target when it asks what to boot. This will be converted to
+#:   TFTP path ``/ttbd-INSTANCE/ARCHNAME/BOOT_FILENAME`` which will be
+#:   requested by the target.
+#:
+#: - ``copy_files`` (list of str): list of files or directories that
+#:   have to copy/rsynced to ``TFTPDIR/ttbd-INSTANCE/ARCHNAME``;
+#:   everything needed for the client to boot ``BOOT_FILENAME`` has to
+#:   be listed here for them to be copied and made available over TFTP.
+#:
+#:   This allows to patch this in runtime based on the site
+#:   configuration and Linux distribution
+#:
+#: The DHCP driver, when powered on, will create
+#: ``TFTPDIR/ttbd-INSTANCE/ARCHNAME``, rsync the files or trees in
+#: ``copy_files`` to it and then symlink
+#: ``TFTPDIR/ttbd-INSTANCE/ARCHNAME/pxelinux.cfg`` to
+#: ``TFTPDIR/ttbd-INSTANCE/pxelinux.cfg`` (as the configurations are
+#: common to all the architectures).
+#:
+#:
+#: To extend in the system configuration, add to any server
+#: configuration file in ``/etc/ttbd-INSTANCE/conf_*.py``; for
+#: example, to use another bootloader for eg, ``x86``:
+#:
+#: >>> import ttbl.dhcp
+#: >>> ...
+#: >>> ttbl.dhcp.pxe_architectures['x86']['copy_files'].append(
+#: >>>     '/usr/local/share/syslinux/lpxelinux1.0`)
+#: >>> ttbl.dhcp.pxe_architectures['x86']['boot_file'] = 'lpxelinux1.0`
+#:
+pxe_architectures = {
+    'x86': dict(
+        rfc_code = "00:00",
+        # lpxe can load HTTP
+        boot_filename = 'lpxelinux.0',
+        copy_files = [
+            "/usr/share/syslinux/lpxelinux.0",
+            "/usr/share/syslinux/ldlinux.c32",
+        ]
+    ),
+    'efi-bc': dict(
+        # apparently sometimes it is misused by some vendors for
+        # x86_64, so we make it do the same
+        # https://www.syslinux.org/wiki/index.php?title=PXELINUX#UEFI
+        rfc_code = "00:07",
+        boot_filename = 'syslinux.efi',
+        copy_files = [
+            "/usr/share/syslinux/efi64/",
+        ]
+    ),
+    'efi-x86_64': dict(
+        rfc_code = "00:09",
+        boot_filename = 'syslinux.efi',
+        copy_files = [
+            "/usr/share/syslinux/efi64/",
+        ]
+    ),
+}
+
+
+
 tftp_prefix = "ttbd" + ttbl.config.instance_suffix
 
 class pci(ttbl.tt_power_control_impl):
@@ -79,6 +168,7 @@ class pci(ttbl.tt_power_control_impl):
             if_len = if_len,
             ip_addr_range_bottom = ip_addr_range_bottom,
             ip_addr_range_top = ip_addr_range_top,
+            dhcp_architecture_types = self._mk_pxe_arch_type_config(),
         )
 
         self.ip_mode = ip_mode
@@ -97,6 +187,44 @@ class pci(ttbl.tt_power_control_impl):
         self.state_dir = None
         self.pxe_dir = None
         self.dhcpd_pidfile = None
+
+    @staticmethod
+    def _mk_pxe_arch_type_config():
+        # Given information in the pxe_architecture member of this
+        # class, generate a block of DHCP config language that looks
+        # like:
+        #
+        #   if option architecture-type = 00:00 {
+        #         filename "%(tftp_prefix)s/lpxelinux.0";
+        #   } elsif option architecture-type = 00:09 {
+        #         filename "%(tftp_prefix)s/efi-x86_64/syslinux.efi";
+        #   } elsif option architecture-type = 00:07 {
+        #         filename "%(tftp_prefix)s/efi-x86_64/syslinux.efi";
+        #   } elsif option architecture-type = 00:06 {
+        #         filename "%(tftp_prefix)s/efi-x86/syslinux.efi";
+        #   } else {
+        #         filename "%(tftp_prefix)s/lpxelinux.0";
+        #   }
+        first = True
+        res = ""
+        for arch_name, arch_data in pxe_architectures.iteritems():
+            if first:
+                if_s = "if"
+                first = False
+            else:
+                if_s = "} elsif"
+            rfc_code = arch_data['rfc_code']
+            boot_filename = arch_data['boot_filename']
+            res += """\
+                %s option architecture-type = %s {
+                    filename "%s/%s/%s";
+""" %  (if_s, rfc_code, tftp_prefix, arch_name, boot_filename)
+        res += """\
+                } else {
+                      filename "%s/lpxelinux.0";
+                }
+""" % tftp_prefix
+        return res
 
     def _dhcp_conf_write_ipv4(self, f):
         # generate the ipv4 part
@@ -117,6 +245,8 @@ option architecture-type code 93 = unsigned integer 16;
         # FIXME: make it so using pxelinux is a configuratio template
         # (likewise on the tftp side, so we can switch to EFI boot or
         # whatever we want)
+        # %(dhcp_architecture_types)s is the output of
+        # _mk_pxe_arch_type_config()
         f.write("""\
 subnet %(if_net)s netmask %(if_netmask)s {
         pool {
@@ -126,17 +256,7 @@ subnet %(if_net)s netmask %(if_netmask)s {
         class "pxeclients" {
                 match if substring (option vendor-class-identifier, 0, 9) = "PXEClient";
                 # http://www.syslinux.org/wiki/index.php?title=PXELINUX#UEFI
-                if option architecture-type = 00:00 {
-                        filename "%(tftp_prefix)s/lpxelinux.0";
-                } elsif option architecture-type = 00:09 {
-                        filename "%(tftp_prefix)s/efi-x86_64/syslinux.efi";
-                } elsif option architecture-type = 00:07 {
-                        filename "%(tftp_prefix)s/efi-x86_64/syslinux.efi";
-                } elsif option architecture-type = 00:06 {
-                        filename "%(tftp_prefix)s/efi-x86/syslinux.efi";
-                } else {
-                        filename "%(tftp_prefix)s/lpxelinux.0";
-                }
+%(dhcp_architecture_types)s
                 # Point to the TFTP server, which is the same as this
                 next-server %(if_addr)s;
         }
@@ -177,6 +297,8 @@ host %s {
         # addresses; PXE is done only over ipv4
         self.log.info("%(if_name)s: IPv6 net/len %(if_addr)s/%(if_len)s" %
                       self._params)
+        # %(dhcp_architecture_types)s is the output of
+        # _mk_pxe_arch_type_config()
         f.write("""\
 # This one line must be outside any bracketed scope
 option architecture-type code 93 = unsigned integer 16;
@@ -187,17 +309,7 @@ subnet6 %(if_net)s/%(if_len)s {
         class "pxeclients" {
                 match if substring (option vendor-class-identifier, 0, 9) = "PXEClient";
                 # http://www.syslinux.org/wiki/index.php?title=PXELINUX#UEFI
-                if option architecture-type = 00:00 {
-                        filename "%(tftp_prefix)s/lpxelinux.0";
-                } elsif option architecture-type = 00:09 {
-                        filename "%(tftp_prefix)s/efi-x86_64/syslinux.efi";
-                } elsif option architecture-type = 00:07 {
-                        filename "%(tftp_prefix)s/efi-x86_64/syslinux.efi";
-                } elsif option architecture-type = 00:06 {
-                        filename "%(tftp_prefix)s/efi-x86/syslinux.efi";
-                } else {
-                        filename "%(tftp_prefix)s/lpxelinux.0";
-                }
+%(dhcp_architecture_types)s
                 # Point to the TFTP server, which is the same as this
 #                next-server %(if_addr)s;
         }
@@ -317,27 +429,26 @@ host %s {
             assert self.target == target
         # FIXME: detect @target is an ipv4 capable network, fail otherwise
         self._init_for_process(target)
-        # Create runtime directory where we place everything
+        # Create runtime directories where we place everything based
+        # on the infomation in pxe_architectures
         shutil.rmtree(self.state_dir, ignore_errors = True)
         os.makedirs(self.state_dir)
+
         # TFTP setup
-        shutil.rmtree(os.path.join(self.pxe_dir, "pxelinux.cfg"), ignore_errors = True)
-        os.makedirs(os.path.join(self.pxe_dir, "pxelinux.cfg"))
-        commonl.makedirs_p(os.path.join(self.pxe_dir, "efi-x86_64"))
-        os.chmod(os.path.join(self.pxe_dir, "pxelinux.cfg"), 0o0775)
-        shutil.copy(os.path.join(syslinux_path, "lpxelinux.0"), self.pxe_dir)
-        shutil.copy(os.path.join(syslinux_path, "ldlinux.c32"), self.pxe_dir)
-        # FIXME: Depends on package syslinux-efi64
-        subprocess.call([ "rsync", "-a", "--delete",
-                          # add that postfix / to make sure we sync
-                          # the dir and not create another subdir
-                          os.path.join(syslinux_path, "efi64") + "/.",
-                          os.path.join(self.pxe_dir, "efi-x86_64") ])
-        # We use always the same configurations; because the rsync
-        # above will remove the symlink, we re-create it
-        # We use a relative symlink so in.tftpd doesn't nix it
-        os.symlink("../pxelinux.cfg",
-                   os.path.join(self.pxe_dir, "efi-x86_64", "pxelinux.cfg"))
+        commonl.makedirs_p(os.path.join(tftp_dir, tftp_prefix,
+                                        "pxelinux.cfg"),
+                           0o0775)
+        for arch_name, arch_data in pxe_architectures.iteritems():
+            tftp_arch_dir = os.path.join(tftp_dir, tftp_prefix, arch_name)
+            commonl.makedirs_p(tftp_arch_dir, 0o0775)
+            cmdline = [ "rsync", "-a", "--delete" ] \
+                + arch_data['copy_files'] + [ tftp_arch_dir ]
+            subprocess.call(cmdline, shell = False, stderr = subprocess.STDOUT)
+            # We use always the same configurations; because the rsync
+            # above might remove the symlink, we re-create it
+            # We use a relative symlink so in.tftpd doesn't nix it
+            commonl.symlink_f("../pxelinux.cfg",
+                              os.path.join(tftp_arch_dir, "pxelinux.cfg"))
 
         # We set the parameters in a dictionary so we can use it to
         # format strings
