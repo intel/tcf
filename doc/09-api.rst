@@ -304,6 +304,26 @@ Provisioning OS specific metadata
 - *linux_options_append*: string describing options to append to a
   Linux kernel boot command line.
 
+.. _pos_http_url_prefix:
+
+- *pos_http_url_prefix*: string describing the prefix to send for
+  loading a Provisoning OS kernel/initramfs. See :ref:`here
+  <pos_boot_http_tftp>`.
+
+  Python's ``%(NAME)s`` codes can be used to substitute values from
+  the target's tags or the interconnect's.
+
+  Example:
+
+  .. code-block:: python
+
+     pos_http_url_prefix = "http://192.168.97.1/ttbd-pos/%(bsp)s/"
+
+  ``bsp`` is common to use as the images for an architecture won't
+  work for another. ``bsp`` is taken from the target's tag ``bsp``. If
+  not present, the first BSP (in alphabetical order) declared in the
+  target tags ``bsps`` will be used.
+
 .. _uefi_boot_manager_ipv4_regex:
 
 - *uefi_boot_manager_ipv4_regex*: allows specifying a Python regular
@@ -314,7 +334,7 @@ Provisioning OS specific metadata
   >>>     'uefi_boot_manager_ipv4_regex': 'UEFI Network'
   >>> })
 
-  :func:`ttbl.pos.efibootmgr_setup` can use this if the defaults do
+  :func:`tcfl.pos.efibootmgr_setup` can use this if the defaults do
   not work :func:`tcfl.pos.deploy_image` reports::
 
     Cannot find IPv4 boot entry, enable manually

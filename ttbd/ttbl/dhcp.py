@@ -20,6 +20,27 @@ tftp_dir = "/var/lib/tftpboot"
 #: Directory where the syslinux tree is located
 syslinux_path = "/usr/share/syslinux"
 
+def template_rexpand(text, kws):
+    """
+    Expand Python keywords in a template repeatedly until none are
+    left.
+
+    if there are substitution fields in the config text,
+    replace them with the keywords; repeat until there are none left
+    (as some of the keywords might bring in new substitution keys).
+
+    Stop after ten iterations
+    """
+    assert isinstance(text, basestring)
+    assert isinstance(kws, dict)
+    count = 0
+    while '%(' in text:
+        text = text % kws
+        count += 1
+        if count > 9:
+            raise RuntimeError('after ten iterations could not resolve '
+                               'all configuration keywords')
+    return text
 
 #:
 #: List of PXE architectures we support
@@ -96,6 +117,8 @@ pxe_architectures = {
         boot_filename = 'syslinux.efi',
         copy_files = [
             "/usr/share/syslinux/efi64/",
+            "/home/ttbd/public_html/x86_64/vmlinuz-tcf-live",
+            "/home/ttbd/public_html/x86_64/initramfs-tcf-live",
         ]
     ),
     'efi-x86_64': dict(
@@ -103,11 +126,22 @@ pxe_architectures = {
         boot_filename = 'syslinux.efi',
         copy_files = [
             "/usr/share/syslinux/efi64/",
+            "/home/ttbd/public_html/x86_64/vmlinuz-tcf-live",
+            "/home/ttbd/public_html/x86_64/initramfs-tcf-live",
         ]
     ),
 }
 
 
+def _tag_get_from_ic_target(kws, tag, ic, target, default = ""):
+    # get first from the target
+    if tag in target.tags:
+        value = target.tags[tag]
+    elif tag in ic.tags:
+        value = ic.tags[tag]
+    else:
+        value = default
+    kws[tag] = value % kws
 
 tftp_prefix = "ttbd" + ttbl.config.instance_suffix
 
@@ -162,6 +196,7 @@ class pci(ttbl.tt_power_control_impl):
 
         # FIXME: move to power_on_do, to get this info from target's tags
         self._params = dict(
+            ip_mode = ip_mode,
             tftp_prefix = tftp_prefix,
             if_net = if_net,
             if_addr = if_addr,
@@ -179,7 +214,6 @@ class pci(ttbl.tt_power_control_impl):
             self._params["allow_known_clients"] = "allow known clients;"
         else:
             self._params["allow_known_clients"] = "# all clients allowed"
-
 
         self.debug = debug
         self.log = None
@@ -226,13 +260,21 @@ class pci(ttbl.tt_power_control_impl):
 """ % tftp_prefix
         return res
 
-    def _dhcp_conf_write_ipv4(self, f):
-        # generate the ipv4 part
-        self.log.info("%s: IPv4 net/mask %s/%s",
-                      self._params['if_name'], self._params['if_net'],
-                      self._params['if_netmask'])
-        # We only do PXE over ipv4
-        f.write("""\
+
+    def _dhcp_conf_write(self, f):
+        kws = dict(self._params)
+        # generate DHCP configuration file based on hackish templating
+        self.log.info(
+            "%(if_name)s: IPv%(ip_mode)d addr/net/mask "
+            "%(if_addr)/%(if_net)s/%(if_netmask)s", self._params)
+        if self.ip_mode == 4:
+            # We only do PXE over ipv4
+            # FIXME: make it so using pxelinux is a configuratio template
+            # (likewise on the tftp side, so we can switch to EFI boot or
+            # whatever we want)
+            # %(dhcp_architecture_types)s is the output of
+            # _mk_pxe_arch_type_config()
+            f.write("""\
 option space pxelinux;
 option pxelinux.magic code 208 = string;
 option pxelinux.configfile code 209 = text;
@@ -241,13 +283,6 @@ option pxelinux.reboottime code 211 = unsigned integer 32;
 # To be used in the pxeclients class
 option architecture-type code 93 = unsigned integer 16;
 
-""")
-        # FIXME: make it so using pxelinux is a configuratio template
-        # (likewise on the tftp side, so we can switch to EFI boot or
-        # whatever we want)
-        # %(dhcp_architecture_types)s is the output of
-        # _mk_pxe_arch_type_config()
-        f.write("""\
 subnet %(if_net)s netmask %(if_netmask)s {
         pool {
                 %(allow_known_clients)s
@@ -262,49 +297,13 @@ subnet %(if_net)s netmask %(if_netmask)s {
         }
 }
 """ % self._params)
-
-        # Now, enumerate the targets that are in this local
-        # configuration and figure out what's their IP address in
-        # this network; create a hardcoded entry for them.
-        #
-        # FIXME: This leaves a gap, as targets in other servers could
-        # be connected to this network. Sigh.
-        for target_id, target in ttbl.config.targets.iteritems():
-            interconnects = target.tags.get('interconnects', {})
-            for ic_id, interconnect in interconnects.iteritems():
-                if ic_id != self.target.id:
-                    continue
-                mac_addr = interconnect.get('mac_addr', None)
-                ipv4_addr = interconnect.get('ipv4_addr', None)
-                if ipv4_addr and mac_addr:
-                    f.write("""\
-host %s {
-        hardware ethernet %s;
-        fixed-address %s;
-        option host-name "%s";
-        # note how we are forcing NFSv3, as it might default to v2
-        # FIXME: parameter?
-        # Also UDP, more resilient for our use and soft so we can
-        # recover in some cases more easily
-        option root-path "%s:%s,udp,soft,nfsvers=3";
-}
-""" % (target_id, mac_addr, ipv4_addr, target_id,
-       self._params['pos_nfs_server'], self._params['pos_nfs_path']))
-
-
-    def _dhcp_conf_write_ipv6(self, f):
-        # generate the ipv6 part -- we only use it to assign
-        # addresses; PXE is done only over ipv4
-        self.log.info("%(if_name)s: IPv6 net/len %(if_addr)s/%(if_len)s" %
-                      self._params)
-        # %(dhcp_architecture_types)s is the output of
-        # _mk_pxe_arch_type_config()
-        f.write("""\
+        else:
+            f.write("""\
 # This one line must be outside any bracketed scope
 option architecture-type code 93 = unsigned integer 16;
 
 subnet6 %(if_net)s/%(if_len)s {
-        range6 %(ip_addr_range_bottom)s  %(ip_addr_range_top)s;
+        range6 %(ip_addr_range_bottom)s %(ip_addr_range_top)s;
 
         class "pxeclients" {
                 match if substring (option vendor-class-identifier, 0, 9) = "PXEClient";
@@ -324,35 +323,82 @@ subnet6 %(if_net)s/%(if_len)s {
         # be connected to this network. Sigh.
         for target_id, target in ttbl.config.targets.iteritems():
             interconnects = target.tags.get('interconnects', {})
+            ic = self.target
+            ic.log.error("DEBUG: generating for %s" % target.id)
+            boot_ic = target.tags.get('pos_boot_interconnect', None)
+            if boot_ic == None:
+                ic.log.info('%s: target has no "pos_boot_interconnect" '
+                            'tag/property defined, ignoring' % target_id)
+                continue
+            # FIXME: these two checks shall be consistency done when
+            # the target is being added
+            if not boot_ic in target.tags['interconnects']:
+                raise RuntimeError('%s: target does not belong to the '
+                                   'boot interconnect "%s" defined in tag '
+                                   '"pos_boot_interconnect"'
+                                   % (target_id, boot_ic))
+            if not boot_ic in ttbl.config.targets:
+                raise RuntimeError('%s: this target\'s boot interconnect %s '
+                                   'defined in "pos_boot_interconnect" tag '
+                                   'is not available in this server'
+                                   % (target_id, boot_ic))
+
+            if not 'bsp' in target.tags:
+                bsps = target.tags['bsps'].keys()
+                kws['bsp'] = sorted(bsps)[0]
+            kws.update(dict(
+                ipv4_gateway = ic.tags.get('ipv4_gateway', ""),
+                ipv4_netmask = commonl.ipv4_len_to_netmask_ascii(
+                    ic.tags['ipv4_prefix_len']),
+                name = target.id,
+                hostname = target.id
+            ))
+
+            # There might be a prefix to the path to the boot kernel and
+            # initrd; we let the target override it and default to the
+            # network's or nothing
+            # FIXME: need v6 nfs_server and http_url
+            _tag_get_from_ic_target(kws, 'pos_http_url_prefix', ic, target)
+            _tag_get_from_ic_target(kws, 'pos_nfs_server', ic, target)
+            _tag_get_from_ic_target(kws, 'pos_nfs_path', ic, target)
+
             for ic_id, interconnect in interconnects.iteritems():
                 if ic_id != self.target.id:
                     continue
-                mac_addr = interconnect.get('mac_addr', None)
-                ipv6_addr = interconnect.get('ipv6_addr', None)
-                if ipv6_addr and mac_addr:
-                    f.write("""\
-host %s {
-        hardware ethernet %s;
-        fixed-address6 %s;
-        option host-name "%s";
-        option root-path "";
+                kws['mac_addr'] = interconnect.get('mac_addr', None)
+                kws['ipv4_addr'] = interconnect.get('ipv4_addr', None)
+                kws['ipv6_addr'] = interconnect.get('ipv6_addr', None)
+
+                if self.ip_mode == 4:
+                    config = """\
+host %(hostname)s {
+        hardware ethernet %(mac_addr)s;
+        fixed-address %(ipv4_addr)s;
+        option host-name "%(hostname)s";
         # note how we are forcing NFSv3, as it might default to v2
         # FIXME: parameter?
         # Also UDP, more resilient for our use and soft so we can
         # recover in some cases more easily
-        option root-path "%s:%s,udp,soft,nfsvers=3";
+        option root-path "%(pos_nfs_server)s:%(pos_nfs_path)s,udp,soft,nfsvers=3";
 }
-""" % (target_id, mac_addr, ipv6_addr, target_id,
-       self._params['pos_nfs_server'], self._params['pos_nfs_path']))
+"""
+                else:
+                    config = """\
+host %(hostname)s {
+        hardware ethernet %(mac_addr)s;
+        fixed-address6 %(ipv6_addr)s;
+        option host-name "%(hostname)s";
+        # note how we are forcing NFSv3, as it might default to v2
+        # FIXME: parameter?
+        # Also UDP, more resilient for our use and soft so we can
+        # recover in some cases more easily
+        # FIXME: pos_nfs_server6?
+        option root-path "%(pos_nfs_server)s:%(pos_nfs_path)s,udp,soft,nfsvers=3";
+}
+"""
+                f.write(template_rexpand(config, kws))
 
-    def _dhcp_conf_write(self):
-        # Write DHCPD configuration
-        with open(os.path.join(self.state_dir, "dhcpd.conf"),
-                  "wb") as f:
-            if self.ip_mode == 4:
-                self._dhcp_conf_write_ipv4(f)
-            else:
-                self._dhcp_conf_write_ipv6(f)
+
 
     def _dhcpd_start(self):
         # Fire up the daemons
@@ -412,12 +458,6 @@ host %s {
             self.pxe_dir = os.path.join(tftp_dir, tftp_prefix)
             self.dhcpd_pidfile = os.path.join(self.state_dir, "dhcpd.pid")
 
-            # These are self._params we might not know at the
-            # beginning (when the object was created) as tags with
-            # information we need might have been created later
-            self._params['pos_nfs_server'] = target.tags['pos_nfs_server']
-            self._params['pos_nfs_path'] = target.tags['pos_nfs_path']
-
     def power_on_do(self, target):
         """
         Start DHCPd servers on the network interface
@@ -458,7 +498,8 @@ host %s {
 
         # FIXME: if we get the parameters from the network here, we
         # have target -- so we don't need to set them on init
-        self._dhcp_conf_write()
+        with open(os.path.join(self.state_dir, "dhcpd.conf"), "wb") as f:
+            self._dhcp_conf_write(f)
 
         # FIXME: before start, filter out leases file, anything in the
         # leases dhcpd.leases file that has a "binding state active"
@@ -520,10 +561,13 @@ def power_on_pre_pos_setup(target):
     if pos_mode == "pxe":
         # now this is dirty -- we kinda hacking here but otherwise, how do
         # we get to the pos_* kws?
-        boot_ic_tags = ttbl.config.targets[boot_ic].tags
+        ic = ttbl.config.targets[boot_ic]
 
         # The service
         kws = dict(target.tags)
+        if not 'bsp' in target.tags:
+            bsps = target.tags['bsps'].keys()
+            kws['bsp'] = sorted(bsps)[0]
         kws.update(dict(
             ipv4_addr = interconnect['ipv4_addr'],
             ipv4_gateway = interconnect.get('ipv4_gateway', ""),
@@ -531,10 +575,14 @@ def power_on_pre_pos_setup(target):
                 interconnect['ipv4_prefix_len']),
             mac_addr = mac_addr,
             name = target.id,
-            pos_http_url_prefix = boot_ic_tags['pos_http_url_prefix'],
-            pos_nfs_server = boot_ic_tags['pos_nfs_server'],
-            pos_nfs_path = boot_ic_tags['pos_nfs_path'],
         ))
+
+        # There might be a prefix to the path to the boot kernel and
+        # initrd; we let the target override it and default to the
+        # network's or nothing
+        _tag_get_from_ic_target(kws, 'pos_http_url_prefix', ic, target)
+        _tag_get_from_ic_target(kws, 'pos_nfs_server', ic, target)
+        _tag_get_from_ic_target(kws, 'pos_nfs_path', ic, target)
 
         # generate configuration for the target to boot the POS's linux
         # kernel with the root fs over NFS
@@ -579,18 +627,7 @@ label boot
     ip=dhcp \
     root=%(root_dev)s %(extra_kopts)s
 """
-        # if there are substitution fields in the config text,
-        # replace them with the keywords; repeat until there are none left
-        # (as some of the keywords might bring in new substitution keys).
-        #
-        # Stop after ten iterations
-        count = 0
-        while '%(' in config:
-            config = config % kws
-            count += 1
-            if count > 9:
-                raise RuntimeError('after ten iterations could not resolve '
-                                   'all configuration keywords')
+        config = template_rexpand(config, kws)
     else:
         # pos_mode is local
         config = """\

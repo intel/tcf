@@ -1351,6 +1351,31 @@ To have it boot back in local mode::
   $ tcf property-set TARGETNAME pos_mode
   $ tcf power-cycle TARGETNAME
 
+.. _pos_boot_http_tftp:
+
+POS: booting from HTTP or TFTP
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When a target is given a syslinux configuration file to boot from, the
+places where it loads the Provisioning OS kernels can be forced with
+:ref:`pos_http_url_prefix`.
+
+By default (no prefix) the boot loader will tend to load with
+TFTP. But by specifying an HTTP or FTP URL prefix, it can boot over
+any of those protocols (which can be faster).
+
+When specified in an interconnect's tags, it will be taken as default
+for that interconnect, but this can be overriden specifying it for
+each target; for the example in :ref:`POS: Configuring networks
+<ttbd_pos_network_config>`, we can add::
+
+  pos_http_url_prefix = "http://192.168.97.1/ttbd-pos/%(bsp)s/"
+
+This will replace in the syslinux configuration file any occurrence of
+``pos_http_url_prefix`` with
+``http://192.168.97.1/ttbd-pos/ARCHNAME/``, where ``ARCHNAME`` is the
+architecture of the target.
+
 .. _linux_target_pos_kernel_options:
 
 Linux targets: POS: setting default linux kernel options

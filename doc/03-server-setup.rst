@@ -838,8 +838,8 @@ been tested yet, shall be similar.
 3. Configure an image repository (FIXME: add in glusterfs steps); we
    choose ``/home/ttbd/images`` but any other location will do::
 
-     # install -o ttbd -g ttbd -m 2775 -d /home/ttbd /home/ttbd/images /home/ttbd/public_html
-
+     # install -o ttbd -g ttbd -m 2775 -d /home/ttbd /home/ttbd/images \
+         /home/ttbd/public_html /home/ttbd/public_html/x86_64
 
 4. Disable the firewall (FIXME: do not require this)::
 
@@ -891,6 +891,10 @@ POS: deploy PXE boot image to HTTP and NFS server locations
 Currently the Provisioning OS is implemented with a derivative of
 Fedora Linux.
 
+.. warning:: these steps are meant for an x86-64 platform and it has
+             to be run in such. Steps for x86 (32-bits) or other
+             platforms need to be documented.
+
 a. Generate TCF-live on the fly::
 
      $ /usr/share/tcf/live/mk-liveimg.sh
@@ -922,7 +926,7 @@ b. Extract the root file system from the ISO image to the
    will read-only root serve it from and also we'll be able to use
    it to flash targets::
 
-     $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/tcf-live tcf-live/tcf-live.iso
+     $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/tcf-live/x86_64/ tcf-live/tcf-live.iso
      I: loop device /dev/loop0
      NAME      MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
      loop0       7:0    0  419M  0 loop
@@ -947,21 +951,22 @@ b. Extract the root file system from the ISO image to the
    (most of those warning messages during verification can be ignored)
 
 c. Make the kernel and initrd for POS available via Apache for
-   PXE-over-HTTP booting:
+   PXE-over-HTTP and PXE-over-TFTP booting:
 
    i. Copy the kernel::
 
-        # ln /home/ttbd/images/tcf-live/boot/vmlinuz-* /home/ttbd/public_html/vmlinuz-tcf-live
+        # ln /home/ttbd/images/tcf-live/x86_64/boot/vmlinuz-* \
+            /home/ttbd/public_html/x86_64/vmlinuz-tcf-live
 
    ii. Regenerate the *initrd* with nfs-root support, as the initrd
        generated does not have nfs-root enabled (FIXME: figure out
        the configuration to enable it straight up)::
 
-         # dracut -v -H --kver $(ls /home/ttbd/images/tcf-live/lib/modules) \
-                -k /home/ttbd/images/tcf-live/lib/modules/* \
-               --kernel-image /home/ttbd/images/tcf-live/boot/vmlinuz-* \
+         # dracut -v -H --kver $(ls /home/ttbd/images/tcf-live/x86_64/lib/modules) \
+                -k /home/ttbd/images/tcf-live/x86_64/lib/modules/* \
+               --kernel-image /home/ttbd/images/tcf-live/x86_64/boot/vmlinuz-* \
                -m "nfs base network kernel-modules kernel-network-modules" \
-               /home/ttbd/public_html/initramfs-tcf-live
+               /home/ttbd/public_html/x86_64/initramfs-tcf-live
 
        .. warning:: ``--kver`` is needed to not default to the kernel
                     version of the system running the command.
@@ -970,8 +975,16 @@ c. Make the kernel and initrd for POS available via Apache for
 
    iii. Make everything readable to the public::
 
-          # chmod 0644 /home/ttbd/public_html/*
+          # chmod a+rX -R /home/ttbd/public_html
           # chcon -R -t httpd_sys_content_t /home/ttbd/public_html
+
+   iv. Copy the POS boot material to the TFTP directory::
+
+         # install -m 2775 -o ttbd -g ttbd -d /var/lib/tftpboot/ttbd-production/
+         # install -m 0644 -o ttbd -g ttbd /home/ttbd/public_html/x86_64/* \
+              /var/lib/tftpboot/ttbd-production/efi-x86_64
+
+       This allows targets to get the boot kernel/initrd over TFTP.
 
    Ensure those two files work by pointing a browser to
    http://YOURSERVERNAME/ttbd-pos/ and verifying they can be downloaded.
@@ -992,8 +1005,8 @@ d. Make the POS root image available over NFS as read-only (note we
 
 .. _ttbd_pos_deploying_images:
 
-POS:Deploying other images
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+POS: Deploying other images
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Image naming follows the format::
 
@@ -1237,9 +1250,9 @@ g. Finally, we need to specify a few more tags that the clients and
               https_proxy =  "http://192.168.97.1:8080",
 
               # Provisioning OS support to boot off PXE on nfs root
-              pos_http_url_prefix = "http://192.168.97.1/ttbd-pos/",
+              pos_http_url_prefix = "http://192.168.97.1/ttbd-pos/%(bsp)s/",
               pos_nfs_server = "192.168.97.1",
-              pos_nfs_path = "/home/ttbd/images/tcf-live",
+              pos_nfs_path = "/home/ttbd/images/tcf-live/%(bsp)s",
               pos_rsync_server = "192.168.97.1::images",
           ),
           ic_type = "ethernet"
@@ -1288,9 +1301,9 @@ All together, it shall look like:
            https_proxy =  "http://192.168.97.1:8080",
 
            # Provisioning OS support to boot off PXE on nfs root
-           pos_http_url_prefix = "http://192.168.97.1/ttbd-pos/",
+           pos_http_url_prefix = "http://192.168.97.1/ttbd-pos/%(bsp)s/",
            pos_nfs_server = "192.168.97.1",
-           pos_nfs_path = "/home/ttbd/images/tcf-live",
+           pos_nfs_path = "/home/ttbd/images/tcf-live/%(bsp)s",
            pos_rsync_server = "192.168.97.1::images",
        ),
        ic_type = "ethernet"
@@ -1317,8 +1330,8 @@ Now the configuration is loaded and you can run::
     ipv4_prefix_len: 24
     ipv6_addr: fc00::61:1
     ipv6_prefix_len: 112
-    pos_http_url_prefix: http://192.168.97.1/ttbd-pos/
-    pos_nfs_path: /home/ttbd/images/tcf-live
+    pos_http_url_prefix: http://192.168.97.1/ttbd-pos/%(bsps)s/
+    pos_nfs_path: /home/ttbd/images/tcf-live/%(bsp)s
     pos_nfs_server: 192.168.97.1
     pos_rsync_server: 192.168.97.1::images
     powered: False
