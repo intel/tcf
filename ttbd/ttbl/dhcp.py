@@ -324,7 +324,7 @@ subnet6 %(if_net)s/%(if_len)s {
         for target_id, target in ttbl.config.targets.iteritems():
             interconnects = target.tags.get('interconnects', {})
             ic = self.target
-            ic.log.error("DEBUG: generating for %s" % target.id)
+
             boot_ic = target.tags.get('pos_boot_interconnect', None)
             if boot_ic == None:
                 ic.log.info('%s: target has no "pos_boot_interconnect" '
