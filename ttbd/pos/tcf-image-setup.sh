@@ -339,40 +339,67 @@ for shadow_file in \
     fi
 done
 
-case $image_type in
-    fedora*|debian*|ubuntu*|clear)
-        # Harcode enable getty on ttyUSB0 (FIXME: maybe do in the
-        # setup script?) -- it doesn't autostart it from /proc/cmdline
-        # because by the time we boot, ttyUSB0 hasb't been detected
-        # yet
-        # ALSO, force 115200 is the only BPS we support
-        sudo sed -i \
-             's|^ExecStart=-/sbin/agetty -o.*|ExecStart=-/sbin/agetty 115200 %I $TERM|' \
-             $destdir/lib/systemd/system/serial-getty@.service
-        info $image_type: force settings of ttyUSB0 console
-        sudo chroot $destdir systemctl enable serial-getty@ttyUSB0
-        info $image_type: force enabling ttyUSB0 console
-        if [ $image_type == clear ]; then
-            # Harcode: disable ANSI script sequences, as they make
-            # scripting way harder
-            sudo sed -i 's/^export PS1=.*/export PS1="\\u@\\H \\w $endchar "/' \
-                 $destdir/usr/share/defaults/etc/profile.d/50-prompt.sh
-            info $image_type: disable ANSI coloring in prompt, makes scripting harder
-        fi
-        ;;
-    yocto)
-        echo 'U0:12345:respawn:/bin/start_getty 115200 ttyUSB0 vt102' |
+#
+# Fixup / harcode serial login consoles
+#
+tty_devs="ttyUSB0 ttyS6 ttyS0 ${TTY_DEVS_EXTRA:-}"
+
+# On new distros, systemd enabled
+if [ -d $destdir/etc/systemd/system/getty.target.wants ]; then
+    # Harcode enable getty on certain devices
+    #
+    # Disable serial-getty@.service's BindTo -- this is needed so
+    # we can have a common image that works in many platforms that
+    # may not have the device without waiting for ever for it as
+    # it won't show up. We caannot override BindTo with # drop in files.
+    #
+    # Why? Because somehow systemd is not being able to auto-detect
+    # all the serial ports given in the console statement to the Linux
+    # kernel command line so we have to hardcode a bunch of console
+    # devices for each platform.
+    #
+    #
+    # This is a workaround until we find out why the kernel consoles
+    # declared in /sys/class/tty/consoles/active are not all being
+    # started or why the kernel is missing to add ttyUSB0 when
+    # given.
+    #
+    # ALSO, force 115200 is the only BPS we support
+    #
+    info $image_type: systemd: hardcoding TTY console settings
+    sudo sed -i \
+         -e 's|^ExecStart=-/sbin/agetty -o.*|ExecStart=-/sbin/agetty 115200 %I $TERM|' \
+         -e 's|^BindsTo=|# <commented out by tcf-image-setup.sh> BindsTo=|' \
+         $destdir/lib/systemd/system/serial-getty@.service
+    for tty_dev in $tty_devs; do
+        info $image_type: force enabling of $tty_dev console
+        sudo chroot $destdir systemctl enable serial-getty@$tty_dev
+    done
+fi
+
+# Old yoctos
+if [ -r $destdir/etc/inittab ]; then
+    for tty_dev in $tty_devs; do
+        echo "U0:12345:respawn:/bin/start_getty 115200 $tty_dev vt102" |
             sudo tee -a $destdir/etc/inittab
-        info $image_type: added ttyUSB0 to automatic console spawn
-        ;;
-esac
+        info $image_type: added $tty_dev to automatic console spawn
+    done
+fi
+
+if [ $image_type == clear ]; then
+    # Harcode: disable ANSI script sequences, as they make
+    # scripting way harder
+    sudo sed -i 's/^export PS1=.*/export PS1="\\u@\\H \\w $endchar "/' \
+         $destdir/usr/share/defaults/etc/profile.d/50-prompt.sh
+    info $image_type: disable ANSI coloring in prompt, makes scripting harder
+fi
 
 case $image_type in
     fedora*)
         # Disable SELinux -- can't figure out how to allow it to work
         # properly in allowing ttyUSB0 access to agetty so we can have
         # a serial console.
-        sudo sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
+        sudo sed -i 's/SELINUX=enforcing/SELINUX=disabled/' $destdir/etc/selinux/config
         info $image_type: disabled SELinux
         ;;
     *)
@@ -394,3 +421,4 @@ EOF
     *)
         ;;
 esac
+
