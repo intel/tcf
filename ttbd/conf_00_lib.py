@@ -1455,6 +1455,29 @@ ttbl.flasher.openocd_c._addrmaps['unneeded'] = dict(
 )
 
 
+ttbl.flasher.openocd_c._boards['disco_l475_iot1'] = dict(
+    addrmap = 'unneeded',	# unneeded
+    targets = [ 'arm' ],
+    target_id_names = { 0: 'stm32f2x.cpu' },
+    write_command = "flash write_image erase %(file)s",
+    # FIXME: until we can set a verify_command that doesn't do
+    # addresses, we can't enable this
+    verify = False,
+    config = """\
+#
+# openocd.cfg configuration from zephyr.git/boards/arm/disco_l475_iot1/support/openocd.cfg
+#
+source [find interface/stlink.cfg]
+
+transport select hla_swd
+hla_serial "%(serial_string)s"
+
+source [find target/stm32l4x.cfg]
+
+reset_config srst_only
+""")
+
+
 ttbl.flasher.openocd_c._boards['nucleo_f103rb'] = dict(
     addrmap = 'unneeded',	# unneeded
     targets = [ 'arm' ],
@@ -1484,6 +1507,7 @@ $_TARGETNAME configure -event gdb-detach {
 }
 """
 )
+
 
 ttbl.flasher.openocd_c._boards['nucleo_f207zg'] = dict(
     addrmap = 'unneeded',	# unneeded
@@ -1517,6 +1541,7 @@ $_TARGETNAME configure -event gdb-detach {
 """
 )
 
+
 ttbl.flasher.openocd_c._boards['nucleo_f429zi'] = dict(
     addrmap = 'unneeded',	# unneeded
     targets = [ 'arm' ],
@@ -1545,6 +1570,7 @@ $_TARGETNAME configure -event gdb-detach {
 """
 )
 
+
 ttbl.flasher.openocd_c._boards['nucleo_f746zg'] = dict(
     addrmap = 'unneeded',	# unneeded
     targets = [ 'arm' ],
@@ -1569,6 +1595,77 @@ $_TARGETNAME configure -event gdb-detach {
 }
 """
 )
+
+
+ttbl.flasher.openocd_c._boards['nucleo_l073rz'] = dict(
+    addrmap = 'unneeded',	# unneeded
+    targets = [ 'arm' ],
+    target_id_names = { 0: 'stm32f2x.cpu' },
+    write_command = "flash write_image erase %(file)s",
+    # FIXME: until we can set a verify_command that doesn't do
+    # addresses, we can't enable this
+    verify = False,
+    config = """\
+#
+# openocd.cfg configuration from zephyr.git/boards/arm/nucleo_l073rz/support/openocd.cfg
+#
+# This is an ST NUCLEO-L073RZ board with single STM32L073RZ chip.
+# http://www.st.com/en/evaluation-tools/nucleo-l073rz.html
+source [find interface/stlink.cfg]
+
+transport select hla_swd
+hla_serial "%(serial_string)s"
+
+set WORKAREASIZE 0x2000
+
+source [find target/stm32l0.cfg]
+
+# Add the second flash bank.
+set _FLASHNAME $_CHIPNAME.flash1
+flash bank $_FLASHNAME stm32lx 0 0 0 0 $_TARGETNAME
+
+# There is only system reset line and JTAG/SWD command can be issued when SRST
+reset_config srst_only
+
+$_TARGETNAME configure -event gdb-attach {
+        echo "Debugger attaching: halting execution"
+        reset halt
+        gdb_breakpoint_override hard
+}
+
+$_TARGETNAME configure -event gdb-detach {
+        echo "Debugger detaching: resuming execution"
+        resume
+}
+""")
+
+
+ttbl.flasher.openocd_c._boards['stm32f3_disco'] = dict(
+    addrmap = 'unneeded',	# unneeded
+    targets = [ 'arm' ],
+    target_id_names = { 0: 'stm32f2x.cpu' },
+    write_command = "flash write_image erase %(file)s",
+    # FIXME: until we can set a verify_command that doesn't do
+    # addresses, we can't enable this
+    verify = False,
+    config = """\
+#
+# openocd.cfg configuration from zephyr.git/boards/arm/stm32f3_disco/support/openocd.cfg
+#
+source [find board/stm32f3discovery.cfg]
+hla_serial "%(serial_string)s"
+
+$_TARGETNAME configure -event gdb-attach {
+        echo "Debugger attaching: halting execution"
+        reset halt
+        gdb_breakpoint_override hard
+}
+
+$_TARGETNAME configure -event gdb-detach {
+        echo "Debugger detaching: resuming execution"
+        resume
+}
+""")
 
 
 def stm32_add(name = None,
@@ -1720,7 +1817,18 @@ def stm32_add(name = None,
 
 
     """
-    if model in ("nucleo_f746zg", ):
+    if model in (
+            "nucleo_f746zg",
+            # OpenOCD complains
+            # Warn : Cannot identify target as a STM32L4 family.
+            # Error: auto_probe failed
+            'disco_l475_iot1',
+            # OpenOCD complains
+            # Error: open failed
+            # in procedure 'init'
+            # in procedure 'ocd_bouncer'
+            'stm32f3_disco',
+    ):
         logging.error("WARNING! %s not configuring as this board is still "
                       "not supported" % name)
         return
