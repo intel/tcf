@@ -1347,7 +1347,8 @@ class tt_power_control_mixin(object):
         power_state = []
         if isinstance(self.pc_impl, tt_power_control_impl):
             powered = self.pc_impl.power_get_do(self)
-            power_state = [(self.pc_impl, powered)]
+            if powered != None:
+                power_state = [(self.pc_impl, powered)]
             self.log.log(8, "power_get()/%s: %s", self.pc_impl, powered)
         elif isinstance(self.pc_impl, list):
             powered = True
@@ -1355,13 +1356,17 @@ class tt_power_control_mixin(object):
                 # If anything is off, then the whole thing is off
                 _powered = impl.power_get_do(self)
                 self.log.log(8, "power_get()[%s]: %s", impl, _powered)
+                if _powered == None:
+                    # fake power units
+                    continue
                 power_state.append((impl, _powered))
                 if _powered == False:
                     powered = False
         else:
             try:
                 powered = self.power_get_do(self)
-                power_state = [(self, powered)]
+                if powered != None:
+                    power_state = [(self, powered)]
                 self.log.log(8, "power_get(): %s", powered)
             except AttributeError as e:
                 raise NotImplementedError("%s" % e)
