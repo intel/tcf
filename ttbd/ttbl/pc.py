@@ -75,6 +75,7 @@ class manual(ttbl.tt_power_control_impl):
         # Tracks the power state of the whole target
         return target.fsdb.get('powered-manual-%s' % self.id) != None
 
+
 class delay(ttbl.tt_power_control_impl):
     """
     Introduce artificial delays when calling on/off/get to allow
@@ -96,9 +97,8 @@ class delay(ttbl.tt_power_control_impl):
         time.sleep(self.off_delay)
 
     def power_get_do(self, target):
-        # This always returns that is powered on, as it is a fake
-        # power controller meant to be used in composition with others.
-        return True
+        # this reports None because this is is just a delay loop
+        return None
 
 
 class delay_til_file_gone(ttbl.tt_power_control_impl):
@@ -151,9 +151,8 @@ class delay_til_file_gone(ttbl.tt_power_control_impl):
                           self, time.time() - t0, self.off_file)
 
     def power_get_do(self, target):
-        # This always returns that is powered on, as it is a fake
-        # power controller meant to be used in composition with others.
-        return True
+        # this reports None because this is is just a delay loop
+        return None
 
 class delay_til_file_appears(ttbl.tt_power_control_impl):
     """
@@ -201,9 +200,9 @@ class delay_til_file_appears(ttbl.tt_power_control_impl):
         pass
 
     def power_get_do(self, target):
-        # This always returns that is powered on, as it is a fake
-        # power controller meant to be used in composition with others.
-        return True
+        # this reports None because this is is just a delay loop
+        return None
+
 
 class delay_til_usb_device(ttbl.tt_power_control_impl):
     """
@@ -362,22 +361,8 @@ class delay_til_usb_device(ttbl.tt_power_control_impl):
             self._is_device_present(target, "power-off")
 
     def power_get_do(self, target):
-        if self.want_connected:
-            try:
-                # We give it some time to determine, in case it is
-                # still stabilizing
-                dev = self._is_device_present(target, "power-get", timeout = 2)
-                return bool(dev)
-            except self.not_found_e:
-                return False
-        else:
-            try:
-                # We give it some time to determine, in case it is
-                # still stabilizing
-                dev = self._is_device_present(target, "power-get", timeout = 2)
-                return not bool(dev)
-            except self.not_found_e:
-                return False
+        # this reports None because this is is just a delay loop
+        return None
 
 
 class dlwps7(ttbl.tt_power_control_impl):
