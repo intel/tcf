@@ -1150,7 +1150,8 @@ def _do_cleanup_released(target, who):
         idle_time = time.time() - target.timestamp_get()
         idle_poweroff = target.tags.get('idle_poweroff',
                                         ttbl.config.target_max_idle)
-        if idle_poweroff and idle_time > idle_poweroff:
+        if idle_poweroff and target.power_rail_get_any \
+           and idle_time > idle_poweroff:
             target.log.info("powering off, idle for %.2fs (max %s)",
                             idle_time, idle_poweroff)
             target.power_off(who)
