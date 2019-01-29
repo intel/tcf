@@ -7,6 +7,7 @@
 
 import copy
 import errno
+import logging
 import os
 import random
 import re
@@ -1719,6 +1720,11 @@ def stm32_add(name = None,
 
 
     """
+    if model in ("nucleo_f746zg", ):
+        logging.error("WARNING! %s not configuring as this board is still "
+                      "not supported" % name)
+        return
+
     if serial_port == None:
         serial_port = "/dev/tty-" + name
 
@@ -1770,6 +1776,8 @@ def stm32_add(name = None,
             'power_cycle_wait': 0.5,
         },
         target_type = model)
+    # We still don't have the nucleos fully supported
+    ttbl.config.targets[name].disable('')
 
 
 def nucleo_add(name = None,
