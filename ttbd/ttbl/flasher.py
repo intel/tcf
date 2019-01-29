@@ -794,7 +794,7 @@ source [find board/snps_em_sk.cfg]
         #: its own code.
         #:
         #: (bool, default False)
-        self.hack_reset_halt_after_init = False
+        self.hack_reset_halt_after_init = 0
         #: Inmediately after running the OpenOCD initialization
         #: sequence, reset the board.
         #:
@@ -802,7 +802,7 @@ source [find board/snps_em_sk.cfg]
         #: start properly OpenOCD unless this is done.
         #:
         #: (bool, default False)
-        self.hack_reset_after_init = False
+        self.hack_reset_after_init = 0
 
     def _test_target_link(self, tt):
         if self.serial:
@@ -924,17 +924,48 @@ source [find board/snps_em_sk.cfg]
                 with self._expect_mgr():
                     self.__send_command(
                         "init command JTAG (%d/%d)" % (count + 1, top), "init")
+
                     if self.board.get("hack_reset_after_power_on", False) \
                        and self.hack_reset_after_power_on:
                         # This board needs this hack because we are
                         # power cycling to flash
                         self._power_on_reset_hack(count, top)
-                    if self.board.get("hack_reset_after_init", False) \
-                       or self.hack_reset_after_init:
-                        self.__target_reset("for reset after init")
-                    if self.board.get("hack_reset_halt_after_init", False) \
-                       or self.hack_reset_halt_after_init:
-                        self.__target_reset_halt("for reset/halt after init")
+
+                    hack_reset_after_init = self.board.get(
+                        "hack_reset_after_init", self.hack_reset_after_init)
+                    for cnt in range(hack_reset_after_init):
+                        try:
+                            self.__target_reset(
+                                "for reset after init [%d/%d]"
+                                % (cnt + 1, hack_reset_after_init))
+                            break
+                        except self.error as e:
+                            if cnt >= hack_reset_after_init:
+                                raise
+                            logging.error(
+                                "[%d/%d: error resetting, retrying: %s",
+                                cnt, hack_reset_after_init, e)
+                    else:
+                        assert False	# Should never get here
+
+                    hack_reset_halt_after_init = self.board.get(
+                        "hack_reset_halt_after_init",
+                        self.hack_reset_halt_after_init)
+                    for cnt in range(hack_reset_halt_after_init):
+                        try:
+                            self.__target_reset_halt(
+                                "for reset/halt after init [%d/%d]"
+                                % (cnt + 1, hack_reset_halt_after_init))
+                            break
+                        except self.error as e:
+                            if cnt >= hack_reset_halt_after_init:
+                                raise
+                            logging.error(
+                                "[%d/%d: error reset halting, retrying: %s",
+                                cnt, hack_reset_halt_after_init, e)
+                    else:
+                        assert False	# Should never get here
+
                     r = self.__send_command(
                         "init verification JTAG (%d/%d)" % (count + 1, top),
                         "targets",
@@ -1200,10 +1231,10 @@ source [find board/snps_em_sk.cfg]
                     self.addrmap[target].get('target_id', None),
                     for_what)
 
-    def __target_reset_halt(self, for_what = ""):
+    def __target_reset_halt(self, for_what = "", command = "reset halt"):
         # this assumes we are inside a 'with self._expect_mgr():' block
         self.log.action = "target reset halt init"
-        command = self.board.get('reset_halt_command', "reset halt")
+        command = self.board.get('reset_halt_command', command)
         r = self.__send_command(
             "target reset/halt %s" % for_what,
             command,
