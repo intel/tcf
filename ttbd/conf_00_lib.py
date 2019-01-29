@@ -1459,7 +1459,6 @@ ttbl.flasher.openocd_c._boards['nucleo_f103rb'] = dict(
     targets = [ 'arm' ],
     target_id_names = { 0: 'stm32f2x.cpu' },
     write_command = "flash write_image erase %(file)s",
-    hack_reset_halt_after_init = True,
     # FIXME: until we can set a verify_command that doesn't do
     # addresses, we can't enable this
     verify = False,
@@ -1469,6 +1468,8 @@ ttbl.flasher.openocd_c._boards['nucleo_f103rb'] = dict(
 #
 source [find board/st_nucleo_f103rb.cfg]
 hla_serial "%(serial_string)s"
+# From https://sourceforge.net/p/openocd/tickets/178/, makes reset work ok
+reset_config srst_only connect_assert_srst
 
 $_TARGETNAME configure -event gdb-attach {
         echo "Debugger attaching: halting execution"
@@ -1488,8 +1489,6 @@ ttbl.flasher.openocd_c._boards['nucleo_f207zg'] = dict(
     targets = [ 'arm' ],
     target_id_names = { 0: 'stm32f2x.cpu' },
     write_command = "flash write_image erase %(file)s",
-    hack_reset_after_init = True,
-    hack_reset_halt_after_init = True,
     # FIXME: until we can set a verify_command that doesn't do
     # addresses, we can't enable this
     verify = False,
@@ -1500,6 +1499,8 @@ ttbl.flasher.openocd_c._boards['nucleo_f207zg'] = dict(
 source [find interface/stlink-v2-1.cfg]
 hla_serial "%(serial_string)s"
 source [find target/stm32f2x.cfg]
+# From https://sourceforge.net/p/openocd/tickets/178/, makes reset work ok
+reset_config srst_only connect_assert_srst
 
 $_TARGETNAME configure -event gdb-attach {
         echo "Debugger attaching: halting execution"
@@ -1742,14 +1743,14 @@ def stm32_add(name = None,
                 # delay until device comes up
                 ttbl.pc.delay_til_usb_device(
                     serial_number,
-                    poll_period = 5,
+                    poll_period = 1,
                     timeout = 30,
                     action = pc_board.power_cycle_raw,
                     # must be a sequence!
                     action_args = (4,)
                 ),
                 ttbl.pc.delay_til_file_appears(	# Serial port comes up
-                    serial_port, poll_period = 4, timeout = 25,
+                    serial_port, poll_period = 1, timeout = 25,
                 ),
                 ttbl.cm_serial.pc(),	# Connect serial ports
                 flasher,            	# Start / stop OpenOCD
@@ -1766,6 +1767,7 @@ def stm32_add(name = None,
                              soc = "stm32",
                              console = ""),
             },
+            'power_cycle_wait': 0.5,
         },
         target_type = model)
 
