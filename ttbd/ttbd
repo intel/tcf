@@ -1144,7 +1144,7 @@ def target_acquired(target, who):
 def _do_cleanup_released(target, who):
     if not hasattr(target, "power_off"):	# Only with power control
         return
-    if not target.power_get():		# Is it off? pass
+    if not target.power_rail_get_any():		# Is it off? pass
         return
     with target_acquired(target, who):	# Acquire, check idleness
         idle_time = time.time() - target.timestamp_get()

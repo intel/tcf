@@ -1336,35 +1336,58 @@ class tt_power_control_mixin(object):
     # state) tuples
     power_state = []
 
-    def power_get(self):
+    def power_rail_get(self):
+        """
+        Return the state of each item of the power rail which powers
+        this target.
+
+        :returns list(bool): list of power states for the power rail
+          that powers this target.
+        """
+        power_state = []
         if isinstance(self.pc_impl, tt_power_control_impl):
             powered = self.pc_impl.power_get_do(self)
-            self.power_state = [(self.pc_impl, powered)]
+            power_state = [(self.pc_impl, powered)]
             self.log.log(8, "power_get()/%s: %s", self.pc_impl, powered)
         elif isinstance(self.pc_impl, list):
             powered = True
-            self.power_state = []
             for impl in self.pc_impl:
                 # If anything is off, then the whole thing is off
                 _powered = impl.power_get_do(self)
                 self.log.log(8, "power_get()[%s]: %s", impl, _powered)
-                self.power_state.append((impl, _powered))
+                power_state.append((impl, _powered))
                 if _powered == False:
                     powered = False
-                    break
         else:
             try:
                 powered = self.power_get_do(self)
-                self.power_state = [(self, powered)]
+                power_state = [(self, powered)]
                 self.log.log(8, "power_get(): %s", powered)
             except AttributeError as e:
                 raise NotImplementedError("%s" % e)
         # Update the cache
-        if powered == True:
+        if all(entry[1] for entry in power_state):
             self.fsdb.set('powered', "On")
         else:
             self.fsdb.set('powered', None)
-        return powered
+        self.power_state = power_state
+        return power_state
+
+    def power_rail_get_any(self):
+        """
+        Return *True* if any power rail element is on, *False* otherwise.
+        """
+        power_states = self.power_rail_get()
+        return any(entry[1] for entry in power_states)
+
+    def power_get(self):
+        """
+        Return *True* if all power rail elements are turned on and
+        thus the target is on, *False* otherwise.
+        """
+        states = self.power_rail_get()
+        # we are only ON if all states are ON
+        return all(entry[1] for entry in states)
 
 
 class test_target_console_mixin(object):
