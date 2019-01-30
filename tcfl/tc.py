@@ -4389,14 +4389,40 @@ class tc_c(object):
                                  dlevel = -10)
             self.target_event.set()
 
-    def _targets_active(self):
+    def targets_active(self, *skip_targets):
         """
         Mark each target this testcase use as being used
+
+        This is to be called when operations are being done on the
+        background that the daemon can't see and thus consider the
+        target active (e.g.: you are copying a big file over SSH)
+
+        >>> class mytest(tcfl.tc.tc_c):
+        >>>     ...
+        >>>     def eval_some(self):
+        >>>         ...
+        >>>         self.targets_active()
+        >>>         ...
+
+        If any target is to be skipped, they can be passed as arguments:
+
+        >>> @tcfl.tc.interconnect()
+        >>> @tcfl.tc.target()
+        >>> @tcfl.tc.target()
+        >>> class mytest(tcfl.tc.tc_c):
+        >>>     ...
+        >>>     def eval_some(self, target):
+        >>>         ...
+        >>>         self.targets_active(target)
+        >>>         ...
         """
-        # FIXME: parallelize?
         for target in self.targets.values():
-            if target.keep_active:
+            if not target in skip_targets and target.keep_active:
                 target.active()
+
+    def _targets_active(self):
+        # backwards compat
+        self.targets_active()
 
     #
     # Remote target selection
