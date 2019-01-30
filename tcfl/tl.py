@@ -219,3 +219,14 @@ def linux_os_release_get(target, prefix = ""):
     for match in matches:
         os_release[match[0]] = match[1]
     return os_release
+
+def linux_ssh_root_nopwd(target, prefix = ""):
+    """
+    Configure a SSH deamon to allow login as root with no passwords
+    """
+    target.shell.run("""\
+mkdir -p %s/etc/ssh
+cat <<EOF >> %s/etc/ssh/sshd_config
+PermitRootLogin yes
+PermitEmptyPasswords yes
+EOF""" % (prefix, prefix))

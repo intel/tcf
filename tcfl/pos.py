@@ -1294,3 +1294,6 @@ def deploy_linux_kernel(ic, target, _kws):
                  "/lib/modules")
     target.testcase._targets_active()
     target.report_pass("linux kernel transferred")
+
+def deploy_linux_ssh_root_nopwd(_ic, target, _kws):
+    tcfl.tl.linux_ssh_root_nopwd(target, "/mnt")
