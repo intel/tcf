@@ -17,47 +17,94 @@ import subprocess
 import time
 
 import commonl
-import tcfl
 import tcfl.tc
+import tcfl.tl
+import tcfl.pos
 
-# Want an interconnect that supports IPv4 (so we test for it having
-# any IP address assigned)
+image = os.environ.get("IMAGE", "clear")
+
 @tcfl.tc.interconnect("ipv4_addr")
-@tcfl.tc.target("linux", name = "linux")
-@tcfl.tc.tags(ignore_example = True)
+@tcfl.tc.target('pos_capable', mode = 'any')
 class _test(tcfl.tc.tc_c):
-    """A linux target (or any target that declares itself as an SSH
-    client with a tag *ssh_client* can be accessed via SSH via the SSH
-    extension.
     """
-    def __init__(self, *args):
-        tcfl.tc.tc_c.__init__(self, *args)
-        self.ts = None
+    Example test using different SSH calls with the SSH extension on a
+    PC target that is provisioned to a Linux OS (Clear, by default)
+    """
+    def deploy(self, ic, target):
+        # ensure network, DHCP, TFTP, etc are up and deploy
+        ic.power.on()
+        ic.report_pass("powered on")
 
-    @staticmethod
-    def start(ic, linux):
-        ic.power.cycle()
-        linux.power.cycle()
+        target.power.on()
 
-    def eval_01_linux_up(self, linux):
-        linux.shell.up()
+        _image = tcfl.pos.deploy_image(
+            ic, target, image,
+            extra_deploy_fns = [
+                # Config SSH to allow login as root with no password
+                tcfl.pos.deploy_linux_ssh_root_nopwd
+            ])
+        target.report_info("Deployed %s" % _image)
 
-        # There has to be an interface that IS NOT loopback that has
-        # UP and LOWER_UP enabled (connected, online)
-        linux.shell.run('ip link show', "BROADCAST,MULTICAST,UP,LOWER_UP")
-        linux.expect(re.compile(r"[0-9]+ \$ "))
+    def setup(self, ic, target):
+        # Tell the tunnelling system which IP address to use
+        # Note the client running this can't connect directly to the
+        # DUT because the DUT is connected to an isolated
+        # NUT. However, the server is connceted to the NUT and can
+        # bridge us. With this we tell the tunneling system which ip
+        # address to use.
+        target.tunnel.ip_addr = target.addr_get(ic, "ipv4")
 
-    def eval_02(self, ic, linux):
+    def start(self, target):
+        target.power.cycle()
+        target.expect("login")
+        target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+        target.shell.up(user = "root")
+
+    def eval_00_run_ssh_commands(self, target):
+        #
+        # Run commands over SSH
+        #
+        # https://zerobot2.ostc.intel.com/job/TCF-master/lastSuccessfulBuild/artifact/html/doc/09-api.html?highlight=ssh#tcfl.target_ext_ssh.ssh.check_output
+        #target.ssh._ssh_cmdline_options.append("-v")	# DEBUG login problems
+        output = target.ssh.check_output("echo hello")
+        assert 'hello' in output
+
+        # Alternative way to do it https://zerobot2.ostc.intel.com/job/TCF-master/lastSuccessfulBuild/artifact/html/doc/04-HOWTOs.html?highlight=ssh#linux-targets-ssh-login-from-a-testcase-client
+        # by hand
+
+        # create a tunnel from server_name:server_port -> to target:22
+        server_name = target.rtb.parsed_url.hostname
+        server_port = target.tunnel.add(22)
+        output = subprocess.check_output(
+            "/usr/bin/ssh -p %d root@%s echo hello"
+            % (server_port, server_name),
+            shell = True)
+        # this is done behind the doors of TCF, it doesn't know that
+        # it was run, so report about it
+        target.report_info("Ran SSH: %s" % output)
+        assert 'hello' in output
+
+    def eval_02_call(self, target):
         self.ts = "%f" % time.time()
-        linux.tunnel.ip_addr = linux.addr_get(ic, "ipv4")
-        linux.ssh.check_output("echo -n %s > somefile" % self.ts)
+        if target.ssh.call("true"):
+            self.report_pass("true over SSH passed")
+        if not target.ssh.call("false"):
+            self.report_pass("false over SSH passed")
+
+    def eval_03_check_output(self, target):
+        self.ts = "%f" % time.time()
+        target.ssh.check_output("echo -n %s > somefile" % self.ts)
         self.report_pass("created a file with SSH command")
 
-    def eval_03(self, linux):
-        linux.ssh.copy_from("somefile", self.tmpdir)
+    def eval_04_check_output(self, target):
+        output = target.ssh.check_output("dmidecode -t system | grep UUID")
+        self.report_pass("SSH check_output returns: %s" % output.strip())
+
+    def eval_05_copy_from(self, target):
+        target.ssh.copy_from("somefile", self.tmpdir)
         with open(os.path.join(self.tmpdir, "somefile")) as f:
             read_ts = f.read()
-            linux.report_info("read ts is %s, gen is %s" % (read_ts, self.ts))
+            target.report_info("read ts is %s, gen is %s" % (read_ts, self.ts))
             if read_ts != self.ts:
                 raise tcfl.tc.failed_e(
                     "The timestamp read from the file we copied from "
@@ -65,11 +112,11 @@ class _test(tcfl.tc.tc_c):
                     % (read_ts, self.ts))
         self.report_pass("File created with SSH command copied back ok")
 
-    def eval_04(self, linux):
-        linux.ssh.copy_to(__file__)
+    def eval_06_copy_to(self, target):
+        target.ssh.copy_to(__file__)
         base_file = os.path.basename(__file__)
         copied_file = os.path.join(self.tmpdir, base_file)
-        linux.ssh.copy_from(base_file, copied_file)
+        target.ssh.copy_from(base_file, copied_file)
 
         orig_hash = commonl.hash_file(hashlib.sha256(), __file__)
         copied_hash = commonl.hash_file(hashlib.sha256(), copied_file)
@@ -78,23 +125,22 @@ class _test(tcfl.tc.tc_c):
         self.report_pass("Bigger file copied around is identical")
 
 
-    def eval_04_tree_copy(self, linux):
-        dirname = os.path.dirname(__file__)
-        copied_subdir = os.path.join(self.tmpdir, "subdir")
+    def eval_07_tree_copy(self, target):
+        dirname = self.kws['srcdir']
+        copied_subdir = self.kws['tmpdir'] + "/dest"
 
         # Copy a tree to remote, then copy it back
-        linux.ssh.copy_to(dirname, "subdir", recursive = True)
-        linux.ssh.copy_from("subdir", copied_subdir, recursive = True)
+        target.shell.run("rm -rf subdir")
+        target.ssh.copy_to(dirname, "subdir", recursive = True)
+        target.ssh.copy_from("subdir", copied_subdir, recursive = True)
 
         # Generate MD5 signatures of the python files in the same order
-        local_md5 = subprocess.check_output(
-            r"find %s -type f -iname \*.py | sort | xargs cat | md5sum"
-            % dirname,
-            shell = True).strip()
-        copied_md5 = subprocess.check_output(
-            r"find %s -type f -iname \*.py | sort | xargs cat | md5sum"
-            % copied_subdir,
-            shell = True).strip()
+        local_md5 = self.shcmd_local(
+            r"find %(srcdir)s -type f -iname \*.py"
+            " | sort | xargs cat | md5sum").strip()
+        copied_md5 = self.shcmd_local(
+            r"find %(tmpdir)s/dest -type f -iname \*.py"
+            " | sort | xargs cat | md5sum").strip()
 
         self.report_info("local_md5 %s" % local_md5, dlevel = 1)
         self.report_info("copied_md5 %s" % copied_md5, dlevel = 1)
@@ -102,19 +148,8 @@ class _test(tcfl.tc.tc_c):
         if local_md5 != copied_md5:
             raise tcfl.tc.failed_e("local and copied MD5s differ")
 
-        self.report_pass("Tree copy passed")
+        self.report_pass("tree copy passed")
 
-    def teardown_dump_console(self):
-        if not self.result_eval.failed and not self.result_eval.blocked:
-            return
-        for target in self.targets.values():
-            if not hasattr(target, "console"):
-                continue
-            if self.result_eval.failed:
-                reporter = target.report_fail
-                reporter("console dump due to failure")
-            else:
-                reporter = target.report_blck
-                reporter("console dump due to blockage")
-            for line in target.console.read().split('\n'):
-                reporter("console: " + line.strip())
+
+    def teardown(self):
+        tcfl.tl.console_dump_on_failure(self)
