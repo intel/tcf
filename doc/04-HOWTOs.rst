@@ -1309,8 +1309,10 @@ redirection, adding to your script:
            server_port = target.tunnel.add(22)
 
            # use SSH to get the content's of the target's /etc/passwd
-           output = subprocess.check_output("ssh -p %d root@%s cat /etc/passwd"
-                                            % (server_port, server_name))
+           output = subprocess.check_output(
+                        "ssh -p %d root@%s cat /etc/passwd"
+                        % (server_port, server_name),
+                        shell = True)
 
 Tunnels can also be created with the command line::
 
@@ -1358,7 +1360,7 @@ POS: booting from HTTP or TFTP
 
 When a target is given a syslinux configuration file to boot from, the
 places where it loads the Provisioning OS kernels can be forced with
-:ref:`pos_http_url_prefix`.
+:ref:`pos_http_url_prefix <pos_http_url_prefix>`.
 
 By default (no prefix) the boot loader will tend to load with
 TFTP. But by specifying an HTTP or FTP URL prefix, it can boot over
@@ -1495,6 +1497,8 @@ or from the console::
   Removing password for user root.
   passwd: Success
 
+.. _linux_ssh_no_root_password:
+
 Linux targets: allowing SSH as root with no passwords
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -1518,6 +1522,42 @@ To allow login in with SSH, add to your test script:
    PermitEmptyPasswords yes
    EOF""")
            target.shell.run("systemctl restart sshd")
+
+or using the :func:`library function tcfl.tl.linux_ssh_root_nopwd
+<tcfl.tl.linux_ssh_root_nopwd>`:
+
+.. code-block:: python
+
+   import tcfl.tl
+   ...
+   @tcfl.tc.interconnect("ipv4_addr")
+   @tcfl.tc.target("linux")
+   class some_test(tcfl.tc.tc_c):
+
+       # ensure target is powered up and the script is logged in
+       def eval_something(self, ic, target):
+           ...
+           tcfl.tl.linux_ssh_root_nopwd(target)
+           ...
+           target.shell.run("systemctl restart sshd")
+
+or even having that done in deployment time when flashing with POS:
+
+.. code-block:: python
+
+   @tcfl.tc.interconnect("ipv4_addr")
+   @tcfl.tc.target('pos_capable', mode = 'any')
+   class _test(tcfl.tc.tc_c):
+
+       def deploy(self, ic, target):
+           # ensure network, DHCP, TFTP, etc are up and deploy
+           ic.power.on()
+           ic.report_pass("powered on")
+
+           image = tcfl.pos.deploy_image(
+               ic, target, "clear",
+               extra_deploy_fns = [ tcfl.pos.deploy_linux_ssh_root_nopwd ])
+
 
 or from the shell::
 
@@ -1551,7 +1591,7 @@ that take a *timeout* parameter that has to be less than
   and :func:`target.on_console_rx_cm <tcfl.tc.target_c.on_console_rx_cm>`
 - :func:`target.wait <tcfl.tc.target_c.wait>`
 - :func:`target.expect <tcfl.tc.target_c.expect>`
-  
+
 .. _finding_testcase_metadata:
 
 Finding testcase's keywords / metadata available for templating
@@ -1814,7 +1854,7 @@ most default output files will be placed, including:
 this defaults to the directory where *tcf run* was invoked from.
 
 .. _general_catchas:
-   
+
 General catchas
 ===============
 
