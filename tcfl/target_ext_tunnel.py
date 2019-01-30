@@ -88,6 +88,9 @@ class tunnel(tc.target_extension_c):
 
         r = target.rtb.rest_tb_target_ip_tunnel_add(
             target.rt, ip_addr, port, proto, ticket = target.ticket)
+        self.target.report_info("%s tunnel added from %s:%d to %s:%d"
+                                % (proto, target.rtb.parsed_url.hostname, r,
+                                   ip_addr, port))
         return r
 
     def remove(self, port, ip_addr = None, proto = None):
