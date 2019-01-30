@@ -3901,7 +3901,8 @@ class tc_c(object):
                 reporter.report_pass("%spassed: '%s' @%s"
                                      % (phase, cmd, origin),
                                      { output_tag: logf })
-                return
+                logf.seek(0,0)
+                return logf.read()
             elif rc == 127:
                 raise blocked_e("exit code %d from '%s' @%s" \
                                 % (rc, cmd, origin),
