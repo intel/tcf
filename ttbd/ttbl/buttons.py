@@ -164,13 +164,13 @@ class interface(ttbl.tt_interface):
                 raise RuntimeError("missing sequence arguments")
             sequence = json.loads(args['sequence'])
             target.buttons.sequence(who, target, sequence)
-            return {}
+            r = {}
         elif method == "GET" and call == "get":
             r = target.buttons.get(target)
         else:
             raise RuntimeError("%s|%s: unsuported" % (method, call))
         target.timestamp()	# If this works, it is acquired and locked
-            
+        return r
 
 def _check_iface(target):
     buttons_iface = getattr(target, "buttons", None)
