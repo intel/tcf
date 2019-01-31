@@ -285,6 +285,15 @@ class delay_til_usb_device(ttbl.tt_power_control_impl):
                            d.idVendor, d.idProduct, d.bus, d.address, e,
                            traceback.format_exc())
 
+    def _find_device(self):
+        # We do not cache the backend [commented out code], as
+        # it (somehow) makes it miss the device we are looking
+        # for; talk about butterfly effect at a local level --
+        # might be a USB library version issue?
+        return usb.core.find(find_all = False,
+                             #backend = type(self).backend,
+                             custom_match = self._usb_match_on_serial)
+
     def _is_device_present(self, target, action, timeout = None):
         if timeout == None:
             timeout = self.timeout
@@ -309,10 +318,7 @@ class delay_til_usb_device(ttbl.tt_power_control_impl):
                 # it (somehow) makes it miss the device we are looking
                 # for; talk about butterfly effect at a local level --
                 # might be a USB library version issue?
-                dev = usb.core.find(
-                    find_all = False,
-                    #backend = type(self).backend,
-                    custom_match = self._usb_match_on_serial)
+                dev = self._find_device()
                 if dev == None:
                     self.log.log(8, "USB [%s]: NOT FOUND", self.serial)
                     if not self.want_connected:
@@ -353,16 +359,31 @@ class delay_til_usb_device(ttbl.tt_power_control_impl):
         return dev
 
     def power_on_do(self, target):
+        self.log = target.log	# for _usb_match_on_serial
         if self.when_powering_on:
             self._is_device_present(target, "power-on")
 
     def power_off_do(self, target):
+        self.log = target.log	# for _usb_match_on_serial
         if not self.when_powering_on:
             self._is_device_present(target, "power-off")
 
     def power_get_do(self, target):
-        # this reports None because this is is just a delay loop
-        return None
+        # Return if the USB device is connected
+        #
+        # Why? because for some targets, we can only tell if they are
+        # connected by seeing a USB device plugged to the system. For
+        # example, a USB connected Android target which we power
+        # on/off by tweaking the buttons so there is no PDU to act upon.
+        self.log = target.log	# for _usb_match_on_serial
+        try:
+            dev = self._find_device()
+            # if we find a device, it is connected, we are On
+            return dev != None
+        except usb.core.USBError as e:
+            target.log.warning("can't tell if USB device `%s` is connected: %s"
+                               % (self.serial, e))
+            return False
 
 
 class dlwps7(ttbl.tt_power_control_impl):
