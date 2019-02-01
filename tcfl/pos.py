@@ -525,10 +525,10 @@ def efibootmgr_setup(target):
         target.shell.run("efibootmgr -n " + lbm)
 
 
-def boot_config(target, root_part_dev, image,
-                linux_kernel_file = None,
-                linux_initrd_file = None,
-                linux_options = None):
+def boot_config_uefi(target, root_part_dev, image,
+                     linux_kernel_file = None,
+                     linux_initrd_file = None,
+                     linux_options = None):
     boot_dev = target.kws['pos_boot_dev']
     # were we have mounted the root partition
     root_dir = "/mnt"
@@ -933,6 +933,250 @@ def _root_part_select(target, image, boot_dev, root_part_dev):
                            % (root_part_dev, seed, score, seed), dlevel = 2)
     return root_part_dev
 
+pos_boot_config = dict(
+    uefi = boot_config_uefi
+)
+
+def _deploy_image_boot_dev(target, boot_dev):
+    # What is our boot device?
+    if boot_dev:
+        assert isinstance(boot_dev, basestring), 'boot_dev must be a string'
+        target.report_info("POS: boot device %s (from arguments)"
+                           % boot_dev, dlevel = 3)
+    else:
+        boot_dev = target.kws.get('pos_boot_dev', None)
+        if boot_dev == None:
+            raise tcfl.tc.blocked_e(
+                "Can't guess boot_dev (no `pos_boot_dev` tag available)",
+                { 'target': target } )
+        target.report_info("POS: boot device %s (from pos_boot_dev tag)"
+                           % boot_dev)
+    boot_dev = "/dev/" + boot_dev
+    # HACK: /dev/[hs]d* do partitions as /dev/[hs]dN, where as mmc and
+    # friends add /dev/mmcWHATEVERpN. Seriously...
+    if boot_dev.startswith("/dev/hd") \
+       or boot_dev.startswith("/dev/sd") \
+       or boot_dev.startswith("/dev/vd"):
+        target.kw_set('p_prefix', "")
+    else:
+        target.kw_set('p_prefix', "p")
+    return boot_dev
+
+# FIXME: what I don't like about this is that we have no info on the
+# interconnect -- this must require it?
+def target_power_cycle_to_pos_pxe(target):
+    target.report_info("Setting target to PXE boot Provisioning OS")
+    target.property_set("pos_mode", "pxe")
+    target.power.cycle()
+
+pos_modes = dict(
+    pxe = target_power_cycle_to_pos_pxe
+)
+
+def target_boot_to_pos(target, pos_prompt = None,
+                       # plenty to boot to an nfsroot, hopefully
+                       timeout = 60,
+                       target_power_cycle_to_pos = None):
+    if target_power_cycle_to_pos == None:
+        # FIXME: make the target declare the pos_mode it supports in pos_capable
+        target_power_cycle_to_pos = pos_modes['pxe']
+
+    for tries in range(3):
+        target.report_info("rebooting into POS for flashing [%d/3]" % tries)
+        target_power_cycle_to_pos(target)
+
+        # Sequence for TCF-live based on Fedora
+        if pos_prompt:
+            target.shell.linux_shell_prompt_regex = pos_prompt
+        try:
+            target.shell.up(timeout = timeout)
+        except tcfl.tc.error_e as e:
+            outputf = e.attachments_get().get('console output', None)
+            if outputf:
+                output = open(outputf.name).read()
+            if output == None or output == "" or output == "\x00":
+                target.report_error("POS: no console output, retrying")
+                continue
+            # sometimes the BIOS has been set to boot local directly,
+            # so we might as well retry
+            target.report_error("POS: unexpected console output, retrying")
+            continue
+        break
+    else:
+        raise tcfl.tc.blocked_e(
+            "POS: tried too many times to boot, without signs of life",
+            { "console output": target.console.read(), 'target': target })
+
+
+def target_partition(target, image,
+                     boot_dev = None, root_part_dev = None,
+                     partitioning_fn = partition):
+    # Ok, we might be accessing the target here to repartition and
+    # such, so let's first select a root partition
+    if target.property_get('pos_repartition'):
+        # Need to reinit the partition table (we were told to by
+        # setting pos_repartition to anything
+        target.report_info("POS: repartitioning per pos_repartition property")
+        partitioning_fn(target, boot_dev)
+        target.property_set('pos_repartition', None)
+
+    if root_part_dev == None:
+        for tries in range(3):
+            target.report_info("POS: guessing partition device [%d/3] "
+                               "(defaulting to %s)" % (tries, root_part_dev))
+            root_part_dev = _root_part_select(target, image,
+                                              boot_dev, root_part_dev)
+            if root_part_dev != None:
+                target.report_info("POS: will use %s for root partition"
+                                   % root_part_dev)
+                break
+            # we couldn't find a root partition device, which means the
+            # thing is trashed
+            target.report_info("POS: repartitioning because couldn't find "
+                               "root partitions")
+            partitioning_fn(target, boot_dev)
+        else:
+            output = target.shell.run("fdisk -l " + boot_dev, output = True)
+            raise tcfl.tc.blocked_e(
+                "Tried too much to reinitialize the partition table to "
+                "pick up a root partition? is there enough space to "
+                "create root partitions?",
+                dict(target = target, fdisk_l = output,
+                     partsizes = target.kws.get('pos_partsizes', None)))
+    return root_part_dev
+
+def _target_mount_rootfs(kws, target, boot_dev, root_part_dev,
+                         partitioning_fn, mkfs_cmd):
+    # FIXME: act on failing, just reformat and retry, then
+    # bail out on failure
+    for try_count in range(3):
+        target.report_info("POS: mounting root partition %s onto /mnt "
+                           "to image [%d/3]" % (root_part_dev, try_count))
+        # don't let it fail or it will raise an exception, so we
+        # print FAILED in that case to look for stuff; note the
+        # double apostrophe trick so the regex finder doens't trip
+        # on the command
+        output = target.shell.run(
+            "mount %(root_part_dev)s /mnt || echo FAI''LED" % kws,
+            output = True)
+        # What did we get?
+        if 'FAILED' in output:
+            if 'mount: /mnt: special device ' + root_part_dev \
+               + ' does not exist.' in output:
+                partitioning_fn(target, boot_dev)
+            elif 'mount: /mnt: wrong fs type, bad option, ' \
+               'bad superblock on ' + root_part_dev + ', missing ' \
+               'codepage or helper program, or other error.' in output:
+                # ok, this means probably the partitions are not
+                # formatted; FIXME: support other filesystemmakeing?
+                target.report_info(
+                    "POS: formating root partition %s with `%s`"
+                    % (root_part_dev, mkfs_cmd % kws))
+                target.shell.run(mkfs_cmd % kws)
+            else:
+                raise tcfl.tc.blocked_e(
+                    "POS: Can't recover unknown error condition: %s"
+                    % output, dict(target = target, output = output))
+        else:
+            target.report_info("POS: mounted %s onto /mnt to image"
+                               % root_part_dev)
+            break	# it worked, we are done
+        # fall through, retry
+    else:
+        raise tcfl.tc.blocked_e(
+            "POS: Tried to mount too many times and failed",
+            dict(target = target))
+
+
+def _deploy_image(ic, target, image,
+                  boot_dev = None, root_part_dev = None,
+                  partitioning_fn = partition,
+                  extra_deploy_fns = None,
+                  # mkfs has to have -F to avoid it asking questions
+                  mkfs_cmd = "mkfs.ext4 -Fj %(root_part_dev)s",
+                  # When flushing to USB drives, it can be slow
+                  timeout_sync = 240,
+                  boot_config = None):
+    testcase = target.testcase
+
+    root_part_dev_base = os.path.basename(root_part_dev)
+    kws = dict(
+        rsync_server = ic.kws['pos_rsync_server'],
+        image = image,
+        boot_dev = boot_dev,
+        root_part_dev = root_part_dev,
+        root_part_dev_base = root_part_dev_base,
+    )
+    kws.update(target.kws)
+
+    # FIXME: verify root partitioning is the right one and recover if
+    # not
+    original_timeout = testcase.tls.expecter.timeout
+    try:
+        testcase.tls.expecter.timeout = 800
+        _target_mount_rootfs(kws, target, boot_dev, root_part_dev,
+                             partitioning_fn, mkfs_cmd)
+
+        image_list_output = target.shell.run(
+            "rsync %(rsync_server)s/" % kws, output = True)
+        images_available = image_list_from_rsync_output(
+            image_list_output)
+        # Do we have that image? autocomplete missing fields
+        # and get us a good match if so
+        image_final = image_select_best(image, images_available,
+                                        target.bsp_model)
+        kws['image'] = ":".join(image_final)
+        target.report_info("POS: rsyncing %(image)s from "
+                           "%(rsync_server)s to /mnt" % kws, dlevel = -1)
+
+        target.shell.run("time rsync -aAX --numeric-ids --delete "
+                         "--exclude='/persistent.tcf.d/*' "
+                         "%(rsync_server)s/%(image)s/. /mnt/." % kws)
+        target.property_set('pos_root_' + root_part_dev_base, image)
+        target.report_info("POS: rsynced %(image)s from "
+                           "%(rsync_server)s to /mnt" % kws)
+
+        # did the user provide an extra function to deploy stuff?
+        if extra_deploy_fns:
+            target_rsyncd_start(ic, target)
+            for extra_deploy_fn in extra_deploy_fns:
+                target.report_info("POS: running extra deploy fn %s"
+                                   % extra_deploy_fn, dlevel = 2)
+                extra_deploy_fn(ic, target, kws)
+            target_rsyncd_stop(target)
+
+        # Configure the bootloader: by hand with shell commands, so it is
+        # easy to reproduce by a user typing them
+        target.report_info("POS: configuring bootloader")
+        if boot_config == None:	            # FIXME: introduce pos_boot_config
+            boot_config = pos_boot_config['uefi']
+        boot_config(target, root_part_dev_base, image_final)
+
+        testcase.tls.expecter.timeout = timeout_sync
+        # sync, kill any processes left over in /mnt, unmount it
+        target.shell.run("""
+sync;
+which lsof && kill -9 `lsof -Fp  /home | sed -n '/^p/{s/^p//;p}'`;
+cd /;
+umount /mnt
+""")
+        # Now setup the local boot loader to boot off that
+        target.property_set("pos_mode", "local")
+    except Exception as e:
+        target.report_info("BUG? exception %s: %s %s" %
+                           (type(e).__name__, e, traceback.format_exc()))
+        raise
+    finally:
+        testcase.tls.expecter.timeout = original_timeout
+        # don't fail if this fails, as it'd trigger another exception
+        # and hide whatever happened that make us fail. Just make a
+        # good hearted attempt at cleaning up
+        target.shell.run("umount -l /mnt || true")
+
+    target.report_info("POS: deployed %(image)s to %(root_part_dev)s" % kws)
+    return kws['image']
+
+
 def deploy_image(ic, target, image,
                  boot_dev = None, root_part_dev = None,
                  partitioning_fn = partition,
@@ -944,6 +1188,8 @@ def deploy_image(ic, target, image,
                  timeout = 60,
                  # When flushing to USB drives, it can be slow
                  timeout_sync = 240,
+                 target_power_cycle_to_pos = None,
+                 boot_config = None,
 ):
 
     """Deploy an image to a target using the Provisioning OS
@@ -995,8 +1241,6 @@ def deploy_image(ic, target, image,
       guessed)
 
     FIXME:
-     - fix to autologing serial console?
-     - do a couple retries if fails?
      - increase in property bd.stats.client.sos_boot_failures and
        bd.stats.client.sos_boot_count (to get a baseline)
      - tag bd.stats.last_reset to DATE
@@ -1012,213 +1256,30 @@ def deploy_image(ic, target, image,
         % type(target).__name__
     assert isinstance(image, basestring)
 
-    testcase = target.testcase
+    boot_dev = _deploy_image_boot_dev(target, boot_dev)
 
-    # What is our boot device?
-    if boot_dev:
-        assert isinstance(boot_dev, basestring), 'boot_dev must be a string'
-        target.report_info("POS: boot device %s (from arguments)"
-                           % boot_dev)
-    else:
-        boot_dev = target.kws.get('pos_boot_dev', None)
-        if boot_dev == None:
-            raise tcfl.tc.blocked_e(
-                "Can't guess boot_dev (no `pos_boot_dev` tag available)",
-                { 'target': target } )
-        target.report_info("POS: boot device %s (from pos_boot_dev tag)"
-                           % boot_dev)
-    boot_dev = "/dev/" + boot_dev
-    # HACK: /dev/[hs]d* do partitions as /dev/[hs]dN, where as mmc and
-    # friends add /dev/mmcWHATEVERpN. Seriously...
-    if boot_dev.startswith("/dev/hd") \
-       or boot_dev.startswith("/dev/sd") \
-       or boot_dev.startswith("/dev/vd"):
-        target.kw_set('p_prefix', "")
-    else:
-        target.kw_set('p_prefix', "p")
+    with tcfl.msgid_c("POS"):
 
+        target_boot_to_pos(
+            target, pos_prompt = pos_prompt, timeout = timeout,
+            target_power_cycle_to_pos = target_power_cycle_to_pos)
 
-    # FIXME: check ic is powered on?
-    for tries in range(3):
-        target.report_info("rebooting into POS for flashing [%d/3]" % tries)
-        target.property_set("pos_mode", "pxe")
-        target.power.cycle()
+        root_part_dev = target_partition(target, image,
+                                         boot_dev = boot_dev,
+                                         root_part_dev = root_part_dev,
+                                         partitioning_fn = partitioning_fn)
 
-        # Sequence for TCF-live based on Fedora
-        if pos_prompt:
-            target.shell.linux_shell_prompt_regex = pos_prompt
-        try:
-            target.shell.up(timeout = timeout)
-        except tcfl.tc.error_e as e:
-            outputf = e.attachments_get().get('console output', None)
-            if outputf:
-                output = open(outputf.name).read()
-            if output == None or output == "" or output == "\x00":
-                target.report_error("POS: no console output, retrying")
-                continue
-            # sometimes the BIOS has been set to boot local directly,
-            # so we might as well retry
-            target.report_error("POS: unexpected console output, retrying")
-            continue
-        break
-    else:
-        raise tcfl.tc.blocked_e(
-            "POS: tried too many times to boot, without signs of life",
-            { "console output": target.console.read(), 'target': target })
-
-    # Ok, we might be accessing the target here to repartition and
-    # such, so let's first select a root partition
-    if target.property_get('pos_repartition'):
-        # Need to reinit the partition table (we were told to by
-        # setting pos_repartition to anything
-        target.report_info("POS: repartitioning per pos_repartition property")
-        partitioning_fn(target, boot_dev)
-        target.property_set('pos_repartition', None)
-
-    for tries in range(3):
-        target.report_info("POS: guessing partition device [%d/3] "
-                           "(defaulting to %s)" % (tries, root_part_dev))
-        root_part_dev = _root_part_select(target, image,
-                                          boot_dev, root_part_dev)
-        if root_part_dev != None:
-            target.report_info("POS: will use %s for root partition"
-                               % root_part_dev)
-            break
-        # we couldn't find a root partition device, which means the
-        # thing is trashed
-        target.report_info("POS: repartitioning because couldn't find "
-                           "root partitions")
-        partitioning_fn(target, boot_dev)
-    else:
-        output = target.shell.run("fdisk -l " + boot_dev, output = True)
-        raise tcfl.tc.blocked_e(
-            "Tried too much to reinitialize the partition table to "
-            "pick up a root partition? is there enough space to "
-            "create root partitions?",
-            dict(target = target, fdisk_l = output,
-                 partsizes = target.kws.get('pos_partsizes', None)))
-
-    root_part_dev_base = os.path.basename(root_part_dev)
-    kws = dict(
-        rsync_server = ic.kws['pos_rsync_server'],
-        image = image,
-        boot_dev = boot_dev,
-        root_part_dev = root_part_dev,
-        root_part_dev_base = root_part_dev_base,
-    )
-    kws.update(target.kws)
-
-    # FIXME: verify root partitioning is the right one and recover if
-    # not
-    try:
-        # FIXME: act on failing, just reformat and retry, then
-        # bail out on failure
-        for try_count in range(3):
-            target.report_info("POS: mounting root partition %s onto /mnt "
-                               "to image [%d/3]" % (root_part_dev, try_count))
-            # don't let it fail or it will raise an exception, so we
-            # print FAILED in that case to look for stuff; note the
-            # double apostrophe trick so the regex finder doens't trip
-            # on the command
-            output = target.shell.run(
-                "mount %(root_part_dev)s /mnt || echo FAI''LED" % kws,
-                output = True)
-            # What did we get?
-            if 'FAILED' in output:
-                if 'mount: /mnt: special device ' + root_part_dev \
-                   + ' does not exist.' in output:
-                    partitioning_fn(target, boot_dev)
-                elif 'mount: /mnt: wrong fs type, bad option, ' \
-                   'bad superblock on ' + root_part_dev + ', missing ' \
-                   'codepage or helper program, or other error.' in output:
-                    # ok, this means probably the partitions are not
-                    # formatted; FIXME: support other filesystemmakeing?
-                    target.report_info(
-                        "POS: formating root partition %s with `%s`"
-                        % (root_part_dev, mkfs_cmd % kws))
-                    target.shell.run(mkfs_cmd % kws)
-                else:
-                    raise tcfl.tc.blocked_e(
-                        "POS: Can't recover unknown error condition: %s"
-                        % output, dict(target = target, output = output))
-            else:
-                target.report_info("POS: mounted %s onto /mnt to image"
-                                   % root_part_dev)
-                break	# it worked, we are done
-            # fall through, retry
-        else:
-            raise tcfl.tc.blocked_e(
-                "POS: Tried to mount too many times and failed",
-                dict(target = target))
-
-        if image:
-            original_timeout = testcase.tls.expecter.timeout
-            try:
-                image_list_output = target.shell.run(
-                    "rsync %(rsync_server)s/" % kws, output = True)
-                images_available = image_list_from_rsync_output(
-                    image_list_output)
-                # Do we have that image? autocomplete missing fields
-                # and get us a good match if so
-                image_final = image_select_best(image, images_available,
-                                                target.bsp_model)
-                kws['image'] = ":".join(image_final)
-                target.report_info("POS: rsyncing %(image)s from "
-                                   "%(rsync_server)s to /mnt" % kws,
-                                   dlevel = -1)
-
-                testcase.tls.expecter.timeout = 800
-                target.shell.run(
-                    "time rsync -aAX --numeric-ids --delete "
-                    "--exclude='/persistent.tcf.d/*' "
-                    "%(rsync_server)s/%(image)s/. /mnt/."
-                    % kws)
-                target.property_set('pos_root_' + root_part_dev_base, image)
-            finally:
-                testcase.tls.expecter.timeout = original_timeout
-            target.report_info("POS: rsynced %(image)s from "
-                               "%(rsync_server)s to /mnt" % kws)
-
-            # did the user provide an extra function to deploy stuff?
-            if extra_deploy_fns:
-                target_rsyncd_start(ic, target)
-
-                for extra_deploy_fn in extra_deploy_fns:
-                    target.report_info("POS: running extra deploy fn %s"
-                                       % extra_deploy_fn, dlevel = 2)
-                    extra_deploy_fn(ic, target, kws)
-                target_rsyncd_stop(target)
-
-            # Configure the bootloader
-            #
-            # We do it by hand -- with shell commands, so it is
-            # easy to reproduce by a user typing them
-
-            # FIXME: we are EFI only for now, way easier
-            # Make sure we have all the entries for systemd-loader
-            target.report_info("POS: configuring bootloader")
-            boot_config(target, root_part_dev_base, image_final)
-        testcase.tls.expecter.timeout = timeout_sync
-        target.shell.run("sync")
-        # Kill any processes left over here
-        target.shell.run("which lsof && kill -9 `lsof -Fp  /home | sed -n '/^p/{s/^p//;p}'`")
-        # leave /mnt
-        target.shell.run("cd /")
-        target.shell.run("umount /mnt")
-        # Now setup the local boot loader to boot off that
-        target.property_set("pos_mode", "local")
-    except Exception as e:
-        target.report_info("BUG? exception %s: %s %s" %
-                           (type(e).__name__, e, traceback.format_exc()))
-        raise
-    finally:
-        # don't fail if this fails, as it'd trigger another exception
-        # and hide whatever happened that make us fail. Just make a
-        # good hearted attempt at cleaning up
-        target.shell.run("umount -l /mnt || true")
-
-    target.report_info("POS: deployed %(image)s to %(root_part_dev)s" % kws)
-    return kws['image']
+        return _deploy_image(
+            ic,
+            target,
+            image,
+            boot_dev = boot_dev,
+            root_part_dev = root_part_dev,
+            partitioning_fn = partitioning_fn,
+            extra_deploy_fns = extra_deploy_fns,
+            mkfs_cmd = mkfs_cmd,
+            timeout_sync = timeout_sync,
+            boot_config = boot_config)
 
 
 def mk_persistent_tcf_d(target, subdirs = None):
