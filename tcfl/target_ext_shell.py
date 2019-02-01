@@ -67,7 +67,7 @@ class shell(tc.target_extension_c):
     def up(self, tempt = None,
            user = None, login_regex = re.compile('login:'),
            password = None, password_regex = re.compile('Password:'),
-           timeout = 120):
+           shell_setup = True, timeout = 120):
         """
         Giving it ample time to boot, wait for a shell prompt and set
         up the shell so that if an error happens, it will print an error
@@ -113,16 +113,17 @@ class shell(tc.target_extension_c):
         finally:
             self.target.testcase.tls.expecter.timeout = original_timeout
 
-        # disable line editing for proper recording of command line
-        # when running bash; otherwise the scrolling readline does
-        # messes up the output
-        self.run('test ! -z "$BASH" && set +o vi +o emacs')
-        # Trap the shell to complain loud if a command fails, and catch it
-        # See that '' in the middle, is so the catcher later doesn't
-        # get tripped by the command we sent to set it up
-        self.run("trap 'echo ERROR''-IN-SHELL' ERR")
-        self.target.on_console_rx("ERROR-IN-SHELL", result = 'errr',
-                                  timeout = False)
+        if shell_setup:
+            # disable line editing for proper recording of command line
+            # when running bash; otherwise the scrolling readline does
+            # messes up the output
+            self.run('test ! -z "$BASH" && set +o vi +o emacs')
+            # Trap the shell to complain loud if a command fails, and catch it
+            # See that '' in the middle, is so the catcher later doesn't
+            # get tripped by the command we sent to set it up
+            self.run("trap 'echo ERROR''-IN-SHELL' ERR")
+            self.target.on_console_rx("ERROR-IN-SHELL", result = 'errr',
+                                      timeout = False)
 
         # Now commands should timeout fast
         self.target.testcase.tls.expecter.timeout = 30
