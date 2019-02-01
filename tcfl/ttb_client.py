@@ -1252,7 +1252,7 @@ def _rest_target_console_read(rtb, target, console, offset, filter_ansi,
     else:
         data = _data.text
     try:
-        sys.stdout.write(data)
+        sys.stdout.write(unicode(data).encode('utf-8', errors = 'ignore'))
         sys.stdout.flush()
     except IOError as e:
         if e.errno != errno.EAGAIN:
