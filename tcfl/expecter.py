@@ -479,7 +479,7 @@ def console_rx_eval(expecter, target,
                     "found expected `%s` in console `%s:%s` at %.2fs"
                     % (what, target.fullid, console_id_name,
                        ts - expecter.ts0),
-                    { "console output": of }, alevel = 1)
+                    { "console output": of }, dlevel = 1, alevel = 2)
                 of.seek(offset_tip)
                 raise tc.pass_e(
                     "found expected `%s` in console `%s:%s` at %.2fs"
