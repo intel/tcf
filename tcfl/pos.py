@@ -139,8 +139,8 @@ def target_rsync(target, src = None, dst = None,
     >>>
     >>>     def deploy(self, ic, target):
     >>>         ic.power.on()
-    >>>         tcfl.pos.deploy_image(
-    >>>             ic, target, "fedora::29",
+    >>>         target.pos.deploy_image(
+    >>>             ic, "fedora::29",
     >>>             extra_deploy_fns = [ self._deploy_mygittree ])
     >>>
     >>>     ...
@@ -1229,11 +1229,12 @@ def deploy_linux_kernel(ic, target, _kws):
     """Deploy a linux kernel tree in the local machine to the target's
     root filesystem
 
-    This is normally given to :func:`tcfl.pos.deploy_image` as:
+    This is normally given to :func:`target.pos.deploy_image
+    <tcfl.pos.extension.deploy_image>` as:
 
     >>> target.kw_set("pos_deploy_linux_kernel", SOMELOCALLOCATION)
-    >>> tcfl.pos.deploy_image(ic, target, IMAGENAME,
-    >>>                       extra_deploy_fns = [ tcfl.pos.deploy_linux_kernel ])
+    >>> target.pos.deploy_image(ic, IMAGENAME,
+    >>>                         extra_deploy_fns = [ tcfl.pos.deploy_linux_kernel ])
 
     as it expects ``kws['pos_deploy_linux_kernel']`` which points to a
     local directory in the form::
@@ -1360,7 +1361,7 @@ class extension(tc.target_extension_c):
         return capability_fn
 
 
-    def deploy_image(self, ic, target, image,
+    def deploy_image(self, ic, image,
                      boot_dev = None, root_part_dev = None,
                      partitioning_fn = partition,
                      extra_deploy_fns = None,
@@ -1377,8 +1378,6 @@ class extension(tc.target_extension_c):
 
         :param tcfl.tc.tc_c ic: interconnect off which we are booting the
           Provisioning OS and to which ``target`` is connected.
-
-        :param tcfl.tc.tc_c target: target which we are provisioning.
 
         :param str image: name of an image available in an rsync server
           specified in the interconnect's ``pos_rsync_server`` tag. Each
@@ -1432,26 +1431,23 @@ class extension(tc.target_extension_c):
         assert isinstance(ic, tc.target_c), \
             "ic must be an instance of tc.target_c, but found %s" \
             % type(ic).__name__
-        assert isinstance(target, tc.target_c), \
-            "target must be an instance of tcfl.tc.target_c, but found %s" \
-            % type(target).__name__
         assert isinstance(image, basestring)
 
-        boot_dev = _deploy_image_boot_dev(target, boot_dev)
+        boot_dev = _deploy_image_boot_dev(self.target, boot_dev)
         with msgid_c("POS"):
 
             target_boot_to_pos(
-                target, pos_prompt = pos_prompt, timeout = timeout,
+                self.target, pos_prompt = pos_prompt, timeout = timeout,
                 boot_to_pos_fn = target_power_cycle_to_pos)
 
             root_part_dev = target_partition(
-                target, image, boot_dev = boot_dev,
+                self.target, image, boot_dev = boot_dev,
                 root_part_dev = root_part_dev,
                 partitioning_fn = partitioning_fn)
 
             return _deploy_image(
                 ic,
-                target,
+                self.target,
                 image,
                 boot_dev = boot_dev,
                 root_part_dev = root_part_dev,

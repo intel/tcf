@@ -34,7 +34,7 @@ class _test(tcfl.tc.tc_c):
         ic.power.on()
         ic.report_pass("powered on")
         global image
-        image = tcfl.pos.deploy_image(ic, target, image)
+        image = target.pos.deploy_image(ic, image)
 
     def start(self, ic, target):
         # fire up the target, wait for a login prompt

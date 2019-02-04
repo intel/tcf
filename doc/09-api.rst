@@ -350,7 +350,8 @@ Provisioning OS specific metadata
   >>> })
 
   :func:`tcfl.pos.efibootmgr_setup` can use this if the defaults do
-  not work :func:`tcfl.pos.deploy_image` reports::
+  not work :func:`target.pos.deploy_image()
+  <tcfl.pos.extension.deploy_image>` reports::
 
     Cannot find IPv4 boot entry, enable manually
 

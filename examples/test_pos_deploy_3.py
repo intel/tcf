@@ -39,7 +39,7 @@ class _test(tcfl.tc.tc_c):
 
     @tcfl.tc.concurrently()
     def deploy_10_target(self, ic, target):
-        tcfl.pos.deploy_image(ic, target, image)
+        target.pos.deploy_imaged(ic, image)
         target.report_pass("DEPLOYED")
         target.power.cycle()
         target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
@@ -47,7 +47,7 @@ class _test(tcfl.tc.tc_c):
 
     @tcfl.tc.concurrently()
     def deploy_10_target1(self, ic, target1):
-        tcfl.pos.deploy_image(ic, target1, image)
+        target1.pos.deploy_imaged(ic, image)
         target1.report_pass("DEPLOYED")
         target1.power.cycle()
         target1.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
@@ -55,7 +55,7 @@ class _test(tcfl.tc.tc_c):
 
     @tcfl.tc.concurrently()
     def deploy_10_target2(self, ic, target2):
-        tcfl.pos.deploy_image(ic, target2, image)
+        target2.pos.deploy_imaged(ic, image)
         target2.report_pass("DEPLOYED")
         target2.power.cycle()
         target2.shell.linux_shell_prompt_regex = re.compile('root@.*# ')

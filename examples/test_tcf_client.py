@@ -13,7 +13,7 @@ class _base(tcfl.tc.tc_c):
 
     def deploy_10(self, ic, target):
         ic.power.cycle()
-        tcfl.pos.deploy_image(ic, target, self.image)
+        target.pos.deploy_image(ic, self.image)
 
     def start_10(self, target):
         # If there are errors, exceptions will come,but otherwise we

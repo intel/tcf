@@ -1554,8 +1554,8 @@ or even having that done in deployment time when flashing with POS:
            ic.power.on()
            ic.report_pass("powered on")
 
-           image = tcfl.pos.deploy_image(
-               ic, target, "clear",
+           image = target.pos.deploy_image(
+               ic, "clear",
                extra_deploy_fns = [ tcfl.pos.deploy_linux_ssh_root_nopwd ])
 
 

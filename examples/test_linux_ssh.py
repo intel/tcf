@@ -37,8 +37,8 @@ class _test(tcfl.tc.tc_c):
 
         target.power.on()
 
-        _image = tcfl.pos.deploy_image(
-            ic, target, image,
+        _image = target.pos.deploy_image(
+            ic, image,
             extra_deploy_fns = [
                 # Config SSH to allow login as root with no password
                 tcfl.pos.deploy_linux_ssh_root_nopwd

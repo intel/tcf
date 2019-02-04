@@ -47,7 +47,7 @@ int main(void) {
     # Deploy the image to the target
     def eval_10_deploy_image(self, target, ic):
         ic.power.cycle()
-        tcfl.pos.deploy_image(ic, target, "clear")
+        target.pos.deploy_image(ic, "clear")
 
         # If there are errors, exceptions will come,but otherwise we
         # are here, still in the service OS, so reboot into our new OS
