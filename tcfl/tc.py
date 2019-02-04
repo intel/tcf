@@ -514,8 +514,7 @@ class target_c(object):
         else:
             self._report_mk_prefix()
         # Fire up the extensions
-        for extension in self.__extensions:
-            name = extension.__name__
+        for name, extension in self.__extensions.iteritems():
             try:
                 self.report_info("%s: %s: initializing target extension"
                                  % (self.want_name, name),
@@ -550,7 +549,7 @@ class target_c(object):
         self.acquire = True
 
     @classmethod
-    def extension_register(cls, ext_cls):
+    def extension_register(cls, ext_cls, name = None):
         """
         Register an extension to the :py:class:`tcfl.tc.target_c` class.
 
@@ -560,23 +559,26 @@ class target_c(object):
         See :py:class:`target_extension_c` for details
 
         :param target_extension_c ext_cls: a class that provides an extension
+        :param str name: (optional) name of the extension (defaults to
+          the class name)
         """
         assert issubclass(ext_cls, target_extension_c)
-        # FIXME: verify __init__ takes only one argument
-        if not ext_cls in cls.__extensions:
-            if ext_cls.__name__ in [e.__name__ for e in cls.__extensions]:
-                raise RuntimeError("%s: can't register extension, there is "
-                                   "already one registered with said name"
-                                   % ext_cls.__name__)
-            if ext_cls.__name__ in target_c.__dict__.keys():
-                raise RuntimeError("%s: can't register extension, there is "
-                                   "already a field in class target_c with "
-                                   "said name that would be overriden"
-                                   % ext_cls.__name__)
-            cls.__extensions.append(ext_cls)
+        assert name == None or isinstance(name, basestring)
+        if name == None:
+            name = ext_cls.__name__
+        if name in target_c.__dict__.keys():
+            raise RuntimeError("%s: can't register extension, there is "
+                               "already a field in class target_c with "
+                               "said name that would be overriden"
+                               % name)
+        if name in cls.__extensions:
+            raise RuntimeError("%s: can't register extension, there is "
+                               "already one registered with said name"
+                               % name)
+        cls.__extensions[name] = ext_cls
 
     @classmethod
-    def extension_unregister(cls, ext_cls):
+    def extension_unregister(cls, ext_cls, name = None):
         """
         Unregister an extension to the :py:class:`tcfl.tc.target_c` class.
 
@@ -586,8 +588,13 @@ class target_c(object):
         See :py:class:`target_extension_c` for details
 
         :param target_extension_c ext_cls: a class that provides an extension
+        :param str name: (optional) name of the extension (defaults to
+          the class name)
         """
-        cls.__extensions.remove(ext_cls)
+        assert name == None or isinstance(name, basestring)
+        if name == None:
+            name = ext_cls.__name__
+        del cls.__extensions[name]
 
     #
     # Actions that don't affect the target
@@ -1458,7 +1465,7 @@ class target_c(object):
     # Private API
     #
 
-    __extensions = []
+    __extensions = {}
 
     def _kws_update(self, bsp = None):
         self.kws.clear()
