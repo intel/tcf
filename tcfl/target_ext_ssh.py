@@ -153,8 +153,8 @@ class ssh(tc.target_extension_c):
           See :ref:`how to find
           <finding_testcase_metadata>` which fields are available.
 
-        :param exc nonzero_e: exception to raise in case of non zero
-          exit code.  Must be a subclass of :class:`tcfl.tc.exception`
+        :param tcfl.tc.exception nonzero_e: exception to raise in case of non
+          zero exit code.  Must be a subclass of :class:`tcfl.tc.exception`
           (i.e.: :class:`tcfl.tc.failed_e`,  :class:`tcfl.tc.error_e`,
           :class:`tcfl.tc.skip_e`, :class:`tcfl.tc.blocked_e`) or
           *None* (default) to not raise anything and just return the
@@ -260,8 +260,8 @@ class ssh(tc.target_extension_c):
         :param bool recursive: (optional) copy recursively (needed for
           directories)
 
-        :param exc nonzero_e: exception to raise in case of non zero
-          exit code.  Must be a subclass of :class:`tcfl.tc.exception`
+        :param tcfl.tc.exception nonzero_e: exception to raise in case of 
+          non zero exit code.  Must be a subclass of :class:`tcfl.tc.exception`
           (i.e.: :class:`tcfl.tc.failed_e`,  :class:`tcfl.tc.error_e`,
           :class:`tcfl.tc.skip_e`, :class:`tcfl.tc.blocked_e`) or
           *None* (default) to not raise anything and just return the
@@ -306,8 +306,8 @@ class ssh(tc.target_extension_c):
         :param bool recursive: (optional) copy recursively (needed for
           directories)
 
-        :param exc nonzero_e: exception to raise in case of non zero
-          exit code.  Must be a subclass of :class:`tcfl.tc.exception`
+        :param tcfl.tc.exception nonzero_e: exception to raise in case of 
+          non zero exit code.  Must be a subclass of :class:`tcfl.tc.exception`
           (i.e.: :class:`tcfl.tc.failed_e`,  :class:`tcfl.tc.error_e`,
           :class:`tcfl.tc.skip_e`, :class:`tcfl.tc.blocked_e`) or
           *None* (default) to not raise anything and just return the
