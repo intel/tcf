@@ -54,7 +54,9 @@ import traceback
 import distutils.version
 import Levenshtein
 
-import tcfl.tc
+import tc
+import tl
+from . import msgid_c
 
 def target_rsyncd_start(ic, target):
     """
@@ -242,7 +244,7 @@ def partition(target, device):
                        "(?P<block_size>[0-9]+)$", re.MULTILINE)
     m = regex.search(output)
     if not m:
-        raise tcfl.tc.blocked_e(
+        raise tc.blocked_e(
             "can't find block and physical blocksize",
             { 'output': output, 'pattern': regex.pattern,
               'target': target }
@@ -255,7 +257,7 @@ def partition(target, device):
 
     partsizes = target.kws.get('pos_partsizes', None)
     if partsizes == None:
-        raise tcfl.tc.blocked_e(
+        raise tc.blocked_e(
             "Can't partition target, it doesn't "
             "specify pos_partsizes tag",
             { 'target': target } )
@@ -335,7 +337,7 @@ def _linux_boot_guess_from_lecs(target, _image):
         lecl.append(lec)
         target.report_info("Loader Entry found: %s" % lec, dlevel = 1)
     if len(lecl) > 1:
-        raise tcfl.tc.blocked_e(
+        raise tc.blocked_e(
             "multiple loader entries in /boot, do not "
             "know which one to use: " + " ".join(lecl),
             dict(target = target))
@@ -375,7 +377,7 @@ def _linux_boot_guess_from_boot(target, image):
     Linux kernels and initramfs; select the latest version
     """
     # guess on the mounted filesystem, otherwise we get the POS!
-    os_release = tcfl.tl.linux_os_release_get(target, prefix = "/mnt")
+    os_release = tl.linux_os_release_get(target, prefix = "/mnt")
     distro = os_release.get('ID', None)
 
     output = target.shell.run("ls -1 /mnt/boot", output = True)
@@ -413,7 +415,7 @@ def _linux_boot_guess_from_boot(target, image):
             initramfs_versions.get(kver, None), \
             options
     elif len(kernel_versions) > 1:
-        raise tcfl.tc.blocked_e(
+        raise tc.blocked_e(
             "more than one Linux kernel in /boot; I don't know "
             "which one to use: " + " ".join(kernel_versions),
             dict(target = target, output = output))
@@ -492,7 +494,7 @@ def efibootmgr_setup(target):
     target.report_info("current boot_order: %s" % boot_order)
     lbm_m = lbm_regex.search(output)
     if not lbm_m:
-        raise tcfl.tc.blocked_e(
+        raise tc.blocked_e(
             "Cannot find 'Linux Boot Manager' EFI boot entry",
             dict(target = target, output = output))
     lbm = lbm_m.groupdict()['entry']
@@ -500,7 +502,7 @@ def efibootmgr_setup(target):
 
     ipv4_m = ipv4_regex.search(output)
     if not ipv4_m:
-        raise tcfl.tc.blocked_e(
+        raise tc.blocked_e(
             # FIXME: improve message to be more helpful and point to docz
             "Cannot find IPv4 boot entry, enable manually",
             dict(target = target, output = output))
@@ -542,7 +544,7 @@ def boot_config_uefi(target, root_part_dev, image,
     if linux_options == None:
         linux_options = _linux_options
     if linux_kernel_file == None:
-        raise tcfl.tc.blocked_e(
+        raise tc.blocked_e(
             "Cannot guess a Linux kernel to boot",
             dict(target = target))
     # remove absolutization (some specs have it), as we need to copy from
@@ -771,7 +773,7 @@ def image_select_best(image, available_images, arch_default):
     # filter which images have arch or no arch spec
     available_images = filter(lambda x: x[4] == arch, available_images)
     if not available_images:
-        raise tcfl.tc.blocked_e(
+        raise tc.blocked_e(
             "can't find image for architecture %s "
             "in list of available image" % arch,
             dict(images_available = \
@@ -793,7 +795,7 @@ def image_select_best(image, available_images, arch_default):
         spin_images = filter(lambda x: x[1] == spin, distro_images)
 
     if not spin_images:
-        raise tcfl.tc.blocked_e(
+        raise tc.blocked_e(
             "can't find match for image %s on available images" % image,
             dict(images_available =
                  "\n".join([ ":".join(i) for i in available_images ]))
@@ -819,7 +821,7 @@ def image_select_best(image, available_images, arch_default):
         ),
         spin_images)
     if not version_images:
-        raise tcfl.tc.blocked_e(
+        raise tc.blocked_e(
             "can't find image match for version %s "
             "in list of available images" % version,
             dict(images_available =
@@ -846,7 +848,7 @@ def image_select_best(image, available_images, arch_default):
         ),
         version_images)
     if not subversion_images:
-        raise tcfl.tc.blocked_e(
+        raise tc.blocked_e(
             "can't find image match for sub-version %s "
             "in list of available images" % subversion,
             dict(images_available =
@@ -867,7 +869,7 @@ def _root_part_select(target, image, boot_dev, root_part_dev):
             'root_part_dev must be a string'
         if not 'pos_root_' + root_part_dev in target.kws:
             # specified a root partition that is not known
-            raise tcfl.tc.blocked_e(
+            raise tc.blocked_e(
                 'POS: asked to use root partition "%s", which is unknown; '
                 '(the target contains no "pos_root_%s" tag/property)'
                 % (root_part_dev, root_part_dev),
@@ -933,10 +935,6 @@ def _root_part_select(target, image, boot_dev, root_part_dev):
                            % (root_part_dev, seed, score, seed), dlevel = 2)
     return root_part_dev
 
-pos_boot_config = dict(
-    uefi = boot_config_uefi
-)
-
 def _deploy_image_boot_dev(target, boot_dev):
     # What is our boot device?
     if boot_dev:
@@ -946,7 +944,7 @@ def _deploy_image_boot_dev(target, boot_dev):
     else:
         boot_dev = target.kws.get('pos_boot_dev', None)
         if boot_dev == None:
-            raise tcfl.tc.blocked_e(
+            raise tc.blocked_e(
                 "Can't guess boot_dev (no `pos_boot_dev` tag available)",
                 { 'target': target } )
         target.report_info("POS: boot device %s (from pos_boot_dev tag)"
@@ -969,28 +967,24 @@ def target_power_cycle_to_pos_pxe(target):
     target.property_set("pos_mode", "pxe")
     target.power.cycle()
 
-pos_modes = dict(
-    pxe = target_power_cycle_to_pos_pxe
-)
-
 def target_boot_to_pos(target, pos_prompt = None,
                        # plenty to boot to an nfsroot, hopefully
                        timeout = 60,
-                       target_power_cycle_to_pos = None):
-    if target_power_cycle_to_pos == None:
-        # FIXME: make the target declare the pos_mode it supports in pos_capable
-        target_power_cycle_to_pos = pos_modes['pxe']
+                       boot_to_pos_fn = None):
+    if boot_to_pos_fn == None:
+        # None specified, let's take from the target config
+        boot_to_pos_fn = target.pos.cap_fn_get('boot_to_pos', 'pxe')
 
     for tries in range(3):
         target.report_info("rebooting into POS for flashing [%d/3]" % tries)
-        target_power_cycle_to_pos(target)
+        boot_to_pos_fn(target)
 
         # Sequence for TCF-live based on Fedora
         if pos_prompt:
             target.shell.linux_shell_prompt_regex = pos_prompt
         try:
             target.shell.up(timeout = timeout)
-        except tcfl.tc.error_e as e:
+        except tc.error_e as e:
             outputf = e.attachments_get().get('console output', None)
             if outputf:
                 output = open(outputf.name).read()
@@ -1003,7 +997,7 @@ def target_boot_to_pos(target, pos_prompt = None,
             continue
         break
     else:
-        raise tcfl.tc.blocked_e(
+        raise tc.blocked_e(
             "POS: tried too many times to boot, without signs of life",
             { "console output": target.console.read(), 'target': target })
 
@@ -1037,7 +1031,7 @@ def target_partition(target, image,
             partitioning_fn(target, boot_dev)
         else:
             output = target.shell.run("fdisk -l " + boot_dev, output = True)
-            raise tcfl.tc.blocked_e(
+            raise tc.blocked_e(
                 "Tried too much to reinitialize the partition table to "
                 "pick up a root partition? is there enough space to "
                 "create root partitions?",
@@ -1074,7 +1068,7 @@ def _target_mount_rootfs(kws, target, boot_dev, root_part_dev,
                     % (root_part_dev, mkfs_cmd % kws))
                 target.shell.run(mkfs_cmd % kws)
             else:
-                raise tcfl.tc.blocked_e(
+                raise tc.blocked_e(
                     "POS: Can't recover unknown error condition: %s"
                     % output, dict(target = target, output = output))
         else:
@@ -1083,7 +1077,7 @@ def _target_mount_rootfs(kws, target, boot_dev, root_part_dev,
             break	# it worked, we are done
         # fall through, retry
     else:
-        raise tcfl.tc.blocked_e(
+        raise tc.blocked_e(
             "POS: Tried to mount too many times and failed",
             dict(target = target))
 
@@ -1149,7 +1143,7 @@ def _deploy_image(ic, target, image,
         # easy to reproduce by a user typing them
         target.report_info("POS: configuring bootloader")
         if boot_config == None:	            # FIXME: introduce pos_boot_config
-            boot_config = pos_boot_config['uefi']
+            boot_config = target.pos.cap_fn_get('boot_config', 'uefi')
         boot_config(target, root_part_dev_base, image_final)
 
         testcase.tls.expecter.timeout = timeout_sync
@@ -1189,97 +1183,20 @@ def deploy_image(ic, target, image,
                  # When flushing to USB drives, it can be slow
                  timeout_sync = 240,
                  target_power_cycle_to_pos = None,
-                 boot_config = None,
-):
-
-    """Deploy an image to a target using the Provisioning OS
-
-    :param tcfl.tc.tc_c ic: interconnect off which we are booting the
-      Provisioning OS and to which ``target`` is connected.
-
-    :param tcfl.tc.tc_c target: target which we are provisioning.
-
-    :param str image: name of an image available in an rsync server
-      specified in the interconnect's ``pos_rsync_server`` tag. Each
-      image is specified as ``IMAGE:SPIN:VERSION:SUBVERSION:ARCH``, e.g:
-
-      - fedora:workstation:28::x86_64
-      - clear:live:25550::x86_64
-      - yocto:core-image-minimal:2.5.1::x86
-
-      Note that you can specify a partial image name and the closest
-      match to it will be selected. From the previous example, asking
-      for *fedora* would auto select *fedora:workstation:28::x86_64*
-      assuming the target supports the *x86_64* target.
-
-    :param str boot_dev: (optional) which is the boot device to use,
-      where the boot loader needs to be installed in a boot
-      partition. e.g.: ``sda`` for */dev/sda* or ``mmcblk01`` for
-      */dev/mmcblk01*.
-
-      Defaults to the value of the ``pos_boot_dev`` tag.
-
-    :param str root_part_dev: (optional) which is the device to use
-      for the root partition. e.g: ``mmcblk0p4`` for
-      */dev/mmcblk0p4* or ``hda5`` for */dev/hda5*.
-
-      If not specified, the system will pick up one from all the
-      different root partitions that are available, trying to select
-      the one that has the most similar to what we are installing to
-      minimize the install time.
-
-    :param extra_deploy_fns: list of functions to call after the
-      image has been deployed. e.g.:
-
-      >>> def deploy_linux_kernel(ic, target, kws, kernel_file = None):
-      >>>     ...
-
-      the function will be passed keywords which contain values found
-      out during this execution
-
-    :returns str: name of the image that was deployed (in case it was
-      guessed)
-
-    FIXME:
-     - increase in property bd.stats.client.sos_boot_failures and
-       bd.stats.client.sos_boot_count (to get a baseline)
-     - tag bd.stats.last_reset to DATE
-
-    Note: you might want the interconnect power cycled
-
-    """
-    assert isinstance(ic, tcfl.tc.target_c), \
-        "ic must be an instance of tcfl.tc.target_c, but found %s" \
-        % type(ic).__name__
-    assert isinstance(target, tcfl.tc.target_c), \
-        "target must be an instance of tcfl.tc.target_c, but found %s" \
-        % type(target).__name__
-    assert isinstance(image, basestring)
-
-    boot_dev = _deploy_image_boot_dev(target, boot_dev)
-
-    with tcfl.msgid_c("POS"):
-
-        target_boot_to_pos(
-            target, pos_prompt = pos_prompt, timeout = timeout,
-            target_power_cycle_to_pos = target_power_cycle_to_pos)
-
-        root_part_dev = target_partition(target, image,
-                                         boot_dev = boot_dev,
-                                         root_part_dev = root_part_dev,
-                                         partitioning_fn = partitioning_fn)
-
-        return _deploy_image(
-            ic,
-            target,
-            image,
-            boot_dev = boot_dev,
-            root_part_dev = root_part_dev,
-            partitioning_fn = partitioning_fn,
-            extra_deploy_fns = extra_deploy_fns,
-            mkfs_cmd = mkfs_cmd,
-            timeout_sync = timeout_sync,
-            boot_config = boot_config)
+                 boot_config = None):
+    target.report_info("WARNING: tcfl.pos.deploy_image() is deprecated in "
+                       "in favour of target.pos.deploy_image()")
+    return target.pos.deploy_image(
+        ic,
+        target,
+        image,
+        boot_dev = boot_dev,
+        root_part_dev = root_part_dev,
+        partitioning_fn = partitioning_fn,
+        extra_deploy_fns = extra_deploy_fns,
+        mkfs_cmd = mkfs_cmd,
+        timeout_sync = timeout_sync,
+        boot_config = boot_config)
 
 
 def mk_persistent_tcf_d(target, subdirs = None):
@@ -1356,5 +1273,190 @@ def deploy_linux_kernel(ic, target, _kws):
     target.testcase._targets_active()
     target.report_pass("linux kernel transferred")
 
-def deploy_linux_ssh_root_nopwd(_ic, target, _kws):
-    tcfl.tl.linux_ssh_root_nopwd(target, "/mnt")
+
+#:
+#: Functions to boot a target into POS
+#:
+#: Different target drivers can be loaded and will add members to
+#: these dictionaries to extend the abilities of the core system to
+#: put targets in Provisioning OS mode.
+#:
+#: This then allows a single test script to work with multiple target
+#: types without having to worry about details.
+capability_fns = dict(
+    #: Function to call to power cycle the target and have it boot the
+    #: Provisioning OS.
+    boot_to_pos = dict(
+        pxe = target_power_cycle_to_pos_pxe
+    ),
+    #: Function to call to configure the boot loader once the system
+    #: has been provisoned.
+    boot_config = dict(
+        uefi = boot_config_uefi
+    )
+)
+
+
+_pos_capable_defaults = dict(
+    # backwards compat
+    boot_to_pos = 'pxe',
+    boot_config = 'uefi',
+)
+
+
+class extension(tc.target_extension_c):
+    """
+
+    Extension to :py:class:`tcfl.tc.target_c` to handle Provisioning
+    OS capabilities.
+    """
+
+    def __init__(self, target):
+        if 'pos_capable' not in target.rt:
+            raise self.unneeded
+        tc.target_extension_c.__init__(self, target)
+
+        pos_capable = target.kws['pos_capable']
+        if isinstance(pos_capable, bool):
+            if pos_capable == False:
+                raise tc.blocked_e("target is not POS capable",
+                                   dict(target = target))
+            target.report_info("WARNING! target's pos_capable is still old "
+                               "style, update your config--taking "
+                               "defaults")
+            self.capabilities = _pos_capable_defaults
+        elif isinstance(pos_capable, dict):
+            self.capabilities = pos_capable
+        else:
+            raise tc.blocked_e("Target's 'pos_capable' target is "
+                               "not a dictionary of POS capabilities",
+                               dict(target = self.target))
+
+    def cap_fn_get(self, capability, default = None):
+        """
+        Return a target's POS capability.
+
+        :param str capability: name of the capability, as defined in
+          the target's tag :ref:`*pos_capable* <pos_capable>`.
+
+        :param str default: (optional) default to use if not
+          specified; DO NOT USE! WILL BE DEPRECATED!
+        """
+        if capability not in capability_fns:
+            raise tc.blocked_e("Unknown POS capability '%s'; maybe "
+                               "needs to be configured in "
+                               "tcfl.pos.capability_fns?" %
+                               capability, dict(target = self.target))
+        if capability not in self.capabilities:
+            self.target.log.error("WARNING! target's pos_capable doesn't list "
+                                  "'%s'; defaulting to '%s'"
+                                  % (capability, default))
+        capability_value = self.capabilities.get(capability, default)
+        capability_fn = capability_fns[capability][capability_value]
+        modname = capability_fn.__module__
+        self.target.report_info("POS: capability %s/%s implemented by %s.%s"
+                                % (capability, capability_value,
+                                   modname, capability_fn.__name__))
+        return capability_fn
+
+
+    def deploy_image(self, ic, target, image,
+                     boot_dev = None, root_part_dev = None,
+                     partitioning_fn = partition,
+                     extra_deploy_fns = None,
+                     # mkfs has to have -F to avoid it asking questions
+                     mkfs_cmd = "mkfs.ext4 -Fj %(root_part_dev)s",
+                     pos_prompt = None,
+                     # plenty to boot to an nfsroot, hopefully
+                     timeout = 60,
+                     # When flushing to USB drives, it can be slow
+                     timeout_sync = 240,
+                     target_power_cycle_to_pos = None,
+                     boot_config = None):
+        """Deploy an image to a target using the Provisioning OS
+
+        :param tcfl.tc.tc_c ic: interconnect off which we are booting the
+          Provisioning OS and to which ``target`` is connected.
+
+        :param tcfl.tc.tc_c target: target which we are provisioning.
+
+        :param str image: name of an image available in an rsync server
+          specified in the interconnect's ``pos_rsync_server`` tag. Each
+          image is specified as ``IMAGE:SPIN:VERSION:SUBVERSION:ARCH``, e.g:
+
+          - fedora:workstation:28::x86_64
+          - clear:live:25550::x86_64
+          - yocto:core-image-minimal:2.5.1::x86
+
+          Note that you can specify a partial image name and the closest
+          match to it will be selected. From the previous example, asking
+          for *fedora* would auto select *fedora:workstation:28::x86_64*
+          assuming the target supports the *x86_64* target.
+
+        :param str boot_dev: (optional) which is the boot device to use,
+          where the boot loader needs to be installed in a boot
+          partition. e.g.: ``sda`` for */dev/sda* or ``mmcblk01`` for
+          */dev/mmcblk01*.
+
+          Defaults to the value of the ``pos_boot_dev`` tag.
+
+        :param str root_part_dev: (optional) which is the device to use
+          for the root partition. e.g: ``mmcblk0p4`` for
+          */dev/mmcblk0p4* or ``hda5`` for */dev/hda5*.
+
+          If not specified, the system will pick up one from all the
+          different root partitions that are available, trying to select
+          the one that has the most similar to what we are installing to
+          minimize the install time.
+
+        :param extra_deploy_fns: list of functions to call after the
+          image has been deployed. e.g.:
+
+          >>> def deploy_linux_kernel(ic, target, kws, kernel_file = None):
+          >>>     ...
+
+          the function will be passed keywords which contain values found
+          out during this execution
+
+        :returns str: name of the image that was deployed (in case it was
+          guessed)
+
+        FIXME:
+         - increase in property bd.stats.client.sos_boot_failures and
+           bd.stats.client.sos_boot_count (to get a baseline)
+         - tag bd.stats.last_reset to DATE
+
+        Note: you might want the interconnect power cycled
+
+        """
+        assert isinstance(ic, tc.target_c), \
+            "ic must be an instance of tc.target_c, but found %s" \
+            % type(ic).__name__
+        assert isinstance(target, tc.target_c), \
+            "target must be an instance of tcfl.tc.target_c, but found %s" \
+            % type(target).__name__
+        assert isinstance(image, basestring)
+
+        boot_dev = _deploy_image_boot_dev(target, boot_dev)
+        with msgid_c("POS"):
+
+            target_boot_to_pos(
+                target, pos_prompt = pos_prompt, timeout = timeout,
+                boot_to_pos_fn = target_power_cycle_to_pos)
+
+            root_part_dev = target_partition(
+                target, image, boot_dev = boot_dev,
+                root_part_dev = root_part_dev,
+                partitioning_fn = partitioning_fn)
+
+            return _deploy_image(
+                ic,
+                target,
+                image,
+                boot_dev = boot_dev,
+                root_part_dev = root_part_dev,
+                partitioning_fn = partitioning_fn,
+                extra_deploy_fns = extra_deploy_fns,
+                mkfs_cmd = mkfs_cmd,
+                timeout_sync = timeout_sync,
+                boot_config = boot_config)

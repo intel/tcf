@@ -6579,3 +6579,5 @@ import target_ext_buttons
 target_c.extension_register(target_ext_buttons.buttons)
 import target_ext_fastboot
 target_c.extension_register(target_ext_fastboot.fastboot)
+import pos
+target_c.extension_register(pos.extension, "pos")

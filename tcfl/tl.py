@@ -230,3 +230,6 @@ cat <<EOF >> %s/etc/ssh/sshd_config
 PermitRootLogin yes
 PermitEmptyPasswords yes
 EOF""" % (prefix, prefix))
+
+def deploy_linux_ssh_root_nopwd(_ic, target, _kws):
+    linux_ssh_root_nopwd(target, "/mnt")

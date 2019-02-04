@@ -304,6 +304,21 @@ Provisioning OS specific metadata
 - *linux_options_append*: string describing options to append to a
   Linux kernel boot command line.
 
+.. _pos_capable:
+
+- *pos_capable*: dictionary describing a target as able to boot into a
+  Provisioning OS to perform target provisioning.
+
+  Keys are the same as described in :data:`tcfl.pos.capability_fns`
+  (e.g: *boot_to_pos*, *boot_config*, etc)
+
+  Values are only one of each of each second level keys in the
+  :data:`tcfl.pos.capability_fns` dictionary (e.g.: *pxe*, *uefi*...).
+
+  This indicates the system which different methodologies have to be
+  used for the target to get into Provisioning OS mode, configure
+  bootloader, etc.
+
 .. _pos_http_url_prefix:
 
 - *pos_http_url_prefix*: string describing the prefix to send for
