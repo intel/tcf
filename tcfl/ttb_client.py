@@ -376,7 +376,7 @@ class rest_target_broker(object):
         :returns: updated target tags
         """
         fullid = self.aka + "/" + target_id
-        r = self.rest_tb_target_list(target_id = target_id)
+        r = self.rest_tb_target_list(target_id = target_id, all_targets = True)
         if r:
             rtd = self._rt_list_to_dict(r)
             # Update the cache
