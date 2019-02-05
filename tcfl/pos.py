@@ -230,7 +230,7 @@ def target_rsyncd_stop(target):
     target.kw_unset('rsync_port')
     target.kw_unset('rsync_server')
 
-def partition(target, device):
+def pos_multiroot_partition(target, device):
     # /dev/SOMETHING to -> SOMETHING
     device_basename = os.path.basename(device)
 
@@ -935,31 +935,6 @@ def _root_part_select(target, image, boot_dev, root_part_dev):
                            % (root_part_dev, seed, score, seed), dlevel = 2)
     return root_part_dev
 
-def _deploy_image_boot_dev(target, boot_dev):
-    # What is our boot device?
-    if boot_dev:
-        assert isinstance(boot_dev, basestring), 'boot_dev must be a string'
-        target.report_info("POS: boot device %s (from arguments)"
-                           % boot_dev, dlevel = 3)
-    else:
-        boot_dev = target.kws.get('pos_boot_dev', None)
-        if boot_dev == None:
-            raise tc.blocked_e(
-                "Can't guess boot_dev (no `pos_boot_dev` tag available)",
-                { 'target': target } )
-        target.report_info("POS: boot device %s (from pos_boot_dev tag)"
-                           % boot_dev)
-    boot_dev = "/dev/" + boot_dev
-    # HACK: /dev/[hs]d* do partitions as /dev/[hs]dN, where as mmc and
-    # friends add /dev/mmcWHATEVERpN. Seriously...
-    if boot_dev.startswith("/dev/hd") \
-       or boot_dev.startswith("/dev/sd") \
-       or boot_dev.startswith("/dev/vd"):
-        target.kw_set('p_prefix', "")
-    else:
-        target.kw_set('p_prefix', "p")
-    return boot_dev
-
 # FIXME: what I don't like about this is that we have no info on the
 # interconnect -- this must require it?
 def target_power_cycle_to_pos_pxe(target):
@@ -967,77 +942,6 @@ def target_power_cycle_to_pos_pxe(target):
     target.property_set("pos_mode", "pxe")
     target.power.cycle()
 
-def target_boot_to_pos(target, pos_prompt = None,
-                       # plenty to boot to an nfsroot, hopefully
-                       timeout = 60,
-                       boot_to_pos_fn = None):
-    if boot_to_pos_fn == None:
-        # None specified, let's take from the target config
-        boot_to_pos_fn = target.pos.cap_fn_get('boot_to_pos', 'pxe')
-
-    for tries in range(3):
-        target.report_info("rebooting into POS for flashing [%d/3]" % tries)
-        boot_to_pos_fn(target)
-
-        # Sequence for TCF-live based on Fedora
-        if pos_prompt:
-            target.shell.linux_shell_prompt_regex = pos_prompt
-        try:
-            target.shell.up(timeout = timeout)
-        except tc.error_e as e:
-            outputf = e.attachments_get().get('console output', None)
-            if outputf:
-                output = open(outputf.name).read()
-            if output == None or output == "" or output == "\x00":
-                target.report_error("POS: no console output, retrying")
-                continue
-            # sometimes the BIOS has been set to boot local directly,
-            # so we might as well retry
-            target.report_error("POS: unexpected console output, retrying")
-            continue
-        break
-    else:
-        raise tc.blocked_e(
-            "POS: tried too many times to boot, without signs of life",
-            { "console output": target.console.read(), 'target': target })
-
-
-def target_partition(target, image,
-                     boot_dev = None, root_part_dev = None,
-                     partitioning_fn = partition):
-    # Ok, we might be accessing the target here to repartition and
-    # such, so let's first select a root partition
-    if target.property_get('pos_repartition'):
-        # Need to reinit the partition table (we were told to by
-        # setting pos_repartition to anything
-        target.report_info("POS: repartitioning per pos_repartition property")
-        partitioning_fn(target, boot_dev)
-        target.property_set('pos_repartition', None)
-
-    if root_part_dev == None:
-        for tries in range(3):
-            target.report_info("POS: guessing partition device [%d/3] "
-                               "(defaulting to %s)" % (tries, root_part_dev))
-            root_part_dev = _root_part_select(target, image,
-                                              boot_dev, root_part_dev)
-            if root_part_dev != None:
-                target.report_info("POS: will use %s for root partition"
-                                   % root_part_dev)
-                break
-            # we couldn't find a root partition device, which means the
-            # thing is trashed
-            target.report_info("POS: repartitioning because couldn't find "
-                               "root partitions")
-            partitioning_fn(target, boot_dev)
-        else:
-            output = target.shell.run("fdisk -l " + boot_dev, output = True)
-            raise tc.blocked_e(
-                "Tried too much to reinitialize the partition table to "
-                "pick up a root partition? is there enough space to "
-                "create root partitions?",
-                dict(target = target, fdisk_l = output,
-                     partsizes = target.kws.get('pos_partsizes', None)))
-    return root_part_dev
 
 def _target_mount_rootfs(kws, target, boot_dev, root_part_dev,
                          partitioning_fn, mkfs_cmd):
@@ -1084,7 +988,7 @@ def _target_mount_rootfs(kws, target, boot_dev, root_part_dev,
 
 def _deploy_image(ic, target, image,
                   boot_dev = None, root_part_dev = None,
-                  partitioning_fn = partition,
+                  partitioning_fn = None,
                   extra_deploy_fns = None,
                   # mkfs has to have -F to avoid it asking questions
                   mkfs_cmd = "mkfs.ext4 -Fj %(root_part_dev)s",
@@ -1173,7 +1077,7 @@ umount /mnt
 
 def deploy_image(ic, target, image,
                  boot_dev = None, root_part_dev = None,
-                 partitioning_fn = partition,
+                 partitioning_fn = pos_multiroot_partition,
                  extra_deploy_fns = None,
                  # mkfs has to have -F to avoid it asking questions
                  mkfs_cmd = "mkfs.ext4 -Fj %(root_part_dev)s",
@@ -1333,6 +1237,35 @@ class extension(tc.target_extension_c):
                                "not a dictionary of POS capabilities",
                                dict(target = self.target))
 
+
+    def _boot_dev_guess(self, boot_dev):
+        target = self.target
+        # What is our boot device?
+        if boot_dev:
+            assert isinstance(boot_dev, basestring), \
+                'boot_dev must be a string'
+            target.report_info("POS: boot device %s (from arguments)"
+                               % boot_dev, dlevel = 3)
+        else:
+            boot_dev = target.kws.get('pos_boot_dev', None)
+            if boot_dev == None:
+                raise tc.blocked_e(
+                    "Can't guess boot_dev (no `pos_boot_dev` tag available)",
+                    { 'target': target } )
+            target.report_info("POS: boot device %s (from pos_boot_dev tag)"
+                               % boot_dev)
+        boot_dev = "/dev/" + boot_dev
+        # HACK: /dev/[hs]d* do partitions as /dev/[hs]dN, where as mmc and
+        # friends add /dev/mmcWHATEVERpN. Seriously...
+        if boot_dev.startswith("/dev/hd") \
+           or boot_dev.startswith("/dev/sd") \
+           or boot_dev.startswith("/dev/vd"):
+            target.kw_set('p_prefix', "")
+        else:
+            target.kw_set('p_prefix', "p")
+        return boot_dev
+
+
     def cap_fn_get(self, capability, default = None):
         """
         Return a target's POS capability.
@@ -1353,6 +1286,15 @@ class extension(tc.target_extension_c):
                                   "'%s'; defaulting to '%s'"
                                   % (capability, default))
         capability_value = self.capabilities.get(capability, default)
+        if capability_value not in capability_fns[capability]:
+            raise tc.blocked_e(
+                "target defines '%s' method for '%s' that is unknown to "
+                "the Provisioning OS library; maybe configuration for it "
+                "is not loaded?" % (capability_value, capability),
+                attachments = dict(target = self.target,
+                                   capability = capability,
+                                   value = capability_value)
+            )
         capability_fn = capability_fns[capability][capability_value]
         modname = capability_fn.__module__
         self.target.report_info("POS: capability %s/%s implemented by %s.%s"
@@ -1361,9 +1303,91 @@ class extension(tc.target_extension_c):
         return capability_fn
 
 
+    def boot_to_pos(self, pos_prompt = None,
+                    # plenty to boot to an nfsroot, hopefully
+                    timeout = 60,
+                    boot_to_pos_fn = None):
+        target = self.target
+        if boot_to_pos_fn == None:
+            # None specified, let's take from the target config
+            boot_to_pos_fn = self.cap_fn_get('boot_to_pos', 'pxe')
+
+        for tries in range(3):
+            target.report_info("rebooting into POS for flashing [%d/3]"
+                               % tries)
+            boot_to_pos_fn(target)
+
+            # Sequence for TCF-live based on Fedora
+            if pos_prompt:
+                target.shell.linux_shell_prompt_regex = pos_prompt
+            try:
+                target.shell.up(timeout = timeout)
+            except tc.error_e as e:
+                outputf = e.attachments_get().get('console output', None)
+                if outputf:
+                    output = open(outputf.name).read()
+                if output == None or output == "" or output == "\x00":
+                    target.report_error("POS: no console output, retrying")
+                    continue
+                # sometimes the BIOS has been set to boot local directly,
+                # so we might as well retry
+                target.report_error("POS: unexpected console output, retrying")
+                continue
+            break
+        else:
+            raise tc.blocked_e(
+                "POS: tried too many times to boot, without signs of life",
+                { "console output": target.console.read(), 'target': target })
+
+
+    def partition(self, image,
+                  boot_dev = None, root_part_dev = None,
+                  partitioning_fn = pos_multiroot_partition):
+        """
+        Ensure the target's permanent storage is formatted properly
+        for the provisioning's needs
+
+        FIXME: this needs some redefinition
+        """
+        target = self.target
+        if target.property_get('pos_repartition'):
+            # Need to reinit the partition table (we were told to by
+            # setting pos_repartition to anything
+            target.report_info("POS: repartitioning per pos_repartition "
+                               "property")
+            partitioning_fn(target, boot_dev)
+            target.property_set('pos_repartition', None)
+
+        if root_part_dev == None:
+            for tries in range(3):
+                target.report_info("POS: guessing partition device [%d/3] "
+                                   "(defaulting to %s)"
+                                   % (tries, root_part_dev))
+                root_part_dev = _root_part_select(target, image,
+                                                  boot_dev, root_part_dev)
+                if root_part_dev != None:
+                    target.report_info("POS: will use %s for root partition"
+                                       % root_part_dev)
+                    break
+                # we couldn't find a root partition device, which means the
+                # thing is trashed
+                target.report_info("POS: repartitioning because couldn't find "
+                                   "root partitions")
+                partitioning_fn(target, boot_dev)
+            else:
+                output = target.shell.run("fdisk -l " + boot_dev,
+                                          output = True)
+                raise tc.blocked_e(
+                    "Tried too much to reinitialize the partition table to "
+                    "pick up a root partition? is there enough space to "
+                    "create root partitions?",
+                    dict(target = target, fdisk_l = output,
+                         partsizes = target.kws.get('pos_partsizes', None)))
+        return root_part_dev
+
     def deploy_image(self, ic, image,
                      boot_dev = None, root_part_dev = None,
-                     partitioning_fn = partition,
+                     partitioning_fn = None,
                      extra_deploy_fns = None,
                      # mkfs has to have -F to avoid it asking questions
                      mkfs_cmd = "mkfs.ext4 -Fj %(root_part_dev)s",
@@ -1433,17 +1457,15 @@ class extension(tc.target_extension_c):
             % type(ic).__name__
         assert isinstance(image, basestring)
 
-        boot_dev = _deploy_image_boot_dev(self.target, boot_dev)
+        boot_dev = self._boot_dev_guess(boot_dev)
         with msgid_c("POS"):
 
-            target_boot_to_pos(
-                self.target, pos_prompt = pos_prompt, timeout = timeout,
-                boot_to_pos_fn = target_power_cycle_to_pos)
+            self.boot_to_pos(pos_prompt = pos_prompt, timeout = timeout,
+                             boot_to_pos_fn = target_power_cycle_to_pos)
 
-            root_part_dev = target_partition(
-                self.target, image, boot_dev = boot_dev,
-                root_part_dev = root_part_dev,
-                partitioning_fn = partitioning_fn)
+            root_part_dev = self.partition(image, boot_dev = boot_dev,
+                                           root_part_dev = root_part_dev,
+                                           partitioning_fn = partitioning_fn)
 
             return _deploy_image(
                 ic,
