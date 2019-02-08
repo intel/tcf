@@ -30,6 +30,15 @@ The output of each ``.t`` execution is parsed with
 of :class:`subcases <tc_taps_subcase_c_base>`) which will report the
 individual result of that subcase execution.
 
+**Setup steps**
+
+To improve the deployment of the BBT tree, a copy can be kept in the
+server's rsync image area for initial seeding; to setup, execute in
+the server::
+
+  $ mkdir -p /home/ttbd/images/misc
+  $ git clone URL/bbt.git /home/ttbd/images/misc/bbt.git
+
 """
 # FIXME:
 #
@@ -319,8 +328,23 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
             os.path.realpath(self.kws['thisfile']),
             os.path.realpath(bbt_tree))
 
-        tcfl.pos.target_rsync(target, bbt_tree.strip(), dst = '/opt/bbt.git',
-                              persistent_name = 'bbt.git')
+        target.shell.run("mkdir -p /mnt/persistent.tcf.d/bbt.git")
+        # try rsyncing a seed bbt.git repo from -- this speeds up
+        # first time transmisisons as the repo is quite close in the
+        # server; further rsync from the local version in the client
+        target.report_info("POS: rsyncing bbt.git from %(rsync_server)s "
+                           "to /mnt/peristent.tcf.git/bbt.git" % _kws,
+                           dlevel = -1)
+        target.shell.run("time rsync -aAX --numeric-ids"
+                         " %(rsync_server)s/misc/bbt.git/."
+                         " /mnt/persistent.tcf.d/bbt.git/."
+                         " || echo FAILED-%(tc_hash)s"
+                         % _kws)
+        target.report_info("POS: rsynced bbt.git from %(rsync_server)s "
+                           "to /mnt/persistent.tcf.d/bbt.git" % _kws)
+
+        target.pos.rsync(bbt_tree.strip(), dst = '/opt/bbt.git',
+                         persistent_name = 'bbt.git')
 
 
     def deploy(self, ic, target):
