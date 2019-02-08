@@ -838,7 +838,9 @@ been tested yet, shall be similar.
 3. Configure an image repository (FIXME: add in glusterfs steps); we
    choose ``/home/ttbd/images`` but any other location will do::
 
-     # install -o ttbd -g ttbd -m 2775 -d /home/ttbd /home/ttbd/images \
+     # install -o ttbd -g ttbd -m 2775 -d \
+         /home/ttbd \
+         /home/ttbd/images/tcf-live/x86_64 \
          /home/ttbd/public_html /home/ttbd/public_html/x86_64
 
 4. Disable the firewall (FIXME: do not require this)::
@@ -1496,7 +1498,7 @@ network *nwa* so it can be flashed with POS.
 Restart the server and verify *nuc-58a* works as expected::
 
   # systemctl restart ttbd@production
-  # tcf healtcheck
+  # tcf healthcheck nuc-58a
 
 will try to power on and off the target; observe in the monitor if the
 target is coming up or not. FIXME: diagose issues
