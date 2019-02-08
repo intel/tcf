@@ -234,15 +234,18 @@ elif [ $image_type == fedoralive -o $image_type == tcflive ]; then
     mounted_dirs="$tmpdir/squashfs ${mounted_dirs:-}"
     info mounted $tmpdir/iso/LiveOS/squashfs.img in $tmpdir/squashfs
 
-    if [ $image_type == fedoralive ]; then
+    # Mount the root fs
+    # use sudo test to test because the mount point might allow no
+    # access to the current user. 
+    if sudo test -r $tmpdir/squashfs/LiveOS/rootfs.img; then
         sudo mount -r -o loop $tmpdir/squashfs/LiveOS/rootfs.img $tmpdir/root
         info mounted $tmpdir/squashfs/LiveOS/rootfs.img in $tmpdir/root
-    elif [ $image_type == tcflive ]; then
+    elif sudo test -r $tmpdir/squashfs/LiveOS/ext3fs.img; then
         # norecovery: if the ext3 fs has a dirty log, we don't want to do it now
         sudo mount -o norecovery,loop $tmpdir/squashfs/LiveOS/ext3fs.img $tmpdir/root
         info mounted $tmpdir/squashfs/LiveOS/ext3fs.img in $tmpdir/root
     else
-        error BUG! Unknown image type for $image_type
+        error BUG! dunno how to mount the root file system (no rootfs.img or ext2fs.img)
     fi
     mounted_dirs="$tmpdir/root ${mounted_dirs:-}"
 elif [ $image_type == qcow2 ]; then
@@ -312,7 +315,7 @@ EOF
 
 elif ! [ -d $destdir ]; then
 
-    mkdir $destdir
+    sudo install -m 0755 -d $destdir
     info created $destdir, transferring
     sudo tar c --selinux --acls --xattrs -C $tmpdir/root . \
         | sudo tar x --selinux --acls --xattrs -C $destdir/.
