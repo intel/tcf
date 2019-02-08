@@ -993,7 +993,7 @@ d. Make the POS root image available over NFS as read-only (note we
    only export those images only, not all)::
 
      # tee /etc/exports.d/ttbd-pos.exports <<EOF
-     /home/ttbd/images/tcf-live *(ro,no_root_squash)
+     /home/ttbd/images/tcf-live/x86_64 *(ro,no_root_squash)
      EOF
      # systemctl reload nfs-server
 
@@ -1001,7 +1001,7 @@ d. Make the POS root image available over NFS as read-only (note we
 
      $ showmount -e SERVERNAME
      Export list for localhost:
-     /home/ttbd/images/tcf-live *
+     /home/ttbd/images/tcf-live/x86_64 *
 
 .. _ttbd_pos_deploying_images:
 
