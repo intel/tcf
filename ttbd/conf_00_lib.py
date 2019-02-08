@@ -2305,6 +2305,9 @@ def dlwps7_add(hostname, powered_on_start = None,
     The DLWPS7 needs to be setup and configured; this function exposes
     the different targets for to expose the individual sockets for debug.
 
+    Add to a configuration file
+    ``/etc/ttbd-production/conf_10_targets.py`` (or similar):
+
     .. code-block:: python
 
        dlwps7_add("sp6")
@@ -2421,9 +2424,9 @@ def dlwps7_add(hostname, powered_on_start = None,
              matches *spM*), gateway *192.168.N.1*; hit the *submit* next to
              it.
 
-          2. Disable the security lockout
+          2. Disable the security lockout in section *Delay*
 
-             *Delay Wrong password lockout* set to zero minutes
+             Set *Wrong password lockout* set to zero minutes
 
           3. Turn on setting power after power loss:
 
