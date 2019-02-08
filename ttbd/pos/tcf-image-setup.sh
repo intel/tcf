@@ -348,7 +348,8 @@ done
 tty_devs="ttyUSB0 ttyS6 ttyS0 ${TTY_DEVS_EXTRA:-}"
 
 # On new distros, systemd enabled
-if [ -d $destdir/etc/systemd/system/getty.target.wants ]; then
+if [ -d $destdir/etc/systemd/system/getty.target.wants ] \
+   || [ -d $destdir/usr/lib/systemd/system/getty.target.wants ]; then
     # Harcode enable getty on certain devices
     #
     # Disable serial-getty@.service's BindTo -- this is needed so
