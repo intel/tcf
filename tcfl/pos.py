@@ -45,6 +45,7 @@ Note installation in the server side is needed, as described in
 right spot).
 """
 
+import inspect
 import operator
 import os
 import random
@@ -57,178 +58,6 @@ import Levenshtein
 import tc
 import tl
 from . import msgid_c
-
-def target_rsyncd_start(ic, target):
-    """
-    Start an *rsync* server on a target running Provisioning OS
-
-    This can be used to receive deployment files from any location
-    needed to execute later in the target. The server is attached to
-    the ``/mnt`` directory and the target is upposed to mount the
-    destination filesystems there.
-
-    This is usually called automatically for the user by the likes of
-    :func:`deploy_image` and others.
-
-    It will create a tunnel from the server to the target's port where
-    the rsync daemon is listening. A client can then connect to the
-    server's port to stream data over the rsync protocol. The server
-    address and port will be stored in the *target*'s keywords
-    *rsync_port* and *rsync_server* and thus can be accessed with:
-
-    >>> print target.kws['rsync_server'], target.kws['rsync_port']
-
-    :param tcfl.tc.target_c ic: interconnect (network) to which
-      the target is connected.
-    """
-    target.shell.run("""\
-cat > /tmp/rsync.conf <<EOF
-[rootfs]
-use chroot = true
-path = /mnt/
-read only = false
-timeout = 60
-uid = root
-gid = root
-EOF""")
-    # start rsync in the background, save it's PID file as rsync makes
-    # no pids and we might not have killall in the POS
-    target.shell.run(
-        "rsync --port 3000 --daemon --no-detach --config /tmp/rsync.conf & "
-        "echo $! > /tmp/rsync.pid")
-    # Tell the tunneling interface which IP address we want to use
-    target.tunnel.ip_addr = target.addr_get(ic, "ipv4")
-    target.kw_set('rsync_port', target.tunnel.add(3000))
-    target.kw_set('rsync_server', target.rtb.parsed_url.hostname)
-
-def target_rsync(target, src = None, dst = None,
-                 persistent_name = None,
-                 persistent_dir = '/persistent.tcf.d'):
-    """
-    rsync data from the local machine to a target
-
-    The local machine is the machine executing the test script (where
-    *tcf run* was called).
-
-    This function will first rsync data to a location in the target
-    (persistent storage ``/persistent.tcd.d``) that will not be
-    overriden when flashing images. Then it will rsync it from there
-    to the final location.
-
-    This allows the content to be cached in between testcase execution
-    that reimages the target. Thus, the first run, the whole source
-    tree is transferred to the persistent area, but subsequent runs
-    will already find it there even when if the OS image has been
-    reflashed (as the reflashing will not touch the persistent
-    area). Of course this assumes the previous executions didn't wipe
-    the persistent area or the whole disk was not corrupted.
-
-    This function can be used, for example, when wanting to deploy
-    extra data to the target when using :func:`deploy_image`:
-
-    >>> @tcfl.tc.interconnect("ipv4_addr")
-    >>> @tcfl.tc.target("pos_capable")
-    >>> class _test(tcfl.tc.tc_c)
-    >>>     ...
-    >>>
-    >>>     @staticmethod
-    >>>     def _deploy_mygittree(_ic, target, _kws):
-    >>>         tcfl.pos.target_rsync(target,
-    >>>                               os.path.expanduser("~/somegittree.git"),
-    >>>                               dst = '/opt/somegittree.git')
-    >>>
-    >>>     def deploy(self, ic, target):
-    >>>         ic.power.on()
-    >>>         target.pos.deploy_image(
-    >>>             ic, "fedora::29",
-    >>>             extra_deploy_fns = [ self._deploy_mygittree ])
-    >>>
-    >>>     ...
-
-
-    In this example, the user has a cloned git tree in
-    ``~/somegittree.git`` that has to be flashed to the target into
-    ``/opt/somegittree.git`` after ensuring the root file system is
-    flashed with *Fedora 29*. :func:`deploy_image` will start the rsync
-    server and then call *_deploy_mygittree()*  which will use
-    :func:`target_rsync` to rsync from the user's machine to the
-    target's persistent location (in
-    ``/mnt/peristent.tcf.d/somegittree.git``) and from there to the
-    final location of ``/mnt/opt/somegittree.git``. When the system
-    boots it will be of course in ``/opt/somegittree.git``
-
-    :param tcfl.tc.target_c target: target to which rsync; it must
-      describe the rsync destination in keywords:
-
-       >>> target.kws['rsync_server']
-       >>> target.kws['rsync_port']
-
-      as setup by calling :func:target_rsyncd_start on the
-      target. Functions such as :func:`deploy_image` do this for you.
-
-    :param str src: (optional) source tree/file in the local machine
-      to be copied to the target's persistent area. If not specified,
-      nothing is copied to the persistent area.
-
-    :param str dst: (optional) destination tree/file in the target
-      machine; if specified, the file is copied from the persistent
-      area to the final destination. If not specified,
-      nothing is copied from the persistent area to the final
-      destination.
-
-    :param str persistent_name: (optional) name for the file/tree in
-      the persistent area; defaults to the basename of the source file
-      specification.
-
-    :param str persistent_dir: (optional) name for the persistent
-      area in the target, defaults to `/persistent.tcf.d`.
-    """
-    target.shell.run("mkdir -p /mnt/%s" % persistent_dir)
-    # upload the directory to the persistent area
-    if persistent_name == None:
-        assert src != None, \
-            "no `src` parameter is given, `persistent_name` must " \
-            "then be specified"
-        persistent_name = os.path.basename(src)
-    if src != None:
-        target.report_info("rsyncing %s to target's persistent area %s/%s"
-                           % (src, persistent_dir, persistent_name))
-        target.shcmd_local(
-            # don't be verbose, makes it too slow and timesout when
-            # sending a lot of files
-            "time rsync -aAX --numeric-ids --delete --port %%(rsync_port)s "
-            " %s/. %%(rsync_server)s::rootfs/%s/%s"
-            % (src, persistent_dir, persistent_name))
-    target.testcase._targets_active()
-    if dst != None:
-        # There is a final destination specified, so now, in the
-        # target, make a copy from the persistent area to the final
-        # destination
-        parent_dirs = os.path.dirname(dst)
-        if parent_dirs != '':
-            target.shell.run("mkdir -p /mnt/%s" % parent_dirs)
-        target.shell.run(
-            # don't be verbose, makes it too slow and timesout when
-            # sending a lot of files
-            "time rsync -aAX --delete /mnt/%s/%s/. /mnt/%s"
-            % (persistent_dir, persistent_name, dst))
-
-def target_rsyncd_stop(target):
-    """
-    Stop an *rsync* server on a target running Provisioning OS
-
-    A server was started with :func:`target_rsyncd_start`; kill it
-    gracefully.
-    """
-    # Use sh syntax rather than bash's $(</tmp/rsync.pid) to avoid
-    # surprises if the shall changes; ideally we'd use killall, but we
-    # don't know if it is installed in the POS
-    target.shell.run("kill -9 `cat /tmp/rsync.pid`")
-    # remove the runnel we created to the rsync server and the
-    # keywords to access it
-    target.tunnel.remove(int(target.kws['rsync_port']))
-    target.kw_unset('rsync_port')
-    target.kw_unset('rsync_server')
 
 def pos_multiroot_partition(target, device):
     # /dev/SOMETHING to -> SOMETHING
@@ -985,96 +814,6 @@ def _target_mount_rootfs(kws, target, boot_dev, root_part_dev,
             "POS: Tried to mount too many times and failed",
             dict(target = target))
 
-
-def _deploy_image(ic, target, image,
-                  boot_dev = None, root_part_dev = None,
-                  partitioning_fn = None,
-                  extra_deploy_fns = None,
-                  # mkfs has to have -F to avoid it asking questions
-                  mkfs_cmd = "mkfs.ext4 -Fj %(root_part_dev)s",
-                  # When flushing to USB drives, it can be slow
-                  timeout_sync = 240,
-                  boot_config = None):
-    testcase = target.testcase
-
-    root_part_dev_base = os.path.basename(root_part_dev)
-    kws = dict(
-        rsync_server = ic.kws['pos_rsync_server'],
-        image = image,
-        boot_dev = boot_dev,
-        root_part_dev = root_part_dev,
-        root_part_dev_base = root_part_dev_base,
-    )
-    kws.update(target.kws)
-
-    # FIXME: verify root partitioning is the right one and recover if
-    # not
-    original_timeout = testcase.tls.expecter.timeout
-    try:
-        testcase.tls.expecter.timeout = 800
-        _target_mount_rootfs(kws, target, boot_dev, root_part_dev,
-                             partitioning_fn, mkfs_cmd)
-
-        image_list_output = target.shell.run(
-            "rsync %(rsync_server)s/" % kws, output = True)
-        images_available = image_list_from_rsync_output(
-            image_list_output)
-        # Do we have that image? autocomplete missing fields
-        # and get us a good match if so
-        image_final = image_select_best(image, images_available,
-                                        target.bsp_model)
-        kws['image'] = ":".join(image_final)
-        target.report_info("POS: rsyncing %(image)s from "
-                           "%(rsync_server)s to /mnt" % kws, dlevel = -1)
-
-        target.shell.run("time rsync -aAX --numeric-ids --delete "
-                         "--exclude='/persistent.tcf.d/*' "
-                         "%(rsync_server)s/%(image)s/. /mnt/." % kws)
-        target.property_set('pos_root_' + root_part_dev_base, image)
-        target.report_info("POS: rsynced %(image)s from "
-                           "%(rsync_server)s to /mnt" % kws)
-
-        # did the user provide an extra function to deploy stuff?
-        if extra_deploy_fns:
-            target_rsyncd_start(ic, target)
-            for extra_deploy_fn in extra_deploy_fns:
-                target.report_info("POS: running extra deploy fn %s"
-                                   % extra_deploy_fn, dlevel = 2)
-                extra_deploy_fn(ic, target, kws)
-            target_rsyncd_stop(target)
-
-        # Configure the bootloader: by hand with shell commands, so it is
-        # easy to reproduce by a user typing them
-        target.report_info("POS: configuring bootloader")
-        if boot_config == None:	            # FIXME: introduce pos_boot_config
-            boot_config = target.pos.cap_fn_get('boot_config', 'uefi')
-        boot_config(target, root_part_dev_base, image_final)
-
-        testcase.tls.expecter.timeout = timeout_sync
-        # sync, kill any processes left over in /mnt, unmount it
-        target.shell.run("""
-sync;
-which lsof && kill -9 `lsof -Fp  /home | sed -n '/^p/{s/^p//;p}'`;
-cd /;
-umount /mnt
-""")
-        # Now setup the local boot loader to boot off that
-        target.property_set("pos_mode", "local")
-    except Exception as e:
-        target.report_info("BUG? exception %s: %s %s" %
-                           (type(e).__name__, e, traceback.format_exc()))
-        raise
-    finally:
-        testcase.tls.expecter.timeout = original_timeout
-        # don't fail if this fails, as it'd trigger another exception
-        # and hide whatever happened that make us fail. Just make a
-        # good hearted attempt at cleaning up
-        target.shell.run("umount -l /mnt || true")
-
-    target.report_info("POS: deployed %(image)s to %(root_part_dev)s" % kws)
-    return kws['image']
-
-
 def deploy_image(ic, target, image,
                  boot_dev = None, root_part_dev = None,
                  partitioning_fn = pos_multiroot_partition,
@@ -1158,8 +897,9 @@ def deploy_linux_kernel(ic, target, _kws):
     :func:`tcfl.pos.deploy_image` is asked to call this function.
 
     The client will rsync the tree from the local machine to the
-    persistent space using :func:`target_rsync`, which also caches it
-    in a persistent area to speed up multiple transfers.
+    persistent space using :meth:`target.pos.rsync <extension.rsync>`,
+    which also caches it in a persistent area to speed up multiple
+    transfers.
 
     """
     if not '' in _kws:
@@ -1168,13 +908,12 @@ def deploy_linux_kernel(ic, target, _kws):
                            "has not been set for the target", dlevel = 2)
         return
     target.report_info("rsyncing boot image to target")
-    target_rsync(target,
-                 "%(pos_deploy_linux_kernel_tree)s/boot" % target.kws,
-                 "/boot")
+    target.pos.rsync("%(pos_deploy_linux_kernel_tree)s/boot" % target.kws,
+                     "/boot")
     target.report_info("rsyncing lib/modules to target")
-    target_rsync(target,
-                 "%(pos_deploy_linux_kernel_tree)s/lib/modules" % target.kws,
-                 "/lib/modules")
+    target.pos.rsync("%(pos_deploy_linux_kernel_tree)s/lib/modules"
+                     % target.kws,
+                     "/lib/modules")
     target.testcase._targets_active()
     target.report_pass("linux kernel transferred")
 
@@ -1191,14 +930,28 @@ def deploy_linux_kernel(ic, target, _kws):
 capability_fns = dict(
     #: Function to call to power cycle the target and have it boot the
     #: Provisioning OS.
+    #:
+    #: Arguments:
+    #: - tcfl.tc.target_c target: target to put in POS mode
     boot_to_pos = dict(
         pxe = target_power_cycle_to_pos_pxe
     ),
     #: Function to call to configure the boot loader once the system
     #: has been provisoned.
+    #:
+    #: Arguments:
+    #: - tcfl.tc.target_c target: target who's boot has to be configured
+    #: - str root_part_dev: root device
+    #: - str image: image specification
     boot_config = dict(
         uefi = boot_config_uefi
-    )
+    ),
+    partition = dict(
+        default = pos_multiroot_partition,
+    ),
+    #: Post-deploy functions to run,
+    extra_deploy_fns = [
+    ],
 )
 
 
@@ -1206,7 +959,18 @@ _pos_capable_defaults = dict(
     # backwards compat
     boot_to_pos = 'pxe',
     boot_config = 'uefi',
+    partition = 'default',
 )
+
+def capability_register(capability, value, function):
+    assert capability in capability_fns.keys(), \
+        "capability %s is not one of: %s" \
+        % (capability, " ".join(capability_fns.keys()))
+    assert isinstance(value, basestring), \
+        "capability value must be a string, got %s" % type(value).__name__
+    assert callable(function), \
+        "function %s is not a callable" % function
+    capability_fns.setdefault(capability, {})[value] = function
 
 
 class extension(tc.target_extension_c):
@@ -1297,9 +1061,10 @@ class extension(tc.target_extension_c):
             )
         capability_fn = capability_fns[capability][capability_value]
         modname = capability_fn.__module__
-        self.target.report_info("POS: capability %s/%s implemented by %s.%s"
-                                % (capability, capability_value,
-                                   modname, capability_fn.__name__))
+        self.target.report_info(
+            "POS: capability %s/%s by %s.%s" % (
+                capability, capability_value,
+                inspect.getsourcefile(capability_fn), capability_fn.__name__))
         return capability_fn
 
 
@@ -1342,13 +1107,16 @@ class extension(tc.target_extension_c):
 
     def partition(self, image,
                   boot_dev = None, root_part_dev = None,
-                  partitioning_fn = pos_multiroot_partition):
+                  partitioning_fn = None):
         """
         Ensure the target's permanent storage is formatted properly
         for the provisioning's needs
 
         FIXME: this needs some redefinition
         """
+        if partitioning_fn == None:
+            partitioning_fn = self.cap_fn_get("partition", "default")
+
         target = self.target
         if target.property_get('pos_repartition'):
             # Need to reinit the partition table (we were told to by
@@ -1384,6 +1152,187 @@ class extension(tc.target_extension_c):
                     dict(target = target, fdisk_l = output,
                          partsizes = target.kws.get('pos_partsizes', None)))
         return root_part_dev
+
+
+    def rsyncd_start(self, ic):
+        """
+        Start an *rsync* server on a target running Provisioning OS
+
+        This can be used to receive deployment files from any location
+        needed to execute later in the target. The server is attached to
+        the ``/mnt`` directory and the target is upposed to mount the
+        destination filesystems there.
+
+        This is usually called automatically for the user by the likes of
+        :func:`deploy_image` and others.
+
+        It will create a tunnel from the server to the target's port where
+        the rsync daemon is listening. A client can then connect to the
+        server's port to stream data over the rsync protocol. The server
+        address and port will be stored in the *target*'s keywords
+        *rsync_port* and *rsync_server* and thus can be accessed with:
+
+        >>> print target.kws['rsync_server'], target.kws['rsync_port']
+
+        :param tcfl.tc.target_c ic: interconnect (network) to which
+          the target is connected.
+        """
+        target = self.target
+        target.shell.run("""\
+cat > /tmp/rsync.conf <<EOF
+[rootfs]
+use chroot = true
+path = /mnt/
+read only = false
+timeout = 60
+uid = root
+gid = root
+EOF""")
+        # start rsync in the background, save it's PID file as rsync makes
+        # no pids and we might not have killall in the POS
+        target.shell.run(
+            "rsync --port 3000 --daemon --no-detach --config /tmp/rsync.conf &"
+            "echo $! > /tmp/rsync.pid")
+        # Tell the tunneling interface which IP address we want to use
+        target.tunnel.ip_addr = target.addr_get(ic, "ipv4")
+        target.kw_set('rsync_port', target.tunnel.add(3000))
+        target.kw_set('rsync_server', target.rtb.parsed_url.hostname)
+
+    def rsync(self, src = None, dst = None,
+              persistent_name = None,
+              persistent_dir = '/persistent.tcf.d'):
+        """
+        rsync data from the local machine to a target
+
+        The local machine is the machine executing the test script (where
+        *tcf run* was called).
+
+        This function will first rsync data to a location in the target
+        (persistent storage ``/persistent.tcd.d``) that will not be
+        overriden when flashing images. Then it will rsync it from there
+        to the final location.
+
+        This allows the content to be cached in between testcase execution
+        that reimages the target. Thus, the first run, the whole source
+        tree is transferred to the persistent area, but subsequent runs
+        will already find it there even when if the OS image has been
+        reflashed (as the reflashing will not touch the persistent
+        area). Of course this assumes the previous executions didn't wipe
+        the persistent area or the whole disk was not corrupted.
+
+        This function can be used, for example, when wanting to deploy
+        extra data to the target when using :func:`deploy_image`:
+
+        >>> @tcfl.tc.interconnect("ipv4_addr")
+        >>> @tcfl.tc.target("pos_capable")
+        >>> class _test(tcfl.tc.tc_c)
+        >>>     ...
+        >>>
+        >>>     @staticmethod
+        >>>     def _deploy_mygittree(_ic, target, _kws):
+        >>>         tcfl.pos.rsync(os.path.expanduser("~/somegittree.git"),
+        >>>                        dst = '/opt/somegittree.git')
+        >>>
+        >>>     def deploy(self, ic, target):
+        >>>         ic.power.on()
+        >>>         target.pos.deploy_image(
+        >>>             ic, "fedora::29",
+        >>>             extra_deploy_fns = [ self._deploy_mygittree ])
+        >>>
+        >>>     ...
+
+
+        In this example, the user has a cloned git tree in
+        ``~/somegittree.git`` that has to be flashed to the target into
+        ``/opt/somegittree.git`` after ensuring the root file system is
+        flashed with *Fedora 29*. :func:`deploy_image` will start the rsync
+        server and then call *_deploy_mygittree()*  which will use
+        :meth:`target.pos.rsync <rsync>` to rsync from the user's
+        machine to the target's persistent location (in
+        ``/mnt/persistent.tcf.d/somegittree.git``) and from there to the
+        final location of ``/mnt/opt/somegittree.git``. When the system
+        boots it will be of course in ``/opt/somegittree.git``
+
+        Because :meth:`target.pos.rsyncd_start <rsyncd_start>`
+        has been called already, we have now these keywords available
+        that allows to know where to connect to.
+
+           >>> target.kws['rsync_server']
+           >>> target.kws['rsync_port']
+
+          as setup by calling :meth:`target.pos.rsyncd_start
+          <rsyncd_start>` on the target. Functions such as
+          :meth:`target.pos.deploy_image <deploy_image>` do this for
+          you.
+
+        :param str src: (optional) source tree/file in the local machine
+          to be copied to the target's persistent area. If not specified,
+          nothing is copied to the persistent area.
+
+        :param str dst: (optional) destination tree/file in the target
+          machine; if specified, the file is copied from the persistent
+          area to the final destination. If not specified,
+          nothing is copied from the persistent area to the final
+          destination.
+
+        :param str persistent_name: (optional) name for the file/tree in
+          the persistent area; defaults to the basename of the source file
+          specification.
+
+        :param str persistent_dir: (optional) name for the persistent
+          area in the target, defaults to `/persistent.tcf.d`.
+        """
+        target = self.target
+        target.shell.run("mkdir -p /mnt/%s" % persistent_dir)
+        # upload the directory to the persistent area
+        if persistent_name == None:
+            assert src != None, \
+                "no `src` parameter is given, `persistent_name` must " \
+                "then be specified"
+            persistent_name = os.path.basename(src)
+        if src != None:
+            target.report_info(
+                "rsyncing %s to target's persistent area /mnt%s/%s"
+                % (src, persistent_dir, persistent_name))
+            target.shcmd_local(
+                # don't be verbose, makes it too slow and timesout when
+                # sending a lot of files
+                "time rsync -aAX --numeric-ids --delete"
+                " --port %%(rsync_port)s "
+                " %s/. %%(rsync_server)s::rootfs/%s/%s"
+                % (src, persistent_dir, persistent_name))
+        target.testcase._targets_active()
+        if dst != None:
+            # There is a final destination specified, so now, in the
+            # target, make a copy from the persistent area to the final
+            # destination
+            parent_dirs = os.path.dirname(dst)
+            if parent_dirs != '':
+                target.shell.run("mkdir -p /mnt/%s" % parent_dirs)
+            target.shell.run(
+                # don't be verbose, makes it too slow and timesout when
+                # sending a lot of files
+                "time rsync -aAX --delete /mnt/%s/%s/. /mnt/%s"
+                % (persistent_dir, persistent_name, dst))
+
+    def rsyncd_stop(self):
+        """
+        Stop an *rsync* server on a target running Provisioning OS
+
+        A server was started with :meth:`target.pos.rsyncd_start
+        <rsyncd_start>`; kill it gracefully.
+        """
+        target = self.target
+        # Use sh syntax rather than bash's $(</tmp/rsync.pid) to avoid
+        # surprises if the shall changes; ideally we'd use killall, but we
+        # don't know if it is installed in the POS
+        target.shell.run("kill -9 `cat /tmp/rsync.pid`")
+        # remove the runnel we created to the rsync server and the
+        # keywords to access it
+        target.tunnel.remove(int(target.kws['rsync_port']))
+        target.kw_unset('rsync_port')
+        target.kw_unset('rsync_server')
+
 
     def deploy_image(self, ic, image,
                      boot_dev = None, root_part_dev = None,
@@ -1456,25 +1405,98 @@ class extension(tc.target_extension_c):
             "ic must be an instance of tc.target_c, but found %s" \
             % type(ic).__name__
         assert isinstance(image, basestring)
-
+        target = self.target
+        testcase = target.testcase
         boot_dev = self._boot_dev_guess(boot_dev)
         with msgid_c("POS"):
 
             self.boot_to_pos(pos_prompt = pos_prompt, timeout = timeout,
                              boot_to_pos_fn = target_power_cycle_to_pos)
 
+            # (maybe) re-partition) the target's hard drive and decide
+            # who is the rootfs.
             root_part_dev = self.partition(image, boot_dev = boot_dev,
                                            root_part_dev = root_part_dev,
                                            partitioning_fn = partitioning_fn)
 
-            return _deploy_image(
-                ic,
-                self.target,
-                image,
+            root_part_dev_base = os.path.basename(root_part_dev)
+            kws = dict(
+                rsync_server = ic.kws['pos_rsync_server'],
+                image = image,
                 boot_dev = boot_dev,
                 root_part_dev = root_part_dev,
-                partitioning_fn = partitioning_fn,
-                extra_deploy_fns = extra_deploy_fns,
-                mkfs_cmd = mkfs_cmd,
-                timeout_sync = timeout_sync,
-                boot_config = boot_config)
+                root_part_dev_base = root_part_dev_base,
+            )
+            kws.update(target.kws)
+
+            original_timeout = testcase.tls.expecter.timeout
+            try:
+                testcase.tls.expecter.timeout = 800
+                # Mount the target's filesystems in /mnt, which might
+                # be a tree of filesystems.
+                _target_mount_rootfs(kws, target, boot_dev, root_part_dev,
+                                     partitioning_fn, mkfs_cmd)
+
+                # List the available images and decide if we have the
+                # one we are asked to install, autocomplete missing
+                # fields and get us a good match if there is any.
+                image_list_output = target.shell.run(
+                    "rsync %(rsync_server)s/" % kws, output = True)
+                images_available = image_list_from_rsync_output(
+                    image_list_output)
+                image_final = image_select_best(image, images_available,
+                                                target.bsp_model)
+                kws['image'] = ":".join(image_final)
+
+                target.report_info("POS: rsyncing %(image)s from "
+                                   "%(rsync_server)s to /mnt" % kws,
+                                   dlevel = -1)
+                target.shell.run("time rsync -aAX --numeric-ids --delete "
+                                 "--exclude='/persistent.tcf.d/*' "
+                                 "%(rsync_server)s/%(image)s/. /mnt/." % kws)
+                target.property_set('pos_root_' + root_part_dev_base, image)
+                target.report_info("POS: rsynced %(image)s from "
+                                   "%(rsync_server)s to /mnt" % kws)
+
+                # did the user provide an extra function to deploy stuff?
+                if extra_deploy_fns:
+                    self.rsyncd_start(ic)
+                    for extra_deploy_fn in extra_deploy_fns:
+                        target.report_info("POS: running extra deploy fn %s"
+                                           % extra_deploy_fn, dlevel = 2)
+                        extra_deploy_fn(ic, target, kws)
+                    self.rsyncd_stop()
+
+                # Configure the bootloader: by hand with shell
+                # commands, so it is easy to reproduce by a user
+                # typing them
+                target.report_info("POS: configuring bootloader")
+                if boot_config == None:	# FIXME: introduce pos_boot_config
+                    boot_config = target.pos.cap_fn_get('boot_config', 'uefi')
+                boot_config(target, root_part_dev_base, image_final)
+
+                testcase.tls.expecter.timeout = timeout_sync
+                # sync, kill any processes left over in /mnt, unmount it
+                target.shell.run("""
+        sync;
+        which lsof && kill -9 `lsof -Fp  /home | sed -n '/^p/{s/^p//;p}'`;
+        cd /;
+        umount /mnt
+        """)
+                # Now setup the local boot loader to boot off that
+                target.property_set("pos_mode", "local")
+            except Exception as e:
+                target.report_info(
+                    "BUG? exception %s: %s %s" %
+                    (type(e).__name__, e, traceback.format_exc()))
+                raise
+            finally:
+                testcase.tls.expecter.timeout = original_timeout
+                # don't fail if this fails, as it'd trigger another exception
+                # and hide whatever happened that make us fail. Just make a
+                # good hearted attempt at cleaning up
+                target.shell.run("umount -l /mnt || true")
+
+            target.report_info("POS: deployed %(image)s to %(root_part_dev)s"
+                               % kws)
+            return kws['image']
