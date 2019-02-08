@@ -15,7 +15,7 @@ directory. The driver will generate one testcase per directory which
 will execute all the ``.t`` in there and then execute all the ``.t``
 in the any-bundle subdirectory.
 
-The testcases created are instances of :class:`tc_clear_bbt`; this
+The testcases created are instances of :class:`tc_clear_bbt_c`; this
 class will allocate one interconnect/network and one
 :ref:`*pos_capable* <pos_setup>` target. In said target it will
 install Clear OS (from an image server in the interconnect) during the
