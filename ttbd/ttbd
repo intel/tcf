@@ -1502,6 +1502,7 @@ if __name__ == "__main__":
 
     # Define things ttbl.config needs for configuring targets
     ttbl.test_target.state_path = os.path.expanduser(args.state_path)
+    ttbl.config.state_path = os.path.expanduser(args.state_path)
     if not os.path.isdir(ttbl.test_target.state_path):
         os.makedirs(ttbl.test_target.state_path, 0o2770)
     else:
