@@ -1630,7 +1630,9 @@ class tc_zephyr_sanity_c(tc.tc_c):
             for entry in data:
                 mapping.update(entry)
         else:
-            assert isinstance(data, dict)
+            assert isinstance(data, dict), \
+                "tests data is not a dict but a %s -- no 'tests' " \
+                "section specified" % type(data).__name__
             mapping = data
         common = y.get('common', {})
         for tc_name, _tc_vals in mapping.iteritems():
