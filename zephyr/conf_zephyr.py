@@ -250,7 +250,7 @@ for field in [
         'Tick overhead',
 ]:
     tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.data_harvest(
-        "Timing info (%(zephyr_board)s)",
+        "Timing info (%(zephyr_board)s - %(tc_name_short)s)",
         "%s (ns)" % field,
         r"%s\s+:\s*[0-9]+ cycles\s*,\s*(?P<value>[0-9]+) ns" % field,
         main_trigger_regex = \
