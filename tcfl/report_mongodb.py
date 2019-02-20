@@ -217,9 +217,26 @@ class report_mongodb_c(tcfl.report.report_c):
         if tag == "DATA":
             # We store data attachments in a different place, so it is
             # easier to get to them.
+            #
             # These must exist, otherwise it is a bug
+            #
+            # data Domain and name must be valid MongoDB fields, so we
+            # replace periods and starting dollar signs with an
+            # underscore.
             domain = attachments['domain']
+            assert isinstance (domain, basestring), \
+                "data domain name '%s' is a %s, need a string" \
+                % (domain, type(domain).__name__)
+            domain = domain.replace(".", "_")
+            if domain.startswith("$"):
+                domain = domain.replace("$", "_", 1)
             name = attachments['name']
+            assert isinstance (domain, basestring), \
+                "data name '%s' is a %s, need a string" \
+                % (name, type(name).__name__)
+            name = name.replace(".", "_")
+            if name.startswith("$"):
+                name = name.replace("$", "_", 1)
             value = attachments['value']
             doc['data'].setdefault(domain, {})
             doc['data'][domain][name] = value
