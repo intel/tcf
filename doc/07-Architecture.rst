@@ -399,6 +399,24 @@ used:
   anybody coming from a certain host (used for localhost
   authentication)
 
+.. _provisioning_os:
+  
+Provisioning
+============
+
+FIXME: describe better
+
+For targets which are capable of doing so, TCF supports a
+*Provisioning mode*, in which the target boots into a *Provisioning
+OS* (normally rooted in a network file system) which can be used to
+partition and install an OS into the permanent storage.
+
+The most common setup is the target PXE-booting to the Provisioning OS
+but other variations are also possible.
+
+Provisioning OS is configured following the steps described in the
+:ref:`guide <pos_setup>`. Usage examples are described in FIXME.
+
 .. _security_considerations:
 
 Security considerations
