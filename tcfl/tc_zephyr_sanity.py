@@ -1639,8 +1639,6 @@ class tc_zephyr_sanity_c(tc.tc_c):
             tc_vals = cls._get_test(tc_name, _tc_vals, common, testcase_valid_keys)
             origin = path + "#" + tc_name
             _tc = cls(origin, path, origin, tc_name)
-            if common:
-                tc_vals.update(common)
             _tc.log.debug("Original %s data for test '%s'\n%s"
                           % (os.path.basename(path), tc_name,
                              pprint.pformat(tc_vals)))
