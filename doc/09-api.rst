@@ -383,6 +383,7 @@ Target types drivers
 
 .. automodule:: ttbl.tt
 .. automodule:: ttbl.tt_qemu
+.. automodule:: ttbl.tt_qemu2
 .. automodule:: ttbl.flasher
 
 User access control and authentication

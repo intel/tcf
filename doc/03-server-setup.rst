@@ -367,10 +367,19 @@ then ran the steps in the test script
 the Zephyr OS sample in ``samples/hello_world``, all of them
 evaluating succesfully, so the ran was considered a sucess (*PASS*).
 
+.. _ttbd_config_qemu:
+
+Configure QEMU targets
+----------------------
+
+QEMU targets can be configured to boot a VM with 
+
 .. _ttbd_config_qemu_linux:
 
 Configure QEMU Linux targets
 ----------------------------
+
+(This is old style and this is deprecated)
 
 The default installation provies a list of QEMU-based targets that are
 suitable for running Fedora, Clear Linux and other Linux cloud OS;
@@ -967,6 +976,7 @@ c. Make the kernel and initrd for POS available via Apache for
          # dracut -v -H --kver $(ls /home/ttbd/images/tcf-live/x86_64/lib/modules) \
                 -k /home/ttbd/images/tcf-live/x86_64/lib/modules/* \
                --kernel-image /home/ttbd/images/tcf-live/x86_64/boot/vmlinuz-* \
+               --add-drivers "r8169 virtio_net" \
                -m "nfs base network kernel-modules kernel-network-modules" \
                /home/ttbd/public_html/x86_64/initramfs-tcf-live
 
@@ -982,7 +992,8 @@ c. Make the kernel and initrd for POS available via Apache for
 
    iv. Copy the POS boot material to the TFTP directory::
 
-         # install -m 2775 -o ttbd -g ttbd -d /var/lib/tftpboot/ttbd-production/
+         # install -m 2775 -o ttbd -g ttbd -d \
+              /var/lib/tftpboot/ttbd-production/efi-x86_64
          # install -m 0644 -o ttbd -g ttbd /home/ttbd/public_html/x86_64/* \
               /var/lib/tftpboot/ttbd-production/efi-x86_64
 

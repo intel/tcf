@@ -869,6 +869,148 @@ def nrf5x_add(name,
         },
         target_type = family)
 
+def qemu_pos_add(target_name,
+                 nw_name,
+                 mac_addr,
+                 ipv4_addr,
+                 ipv6_addr,
+                 consoles = None,
+                 disk_size = "30G",
+                 mr_partsizes = "1:4:5:5",
+                 extra_cmdline = "",	# pylint: disable = unused-argument
+                 ram_megs = 2048):
+    """Add a QEMU virtual machine capable of booting over Provisioning OS.
+
+    This target supports a serial console (*ttyS0*) and a single hard
+    drive that gets fully reinitialized every time the server is
+    restarted.
+
+    Note this target uses a UEFI bios *and* defines UEFI storage
+    space; this is needed so the right boot order is maintained.
+
+    Add to a server configuration file ``/etc/ttbd-*/conf_*.py``
+
+    >>> target = qemu_pos_add("qemu-x86-64-05a"
+    >>>                       "nwa",
+    >>>                       mac_addr = "02:61:00:00:00:05",
+    >>>                       ipv4_addr = "192.168.95.5",
+    >>>                       ipv6_addr = "fc00::61x:05")
+
+    Extra paramenters can be added by using the *extra_cmdline*
+    arguments, such as for example, to add VNC display:
+
+    >>>                       extra_cmdline = "-display vnc=0.0.0.0:0",
+
+    Adding to other networks:
+
+    >>> ttbl.config.targets['nuc-43'].add_to_interconnect(
+    >>>     'nwb', dict(
+    >>>         mac_addr = "02:62:00:00:00:05",
+    >>>         ipv4_addr = "192.168.98.5", ipv4_prefix_len = 24,
+    >>>         ipv6_addr = "fc00::62:05", ipv6_prefix_len = 112)
+
+    
+    :param str target_name: name of the target to create
+
+    :param str nw_name: name of the network to which this target will
+      be connected that provides Provisioning OS services.
+
+    :param str mac_addr: MAC address for this target (fake one). Will
+      be given to the virtual device created and can't be the same as
+      any other MAC address in the system or the networks. It is
+      recommended to be in the format:
+
+      >>> 02:HX:00:00:00:HY
+
+      where HX and HY are two hex digits
+
+    :param str disk_size: (optional) size specification for the
+      target's hard drive, as understood by QEMU's qemu-img create
+      program.
+
+    :param list(str) consoles: serial consoles to create (defaults to
+      just one, which is also the minimum).
+
+    :param int ram_megs: (optional) size of memory in megabytes
+
+    :param str mr_partsizes: (optional) specification for partition
+      sizes for the multiroot Provisoning OS environment. FIXME:
+      document link
+
+    :param str extra_cmdline: a string with extra command line to add;
+      %(FIELD)s supported (target tags).
+
+
+    """
+    if consoles == None or consoles == []:
+        consoles = [ 'ttyS0' ]
+    assert isinstance(target_name, basestring)
+    assert isinstance(consoles, list) \
+        and all([ isinstance(console, basestring) for console in consoles ])
+    assert len(consoles) >= 1
+    assert ram_megs > 0
+
+    target =  ttbl.tt_qemu2.tt_qemu(
+        target_name,
+        """\
+/usr/bin/qemu-system-x86_64 \
+  -enable-kvm \
+  -drive if=pflash,format=raw,readonly,file=/usr/share/edk2/ovmf/OVMF_CODE.fd \
+  -drive if=pflash,format=raw,file=%%(path)s/OVMF_VARS.fd \
+  -m %(ram_megs)s \
+  -drive file=%%(path)s/hd.qcow2,if=virtio,aio=threads \
+  -boot order=nc \
+  %(extra_cmdline)s \
+""" % locals(),
+        consoles = consoles,
+        _tags = dict(
+            bsp_models = { 'x86_64': None },
+            bsps = dict(
+                x86_64 = dict(console = 'x86_64', linux = True),
+            ),
+            ssh_client = True,
+            pos_capable = dict(
+                boot_to_pos = 'pxe',
+                boot_config = 'uefi',
+                boot_to_normal = 'pxe',
+                mount_fs = 'multiroot',
+            ),
+            pos_boot_interconnect = nw_name,
+            pos_boot_dev = "vda",
+            pos_partsizes = mr_partsizes,
+            linux_serial_console_default = consoles[0],
+        )
+    )
+    # set up the consoles
+    target.power_on_pre_fns.append(target._power_on_pre_consoles)
+    # Setup the network hookups (requires vlan_pci)
+    target.power_on_pre_fns.append(target._power_on_pre_nw)
+    # tell QEMU to start the VM once we have it all setup
+    target.power_on_post_fns.append(target._qmp_start)
+    target.power_off_post_fns.append(target._power_off_post_nw)
+    target.power_on_pre_fns.append(ttbl.dhcp.power_on_pre_pos_setup)
+
+    # Create an HD for this guy -- we do it after creating the
+    # target so the state path is created -- double check if the
+    # drive already exists so not to override it? nah, screw
+    # it--it is supposed to be all throwaway
+    subprocess.check_call([
+        "qemu-img", "create", "-q", "-f", "qcow2",
+        "%s/hd.qcow2" % (target.state_dir),
+        disk_size
+    ])
+    # reinitialize also the EFI vars storage
+    shutil.copy("/usr/share/OVMF/OVMF_VARS.fd", target.state_dir)
+    ttbl.config.target_add(target, target_type = "qemu-uefi-x86_64")
+    target.add_to_interconnect(
+        nw_name,
+        dict(
+            ipv4_addr = ipv4_addr, ipv4_prefix_len = 24,
+            ipv6_addr = ipv6_addr, ipv6_prefix_len = 112,
+            mac_addr = mac_addr,
+        )
+    )
+
 
 def frdm_add(name = None,
              serial_number = None,
@@ -1493,7 +1635,7 @@ ttbl.flasher.openocd_c._boards['nucleo_f103rb'] = dict(
 source [find board/st_nucleo_f103rb.cfg]
 hla_serial "%(serial_string)s"
 # From https://sourceforge.net/p/openocd/tickets/178/, makes reset work ok
-reset_config srst_only connect_assert_srst
+#reset_config srst_only connect_assert_srst
 
 $_TARGETNAME configure -event gdb-attach {
         echo "Debugger attaching: halting execution"
@@ -1822,7 +1964,7 @@ def stm32_add(name = None,
             # OpenOCD complains
             # Warn : Cannot identify target as a STM32L4 family.
             # Error: auto_probe failed
-            'disco_l475_iot1',
+            #'disco_l475_iot1',
             # OpenOCD complains
             # Error: open failed
             # in procedure 'init'

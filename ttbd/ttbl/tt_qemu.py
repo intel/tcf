@@ -4,6 +4,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+"""
+.. note:: This is now deprecated and replaced by :mod:`ttbl.tt_qemu2`.
+"""
 
 import contextlib
 import errno
