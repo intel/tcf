@@ -245,7 +245,7 @@ elif [ $image_type == fedoralive -o $image_type == tcflive ]; then
         sudo mount -o norecovery,loop $tmpdir/squashfs/LiveOS/ext3fs.img $tmpdir/root
         info mounted $tmpdir/squashfs/LiveOS/ext3fs.img in $tmpdir/root
     else
-        error BUG! dunno how to mount the root file system (no rootfs.img or ext2fs.img)
+        error "BUG! dunno how to mount the root file system (no rootfs.img or ext2fs.img)"
     fi
     mounted_dirs="$tmpdir/root ${mounted_dirs:-}"
 elif [ $image_type == qcow2 ]; then
