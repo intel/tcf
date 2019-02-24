@@ -266,7 +266,7 @@ class pci(ttbl.tt_power_control_impl):
         # generate DHCP configuration file based on hackish templating
         self.log.info(
             "%(if_name)s: IPv%(ip_mode)d addr/net/mask "
-            "%(if_addr)/%(if_net)s/%(if_netmask)s", self._params)
+            "%(if_addr)s/%(if_net)s/%(if_len)s", self._params)
         if self.ip_mode == 4:
             # We only do PXE over ipv4
             # FIXME: make it so using pxelinux is a configuratio template
