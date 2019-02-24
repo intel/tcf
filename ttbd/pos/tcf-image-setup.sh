@@ -29,6 +29,10 @@ Ubuntu:
   $ wget http://releases.ubuntu.com/18.10/ubuntu-18.10-desktop-amd64.iso
   $ $progname ubuntu:live:18.10::x86_64 ubuntu-18.10-desktop-amd64.iso
 
+rootfsimage:
+
+  takes a whole image that is a single root filesystem
+
 Using QEMU
 
 1. create a 20G virtual disk:
@@ -184,7 +188,7 @@ case "$image_type" in
         boot_part=p1
         root_part=p2
         ;;
-    android|qcow2)
+    android|qcow2|rootfsimage)
         ;;
     *)
         error Unknown image type for $image_file
@@ -254,6 +258,12 @@ elif [ $image_type == qcow2 ]; then
     info mounted ${nbd_dev} in $tmpdir/root
     mounted_dirs="$tmpdir/root ${mounted_dirs:-}"
 
+elif [ $image_type == rootfsimage ]; then
+
+    sudo mount ${loop_dev} $tmpdir/root
+    info mounted ${loop_dev} in $tmpdir/root
+    mounted_dirs="$tmpdir/root ${mounted_dirs:-}"
+    
 else
 
     sudo mount ${loop_dev}${root_part} $tmpdir/root
