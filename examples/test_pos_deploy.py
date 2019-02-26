@@ -38,7 +38,7 @@ class _test(tcfl.tc.tc_c):
 
     def start(self, ic, target):
         # fire up the target, wait for a login prompt
-        target.power.cycle()
+        target.pos.boot_normal()
         target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
         target.shell.up(user = 'root')
         target.report_pass("Deployed %s" % image)

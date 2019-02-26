@@ -16,6 +16,8 @@ Provisioning/deploying/flashing PC-class devices with a Provisioning OS
 -----------------------------------------------------------------------
 
 .. automodule:: tcfl.pos
+.. automodule:: tcfl.pos_uefi
+.. automodule:: tcfl.pos_multiroot
 
 Extensions to :class:`tcfl.tc.target_c` types
 ---------------------------------------------
@@ -349,7 +351,7 @@ Provisioning OS specific metadata
   >>>     'uefi_boot_manager_ipv4_regex': 'UEFI Network'
   >>> })
 
-  :func:`tcfl.pos.efibootmgr_setup` can use this if the defaults do
+  :func:`tcfl.pos_uefi.efibootmgr_setup` can use this if the defaults do
   not work :func:`target.pos.deploy_image()
   <tcfl.pos.extension.deploy_image>` reports::
 

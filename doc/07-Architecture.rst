@@ -404,12 +404,11 @@ used:
 Provisioning
 ============
 
-FIXME: describe better
-
 For targets which are capable of doing so, TCF supports a
 *Provisioning mode*, in which the target boots into a *Provisioning
-OS* (normally rooted in a network file system) which can be used to
-partition and install an OS into the permanent storage.
+OS* (normally rooted in a network file system to avoid depending on
+anything in the target) which can be used to partition and install an
+OS into the permanent storage.
 
 The most common setup is the target PXE-booting to the Provisioning OS
 but other variations are also possible.
@@ -417,6 +416,39 @@ but other variations are also possible.
 Provisioning OS is configured following the steps described in the
 :ref:`guide <pos_setup>`. Usage examples are described in FIXME.
 
+The client side module :mod:`tcfl.pos` provides the client side
+frontend to perform this features via the :class:`target.pos
+<tcfl.pos.extension>` extension API to targets, which allows to flash
+any available image with:
+
+>>> target.pos.deploy_image(ic, "fedora")
+
+more complete and complex image and deployment instructions are
+posisble, refer to the extension's documentation.
+
+Other modules which extend POS are:
+
+- :mod:`tcfl.pos_multiroot`: provides a methodology to keep multiple
+  root partitions provisoned in a file system, that makes it very fast
+  to reinitialize or switch to new ones.
+  
+- :mod:`tcfl.pos_uefi`: provides hooks to configure UEFI bootloaders
+  to work with the multiroot methodology and configure the boot
+  system.
+
+On the server side, the support is reduced to start DHCP, TFTP, HTTP
+and NFS servers to support booting to the Provisioning OS and to
+populate filesystems using rsync via an rsync image server.
+
+NFS rooting is used to the provisioining OS as it allows to load the
+bare minimal SW over the network. Rsync is used to flash as it will
+produce identical copies with minimum data bandwidth.
+
+The daemon relies on a few target tags and properties to decide if a
+target has to be booted in PXE mode or not when supporting targets
+that boot off PXE. Other modes are supported, but mostly driven from
+the client side (FIXME: describe).
+  
 .. _security_considerations:
 
 Security considerations
