@@ -281,10 +281,18 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
                               path, t_file_path)
         # t_file_path goes to self.kws['thisfile'], name to self.name
         # and self.kws['tc_name']
-        self.image = None
         self.rel_path_in_target = None
         self.t_files = [ t_file_path ]
 
+    #: Specification of image to install
+    #:
+    #: default to whatever is configured on the environment (if any)
+    #: for quick setup; otherwise it can be configured in a TCF
+    #: configuration file by adding:
+    #:
+    #: >>> tcfl.tc_clear_bbt.tc_clear_bbt_c.image = "clear::24800"
+    #:
+    image = os.environ.get("IMAGE", "clear")
 
     #: Mapping from TAPS output to TCF conditions
     #:
@@ -333,7 +341,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         # first time transmisisons as the repo is quite close in the
         # server; further rsync from the local version in the client
         target.report_info("POS: rsyncing bbt.git from %(rsync_server)s "
-                           "to /mnt/peristent.tcf.git/bbt.git" % _kws,
+                           "to /mnt/persistent.tcf.git/bbt.git" % _kws,
                            dlevel = -1)
         target.shell.run("time rsync -aAX --numeric-ids"
                          " %(rsync_server)s/misc/bbt.git/."
@@ -352,7 +360,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         ic.power.on()
         ic.report_pass("powered on")
         self.image = target.pos.deploy_image(
-            ic, "clear", extra_deploy_fns = [ self._deploy_bbt, ])
+            ic, self.image, extra_deploy_fns = [ self._deploy_bbt, ])
         target.report_info("Deployed %s" % self.image)
 
     def start(self, ic, target):
@@ -368,7 +376,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         # take it in. It has a bundle per line.
         bundles = [
             # always needs this, that installs 'bats'
-            'software-testing'
+            'dev-utils'
         ]
         requirements_fname = os.path.join(self.kws['srcdir'], 'requirements')
         if os.path.exists(requirements_fname):
