@@ -637,6 +637,26 @@ examples:
   - *minnowboard-04r*
   - *nuc-58a*
 
+.. _bp_naming_networks:
+
+Naming Networks
+~~~~~~~~~~~~~~~
+
+It helps to name networks with a single letter, e.g.: *nwa*,
+*nwb*...*nwr*:
+
+- it's a short name and it will fit into network interface names, etc.
+
+- it allows to use the letter's ASCII value for naming the IP address
+  ranges and MAC address generation. E.g. *a* in *nwa* is 97, 0x61
+  which can be used to define networks::
+
+    ipv6_addr: fc00::61:0/112
+    ipv4_addr: 192.168.97.0/24
+
+- as well, as described :ref:`in the previous section
+  <bp_naming_targets>` it allows to add a single letter to a target
+  name to indicate which network it is connected to.
 
 Configuration Example 1
 ^^^^^^^^^^^^^^^^^^^^^^^

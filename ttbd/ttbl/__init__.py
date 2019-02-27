@@ -374,6 +374,12 @@ class test_target(object):
                 assert val > 0 and val < 128, \
                     "%s: invalid IPv6 prefix len %s for interconnect %s " \
                     "(valid values are 1-127)" % (self.id, val, name)
+            if key == "vlan":
+                val = int(val)
+                assert val >= 0 and val < 4096, \
+                    "vlan %d is outside of the valid values 0-4095" % val
+                assert 'mac_addr' in data, \
+                    "vlan specified without a mac_addr"
 
     def _tags_verify(self):
         if 'bsp_models' in self.tags:

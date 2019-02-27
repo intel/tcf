@@ -2624,23 +2624,35 @@ def dlwps7_add(hostname, powered_on_start = None,
             tags = dict(idle_poweroff = 0))
         ttbl.config.targets[name].disable("")
 
+
 class vlan_pci(ttbl.tt_power_control_impl):
-    """Fake power controller to implement networks using macvtap
-    for virtual machines and bridges for physical devices.
+    """Power controller to implement networks on the server side.
 
-    This behaves as a power control implementation that when turned:
+    Supports:
 
-    - on: starts an internal network a `macvtap
-      http://virt.kernelnewbies.org/MacVTap` Linux device that allows
-      virtual machines to talk to each other and to the outside. When
-      a physical device is also present, it is used as the upper
+    - connecting the server to a physical net physical networks with
+      physical devices (normal or VLAN networks)
+
+    - creating internal virtual networks with `macvtap
+      http://virt.kernelnewbies.org/MacVTap` so VMs running in the
+      host can get into said networks.
+
+      When a physical device is also present, it is used as the upper
       device (instead of a bridge) so traffic can flow from physical
       targets to the virtual machines in the network.
 
+    - *tcpdump* capture of network traffic
+
+    This behaves as a power control implementation that when turned:
+
+    - on: sets up the interfaces, brings them up, start capturing
+
     - off: stops all the network devices, making communication impossible.
 
-    This also supports capturing network traffic with *tcpdump*, which
-    can be enabled setting the target's property *tcpdump*::
+
+    **Capturing with tcpdump**
+
+    Can be enabled setting the target's property *tcpdump*::
 
       $ tcf property-set TARGETNAME tcpdump FILENAME
 
@@ -2651,27 +2663,29 @@ class vlan_pci(ttbl.tt_power_control_impl):
       $ tcf broker-file-download FILENAME
 
     *FILENAME* must be a valid file name, with no directory
-    components. Note this requires the property *tcpdump* being listed
-    in :data:`ttbl.test_target.user_properties`, which is added after
-    this class declaration.
+    components.
 
-    Example configuration:
+    .. note:: Note this requires the property *tcpdump* being listed
+              in :data:`ttbl.test_target.user_properties` so normal
+              users.
 
-    >>> ttbl.config.target_add(
-    >>>     ttbl.tt.tt_power("nw01", vlan_pci()),
+    Example configuration (see :ref:`naming networks <bp_naming_networks>`):
+
+    >>> ttbl.config.interconnect_add(
+    >>>     ttbl.tt.tt_power("nwa", vlan_pci()),
     >>>     tags = {
-    >>>         'ipv6_addr': 'fc00::1:1',
-    >>>         'ipv4_addr': '192.168.1.1',
+    >>>         'ipv4_addr': '192.168.97.1',
     >>>         'ipv4_prefix_len': 24,
-    >>>         'mac_addr': '02:01:01:00:00:24:',
+    >>>         'ipv6_addr': 'fc00::61:1',
+    >>>         'ipv6_prefix_len': 112,
+    >>>         'mac_addr': '02:61:00:00:00:01:',
     >>>     })
-    >>> ttbl.config.targets['nw01'].tags.['interfaces'].append('interconnect_c')
 
     Now QEMU targets (for example), can declare they are part of this
     network and upon start, create a tap interface for themselves::
 
-      $ ip link add link _bnw01 name tnw01TARGET type macvtap mode bridge
-      $ ip link set tnw01TARGET address 02:01:00:00:00:IC_INDEX up
+      $ ip link add link _bnwa name tnwaTARGET type macvtap mode bridge
+      $ ip link set tnwaTARGET address 02:01:00:00:00:IC_INDEX up
 
     which then is given to QEMU as an open file descriptor::
 
@@ -2686,7 +2700,7 @@ class vlan_pci(ttbl.tt_power_control_impl):
 
     - keep target names short, as they will be used to generate
       network interface names and those are limited in size (usually to
-      about 12 chars?), eg tnw01TARGET comes from *nw01* being the
+      about 12 chars?), eg tnwaTARGET comes from *nwa* being the
       name of the network target/interconnect, TARGET being the target
       connected to said interconnect.
 
@@ -2786,6 +2800,26 @@ class vlan_pci(ttbl.tt_power_control_impl):
       of the *nwa* power control rail. Thus, when powered on, it will
       bring the network up up and also turn on the network switch.
 
+    - add the tag *vlan* to also be a member of an ethernet VLAN
+      network (requires also a *mac_addr*)::
+
+      .. code-block:: python
+
+         ttbl.config.inteconnect_add(
+             ttbl.tt.tt_power('nwc', vlan_pci()),
+             tags = dict(
+                 mac_addr = "a0:ce:c8:00:18:73",
+                 vlan = 30,
+                 ipv6_addr = 'fc00::13:1',
+                 ipv6_prefix_len = 112,
+                 ipv4_addr = '192.168.13.1',
+                 ipv4_prefix_len = 24,
+             )
+         )
+
+      in this case, all packets in the interface described by MAC addr
+      *a0:ce:c8:00:18:73* with tag *30*.
+
     - lastly, for each target connected to that network, update it's
       tags to indicate it:
 
@@ -2808,53 +2842,87 @@ class vlan_pci(ttbl.tt_power_control_impl):
     kept separated <separated_networks>`.
 
     """
+    def __init__(self):
+        ttbl.tt_power_control_impl.__init__(self)
 
     @staticmethod
-    def _if_rename(target):
-        if 'mac_addr' in target.tags:
-            # We do have a physical device, so we are going to first,
-            # rename it to match the IC's name (so it allows targets
-            # to find it to run IP commands to attach to it)
-            ifname = commonl.if_find_by_mac(target.tags['mac_addr'])
-            if ifname == None:
-                raise ValueError("Cannot find network interface with MAC '%s'"
-                                 % target.tags['mac_addr'])
-            if ifname != target.id:
-                subprocess.check_call("ip link set %s down" % ifname,
-                                      shell = True)
-                subprocess.check_call("ip link set %s name _b%s"
-                                      % (ifname, target.id), shell = True)
+    def _get_mode(target):
+        if 'vlan' in target.tags and 'mac_addr' in target.tags:
+            # we are creating ethernet vlans, so we do not own the
+            # device exclusively and will create new links
+            return 'vlan'
+        elif 'vlan' in target.tags and 'mac_addr' not in target.tags:
+            raise RuntimeError("vlan ID specified without a mac_addr")
+        elif 'mac_addr' in target.tags:
+            # we own the device exclusively
+            return 'physical'
+        else:
+            return 'virtual'
 
     def power_on_do(self, target):
-        if 'mac_addr' in target.tags:
-            self._if_rename(target)
-        else:
+        # Bring up the lower network interface; lower is called
+        # whatever (if it is a physical device) or _bNAME; bring it
+        # up, make it promiscuous
+        mode = self._get_mode(target)
+        if mode == 'vlan':
+            # our lower is a physical device, our upper is a device
+            # which till tag for eth vlan %(vlan)
+            ifname = commonl.if_find_by_mac(target.tags['mac_addr'])
+            commonl.if_remove_maybe("b%(id)s" % target.kws)
+            kws = dict(target.kws)
+            kws['ifname'] = ifname
+            subprocess.check_call(
+                "/usr/sbin/ip link add"
+                " link %(ifname)s name b%(id)s"
+                " type vlan id %(vlan)s"
+                #" protocol VLAN_PROTO"
+                #" reorder_hdr on|off"
+                #" gvrp on|off mvrp on|off loose_binding on|off"
+                % kws, shell = True)
+            subprocess.check_call(	# bring lower up
+                "/usr/sbin/ip link set dev %s up promisc on" % ifname,
+                shell = True)
+        elif mode == 'physical':
+            ifname = commonl.if_find_by_mac(target.tags['mac_addr'])
+            subprocess.check_call(	# bring lower up
+                "/usr/sbin/ip link set dev %s up promisc on" % ifname,
+                shell = True)
+        elif mode == 'virtual':
             # We do not have a physical device, a bridge, to serve as
             # lower
             commonl.if_remove_maybe("_b%(id)s" % target.kws)
             subprocess.check_call(
-                "/usr/sbin/ip link add name _b%(id)s type bridge"
+                "/usr/sbin/ip link add"
+                "  name _b%(id)s"
+                "  type bridge"
                 % target.kws, shell = True)
+            subprocess.check_call(
+                "/usr/sbin/ip link add"
+                "  link _b%(id)s name b%(id)s"
+                "  type macvlan mode bridge; "
+                % target.kws, shell = True)
+            subprocess.check_call(	# bring lower up
+                "/usr/sbin/ip link set"
+                "  dev _b%(id)s"
+                "  up promisc on"
+                % target.kws, shell = True)
+        else:
+            raise AssertionError("Unknown mode %s" % mode)
 
-        # Add an interface called bICNAME which will get the IP
-        # addressing.
+        # Configure the IP addresses for the top interface
         subprocess.check_call(
-            "/usr/sbin/ip link add"
-            "  link _b%(id)s name b%(id)s"
-            "  type macvlan mode bridge; "
             "/usr/sbin/ip addr add"
             "  %(ipv6_addr)s/%(ipv6_prefix_len)s dev b%(id)s; "
             "/usr/sbin/ip addr add"
             "  %(ipv4_addr)s/%(ipv4_prefix_len)d"
             "  dev b%(id)s" % target.kws, shell = True)
 
-        target.fsdb.set('power_state', 'on')
-
-        # Bring them both up
+        # Bring up the top interface, which sets up ther outing
         subprocess.check_call(
-            "/usr/sbin/ip link set dev _b%(id)s up promisc on; "
             "/usr/sbin/ip link set dev b%(id)s up promisc on"
             % target.kws, shell = True)
+
+        target.fsdb.set('power_state', 'on')
 
         # Start tcpdump on the network?
         #
@@ -2911,22 +2979,24 @@ class vlan_pci(ttbl.tt_power_control_impl):
         pidfile = os.path.join(target.state_dir, "tcpdump.pid")
         commonl.process_terminate(pidfile, tag = "tcpdump",
                                   path = "/usr/sbin/tcpdump")
-
-        if 'mac_addr' in target.tags:
-            # We might have powered up in the middle and the state
-            # might be a wee confusing
-            self._if_rename(target)
-
+        # remove the top level device
         commonl.if_remove_maybe("b%(id)s" % target.kws)
-        if 'mac_addr' in target.tags:
-            # We do have a physical device, just bring it down
+        mode = self._get_mode(target)
+        if mode == 'physical':
+            # bring down the lower device
+            ifname = commonl.if_find_by_mac(target.tags['mac_addr'])
             subprocess.check_call(
-                "ip link set dev _b%(id)s down promisc off" % target.kws,
+                "/usr/sbin/ip link set dev %s down promisc off" % ifname,
                 shell = True)
-        else:
-            # We do not have a physical device, we made a bridge, so
-            # we will just remove it
+        if mode == 'vlan':
+            # nothing; we killed the upper and on the lwoer, a
+            # physical device we do nothing, as others might be using it
+            pass
+        elif mode == 'virtual':
+            # remove the lower we created
             commonl.if_remove_maybe("_b%(id)s" % target.kws)
+        else:
+            raise AssertionError("Unknown mode %s" % mode)
 
         target.fsdb.set('power_state', 'off')
 
