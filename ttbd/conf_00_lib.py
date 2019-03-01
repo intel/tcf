@@ -2988,7 +2988,7 @@ class vlan_pci(ttbl.tt_power_control_impl):
             subprocess.check_call(
                 "/usr/sbin/ip link set dev %s down promisc off" % ifname,
                 shell = True)
-        if mode == 'vlan':
+        elif mode == 'vlan':
             # nothing; we killed the upper and on the lwoer, a
             # physical device we do nothing, as others might be using it
             pass
