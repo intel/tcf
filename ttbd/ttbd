@@ -473,7 +473,7 @@ def _property_set(target_id):
         with log_to_str_too(target.log, iostr_wrapper):
             if user_is_admin:
                 target.property_set(prop, value)
-            elif not prop in target.user_properties:
+            elif not target.property_is_user(prop):
                 raise ttbl.test_target_not_admin_e(target)
             else:
                 # A non-admin must own the target before setting anything
@@ -506,7 +506,7 @@ def _property_get(target_id):
         with log_to_str_too(target.log, iostr_wrapper):
             if user_is_admin:
                 value = target.property_get(who_make(ticket), prop)
-            elif not prop in target.user_properties:
+            elif not target.property_is_user(prop):
                 raise ttbl.test_target_not_admin_e(target)
             else:
                 # A non-admin must own the target before getting anything

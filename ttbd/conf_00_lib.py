@@ -3013,7 +3013,7 @@ class vlan_pci(ttbl.tt_power_control_impl):
             raise AssertionError("r is %s" % r)
 
 # declare the property we normal users to be able to set
-ttbl.test_target.user_properties.add('tcpdump')
+ttbl.test_target.properties_user.add('tcpdump')
 
 class tt_qemu_linux(ttbl.tt_qemu.tt_qemu):
     """QEMU x86-64 test target that can run Linux cloud images

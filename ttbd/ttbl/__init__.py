@@ -198,13 +198,21 @@ class test_target(object):
     files_path = "__undefined__"
 
     #: Properties that normal users (non-admins) can set when owning a
-    #: target and that will be reset when releasing a target
+    #: target and that will be reset when releasing a target (except
+    #: if listed in :data:`properties_keep_on_release`)
     #:
     #: Note this is a global variable that can be speciazed to each
     #: class/target.
-    user_properties = set([
+    properties_user = set([
         # provisioning OS mode
-        'pos_mode'
+        'pos_mode',
+        'pos_reinitialize',
+        'pos_repartition', 	# deprecated for pos_reinitialize
+        re.compile('^pos_root_[_a-z0-9A-Z]+$'),
+    ])
+    #: Properties that should not be cleared on target release
+    properties_keep_on_release = set([
+        re.compile('^pos_root_[_a-z0-9A-Z]+$'),
     ])
 
     """
@@ -565,6 +573,45 @@ class test_target(object):
             return default
         return r
 
+    def property_is_user(self, name):
+        """
+        Return *True* if a property is considered a user property (no
+        admin rights are needed to set it or read it).
+
+        :returns: bool
+        """
+        for prop in self.properties_user:
+            if isinstance(prop, basestring):
+                if prop == name:
+                    return True
+                continue
+            if isinstance(prop, re._pattern_type):
+                if prop.match(name):
+                    return True
+                continue
+            raise AssertionError, \
+                "user property %s: not a string or regex, but %s" \
+                % (prop, type(prop).__name__)
+        return False
+            
+    def property_keep_value(self, name):
+        """
+        Return *True* if a user property's value needs to be kept.
+        """
+        for prop in self.properties_keep_on_release:
+            if isinstance(prop, basestring):
+                if prop == name:
+                    return True
+                continue
+            if isinstance(prop, re._pattern_type):
+                if prop.match(name):
+                    return True
+                continue
+            raise AssertionError, \
+                "user property %s: not a string or regex, but %s" \
+                % (prop, type(prop).__name__)
+        return False
+            
     def thing_add(self, name, plugger):
         """
         Define a thing that can be un/plugged to this target
@@ -831,10 +878,11 @@ class test_target(object):
             target._thing_unplug(self, plugger)
         for release_hook in self.release_hooks:
             release_hook(self, force)
-        # Any property set in target.user_properties gets cleared when
+        # Any property set in target.properties_user gets cleared when
         # releasing.
-        for prop in self.user_properties:
-            self.fsdb.set(prop, None)
+        for prop in self.fsdb.keys():
+            if self.property_is_user(prop) and not self.property_keep_value(prop):
+                self.fsdb.set(prop, None)
 
     def release(self, who, force = False):
         """
