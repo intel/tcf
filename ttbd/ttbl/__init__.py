@@ -202,7 +202,10 @@ class test_target(object):
     #:
     #: Note this is a global variable that can be speciazed to each
     #: class/target.
-    user_properties = set()
+    user_properties = set([
+        # provisioning OS mode
+        'pos_mode'
+    ])
 
     """
     A test target base class
