@@ -2846,6 +2846,22 @@ class vlan_pci(ttbl.tt_power_control_impl):
         ttbl.tt_power_control_impl.__init__(self)
 
     @staticmethod
+    def _if_rename(target):
+        if 'mac_addr' in target.tags:
+            # We do have a physical device, so we are going to first,
+            # rename it to match the IC's name (so it allows targets
+            # to find it to run IP commands to attach to it)
+            ifname = commonl.if_find_by_mac(target.tags['mac_addr'])
+            if ifname == None:
+                raise ValueError("Cannot find network interface with MAC '%s'"
+                                 % target.tags['mac_addr'])
+            if ifname != target.id:
+                subprocess.check_call("ip link set %s down" % ifname,
+                                      shell = True)
+                subprocess.check_call("ip link set %s name b%s"
+                                      % (ifname, target.id), shell = True)
+
+    @staticmethod
     def _get_mode(target):
         if 'vlan' in target.tags and 'mac_addr' in target.tags:
             # we are creating ethernet vlans, so we do not own the
@@ -2887,6 +2903,7 @@ class vlan_pci(ttbl.tt_power_control_impl):
             subprocess.check_call(	# bring lower up
                 "/usr/sbin/ip link set dev %s up promisc on" % ifname,
                 shell = True)
+            self._if_rename(target)
         elif mode == 'virtual':
             # We do not have a physical device, a bridge, to serve as
             # lower
@@ -2911,6 +2928,8 @@ class vlan_pci(ttbl.tt_power_control_impl):
 
         # Configure the IP addresses for the top interface
         subprocess.check_call(
+            # clean up existing address, set new ones
+            "/usr/sbin/ip add flush dev b%(id)s; "
             "/usr/sbin/ip addr add"
             "  %(ipv6_addr)s/%(ipv6_prefix_len)s dev b%(id)s; "
             "/usr/sbin/ip addr add"
@@ -2980,19 +2999,23 @@ class vlan_pci(ttbl.tt_power_control_impl):
         commonl.process_terminate(pidfile, tag = "tcpdump",
                                   path = "/usr/sbin/tcpdump")
         # remove the top level device
-        commonl.if_remove_maybe("b%(id)s" % target.kws)
         mode = self._get_mode(target)
         if mode == 'physical':
             # bring down the lower device
             ifname = commonl.if_find_by_mac(target.tags['mac_addr'])
             subprocess.check_call(
-                "/usr/sbin/ip link set dev %s down promisc off" % ifname,
+                # flush the IP addresses, bring it down
+                "/usr/sbin/ip add flush dev %s; "
+                "/usr/sbin/ip link set dev %s down promisc off"
+                % (ifname, ifname),
                 shell = True)
         elif mode == 'vlan':
+            commonl.if_remove_maybe("b%(id)s" % target.kws)
             # nothing; we killed the upper and on the lwoer, a
             # physical device we do nothing, as others might be using it
             pass
         elif mode == 'virtual':
+            commonl.if_remove_maybe("b%(id)s" % target.kws)
             # remove the lower we created
             commonl.if_remove_maybe("_b%(id)s" % target.kws)
         else:
