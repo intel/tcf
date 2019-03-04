@@ -3024,16 +3024,26 @@ class vlan_pci(ttbl.tt_power_control_impl):
         target.fsdb.set('power_state', 'off')
 
     def power_get_do(self, target):
-        r = target.fsdb.get('power_state')
-        if r == None:
-            # First run, we assume it's off
+
+        # we know we have created an interface named bNWNAME, so let's
+        # check it is there
+        if not os.path.isdir("/sys/class/net/b" + target.id):
             return False
-        elif r == 'on':
-            return True
-        elif r == 'off':
-            return False
+
+        # FIXME: check bNWNAME exists and is up
+        if mode == 'vlan':
+            pass
+        elif mode == 'physical':
+            pass
+        elif mode == 'virtual':
+            # check _bNWNAME exists
+            if not os.path.isdir("/sys/class/net/_b" + target.id):
+                return False
         else:
-            raise AssertionError("r is %s" % r)
+            raise AssertionError("Unknown mode %s" % mode)
+
+        # FIXME: check IP addresses are assigned, if is up
+        return True
 
 # declare the property we normal users to be able to set
 ttbl.test_target.properties_user.add('tcpdump')
