@@ -360,9 +360,7 @@ class tt_qemu(
 
         # Setup network stuff, create virtual tap interfaces
         for ic_name, ic_kws in self.tags.get('interconnects', {}).iteritems():
-            self.log.error("DEBUG: ic_name %s" % ic_name)
             if 'ipv4_addr' in ic_kws or 'ipv6_addr' in ic_kws:
-                self.log.error("DEBUG: ic_name %s entramos" % ic_name)
                 _kws = dict(kws)
                 _kws.update(ic_kws)
                 _kws['ic_name'] = ic_name
