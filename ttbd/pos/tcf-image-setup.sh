@@ -177,6 +177,11 @@ case "$image_type" in
         boot_part=p1
         root_part=p2
         ;;
+    # Newer clear versions
+    clear2)
+        boot_part=p1
+        root_part=p3
+        ;;
     yocto)
         boot_part=p1
         root_part=p2
