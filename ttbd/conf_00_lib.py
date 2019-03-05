@@ -2883,7 +2883,8 @@ class vlan_pci(ttbl.tt_power_control_impl):
         if mode == 'vlan':
             # our lower is a physical device, our upper is a device
             # which till tag for eth vlan %(vlan)
-            ifname = commonl.if_find_by_mac(target.tags['mac_addr'])
+            ifname = commonl.if_find_by_mac(target.tags['mac_addr'],
+                                            physical = True)
             commonl.if_remove_maybe("b%(id)s" % target.kws)
             kws = dict(target.kws)
             kws['ifname'] = ifname
@@ -3030,6 +3031,7 @@ class vlan_pci(ttbl.tt_power_control_impl):
         if not os.path.isdir("/sys/class/net/b" + target.id):
             return False
 
+        mode = self._get_mode(target)
         # FIXME: check bNWNAME exists and is up
         if mode == 'vlan':
             pass

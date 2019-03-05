@@ -892,7 +892,7 @@ def if_index(ifname):
     except IOError:
         raise IndexError("%s: network interface does not exist" % ifname)
 
-def if_find_by_mac(mac):
+def if_find_by_mac(mac, physical = True):
     """
     Return the name of the physical network interface whose MAC
     address matches *mac*.
@@ -901,10 +901,15 @@ def if_find_by_mac(mac):
     insensitive.
 
     :param str mac: MAC address of the network interface to find
+    :param bool physical: True if only look for physical devices (eg:
+      not vlans); this means there a *device* symlink in
+      */sys/class/net/DEVICE/*
     :returns: Name of the interface if it exists, None otherwise
     """
     assert isinstance(mac, basestring)
     for path in glob.glob("/sys/class/net/*/address"):
+        if physical and not os.path.exists(os.path.dirname(path) + "/device"):
+            continue
         with open(path) as f:
             path_mac = f.read().strip()
             if path_mac.lower() == mac.lower():
