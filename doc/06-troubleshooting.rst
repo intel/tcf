@@ -153,6 +153,23 @@ There might be multiple causes for this, but here are the most common:
   target configuration so that the target's IP address won't be in the
   network's address range. Ensure this is correct.
 
+PXE POS provisioning target fails to boot: NFS: an incorrect mount option was specified
+---------------------------------------------------------------------------------------
+
+When the Provisoning OS kernel tries to NFS mount the root, it fails
+with invalid mount option specified:
+
+Check the MAC address is correct and the system is given the right IP
+address (vs any from the pool).
+
+This usually happens when the system doesn't recognize the MAC address
+as matching the right host. It is very common when changing
+names. Also, before reinitializing the server, clean up the cache::
+
+  $ rm -rf /var/lib/tftpbootlib/ttbd-production/pxelinux.cfg/*
+
+to ensure there are no left-over configuration files with old addresses
+
 *ttbd* server
 =============
 
