@@ -109,7 +109,19 @@ def image_select_best(image, available_images, target):
     arch = image_spec[4]
     if arch == "":
         arch = arch_default
+    if arch == None or arch == "":
+        image_spec2 = list(image_spec)
+        image_spec2[4] = "ARCHITECTURE"
+        raise tc.blocked_e(
+            "no architecture specified (image %s), neither it could not be "
+            "guessed from the target's BSP model (%s); try specifying the "
+            "image as %s"
+            % (image, target.bsp_model, ":".join(image_spec2)))
+    target.report_info("POS: goal image spec: %s" % list(image_spec), dlevel = 2)
 
+    for available_image in available_images:
+        target.report_info("POS: available images: %s" % list(available_image),
+                           dlevel = 2)
     # filter which images have arch or no arch spec
     available_images = filter(lambda x: x[4] == arch, available_images)
     if not available_images:
@@ -119,6 +131,9 @@ def image_select_best(image, available_images, target):
             dict(images_available = \
                  "\n".join([ ":".join(i) for i in available_images ]))
         )
+    for available_image in available_images:
+        target.report_info("POS: available images (filtered arch %s): %s"
+                           % (arch, list(available_image)), dlevel = 2)
 
     # filter first based on the distro (first field)
     distro = image_spec[0]
@@ -126,6 +141,9 @@ def image_select_best(image, available_images, target):
         distro_images = available_images
     else:
         distro_images = filter(lambda x: x[0] == distro, available_images)
+    for available_image in distro_images:
+        target.report_info("POS: available images (filtered distro %s): %s"
+                           % (distro, list(available_image)), dlevel = 2)
 
     # now filter based on the distro spin; if none, well, pick one at random
     spin = image_spec[1]
@@ -140,6 +158,9 @@ def image_select_best(image, available_images, target):
             dict(images_available =
                  "\n".join([ ":".join(i) for i in available_images ]))
         )
+    for available_image in spin_images:
+        target.report_info("POS: available images (filtered spin %s): %s"
+                           % (spin, list(available_image)), dlevel = 2)
 
     # now filter based on version -- rules change here -- if there is
     # no version specified, pick what seems to be the most recent
@@ -167,6 +188,9 @@ def image_select_best(image, available_images, target):
             dict(images_available =
                  "\n".join([ ":".join(i) for i in version_images ]))
         )
+    for available_image in version_images:
+        target.report_info("POS: available images (filtered version %s): %s"
+                           % (spin, list(available_image)), dlevel = 2)
 
     # now filter based on subversion -- rules change here -- if there is
     # no subversion specified, pick what seems to be the most recent
@@ -194,6 +218,9 @@ def image_select_best(image, available_images, target):
             dict(images_available =
                  "\n".join([ ":".join(i) for i in subversion_images ]))
         )
+    for available_image in subversion_images:
+        target.report_info("POS: available images (filtered subversion %s): %s"
+                           % (spin, list(available_image)), dlevel = 2)
     # we might have multiple image choices if distro or live image
     # weren't specified, so pick one
     return random.choice(subversion_images)
@@ -239,7 +266,6 @@ When flashing a new image to this partition, the contents in this tree
 will not be removed/replaced. It is then faster to rsync things in
 from the client machine.
 EOF""")
-
 
 def deploy_linux_kernel(ic, target, _kws):
     """Deploy a linux kernel tree in the local machine to the target's
@@ -424,6 +450,10 @@ class extension(tc.target_extension_c):
         return boot_dev
 
 
+
+    # FIXME: make this return fn and a description saying
+    # "capability %s/%s @ %s.%s()" so we can use it to feed to messages such as
+    # "rebooting into Provisioning OS [0/3] with capability %s/%s @ %s.%s()"
     def cap_fn_get(self, capability, default = None):
         """
         Return a target's POS capability.
