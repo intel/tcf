@@ -141,40 +141,6 @@ mkpart primary ext4 %(swap_end)s %(scratch_end)s \
     target.shell.run("mkfs.ext4 -FqL tcf-scratch " + home_dev)
 
 
-
-def _seed_match(lp, goal):
-    """
-    Given two image/seed specifications, return the most similar one
-
-    >>> lp = {
-    >>>     'part1': 'clear:live:25550::x86-64',
-    >>>     'part2': 'fedora:workstation:28::x86',
-    >>>     'part3': 'rtk::91',
-    >>>     'part4': 'rtk::90',
-    >>>     'part5': 'rtk::114',
-    >>> }
-    >>> _seed_match(lp, "rtk::112")
-    >>> ('part5', 0.933333333333, 'rtk::114')
-
-    """
-
-    goall = pos.image_spec_to_tuple(str(goal))
-    scores = {}
-    for part_name, seed in lp.iteritems():
-        score = 0
-        seedl = pos.image_spec_to_tuple(str(seed))
-
-        if seedl[0] == goall[0]:
-            # At least we want a distribution match for it to be
-            # considered
-            scores[part_name] = Levenshtein.seqratio(goall, seedl)
-        else:
-            scores[part_name] = 0
-    if scores:
-        selected, score = max(scores.iteritems(), key = operator.itemgetter(1))
-        return selected, score, lp[selected]
-    return None, 0, None
-
 def _rootfs_guess_by_image(target, image, boot_dev):
 
     # Gave a None partition, means pick our own based on a guess. We
@@ -216,7 +182,7 @@ def _rootfs_guess_by_image(target, image, boot_dev):
     # This prolly can be made more efficient, like collect least-used
     # partition data? to avoid the situation where two clients keep
     # imaging over each other when they could have two separate images
-    root_part_dev, score, seed = _seed_match(partl, image)
+    root_part_dev, score, seed = pos.image_seed_match(partl, image)
     if score == 0:
         # none is a good match, find an empty one...if there are
         # non empty, just any

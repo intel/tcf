@@ -102,7 +102,8 @@ def image_list_from_rsync_output(output):
     return imagel
 
 
-def image_select_best(image, available_images, arch_default):
+def image_select_best(image, available_images, target):
+    arch_default = target.bsp_model
     image_spec = image_spec_to_tuple(image)
 
     arch = image_spec[4]
@@ -823,7 +824,7 @@ EOF""")
                 images_available = image_list_from_rsync_output(
                     image_list_output)
                 image_final_tuple = image_select_best(image, images_available,
-                                                      target.bsp_model)
+                                                      target)
                 image_final = ":".join(image_final_tuple)
                 kws['image'] = image_final
 
@@ -884,9 +885,70 @@ EOF""")
                     "for device in %s; do umount -l $device || true; done"
                     % " ".join(reversed(target.pos.umount_list)))
 
-            target.report_info("POS: deployed %(image)s to %(root_part_dev)s"
-                               % kws)
+            target.report_info("POS: deployed %(image)s" % kws)
             return kws['image']
+
+def image_seed_match(lp, goal):
+    """
+    Given two image/seed specifications, return the most similar one
+
+    >>> lp = {
+    >>>     'part1': 'clear:live:25550::x86-64',
+    >>>     'part2': 'fedora:workstation:28::x86',
+    >>>     'part3': 'rtk::91',
+    >>>     'part4': 'rtk::90',
+    >>>     'part5': 'rtk::114',
+    >>> }
+    >>> _seed_match(lp, "rtk::112")
+    >>> ('part5', 0.933333333333, 'rtk::114')
+
+    """
+
+    goall = image_spec_to_tuple(str(goal))
+    scores = {}
+    for part_name, seed in lp.iteritems():
+        score = 0
+        seedl = image_spec_to_tuple(str(seed))
+
+        if seedl[0] == goall[0]:
+            # At least we want a distribution match for it to be
+            # considered
+            scores[part_name] = Levenshtein.seqratio(goall, seedl)
+        else:
+            scores[part_name] = 0
+    if scores:
+        selected, score = max(scores.iteritems(), key = operator.itemgetter(1))
+        return selected, score, lp[selected]
+    return None, 0, None
+
+
+def deploy_tree(_ic, target, _kws):
+    """
+    Rsync a local tree to the target after imaging
+
+    This is normally given to :func:`target.pos.deploy_image
+    <tcfl.pos.extension.deploy_image>` as:
+
+    >>> target.kw_set("pos_deploy_linux_kernel", SOMELOCALLOCATION)
+    >>> target.pos.deploy_image(ic, IMAGENAME,
+    >>>                         extra_deploy_fns = [ tcfl.pos.deploy_linux_kernel ])
+
+    """
+    source_tree = target.getattr("deploy_tree_src", None)
+    if source_tree == None:
+
+        target.report_info("not deploying local tree because "
+                           "*target.deploy_tree_src* is missing or None ",
+                           dlevel = 2)
+        return
+    target.report_info("rsyncing tree %s -> target:/" % source_tree,
+                       dlevel = 1)
+    target.testcase._targets_active()
+    target.pos.rsync_np(source_tree, "/")
+    target.testcase._targets_active()
+    target.report_pass("rsynced tree %s -> target:/" % source_tree)
+
+
 
 import pos_multiroot	# pylint: disable = wrong-import-order,wrong-import-position,relative-import
 import pos_uefi		# pylint: disable = wrong-import-order,wrong-import-position,relative-import

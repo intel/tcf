@@ -13,6 +13,7 @@ import tcfl.tc
 import tcfl.tl
 import tcfl.pos
 
+image_env = os.environ.get("IMAGE", None)
 
 @tcfl.tc.interconnect("pos_rsync_server", mode = "all")
 class _(tcfl.tc.tc_c):
@@ -40,9 +41,7 @@ class _(tcfl.tc.tc_c):
         for image in imagel:
             print ic.fullid, ":".join(image)
 
-        image = os.environ.get("IMAGE", None)
-        if image:
-            d = {}
-            for _image in imagel:
-                d[_image] = _image
-            print image, tcfl.pos._seed_match(d, image)
+        if image_env:
+            image_match = tcfl.pos.image_select_best(image_env, imagel, ic)
+            self.report_info("Image '%s' (from env IMAGE) matches: %s"
+                             % (image_env, ":".join(image_match)), level = 1)
