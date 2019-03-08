@@ -620,6 +620,7 @@ EOF""")
         target.kw_set('rsync_port', target.tunnel.add(3000))
         target.kw_set('rsync_server', target.rtb.parsed_url.hostname)
 
+
     def rsync(self, src = None, dst = None,
               persistent_name = None,
               persistent_dir = '/persistent.tcf.d'):
@@ -736,6 +737,76 @@ EOF""")
                 # sending a lot of files
                 "time rsync -aAX --delete /mnt/%s/%s/. /mnt/%s"
                 % (persistent_dir, persistent_name, dst))
+
+
+    def rsync_np(self, src, dst, option_delete = True):
+        """rsync data from the local machine to a target
+
+        The local machine is the machine executing the test script (where
+        *tcf run* was called).
+
+        Unlike :meth:`rsync`, this function will rsync data straight
+        from the local machine to the target's final destination, but
+        without using the persistent storage ``/persistent.tcd.d``.
+
+        This function can be used, for example, to flash a whole
+        distribution from the target--however, because that would be
+        very slow, :meth:`deploy_image` is used to transfer a distro
+        as a seed from the server (faster) and then from the local
+        machine, just whatever changed (eg: some changes being tested
+        in some package):
+
+        >>> @tcfl.tc.interconnect("ipv4_addr")
+        >>> @tcfl.tc.target("pos_capable")
+        >>> class _test(tcfl.tc.tc_c)
+        >>>     ...
+        >>>
+        >>>     def deploy_tree(_ic, target, _kws):
+        >>>         target.pos.rsync_np("/SOME/DIR/my-fedora-29", "/")
+        >>>
+        >>>     def deploy(self, ic, target):
+        >>>         ic.power.on()
+        >>>         target.pos.deploy_image(
+        >>>             ic, "fedora::29",
+        >>>             extra_deploy_fns = [ self.deploy_tree ])
+        >>>
+        >>>     ...
+
+        In this example, the target will be flashed to whatever fedora
+        29 is available in the server and then
+        ``/SOME/DIR/my-fedora-29`` will be rsynced on top.
+
+        :param str src: (optional) source tree/file in the local machine
+          to be copied to the target's persistent area. If not specified,
+          nothing is copied to the persistent area.
+
+        :param str dst: (optional) destination tree/file in the target
+          machine; if specified, the file is copied from the persistent
+          area to the final destination. If not specified,
+          nothing is copied from the persistent area to the final
+          destination.
+
+        :param bool option_delete: (optional) Add the ``--delete``
+          option to delete anything in the target that is not present
+          in the source (%(default)s).
+
+        """
+        target = self.target
+        target.shell.run("mkdir -p /%s" % dst)
+        target.report_info(
+            "rsyncing %s to target's /mnt/%s"
+            % (src, dst), dlevel = -1)
+        target.shcmd_local(
+            # don't be verbose, makes it too slow and timesout when
+            # sending a lot of files
+            "time sudo rsync -vvvaAX --numeric-ids --delete"
+            " --exclude='/persistent.tcf.d/*'"
+            " --port %%(rsync_port)s  %s/. %%(rsync_server)s::rootfs/%s/."
+            % (src, dst))
+        target.testcase._targets_active()
+        target.report_info(
+            "rsynced %s to target's /%s"
+            % (src, dst))
 
     def rsyncd_stop(self):
         """
