@@ -405,8 +405,8 @@ if [ -r $destdir/etc/inittab ]; then
     done
 fi
 
-if [ $image_type == clear ]; then
-    # Harcode: disable ANSI script sequences, as they make
+if test -r $destdir/usr/share/defaults/etc/profile.d/50-prompt.sh; then
+    # Hardcode: disable ANSI script sequences, as they make
     # scripting way harder
     sudo sed -i 's/^export PS1=.*/export PS1="\\u@\\H \\w $endchar "/' \
          $destdir/usr/share/defaults/etc/profile.d/50-prompt.sh
