@@ -905,7 +905,7 @@ EOF""")
 
             self.boot_to_pos(pos_prompt = pos_prompt, timeout = timeout,
                              boot_to_pos_fn = target_power_cycle_to_pos)
-
+            testcase.targets_active()
             kws = dict(
                 rsync_server = ic.kws['pos_rsync_server'],
                 image = image,
@@ -929,6 +929,7 @@ EOF""")
                 image_final = ":".join(image_final_tuple)
                 kws['image'] = image_final
 
+                testcase.targets_active()
                 root_part_dev = self.mount_fs(image_final, boot_dev)
                 kws['root_part_dev'] = root_part_dev
 
@@ -953,12 +954,14 @@ EOF""")
                     for extra_deploy_fn in _extra_deploy_fns:
                         target.report_info("POS: running extra deploy fn %s"
                                            % extra_deploy_fn, dlevel = 2)
+                        testcase.targets_active()
                         extra_deploy_fn(ic, target, kws)
                     self.rsyncd_stop()
 
                 # Configure the bootloader: by hand with shell
                 # commands, so it is easy to reproduce by a user
                 # typing them
+                testcase.targets_active()
                 target.report_info("POS: configuring bootloader")
                 boot_config_fn = target.pos.cap_fn_get('boot_config', 'uefi')
                 if boot_config_fn:
