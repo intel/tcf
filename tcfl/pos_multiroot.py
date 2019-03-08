@@ -253,8 +253,11 @@ def mount_fs(target, image, boot_dev):
         target.property_set('pos_reinitialize', None)
 
     root_part_dev = _rootfs_guess(target, image, boot_dev)
-    target.report_info("POS: will use %s for root partition"
-                       % root_part_dev)
+    root_part_dev_base = os.path.basename(root_part_dev)
+    image_prev = target.property_get("pos_root_" + root_part_dev_base,
+                                     "nothing")
+    target.report_info("POS: will use %s for root partition (had %s before)"
+                       % (root_part_dev, image_prev))
 
     for try_count in range(3):
         target.report_info("POS: mounting root partition %s onto /mnt "

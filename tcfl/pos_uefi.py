@@ -232,7 +232,7 @@ def efibootmgr_setup(target):
     # multiple times, the system gets confused when it has to do
     # So we use syslinux to always control it
 
-def boot_config_multiroot(target, boot_dev, root_part_dev, image):
+def boot_config_multiroot(target, boot_dev, image):
     """
     Configure the target to boot using the multiroot
     """

@@ -966,7 +966,7 @@ EOF""")
                 boot_config_fn = target.pos.cap_fn_get('boot_config', 'uefi')
                 if boot_config_fn:
                     # maybe something, maybe nothing
-                    boot_config_fn(target, boot_dev, root_part_dev, image_final)
+                    boot_config_fn(target, boot_dev, image_final)
 
                 testcase.tls.expecter.timeout = timeout_sync
             except Exception as e:
