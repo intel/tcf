@@ -2,3 +2,4 @@
 dosfstools
 efibootmgr
 wget
+python3-cryptography
