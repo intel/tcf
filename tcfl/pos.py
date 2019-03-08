@@ -800,7 +800,7 @@ EOF""")
             # don't be verbose, makes it too slow and timesout when
             # sending a lot of files
             "time sudo rsync -vvvaAX --numeric-ids --delete"
-            " --exclude='/persistent.tcf.d/*'"
+            " --inplace --exclude='/persistent.tcf.d/*'"
             " --port %%(rsync_port)s  %s/. %%(rsync_server)s::rootfs/%s/."
             % (src, dst))
         target.testcase._targets_active()
@@ -936,9 +936,9 @@ EOF""")
                 target.report_info("POS: rsyncing %(image)s from "
                                    "%(rsync_server)s to /mnt" % kws,
                                    dlevel = -1)
-                target.shell.run("time rsync -aAX --numeric-ids --delete "
-                                 "--exclude='/persistent.tcf.d/*' "
-                                 "%(rsync_server)s/%(image)s/. /mnt/." % kws)
+                target.shell.run("time rsync -aAX --numeric-ids --delete"
+                                 " --inplace --exclude='/persistent.tcf.d/*'"
+                                 " %(rsync_server)s/%(image)s/. /mnt/." % kws)
                 target.report_info("POS: rsynced %(image)s from "
                                    "%(rsync_server)s to /mnt" % kws)
 
