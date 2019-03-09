@@ -261,6 +261,8 @@ def boot_config_multiroot(target, boot_dev, image):
 
     # MULTIROOT: indicate which image has been flashed to this
     # partition
+    # saved by pos_multiroot.mountfs
+    root_part_dev = target.root_part_dev
     root_part_dev_base = os.path.basename(root_part_dev)
     target.property_set('pos_root_' + root_part_dev_base, image)
     # /boot EFI system partition is always /dev/DEVNAME1 (first

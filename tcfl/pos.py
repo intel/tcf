@@ -362,7 +362,8 @@ capability_fns = dict(
     #:   partitioning
     #: - str boot_dev: device used to boot
     #:
-    #: returns: name of the root partition device
+    #: returns: nothing, but sets target.root_part_dev, where the rootfs is
+    #:
     mount_fs = dict(),
     #: Post-deploy functions to run
     extra_deploy = dict(),

@@ -253,6 +253,8 @@ def mount_fs(target, image, boot_dev):
         target.property_set('pos_reinitialize', None)
 
     root_part_dev = _rootfs_guess(target, image, boot_dev)
+    # save for other functions called later
+    target.root_part_dev = root_part_dev
     root_part_dev_base = os.path.basename(root_part_dev)
     image_prev = target.property_get("pos_root_" + root_part_dev_base,
                                      "nothing")
