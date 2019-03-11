@@ -1799,6 +1799,10 @@ class result_c():
 
         if 'target' in attachments:
             reporter = attachments['target']
+            # create a copy of the dictionary and remove the target
+            # spec, use it as reporter.
+            attachments = dict(attachments)
+            attachments.pop('target')
             assert isinstance(reporter, tcfl.tc.target_c), \
                 "attachment 'target' does not point to a " \
                 "tcfl.tc.target_c but to a type %s" % type(reporter).__name__
