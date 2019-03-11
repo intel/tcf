@@ -128,9 +128,44 @@ class shell(tc.target_extension_c):
         # Now commands should timeout fast
         self.target.testcase.tls.expecter.timeout = 30
 
+    def _run(self, cmd = None, expect = None, prompt_regex = None,
+             output = False, output_filter_crlf = True):
+        if cmd:
+            assert isinstance(cmd, basestring)
+        assert expect == None \
+            or isinstance(expect, basestring) \
+            or isinstance(expect, re._pattern_type) \
+            or isinstance(expect, list)
+        assert prompt_regex == None \
+            or isinstance(prompt_regex, basestring) \
+            or isinstance(prompt_regex, re._pattern_type)
+
+        if output:
+            offset = self.target.console.size()
+
+        if cmd:
+            self.target.send(cmd)
+        if expect:
+            if isinstance(expect, list):
+                for expectation in expect:
+                    assert isinstance(expectation, basestring) \
+                        or isinstance(expectation, re._pattern_type)
+                    self.target.expect(expectation)
+            else:
+                self.target.expect(expect)
+        if prompt_regex == None:
+            self.target.expect(self.linux_shell_prompt_regex)
+        else:
+            self.target.expect(prompt_regex)
+        if output:
+            output = self.target.console.read(offset = offset)
+            if output_filter_crlf:
+                return output.replace("\r\n", self.target.crlf)
+            return output
+        return None
 
     def run(self, cmd = None, expect = None, prompt_regex = None,
-            output = False, output_filter_crlf = True):
+            output = False, output_filter_crlf = True, timeout = None):
         """Runs *some command* as a shell command and wait for the shell
         prompt to show up.
 
@@ -186,39 +221,21 @@ class shell(tc.target_extension_c):
              >>> output = output.replace('\\r\\n', target.crlf)
 
         """
-        if cmd:
-            assert isinstance(cmd, basestring)
-        assert expect == None \
-            or isinstance(expect, basestring) \
-            or isinstance(expect, re._pattern_type) \
-            or isinstance(expect, list)
-        assert prompt_regex == None \
-            or isinstance(prompt_regex, basestring) \
-            or isinstance(prompt_regex, re._pattern_type)
-
-        if output:
-            offset = self.target.console.size()
-
-        if cmd:
-            self.target.send(cmd)
-        if expect:
-            if isinstance(expect, list):
-                for expectation in expect:
-                    assert isinstance(expectation, basestring) \
-                        or isinstance(expectation, re._pattern_type)
-                    self.target.expect(expectation)
-            else:
-                self.target.expect(expect)
-        if prompt_regex == None:
-            self.target.expect(self.linux_shell_prompt_regex)
-        else:
-            self.target.expect(prompt_regex)
-        if output:
-            output = self.target.console.read(offset = offset)
-            if output_filter_crlf:
-                return output.replace("\r\n", self.target.crlf)
-            return output
-        return None
+        assert timeout == None or timeout > 0, \
+            "timeout has to be a greater than zero number of seconds " \
+            "(got %s)" % timeout
+        testcase = self.target.testcase
+        original_timeout = testcase.tls.expecter.timeout
+        try:
+            if timeout:
+                testcase.tls.expecter.timeout = timeout
+            return self._run(
+                cmd = cmd, expect = expect,
+                prompt_regex = prompt_regex,
+                output = output, output_filter_crlf = output_filter_crlf)
+        finally:
+            if timeout:
+                testcase.tls.expecter.timeout = original_timeout
 
     def file_remove(self, remote_filename):
         """
