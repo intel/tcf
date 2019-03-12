@@ -170,15 +170,6 @@ def efibootmgr_setup(target):
     Note the server can configure :ref:`how the UEFI network entry
     looks over the defaults <uefi_boot_manager_ipv4_regex>`.
     """
-    output = target.shell.run("efibootmgr", output = True)
-    bo_regex = re.compile(r"^BootOrder: "
-                          "(?P<boot_order>([a-fA-F0-9]{4},)*[a-fA-F0-9]{4})$",
-                          re.MULTILINE)
-    # this one we added before calling this function with "bootctl
-    # install"
-    lbm_regex = re.compile(r"^Boot(?P<entry>[a-fA-F0-9]{4})\*? "
-                           "(?P<name>Linux Boot Manager$)", re.MULTILINE)
-
     # this allows getting metadata from the target that tells us what
     # to look for in the UEFI thing
     uefi_bm_ipv4_entries = [
@@ -190,44 +181,32 @@ def efibootmgr_setup(target):
     if 'uefi_boot_manager_ipv4_regex' in target.kws:
         uefi_bm_ipv4_entries.append(target.kws["uefi_boot_manager_ipv4_regex"])
     ipv4_regex = re.compile(
-        r"^Boot(?P<entry>[a-fA-F0-9]{4})\*? "
         # PXEv4 is QEMU's UEFI
         # .*IPv4 are some NUCs I've found
-        "(?P<name>(" + "|".join(uefi_bm_ipv4_entries) + "))",
+        "(" + "|".join(uefi_bm_ipv4_entries) + ")",
         re.MULTILINE)
-    bom_m = bo_regex.search(output)
-    if bom_m:
-        boot_order = bom_m.groupdict()['boot_order'].split(",")
-    else:
-        boot_order = []
-    target.report_info("POS: current boot_order: %s" % " ".join(boot_order))
-    lbm_m = lbm_regex.search(output)
-    if not lbm_m:
-        raise tc.blocked_e(
-            "Cannot find 'Linux Boot Manager' EFI boot entry",
-            dict(target = target, output = output))
-    lbm = lbm_m.groupdict()['entry']
-    lbm_name = lbm_m.groupdict()['name']
 
-    ipv4_m = ipv4_regex.search(output)
-    if not ipv4_m:
-        raise tc.blocked_e(
-            # FIXME: improve message to be more helpful and point to docz
-            "Cannot find IPv4 boot entry, enable manually",
-            dict(target = target, output = output))
-    ipv4 = ipv4_m.groupdict()['entry']
-    ipv4_name = ipv4_m.groupdict()['name']
-
-    # the first to boot has to be ipv4, then linux boot manager
-
-    if lbm in boot_order:
-        boot_order.remove(lbm)
-    if ipv4 in boot_order:
-        boot_order.remove(ipv4)
-    boot_order = [ ipv4, lbm ] + boot_order
-    target.report_info("POS: changing boot order to '%s', '%s'"
-                       % (ipv4_name, lbm_name))
+    # FIXME: this doesn't respect the current bootorder besides just
+    # adding ipv4
+    entry_regex = re.compile(
+        r"^Boot(?P<entry>[0-9A-F]{4})\*? (?P<name>.*)$", re.MULTILINE)
+    output = target.shell.run("efibootmgr", output = True)
+    matches = re.findall(entry_regex, output)
+    boot_order = [ ]
+    seen = False
+    for entry, name in matches:
+        if name in [ 'Linux Boot Manager', 'Linux bootloader' ]:
+            # delete repeated entries
+            if seen:
+                target.shell.run("efibootmgr -b %s -B" % entry)
+                seen = True
+        # Ensure ipv4 boot is first
+        if ipv4_regex.search(name):
+            boot_order.insert(0, entry)
+        else:
+            boot_order.append(entry)
     target.shell.run("efibootmgr -o " + ",".join(boot_order))
+    
     # We do not set the next boot order to be our system; why?
     # multiple times, the system gets confused when it has to do
     # So we use syslinux to always control it
@@ -377,12 +356,10 @@ initrd /%(linux_initrd_file_basename)s
 EOF
 """ % kws)
 
-    # Cleanup previous install of the bootloader, setup new one
-    # we don't care if we fail to remote, maybe not yet installed
-    target.shell.run(
-        "bootctl remove || true; "
-        "bootctl install; "
-        "sync")
+    # Install new or update existing
+    target.shell.run("bootctl update --no-variables"
+                     " || bootctl install --no-variables;"
+                     " sync")
 
     # Now mess with the EFIbootmgr
     # FIXME: make this a function and a configuration option (if the
