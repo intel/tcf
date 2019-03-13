@@ -186,11 +186,21 @@ def efibootmgr_setup(target):
         "(" + "|".join(uefi_bm_ipv4_entries) + ")",
         re.MULTILINE)
 
+    # ok, get current EFI bootloader status
+    output = target.shell.run("efibootmgr", output = True)
+    
+    boot_order_regex = re.compile(
+        r"^BootOrder: (?P<boot_order>[0-9a-fA-F,]+)$", re.MULTILINE)
+    boot_order_match = boot_order_regex.search(output)
+    if not boot_order_match:
+        raise tc.error_e("can't extract boot order",
+                         attachments(target = target, output = output))
+    boot_order_original = boot_order_match.groupdict()['boot_order'].split(',')
+
     # FIXME: this doesn't respect the current bootorder besides just
     # adding ipv4
     entry_regex = re.compile(
         r"^Boot(?P<entry>[0-9A-F]{4})\*? (?P<name>.*)$", re.MULTILINE)
-    output = target.shell.run("efibootmgr", output = True)
     matches = re.findall(entry_regex, output)
     boot_order = [ ]
     seen = False
@@ -198,13 +208,19 @@ def efibootmgr_setup(target):
         if name in [ 'Linux Boot Manager', 'Linux bootloader' ]:
             # delete repeated entries
             if seen:
+                target.report_info("removing repeated EFI boot entry %s (%s)"
+                                   % (entry, name))
                 target.shell.run("efibootmgr -b %s -B" % entry)
-                seen = True
+                continue	# don't add it to the boot order
+            seen = True
         # Ensure ipv4 boot is first
         if ipv4_regex.search(name):
             boot_order.insert(0, entry)
-        else:
+        elif entry in boot_order_original:
             boot_order.append(entry)
+        else:
+            # if the entry wasn't in the original boot order, ignore it
+            pass
     target.shell.run("efibootmgr -o " + ",".join(boot_order))
     
     # We do not set the next boot order to be our system; why?
