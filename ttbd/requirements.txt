@@ -2,6 +2,7 @@ duplicity
 Flask
 pexpect
 ply
+pyghmi
 pyserial
 python_ldap
 pyusb
