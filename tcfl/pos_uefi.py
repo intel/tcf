@@ -386,3 +386,19 @@ EOF
     # have to redo the whole thing anyway, so do not touch it, in case
     # we are jumping in for manual debugging
     target.shell.run("umount /dev/%(boot_part_dev)s" % kws)
+
+
+def boot_config_fix(target):
+    # when the system was supposed to boot into Provisioning OS, it
+    # didn't, but seems it booted some other OS.
+    #
+    # In the case of UEFI systems, this booted into a OS because the
+    # EFI bootmgr order got munged, so let's try to get that fixed
+    # (IPv4 and IPv6 boot first).
+    try:
+        prompt_original = target.shell.linux_shell_prompt_regex
+        target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+        target.shell.up(user = 'root')
+        efibootmgr_setup(target)
+    finally:
+        target.shell.linux_shell_prompt_regex = prompt_original

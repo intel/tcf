@@ -317,70 +317,6 @@ def deploy_linux_kernel(ic, target, _kws):
     target.testcase._targets_active()
     target.report_pass("linux kernel transferred")
 
-def efibootmgr_setup(target):
-    """
-    Ensure EFI Boot Manager boots first to IPv4 and then to an entry
-    we are creating called Linux Boot Manager.
-
-    We do this because the configuration file the server drops in TFTP
-    for syslinux to pick up for the MAC address of the target will
-    tell it if the target boots to POS mode or to local boot. So we
-    don't have to mess with BIOS menus.
-
-    General efibootmgr output::
-
-      $ efibootmgr
-      BootCurrent: 0006
-      Timeout: 0 seconds
-      BootOrder: 0000,0006,0004,0005
-      Boot0000* Linux Boot Manager
-      Boot0004* UEFI : Built-in EFI Shell
-      Boot0005* UEFI : LAN : IP6 Intel(R) Ethernet Connection (3) I218-V
-      Boot0006* UEFI : LAN : IP4 Intel(R) Ethernet Connection (3) I218-V
-
-    Note the server can configure :ref:`how the UEFI network entry
-    looks over the defaults <uefi_boot_manager_ipv4_regex>`.
-    """
-    # this allows getting metadata from the target that tells us what
-    # to look for in the UEFI thing
-    uefi_bm_ipv4_entries = [
-        "U?EFI Network.*$",
-        "UEFI PXEv4.*$",
-        ".*IPv?4.*$",
-    ]
-    # FIXME: validate better
-    if 'uefi_boot_manager_ipv4_regex' in target.kws:
-        uefi_bm_ipv4_entries.append(target.kws["uefi_boot_manager_ipv4_regex"])
-    ipv4_regex = re.compile(
-        # PXEv4 is QEMU's UEFI
-        # .*IPv4 are some NUCs I've found
-        "(" + "|".join(uefi_bm_ipv4_entries) + ")",
-        re.MULTILINE)
-
-    # FIXME: this doesn't respect the current bootorder besides just
-    # adding ipv4
-    entry_regex = re.compile(
-        r"^Boot(?P<entry>[0-9A-F]{4})\*? (?P<name>.*)$", re.MULTILINE)
-    output = target.shell.run("efibootmgr", output = True)
-    matches = re.findall(entry_regex, output)
-    boot_order = [ ]
-    seen = False
-    for entry, name in matches:
-        if name in [ 'Linux Boot Manager', 'Linux bootloader' ]:
-            # delete repeated entries
-            if seen:
-                target.shell.run("efibootmgr -b %s -B" % entry)
-                seen = True
-        # Ensure ipv4 boot is first
-        if ipv4_regex.search(name):
-            boot_order.insert(0, entry)
-        else:
-            boot_order.append(entry)
-    target.shell.run("efibootmgr -o " + ",".join(boot_order))
-    
-    # We do not set the next boot order to be our system; why?
-    # multiple times, the system gets confused when it has to do
-    # So we use syslinux to always control it
     
 
 #:
@@ -416,6 +352,13 @@ capability_fns = dict(
     #: - str root_part_dev: root device
     #: - str image: image specification
     boot_config = dict(),
+    #: Function to call to fix the boot loader from a system that
+    #: might have booted, we have something like a login prompt on the
+    #: serial console
+    #:
+    #: Arguments:
+    #: - tcfl.tc.target_c target: target who's boot has to be configured
+    boot_config_fix = dict(),
     #: Function to use to partition the target's storage
     #:
     #: Will be called when the target has a property *pos_repartition*
@@ -565,22 +508,28 @@ class extension(tc.target_extension_c):
     _regex_waiting_for_login = re.compile(r".*\blogin:\s*$")
 
     def _unexpected_console_output_try_fix(self, output, target):
+        # so when trying to boot POS we got unexpected console output;
+        # let's see what can we do about it.
         if output == None:
             # nah, can't do much
             return
-        
-        if self._regex_waiting_for_login.search(output):
-            # maybe this booted into a OS because the EFI bootmgr
-            # order got munged, so let's try to get that fixed
-            # FIXME: this has to be a capability
-            try:
-                prompt_original = target.shell.linux_shell_prompt_regex
-                target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
-                target.shell.up(user = 'root')
-                efibootmgr_setup(target)
-            finally:
-                target.shell.linux_shell_prompt_regex = prompt_original
 
+        # looks like a login prompt? Maybe we can login and munge
+        # things around
+        if self._regex_waiting_for_login.search(output):
+            boot_config_fix_fn = target.pos.cap_fn_get('boot_config_fix',
+                                                       'uefi')
+            if boot_config_fix_fn:
+                target.report_info("POS: got an unexpected login "
+                                   "prompt, will try to fix the "
+                                   "boot configuration"
+                boot_config_fix_fn(target)
+            else:
+                target.report_error(
+                    "POS: seems we got a login prompt that is not POS, "
+                    "but I don't know how to fix it; target does not "
+                    "declare capability `boot_config_fix`",
+                    attachments = dict(output = output))
     
     def boot_to_pos(self, pos_prompt = None,
                     # plenty to boot to an nfsroot, hopefully
@@ -1151,3 +1100,4 @@ capability_register('mount_fs', 'multiroot', pos_multiroot.mount_fs)
 capability_register('boot_to_pos', 'pxe', target_power_cycle_to_pos_pxe)
 capability_register('boot_to_normal', 'pxe', target_power_cycle_to_normal_pxe)
 capability_register('boot_config', 'uefi', pos_uefi.boot_config_multiroot)
+capability_register('boot_config_fix', 'uefi', pos_uefi.boot_config_fix)
