@@ -522,7 +522,7 @@ class extension(tc.target_extension_c):
             if boot_config_fix_fn:
                 target.report_info("POS: got an unexpected login "
                                    "prompt, will try to fix the "
-                                   "boot configuration"
+                                   "boot configuration")
                 boot_config_fix_fn(target)
             else:
                 target.report_error(
