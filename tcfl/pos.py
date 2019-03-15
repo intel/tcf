@@ -317,6 +317,71 @@ def deploy_linux_kernel(ic, target, _kws):
     target.testcase._targets_active()
     target.report_pass("linux kernel transferred")
 
+def efibootmgr_setup(target):
+    """
+    Ensure EFI Boot Manager boots first to IPv4 and then to an entry
+    we are creating called Linux Boot Manager.
+
+    We do this because the configuration file the server drops in TFTP
+    for syslinux to pick up for the MAC address of the target will
+    tell it if the target boots to POS mode or to local boot. So we
+    don't have to mess with BIOS menus.
+
+    General efibootmgr output::
+
+      $ efibootmgr
+      BootCurrent: 0006
+      Timeout: 0 seconds
+      BootOrder: 0000,0006,0004,0005
+      Boot0000* Linux Boot Manager
+      Boot0004* UEFI : Built-in EFI Shell
+      Boot0005* UEFI : LAN : IP6 Intel(R) Ethernet Connection (3) I218-V
+      Boot0006* UEFI : LAN : IP4 Intel(R) Ethernet Connection (3) I218-V
+
+    Note the server can configure :ref:`how the UEFI network entry
+    looks over the defaults <uefi_boot_manager_ipv4_regex>`.
+    """
+    # this allows getting metadata from the target that tells us what
+    # to look for in the UEFI thing
+    uefi_bm_ipv4_entries = [
+        "U?EFI Network.*$",
+        "UEFI PXEv4.*$",
+        ".*IPv?4.*$",
+    ]
+    # FIXME: validate better
+    if 'uefi_boot_manager_ipv4_regex' in target.kws:
+        uefi_bm_ipv4_entries.append(target.kws["uefi_boot_manager_ipv4_regex"])
+    ipv4_regex = re.compile(
+        # PXEv4 is QEMU's UEFI
+        # .*IPv4 are some NUCs I've found
+        "(" + "|".join(uefi_bm_ipv4_entries) + ")",
+        re.MULTILINE)
+
+    # FIXME: this doesn't respect the current bootorder besides just
+    # adding ipv4
+    entry_regex = re.compile(
+        r"^Boot(?P<entry>[0-9A-F]{4})\*? (?P<name>.*)$", re.MULTILINE)
+    output = target.shell.run("efibootmgr", output = True)
+    matches = re.findall(entry_regex, output)
+    boot_order = [ ]
+    seen = False
+    for entry, name in matches:
+        if name in [ 'Linux Boot Manager', 'Linux bootloader' ]:
+            # delete repeated entries
+            if seen:
+                target.shell.run("efibootmgr -b %s -B" % entry)
+                seen = True
+        # Ensure ipv4 boot is first
+        if ipv4_regex.search(name):
+            boot_order.insert(0, entry)
+        else:
+            boot_order.append(entry)
+    target.shell.run("efibootmgr -o " + ",".join(boot_order))
+    
+    # We do not set the next boot order to be our system; why?
+    # multiple times, the system gets confused when it has to do
+    # So we use syslinux to always control it
+    
 
 #:
 #: Functions to boot a target into POS
@@ -497,6 +562,26 @@ class extension(tc.target_extension_c):
         return capability_fn
 
 
+    _regex_waiting_for_login = re.compile(r".*\blogin:\s*$")
+
+    def _unexpected_console_output_try_fix(self, output, target):
+        if output == None:
+            # nah, can't do much
+            return
+        
+        if self._regex_waiting_for_login.search(output):
+            # maybe this booted into a OS because the EFI bootmgr
+            # order got munged, so let's try to get that fixed
+            # FIXME: this has to be a capability
+            try:
+                prompt_original = target.shell.linux_shell_prompt_regex
+                target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+                target.shell.up(user = 'root')
+                efibootmgr_setup(target)
+            finally:
+                target.shell.linux_shell_prompt_regex = prompt_original
+
+    
     def boot_to_pos(self, pos_prompt = None,
                     # plenty to boot to an nfsroot, hopefully
                     timeout = 60,
@@ -526,6 +611,7 @@ class extension(tc.target_extension_c):
                 # sometimes the BIOS has been set to boot local directly,
                 # so we might as well retry
                 target.report_error("POS: unexpected console output, retrying")
+                self._unexpected_console_output_try_fix(output, target)
                 continue
             target.report_info("POS: got Provisioning OS shell")
             break
@@ -797,13 +883,17 @@ EOF""")
         target.report_info(
             "rsyncing %s to target's /mnt/%s"
             % (src, dst), dlevel = -1)
+        if option_delete:
+            _delete = "--delete"
+        else:
+            _delete = ""
         target.shcmd_local(
             # don't be verbose, makes it too slow and timesout when
             # sending a lot of files
-            "time sudo rsync -vvvaAX --numeric-ids --delete"
+            "time sudo rsync -vvvaAX --numeric-ids %s"
             " --inplace --exclude='/persistent.tcf.d/*'"
             " --port %%(rsync_port)s  %s/. %%(rsync_server)s::rootfs/%s/."
-            % (src, dst))
+            % (_delete, src, dst))
         target.testcase._targets_active()
         target.report_info(
             "rsynced %s to target's /%s"
