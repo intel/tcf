@@ -15,6 +15,10 @@
      $ cd zephyr
      $ python2 setup.py install --user
 
+   (see :ref:`installation
+   troubleshooting<tcf_client_install_troubleshooting>` for things
+   that can go wrong)
+     
    You can also run *tcf* from the :ref:`source directory
    <tcf_run_from_source_tree>`.
      

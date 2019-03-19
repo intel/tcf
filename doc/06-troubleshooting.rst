@@ -9,10 +9,41 @@ For support, see the :ref:`contributing section
 TCF client
 ==========
 
+.. _tcf_client_install_troubleshooting:
+
+*tcf* dependencies installation failures
+----------------------------------------
+
+.. _tcf_client_missing_redhat_hardened_cc1:
+
+Missing *redhat-hardened-cc1*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+During installation with pip2::
+
+  $ pip2 install --user -r requirements.txt
+  ...
+  creating build/temp.linux-x86_64-2.7
+  creating build/temp.linux-x86_64-2.7/Levenshtein
+  gcc -pthread -fno-strict-aliasing -O2 -g -pipe -Wall -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector-strong --param=ssp-buffer-size=4 -grecord-gcc-switches -specs=/usr/lib/rpm/redhat/redhat-hardened-cc1 -m64 -mtune=generic -D_GNU_SOURCE -fPIC -fwrapv -DNDEBUG -O2 -g -pipe -Wall -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector-strong --param=ssp-buffer-size=4 -grecord-gcc-switches -specs=/usr/lib/rpm/redhat/redhat-hardened-cc1 -m64 -mtune=generic -D_GNU_SOURCE -fPIC -fwrapv -fPIC -I/usr/include/python2.7 -c Levenshtein/_levenshtein.c -o build/temp.linux-x86_64-2.7/Levenshtein/_levenshtein.o
+  gcc: error: /usr/lib/rpm/redhat/redhat-hardened-cc1: No such file or directory
+  error: command 'gcc' failed with exit status 1
+
+this usually happens in Fedora based distros; fix by installing
+missing package::
+
+  # dnf install -y redhat-rpm-config
+
+  
 *tcf* just hangs there, nothing happens
 ---------------------------------------
 
-Add ``-v``\s, check your proxy settings are ok
+Add ``-v``\s right after *tcf* (e.g.: ``tcf -vvv ...``; usually this
+means TCF is trying to contact a host that is either:
+
+- nonresponsive (the server might be up, the port open but the daemon
+  is not responding or the server has crashed)
+- blocked by a firewall (check your proxy settings are ok)
 
 Client operations report *EOF occurred in violation of protocol*
 ----------------------------------------------------------------
