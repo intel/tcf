@@ -740,6 +740,9 @@ class test_target(object):
             for key, value in ic_data.iteritems():
                 if not key.endswith("_addr"):
                     continue
+                if not key.startswith("ip"):
+                    # this has to be an IP address...
+                    continue
                 itr_ip_addr = ipaddress.ip_address(unicode(value))
                 if ip_addr == itr_ip_addr:
                     return
