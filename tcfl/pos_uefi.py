@@ -42,6 +42,9 @@ def _linux_boot_guess_from_lecs(target, _image):
         lec = lec.strip()
         if not lec.startswith("/mnt/boot/loader/entries/"):
             continue
+        if 'rescue' in lec:
+            target.report_info("POS: ignoring rescue loader entry %s" % lec)
+            continue
         lecl.append(lec)
         target.report_info("Loader Entry found: %s" % lec, dlevel = 1)
     if len(lecl) > 1:
