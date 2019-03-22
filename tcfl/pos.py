@@ -756,7 +756,7 @@ EOF""")
             target.shcmd_local(
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
-                "time rsync -aAX --numeric-ids --delete"
+                "time rsync -HaAX --numeric-ids --delete"
                 " --port %%(rsync_port)s "
                 " %s/. %%(rsync_server)s::rootfs/%s/%s"
                 % (src, persistent_dir, persistent_name))
@@ -771,7 +771,7 @@ EOF""")
             target.shell.run(
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
-                "time rsync -aAX --delete /mnt/%s/%s/. /mnt/%s"
+                "time rsync -HaAX --delete /mnt/%s/%s/. /mnt/%s"
                 % (persistent_dir, persistent_name, dst))
 
 
@@ -828,25 +828,28 @@ EOF""")
 
         """
         target = self.target
-        target.shell.run("mkdir -p /%s" % dst)
-        target.report_info(
-            "rsyncing %s to target's /mnt/%s"
-            % (src, dst), dlevel = -1)
+        target.shell.run("mkdir -p /%s	# create dest for rsync_np" % dst)
         if option_delete:
             _delete = "--delete"
         else:
             _delete = ""
-        target.shcmd_local(
-            # don't be verbose, makes it too slow and timesout when
-            # sending a lot of files
-            "time sudo rsync -vvvaAX --numeric-ids %s"
-            " --inplace --exclude='/persistent.tcf.d/*'"
-            " --port %%(rsync_port)s  %s/. %%(rsync_server)s::rootfs/%s/."
-            % (_delete, src, dst))
+        # don't be verbose, makes it too slow and timesout when
+        # sending a lot of files
+        cmdline = \
+            "time sudo rsync -HaAX --numeric-ids %s" \
+            " --inplace" \
+            " --exclude=persistent.tcf.d --exclude='persistent.tcf.d/*'" \
+            " --port %%(rsync_port)s %s/. %%(rsync_server)s::rootfs/%s/." \
+            % (_delete, src, dst)
+        target.report_info(
+            "POS: rsyncing %s to target's /mnt/%s" % (src, dst), dlevel = -1,
+            attachments = dict(cmdline = cmdline))
+        output = target.shcmd_local(cmdline)
         target.testcase._targets_active()
         target.report_info(
             "rsynced %s to target's /%s"
-            % (src, dst))
+            % (src, dst),
+            attachments = dict(cmdline = cmdline, output = output))
 
     def rsyncd_stop(self):
         """
@@ -976,9 +979,11 @@ EOF""")
                 target.report_info("POS: rsyncing %(image)s from "
                                    "%(rsync_server)s to /mnt" % kws,
                                    dlevel = -1)
-                target.shell.run("time rsync -aAX --numeric-ids --delete"
-                                 " --inplace --exclude='/persistent.tcf.d/*'"
-                                 " %(rsync_server)s/%(image)s/. /mnt/." % kws)
+                target.shell.run(
+                    "time rsync -HaAX --numeric-ids --delete --inplace"
+                    " --exclude=/persistent.tcf.d"
+                    " --exclude='/persistent.tcf.d/*'"
+                    " %(rsync_server)s/%(image)s/. /mnt/." % kws)
                 target.report_info("POS: rsynced %(image)s from "
                                    "%(rsync_server)s to /mnt" % kws)
 
