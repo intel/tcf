@@ -1629,10 +1629,16 @@ class tc_zephyr_sanity_c(tc.tc_c):
             # now that is fixed, we flatten that.
             for entry in data:
                 mapping.update(entry)
+        elif data == None:
+            # this means this .yaml has just a description but it does
+            # not specify how to run any of it, so we are going to
+            # pass
+            raise tc.skip_e(
+                "no `tests` section declared in %s" % path)
+            return
         else:
             assert isinstance(data, dict), \
-                "tests data is not a dict but a %s -- no 'tests' " \
-                "section specified" % type(data).__name__
+                "tests data is not a dict but a %s" % type(data).__name__
             mapping = data
         common = y.get('common', {})
         for tc_name, _tc_vals in mapping.iteritems():
