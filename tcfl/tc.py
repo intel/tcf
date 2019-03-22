@@ -1675,7 +1675,8 @@ class target_group_c(object):
 assign_period = 2
 
 class result_c():
-    def __init__(self, passed, errors, failed, blocked, skipped):
+    def __init__(self, passed = 0, errors = 0, failed = 0,
+                 blocked = 0, skipped = 0):
         self.passed = passed
         self.errors = errors
         self.failed = failed
