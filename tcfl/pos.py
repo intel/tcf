@@ -775,7 +775,7 @@ EOF""")
                 % (persistent_dir, persistent_name, dst))
 
 
-    def rsync_np(self, src, dst, option_delete = True):
+    def rsync_np(self, src, dst, option_delete = False):
         """rsync data from the local machine to a target
 
         The local machine is the machine executing the test script (where
@@ -1083,7 +1083,7 @@ def deploy_tree(_ic, target, _kws):
     >>>                         extra_deploy_fns = [ tcfl.pos.deploy_linux_kernel ])
 
     """
-    source_tree = target.getattr("deploy_tree_src", None)
+    source_tree = getattr(target, "deploy_tree_src", None)
     if source_tree == None:
 
         target.report_info("not deploying local tree because "
@@ -1093,7 +1093,7 @@ def deploy_tree(_ic, target, _kws):
     target.report_info("rsyncing tree %s -> target:/" % source_tree,
                        dlevel = 1)
     target.testcase._targets_active()
-    target.pos.rsync_np(source_tree, "/")
+    target.pos.rsync_np(source_tree, "/", option_delete = True)
     target.testcase._targets_active()
     target.report_pass("rsynced tree %s -> target:/" % source_tree)
 
