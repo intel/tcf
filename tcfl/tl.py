@@ -233,3 +233,41 @@ EOF""" % (prefix, prefix))
 
 def deploy_linux_ssh_root_nopwd(_ic, target, _kws):
     linux_ssh_root_nopwd(target, "/mnt")
+
+def linux_ipv4_addr_get_from_console(target, ifname):
+    """
+    Get the IPv4 address of a Linux Interface from the Linux shell
+    using the *ip addr show* command.
+
+    :param tcfl.tc.target_c target: target on which to find the IPv4
+      address.
+    :param str ifname: name of the interface for which we want to find
+      the IPv4 address.
+
+    :raises tcfl.tc.error_e: if it cannot find the IP address.
+
+    Example:
+
+    >>> import tcfl.tl
+    >>> ...
+    >>>
+    >>> @tcfl.tc.interconnect("ipv4_addr")
+    >>> @tcfl.tc.target("pos_capable")
+    >>> class my_test(tcfl.tc.tc_c):
+    >>>    ...
+    >>>    def eval(self, tc, target):
+    >>>        ...
+    >>>        ip4 = tcfl.tl.linux_ipv4_addr_get_from_console(target, "eth0")
+    >>>        ip4_config = target.addr_get(ic, "ipv4")
+    >>>        if ip4 != ip4_config:
+    >>>            raise tcfl.tc.failed_e(
+    >>>                "assigned IPv4 addr %s is different than"
+    >>>                " expected from configuration %s" % (ip4, ip4_config))
+
+    """
+    output = target.shell.run("ip addr show dev %s" % ifname, output = True)
+    regex = re.compile(r"^    inet (?P<name>([0-9\.]+){4})/", re.MULTILINE)
+    matches = regex.search(output)
+    if not matches:
+        raise tcfl.tc.error_e("can't find IP addr")
+    return matches.groupdict()['name']
