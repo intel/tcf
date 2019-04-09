@@ -57,7 +57,7 @@ class _test(tcfl.tc.tc_c):
     def start(self, target):
         target.power.cycle()
         target.expect("login")
-        target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+        target.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
         target.shell.up(user = "root")
 
     def eval_00_run_ssh_commands(self, target):

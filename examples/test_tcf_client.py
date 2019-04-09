@@ -20,7 +20,7 @@ class _base(tcfl.tc.tc_c):
         # are here, still in the service OS, so reboot into our new OS
         target.power.cycle()
         self._targets_active()
-        target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+        target.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
         target.shell.up(user = 'root')
         target.report_pass("booted")
         self._targets_active()

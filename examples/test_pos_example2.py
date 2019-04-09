@@ -61,7 +61,7 @@ class _test(tcfl.tc.tc_c):
         target.pos.boot_normal()
 
         # our shell prompt will look like this...
-        target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+        target.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
         # wait for target to boot, login as root to the console
         target.shell.up(user = 'root')
 

@@ -39,26 +39,26 @@ class _test(tcfl.tc.tc_c):
 
     @tcfl.tc.concurrently()
     def deploy_10_target(self, ic, target):
-        target.pos.deploy_imaged(ic, image)
+        target.pos.deploy_image(ic, image)
         target.report_pass("DEPLOYED")
         target.power.cycle()
-        target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+        target.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
         target.shell.up(user = 'root')
 
     @tcfl.tc.concurrently()
     def deploy_10_target1(self, ic, target1):
-        target1.pos.deploy_imaged(ic, image)
+        target1.pos.deploy_image(ic, image)
         target1.report_pass("DEPLOYED")
         target1.power.cycle()
-        target1.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+        target1.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
         target1.shell.up(user = 'root')
 
     @tcfl.tc.concurrently()
     def deploy_10_target2(self, ic, target2):
-        target2.pos.deploy_imaged(ic, image)
+        target2.pos.deploy_image(ic, image)
         target2.report_pass("DEPLOYED")
         target2.power.cycle()
-        target2.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+        target2.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
         target2.shell.up(user = 'root')
 
     def eval(self, target, target1, target2):

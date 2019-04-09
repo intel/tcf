@@ -400,7 +400,7 @@ def boot_config_fix(target):
     # (IPv4 and IPv6 boot first).
     try:
         prompt_original = target.shell.linux_shell_prompt_regex
-        target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+        target.shell.linux_shell_prompt_regex = tl.linux_root_prompts
         target.shell.up(user = 'root')
         efibootmgr_setup(target)
     finally:

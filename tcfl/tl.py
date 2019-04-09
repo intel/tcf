@@ -271,3 +271,16 @@ def linux_ipv4_addr_get_from_console(target, ifname):
     if not matches:
         raise tcfl.tc.error_e("can't find IP addr")
     return matches.groupdict()['name']
+
+# common linux root prompts
+linux_root_prompts = re.compile(
+    '('
+    # clear, Fedora
+    'root@.*# '
+    '|'
+    # SLES; make sure there is no trailing space, otherwise it gets
+    # confused with the ANSI colouring sequences that come between the
+    # and the space.
+    '[^:]+:.* #'
+    ')'
+)

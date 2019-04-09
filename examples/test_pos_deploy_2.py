@@ -40,7 +40,7 @@ class _test(tcfl.tc.tc_c):
         target.pos.deploy_image(ic, image)
         target.report_pass("DEPLOYED")
         target.power.cycle()
-        target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+        target.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
         target.shell.up(user = 'root')
 
     @tcfl.tc.concurrently()
@@ -48,7 +48,7 @@ class _test(tcfl.tc.tc_c):
         target1.pos.deploy_image(ic, image)
         target1.report_pass("DEPLOYED")
         target1.power.cycle()
-        target1.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+        target1.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
         target1.shell.up(user = 'root')
 
     def eval(self, target, target1):

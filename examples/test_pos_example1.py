@@ -54,7 +54,7 @@ int main(void) {
         target.power.cycle()
 
         # our shell prompt will look like this...
-        target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+        target.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
         # wait for target to boot, login as root to the console
         target.shell.up(user = 'root')
 

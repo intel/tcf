@@ -32,14 +32,13 @@ class _test(tcfl.tc.tc_c):
     def deploy(self, ic, target):
         # ensure network, DHCP, TFTP, etc are up and deploy
         ic.power.on()
-        ic.report_pass("powered on")
         global image
         image = target.pos.deploy_image(ic, image)
 
     def start(self, ic, target):
         # fire up the target, wait for a login prompt
         target.pos.boot_normal()
-        target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+        target.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
         target.shell.up(user = 'root')
         target.report_pass("Deployed %s" % image)
         # release here so we had the daemon control where we boot to
