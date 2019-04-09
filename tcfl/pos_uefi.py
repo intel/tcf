@@ -205,12 +205,14 @@ def efibootmgr_setup(target):
                          attachments(target = target, output = output))
     boot_order_original = boot_order_match.groupdict()['boot_order'].split(',')
 
-    # FIXME: this doesn't respect the current bootorder besides just
-    # adding ipv4
+    # this respects the current bootorder besides just
+    # adding ipv4 and putting the local one first
     entry_regex = re.compile(
         r"^Boot(?P<entry>[0-9A-F]{4})\*? (?P<name>.*)$", re.MULTILINE)
     matches = re.findall(entry_regex, output)
     boot_order = [ ]
+    local_boot_order = [ ]
+    network_boot_order = [ ]
     seen = False
     for entry, name in matches:
         if name in [ 'Linux Boot Manager', 'Linux bootloader' ]:
@@ -221,15 +223,17 @@ def efibootmgr_setup(target):
                 target.shell.run("efibootmgr -b %s -B" % entry)
                 continue	# don't add it to the boot order
             seen = True
-        # Ensure ipv4 boot is first
-        if ipv4_regex.search(name):
-            boot_order.insert(0, entry)
+            local_boot_order.append(entry)
+        elif ipv4_regex.search(name):
+            # Ensure ipv4 boot is first
+            network_boot_order.append(entry)
         elif entry in boot_order_original:
             boot_order.append(entry)
         else:
             # if the entry wasn't in the original boot order, ignore it
             pass
-    target.shell.run("efibootmgr -o " + ",".join(boot_order))
+    target.shell.run("efibootmgr -o " + ",".join(
+        network_boot_order + local_boot_order + boot_order))
     
     # We do not set the next boot order to be our system; why?
     # multiple times, the system gets confused when it has to do
@@ -381,8 +385,10 @@ EOF
 """ % kws)
 
     # Install new or update existing
+    # don't do variables in the update case, as we will poke with them
+    # later on anyway
     target.shell.run("bootctl update --no-variables"
-                     " || bootctl install --no-variables;"
+                     " || bootctl install;"
                      " sync")
 
     # Now mess with the EFIbootmgr
