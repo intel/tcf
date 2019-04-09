@@ -77,6 +77,12 @@ Using QEMU
 
      $ $progname ubuntu:desktop:18.10::x86_64 ubuntu-18.10.qcow2
 
+Forcing things (set environment variables)
+
+ROOT_PARTITION   force the root partition to be that number (1, 2, 3...)
+BOOT_PARTITION   force the boot partition to be that number (1, 2, 3...)
+
+
 EOF
 }
 
@@ -174,26 +180,30 @@ fi
 case "$image_type" in
     # clear, yocto core image minimal
     clear)
-        boot_part=p1
-        root_part=p2
+        boot_part=p${BOOT_PARTITION:-1}
+        root_part=p${ROOT_PARTITION:-2}
         ;;
     # Newer clear versions
     clear2)
-        boot_part=p1
-        root_part=p3
+        boot_part=p${BOOT_PARTITION:-1}
+        root_part=p${ROOT_PARTITION:-3}
         ;;
     yocto)
-        boot_part=p1
-        root_part=p2
+        boot_part=p${BOOT_PARTITION:-1}
+        root_part=p${ROOT_PARTITION:-2}
         ;;
     debian|fedoralive|tcflive)
-        root_part=p1
+        root_part=p${ROOT_PARTITION:-1}
         ;;
     rootfswic)
-        boot_part=p1
-        root_part=p2
+        boot_part=p${BOOT_PARTITION:-1}
+        root_part=p${ROOT_PARTITION:-2}
         ;;
-    android|qcow2|rootfsimage)
+    qcow2)
+        boot_part=
+        root_part=p${ROOT_PARTITION:-1}
+        ;;
+    android|rootfsimage)
         ;;
     *)
         error Unknown image type for $image_file
@@ -203,8 +213,17 @@ esac
 
 if [ $image_type = qcow2 ]; then
     sudo modprobe nbd
-    sudo qemu-nbd -c $nbd_dev -P 1 -r $image_file &
-    qemu_nbd_pid=$!
+    # can't really use -P, it fails on some when doing -P2
+    sudo qemu-nbd -c $nbd_dev -r $image_file &
+    # Get the PID of the process run by sudo by detecting who is using
+    # the lock file. Might take a while to start -- yeh, this is kinda
+    # race condition
+    sleep 3s
+    qemu_nbd_pid=$(sudo lsof -t /var/lock/qemu-nbd-$(basename $nbd_dev))
+    root_part=${nbd_dev}$root_part
+    if ! [ -z "${boot_part:-}" ]; then
+        boot_part=${nbd_dev}$boot_part
+    fi
     info QEMU NBD at $qemu_nbd_pid
 else
     loop_dev=$(sudo losetup --show -fP $image_file)
