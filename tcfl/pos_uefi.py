@@ -101,6 +101,8 @@ def _linux_boot_guess_from_boot(target, image):
             continue
         file_name = m.groups()[0]
         kver = m.groups()[1]
+        if kver == None:
+            kver = "default"
         if kver and ("rescue" in kver or "kdump" in kver):
             # these are usually found on Fedora
             continue
@@ -112,6 +114,9 @@ def _linux_boot_guess_from_boot(target, image):
         else:
             kernel_versions[kver] = line
 
+    if len(kernel_versions) > 1 and 'default' in kernel_versions:
+        del kernel_versions['default']
+            
     if len(kernel_versions) == 1:
         kver = kernel_versions.keys()[0]
         options = ""
