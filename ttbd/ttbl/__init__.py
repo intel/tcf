@@ -349,12 +349,16 @@ class test_target(object):
 
 
     def _tags_verify_interconnect(self, name, data):
-        ic = ttbl.config.targets.get(name, None)
+        if '#' in name:
+            real_name, _instance = name.split("#", 1)
+        else:
+            real_name = name
+        ic = ttbl.config.targets.get(real_name, None)
         if ic == None:
             self.log.warning("target declares connectivity to interconnect "
                              "'%s' that is not local, cannot verify; "
                              "if it is local, declare it before the targets "
-                             "using it" % name)
+                             "using it" % real_name)
         for key, val in data.iteritems():
             # FIXME: verify duped addresses
             if key in ["ipv4_addr", "ipv6_addr"]:
@@ -415,13 +419,25 @@ class test_target(object):
             self._tags_verify_interconnect(name, data)
 
     def add_to_interconnect(self, ic_id, ic_tags = None):
-        """
-        Add a target to an interconnect
+        """Add a target to an interconnect
 
         :param str ic_id: name of the interconnect; might be present in
           this server or another one.
+
+          If named ``IC_ID#INSTANCE``, this is understood as this
+          target has multiple connections to the same interconnect
+          (via multiple physical or virtual network interfaces).
+
+          No instance name (no ``#INSTANCE``) means the default,
+          primary connection.
+
+          Thus, a target that can instantiate multiple virtual
+          machines, for example, might want to declare them here if we
+          need to pre-determine and pre-assign those IP addresses.
+
         :param dict ic_tags: (optional) dictionary of tags describing the
           tags for this target on this interconnect.
+
         """
         assert isinstance(ic_id, basestring)
         if ic_tags == None:

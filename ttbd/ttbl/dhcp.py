@@ -351,7 +351,6 @@ subnet6 %(if_net)s/%(if_len)s {
                 ipv4_netmask = commonl.ipv4_len_to_netmask_ascii(
                     ic.tags['ipv4_prefix_len']),
                 name = target.id,
-                hostname = target.id
             ))
 
             # There might be a prefix to the path to the boot kernel and
@@ -363,7 +362,13 @@ subnet6 %(if_net)s/%(if_len)s {
             _tag_get_from_ic_target(kws, 'pos_nfs_path', ic, target)
 
             for ic_id, interconnect in interconnects.iteritems():
-                if ic_id != self.target.id:
+                if '#' in ic_id:
+                    real_ic_id, instance = ic_id.split("#", 1)
+                    kws['hostname'] = target.id + "-" + instance
+                else:
+                    real_ic_id = ic_id
+                    kws['hostname'] = target.id
+                if real_ic_id != self.target.id:
                     continue
                 kws['mac_addr'] = interconnect.get('mac_addr', None)
                 kws['ipv4_addr'] = interconnect.get('ipv4_addr', None)

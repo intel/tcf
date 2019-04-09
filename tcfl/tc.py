@@ -797,7 +797,7 @@ class target_c(object):
                 % (field, field_description, ic.id))
         return self.rt['interconnects'][ic.id][field]
 
-    def addr_get(self, ic, tech):
+    def addr_get(self, ic, tech, instance = None):
         """Obtain the address for a target in an interconnect
 
         A target might be a member of one or more interconnects, as
@@ -818,6 +818,18 @@ class target_c(object):
 
           If *tech* fits a whole key name, it will be used instead.
 
+        :param str instance: (optional) when this target has multiple
+          connections to the same interconnect (via multiple physical
+          or virtual network interfaces), you can select which
+          instance of those it is wanted. 
+
+          By default this will return the default instance (eg, the
+          one corresponding to the interconnect ``ICNAME``), but if an
+          instance is added, it will return the IP address for
+          ``ICNAME#INSTANCE`` as declared in the target's
+          configuration with functions such as
+          :func:`ttbl.test_target.add_to_interconnect`.
+
         When the target, for the current testcase is member of a
         single interconnect, any *TECHNOLOGY_addr* for the
         interconnect key/value will be available in the :attr:`kws`
@@ -834,8 +846,10 @@ class target_c(object):
         >>> def eval_somestep(self, ic, target1, target2):
         >>>    target1.shell.run("scp /etc/passwd %s:/etc/passwd"
         >>>                      % target2.addr_get(ic, 'ipv4'))
+
         """
-        return self.ic_field_get(ic, tech + "_addr", "(address)")
+        return self.ic_field_get(ic, tech + "_addr", "(address)",
+                                 instance = instance)
 
     def app_get(self, bsp = None, noraise = True):
         """
