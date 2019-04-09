@@ -63,6 +63,7 @@ import glob
 import os
 import re
 import subprocess
+import time
 
 import commonl
 import tcfl
@@ -293,6 +294,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
     #: >>> tcfl.tc_clear_bbt.tc_clear_bbt_c.image = "clear::24800"
     #:
     image = os.environ.get("IMAGE", "clear")
+    image_tree = os.environ.get("IMAGE_TREE", None)
 
     #: Mapping from TAPS output to TCF conditions
     #:
@@ -359,8 +361,16 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         # ensure network, DHCP, TFTP, etc are up and deploy
         ic.power.on()
         ic.report_pass("powered on")
+        if self.image_tree:
+            target.deploy_tree_src = self.image_tree
         self.image = target.pos.deploy_image(
-            ic, self.image, extra_deploy_fns = [ self._deploy_bbt, ])
+            ic, self.image, extra_deploy_fns = [
+                # first deploy our local tree, if any--note this will
+                # wipe out anything existing
+                tcfl.pos.deploy_tree,
+                # then layer the BBT on top
+                self._deploy_bbt,
+            ])
         target.report_info("Deployed %s" % self.image)
 
     def start(self, ic, target):
