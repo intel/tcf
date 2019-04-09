@@ -82,6 +82,10 @@ Forcing things (set environment variables)
 ROOT_PARTITION   force the root partition to be that number (1, 2, 3...)
 BOOT_PARTITION   force the boot partition to be that number (1, 2, 3...)
 
+ROOT_MOUNTOPTS   use these root mount options (default to ext*'s
+                 noload; use norecovery for xfs)
+
+BOOT_MOUNTOPTS   use these boot mount options (default to empty)
 
 EOF
 }
@@ -278,8 +282,8 @@ elif [ $image_type == fedoralive -o $image_type == tcflive ]; then
     mounted_dirs="$tmpdir/root ${mounted_dirs:-}"
 elif [ $image_type == qcow2 ]; then
 
-    sudo mount -r -o noload ${nbd_dev} $tmpdir/root
-    info mounted ${nbd_dev} in $tmpdir/root
+    sudo mount -r -o ${ROOT_MOUNTOPTS:-noload} ${root_part} $tmpdir/root
+    info mounted ${root_part} in $tmpdir/root
     mounted_dirs="$tmpdir/root ${mounted_dirs:-}"
 
 elif [ $image_type == rootfsimage ]; then
@@ -307,7 +311,9 @@ fi
 
 if ! [ -z "$boot_part" ]; then
     # clear does this
-    sudo mount ${loop_dev}${boot_part} $tmpdir/root/boot
+    # 'auto' is used this a placeholder for a default option that
+    # otherwise is doing no option
+    sudo mount -o ${BOOT_MOUNTOPTS:-auto} ${loop_dev}${boot_part} $tmpdir/root/boot
     mounted_dirs="$tmpdir/root/boot ${mounted_dirs:-}"
     info mounted ${loop_dev}${boot_part} in $tmpdir/root/boot
 fi
@@ -376,6 +382,16 @@ for shadow_file in \
     fi
 done
 
+file=etc/pam.d/common-auth
+if [ -r $destdir/$file ]; then
+    # SuSE SLES seems to be configuring PAM so a passwordless root
+    # acount doesn't work; tweak it
+    if ! grep -q "pam_unix.so.*nullok" $destdir/$file; then        
+        info "$file: allowing login to accounts with no password (adding 'nullok')"
+        sudo sed -i 's/pam_unix.so/pam_unix.so\tnullok /' $destdir/$file
+    fi
+fi
+
 #
 # Fixup / harcode serial login consoles
 #
@@ -405,10 +421,16 @@ if [ -d $destdir/etc/systemd/system/getty.target.wants ] \
     # ALSO, force 115200 is the only BPS we support
     #
     info $image_type: systemd: hardcoding TTY console settings
-    sudo sed -i \
-         -e 's|^ExecStart=-/sbin/agetty -o.*|ExecStart=-/sbin/agetty 115200 %I $TERM|' \
-         -e 's|^BindsTo=|# <commented out by tcf-image-setup.sh> BindsTo=|' \
-         $destdir/lib/systemd/system/serial-getty@.service
+    for systemd_libdir in $destdir/lib $destdir/usr/lib; do
+        if ! [ -d $systemd_libdir/systemd ]; then
+            # some systems have systemd in /lib, others /usr/lib...
+            continue
+        fi
+        sudo sed -i \
+             -e 's|^ExecStart=-/sbin/agetty -o.*|ExecStart=-/sbin/agetty 115200 %I $TERM|' \
+             -e 's|^BindsTo=|# <commented out by tcf-image-setup.sh> BindsTo=|' \
+             $systemd_libdir/systemd/system/serial-getty@.service
+    done
     for tty_dev in $tty_devs; do
         info $image_type: force enabling of $tty_dev console
         sudo chroot $destdir systemctl enable serial-getty@$tty_dev
@@ -422,6 +444,24 @@ if [ -r $destdir/etc/inittab ]; then
             sudo tee -a $destdir/etc/inittab
         info $image_type: added $tty_dev to automatic console spawn
     done
+fi
+
+if [ -r $destdir/etc/fstab ]; then
+    info $image_type: removing UUID from /etc/fstab, replacing with LABEL=tcf-swap
+    # otherwise boot tries to wait for UUID waiting to show up and our
+    # filesystem might have different UUIDs 
+    sudo sed -i 's/^UUID=.*swap/LABEL=tcf-swap swap/g' $destdir/etc/fstab
+
+    # SuSE seems to do this a lot, so we need to write it out
+    #
+    # UUID=<UUID> /      btrfs defaults               0 0
+    # UUID=<UUID> /var   btrfs subvol=/@/VAR defaults 0 0
+    # ...
+    # UUID=<UUID> /tmp   btrfs subvol=/@/VAR defaults 0 0
+    #
+    # Let's just remove it and let the normal boot process (kernel)
+    # mount the root filesystem
+    sudo sed -i '/^UUID=[-0-9a-fA-F]\+[ \t]\+.*btrfs/d' $destdir/etc/fstab 
 fi
 
 if test -r $destdir/usr/share/defaults/etc/profile.d/50-prompt.sh; then
