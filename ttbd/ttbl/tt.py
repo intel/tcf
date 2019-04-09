@@ -144,7 +144,7 @@ class tt_arduino2(
 
     def __init__(self, _id, serial_port,
                  power_control = None,
-                 bossac_cmd = "bossac"):
+                 bossac_cmd = None):
         """Test target for a target flashable with the bossac tool (mostly
         Arduino Due)
 
@@ -198,8 +198,8 @@ class tt_arduino2(
         :param ttbl.tt_power_control_impl power_control: power controller
           (if any)
 
-        :param bossac_cmd: Path and file where to find the `bossac`
-          utility.
+        :param bossac_cmd: (optional) path and file where to find the
+          `bossac` utility.
 
         """
         self.serial_port = serial_port
@@ -214,7 +214,9 @@ class tt_arduino2(
                 "pc",
                 { 'port': serial_port, 'baudrate': 115200 }
             ])
-        self.bossac_cmd = bossac_cmd
+        if bossac_cmd:
+            assert isinstance(bossac_cmd, basestring)
+            self.bossac_cmd = bossac_cmd
 
     def image_do_set(self, image_type, image_name):
         """Just validates the image types are ok. The flashing happens in

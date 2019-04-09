@@ -1254,8 +1254,7 @@ def arduino2_add(name = None,
                     serial_port, poll_period = 4, timeout = 25,
                 ),
                 ttbl.cm_serial.pc(),
-            ],
-            bossac_cmd = "bossac"),
+            ]),
         tags = {
             'bsp_models': { 'arm': None },
             'bsps' : {
