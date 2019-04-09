@@ -877,6 +877,7 @@ def qemu_pos_add(target_name,
                  consoles = None,
                  disk_size = "30G",
                  mr_partsizes = "1:4:5:5",
+                 sd_iftype = 'virtio',
                  extra_cmdline = "",	# pylint: disable = unused-argument
                  ram_megs = 2048):
     """Add a QEMU virtual machine capable of booting over Provisioning OS.
@@ -950,6 +951,16 @@ def qemu_pos_add(target_name,
     assert len(consoles) >= 1
     assert ram_megs > 0
 
+    if sd_iftype == 'virtio':
+        pos_boot_dev = 'vda'
+    elif sd_iftype == 'scsi':
+        pos_boot_dev = 'sda'
+    elif sd_iftype == 'ide':
+        pos_boot_dev = 'hda'
+    else:
+        raise AssertionError("Don't know dev name for disk iftype %s"
+                             % sd_iftype)
+
     target =  ttbl.tt_qemu2.tt_qemu(
         target_name,
         """\
@@ -958,7 +969,7 @@ def qemu_pos_add(target_name,
   -drive if=pflash,format=raw,readonly,file=/usr/share/edk2/ovmf/OVMF_CODE.fd \
   -drive if=pflash,format=raw,file=%%(path)s/OVMF_VARS.fd \
   -m %(ram_megs)s \
-  -drive file=%%(path)s/hd.qcow2,if=virtio,aio=threads \
+  -drive file=%%(path)s/hd.qcow2,if=%(sd_iftype)s,aio=threads \
   -boot order=nc \
   %(extra_cmdline)s \
 """ % locals(),
@@ -976,7 +987,7 @@ def qemu_pos_add(target_name,
                 mount_fs = 'multiroot',
             ),
             pos_boot_interconnect = nw_name,
-            pos_boot_dev = "vda",
+            pos_boot_dev = pos_boot_dev,
             pos_partsizes = mr_partsizes,
             linux_serial_console_default = consoles[0],
         )
