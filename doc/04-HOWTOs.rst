@@ -116,6 +116,11 @@ You will need:
      # nmcli con add type ethernet con-name TCF-infrastructure ifname IFNAME ip4 192.168.0.20X/24
      # nmcli con up TCF-infrastructure
 
+   note that you can also use VLANs if you add with **type vlan id NN
+   dev IFNAME** for VLAN number ``NN``::
+
+     # nmcli con add type vlan con-name TCF-Infrastructure dev enp0s20u4 id 4 ip4 192.168.4.209/24
+     
 Conventions for assignment of addresses in the infastructure network:
 
 - use IPv4 (easier)
@@ -172,6 +177,12 @@ run::
 
   # nmcli con add type ethernet con-name NETWORKNAME ifname IFNAME ip4 192.168.2.205/24
   # nmcli con up NETWORKNAME
+
+note that you can also use VLANs if you add with **id NN** for VLAN
+number ``NN``::
+
+  # nmcli con add type vlan con-name NETWORKNAME dev IFNAME id NN ip4 192.168.2.205/24
+     
 
 .. _generate_ssl_certificate:
 
