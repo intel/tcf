@@ -562,7 +562,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         be skipped after creating the base config.
 
     """
-    def __init__(self, name, tc_file_path, origin, zephyr_name):
+    def __init__(self, name, tc_file_path, origin, zephyr_name, subcases):
         tc.tc_c.__init__(self, name, tc_file_path, origin)
         # app_zephyr will have inserted methods to build, cleanup, setup
         # Force hooks to be run by app_zephyr's setup
@@ -579,6 +579,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         self.zephyr_filter_origin = None
         #: Harness to run
         self.harness = None
+        self.subcases = subcases
         #: Subtestcases that are identified as part of this (possibly)
         #: a container testcase.
         self.subtestcases = dict()
@@ -588,14 +589,8 @@ class tc_zephyr_sanity_c(tc.tc_c):
         self.unit_test_output = None
         self.zephyr_depends_on = []
 
-    def _stc_scan_path(self, path):
-        if self.kws['thisfile'].endswith("testcase.ini") \
-           or self.unit_test:
-            # Scan the source with our fall back method, because
-            # Zephyr's sanitycheck does not do backward compat (old
-            # testcase.ini or unit tests)
-            return _stc_scan_path_source(path)
-
+    @classmethod
+    def __sanity_check_list_tests(cls, path):
         ZEPHYR_BASE = os.environ.get('ZEPHYR_BASE',
                                      "__ZEPHYR_BASE_not_defined__")
         sanity_check = os.path.join(ZEPHYR_BASE, 'scripts', 'sanitycheck')
@@ -606,19 +601,47 @@ class tc_zephyr_sanity_c(tc.tc_c):
         # will collide. This moves that to our tempdir, so they do not
         # collide. Ideally we'd generate it only once, but we have no
         # easy way to do it.
-        env['PARSETAB_DIR'] = self.tmpdir
+        env['PARSETAB_DIR'] = cls.tmpdir
         cmdline = [ sanity_check, '--list-tests', '-T', path ]
         try:
-            output = subprocess.check_output(
+            # --list-tests prints in stdout
+            #
+            # Cleaning output directory ZEPHYR_BASE/sanity-out
+            # - kernel.common.byteorder_memcpy_swap
+            # - kernel.common.byteorder_mem_swap
+            # - kernel.common.atomic
+            # - kernel.common.bitfield
+            # - kernel.common.printk
+            # - kernel.common.slist
+            # - kernel.common.dlist
+            # - kernel.common.intmath
+            # - kernel.common.timeout_order
+            # - kernel.common.clock_uptime
+            # - kernel.common.clock_cycle
+            # - kernel.common.version
+            # - kernel.common.multilib
+            # 13 total.
+            #
+            # We are going to ignore the kernel.common part, so we scan the
+            # last component
+            return subprocess.check_output(
                 cmdline, shell = False, stderr = subprocess.STDOUT, env = env)
         except OSError as e:
             raise tcfl.tc.error_e("Can't execute '%s: %s'"
                                   % (" ".join(cmdline), e))
-        except subprocess.CalledProcessError as e:
-            if 'unrecognized arguments' in e.output:
-                # Scan the source with our fall back method
-                return _stc_scan_path_source(path)
-            raise
+    @classmethod
+    def _list_subtests(cls, path):
+        output = cls.__sanity_check_list_tests(path)
+        subcases = []
+        for line in output.split("\n"):
+            if line.startswith(" - "):
+                subcases.append(line[3:])
+        return subcases
+
+
+    @classmethod
+    def _stc_scan_path(cls, path):
+        output = cls.__sanity_check_list_tests(path)
         subcases = []
         # --list-tests prints in stdout
         #
@@ -652,13 +675,13 @@ class tc_zephyr_sanity_c(tc.tc_c):
         set_subcases_src = set(subcases_src)
         set_subcases = set(subcases)
         if set_subcases_src - set_subcases:
-            self.report_error(
+            logging.error(
                 "subtestcase detection with 'sanitycheck --list-tests' "
-                "missed: %s" % " ".join(set_subcases_src - set_subcases))
+                "missed: %s", " ".join(set_subcases_src - set_subcases))
         if set_subcases - set_subcases_src:
-            self.report_error(
-                "subtestcase detection fallback missed: %s"
-                % " ".join(set_subcases - set_subcases_src))
+            logging.error(
+                "subtestcase detection fallback missed: %s",
+                " ".join(set_subcases - set_subcases_src))
         return subcases, [],
 
     # Because of unfortunate implementation decissions that have to be
@@ -671,10 +694,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
     # _clone(). So the constructor is never called again -- yeah, that
     # has to change.
     def configure_00(self):	# pylint: disable = missing-docstring
-        subcases, warnings = self._stc_scan_path(self.kws['srcdir_abs'])
-        for warning in warnings:
-            self.report_info("WARNING: %s" % warning)
-        for subcase in set(subcases):
+        for subcase in self.subcases:
             # if they haven't ran, we fail them on purpose
             stc = tc_zephyr_subsanity_c(
                 self.name + "." + subcase,
@@ -689,9 +709,9 @@ class tc_zephyr_sanity_c(tc.tc_c):
             stc.tags_set(self._tags, overwrite = False)
             self.subtestcases[subcase] = stc
             self.post_tc_append(stc)
-        if subcases:
+        if self.subcases:
             self.report_pass("NOTE: this testcase will unfold subcases: %s" %
-                             " ".join(subcases), dlevel = 1)
+                             " ".join(self.subcases), dlevel = 1)
         else:
             self.report_pass("NOTE: this testcase does not provide subcases",
                              dlevel = 1)
@@ -1616,9 +1636,61 @@ class tc_zephyr_sanity_c(tc.tc_c):
     
     @classmethod
     def _testcasesample_yaml_mktcs(cls, path):
+        #
+        #
+        # ASSUMPTIONS:
+        #   - way too many
+        #
+        # 1 - each subtestcase listed in testcase|sample.yaml or in the
+        #     output of 'sanitycheck --list-tests' is in the form
+        #     something.other.whatever.final
+        #
+        # 2 - if the testcase provides subcases inside the source,
+        #     something.other.whatever has to match as a subcase in the
+        #     testcase|sample.yaml
+        #
+        # so anyhoo, there are multiple testcases declared in the
+        # yaml, which allow us to build multiple testcases from the
+        # same source; then the source might define multiple
+        # subtestcases and 'scripts/sanitycheck --list-tests' throws
+        # them all in the same bag
+        #
+        # So it is kinda hard to identify what is the top_subcase
+        # subtestcase (off the YAML file) or scanned from the source
+        # (src_subcase)
+        #
+        # For example, when listing zephyr/samples/philosophers
+        #
+        #   $ scripts/sanitycheck --list-tests -T samples/philosophers/
+        #   JOBS: 16
+        #    - sample.philosopher
+        #    - sample.philosopher.coop_only
+        #    - sample.philosopher.fifos
+        #    - sample.philosopher.lifos
+        #    - sample.philosopher.preempt_only
+        #    - sample.philosopher.same_prio
+        #    - sample.philosopher.semaphores
+        #    - sample.philosopher.stacks
+        #    - sample.philosopher.static
+        #    - sample.philosopher.tracing
+        #
+        # these are all top_subcase (from the YAML tests: listing)
+        # but there is no way to tell; for example:
+        #
+        #   $ scripts/sanitycheck --list-tests -T tests/kernel/critical/
+        #   JOBS: 16
+        #   - kernel.common.critical
+        #   - kernel.common.nsim.critical
+        #   2 total.
+        #
+        # off the YAML come kernel.common and kernel.common.nsim and
+        # critical a src_subcase.
+        #
         tcs = []
         yaml_tc_schema = cls.schema_get("sanitycheck-tc-schema.yaml")
         y = tc_zephyr_scl.yaml_load_verify(path, yaml_tc_schema)
+
+        subcases = cls._list_subtests(os.path.dirname(path))
 
         data = y.get('tests', None)
         if isinstance(data, list):
@@ -1641,10 +1713,32 @@ class tc_zephyr_sanity_c(tc.tc_c):
                 "tests data is not a dict but a %s" % type(data).__name__
             mapping = data
         common = y.get('common', {})
+        # tc_name iterate over the testcase names in
+        # testcase|sample.yaml, where we are getting config options,
+        # excludes, etc...
         for tc_name, _tc_vals in mapping.iteritems():
+            the_subcases = []
+            for subcase in subcases:
+                # split kernel.common.somecase -> kernel.common ||
+                # somecase
+                # Well, this is the magic to try to differentiate when
+                # the thing is a subcase from the source or from the
+                # yaml and when it is impossible to tell appart...look
+                # for the big comment block above. Yep, it is a
+                # POS.
+                #
+                # ASSUMPTION: src subcases can come after only
+                # one period (name1.name2.name3.name4, a src_subcase
+                # can come only as name4, not as name3.name4).
+                top_subcase, src_subcase = os.path.splitext(subcase)
+                if ( subcase == tc_name and top_subcase >= tc_name ) \
+                   or ( top_subcase == tc_name ):
+                    if not tc_name.endswith(src_subcase):
+                        # the src_subcase is from the split .WHATEVER
+                        the_subcases.append(src_subcase[1:])
             tc_vals = cls._get_test(tc_name, _tc_vals, common, testcase_valid_keys)
             origin = path + "#" + tc_name
-            _tc = cls(origin, path, origin, tc_name)
+            _tc = cls(origin, path, origin, tc_name, the_subcases)
             _tc.log.debug("Original %s data for test '%s'\n%s"
                           % (os.path.basename(path), tc_name,
                              pprint.pformat(tc_vals)))
