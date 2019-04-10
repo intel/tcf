@@ -1497,6 +1497,8 @@ class tc_zephyr_sanity_c(tc.tc_c):
         """
         Given the output of the testcases, parse subtestcases for each target
         """
+        if not self.subcases:
+            return
         if self.unit_test:
             self._subtestcases_grok(None)
         else:
