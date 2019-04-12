@@ -1717,30 +1717,25 @@ class tc_zephyr_sanity_c(tc.tc_c):
         common = y.get('common', {})
         # tc_name iterate over the testcase names in
         # testcase|sample.yaml, where we are getting config options,
-        # excludes, etc...
-        for tc_name, _tc_vals in mapping.iteritems():
-            the_subcases = []
-            for subcase in subcases:
-                # split kernel.common.somecase -> kernel.common ||
-                # somecase
-                # Well, this is the magic to try to differentiate when
-                # the thing is a subcase from the source or from the
-                # yaml and when it is impossible to tell appart...look
-                # for the big comment block above. Yep, it is a
-                # POS.
-                #
-                # ASSUMPTION: src subcases can come after only
-                # one period (name1.name2.name3.name4, a src_subcase
-                # can come only as name4, not as name3.name4).
+        # excludes, etc... try to guess who comes fro the YAML level,
+        # who is a subtest in the source.
+        src_subcases = set()
+        yaml_subcases = mapping.keys()
+        for subcase in subcases:
+            if subcase not in yaml_subcases:
                 top_subcase, src_subcase = os.path.splitext(subcase)
-                if ( subcase == tc_name and top_subcase >= tc_name ) \
-                   or ( top_subcase == tc_name ):
-                    if not tc_name.endswith(src_subcase):
-                        # the src_subcase is from the split .WHATEVER
-                        the_subcases.append(src_subcase[1:])
+                if top_subcase not in yaml_subcases:
+                    raise tcfl.tc.error_e(
+                        "testcase declares subcase %s (top %s src %s) whose "
+                        "top not listed in YAML's subcases (%s)"
+                        % (subcase, top_subcase, src_subcase,
+                           " ".join(yaml_subcases)))
+                src_subcases.add(src_subcase[1:])
+
+        for tc_name, _tc_vals in mapping.iteritems():
             tc_vals = cls._get_test(tc_name, _tc_vals, common, testcase_valid_keys)
             origin = path + "#" + tc_name
-            _tc = cls(origin, path, origin, tc_name, the_subcases)
+            _tc = cls(origin, path, origin, tc_name, src_subcases)
             _tc.log.debug("Original %s data for test '%s'\n%s"
                           % (os.path.basename(path), tc_name,
                              pprint.pformat(tc_vals)))
