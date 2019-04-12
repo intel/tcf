@@ -1197,7 +1197,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
             target.on_console_rx("RunID: %(runid)s:%(tg_hash)s" % target.kws,
                                  console = target.kws.get("console", None))
             target.on_console_rx(
-                re.compile("\*\*\*\*\* Booting Zephyr OS .* \(delayed boot [0-9]+ms\) *\*\*\*\*\*"),
+                re.compile("\*\*\*\*\* Booting Zephyr OS [^\*]*\*\*\*\*\*"),
                 console = target.kws.get("console", None))
             target.on_console_rx("PROJECT EXECUTION SUCCESSFUL",
                                  console = target.kws.get("console", None))
