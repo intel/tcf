@@ -848,8 +848,10 @@ class target_c(object):
         >>>                      % target2.addr_get(ic, 'ipv4'))
 
         """
-        return self.ic_field_get(ic, tech + "_addr", "(address)",
-                                 instance = instance)
+        if instance:
+            assert isinstance(instance, basestring)
+            ic = ic + "#" + instance
+        return self.ic_field_get(ic, tech + "_addr", "(address)")
 
     def app_get(self, bsp = None, noraise = True):
         """
