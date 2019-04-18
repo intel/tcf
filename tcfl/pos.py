@@ -1099,6 +1099,91 @@ def deploy_tree(_ic, target, _kws):
 
 
 
+# FIXME: when tc.py's import hell is fixed, this shall move to tl.py?
+
+@tc.interconnect("ipv4_addr")
+@tc.target('pos_capable')
+class tc_pos_base(tc.tc_c):
+    """
+    A template for testcases that install an image in a target that
+    can be provisioned with Provisioning OS.
+
+    This basic template deploys an image specified in the environment
+    variable ``IMAGE`` or in *self.requested_image*, power cycles into
+    it and waits for a prompt in the serial console.
+
+    To use:
+
+    >>> class my_test(tcfl.tl.tc_pos_base):
+    >>>     def eval(self, ic, target):
+    >>>         target.shell.run("echo Hello'' World",
+    >>>                          "Hello World")
+
+    All the methods (deploy, start, teardown) defined in the class are
+    suffixed ``_50``, so it is easy to do extra tasks before and
+    after.
+
+    >>> class my_test(tcfl.tl.tc_pos_base):
+    >>>     def start_60(self, ic):
+    >>>         ic.release()    # we don't need the network after imaging
+    >>>
+    >>>     def eval(self, ic, target):
+    >>>         target.shell.run("echo Hello'' World",
+    >>>                          "Hello World")
+
+    """
+
+
+    #: Image we want to install in the target
+    #:
+    #: Note this can be specialized in a subclass such as
+    #:
+    #: >>> class my_test(tcfl.tl.tc_pos_base):
+    #: >>>
+    #: >>>     image_requested = "fedora:desktop:29"
+    #: >>>
+    #: >>>     def eval(self, ic, target):
+    #: >>>         ...
+    image_requested = os.environ.get("IMAGE", None)
+
+    #: extra parameters to the image deployment function
+    #: :func:`target.pos.deploy_image
+    #: <tcfl.pos.extension.deploy_image>`
+    #:
+    #: >>> class my_test(tcfl.tl.tc_pos_base):
+    #: >>>
+    #: >>>     deploy_image_args = dict(
+    #: >>>         timeout = 40,
+    #: >>>         extra_deploy_fns = [
+    #: >>>             tcfl.tl.deploy_tree,
+    #: >>>             tcfl.tl.deploy_linux_ssh_root_nopwd
+    #: >>>         ]
+    #: >>>     )
+    #: >>> ...
+
+    deploy_image_args = {}
+
+    def deploy_50(self, ic, target):
+        # ensure network, DHCP, TFTP, etc are up and deploy
+        ic.power.on()
+        if not self.image_requested:
+            raise tc.block_e(
+                "No image to install specified, set envar IMAGE "
+                "or self.image_requested")
+        self.image = target.pos.deploy_image(ic, self.image_requested,
+                                             **self.deploy_image_args)
+
+    def start_50(self, ic, target):
+        # fire up the target, wait for a login prompt
+        target.pos.boot_normal()
+        target.shell.linux_shell_prompt_regex = tl.linux_root_prompts
+        target.shell.up(user = 'root')
+        target.report_pass("Deployed %s" % self.image)
+
+    def teardown_50(self):
+        tl.console_dump_on_failure(self)
+
+
 import pos_multiroot	# pylint: disable = wrong-import-order,wrong-import-position,relative-import
 import pos_uefi		# pylint: disable = wrong-import-order,wrong-import-position,relative-import
 capability_register('mount_fs', 'multiroot', pos_multiroot.mount_fs)
