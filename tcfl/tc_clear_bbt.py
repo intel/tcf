@@ -294,6 +294,13 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
     #: >>> tcfl.tc_clear_bbt.tc_clear_bbt_c.image = "clear::24800"
     #:
     image = os.environ.get("IMAGE", "clear")
+
+    #: swupd mirror to use
+    #:
+    #: >>> tcfl.tc_clear_bbt.tc_clear_bbt_c.swupd_url = \
+    #: >>>      "http://koji-lts.png.intel.com/L1/update/"
+    #:
+    swupd_url = os.environ.get("SWUPD_URL", None)
     image_tree = os.environ.get("IMAGE_TREE", None)
 
     #: Mapping from TAPS output to TCF conditions
@@ -392,17 +399,8 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         if os.path.exists(requirements_fname):
             bundles += open(requirements_fname).read().split()
 
-        # If the network exposes a distro mirror, use it -- this is
-        # kind of a hack for now, because we assume that if there is a
-        # mirror, we don't have to use a proxy (if any) for getting to
-        # it.
-        # FIXME
         distro_mirror = ic.kws.get('distro_mirror', None)
-        if distro_mirror:
-            target.shell.run(
-                "swupd mirror -s %s/pub/mirrors/clearlinux/update/"
-                % distro_mirror)
-        else:
+        if self.swupd_url or not distro_mirror:
             # if there is no distro mirror, use proxies -- HACK
             if 'http_proxy' in ic.kws:
                 target.shell.run("export http_proxy=%s"
@@ -414,6 +412,18 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
                                  % ic.kws.get('https_proxy'))
                 target.shell.run("export HTTPS_PROXY=%s"
                                  % ic.kws.get('https_proxy'))
+
+        if self.swupd_url:
+            target.shell.run("swupd mirror -s %s" % self.swupd_url)
+        elif distro_mirror:
+            # If the network exposes a distro mirror, use it -- this is
+            # kind of a hack for now, because we assume that if there is a
+            # mirror, we don't have to use a proxy (if any) for getting to
+            # it.
+            # FIXME
+            target.shell.run(
+                "swupd mirror -s %s/pub/mirrors/clearlinux/update/"
+                % distro_mirror)
 
         # Install them bundles
         #
