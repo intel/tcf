@@ -15,6 +15,7 @@ that just got an image deployed to it using the multiroot methodology.
 """
 
 import os
+import pprint
 import re
 
 import tc
@@ -82,6 +83,138 @@ def _linux_boot_guess_from_lecs(target, _image):
 
     return kernel, initrd, options
 
+
+_grub_var_regex = re.compile(r"\${[^}]+}")
+_grub_menuentry_regex = re.compile("^[ \t]*menuentry[ \t]+'(?P<name>[^']+)'")
+_grub_linux_initrd_entry_regex = re.compile(
+    "^[ \t]*("
+    r"linux[ \t]+(?P<linux>\S+)[ \t]+(?P<linux_args>.*)"
+    "|"
+    r"initrd[ \t]+(?P<initrd>\S+)"
+    ")$")
+
+
+# we use a dictionary to remove duplicate entries
+#
+# we key the entries by the initrd, linux kernel and kernel args they
+# use; if they are the same, it will be overriden and we won't have to
+# pick one.
+_grub_entries = {}
+
+def _linux_boot_guess_from_grub_cfg(target, _image):
+    """
+    Extract kernel, initrd, kernel args from grub configuration
+
+    Parses a grub config file to extract which boot entries are
+    available, with their kernel and initrd files, the command line
+    options and the manu entry names.
+
+    Eliminate recovery and default, we shall be left with only one
+    that is the main boot option, the one that always has to be booted
+    that we will replicate.
+
+    A grub.cfg looks like a lot of configuration stuff, but at the
+    end, it boils down to entries like::
+
+      menuentry 'SLED 15-SP1'  --class sled --class gnu-linux --class gnu --class os $menuentry_id_option 'gnulinux-simple-6bfcca25-0f4b-4d6c-87a0-c3bb25e5d512' {
+      	load_video
+      	set gfxpayload=keep
+      	insmod gzio
+      	insmod part_gpt
+      	insmod btrfs
+      	set root='hd0,gpt2'
+      	if [ x$feature_platform_search_hint = xy ]; then
+      	  search --no-floppy --fs-uuid --set=root --hint-bios=hd0,gpt2 --hint-efi=hd0,gpt2 --hint-baremetal=ahci0,gpt2 --hint='hd0,gpt2'  6bfcca25-0f4b-4d6c-87a0-c3bb25e5d512
+      	else
+      	  search --no-floppy --fs-uuid --set=root 6bfcca25-0f4b-4d6c-87a0-c3bb25e5d512
+      	fi
+      	echo	'Loading Linux 4.12.14-110-default ...'
+      	linux	/boot/vmlinuz-4.12.14-110-default root=UUID=6bfcca25-0f4b-4d6c-87a0-c3bb25e5d512  ${extra_cmdline} splash=silent resume=/dev/disk/by-id/ata-QEMU_HARDDISK_QM00001-part3 quiet crashkernel=173M,high
+      	echo	'Loading initial ramdisk ...'
+      	initrd	/boot/initrd-4.12.14-110-default
+      }
+
+    We ignore all but menuentry, linux, initrd; initrd might be missing
+
+    """
+    # ignore errors if it does not exist
+    grub_cfg_path = target.shell.run("find /mnt/boot -iname grub.cfg",
+                                     output = True, trim = True)
+    grub_cfg_path = grub_cfg_path.strip()
+    if grub_cfg_path == "":	# no grub.cfg to rely on
+        return None, None, None
+    grub_cfg = target.shell.run(r"cat %s" % grub_cfg_path,
+                                output = True, trim = True)
+
+    # a grub entry
+    class _entry(object):
+        name = None
+        linux = None
+        linux_args = None
+        initrd = None
+
+    global _grub_entries
+    entry = _entry()
+
+    def _entry_record():
+        global _grub_entries
+        entry_id = \
+            (entry.linux if entry.linux else "" ) \
+            + (entry.initrd if entry.initrd else "") \
+            + (entry.linux_args if entry.linux_args else "")
+        if entry_id != "":	# record existing
+            _grub_entries[entry_id] = entry
+
+    for line in grub_cfg.splitlines():
+        # match menuentry lines and save name, flushing previous data
+        # if any
+        m = _grub_menuentry_regex.search(line)
+        if m:
+            # new entry!, close the previous
+            _entry_record()
+            entry = _entry()
+            entry.name = m.groupdict()['name']
+            continue
+
+        # match linux/initrd lines and extract values
+        m = _grub_linux_initrd_entry_regex.search(line)
+        if not m:
+            continue
+        gd = m.groupdict()
+        linux = gd.get('linux', None)
+        if linux:
+            entry.linux = linux
+        linux_args = gd.get('linux_args', None)
+        if linux:
+            # remove any ${SUBST} from the command line
+            linux_args = re.sub(_grub_var_regex, "", linux_args)
+            entry.linux_args = linux_args
+        initrd = gd.get('initrd', None)
+        if initrd:
+            entry.initrd = initrd
+
+    _entry_record()	# record last entry
+
+    # delete recovery / rescue stuff, we don't use it
+    for entry_id in list(_grub_entries.keys()):
+        entry = _grub_entries[entry_id]
+        if 'recovery mode' in entry.name \
+           or 'rescue' in entry.name:
+            del _grub_entries[entry_id]
+
+    if len(_grub_entries) > 1:
+        entries = pprint.pformat([ i.__dict__
+                                   for i in _grub_entries.values() ])
+        raise tc.blocked_e(
+            "%s: more than one Linux kernel entry; I don't know "
+            "which one to use",
+            dict(target = target, entries = entries))
+
+    entry = _grub_entries.values()[0]
+    return os.path.basename(entry.linux), \
+        os.path.basename(entry.initrd), entry.linux_args
+
+
 def _linux_boot_guess_from_boot(target, image):
     """
     Given a list of files (normally) in /boot, decide which ones are
@@ -116,7 +249,7 @@ def _linux_boot_guess_from_boot(target, image):
 
     if len(kernel_versions) > 1 and 'default' in kernel_versions:
         del kernel_versions['default']
-            
+
     if len(kernel_versions) == 1:
         kver = kernel_versions.keys()[0]
         options = ""
@@ -140,11 +273,16 @@ def _linux_boot_guess_from_boot(target, image):
 
 def _linux_boot_guess(target, image):
     """
-    Setup a Linux kernel to boot using Gumniboot
+    Scan the boot configuration and extract it, so we can replicate it
     """
+    kernel, initrd, options = _linux_boot_guess_from_grub_cfg(target, image)
+    if kernel:
+        return kernel, initrd, options
+    # systemd-boot
     kernel, initrd, options = _linux_boot_guess_from_lecs(target, image)
     if kernel:
         return kernel, initrd, options
+    # from files listed in /boot
     kernel, initrd, options = _linux_boot_guess_from_boot(target, image)
     if kernel:
         target.report_info("POS: guessed kernel from /boot directory: "
@@ -196,7 +334,7 @@ def efibootmgr_setup(target):
 
     # ok, get current EFI bootloader status
     output = target.shell.run("efibootmgr", output = True)
-    
+
     boot_order_regex = re.compile(
         r"^BootOrder: (?P<boot_order>[0-9a-fA-F,]+)$", re.MULTILINE)
     boot_order_match = boot_order_regex.search(output)
@@ -234,7 +372,7 @@ def efibootmgr_setup(target):
             pass
     target.shell.run("efibootmgr -o " + ",".join(
         network_boot_order + local_boot_order + boot_order))
-    
+
     # We do not set the next boot order to be our system; why?
     # multiple times, the system gets confused when it has to do
     # So we use syslinux to always control it
@@ -304,7 +442,10 @@ def boot_config_multiroot(target, boot_dev, image):
         linux_options_replace = {
             # we want to use hard device name rather than LABELS/UUIDs, as
             # we have reformated and those will have changed
-            "root": "/dev/%(root_part_dev_base)s" % kws
+            "root": "/dev/%(root_part_dev_base)s" % kws,
+            # we have created this in pos_multiroot and will only
+            # replace it if the command line option is present.
+            "resume": "/dev/disk/by-label/tcf-swap",
         }
 
         # FIXME: can this come from config?
