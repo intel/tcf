@@ -129,7 +129,7 @@ class shell(tc.target_extension_c):
         self.target.testcase.tls.expecter.timeout = 30
 
     def _run(self, cmd = None, expect = None, prompt_regex = None,
-             output = False, output_filter_crlf = True):
+             output = False, output_filter_crlf = True, trim = False):
         if cmd:
             assert isinstance(cmd, basestring)
         assert expect == None \
@@ -160,12 +160,19 @@ class shell(tc.target_extension_c):
         if output:
             output = self.target.console.read(offset = offset)
             if output_filter_crlf:
-                return output.replace("\r\n", self.target.crlf)
+                output = output.replace("\r\n", self.target.crlf)
+            if trim:
+                # FIXME: not good enough, if the output didn't include
+                # a nl, it will mess it up -- use regex finding
+                first_nl = output.find(self.target.crlf)
+                last_nl = output.rfind(self.target.crlf)
+                output = output[first_nl+1:last_nl+1]
             return output
         return None
 
     def run(self, cmd = None, expect = None, prompt_regex = None,
-            output = False, output_filter_crlf = True, timeout = None):
+            output = False, output_filter_crlf = True, timeout = None,
+            trim = False):
         """Runs *some command* as a shell command and wait for the shell
         prompt to show up.
 
@@ -207,6 +214,9 @@ class shell(tc.target_extension_c):
         :param bool output_filter_crlf: (optional, default True) if we
           are returning output, filter out ``\\r\\n`` to whatever our CRLF
           convention is.
+        :param bool trim: if ``output`` is True, trim the command and
+          the prompt from the beginning and the end of the output
+          respectively (True)
         :returns str: if ``output`` is true, a string with the output
           of the command.
 
@@ -232,7 +242,8 @@ class shell(tc.target_extension_c):
             return self._run(
                 cmd = cmd, expect = expect,
                 prompt_regex = prompt_regex,
-                output = output, output_filter_crlf = output_filter_crlf)
+                output = output, output_filter_crlf = output_filter_crlf,
+                trim = trim)
         finally:
             if timeout:
                 testcase.tls.expecter.timeout = original_timeout
