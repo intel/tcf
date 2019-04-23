@@ -862,7 +862,11 @@ EOF""")
         # Use sh syntax rather than bash's $(</tmp/rsync.pid) to avoid
         # surprises if the shall changes; ideally we'd use killall, but we
         # don't know if it is installed in the POS
-        target.shell.run("kill -9 `cat /tmp/rsync.pid`")
+        target.shell.run(
+            # set -b: notify immediatelly so we get the Killed message
+            # and it does not clobber the output of the next command.
+            "set -b; kill -9 `cat /tmp/rsync.pid`",
+            re.compile("Killed +rsync"))
         # remove the runnel we created to the rsync server and the
         # keywords to access it
         target.tunnel.remove(int(target.kws['rsync_port']))
