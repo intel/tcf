@@ -788,7 +788,8 @@ def _target_interface(target_id, interface, call):
                                            user_path)
         assert isinstance(result, dict), \
             "BUG: %s: request_process() did not return a dictionary" \
-            % interface
+            " but a %s" \
+            % (interface, type(result).__name__)
         if 'diagnostics' in result:
             target.log.error("BUG: %s: request_process() added a "
                              "'diagnostics' field that will be overriden"
@@ -800,7 +801,15 @@ def _target_interface(target_id, interface, call):
         flask_logi_abort(400, "%s" % e, exc_info = True)
     except Exception as e:
         flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify(result)
+    if 'stream_file' in result:
+        filepath = result['stream_file']
+        try:
+            fd = open(filepath, "rb")
+        except Exception as e:
+            flask_logi_abort(400, "%s: can't stream file: %s" % (filepath, e))
+        return flask.Response(fd, direct_passthrough = True)
+    else:
+        return flask.jsonify(result)
 
 
 # FIXME: rewrite to pass the data in the body as a binary sequence
