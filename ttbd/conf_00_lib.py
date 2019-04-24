@@ -956,7 +956,7 @@ def qemu_pos_add(target_name,
     elif sd_iftype == 'scsi':
         pos_boot_dev = 'sda'
     elif sd_iftype == 'ide':
-        pos_boot_dev = 'hda'
+        pos_boot_dev = 'sda'
     else:
         raise AssertionError("Don't know dev name for disk iftype %s"
                              % sd_iftype)
