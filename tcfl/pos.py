@@ -1150,6 +1150,8 @@ class tc_pos_base(tc.tc_c):
     #: >>>         ...
     image_requested = os.environ.get("IMAGE", None)
 
+    image = "image-not-deployed"
+    
     #: extra parameters to the image deployment function
     #: :func:`target.pos.deploy_image
     #: <tcfl.pos.extension.deploy_image>`
