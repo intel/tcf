@@ -213,6 +213,7 @@ class test_target(object):
     #: Properties that should not be cleared on target release
     properties_keep_on_release = set([
         re.compile('^pos_root_[_a-z0-9A-Z]+$'),
+        'linux_options_append',
     ])
 
     """
