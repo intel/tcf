@@ -563,14 +563,13 @@ class test_target(object):
         with self.target_owned_and_locked(who):
             self.fsdb.set(prop, value)
 
-    def property_get(self, who, prop, default = None):
+    def property_get(self, prop, default = None):
         """
         Get a target's property
 
         :param str who: User that is claiming the target
         :param str prop: Property name
         """
-        assert isinstance(who, basestring)
         r = self.fsdb.get(prop)
         if r == None and default != None:
             return default
