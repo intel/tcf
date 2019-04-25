@@ -81,8 +81,8 @@ CapabilityBoundingSet = \
 Type = notify
 User = ttbd
 Group = ttbd
-# video so we can do video capture
-SupplementaryGroups = dialout root kvm video
+# audio&video so we can do audio/video capture
+SupplementaryGroups = dialout root kvm video audio
 # Clean compiled Python to avoid old files (from removed .py)
 ExecStartPre = /bin/rm -f /etc/ttbd-%i/*.pyc
 ExecStartPre = /usr/bin/install -vv -d --mode 2770 --owner ttbd --group ttbd /var/run/ttbd-%i /var/cache/ttbd-%i
