@@ -16,9 +16,9 @@ class impl_c(object):
     """
     Implementation interface for a button driver
     """
-    def __init__(self):
-        # can be None (no need to start), True if started, False if stopped
-        self.capturing = False
+    def __init__(self, stream):
+        # can be False (just gets), True (start/stop+get)
+        self.stream = stream
         # Path to the user directory, updated on every request_process
         # call
         self.user_path = None
@@ -77,13 +77,14 @@ class interface(ttbl.tt_interface):
         assert capturer in self.impls.keys(), "capturer %s unknown" % capturer
         with target.target_owned_and_locked(who):
             impl = self.impls[capturer]
-            if impl.capturing == None:
+            if impl.stream == False:
                 # doesn't need starting
                 return { 'result' : 'capture start not needed'}
-            if impl.capturing == False:
+            capturing = target.property_get("capturer-%s-started" % capturer)
+            if not capturing:
                 impl.user_path = self.user_path
                 impl.start(target, capturer)
-                impl.capturing = True
+                target.property_set("capturer-%s-started" % capturer, "True")
                 return { 'result' : 'capture started'}
             else:
                 return { 'result' : 'already capturing'}
@@ -92,12 +93,13 @@ class interface(ttbl.tt_interface):
         assert capturer in self.impls.keys(), "capturer %s unknown" % capturer
         with target.target_owned_and_locked(who):
             impl = self.impls[capturer]
-            if impl.capturing == None:
+            if impl.stream == False:
                 impl.user_path = self.user_path
                 return impl.stop_and_get(target, capturer)
-            elif impl.capturing == True:
+            capturing = target.property_get("capturer-%s-started" % capturer)
+            if capturing:
                 impl.user_path = self.user_path
-                impl.capturing = False
+                target.property_set("capturer-%s-started" % capturer, None)
                 return impl.stop_and_get(target, capturer)
             else:
                 return { 'result' : 'it is not capturing, can not stop'}
@@ -108,12 +110,19 @@ class interface(ttbl.tt_interface):
         """
         res = {}
         for name, impl in self.impls.iteritems():
-            res[name] = impl.capturing
+            if impl.stream:
+                capturing = target.property_get("capturer-%s-started" % capturer)
+                if capturing:
+                    res[name] = "capturing"
+                else:
+                    res[name] = "not-capturing"
+            else:
+                res[name] = "ready"
         return dict(capturers = res)
 
     def _release_hook(self, target, _force):
         for name, impl in self.impls.iteritems():
-            if impl.capturing == True:
+            if impl.stream == True:
                 impl.stop_and_get(target, name)
 
     def _args_check(self, target, args):
@@ -155,8 +164,7 @@ class vnc(impl_c):
     """
     def __init__(self, port):
         self.port = port
-        impl_c.__init__(self)
-        self.capturing = None  # meaning we don't need to start
+        impl_c.__init__(self, False)
 
     def start(self, target, capturer):
         impl_c.start(self, target, capturer)
@@ -185,8 +193,7 @@ class ffmpeg(impl_c):
     """
     def __init__(self, video_device):
         self.video_device = video_device
-        impl_c.__init__(self)
-        self.capturing = None  # meaning we don't need to start
+        impl_c.__init__(self, False)
 
     def start(self, target, capturer):
         impl_c.start(self, target, capturer)
@@ -203,6 +210,7 @@ class ffmpeg(impl_c):
             cmdline = [
                 "ffmpeg",
                 "-i", self.video_device,
+                "-s", "1",
                 "-frames", str(1),	# only one frame
                 "-y", file_name	# force overwrite output file
             ]
