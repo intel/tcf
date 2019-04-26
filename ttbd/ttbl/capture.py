@@ -43,6 +43,8 @@ class impl_c(object):
     """
     Implementation interface for a capture driver
 
+    The target will list the available capturers in the *capture* tag.
+
     :param bool stream: if this capturer is capable of streaming; an
       streaming capturer has to be told to start and then stop and
       return the capture as a file.
@@ -90,6 +92,7 @@ class impl_c(object):
         assert isinstance(target, ttbl.test_target)
         assert isinstance(capturer, basestring)
         # must return a dict
+
 
 class interface(ttbl.tt_interface):
     """
@@ -149,6 +152,13 @@ class interface(ttbl.tt_interface):
         # Path to the user directory, updated on every request_process
         # call
         self.user_path = None
+
+    def _target_setup(self, target):
+        """
+        Called when the interface is added to a target to initialize
+        the needed target aspect (such as adding tags/metadata)
+        """
+        target.tags_update(dict(capture = " ".join(self.impls.keys())))
 
     def start(self, who, target, capturer):
         """
@@ -211,7 +221,8 @@ class interface(ttbl.tt_interface):
         res = {}
         for name, impl in self.impls.iteritems():
             if impl.stream:
-                capturing = target.property_get("capturer-%s-started" % capturer)
+                capturing = target.property_get("capturer-%s-started"
+                                                % capturer)
                 if capturing:
                     res[name] = "capturing"
                 else:
