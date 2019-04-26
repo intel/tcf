@@ -398,7 +398,6 @@ class target_c(object):
     - :py:class:`power <tcfl.target_ext_power.power>`
     - :py:class:`shell <tcfl.target_ext_shell.shell>`
     - :py:class:`ssh <tcfl.target_ext_ssh.ssh>`
-    - :py:class:`tcob <tcfl.target_ext_tcob.tcob>`
     - :py:class:`tunnel <tcfl.target_ext_tunnel.tunnel>`
     - :py:class:`zephyr <tcfl.app_zephyr.zephyr>`
 
@@ -6589,8 +6588,6 @@ import target_ext_images
 target_c.extension_register(target_ext_images.images)
 import target_ext_debug
 target_c.extension_register(target_ext_debug.debug)
-import target_ext_tcob
-target_c.extension_register(target_ext_tcob.tcob)
 import target_ext_tunnel
 target_c.extension_register(target_ext_tunnel.tunnel)
 import target_ext_shell

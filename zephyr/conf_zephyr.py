@@ -9,14 +9,12 @@ import tcfl.app
 import tcfl.tc
 
 import tcfl.app_zephyr
-import tcfl.target_ext_tags
 import tcfl.tc_zephyr_sanity
 
 # Zephyr-specific drivers
 tcfl.app.driver_add(tcfl.app_zephyr.app_zephyr)
 tcfl.tc.target_c.extension_register(tcfl.app_zephyr.zephyr)
 tcfl.tc.tc_c.driver_add(tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c)
-tcfl.tc.target_c.extension_register(tcfl.target_ext_tags.patch_tags)
 
 # Don't scan for test cases in doc directories
 tcfl.tc.tc_c.dir_ignore_add_regex("^doc$")
