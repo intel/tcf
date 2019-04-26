@@ -388,6 +388,9 @@ class target_c(object):
     implemented interfaces:
 
     - :py:class:`console <tcfl.target_ext_console.console>`
+    - :py:class:`capture <tcfl.target_ext_capture.extension>` for
+      stream and snapshot captures of audio, video, network traffic,
+      etc
     - :py:class:`debug <tcfl.target_ext_debug.debug>`
     - :py:class:`fastboot <tcfl.target_ext_fastboot.fastboot>`
     - :py:class:`images <tcfl.target_ext_images.images>`
