@@ -4,6 +4,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+"""
+Access target's debugging capabilities
+--------------------------------------
+
+"""
 
 import tc
 

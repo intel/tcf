@@ -5,6 +5,12 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
+"""
+Run commands a shell available on a target's serial console
+-----------------------------------------------------------
+
+Also allows basic file transmission over serial line.
+"""
 
 import binascii
 import collections
@@ -303,4 +309,48 @@ class shell(tc.target_extension_c):
             'python3 -c "import sys, binascii; '
             'sys.stdout.buffer.write(binascii.a2b_base64(sys.stdin.read()))"'
             ' < /tmp/file.b64 > %s' % remote_filename)
+        # FIXME: checksum and verify :/
+
+    def file_copy_from(self, local_filename, remote_filename):
+        """\
+        Send a file to the target via the console (if the target supports it)
+
+        Encodes the file to base64 and sends it via the console in chunks
+        of 64 bytes (some consoles are kinda...unreliable) to a file in
+        the target called /tmp/file.b64, which then we decode back to
+        normal.
+
+        Assumes the target has python3; permissions are not maintained
+
+        .. note:: it is *slow*. The limits are not well defined; how
+                  big a file can be sent/received will depend on local
+                  and remote memory capacity, as things are read
+                  hole. This could be optimized to stream instead of
+                  just read all, but still sending a way big file over
+                  a cheap ASCII protocol is not a good idea. Warned
+                  you are.
+
+        """
+        assert isinstance(local_filename, basestring)
+        assert isinstance(remote_filename, basestring)
+
+        # Now we do a python3 command in there (as cloud
+        # versions don't include python2. good) to encode the file in
+        # b64 and read it from the console
+        output = self.run(
+            'python3 -c "import sys, binascii; '
+            'sys.stdout.buffer.write(binascii.b2a_base64(sys.stdin.read()))"'
+            ' < %s' % remote_filename, output = True, trim = True)
+        # output comes as
+        ## python3 -c...
+        ## B64DATA
+        ## PROMPT
+        # so extract it
+        first_nl = output.find('\n')
+        last_nl = output.rfind('\n')
+        output = output[first_nl+1:last_nl+1]
+        with open(local_filename, "wb") as f:
+            for line in output.splitlines():
+                data = binascii.a2b_base64(line)
+                f.write(data)
         # FIXME: checksum and verify :/

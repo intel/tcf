@@ -19,11 +19,12 @@ Provisioning/deploying/flashing PC-class devices with a Provisioning OS
 .. automodule:: tcfl.pos_uefi
 .. automodule:: tcfl.pos_multiroot
 
-Extensions to :class:`tcfl.tc.target_c` types
----------------------------------------------
+Other target interfaces
+-----------------------
 
 .. automodule:: tcfl.target_ext_broker_files
 .. automodule:: tcfl.target_ext_buttons
+.. automodule:: tcfl.target_ext_capture
 .. automodule:: tcfl.target_ext_console
 .. automodule:: tcfl.target_ext_debug
 .. automodule:: tcfl.target_ext_fastboot
@@ -32,8 +33,6 @@ Extensions to :class:`tcfl.tc.target_c` types
 .. automodule:: tcfl.target_ext_power
 .. automodule:: tcfl.target_ext_shell
 .. automodule:: tcfl.target_ext_ssh
-.. automodule:: tcfl.target_ext_tags
-.. automodule:: tcfl.target_ext_tcob
 .. automodule:: tcfl.target_ext_tunnel
 
 *TCF run* Application builders

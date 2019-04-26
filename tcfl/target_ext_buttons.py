@@ -4,6 +4,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+"""
+Press and release buttons in the target
+---------------------------------------
+
+"""
 import json
 
 import tc

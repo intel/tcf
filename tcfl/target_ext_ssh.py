@@ -4,6 +4,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+"""
+Run commands to the target and copy files back and forth using SSH
+------------------------------------------------------------------
+
+"""
 
 import subprocess
 

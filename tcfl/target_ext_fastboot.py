@@ -4,6 +4,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+"""
+Flash the target with fastboot
+------------------------------
+
+"""
 
 import json
 

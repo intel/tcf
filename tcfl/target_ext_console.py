@@ -4,6 +4,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+"""
+Raw access to the target's serial consoles
+------------------------------------------
+
+"""
 
 import curses.ascii
 import tc

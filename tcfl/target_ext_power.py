@@ -4,6 +4,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+"""
+Power the target on or off
+--------------------------
+
+"""
 
 import tc
 

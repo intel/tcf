@@ -4,6 +4,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+"""
+Copy files from and to the server's user storage area
+-----------------------------------------------------
+
+"""
 
 import tc
 
