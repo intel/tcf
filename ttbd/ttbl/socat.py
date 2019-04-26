@@ -3,6 +3,13 @@
 # Copyright (c) 2017 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
+"""
+Power control module to start a socat daemon when a network is powered-on
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This socat daemon can provide tunneling services to allow targets to
+access outside isolated test networks via the server.
+"""
 
 import os
 import subprocess

@@ -5,6 +5,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # FIXME: experiment, not sure this is the best way to do this
+"""
+Interface to flash the target using *ioc_flash_server_app* 
+----------------------------------------------------------
+"""
 
 import os
 import subprocess

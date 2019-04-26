@@ -1,4 +1,8 @@
 #! /usr/bin/python2
+"""
+Power control module to start a rsync daemon when a network is powered-on
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+"""
 import os
 import subprocess
 

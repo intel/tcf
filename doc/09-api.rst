@@ -413,21 +413,21 @@ Power Control Interface
 -----------------------
 
 .. autoclass:: ttbl.tt_power_control_mixin
+.. automodule:: ttbl.dhcp
 .. automodule:: ttbl.pc
 .. automodule:: ttbl.pc_ykush
-.. automodule:: ttbl.usbrly08b
-
-
-Miscelaneous and other interfaces
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: ttbl.buttons
-.. automodule:: ttbl.dhcp
-.. automodule:: ttbl.fastboot
-.. automodule:: ttbl.ioc_flash_server_app
 .. automodule:: ttbl.rsync
 .. automodule:: ttbl.socat
-.. automodule:: ttbl.target
+.. automodule:: ttbl.usbrly08b
+
+Other interfaces
+----------------
+
+.. automodule:: ttbl.buttons
+.. automodule:: ttbl.capture
+.. automodule:: ttbl.fastboot
+.. automodule:: ttbl.ioc_flash_server_app
+
 
 Common helper library
 ---------------------
