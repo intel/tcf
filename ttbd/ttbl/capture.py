@@ -32,11 +32,13 @@ This can be used to, for example:
 
 """
 
+import errno
 import json
 import os
 import subprocess
 import time
 
+import commonl
 import ttbl
 
 class impl_c(object):
@@ -281,6 +283,8 @@ class vnc(impl_c):
         # we don't do anything here, only upon stop
 
     def stop_and_get(self, target, capturer):
+        target.log.warning("This object is deprecated, "
+                           "use ttbl.capture.generic_snapshot")
         impl_c.stop_and_get(self, target, capturer)
         file_name = "%s/%s-%s-%s.png" % (self.user_path, target.id, capturer,
                                          time.strftime("%Y%m%d-%H%M%S"))
@@ -309,6 +313,8 @@ class ffmpeg(impl_c):
         # we don't do anything here, only upon stop
 
     def stop_and_get(self, target, capturer):
+        target.log.warning("This object is deprecated, "
+                           "use ttbl.capture.generic_snapshot")
         impl_c.stop_and_get(self, target, capturer)
         file_name = "%s/%s-%s-%s.png" % (self.user_path, target.id, capturer,
                                          time.strftime("%Y%m%d-%H%M%S"))
@@ -332,3 +338,210 @@ class ffmpeg(impl_c):
             raise
         # tell the caller to stream this file to the client
         return dict(stream_file = file_name)
+
+
+class generic_snapshot(impl_c):
+    """This is a generic snaptshot capturer which can be used to invoke any
+    program that will do capture a snapshot; in a server
+    configuration file:
+
+    >>>
+    >>> target = ttbl.config.targets['TARGETNAME']
+    >>> target.interface_add("capture", ttbl.capture.interface(
+    >>>
+    >>>         # capture screenshots from VNC, return a PNG
+    >>>         vnc0 = ttbl.capture.generic_snapshot(
+    >>>             "VNC :%d" % count,
+    >>>             "gvnccapture -q localhost:%s $OUTPUTFILENAME$" % count
+    >>>         ),
+    >>>
+    >>>         ...
+    >>>     )
+    >>> )
+    >>>
+
+
+    Before taking the snapshot, the pre-commands are executed and then
+    the cmdline is invoked and the cmline shall capture the snapshot
+    and place it in the file *$OUTPUTFILENAME$*.
+
+    :param str name: name for error messges from this capturer
+    :param str cmdline: commandline to invoke the capturing the
+      snapshot. Eg::
+
+        capture-from-device -i /dev/video1 -o $OUTPUTFILENAME$
+
+      note how *$OUTPUTFILENAME$* is replaced with the outputfile.
+
+    :param list(str) pre_commands: (optional) list of commands to
+      execute before the command line, to for example, set parameters
+      eg:
+
+      >>> pre_commands = [
+      >>>     # set some video parameter
+      >>>     "v4l-ctl -i /dev/video1 -someparam 45",
+      >>> ]
+
+    """
+    def __init__(self, name, cmdline, pre_commands = None):
+        assert isinstance(name, basestring)
+        assert isinstance(cmdline, basestring)
+        self.name = name
+        self.cmdline = cmdline.split()
+        if pre_commands:
+            self.pre_commands = pre_commands
+            assert all([ isinstance(command, basestring)
+                         for command in pre_commands ]), \
+                             "list of pre_commands have to be strings"
+        else:
+            self.pre_commands = []
+        impl_c.__init__(self, False)
+
+    def start(self, target, capturer):
+        impl_c.start(self, target, capturer)
+        # we don't do anything here, only upon stop
+
+    def stop_and_get(self, target, capturer):
+        impl_c.stop_and_get(self, target, capturer)
+        file_name = "%s/%s-%s-%s" % (self.user_path, target.id, capturer,
+                                     time.strftime("%Y%m%d-%H%M%S"))
+        try:
+            for command in self.pre_commands:
+                subprocess.check_call(command.split())
+            # replace $OUTPUTFILENAME$ with the name of the output file
+            cmdline = []
+            for i in self.cmdline:
+                if '$OUTPUTFILENAME$' in i:
+                    i = i.replace("$OUTPUTFILENAME$", file_name)
+                cmdline.append(i)
+            target.log.info("snapshot command: %s" % " ".join(cmdline))
+            subprocess.check_call(cmdline, cwd = "/tmp", shell = False,
+                                  close_fds = True,
+                                  stderr = subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
+            target.log.error(
+                "%s: capturing of '%s' with '%s' failed: (%d) %s"
+                % (target.id, self.name, " ".join(cmdline), e.returncode,
+                   e.output))
+            raise
+        # tell the caller to stream this file to the client
+        return dict(stream_file = file_name)
+
+
+class generic_stream(impl_c):
+    """
+    This is a generic stream capturer which can be used to invoke any
+    program that will do capture the stream for a while; in a server
+    configuration file:
+
+    >>>
+    >>> target = ttbl.config.targets['TARGETNAME']
+    >>> target.interface_add("capture", ttbl.capture.interface(
+    >>>         ...
+    >>>
+    >>>         # capture a stream from a webcam pointing to the screen
+    >>>         video1_stream = ttbl.capture.generic_stream(
+    >>>             "Video stream #1",
+    >>>             # Capture with FFMPEG the webcam and Alsa's system
+    >>>             # device, as there is no pulse input as a daemon
+    >>>             # -y forces overriding the file
+    >>>             "ffmpeg -i /dev/video0  -f alsa -i sysdefault "
+    >>>             " -f avi -qscale:v 10 -y $OUTPUTFILENAME$",
+    >>>             pre_commands = [
+    >>>                 # set the input volume so it doesn't clip
+    >>>                 "amixer -D sysdefault sset Capture 75%",
+    >>>             ],
+    >>>             # give it time to save when killing ffmpeg
+    >>>             wait_to_kill = 2
+    >>>         )
+    >>>     )
+    >>> )
+    >>>
+
+
+    When the capturer is started, the pre-commands are executed (eg:
+    to set volumes) and then the cmdline is invoked. The cmdline is
+    expected to start capturing to the $OUTPUTFILENAME$ until killed.
+
+    :param str name: name for error messges from this capturer
+    :param str cmdline: commandline to invoke the capturing of the
+      stream, eg::
+
+        capture-from-device -i /dev/video1 -o $OUTPUTFILENAME$
+
+      note how *$OUTPUTFILENAME$* is replaced with the outputfile.
+
+    :param list(str) pre_commands: (optional) list of commands to
+      execute before the command line, to for example, set
+      volumes. eg:
+
+      >>> pre_commands = [
+      >>>     # set the input volume so it doesn't clip
+      >>>     "amixer -D sysdefault sset Capture 75%",
+      >>> ]
+
+    :param int wait_to_kill: (optional) time to wait since we send a
+      SIGTERM to the capturing process until we send a SIGKILL, so it
+      has time to close the capture file. Defaults to one second.
+    """
+    def __init__(self, name, cmdline, pre_commands = None, wait_to_kill = 1):
+        assert isinstance(name, basestring)
+        assert isinstance(cmdline, basestring)
+        assert wait_to_kill > 0
+        self.name = name
+        self.cmdline = cmdline.split()
+        self.wait_to_kill = wait_to_kill
+        if pre_commands:
+            self.pre_commands = pre_commands
+            assert all([ isinstance(command, basestring)
+                         for command in pre_commands ]), \
+                             "list of pre_commands have to be strings"
+        else:
+            self.pre_commands = []
+        impl_c.__init__(self, True)
+
+
+    def start(self, target, capturer):
+        impl_c.start(self, target, capturer)
+        pidfile = os.path.join(target.state_dir,
+                               "capturer-" + capturer + ".pid")
+        file_name = "%s/%s-%s-%s" % (self.user_path, target.id, capturer,
+                                     time.strftime("%Y%m%d-%H%M%S"))
+        target.property_set("capturer-%s-output" % capturer, file_name)
+        try:
+            for command in self.pre_commands:
+                target.log.info("streaming pre-command: %s" % command)
+                subprocess.check_call(command.split())
+            # replace $OUTPUTFILENAME$ with the name of the output file
+            cmdline = []
+            for i in self.cmdline:
+                if '$OUTPUTFILENAME$' in i:
+                    i = i.replace("$OUTPUTFILENAME$", file_name)
+                cmdline.append(i)
+            target.log.info("streaming command: %s" % " ".join(cmdline))
+            p = subprocess.Popen(cmdline, cwd = "/tmp", shell = False,
+                                 close_fds = True,
+                                 stderr = subprocess.STDOUT)
+            with open(pidfile, "w+") as pidf:
+                pidf.write("%s" % p.pid)
+        except subprocess.CalledProcessError as e:
+            target.log.error(
+                "%s: starting capture of '%s' output with '%s' failed: (%d) %s"
+                % (target.id, self.name, " ".join(cmdline), e.returncode,
+                   e.output))
+            raise
+
+    def stop_and_get(self, target, capturer):
+        impl_c.stop_and_get(self, target, capturer)
+        pidfile = os.path.join(target.state_dir,
+                               "capturer-" + capturer + ".pid")
+        try:
+            file_name = target.property_get("capturer-%s-output" % capturer)
+            target.property_set("capturer-%s-output" % capturer, None)
+            commonl.process_terminate(pidfile, tag = "capture: ",
+                                      wait_to_kill = self.wait_to_kill)
+            return dict(stream_file = file_name)
+        except OSError as e:
+            # adb might have died already
+            if e != errno.ESRCH:
+                raise
