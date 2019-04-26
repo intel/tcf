@@ -222,7 +222,7 @@ class interface(ttbl.tt_interface):
         for name, impl in self.impls.iteritems():
             if impl.stream:
                 capturing = target.property_get("capturer-%s-started"
-                                                % capturer)
+                                                % name)
                 if capturing:
                     res[name] = "capturing"
                 else:
