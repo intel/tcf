@@ -1,4 +1,5 @@
 #! /usr/bin/python
+import errno
 import os
 import subprocess
 
@@ -112,7 +113,7 @@ class pci(ttbl.tt_power_control_impl):
             commonl.process_terminate(pidfile, path = self.path, tag = "adb")
         except OSError as e:
             # adb might have died already
-            if e != errno.EPROCESS:
+            if e != errno.ESRCH:
                 raise
 
     def power_get_do(self, target):
