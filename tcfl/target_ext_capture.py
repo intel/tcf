@@ -4,7 +4,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+"""
+Capture screenshots or video/audio stream from the target
+---------------------------------------------------------
 
+"""
 import contextlib
 import os
 
@@ -13,8 +17,8 @@ import ttb_client
 
 def _rest_tb_target_capture_start(rtb, rt, capturer, ticket = ''):
     assert isinstance(capturer, basestring)
-    rtb.send_request("POST", "targets/%s/capture/start" % rt['id'],
-                     data = { 'capturer': capturer, 'ticket': ticket })
+    return rtb.send_request("POST", "targets/%s/capture/start" % rt['id'],
+                            data = { 'capturer': capturer, 'ticket': ticket })
 
 def _rest_tb_target_capture_stop_and_get(rtb, rt, capturer, local_filename,
                                          ticket = ''):
@@ -38,6 +42,32 @@ def _rest_tb_target_capture_list(rtb, rt, ticket = ''):
 
 class extension(tc.target_extension_c):
     """
+    When a target supports the *capture* interface, it's
+    *tcfl.tc.target_c* object will expose *target.capture* where the
+    following calls can be made to capture data from it.
+
+    A streaming capturer will start capturing when :meth:`start` is
+    called and stop when :meth:`stop_and_get` is called, bringing the
+    capture file from the server to the machine executing *tcf run*.
+
+    A non streaming capturer just takes a snapshot when :meth:`get`
+    is called.
+
+    You can find available capturers with :meth:`list` or::
+
+      $ tcf capture-list TARGETNAME
+      vnc0:ready
+      screen:ready
+      video1:not-capturing
+      video0:ready
+
+    a *ready* capturer is capable of taking screenshots only
+
+    or::
+
+      $ tcf list TARGETNAME | grep capture:
+        capture: vnc0 screen video1 video0
+
     """
 
     def __init__(self, target):
@@ -46,12 +76,37 @@ class extension(tc.target_extension_c):
             raise self.unneeded
 
     def start(self, capturer):
-        self.target.report_info("%s: starting capture" % capturer, dlevel = 1)
-        _rest_tb_target_capture_start(self.target.rtb, self.target.rt,
-                                      capturer, ticket = self.target.ticket)
-        self.target.report_info("%s: started capture" % capturer)
+        """
+        Start capturing the stream with capturer *capturer*
 
-    def get(self, capturer, local_filename):
+        (if this is not an streaming capturer, nothing happens)
+
+        >>> target.capture.start("screen_stream")
+
+        :param str capturer: capturer to use, as listed in the
+          target's *capture*
+        :returns: dictionary of values passed by the server
+        """
+        self.target.report_info("%s: starting capture" % capturer, dlevel = 1)
+        r = _rest_tb_target_capture_start(self.target.rtb, self.target.rt,
+                                          capturer,
+                                          ticket = self.target.ticket)
+        self.target.report_info("%s: started capture" % capturer)
+        return r
+
+    def stop_and_get(self, capturer, local_filename):
+        """
+        If this is a streaming capturer, stop streaming and return the
+        captured data or if no streaming, take a snapshot and return it.
+
+        >>> target.capture.stop_and_get("screen_stream", "file.avi")
+        >>> target.capture.get("screen", "file.png")
+        >>> network.capture.get("tcpdump", "file.pcap")
+
+        :param str capturer: capturer to use, as listed in the
+          target's *capture*
+        :returns: dictionary of values passed by the server
+        """
         self.target.report_info("%s: stopping capture" % capturer, dlevel = 1)
         r = _rest_tb_target_capture_stop_and_get(
             self.target.rtb, self.target.rt,
@@ -60,7 +115,22 @@ class extension(tc.target_extension_c):
                                 % (capturer, r))
         return r
 
+    def get(self, capturer, local_filename):
+        """
+        This is the same :meth:`stop_and_get`
+        """
+        return self.stop_and_get(capturer, local_file_name)
+    
     def list(self):
+        """
+        List capturers available for this target.
+
+        >>> r = target.capture.list()
+        >>> print r
+        >>> {'screen': 'ready', 'audio': 'not-capturing', 'screen_stream': 'capturing'}
+
+        :returns: dictionary of capturers and their state
+        """
         self.target.report_info("listing", dlevel = 1)
         data = _rest_tb_target_capture_list(self.target.rtb, self.target.rt,
                                             ticket = self.target.ticket)
@@ -86,11 +156,7 @@ def cmdline_capture_list(args):
     data = _rest_tb_target_capture_list(rtb, rt, ticket = args.ticket)
     capturers = data['capturers']
     for name, state in capturers.iteritems():
-        if state:
-            _state = 'capturing'
-        else:
-            _state = 'off'
-        print "%s:%s" % (name, _state)
+        print "%s:%s" % (name, state)
 
 
 def cmdline_setup(argsp):
