@@ -186,6 +186,13 @@ class tt_interface(object):
         """
         raise NotImplementedError
 
+    def _target_setup(self, target):
+        """
+        Called when the interface is added to a target to initialize
+        the needed target aspect (such as adding tags/metadata)
+        """
+        
+
 # FIXME: generate a unique ID; has to be stable across reboots, so it
 #        needs to be generated from whichever path we are connecting
 #        it to
@@ -979,6 +986,7 @@ class test_target(object):
                 "An interface of type %s has been already "
                 "registered for target %s at %s" %
                 (name, self.id, self.interface_origin[name]))
+        obj._target_setup(self)
         self.tags['interfaces'].append(name)
         self.interface_origin[name] = commonl.origin_get()
         setattr(self, name, obj)
