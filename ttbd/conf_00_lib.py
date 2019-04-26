@@ -17,12 +17,17 @@ import time
 
 import commonl
 import ttbl
+import ttbl.capture
 import ttbl.cm_serial
+import ttbl.dhcp
 import ttbl.flasher
 import ttbl.pc
-import ttbl.usbrly08b
 import ttbl.pc_ykush
+import ttbl.rsync
+import ttbl.socat
 import ttbl.tt
+import ttbl.tt_qemu2
+import ttbl.usbrly08b
 
 # OpenOCD paths -- multiple versions
 sdk_path = os.path.join(
@@ -4468,7 +4473,7 @@ def tinytile_add(name,
     )
 
 
-def nw_default_targets_add(letter, pairs = 1):
+def nw_default_targets_add(letter, pairs = 5):
     """
     Add the default targets to a configuration
 
@@ -4503,33 +4508,33 @@ def nw_default_targets_add(letter, pairs = 1):
         ic_type = "ethernet"
     )
 
+    count = 0
     # Add QEMU Fedora Linux targets with addresses .4+.5, .6+.7, .7+.8...
     # look in TCF's documentation for how to generate tcf-live.iso
-    for pair in range(pairs):
-        # Add two QEMU Fedora Linux targets on the network
-        # qlf04LETTER .2 has only access to the test network
-        v = 2 * pair + 4
-        ttbl.config.target_add(
-            # Note tt_qemu_linux needs those basic tags fed to the constructor
-            tt_qemu_linux("qlf%02d" % v + letter,
-                          tags = dict(
-                              qemu_ro_image = '/var/lib/ttbd/tcf-live.iso',
-                              qemu_bios_image = '/usr/share/qemu/bios.bin',
-                              ram_megs = 1024,
-                              )),
-            target_type = "qemu-linux-fedora-x86_64",
-            tags = dict(
-                ssh_client = True,
-                interconnects = {
-                    nw_name: dict(
-                        ipv4_addr = "192.168.%d.%d" % (nw_idx, v),
-                        ipv4_prefix_len = 24,
-                        ipv6_addr = "fc00::%02x:%02x" % (nw_idx, v),
-                        ipv6_prefix_len = 112,
-                        mac_addr = "02:%02x:00:00:00:%02x" % (nw_idx, v),
-                    )
-                }
-            ))
+    for pair in range(pairs + 1):
+        v = pair + 4
+        target_name = "qu%02d" % v + letter
+        qemu_pos_add(target_name,
+                     nw_name,
+                     # more distros support ide than virtio/scsi with
+                     # generic kernels
+                     sd_iftype = 'ide',
+                     mr_partsizes = "1:4:5:8",
+                     mac_addr = "02:%02x:00:00:00:%02x" % (nw_idx, v),
+                     ipv4_addr = "192.168.%d.%d" % (nw_idx, v),
+                     ipv6_addr = "fc00::%02x:%02x" % (nw_idx, v),
+                     extra_cmdline = "-display vnc=0.0.0.0:%d" % count)
+        target = ttbl.config.targets[target_name]
+        target.tags_update(dict(vnc_port = count))
+        target.interface_add("capture", ttbl.capture.interface(
+            # capture screenshots from VNC, return a PNG
+            screen = "vnc0",
+            vnc0 = ttbl.capture.generic_snapshot(
+                "VNC :%d" % count,
+                "gvnccapture -q localhost:%s $OUTPUTFILENAME$" % count
+            ),
+        ))
+        count += 1
         if False:
             # FIXME: NAT is currently broken
             # qlf05LETTERH .5 has access to the test network and
