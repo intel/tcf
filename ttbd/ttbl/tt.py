@@ -25,7 +25,6 @@ import ttbl.cm_loopback
 import ttbl.cm_serial
 import ttbl.config
 import ttbl.pc_ykush
-import ttbl.tt_qemu
 
 
 class tt_serial(

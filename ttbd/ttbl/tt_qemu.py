@@ -162,7 +162,6 @@ class tt_qemu(
     .. admonition:: Examples
 
        - :class:`VMs for Zephyr OS <conf_00_lib.tt_qemu_zephyr>`
-       - :class:`VMs for Fedora Linux Cloud images OS <conf_00_lib.tt_qemu_linux>`
 
     """
 

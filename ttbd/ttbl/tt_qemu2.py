@@ -188,9 +188,10 @@ class tt_qemu(
 
     Supports power control, serial consoles and image flashing.
 
-    A subclass of this must provide a command line to start QEMU, as
-    described in :data:`qemu_cmdline`.
+    :param str qemu_cmdline: command line to start QEMU, as
+      described in :data:`tt_qemu.qemu_cmdline`.
 
+      FIXME: describe better
 
     :param list(str) consoles: names of serial consoles to start by
       adding command line configuration. Note each string needs to be
@@ -221,7 +222,6 @@ class tt_qemu(
     .. admonition:: Examples
 
        - :class:`VMs for Zephyr OS <conf_00_lib.tt_qemu_zephyr>`
-       - :class:`VMs for Fedora Linux Cloud images OS <conf_00_lib.tt_qemu_linux>`
 
     """
 

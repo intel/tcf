@@ -149,8 +149,7 @@ As well, you can add
 - physical targets, such as :ref:`MCUs <ttbd_config_mcus>`
 - read on for information about :ref:`networking targets
   <ttbd_config_vlan>`, default QEMU targets for running :ref:`Zephyr
-  OS <ttbd_config_qemu_zephyr>` and :ref:`Linux
-  <ttbd_config_qemu_linux>`.
+  OS <ttbd_config_qemu_zephyr>`.
 
 .. _ttbd_config_vlan:
 
@@ -373,71 +372,6 @@ Configure QEMU targets
 ----------------------
 
 QEMU targets can be configured to boot a VM with 
-
-.. _ttbd_config_qemu_linux:
-
-Configure QEMU Linux targets
-----------------------------
-
-(This is old style and this is deprecated)
-
-The default installation provies a list of QEMU-based targets that are
-suitable for running Fedora, Clear Linux and other Linux cloud OS;
-they are defined in ``/etc/ttbd-production/conf_06_default.py`` (you
-can add more or less in your configuration files).
-
-However, TCF provides a kickstarter configuration setup that generates
-a Fedora-based TCF Live ISO image to run Linux machines that:
-
- - are continuously recycled (upon boot, they are always a fresh
-   reinstall)
-
- - have installed the RPMs you need (look into
-   :class:`conf_00_lib.tt_qemu_linux` for details on how to add more).
-
- - systemd networking is configured to work with TCF networks
-
- - works on VMs and physical machines
-
- - provide a serial console which autologs to root, TCF
-   *console-read* and *console-write* commands can access the root
-   console.
-
-To generate the Linux image from a Fedora machine, you will need sudo
-access::
-
-  $ /usr/share/tcf/live/mk-liveimg.sh [OPTIONALPATHs]
-  $ mv tcf-intel/tcf-intel.iso /var/lib/ttbd/
-
-.. note::
-
-   *OPTIONALPATHS* are paths to directories where to find extra
-   configuration; read the documentaion on
-   */usr/share/tcf/live/mk-liveimg.sh* for more information.
-
-or download it
-
-.. include:: 03-server-setup-LL-image-download.rst
-
-Now, ``tcf list`` should show, after you login::
-
-  # tcf list | grep ^ql
-  ...
-  locals/nwa
-  locals/nwb
-  locals/qlf04a
-  locals/qlf04b
-  locals/qlf05aH
-  locals/qlf05bH
-  ...
-
-(output may vary based on configuration)
-
-There are two test networks defined (*nwa*, *nwb*), *qlc* are Clear
-Linux targets, *qlf* are Fedora. The number indicates the last part of
-their IPv4 and IPv6 addresses. The letter *a* and *b* helps to tell
-which network are they at. *H* at the end says they also have a NAT
-connection to the server's upstream network connection.
 
 
 Configure physical test targets and power switches
@@ -925,6 +859,8 @@ Fedora Linux.
 .. warning:: these steps are meant for an x86-64 platform and it has
              to be run in such. Steps for x86 (32-bits) or other
              platforms need to be documented.
+
+.. _generate_tcf_live_iso:
 
 a. Generate TCF-live on the fly::
 

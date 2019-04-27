@@ -788,8 +788,7 @@ provides serial console access, then this will work:
 Configure physical Linux targets with a fixed Live filesystem
 -------------------------------------------------------------
 
-Using the same mechanism as for :ref:`QEMU <ttbd_config_qemu_linux>`,
-a physical Linux machine can be booted with the TCF-live image that
+A physical Linux machine can be booted with the TCF-live image that
 will always boot fresh to the same state.
 
 This builds on the :ref:`previous section <tt_linux_simple>`.
@@ -806,6 +805,9 @@ This builds on the :ref:`previous section <tt_linux_simple>`.
   on/off (eg, a :func:`DLWPS7 <conf_00_lib.dlwps7_add>`)
 
 **Connecting the test target fixture**
+
+0. Generate a TCF Live ISO image :ref:`following these steps
+   <generate_tcf_live_iso>`
 
 1. Initialize the USB drive with the image (assuming
    it is at */dev/sdb*)::
