@@ -1205,13 +1205,14 @@ class tc_pos_base(tc.tc_c):
         # ensure network, DHCP, TFTP, etc are up and deploy
         ic.power.on()
         if not self.image_requested:
-            raise tc.block_e(
+            raise tc.blocked_e(
                 "No image to install specified, set envar IMAGE "
                 "or self.image_requested")
         self.image = target.pos.deploy_image(ic, self.image_requested,
                                              **self.deploy_image_args)
 
     def start_50(self, ic, target):
+        ic.power.on()
         # fire up the target, wait for a login prompt
         target.pos.boot_normal()
         target.shell.linux_shell_prompt_regex = tl.linux_root_prompts
