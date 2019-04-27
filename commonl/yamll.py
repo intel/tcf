@@ -42,7 +42,6 @@ try:
         if not schema:
             return
         c = pykwalify.core.Core(source_data = data, schema_data = schema)
-        help(c.validate)
         c.validate(raise_exception = True)
 
 except ImportError as e:
