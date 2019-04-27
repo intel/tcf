@@ -38,12 +38,12 @@ class _test(tcfl.tc.tc_c):
     @tcfl.tc.concurrently()
     def deploy_10_target(self, ic, target):
         image_final = target.pos.deploy_image(ic, image)
-        target.report_pass("deployed %s" % image_final)
+        target.report_pass("deployed %s" % image_final, dlevel = -1)
 
     @tcfl.tc.concurrently()
     def deploy_10_target1(self, ic, target1):
         image_final = target1.pos.deploy_image(ic, image)
-        target1.report_pass("deployed %s" % image_final)
+        target1.report_pass("deployed %s" % image_final, dlevel = -1)
 
     def start(self, ic, target, target1):
         ic.power.on()			# in case we skip deploy
