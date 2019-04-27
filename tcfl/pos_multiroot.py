@@ -223,6 +223,7 @@ def _rootfs_guess(target, image, boot_dev):
             target.report_info("POS: repartitioning because couldn't find "
                                "root partitions")
             _disk_partition(target)
+            target.pos._fsinfo_load()
         except Exception as e:
             reason = str(e)
             if tries < 3:
@@ -271,9 +272,53 @@ def mount_fs(target, image, boot_dev):
     target.report_info("POS: will use %s for root partition (had %s before)"
                        % (root_part_dev, image_prev))
 
+    # fsinfo looks like described in target.pos._fsinfo_load()
+    dev_info = None
+    for blockdevice in target.pos.fsinfo.get('blockdevices', []):
+        for child in blockdevice.get('children', []):
+            if child['name'] == root_part_dev_base:
+                dev_info = child
+    if dev_info == None:
+        # it cannot be we might have to repartition because at this
+        # point *we* have partitoned.
+        raise tc.error_e(
+            "Can't find information for root device %s in FSinfo array"
+            % root_part_dev_base,
+            dict(fsinfo = target.pos.fsinfo))
+
+    # what format does it currently have?
+    current_fstype = dev_info.get('fstype', 'ext4')
+
+    # What format does it have to have?
+    #
+    # Ok, here we need to note that we can't have multiple root
+    # filesystems with the same UUID or LABEL, so the image can't rely
+    # on UUIDs
+    #
+    img_fss = target.pos.metadata.get('filesystems', {})
+    if '/' in img_fss:
+        # a common origin is ok because the YAML schema forces both
+        # fstype and mkfs_opts to be specified
+        origin = "image's /.tcf.metadata.yaml"
+        fsdata = img_fss.get('/', {})
+    else:
+        origin = "defaults @" + commonl.origin_get(0)
+        fsdata = {}
+    fstype = fsdata.get('fstype', 'ext4')
+    mkfs_opts = fsdata.get('mkfs_opts', '-Fj')
+
+    # do they match?
+    if fstype != current_fstype:
+        target.report_info(
+            "POS: reformatting %s because current format is '%s' and "
+            "'%s' is needed (per %s)"
+            % (root_part_dev, current_fstype, fstype, origin))
+        _mkfs(target, root_part_dev, fstype, mkfs_opts)
+
     for try_count in range(3):
         target.report_info("POS: mounting root partition %s onto /mnt "
                            "to image [%d/3]" % (root_part_dev, try_count))
+
         # don't let it fail or it will raise an exception, so we
         # print FAILED in that case to look for stuff; note the
         # double apostrophe trick so the regex finder doens't trip

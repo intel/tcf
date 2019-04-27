@@ -1,0 +1,39 @@
+#
+# Schema to validate a YAML file describing a TCF POS image
+#
+# We load this with pykwalify
+# (http://pykwalify.readthedocs.io/en/unstable/validation-rules.html),
+# a YAML structure validator, to validate the YAML files.
+#
+---
+type: map
+mapping:
+  "filesystems":
+    type: map
+    mapping:
+      regex;(([/a-zA-Z0-9_]+)):    # mount point regex
+        type: map
+        mapping:
+          "fstype":
+            type: str
+            required: true
+            enum:
+              - 'btrfs'
+              - 'cramfs'
+              - 'exfat'
+              - 'ext2'
+              - 'ext3'
+              - 'ext4'
+              - 'fat'
+              - 'minix'
+              - 'msdos'
+              - 'ntfs'
+              - 'vfat'
+              - 'xfs'
+          "mkfs_opts":
+            type: str
+            required: true
+
+  "post_flash_script":
+    type: str
+    required: false

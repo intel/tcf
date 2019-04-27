@@ -50,6 +50,8 @@ Note installation in the server side is needed, as described in
 """
 
 import inspect
+import json
+import logging
 import operator
 import os
 import random
@@ -59,6 +61,8 @@ import traceback
 import distutils.version
 import Levenshtein
 
+import commonl
+import commonl.yamll
 import tc
 import tl
 from . import msgid_c
@@ -400,6 +404,20 @@ def capability_register(capability, value, fns):
     capability_fns.setdefault(capability, {})[value] = fns
 
 
+# initialized at the bottom, when this is parsed
+_metadata_schema_yaml = None
+
+def _metadata_schema_yaml_load():
+    global _metadata_schema_yaml
+    # this has to be done only once we are all initialized
+    if _metadata_schema_yaml:	# already loaded
+        return
+    schema_path = commonl.ttbd_locate_helper("img-metadata.schema.yaml",
+                                             logging, "tcfl")
+    _metadata_schema_yaml = commonl.yamll.load(schema_path)
+    logging.info("POS: loaded image YAML schema from %s", schema_path)
+
+
 class extension(tc.target_extension_c):
     """
 
@@ -428,6 +446,8 @@ class extension(tc.target_extension_c):
                                "not a dictionary of POS capabilities",
                                dict(target = self.target))
         self.umount_list = [ '/mnt' ]
+        self.fsinfo = {}
+        self.metadata = {}	# FIXME: ren to image_metadata
 
     def _boot_dev_guess(self, boot_dev):
         target = self.target
@@ -607,7 +627,6 @@ class extension(tc.target_extension_c):
         assert isinstance(image, basestring)
         assert isinstance(boot_dev, basestring)
 
-        self.target.shell.run("lsblk")
         mount_fs_fn = self.cap_fn_get("mount_fs")
         return mount_fs_fn(self.target, image, boot_dev)
 
@@ -873,13 +892,80 @@ EOF""")
         target.kw_unset('rsync_port')
         target.kw_unset('rsync_server')
 
+    def _metadata_load(self, target, kws):
+        # copy and parse image metadata
+        target.shell.run(
+            # ensure we remove any possibly existing one
+            "rm -f /tmp/tcf.metadata.yaml;"
+            # rsync the metadata file to target's /tmp
+            " time rsync -HaAX --numeric-ids --delete --inplace -L -vv"
+            # don't really complain if there is none
+            " --ignore-missing-args"
+            " %(rsync_server)s/%(image)s/.tcf.metadata.yaml"
+            " /tmp/tcf.metadata.yaml" % kws)
+        # if there was one, cat it
+        self.metadata = {}
+        output = target.shell.run("[ -r /tmp/tcf.metadata.yaml ] "
+                                  "&& cat /tmp/tcf.metadata.yaml",
+                                  output = True, trim = True)
+        if output.strip():
+            _metadata_schema_yaml_load()
+            self.metadata = commonl.yamll.parse_verify(
+                output, _metadata_schema_yaml)
+            if self.metadata == None:
+                self.metadata = {}
+
+    def _post_flash_setup(self, target, root_part_dev, image_final):
+        # Run post setup scripts from the image's metadata
+        post_flash_script = self.metadata.get('post_flash_script', "")
+        if post_flash_script:
+            target.report_info("POS: executing post flash script from "
+                               "%s:.tcf.metadata.yaml" % image_final)
+            target.shell.run(
+                "export ROOTDEV=%s" % root_part_dev
+                + " ROOT=/mnt"
+                + " ")
+        line_acc = ""
+        for line in post_flash_script.split('\n'):
+            if not line:
+                continue
+            if line[-1] == "\\":
+                line_acc += line[:-1]
+            else:
+                target.shell.run(line_acc + line)
+                line_acc = ""
+
+    def _fsinfo_load(self):
+        # Query filesystem information -> self.fsinfo
+        output = self.target.shell.run(
+            "lsblk --json -bni -o NAME,SIZE,TYPE,FSTYPE,UUID,LABEL,MOUNTPOINT",
+            output = True, trim = True)
+        # this output will be
+        #
+        ## {
+        ##   "blockdevices": [
+        ##     {"name": "sr0", "size": "1073741312", "type": "rom",
+        ##      "fstype": null, "mountpoint": null},
+        ##     {"name": "vda", "size": "32212254720", "type": "disk",
+        ##      "fstype": null, "mountpoint": null,
+        ##      "children": [
+        ##        {"name": "vda1", "size": "1072693248", "type": "part",
+        ##         "fstype": "vfat", "mountpoint": null},
+        ##        {"name": "vda2", "size": "4294967296", "type": "part",
+        ##         "fstype": "swap", "mountpoint": null},
+        ##        ...
+        ##        {"name": "vda6", "size": "5368709120", "type": "part",
+        ##         "fstype": "ext4", "mountpoint": null}
+        ##      ]
+        ##    }
+        ##  ]
+        ## }
+        self.fsinfo = json.loads(output)
 
     def deploy_image(self, ic, image,
                      boot_dev = None, root_part_dev = None,
                      partitioning_fn = None,
                      extra_deploy_fns = None,
-                     # mkfs has to have -F to avoid it asking questions
-                     mkfs_cmd = "mkfs.ext4 -Fj %(root_part_dev)s",
                      pos_prompt = None,
                      # plenty to boot to an nfsroot, hopefully
                      timeout = 60,
@@ -964,18 +1050,19 @@ EOF""")
             try:
                 testcase.tls.expecter.timeout = 800
 
+                self._fsinfo_load()
+
                 # List the available images and decide if we have the
                 # one we are asked to install, autocomplete missing
                 # fields and get us a good match if there is any.
-                image_list_output = target.shell.run(
+                output = target.shell.run(
                     "rsync %(rsync_server)s/" % kws, output = True)
-                images_available = image_list_from_rsync_output(
-                    image_list_output)
-                image_final_tuple = image_select_best(image, images_available,
-                                                      target)
+                images = image_list_from_rsync_output(output)
+                image_final_tuple = image_select_best(image, images, target)
                 image_final = ":".join(image_final_tuple)
                 kws['image'] = image_final
 
+                self._metadata_load(target, kws)
                 testcase.targets_active()
                 root_part_dev = self.mount_fs(image_final, boot_dev)
                 kws['root_part_dev'] = root_part_dev
@@ -991,13 +1078,12 @@ EOF""")
                 target.report_info("POS: rsynced %(image)s from "
                                    "%(rsync_server)s to /mnt" % kws)
 
+                self._post_flash_setup(target, root_part_dev, image_final)
+
                 # did the user provide an extra function to deploy stuff?
-                _extra_deploy_fns = []
                 if extra_deploy_fns:
-                    _extra_deploy_fns += extra_deploy_fns
-                if _extra_deploy_fns:
                     self.rsyncd_start(ic)
-                    for extra_deploy_fn in _extra_deploy_fns:
+                    for extra_deploy_fn in extra_deploy_fns:
                         target.report_info("POS: running extra deploy fn %s"
                                            % extra_deploy_fn, dlevel = 2)
                         testcase.targets_active()
