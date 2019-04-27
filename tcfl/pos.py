@@ -317,7 +317,7 @@ def deploy_linux_kernel(ic, target, _kws):
     target.testcase._targets_active()
     target.report_pass("linux kernel transferred")
 
-    
+
 
 #:
 #: Functions to boot a target into POS
@@ -438,7 +438,7 @@ class extension(tc.target_extension_c):
             assert isinstance(boot_dev, basestring), \
                 'boot_dev must be a string'
             target.report_info("POS: boot device %s (from arguments)"
-                               % boot_dev, dlevel = 3)
+                               % boot_dev, dlevel = 4)
         else:
             boot_dev = target.kws.get('pos_boot_dev', None)
             if boot_dev == None:
@@ -446,7 +446,7 @@ class extension(tc.target_extension_c):
                     "Can't guess boot_dev (no `pos_boot_dev` tag available)",
                     { 'target': target } )
             target.report_info("POS: boot device %s (from pos_boot_dev tag)"
-                               % boot_dev)
+                               % boot_dev, dlevel = 4)
         boot_dev = "/dev/" + boot_dev
         # HACK: /dev/[hs]d* do partitions as /dev/[hs]dN, where as mmc and
         # friends add /dev/mmcWHATEVERpN. Seriously...
