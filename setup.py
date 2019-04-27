@@ -80,7 +80,7 @@ This is the client and meta-testcase runner for the TCF test case framework.
         ]),
         # ('etc/tcf', glob.glob("conf_*.py")),
         ('@prefix@/share/tcf', [
-            'img-metadata.schema.yaml',
+            'tcfl/img-metadata.schema.yaml',
         ]),
         ('@prefix@/share/tcf/examples',
          [ ] \
