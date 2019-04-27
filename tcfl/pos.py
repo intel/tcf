@@ -1068,7 +1068,8 @@ EOF""")
                 kws['root_part_dev'] = root_part_dev
 
                 target.report_info("POS: rsyncing %(image)s from "
-                                   "%(rsync_server)s to /mnt" % kws,
+                                   "%(rsync_server)s to %(root_part_dev)s"
+                                   % kws,
                                    dlevel = -1)
                 target.shell.run(
                     "time rsync -HaAX --numeric-ids --delete --inplace"
@@ -1076,7 +1077,8 @@ EOF""")
                     " --exclude='/persistent.tcf.d/*'"
                     " %(rsync_server)s/%(image)s/. /mnt/." % kws)
                 target.report_info("POS: rsynced %(image)s from "
-                                   "%(rsync_server)s to /mnt" % kws)
+                                   "%(rsync_server)s to %(root_part_dev)s"
+                                   % kws)
 
                 self._post_flash_setup(target, root_part_dev, image_final)
 
