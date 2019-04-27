@@ -373,8 +373,6 @@ capability_fns = dict(
     #: returns: nothing, but sets target.root_part_dev, where the rootfs is
     #:
     mount_fs = dict(),
-    #: Post-deploy functions to run
-    extra_deploy = dict(),
 )
 
 
@@ -995,9 +993,6 @@ EOF""")
 
                 # did the user provide an extra function to deploy stuff?
                 _extra_deploy_fns = []
-                more = self.cap_fn_get('extra_deploy')
-                if more:
-                    _extra_deploy_fns += more
                 if extra_deploy_fns:
                     _extra_deploy_fns += extra_deploy_fns
                 if _extra_deploy_fns:
