@@ -22,6 +22,7 @@ import tcfl.tl
 import tcfl.pos
 
 image = os.environ["IMAGE"]
+image1 = os.environ.get("IMAGE1", image)
 
 @tcfl.tc.interconnect("ipv4_addr")
 @tcfl.tc.target('pos_capable')
@@ -42,7 +43,7 @@ class _test(tcfl.tc.tc_c):
 
     @tcfl.tc.concurrently()
     def deploy_10_target1(self, ic, target1):
-        image_final = target1.pos.deploy_image(ic, image)
+        image_final = target1.pos.deploy_image(ic, image1)
         target1.report_pass("deployed %s" % image_final, dlevel = -1)
 
     def start(self, ic, target, target1):
