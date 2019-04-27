@@ -94,12 +94,6 @@ _grub_linux_initrd_entry_regex = re.compile(
     ")$")
 
 
-# we use a dictionary to remove duplicate entries
-#
-# we key the entries by the initrd, linux kernel and kernel args they
-# use; if they are the same, it will be overriden and we won't have to
-# pick one.
-_grub_entries = {}
 
 def _linux_boot_guess_from_grub_cfg(target, _image):
     """
@@ -156,17 +150,21 @@ def _linux_boot_guess_from_grub_cfg(target, _image):
         linux_args = None
         initrd = None
 
-    global _grub_entries
+    # we use a dictionary to remove duplicate entries
+    #
+    # we key the entries by the initrd, linux kernel and kernel args they
+    # use; if they are the same, it will be overriden and we won't have to
+    # pick one.
+    target._grub_entries = {}
     entry = _entry()
 
     def _entry_record():
-        global _grub_entries
         entry_id = \
             (entry.linux if entry.linux else "" ) \
             + (entry.initrd if entry.initrd else "") \
             + (entry.linux_args if entry.linux_args else "")
         if entry_id != "":	# record existing
-            _grub_entries[entry_id] = entry
+            target._grub_entries[entry_id] = entry
 
     for line in grub_cfg.splitlines():
         # match menuentry lines and save name, flushing previous data
@@ -199,23 +197,25 @@ def _linux_boot_guess_from_grub_cfg(target, _image):
     _entry_record()	# record last entry
 
     # delete recovery / rescue stuff, we don't use it
-    for entry_id in list(_grub_entries.keys()):
-        entry = _grub_entries[entry_id]
+    for entry_id in list(target._grub_entries.keys()):
+        entry = target._grub_entries[entry_id]
         if 'recovery mode' in entry.name \
            or 'rescue' in entry.name:
-            del _grub_entries[entry_id]
+            del target._grub_entries[entry_id]
 
-    if len(_grub_entries) > 1:
+    if len(target._grub_entries) > 1:
         entries = pprint.pformat([ i.__dict__
-                                   for i in _grub_entries.values() ])
+                                   for i in target._grub_entries.values() ])
         raise tc.blocked_e(
-            "%s: more than one Linux kernel entry; I don't know "
+            "more than one Linux kernel entry; I don't know "
             "which one to use",
             dict(target = target, entries = entries))
 
-    if not _grub_entries:		# can't find?
+    if not target._grub_entries:		# can't find?
+        del target._grub_entries
         return None, None, None
-    entry = _grub_entries.values()[0]
+    entry = target._grub_entries.values()[0]
+    del target._grub_entries
     return os.path.basename(entry.linux), \
         os.path.basename(entry.initrd), entry.linux_args
 
