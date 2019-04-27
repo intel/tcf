@@ -777,7 +777,7 @@ EOF""")
                 % (persistent_dir, persistent_name, dst))
 
 
-    def rsync_np(self, src, dst, option_delete = False):
+    def rsync_np(self, src, dst, option_delete = False, path_append = "/."):
         """rsync data from the local machine to a target
 
         The local machine is the machine executing the test script (where
@@ -830,7 +830,7 @@ EOF""")
 
         """
         target = self.target
-        target.shell.run("mkdir -p /%s	# create dest for rsync_np" % dst)
+        target.shell.run("mkdir -p /mnt/%s	# create dest for rsync_np" % dst)
         if option_delete:
             _delete = "--delete"
         else:
@@ -841,10 +841,10 @@ EOF""")
             "time sudo rsync -HaAX --numeric-ids %s" \
             " --inplace" \
             " --exclude=persistent.tcf.d --exclude='persistent.tcf.d/*'" \
-            " --port %%(rsync_port)s %s/. %%(rsync_server)s::rootfs/%s/." \
-            % (_delete, src, dst)
+            " --port %%(rsync_port)s %s%s %%(rsync_server)s::rootfs/%s%s" \
+            % (_delete, src, path_append, dst, path_append)
         target.report_info(
-            "POS: rsyncing %s to target's /mnt/%s" % (src, dst), dlevel = -1,
+            "POS: rsyncing %s to target's %s" % (src, dst), dlevel = -1,
             attachments = dict(cmdline = cmdline))
         output = target.shcmd_local(cmdline)
         target.testcase._targets_active()
@@ -1084,14 +1084,13 @@ def deploy_tree(_ic, target, _kws):
     This is normally given to :func:`target.pos.deploy_image
     <tcfl.pos.extension.deploy_image>` as:
 
-    >>> target.kw_set("pos_deploy_linux_kernel", SOMELOCALLOCATION)
+    >>> target.deploy_tree_src = SOMELOCALLOCATION
     >>> target.pos.deploy_image(ic, IMAGENAME,
     >>>                         extra_deploy_fns = [ tcfl.pos.deploy_linux_kernel ])
 
     """
     source_tree = getattr(target, "deploy_tree_src", None)
     if source_tree == None:
-
         target.report_info("not deploying local tree because "
                            "*target.deploy_tree_src* is missing or None ",
                            dlevel = 2)
@@ -1102,6 +1101,37 @@ def deploy_tree(_ic, target, _kws):
     target.pos.rsync_np(source_tree, "/", option_delete = True)
     target.testcase._targets_active()
     target.report_pass("rsynced tree %s -> target:/" % source_tree)
+
+
+def deploy_path(_ic, target, _kws, cache = True):
+    """
+    Rsync a local tree to the target after imaging
+
+    This is normally given to :func:`target.pos.deploy_image
+    <tcfl.pos.extension.deploy_image>` as:
+
+    >>> target.deploy_path_src = self.kws['srcdir'] + "/collateral/movie.avi"
+    >>> target.deploy_path_dest = "/root"   # optional,defaults to /
+    >>> target.pos.deploy_image(ic, IMAGENAME,
+    >>>                         extra_deploy_fns = [ tcfl.pos.deploy_linux_kernel ])
+
+    """
+    source_path = getattr(target, "deploy_path_src", None)
+    dst_path = getattr(target, "deploy_path_dest", "/")
+    if source_path == None:
+        target.report_info("not deploying local path because "
+                           "*target.deploy_path_src is missing or None ",
+                           dlevel = 2)
+        return
+    target.report_info("rsyncing file %s -> target:%s"
+                       % (source_path, dst_path), dlevel = 1)
+    target.testcase._targets_active()
+    # FIXME: implement cache (use rsync())
+    target.pos.rsync_np(source_path, dst_path, option_delete = True,
+                        path_append = "")
+    target.testcase._targets_active()
+    target.report_pass("rsynced file %s -> target:%s"
+                       % (source_path, dst_path))
 
 
 
