@@ -505,7 +505,9 @@ class extension(tc.target_extension_c):
         return capability_fn
 
 
-    _regex_waiting_for_login = re.compile(r".*\blogin:\s*$")
+    # can't add $ at the end because sometimes there are spurious
+    # messages after it...
+    _regex_waiting_for_login = re.compile(r".*\blogin:\s+")
 
     def _unexpected_console_output_try_fix(self, output, target):
         # so when trying to boot POS we got unexpected console output;
@@ -530,7 +532,7 @@ class extension(tc.target_extension_c):
                     "but I don't know how to fix it; target does not "
                     "declare capability `boot_config_fix`",
                     attachments = dict(output = output))
-    
+
     def boot_to_pos(self, pos_prompt = None,
                     # plenty to boot to an nfsroot, hopefully
                     timeout = 60,
