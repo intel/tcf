@@ -52,8 +52,9 @@ import re
 
 import Levenshtein
 
-import tc
+import commonl
 import pos
+import tc
 
 # FIXME: deprecate that _device
 def _disk_partition(target):
@@ -202,6 +203,11 @@ def _rootfs_guess_by_image(target, image, boot_dev):
                            % (root_part_dev, seed, score, seed), dlevel = 2)
     return root_part_dev
 
+def _mkfs(target, dev, fstype, mkfs_opts):
+    target.report_info("POS: formatting %s (mkfs.%s %s)"
+                       % (dev, fstype, mkfs_opts), dlevel = 1)
+    target.shell.run("mkfs.%s %s %s" % (fstype, mkfs_opts, dev))
+    target.report_info("POS: formatted rootfs %s as %s" % (dev, fstype))
 
 def _rootfs_guess(target, image, boot_dev):
     reason = "unknown issue"
@@ -249,6 +255,10 @@ def mount_fs(target, image, boot_dev):
         # setting pos_repartition to anything
         target.report_info("POS: repartitioning per pos_reinitialize "
                            "property")
+        for tag in target.rt.keys():
+            # remove pos_root_*, as they don't apply anymore
+            if tag.startswith("pos_root_"):
+                target.property_set(tag, None)
         _disk_partition(target)
         target.property_set('pos_reinitialize', None)
 
@@ -281,11 +291,7 @@ def mount_fs(target, image, boot_dev):
                'codepage or helper program, or other error.' in output:
                 # ok, this means probably the partitions are not
                 # formatted; FIXME: support other filesystemmakeing?
-                mkfs_cmd = "mkfs.ext4 -Fj %s" % root_part_dev
-                target.report_info(
-                    "POS: formating root partition %s with `%s`"
-                    % (root_part_dev, mkfs_cmd))
-                target.shell.run(mkfs_cmd)
+                _mkfs(target, root_part_dev, fstype, mkfs_opts)
             else:
                 raise tc.blocked_e(
                     "POS: Can't recover unknown error condition: %s"
