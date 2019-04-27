@@ -402,16 +402,15 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         distro_mirror = ic.kws.get('distro_mirror', None)
         if self.swupd_url or not distro_mirror:
             # if there is no distro mirror, use proxies -- HACK
+            proxy_cmd = ""
             if 'http_proxy' in ic.kws:
-                target.shell.run("export http_proxy=%s"
-                                 % ic.kws.get('http_proxy'))
-                target.shell.run("export HTTP_PROXY=%s"
-                                 % ic.kws.get('http_proxy'))
+                proxy_cmd += " http_proxy=%(http_proxy)s "\
+                    "HTTP_PROXY=%(http_proxy)s" % ic.kws
             if 'https_proxy' in ic.kws:
-                target.shell.run("export https_proxy=%s"
-                                 % ic.kws.get('https_proxy'))
-                target.shell.run("export HTTPS_PROXY=%s"
-                                 % ic.kws.get('https_proxy'))
+                proxy_cmd += " https_proxy=%(https_proxy)s "\
+                    "HTTPS_PROXY=%(https_proxy)s" % ic.kws
+            if proxy_cmd != "":
+                target.shell.run("export " + proxy_cmd)
 
         if self.swupd_url:
             target.shell.run("swupd mirror -s %s" % self.swupd_url)
