@@ -143,8 +143,11 @@ def _linux_boot_guess_from_grub_cfg(target, _image):
     grub_cfg_path = grub_cfg_path.strip()
     if grub_cfg_path == "":	# no grub.cfg to rely on
         return None, None, None
-    grub_cfg = target.shell.run(r"cat %s" % grub_cfg_path,
-                                output = True, trim = True)
+    # read grub in, but only the parts we care for--it's faster
+    grub_cfg = target.shell.run(
+        r" grep --color=never -w '\(menuentry\|linux\|initrd\)' %s"
+        % grub_cfg_path,
+        output = True, trim = True)
 
     # a grub entry
     class _entry(object):
@@ -210,6 +213,8 @@ def _linux_boot_guess_from_grub_cfg(target, _image):
             "which one to use",
             dict(target = target, entries = entries))
 
+    if not _grub_entries:		# can't find?
+        return None, None, None
     entry = _grub_entries.values()[0]
     return os.path.basename(entry.linux), \
         os.path.basename(entry.initrd), entry.linux_args
