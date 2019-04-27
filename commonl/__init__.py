@@ -1143,20 +1143,20 @@ def which(cmd, mode = os.F_OK | os.X_OK, path = None):
                     return name
     return None
 
-def ttbd_locate_helper(filename, log = logging):
+def ttbd_locate_helper(filename, log = logging, relsrcpath = ""):
     """
     Find the path to a TTBD file, depending on we running from source
     or installed system wide.
 
     :param str filename: name of the TTBD file we are looking for.
+    :param str relsrcpath: path relative to the running binary in the source
     """
     # Simics needs an image with a bootloader, we use grub2 and we
     # share the setup-efi-grub2-elf.sh implementation from grub2elf.
     _src = os.path.abspath(sys.argv[0])
     _srcdir = os.path.dirname(_src)
     # Running from source tree
-    cmd_path = os.path.join(_srcdir, filename)
-    log.debug("looking for %s" % cmd_path)
+    cmd_path = os.path.join(_srcdir, relsrcpath, filename)
     if os.path.exists(cmd_path):
         return cmd_path
     # System-wide install in the same prefix -> ../share/tcf
