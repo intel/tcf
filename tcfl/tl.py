@@ -276,11 +276,11 @@ def linux_ipv4_addr_get_from_console(target, ifname):
 linux_root_prompts = re.compile(
     '('
     # clear, Fedora
-    'root@.*# '
+    r'[^@]+@.*[#\$] '
     '|'
     # SLES; make sure there is no trailing space, otherwise it gets
-    # confused with the ANSI colouring sequences that come between the
+    # confused with the ANSI colouring sequences that come between them
     # and the space.
-    '[^:]+:.* #'
+    r'[^:]+:.*[#\$]'
     ')'
 )
