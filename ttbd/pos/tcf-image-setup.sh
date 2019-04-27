@@ -204,7 +204,11 @@ case "$image_type" in
         root_part=p${ROOT_PARTITION:-2}
         ;;
     qcow2)
-        boot_part=
+        if [ -z "${BOOT_PARTITION:-}" ]; then
+            boot_part=
+        else
+            boot_part=p${BOOT_PARTITION}
+        fi
         root_part=p${ROOT_PARTITION:-1}
         ;;
     android|rootfsimage)
@@ -235,6 +239,7 @@ else
     lsblk $loop_dev
 fi
 
+root_fstype=ext4
 mkdir $tmpdir/root
 set -e
 if [ $image_type = debian ]; then
@@ -268,7 +273,7 @@ elif [ $image_type == fedoralive -o $image_type == tcflive ]; then
 
     # Mount the root fs
     # use sudo test to test because the mount point might allow no
-    # access to the current user. 
+    # access to the current user.
     if sudo test -r $tmpdir/squashfs/LiveOS/rootfs.img; then
         sudo mount -r -o loop $tmpdir/squashfs/LiveOS/rootfs.img $tmpdir/root
         info mounted $tmpdir/squashfs/LiveOS/rootfs.img in $tmpdir/root
@@ -284,18 +289,24 @@ elif [ $image_type == qcow2 ]; then
 
     sudo mount -r -o ${ROOT_MOUNTOPTS:-noload} ${root_part} $tmpdir/root
     info mounted ${root_part} in $tmpdir/root
+    # do this after mounting works better, sometimes fails otherwise
+    root_fstype=$(lsblk -n -o fstype ${root_part})
     mounted_dirs="$tmpdir/root ${mounted_dirs:-}"
 
 elif [ $image_type == rootfsimage ]; then
 
     sudo mount ${loop_dev} $tmpdir/root
-    info mounted ${loop_dev} in $tmpdir/root
+    info mounted ${loop_dev} in $tmpdir/root XX1
+    # do this after mounting works better, sometimes fails otherwise
+    root_fstype=$(lsblk -n -o fstype ${loop_dev})
     mounted_dirs="$tmpdir/root ${mounted_dirs:-}"
-    
+
 else
 
     sudo mount ${loop_dev}${root_part} $tmpdir/root
-    info mounted ${loop_dev}${root_part} in $tmpdir/root
+    info mounted ${loop_dev}${root_part} in $tmpdir/root XX2
+    # do this after mounting works better, sometimes fails otherwise
+    root_fstype=$(lsblk -n -o fstype ${loop_dev}${root_part})
     mounted_dirs="$tmpdir/root ${mounted_dirs:-}"
 
 fi
@@ -386,7 +397,7 @@ file=etc/pam.d/common-auth
 if [ -r $destdir/$file ]; then
     # SuSE SLES seems to be configuring PAM so a passwordless root
     # acount doesn't work; tweak it
-    if ! grep -q "pam_unix.so.*nullok" $destdir/$file; then        
+    if ! grep -q "pam_unix.so.*nullok" $destdir/$file; then
         info "$file: allowing login to accounts with no password (adding 'nullok')"
         sudo sed -i 's/pam_unix.so/pam_unix.so\tnullok /' $destdir/$file
     fi
@@ -446,24 +457,6 @@ if [ -r $destdir/etc/inittab ]; then
     done
 fi
 
-if [ -r $destdir/etc/fstab ]; then
-    info $image_type: removing UUID from /etc/fstab, replacing with LABEL=tcf-swap
-    # otherwise boot tries to wait for UUID waiting to show up and our
-    # filesystem might have different UUIDs 
-    sudo sed -i 's/^UUID=.*swap/LABEL=tcf-swap swap/g' $destdir/etc/fstab
-
-    # SuSE seems to do this a lot, so we need to write it out
-    #
-    # UUID=<UUID> /      btrfs defaults               0 0
-    # UUID=<UUID> /var   btrfs subvol=/@/VAR defaults 0 0
-    # ...
-    # UUID=<UUID> /tmp   btrfs subvol=/@/VAR defaults 0 0
-    #
-    # Let's just remove it and let the normal boot process (kernel)
-    # mount the root filesystem
-    sudo sed -i '/^UUID=[-0-9a-fA-F]\+[ \t]\+.*btrfs/d' $destdir/etc/fstab 
-fi
-
 if test -r $destdir/usr/share/defaults/etc/profile.d/50-prompt.sh; then
     # Hardcode: disable ANSI script sequences, as they make
     # scripting way harder
@@ -500,3 +493,84 @@ EOF
         ;;
 esac
 
+
+#
+# Now generate metadata, might not be needed, but we always did it just in case
+#
+md=$tmpdir/.tcf.metadata.yaml
+cat > $md <<EOF
+# this is metadata to help setup the image in a target system
+#
+# The TCF POS client will look for it in IMAGEDIR/.tcf-metadata.yaml
+# and (keep it) in the final image for reference.
+
+EOF
+case $root_fstype in
+    btrfs)
+        cat >> $md <<EOF
+filesystems:
+  /:
+    fstype: btrfs
+    mkfs_opts: -f
+
+EOF
+        ;;
+    ext4)
+        # let it use defaults
+        cat >> $md <<EOF
+filesystems:
+  /:
+    fstype: ext4
+    mkfs_opts: -Fj
+EOF
+        ;;
+    *)
+
+esac
+
+cat >> $md <<EOF
+# \$ROOT    - location where rootfs is mounted
+# \$ROOTDEV - device which is mounted as root
+post_flash_script: |
+  cd \$ROOT
+EOF
+
+if [ $root_fstype == btrfs ]; then
+    # if there are volumes in a btrfs filesystem, re-create them
+    volumes=""
+    rename_commands=""
+    sudo btrfs subvolume list -oa $tmpdir/root > $tmpdir/volumes
+    while read _id id _gen gen _top _level top_level _path path; do
+        path=${path#<FS_TREE>/}
+        if echo $path | grep -q .snapshots/; then
+            continue
+        fi
+        capped_path=$(echo $path | cut -b3-)
+        if echo $capped_path | grep -q /; then
+            # volume has subdirs, which we can't create, so rename
+            renamed_path=@/${capped_path//\//_}
+            rename_commands="$rename_commands -e 's|subvol=/$path|subvol=/$renamed_path|' "
+            path=$renamed_path
+        fi
+        volumes="$volumes $path"
+    done < $tmpdir/volumes
+
+    if ! [ -z "$volumes" ]; then
+        cat >> $md <<EOF
+  # SuSE rootfs expects subvolumes in its btrfs filesystem; renamed the
+  # /usr/local and /boot/grub2/* subvolumes to not contain an internal
+  # slash  *because* the 'btrfs subvolumecreate' tool seems to be incapable of creating them
+  for v in $volumes; do \\
+      btrfs subvolume create \$v; \\
+  done
+EOF
+    fi
+    cat >> $md <<EOF
+  sed -i \\
+      -e "/^UUID=.*swap/s/^UUID=[-0-9a-fA-F]\+/LABEL=tcf-swap/g" \\
+      -e "/^UUID=.*btrfs/s/^UUID=[-0-9a-fA-F]\+/UUID=\$(lsblk -no uuid \$ROOTDEV)/g" \\
+      $rename_commands \\
+      etc/fstab
+EOF
+fi
+sudo mv $tmpdir/.tcf.metadata.yaml $destdir
