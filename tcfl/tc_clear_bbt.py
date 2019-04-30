@@ -277,9 +277,9 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
     """
 
     def __init__(self, path, t_file_path):
-        tcfl.tc.tc_c.__init__(self, commonl.name_make_safe(path),
+        tcfl.tc.tc_c.__init__(self, path,
                               # these two count as the ones that started this
-                              path, t_file_path)
+                              t_file_path, t_file_path)
         # t_file_path goes to self.kws['thisfile'], name to self.name
         # and self.kws['tc_name']
         self.rel_path_in_target = None
@@ -421,12 +421,14 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         # take it in. It has a bundle per line.
         bundles = [
             # always needs this, that installs 'bats'
-            'dev-utils'
+            'os-testsuite'
         ]
         requirements_fname = os.path.join(self.kws['srcdir'], 'requirements')
         if os.path.exists(requirements_fname):
             bundles += open(requirements_fname).read().split()
-
+        self.report_info("Bundle requirements: %s" % " ".join(bundles),
+                         dlevel = 1)
+        
         # if there is no distro mirror, use proxies -- HACK
         proxy_cmd = ""
         if 'http_proxy' in ic.kws:
