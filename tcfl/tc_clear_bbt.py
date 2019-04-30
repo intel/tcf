@@ -284,6 +284,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         # and self.kws['tc_name']
         self.rel_path_in_target = None
         self.t_files = [ t_file_path ]
+        self.deploy_done = False
 
     #: Specification of image to install
     #:
@@ -298,10 +299,24 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
     #: swupd mirror to use
     #:
     #: >>> tcfl.tc_clear_bbt.tc_clear_bbt_c.swupd_url = \
-    #: >>>      "http://koji-lts.png.intel.com/L1/update/"
+    #: >>>      "http://someupdateserver.com/update/"
     #:
+    #:
+    #: Note this can use keywords exported by the interconnect, eg:
+    #:
+    #: >>> tcfl.tc_clear_bbt.tc_clear_bbt_c.swupd_url = \
+    #: >>>      "http://%(MYFIELD)s/update/"
+    #:
+    #: where::
+    #:
+    #:   $ tcf list -vv nwa | grep MYFIELD
+    #:     MYFIELD: someupdateserver.com
     swupd_url = os.environ.get("SWUPD_URL", None)
+    
     image_tree = os.environ.get("IMAGE_TREE", None)
+
+    #: Do we add debug output to swupd?
+    swupd_debug = bool(os.environ.get("SWUPD_DEBUG", False))
 
     #: Mapping from TAPS output to TCF conditions
     #:
@@ -364,10 +379,10 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
                          persistent_name = 'bbt.git')
 
 
+#    @tcfl.tc.concurrently()
     def deploy(self, ic, target):
         # ensure network, DHCP, TFTP, etc are up and deploy
         ic.power.on()
-        ic.report_pass("powered on")
         if self.image_tree:
             target.deploy_tree_src = self.image_tree
         self.image = target.pos.deploy_image(
@@ -379,6 +394,19 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
                 self._deploy_bbt,
             ])
         target.report_info("Deployed %s" % self.image)
+        self.deploy_done = True
+
+# FIXME:
+#    @tcfl.tc.concurrently()
+#    def deploy_keep_active(self, ic, target):
+#        t0 = time.time()
+#        while not self.deploy_done:
+#            self.targets_active()
+#            time.sleep(5)
+#            t = time.time()
+#            self.report_info("DEBUG keeping targets active after %f"
+#                             % (t - t0), level = 0)
+#            t0 = t
 
     def start(self, ic, target):
         # fire up the target, wait for a login prompt
@@ -399,21 +427,27 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         if os.path.exists(requirements_fname):
             bundles += open(requirements_fname).read().split()
 
-        distro_mirror = ic.kws.get('distro_mirror', None)
-        if self.swupd_url or not distro_mirror:
-            # if there is no distro mirror, use proxies -- HACK
-            proxy_cmd = ""
-            if 'http_proxy' in ic.kws:
-                proxy_cmd += " http_proxy=%(http_proxy)s "\
-                    "HTTP_PROXY=%(http_proxy)s" % ic.kws
-            if 'https_proxy' in ic.kws:
-                proxy_cmd += " https_proxy=%(https_proxy)s "\
-                    "HTTPS_PROXY=%(https_proxy)s" % ic.kws
-            if proxy_cmd != "":
-                target.shell.run("export " + proxy_cmd)
+        # if there is no distro mirror, use proxies -- HACK
+        proxy_cmd = ""
+        if 'http_proxy' in ic.kws:
+            proxy_cmd += " http_proxy=%(http_proxy)s "\
+                "HTTP_PROXY=%(http_proxy)s" % ic.kws
+        if 'https_proxy' in ic.kws:
+            proxy_cmd += " https_proxy=%(https_proxy)s "\
+                "HTTPS_PROXY=%(https_proxy)s" % ic.kws
+        if proxy_cmd != "":
+            # if we are setting a proxy, make sure it doesn't do the
+            # local networks
+            proxy_cmd += \
+                " no_proxy=127.0.0.1,%(ipv4_addr)s/%(ipv4_prefix_len)s," \
+                "%(ipv6_addr)s/%(ipv6_prefix_len)d" \
+                " NO_PROXY=127.0.0.1,%(ipv4_addr)s/%(ipv4_prefix_len)s," \
+                "%(ipv6_addr)s/%(ipv6_prefix_len)d" % ic.kws            
+            target.shell.run("export " + proxy_cmd)
 
         if self.swupd_url:
-            target.shell.run("swupd mirror -s %s" % self.swupd_url)
+            swupd_url = self.swupd_url % ic.kws
+            target.shell.run("swupd mirror -s %s" % swupd_url)
         elif distro_mirror:
             # If the network exposes a distro mirror, use it -- this is
             # kind of a hack for now, because we assume that if there is a
@@ -430,7 +464,11 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         # time so the system knows we are using the target.
         self.tls.expecter.timeout = 240
         for bundle in bundles:
-            target.shell.run("time swupd bundle-add %s" % bundle)
+            if self.swupd_debug:
+                debug = "--debug"
+            else:
+                debug = ""
+            target.shell.run("time swupd bundle-add %s %s" % (debug, bundle))
 
     def _eval_one(self, target, t_file, prefix = ""):
         result = tcfl.tc.result_c(0, 0, 0, 0, 0)
