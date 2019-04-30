@@ -357,7 +357,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         # have the BBT tree in /opt
         # realpath -> undo symlinks, otherwise relpath() might get confused
         self.rel_path_in_target = os.path.relpath(
-            os.path.realpath(self.kws['thisfile']),
+            os.path.realpath(self.kws['srcdir']),
             os.path.realpath(bbt_tree))
 
         target.shell.run("mkdir -p /mnt/persistent.tcf.d/bbt.git")
@@ -415,6 +415,12 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         target.shell.up(user = 'root')
         target.report_pass("Booted %s" % self.image)
 
+        target.shell.run(
+            "test -f /etc/ca-certs/trusted/regenerate"
+            " && rm -rf /run/lock/clrtrust.lock"
+            " && clrtrust -v generate"
+            " && rm -f /etc/ca-certs/trusted/regenerate")
+        
         # Install bundles we need
         #
         # If there is a  'requirements' file alongside our .t file,
