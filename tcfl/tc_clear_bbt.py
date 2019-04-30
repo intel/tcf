@@ -445,6 +445,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
                 "%(ipv6_addr)s/%(ipv6_prefix_len)d" % ic.kws            
             target.shell.run("export " + proxy_cmd)
 
+        distro_mirror = ic.kws.get('distro_mirror', None)
         if self.swupd_url:
             swupd_url = self.swupd_url % ic.kws
             target.shell.run("swupd mirror -s %s" % swupd_url)
