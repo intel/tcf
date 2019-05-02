@@ -439,22 +439,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
                          dlevel = 1)
         
         # if there is no distro mirror, use proxies -- HACK
-        proxy_cmd = ""
-        if 'http_proxy' in ic.kws:
-            proxy_cmd += " http_proxy=%(http_proxy)s "\
-                "HTTP_PROXY=%(http_proxy)s" % ic.kws
-        if 'https_proxy' in ic.kws:
-            proxy_cmd += " https_proxy=%(https_proxy)s "\
-                "HTTPS_PROXY=%(https_proxy)s" % ic.kws
-        if proxy_cmd != "":
-            # if we are setting a proxy, make sure it doesn't do the
-            # local networks
-            proxy_cmd += \
-                " no_proxy=127.0.0.1,%(ipv4_addr)s/%(ipv4_prefix_len)s," \
-                "%(ipv6_addr)s/%(ipv6_prefix_len)d" \
-                " NO_PROXY=127.0.0.1,%(ipv4_addr)s/%(ipv4_prefix_len)s," \
-                "%(ipv6_addr)s/%(ipv6_prefix_len)d" % ic.kws            
-            target.shell.run("export " + proxy_cmd)
+        tcfl.tl.sh_export_proxy(ic, target)
 
         distro_mirror = ic.kws.get('distro_mirror', None)
         if self.swupd_url:
@@ -547,16 +532,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
 
     def eval(self, ic, target):
 
-        # Now always make the proxy available if there is
-        if 'http_proxy' in ic.kws:
-            target.shell.run("export http_proxy=%s" % ic.kws.get('http_proxy'))
-            target.shell.run("export HTTP_PROXY=%s" % ic.kws.get('http_proxy'))
-        if 'https_proxy' in ic.kws:
-            target.shell.run("export https_proxy=%s"
-                             % ic.kws.get('https_proxy'))
-            target.shell.run("export HTTPS_PROXY=%s"
-                             % ic.kws.get('https_proxy'))
-
+        tcfl.tl.sh_export_proxy(ic, target)
         # most testcases assume they are running from the same
         # directory where the .t is.
         target.shell.run("cd /opt/bbt.git/%s" % self.rel_path_in_target)

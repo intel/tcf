@@ -284,3 +284,44 @@ linux_root_prompts = re.compile(
     r'[^:]+:.*[#\$]'
     ')'
 )
+
+def sh_export_proxy(ic, target):
+    """
+    If the interconnect *ic* defines a proxy environment, issue a
+    shell command in *target* to export environment variables that
+    configure it:
+
+    >>> class test(tcfl.tc.tc_c):
+    >>>
+    >>>     def eval_some(self, ic, target):
+    >>>         ...
+    >>>         tcfl.tl.sh_export_proxy(ic, target)
+
+    would yield a command such as::
+
+       $ export  http_proxy=http://192.168.98.1:8888 \
+          https_proxy=http://192.168.98.1:8888 \
+          no_proxy=127.0.0.1,192.168.98.1/24,fc00::62:1/112 \
+          HTTP_PROXY=$http_proxy \
+          HTTPS_PROXY=$https_proxy \
+          NO_PROXY=$no_proxy
+
+    being executed in the target
+
+    """
+    proxy_cmd = ""
+    if 'http_proxy' in ic.kws:
+        proxy_cmd += " http_proxy=%(http_proxy)s "\
+            "HTTP_PROXY=%(http_proxy)s"
+    if 'https_proxy' in ic.kws:
+        proxy_cmd += " https_proxy=%(https_proxy)s "\
+            "HTTPS_PROXY=%(https_proxy)s"
+    if proxy_cmd != "":
+        # if we are setting a proxy, make sure it doesn't do the
+        # local networks
+        proxy_cmd += \
+            " no_proxy=127.0.0.1,%(ipv4_addr)s/%(ipv4_prefix_len)s," \
+            "%(ipv6_addr)s/%(ipv6_prefix_len)d" \
+            " NO_PROXY=127.0.0.1,%(ipv4_addr)s/%(ipv4_prefix_len)s," \
+            "%(ipv6_addr)s/%(ipv6_prefix_len)d"
+        target.shell.run("export " + proxy_cmd % ic.kws)
