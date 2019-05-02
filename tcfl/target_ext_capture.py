@@ -119,7 +119,7 @@ class extension(tc.target_extension_c):
         """
         This is the same :meth:`stop_and_get`
         """
-        return self.stop_and_get(capturer, local_file_name)
+        return self.stop_and_get(capturer, local_filename)
     
     def list(self):
         """
