@@ -241,7 +241,7 @@ def target_power_cycle_to_pos_pxe(target):
 # FIXME: what I don't like about this is that we have no info on the
 # interconnect -- this must require it?
 def target_power_cycle_to_normal_pxe(target):
-    target.report_info("Setting target not to PXE boot Provisioning OS")
+    target.report_info("POS: setting target not to PXE boot Provisioning OS")
     target.property_set("pos_mode", "local")
     target.power.cycle()
 
@@ -519,7 +519,8 @@ class extension(tc.target_extension_c):
         self.target.report_info(
             "POS: capability %s/%s by %s.%s" % (
                 capability, capability_value,
-                inspect.getsourcefile(capability_fn), capability_fn.__name__))
+                inspect.getsourcefile(capability_fn), capability_fn.__name__),
+            dlevel = 1)
         return capability_fn
 
 
@@ -1070,7 +1071,7 @@ EOF""")
                 target.report_info("POS: rsyncing %(image)s from "
                                    "%(rsync_server)s to %(root_part_dev)s"
                                    % kws,
-                                   dlevel = -1)
+                                   dlevel = -2)
                 target.shell.run(
                     "time rsync -HaAX --numeric-ids --delete --inplace"
                     " --exclude=/persistent.tcf.d"
@@ -1284,6 +1285,8 @@ class tc_pos_base(tc.tc_c):
 
     deploy_image_args = {}
 
+    login_user = 'root'
+    
     def deploy_50(self, ic, target):
         # ensure network, DHCP, TFTP, etc are up and deploy
         ic.power.on()
@@ -1299,7 +1302,7 @@ class tc_pos_base(tc.tc_c):
         # fire up the target, wait for a login prompt
         target.pos.boot_normal()
         target.shell.linux_shell_prompt_regex = tl.linux_root_prompts
-        target.shell.up(user = 'root')
+        target.shell.up(user = self.login_user)
         target.report_pass("Deployed %s" % self.image)
 
     def teardown_50(self):
