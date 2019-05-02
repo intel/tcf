@@ -470,7 +470,8 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
             else:
                 debug = ""
             count = 0
-            for count in range(1, 11):
+            top = 10
+            for count in range(1, top + 1):
                 output = target.shell.run(
                     "/usr/bin/time -f '\\nKPI-TIME=%%e\\n' "
                     "swupd bundle-add %s %s || echo FAI''LED"
@@ -478,7 +479,8 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
                 if not 'FAILED' in output:
                     # we assume it worked
                     break
-                target.shell.run("sleep 5s # failed? retrying in 5s")
+                target.shell.run("sleep 5s # failed %d/%d? retrying in 5s"
+                                 % (count, top))
             else:
                 target.report_data("BBT bundle-add retries",
                                    bundle, count)
