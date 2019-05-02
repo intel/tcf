@@ -471,13 +471,43 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         #
         # installing can take too much time, so we do one bundle at a
         # time so the system knows we are using the target.
+        #
+        # As well, swupd doesn't seem to be able to recover well from
+        # network glitches--so we do a loop where we retry a few times;
+        # we record how many tries we did and the time it took as KPIs
         self.tls.expecter.timeout = 240
         for bundle in bundles:
             if self.swupd_debug:
                 debug = "--debug"
             else:
                 debug = ""
-            target.shell.run("time swupd bundle-add %s %s" % (debug, bundle))
+            count = 0
+            for count in range(1, 11):
+                output = target.shell.run(
+                    "/usr/bin/time -f '\\nKPI-TIME=%%e\\n' "
+                    "swupd bundle-add %s %s || echo FAI''LED"
+                    % (debug, bundle), output = True)
+                if not 'FAILED' in output:
+                    # we assume it worked
+                    break
+                target.shell.run("sleep 5s # failed? retrying in 5s")
+            else:
+                target.report_data("BBT bundle-add retries",
+                                   bundle, count)
+                raise tcfl.tc.error_e("bundle-add failed too many times")
+            kpi_regex = re.compile("KPI-TIME=(?P<seconds>[0-9]+)",
+                                   re.MULTILINE)
+            m = kpi_regex.search(output)
+            if not m:
+                raise tcfl.tc.error_e(
+                    "Can't find regex %s in output" % kpi_regex.pattern,
+                    dict(output = output))
+            # maybe domain shall include the top level image type
+            # (clear:lts, clear:desktop...)
+            target.report_data("BBT bundle-add retries",
+                               bundle, int(count))
+            target.report_data("BBT bundle-add duration (seconds)",
+                               bundle, int(m.groupdict()['seconds']))
 
     def _eval_one(self, target, t_file, prefix = ""):
         result = tcfl.tc.result_c(0, 0, 0, 0, 0)
