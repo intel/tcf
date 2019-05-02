@@ -602,7 +602,7 @@ class file_c(report_c):
         Report data to log files for a possible failure report later
 
         We don't even check the levels, we log everything here by
-        INFO > 2.
+        INFO <= 4.
 
         We report to the file ``TAG LEVEL CODE MESSAGE`` which we'll
         parse later to generate the report.
@@ -618,7 +618,7 @@ class file_c(report_c):
         # Note we open the file for every thing we report -- we can be
         # running *A LOT* of stuff in parallel and run out of file
         # descriptors.
-        if tag == "INFO" and level > 2:
+        if tag == "INFO" and level > 4:
             return
         code = self._get_code()
         if not code in self.fs:
