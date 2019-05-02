@@ -286,6 +286,28 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         self.t_files = [ t_file_path ]
         self.deploy_done = False
 
+    def configure_10_set_relpath_set(self):
+        # calculate these here in case we skip deployment
+        self.bbt_tree = subprocess.check_output(
+            [
+                'git', 'rev-parse', '--flags', '--show-toplevel',
+                # this way it works if we are calling from inside bbt.git
+                # or from outside
+                os.path.basename(self.kws['thisfile']),
+            ],
+            stderr = subprocess.STDOUT,
+            cwd = os.path.dirname(self.kws['thisfile'])
+        ).strip()
+
+        # later we'll need to change to the path where the .t is to
+        # run bats on it (otherwise it seems to fail, FIXME: why?). So
+        # we get the relative path and save it, as in the target we'll
+        # have the BBT tree in /opt
+        # realpath -> undo symlinks, otherwise relpath() might get confused
+        self.rel_path_in_target = os.path.relpath(
+            os.path.realpath(self.kws['srcdir']),
+            os.path.realpath(self.bbt_tree))
+
     #: Specification of image to install
     #:
     #: default to whatever is configured on the environment (if any)
@@ -336,29 +358,9 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
     }
 
     def _deploy_bbt(self, _ic, target, _kws):
-        # we need to move the whole BBT tree to the target to run it,
-        # because what we need from it
-        # However, if we can't find the top level (eg: because it ain't
-        # a git tree...) well, too bad FIXME allow specifying it
-        # somehow else.
-        bbt_tree = subprocess.check_output(
-            [
-                'git', 'rev-parse', '--flags', '--show-toplevel',
-                # this way it works if we are calling from inside bbt.git
-                # or from outside
-                os.path.basename(self.kws['thisfile']),
-            ],
-            stderr = subprocess.STDOUT,
-            cwd = os.path.dirname(self.kws['thisfile'])
-        ).strip()
-        # later we'll need to change to the path where the .t is to
-        # run bats on it (otherwise it seems to fail, FIXME: why?). So
-        # we get the relative path and save it, as in the target we'll
-        # have the BBT tree in /opt
-        # realpath -> undo symlinks, otherwise relpath() might get confused
-        self.rel_path_in_target = os.path.relpath(
-            os.path.realpath(self.kws['srcdir']),
-            os.path.realpath(bbt_tree))
+        # note self.bbt_tree and self.rel_path_in_target are set by
+        # configure_00_set_relpath_set(); this way if we call withtout
+        # deploying, we still have them
 
         target.shell.run("mkdir -p /mnt/persistent.tcf.d/bbt.git")
         # try rsyncing a seed bbt.git repo from -- this speeds up
@@ -375,7 +377,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         target.report_info("POS: rsynced bbt.git from %(rsync_server)s "
                            "to /mnt/persistent.tcf.d/bbt.git" % _kws)
 
-        target.pos.rsync(bbt_tree.strip(), dst = '/opt/bbt.git',
+        target.pos.rsync(self.bbt_tree, dst = '/opt/bbt.git',
                          persistent_name = 'bbt.git')
 
 
@@ -409,6 +411,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
 #            t0 = t
 
     def start(self, ic, target):
+        ic.power.on()
         # fire up the target, wait for a login prompt
         target.power.cycle()
         target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
