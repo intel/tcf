@@ -472,9 +472,12 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
             count = 0
             top = 10
             for count in range(1, top + 1):
+                # We use -p so the format is the POSIX standard as
+                # defined in
+                # https://pubs.opengroup.org/onlinepubs/009695399/utilities/time.html
+                # STDERR section
                 output = target.shell.run(
-                    "/usr/bin/time -f '\\nKPI-TIME=%%e\\n' "
-                    "swupd bundle-add %s %s || echo FAILED''-%s"
+                    "time -p swupd bundle-add %s %s || echo FAILED''-%s"
                     % (debug, bundle, self.kws['tc_hash']), output = True)
                 if not 'FAILED-%(tc_hash)s' % self.kws in output:
                     # we assume it worked
@@ -485,7 +488,8 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
                 target.report_data("BBT bundle-add retries",
                                    bundle, count)
                 raise tcfl.tc.error_e("bundle-add failed too many times")
-            kpi_regex = re.compile("KPI-TIME=(?P<seconds>[0-9]+)",
+            # see above on time -p
+            kpi_regex = re.compile(r"^real[ \t]+(?P<seconds>[\.0-9]+)$",
                                    re.MULTILINE)
             m = kpi_regex.search(output)
             if not m:
@@ -497,7 +501,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
             target.report_data("BBT bundle-add retries",
                                bundle, int(count))
             target.report_data("BBT bundle-add duration (seconds)",
-                               bundle, int(m.groupdict()['seconds']))
+                               bundle, float(m.groupdict()['seconds']))
 
     def _eval_one(self, target, t_file, prefix = ""):
         result = tcfl.tc.result_c(0, 0, 0, 0, 0)
