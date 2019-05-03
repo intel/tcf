@@ -550,7 +550,8 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         # know we have copied to the remote:
         target.shell.run("cd /opt/bbt.git/any-bundle")
         for any_t_file_path in glob.glob(os.path.join(
-                self.kws['thisfile'], "..", "..", "any-bundle", "*.t")):
+                os.path.dirname(self.kws['thisfile']),
+                "..", "..", "any-bundle", "*.t")):
             any_t_file = os.path.basename(any_t_file_path)
             result += self._eval_one(
                 target, any_t_file,
