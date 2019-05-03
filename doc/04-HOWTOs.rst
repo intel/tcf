@@ -1176,8 +1176,36 @@ Note that resetting or power-cycling the board will create a new GDB
 target with a different port, so you will have to reconnect that GDB
 wo the new target remote reported by *tcf debug-info*.
 
-How can I quickly build and deploy an image to a target?
---------------------------------------------------------
+.. _howto_pos_list_deploy:
+
+How can I quickly flash a Linux target
+--------------------------------------
+
+When your server and targets are configured for Provisisoning OS
+support (target exports the *pos_capable* tag in ``tcf list -vv
+TARGET``), you can quickly flash the target *target1A*, which is
+connected to network *nwA* with::
+
+  $ IMAGE=fedora::29 tcf run -vvvt 'nwA or target1A' /usr/share/tcf/examples/test_pos_deploy.py
+
+to find our which images your server has available
+
+.. _howto_pos_list_images:
+
+To find out available images::
+
+  $ tcf run /usr/share/tcf/examples/test_pos_list_images.py
+  server10/nwa clear:live:25550::x86_64
+  server10/nwa clear:live:25890::x86_64
+  server10/nwa fedora::29::x86_64
+  server10/nwa yocto:core-minimal:2.5.1::x86_64
+  PASS0/	toplevel @local: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:00:06.635452) - passed
+
+See how to :ref:`install more images <ttbd_pos_deploying_images>`.
+
+
+How can I quickly build and deploy an image to a Zephyr target?
+---------------------------------------------------------------
 
 You can use the boilerplate testcase :download:`test_zephyr_boots.py
 <../examples/test_zephyr_boots.py>`, which will build any Zephyr app
