@@ -474,9 +474,9 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
             for count in range(1, top + 1):
                 output = target.shell.run(
                     "/usr/bin/time -f '\\nKPI-TIME=%%e\\n' "
-                    "swupd bundle-add %s %s || echo FAI''LED"
-                    % (debug, bundle), output = True)
-                if not 'FAILED' in output:
+                    "swupd bundle-add %s %s || echo FAILED''-%s"
+                    % (debug, bundle, self.kws['tc_hash']), output = True)
+                if not 'FAILED-%(tc_hash)s' % self.kws in output:
                     # we assume it worked
                     break
                 target.shell.run("sleep 5s # failed %d/%d? retrying in 5s"
@@ -505,7 +505,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         self.kw_set("t_file", t_file)
         output = target.shell.run(
             # remember we cd'ed into the directory
-            "bats --tap %s || echo FAI''LED-%s"
+            "bats --tap %s || echo FAILED''-%s"
             % (t_file, self.kws['tc_hash']),
             output = True)
         if 'bats: command not found' in output:
