@@ -21,6 +21,26 @@ import re
 import tc
 import tl
 
+boot_entries_ignore = [
+    # RHEL / Fedora
+    re.compile('(rescue|recovery mode)'),
+    # Android does this
+    re.compile('Debug'),
+]
+
+def _ignore_boot_entry(target, name, origin):
+    count = 0
+    for regex in boot_entries_ignore:
+        m = regex.search(name)
+        if m:
+            target.report_info(
+                "POS: ignoring boot entry '%s' @%s as it matched configured "
+                "regex #%d [%s] in tcfl.pos_uefi.boot_entries_ignore"
+                % (name, origin, count, regex.pattern))
+            return True
+        count += 1
+    return False
+
 
 def _linux_boot_guess_from_lecs(target, _image):
     """
@@ -43,8 +63,8 @@ def _linux_boot_guess_from_lecs(target, _image):
         lec = lec.strip()
         if not lec.startswith("/mnt/boot/loader/entries/"):
             continue
-        if 'rescue' in lec:
-            target.report_info("POS: ignoring rescue loader entry %s" % lec)
+        if _ignore_boot_entry(target, os.path.basename(lec),
+                              os.path.dirname(lec)):
             continue
         lecl.append(lec)
         target.report_info("Loader Entry found: %s" % lec, dlevel = 1)
@@ -81,14 +101,21 @@ def _linux_boot_guess_from_lecs(target, _image):
         elif command == 'options':
             options = value
 
+    # note we assume the LEC entries are in [/mnt]/boot because LEC
+    # specifies them relateive to the filesystem
+    if kernel:
+        kernel = "/boot/" + kernel
+    if initrd:
+        initrd = "/boot/" + initrd
     return kernel, initrd, options
 
 
 _grub_var_regex = re.compile(r"\${[^}]+}")
-_grub_menuentry_regex = re.compile("^[ \t]*menuentry[ \t]+'(?P<name>[^']+)'")
+_grub_menuentry_regex = re.compile(
+    "^[ \t]*(menuentry[ \t]+'(?P<name1>[^']+)'|title[ \t]+(?P<name2>.+)$)")
 _grub_linux_initrd_entry_regex = re.compile(
     "^[ \t]*("
-    r"linux[ \t]+(?P<linux>\S+)[ \t]+(?P<linux_args>.*)"
+    r"(kernel|linux)[ \t]+(?P<linux>\S+)[ \t]+(?P<linux_args>.*)"
     "|"
     r"initrd[ \t]+(?P<initrd>\S+)"
     ")$")
@@ -128,18 +155,50 @@ def _linux_boot_guess_from_grub_cfg(target, _image):
       	initrd	/boot/initrd-4.12.14-110-default
       }
 
+    There is also the older style::
+
+      default=0
+      timeout=6
+      splashimage=/grub/android-x86.xpm.gz
+      root (hd0,0)
+
+      title Android-x86 7.1-r2
+      	kernel /android-7.1-r2/kernel quiet root=/dev/ram0 androidboot.selinux=permissive vmalloc=192M buildvariant=userdebug SRC=/android-7.1-r2
+      	initrd /android-7.1-r2/initrd.img
+
+      title Android-x86 7.1-r2 (Debug mode)
+      	kernel /android-7.1-r2/kernel root=/dev/ram0 androidboot.selinux=permissive vmalloc=192M buildvariant=userdebug DEBUG=2 SRC=/android-7.1-r2
+      	initrd /android-7.1-r2/initrd.img
+
+      title Android-x86 7.1-r2 (Debug nomodeset)
+      	kernel /android-7.1-r2/kernel nomodeset root=/dev/ram0 androidboot.selinux=permissive vmalloc=192M buildvariant=userdebug DEBUG=2 SRC=/android-7.1-r2
+      	initrd /android-7.1-r2/initrd.img
+
+      title Android-x86 7.1-r2 (Debug video=LVDS-1:d)
+      	kernel /android-7.1-r2/kernel video=LVDS-1:d root=/dev/ram0 androidboot.selinux=permissive vmalloc=192M buildvariant=userdebug DEBUG=2 SRC=/android-7.1-r2
+      	initrd /android-7.1-r2/initrd.img
+
     We ignore all but menuentry, linux, initrd; initrd might be missing
 
     """
     # ignore errors if it does not exist
-    grub_cfg_path = target.shell.run("find /mnt/boot -iname grub.cfg",
-                                     output = True, trim = True)
+    grub_cfg_path = target.shell.run(
+        # /mnt/grub|menu.lst is android ISO x86
+        # /mnt/boot|grub.cfg most other distros
+        # ignore failures if the find process errors out
+        "find /mnt/grub /mnt/boot"
+        # redirect erros to /dev/null so they don't pollute the output we need
+        " -iname grub.cfg -o -iname menu.lst 2> /dev/null"
+        " || true",
+        output = True, trim = True)
     grub_cfg_path = grub_cfg_path.strip()
     if grub_cfg_path == "":	# no grub.cfg to rely on
+        target.report_info("POS/uefi: found no grub config")
         return None, None, None
+    target.report_info("POS/uefi: found grub config at %s" % grub_cfg_path)
     # read grub in, but only the parts we care for--it's faster
     grub_cfg = target.shell.run(
-        r" grep --color=never -w '\(menuentry\|linux\|initrd\)' %s"
+        r" grep --color=never -w '\(menuentry\|title\|kernel\|linux\|initrd\)' %s"
         % grub_cfg_path,
         output = True, trim = True)
 
@@ -166,6 +225,7 @@ def _linux_boot_guess_from_grub_cfg(target, _image):
         if entry_id != "":	# record existing
             target._grub_entries[entry_id] = entry
 
+    entry_count = 0
     for line in grub_cfg.splitlines():
         # match menuentry lines and save name, flushing previous data
         # if any
@@ -174,7 +234,16 @@ def _linux_boot_guess_from_grub_cfg(target, _image):
             # new entry!, close the previous
             _entry_record()
             entry = _entry()
-            entry.name = m.groupdict()['name']
+            gd = m.groupdict()
+            # the entries will always exist because that's the regex
+            # search output, but we need to check they are not empty
+            if gd['name1']:
+                entry.name = gd['name1']
+            elif gd['name2']:
+                entry.name = gd['name2']
+            else:
+                entry.name = "entry #%d" % entry_count
+            entry_count += 1
             continue
 
         # match linux/initrd lines and extract values
@@ -199,8 +268,8 @@ def _linux_boot_guess_from_grub_cfg(target, _image):
     # delete recovery / rescue stuff, we don't use it
     for entry_id in list(target._grub_entries.keys()):
         entry = target._grub_entries[entry_id]
-        if 'recovery mode' in entry.name \
-           or 'rescue' in entry.name:
+        if _ignore_boot_entry(target, entry.name,
+                              grub_cfg_path.replace("/mnt", "")):
             del target._grub_entries[entry_id]
 
     if len(target._grub_entries) > 1:
@@ -212,12 +281,11 @@ def _linux_boot_guess_from_grub_cfg(target, _image):
             dict(target = target, entries = entries))
 
     if not target._grub_entries:		# can't find?
-        del target._grub_entries
+        del target._grub_entries		# need no more
         return None, None, None
     entry = target._grub_entries.values()[0]
-    del target._grub_entries
-    return os.path.basename(entry.linux), \
-        os.path.basename(entry.initrd), entry.linux_args
+    del target._grub_entries			# need no more
+    return entry.linux, entry.initrd, entry.linux_args
 
 
 def _linux_boot_guess_from_boot(target, image):
@@ -265,9 +333,13 @@ def _linux_boot_guess_from_boot(target, image):
             target.report_info("Linux Live hack: adding 'rw' to cmdline",
                                dlevel = 2)
             options = "console=tty0 rw"
-        return kernel_versions[kver], \
-            initramfs_versions.get(kver, None), \
-            options
+        kernel = kernel_versions[kver]
+        if kernel:
+            kernel = "/boot/" + kernel
+        initrd = initramfs_versions.get(kver, None)
+        if initrd:
+            initrd = "/boot/" + initrd
+        return kernel, initrd, options
     elif len(kernel_versions) > 1:
         raise tc.blocked_e(
             "more than one Linux kernel in /boot; I don't know "
@@ -510,7 +582,7 @@ EOF
     # system partition mounted in /boot; remember they are in /mnt/,
     # our root partition
     # use dd instead of cp, it won't ask to override random params and such
-    target.shell.run("dd if=/mnt/boot/%(linux_kernel_file)s "
+    target.shell.run("dd if=/mnt/%(linux_kernel_file)s "
                      "of=/boot/%(linux_kernel_file_basename)s" % kws)
     # remember paths to the bootloader are relative to /boot
     target.shell.run("""\
@@ -521,7 +593,7 @@ options %(linux_options)s
 EOF
 """ % kws)
     if kws.get("linux_initrd_file", None):
-        target.shell.run("dd if=/mnt/boot/%(linux_initrd_file)s "
+        target.shell.run("dd if=/mnt/%(linux_initrd_file)s "
                          "of=/boot/%(linux_initrd_file_basename)s" % kws)
     # remember paths to the bootloader are relative to /boot
         target.shell.run("""\
