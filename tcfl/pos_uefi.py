@@ -352,11 +352,11 @@ def _linux_boot_guess(target, image):
     """
     Scan the boot configuration and extract it, so we can replicate it
     """
-    kernel, initrd, options = _linux_boot_guess_from_grub_cfg(target, image)
-    if kernel:
-        return kernel, initrd, options
     # systemd-boot
     kernel, initrd, options = _linux_boot_guess_from_lecs(target, image)
+    if kernel:
+        return kernel, initrd, options
+    kernel, initrd, options = _linux_boot_guess_from_grub_cfg(target, image)
     if kernel:
         return kernel, initrd, options
     # from files listed in /boot
