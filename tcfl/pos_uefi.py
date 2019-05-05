@@ -369,10 +369,10 @@ def _linux_boot_guess(target, image):
     return None, None, None
 
 
-def efibootmgr_setup(target):
+def efibootmgr_setup(target, boot_dev, partition):
     """
     Ensure EFI Boot Manager boots first to IPv4 and then to an entry
-    we are creating called Linux Boot Manager.
+    we are creating called TCF Localboot
 
     We do this because the configuration file the server drops in TFTP
     for syslinux to pick up for the MAC address of the target will
@@ -385,13 +385,16 @@ def efibootmgr_setup(target):
       BootCurrent: 0006
       Timeout: 0 seconds
       BootOrder: 0000,0006,0004,0005
-      Boot0000* Linux Boot Manager
+      Boot0000* TCF Localboot
       Boot0004* UEFI : Built-in EFI Shell
       Boot0005* UEFI : LAN : IP6 Intel(R) Ethernet Connection (3) I218-V
       Boot0006* UEFI : LAN : IP4 Intel(R) Ethernet Connection (3) I218-V
 
     Note the server can configure :ref:`how the UEFI network entry
     looks over the defaults <uefi_boot_manager_ipv4_regex>`.
+
+    Note we only touch the boot order once we have the local boot
+    entry created.
     """
     # this allows getting metadata from the target that tells us what
     # to look for in the UEFI thing
@@ -425,12 +428,24 @@ def efibootmgr_setup(target):
     entry_regex = re.compile(
         r"^Boot(?P<entry>[0-9A-F]{4})\*? (?P<name>.*)$", re.MULTILINE)
     matches = re.findall(entry_regex, output)
+    names = [ match[1] for match in matches ]
+    if not 'TCF Localboot' in names:
+        # Create the TCF Localboot entry; we make it boot the local
+        # default (BOOTX64) which in our case is installed by
+        # boot_config_multiroot() running bootctl. No altering boot
+        # order, we'll do it later atomically to make sure IPv4 PXE is
+        # always first.
+        output = target.shell.run(
+            "efibootmgr -C -d %s -p %d -L 'TCF Localboot'"
+            " -l \\EFI\\BOOT\\BOOTX64.EFI" % (boot_dev, partition),
+            output = True)
+        matches = re.findall(entry_regex, output)
     boot_order = [ ]
     local_boot_order = [ ]
     network_boot_order = [ ]
     seen = False
     for entry, name in matches:
-        if name in [ 'Linux Boot Manager', 'Linux bootloader' ]:
+        if name in [ 'TCF localboot' ]:
             # delete repeated entries
             if seen:
                 target.report_info("removing repeated EFI boot entry %s (%s)"
@@ -602,17 +617,20 @@ initrd /%(linux_initrd_file_basename)s
 EOF
 """ % kws)
 
-    # Install new or update existing
-    # don't do variables in the update case, as we will poke with them
-    # later on anyway
+    # Install new -- we wiped the /boot fs new anyway; if there are
+    # multiple options already, bootctl shall be able to handle it.
+    # Don't do variables in the any casewe will poke with them later
+    # on anyway. Why? Because there is space for a race condition that
+    # will leave us with the system booting off the localdisk vs the
+    # network for PXE--see efibootmgr_setup()
     target.shell.run("bootctl update --no-variables"
-                     " || bootctl install;"
+                     " || bootctl install --no-variables;"
                      " sync")
 
     # Now mess with the EFIbootmgr
     # FIXME: make this a function and a configuration option (if the
     # target does efibootmgr)
-    efibootmgr_setup(target)
+    efibootmgr_setup(target, "/dev/%s" % boot_dev, 1)
     # umount only if things go well
     # Shall we try to unmount in case of error? nope, we are going to
     # have to redo the whole thing anyway, so do not touch it, in case
@@ -631,6 +649,6 @@ def boot_config_fix(target):
         prompt_original = target.shell.linux_shell_prompt_regex
         target.shell.linux_shell_prompt_regex = tl.linux_root_prompts
         target.shell.up(user = 'root')
-        efibootmgr_setup(target)
+        efibootmgr_setup(target, target.kws['pos_boot_dev'], 1)
     finally:
         target.shell.linux_shell_prompt_regex = prompt_original
