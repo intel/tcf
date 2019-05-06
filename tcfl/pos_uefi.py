@@ -429,15 +429,20 @@ def efibootmgr_setup(target, boot_dev, partition):
         r"^Boot(?P<entry>[0-9A-F]{4})\*? (?P<name>.*)$", re.MULTILINE)
     matches = re.findall(entry_regex, output)
     names = [ match[1] for match in matches ]
-    if not 'TCF Localboot' in names:
+    if not 'TCF Localboot v2' in names:
         # Create the TCF Localboot entry; we make it boot the local
         # default (BOOTX64) which in our case is installed by
         # boot_config_multiroot() running bootctl. No altering boot
         # order, we'll do it later atomically to make sure IPv4 PXE is
         # always first.
         output = target.shell.run(
-            "efibootmgr -C -d %s -p %d -L 'TCF Localboot'"
-            " -l \\EFI\\BOOT\\BOOTX64.EFI" % (boot_dev, partition),
+            "efibootmgr -C -d %s -p %d -L 'TCF Localboot v2'"
+            # Python backslashes \\ -> \, so \\\\ becomes \\ that the
+            # shell convers to a single \. Yes, it was a very good
+            # idea to use as directory separator the same character
+            # everyone uses for escaping. Grunt.
+            # https://blogs.msdn.microsoft.com/larryosterman/2005/06/24/why-is-the-dos-path-character/
+            " -l \\\\EFI\\\\BOOT\\\\BOOTX64.EFI" % (boot_dev, partition),
             output = True)
         matches = re.findall(entry_regex, output)
     boot_order = [ ]
@@ -445,7 +450,7 @@ def efibootmgr_setup(target, boot_dev, partition):
     network_boot_order = [ ]
     seen = False
     for entry, name in matches:
-        if name in [ 'TCF localboot' ]:
+        if name == 'TCF Localboot v2':
             # delete repeated entries
             if seen:
                 target.report_info("removing repeated EFI boot entry %s (%s)"
@@ -454,6 +459,11 @@ def efibootmgr_setup(target, boot_dev, partition):
                 continue	# don't add it to the boot order
             seen = True
             local_boot_order.append(entry)
+        elif name in [ 'TCF Localboot', 'Linux bootloader',
+                       'Linux Boot Manager', 'ubuntu' ]:
+            target.report_info("removing old EFI boot entry %s (%s)"
+                               % (entry, name))
+            target.shell.run("efibootmgr -b %s -B" % entry)
         elif ipv4_regex.search(name):
             # Ensure ipv4 boot is first
             network_boot_order.append(entry)
