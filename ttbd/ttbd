@@ -505,7 +505,7 @@ def _property_get(target_id):
         info = ""
         with log_to_str_too(target.log, iostr_wrapper):
             if user_is_admin:
-                value = target.property_get(who_make(ticket), prop)
+                value = target.property_get(prop)
             elif not target.property_is_user(prop):
                 raise ttbl.test_target_not_admin_e(target)
             else:
