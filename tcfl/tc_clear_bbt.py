@@ -283,7 +283,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         # t_file_path goes to self.kws['thisfile'], name to self.name
         # and self.kws['tc_name']
         self.rel_path_in_target = None
-        self.t_files = [ t_file_path ]
+        self.t_files = [ os.path.basename(t_file_path) ]
         self.deploy_done = False
 
     def configure_10_set_relpath_set(self):
@@ -610,7 +610,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
             # there is a testcase for this directory already, append
             # the .t
             tc = cls.paths[dir_name]
-            tc.t_files.append(path)
+            tc.t_files.append(os.path.basename(path))
             tc.report_info("%s will be run by %s" % (file_name, dir_name),
                            dlevel = 3)
         else:
