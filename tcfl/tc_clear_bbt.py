@@ -379,6 +379,8 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
 
         target.pos.rsync(self.bbt_tree, dst = '/opt/bbt.git',
                          persistent_name = 'bbt.git')
+        # BBT checks will complain about the metadata file, so wipe it
+        target.shell.run("rm -f /mnt/.tcf.metadata.yaml")
 
 
 #    @tcfl.tc.concurrently()
