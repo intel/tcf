@@ -314,6 +314,11 @@ def mount_fs(target, image, boot_dev):
             "'%s' is needed (per %s)"
             % (root_part_dev, current_fstype, fstype, origin))
         _mkfs(target, root_part_dev, fstype, mkfs_opts)
+    else:
+        target.report_info(
+            "POS: no need to reformat %s because current format is '%s' and "
+            "'%s' is needed (per %s)"
+            % (root_part_dev, current_fstype, fstype, origin), dlevel = 1)
 
     for try_count in range(3):
         target.report_info("POS: mounting root partition %s onto /mnt "
