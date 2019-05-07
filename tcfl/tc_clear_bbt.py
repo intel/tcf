@@ -156,7 +156,7 @@ def tap_parse_output(output):
         if m:
             d = m.groupdict()
             tap_version = int(d['tap_version'])
-            if tap_version != 12:
+            if tap_version <= 12:
                 raise RuntimeError("%d: Can't process versions != 12", linecnt)
             continue
         m = tc_output.search(line)
