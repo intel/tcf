@@ -505,7 +505,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
             target.report_data("BBT bundle-add duration (seconds)",
                                bundle, float(m.groupdict()['seconds']))
 
-    def _eval_one(self, target, t_file, prefix = ""):
+    def _eval_one(self, target, t_file, prefix):
         result = tcfl.tc.result_c(0, 0, 0, 0, 0)
         self.report_info("running %s%s" % (prefix, t_file))
         self.kw_set("t_file", t_file)
@@ -549,8 +549,9 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         self.report_info("will run t_files %s" % " ".join(self.t_files),
                          dlevel = 1)
 
+        srcdir = os.path.join(self.kws['srcdir'])
         for t_file in sorted(self.t_files):
-            result += self._eval_one(target, t_file)
+            result += self._eval_one(target, t_file, srcdir + "/")
 
         # we scan for 'any' bundle testcases in the local FS, which we
         # know we have copied to the remote:
@@ -559,9 +560,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
                 os.path.dirname(self.kws['thisfile']),
                 "..", "..", "any-bundle", "*.t")):
             any_t_file = os.path.basename(any_t_file_path)
-            result += self._eval_one(
-                target, any_t_file,
-                prefix = self.rel_path_in_target + "/any#")
+            result += self._eval_one(target, any_t_file, srcdir + "/any#")
 
         return result
 
