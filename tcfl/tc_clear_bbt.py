@@ -415,8 +415,8 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
     def start(self, ic, target):
         ic.power.on()
         # fire up the target, wait for a login prompt
-        target.power.cycle()
-        target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+        target.pos.boot_normal()
+        target.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
         target.shell.up(user = 'root')
         target.report_pass("Booted %s" % self.image)
 
