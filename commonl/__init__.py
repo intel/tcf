@@ -570,7 +570,7 @@ def rm_f(filename):
         if e.errno != errno.ENOENT:
             raise
 
-def makedirs_p(dirname, mode):
+def makedirs_p(dirname, mode = None):
     """
     Create a directory tree, ignoring an error if it already exists
 
@@ -582,7 +582,8 @@ def makedirs_p(dirname, mode):
         # yes, this is a race condition--but setting the umask so
         # os.makedirs() gets the right mode would interfere with other
         # threads and processes.
-        os.chmod(dirname, mode)
+        if mode:
+            os.chmod(dirname, mode)
     except OSError:
         if not os.path.isdir(dirname):
             raise
@@ -1026,10 +1027,15 @@ def tcp_port_busy(port):
 # daemons that need to get assigned more than one port and then it is
 # impossible to get from them where did they bind (assuming they can
 # do it)
-def tcp_port_assigner(ports = 1):
+def tcp_port_assigner(ports = 1, port_range = (1025, 65530)):
+    assert isinstance(port_range, tuple) and len(port_range) == 2 \
+        and port_range[0] > 0 and port_range[1] < 65536 \
+        and port_range[0] + 10 < port_range[1], \
+        "port range has to be (A, B) with A > 0 and B < 65536, A << B; " \
+        "got " + str(port_range)
     max_tries = 1000
     while max_tries > 0:
-        port_base = random.randrange(1025, 65530)
+        port_base = random.randrange(port_range[0], port_range[1])
         for port_cnt in range(ports):
             if tcp_port_busy(port_base + port_cnt):
                 continue

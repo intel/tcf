@@ -827,7 +827,8 @@ class test_target(object):
                 if commonl.process_alive(pid, "/usr/bin/socat"):
                     return local_port
 
-            local_port = commonl.tcp_port_assigner()
+            local_port = commonl.tcp_port_assigner(
+                port_range = ttbl.config.tcp_port_range)
             ip_addr = ipaddress.ip_address(unicode(ip_addr))
             if isinstance(ip_addr, ipaddress.IPv6Address):
                 # beacause socat (and most others) likes it like that

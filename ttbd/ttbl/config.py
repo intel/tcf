@@ -172,3 +172,6 @@ cleanup_files_period = 60 # 60sec
 
 #: Age of the file after which it will be deleted
 cleanup_files_maxage = 86400 #  1day, count is in seconds, 24x60x60 sec
+
+#: Which TCP port range we can use
+tcp_port_range = (1025, 65530)

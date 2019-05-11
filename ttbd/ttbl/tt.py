@@ -1523,7 +1523,8 @@ class simics(
 
         # Write the command script here, in case anything changes in
         # the interpretation of the fields
-        simics_console_port = commonl.tcp_port_assigner(1)
+        simics_console_port = commonl.tcp_port_assigner(
+            1, port_range = ttbl.config.tcp_port_range)
         with open(cmd_file_name, "w") as cmd_file:
             simics_vars = dict(self.simics_vars)
             simics_vars['simics_console_port'] = simics_console_port

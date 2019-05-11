@@ -837,7 +837,8 @@ source [find board/snps_em_sk.cfg]
         #tcp_port_base = ttbl.tcp_port_assigner(2 + self.max_target)
         # Schew it, let's go random -- if it fails, it'll be restarted
         # with another one
-        tcp_port_base = commonl.tcp_port_assigner(2 + self.max_target)
+        tcp_port_base = commonl.tcp_port_assigner(2 + self.max_target,
+                                                  ttbl.config.tcp_port_range)
         self.log.debug("port base %d" % tcp_port_base)
         self.tt.fsdb.set("openocd.port", "%d" % tcp_port_base)
         self.log.debug("port base read: %s" % self.tt.fsdb.get("openocd.port"))

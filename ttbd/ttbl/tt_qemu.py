@@ -306,7 +306,8 @@ class tt_qemu(
 
     # power control interface
     def _qemu_launch(self, bsp, kws):
-        gdb_tcp_port = commonl.tcp_port_assigner(1)
+        gdb_tcp_port = commonl.tcp_port_assigner(
+            1, port_range = ttbl.config.tcp_port_range)
         self.fsdb.set("debug-%s-gdb-tcp-port" % bsp, "%s" % gdb_tcp_port)
         console_out_fname = os.path.join(
             self.state_dir, "console-%s.log" % bsp)
