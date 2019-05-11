@@ -3851,7 +3851,8 @@ def nw_default_targets_add(letter, pairs = 5):
             screen = "vnc0",
             vnc0 = ttbl.capture.generic_snapshot(
                 "VNC :%d" % count,
-                "gvnccapture -q localhost:%s $OUTPUTFILENAME$" % count
+                "gvnccapture -q localhost:%s $OUTPUTFILENAME$" % count,
+                mimetype = "image/png"
             ),
         ))
         count += 1

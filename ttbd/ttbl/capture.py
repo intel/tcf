@@ -50,13 +50,15 @@ class impl_c(object):
     :param bool stream: if this capturer is capable of streaming; an
       streaming capturer has to be told to start and then stop and
       return the capture as a file.
+    :param str mimetype: MIME type of the capture output, eg image/png
     """
-    def __init__(self, stream):
+    def __init__(self, stream, mimetype = None):
         # can be False (just gets), True (start/stop+get)
         self.stream = stream
         # Path to the user directory, updated on every request_process
         # call
         self.user_path = None
+        self.mimetype = mimetype
 
     def start(self, target, capturer):
         """
@@ -160,7 +162,14 @@ class interface(ttbl.tt_interface):
         Called when the interface is added to a target to initialize
         the needed target aspect (such as adding tags/metadata)
         """
-        target.tags_update(dict(capture = " ".join(self.impls.keys())))
+        capturers = []
+        for capturer, impl in self.impls.iteritems():
+            ctype = "stream" if impl.stream else "snapshot"
+            descr = capturer + ":" + ctype
+            if impl.mimetype:
+                descr += ":" + impl.mimetype
+            capturers.append(descr)
+        target.tags_update(dict(capture = " ".join(capturers)))
 
     def start(self, who, target, capturer):
         """
@@ -276,7 +285,7 @@ class vnc(impl_c):
     """
     def __init__(self, port):
         self.port = port
-        impl_c.__init__(self, False)
+        impl_c.__init__(self, False, "image/png")
 
     def start(self, target, capturer):
         impl_c.start(self, target, capturer)
@@ -306,7 +315,7 @@ class ffmpeg(impl_c):
     """
     def __init__(self, video_device):
         self.video_device = video_device
-        impl_c.__init__(self, False)
+        impl_c.__init__(self, False, "image/png")
 
     def start(self, target, capturer):
         impl_c.start(self, target, capturer)
@@ -373,6 +382,8 @@ class generic_snapshot(impl_c):
 
       note how *$OUTPUTFILENAME$* is replaced with the outputfile.
 
+    :param str mimetype: MIME type of the capture output, eg image/png
+
     :param list(str) pre_commands: (optional) list of commands to
       execute before the command line, to for example, set parameters
       eg:
@@ -383,7 +394,7 @@ class generic_snapshot(impl_c):
       >>> ]
 
     """
-    def __init__(self, name, cmdline, pre_commands = None):
+    def __init__(self, name, cmdline, pre_commands = None, mimetype = None):
         assert isinstance(name, basestring)
         assert isinstance(cmdline, basestring)
         self.name = name
@@ -395,7 +406,7 @@ class generic_snapshot(impl_c):
                              "list of pre_commands have to be strings"
         else:
             self.pre_commands = []
-        impl_c.__init__(self, False)
+        impl_c.__init__(self, False, mimetype)
 
     def start(self, target, capturer):
         impl_c.start(self, target, capturer)
@@ -483,8 +494,10 @@ class generic_stream(impl_c):
     :param int wait_to_kill: (optional) time to wait since we send a
       SIGTERM to the capturing process until we send a SIGKILL, so it
       has time to close the capture file. Defaults to one second.
+    :param str mimetype: MIME type of the capture output, eg video/avi
     """
-    def __init__(self, name, cmdline, pre_commands = None, wait_to_kill = 1):
+    def __init__(self, name, cmdline, pre_commands = None, wait_to_kill = 1,
+                 mimetype = None):
         assert isinstance(name, basestring)
         assert isinstance(cmdline, basestring)
         assert wait_to_kill > 0
