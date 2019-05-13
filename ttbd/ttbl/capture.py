@@ -151,7 +151,7 @@ class interface(ttbl.tt_interface):
                 raise AssertionError(
                     "capturer '%s' implementation is type %s, " \
                     "expected ttbl.capture.impl_c or str"
-                    % (capturer, type(impl)._name__))
+                    % (capturer, type(impl).__name__))
 
         # Path to the user directory, updated on every request_process
         # call
@@ -351,48 +351,86 @@ class ffmpeg(impl_c):
 
 class generic_snapshot(impl_c):
     """This is a generic snaptshot capturer which can be used to invoke any
-    program that will do capture a snapshot; in a server
-    configuration file:
+    program that will do capture a snapshot.
 
-    >>>
-    >>> target = ttbl.config.targets['TARGETNAME']
-    >>> target.interface_add("capture", ttbl.capture.interface(
-    >>>
-    >>>         # capture screenshots from VNC, return a PNG
-    >>>         vnc0 = ttbl.capture.generic_snapshot(
-    >>>             "VNC :%d" % count,
-    >>>             "gvnccapture -q localhost:%s $OUTPUTFILENAME$" % count
-    >>>         ),
-    >>>
+    For example, in a server configuration file, define a capturer
+    that will connect to VNC and take a screenshot:
+
+    >>> capture_screenshot_vnc = ttbl.capture.generic_snapshot(
+    >>>     "%(id)s VNC @localhost:%(vnc_port)s",
+    >>>     # need to make sure vnc_port is defined in the target's tags
+    >>>     "gvnccapture -q localhost:%(vnc_port)s %(output_file_name)s",
+    >>>     mimetype = "image/png"
+    >>> )
+
+    Then attach the capture interface to the target with:
+
+    >>> ttbl.config.targets['TARGETNAME'].interface_add(
+    >>>     "capture",
+    >>>     ttbl.capture.interface(
+    >>>         vnc0 = capture_screenshot_vnc,
     >>>         ...
     >>>     )
     >>> )
-    >>>
 
+    Now the command::
 
-    Before taking the snapshot, the pre-commands are executed and then
-    the cmdline is invoked and the cmline shall capture the snapshot
-    and place it in the file *$OUTPUTFILENAME$*.
+      $ tcf capture-get TARGETNAME vnc0 file.png
 
-    :param str name: name for error messges from this capturer
+    will download to ``file.png`` a capture of the target's screen via
+    VNC.
+
+    :param str name: name for error messages from this capturer.
+
+      E.g.: `%(id)s HDMI`
+
     :param str cmdline: commandline to invoke the capturing the
-      snapshot. Eg::
+      snapshot.
 
-        capture-from-device -i /dev/video1 -o $OUTPUTFILENAME$
-
-      note how *$OUTPUTFILENAME$* is replaced with the outputfile.
+      E.g.: `ffmpeg -i /dev/video-%(id)s`; in this case udev
+      has been configured to create a symlink called
+      */dev/video-TARGETNAME* so we can uniquely identify the device
+      associated to screen capture for said target.
 
     :param str mimetype: MIME type of the capture output, eg image/png
 
-    :param list(str) pre_commands: (optional) list of commands to
+    :param list pre_commands: (optional) list of commands (str) to
       execute before the command line, to for example, set parameters
       eg:
 
       >>> pre_commands = [
       >>>     # set some video parameter
-      >>>     "v4l-ctl -i /dev/video1 -someparam 45",
+      >>>     "v4l-ctl -i /dev/video-%(id)s -someparam 45",
       >>> ]
 
+    Note all string parameters are `%(keyword)s` expanded from the
+    target's tags (as reported by `tcf list -vv TARGETNAME`), such as:
+
+    - output_file_name: name of the file where to dump the capture
+      output; file shall be overwritten.
+    - id: target's name
+    - type: target's type
+    - ... (more with `tcf list -vv TARGETNAME`)
+
+
+    **System configuration**
+
+    It is highly recommendable to configure *udev* to generate device
+    nodes named after the target's name, so make configuration simpler
+    and isolate the system from changes in the device enumeration
+    order.
+
+    For example, adding to `/etc/udev/rules.d/90-ttbd.rules`::
+
+      SUBSYSTEM == "video4linux", ACTION == "add", \
+          KERNEL=="video*", \
+          ENV{ID_SERIAL} == "SERIALNUMBER", \
+          SYMLINK += "video-TARGETNAME" \
+
+    where *SERIALNUMBER* is the serial number of the device that
+    captures the screen for *TARGETNAME*. Note it is recommended to
+    call the video interface *video-SOMETHING* so that tools such as
+    *ffmpeg* won't be confused.
     """
     def __init__(self, name, cmdline, pre_commands = None, mimetype = None):
         assert isinstance(name, basestring)
@@ -416,15 +454,17 @@ class generic_snapshot(impl_c):
         impl_c.stop_and_get(self, target, capturer)
         file_name = "%s/%s-%s-%s" % (self.user_path, target.id, capturer,
                                      time.strftime("%Y%m%d-%H%M%S"))
+        kws = dict(output_file_name = file_name)
+        kws.update(target.kws)
         try:
             for command in self.pre_commands:
-                subprocess.check_call(command.split())
+                subprocess.check_call((command % kws).split())
             # replace $OUTPUTFILENAME$ with the name of the output file
             cmdline = []
             for i in self.cmdline:
                 if '$OUTPUTFILENAME$' in i:
                     i = i.replace("$OUTPUTFILENAME$", file_name)
-                cmdline.append(i)
+                cmdline.append(i % kws)
             target.log.info("snapshot command: %s" % " ".join(cmdline))
             subprocess.check_call(cmdline, cwd = "/tmp", shell = False,
                                   close_fds = True,
@@ -432,7 +472,7 @@ class generic_snapshot(impl_c):
         except subprocess.CalledProcessError as e:
             target.log.error(
                 "%s: capturing of '%s' with '%s' failed: (%d) %s"
-                % (target.id, self.name, " ".join(cmdline), e.returncode,
+                % (target.id, self.name % kws, " ".join(cmdline), e.returncode,
                    e.output))
             raise
         # tell the caller to stream this file to the client
@@ -442,59 +482,73 @@ class generic_snapshot(impl_c):
 class generic_stream(impl_c):
     """
     This is a generic stream capturer which can be used to invoke any
-    program that will do capture the stream for a while; in a server
-    configuration file:
+    program that will do capture the stream for a while.
 
-    >>>
-    >>> target = ttbl.config.targets['TARGETNAME']
-    >>> target.interface_add("capture", ttbl.capture.interface(
+    For example, in a server configuration file, define a capturer
+    that will record video with ffmpeg from a camera that is pointing
+    to the target's monitor or an HDMI capturer:
+
+    >>> capture_vstream_ffmpeg_v4l = ttbl.capture.generic_snapshot(
+    >>>    "%(id)s screen",
+    >>>    "ffmpeg -i /dev/video-%(id)s-0"
+    >>>    " -f avi -qscale:v 10 -y %(output_file_name)s",
+    >>>     mimetype = "video/avi",
+    >>>     wait_to_kill = 0.25,
+    >>>     pre_commands = [
+    >>>         "v4l2-ctl -d /dev/video-%(id)s-0 -c focus_auto=0"
+    >>>     ]
+    >>> )
+
+    Then attach the capture interface to the target with:
+
+    >>> ttbl.config.targets['TARGETNAME'].interface_add(
+    >>>     "capture",
+    >>>     ttbl.capture.interface(
+    >>>         hdmi0_vstream = capture_vstream_ffmpeg_v4l,
     >>>         ...
-    >>>
-    >>>         # capture a stream from a webcam pointing to the screen
-    >>>         video1_stream = ttbl.capture.generic_stream(
-    >>>             "Video stream #1",
-    >>>             # Capture with FFMPEG the webcam and Alsa's system
-    >>>             # device, as there is no pulse input as a daemon
-    >>>             # -y forces overriding the file
-    >>>             "ffmpeg -i /dev/video0  -f alsa -i sysdefault "
-    >>>             " -f avi -qscale:v 10 -y $OUTPUTFILENAME$",
-    >>>             pre_commands = [
-    >>>                 # set the input volume so it doesn't clip
-    >>>                 "amixer -D sysdefault sset Capture 75%",
-    >>>             ],
-    >>>             # give it time to save when killing ffmpeg
-    >>>             wait_to_kill = 2
-    >>>         )
     >>>     )
     >>> )
-    >>>
 
+    Now, when the client runs to start the capture::
 
-    When the capturer is started, the pre-commands are executed (eg:
-    to set volumes) and then the cmdline is invoked. The cmdline is
-    expected to start capturing to the $OUTPUTFILENAME$ until killed.
+      $ tcf capture-start TARGETNAME hdmi0_vstream
+
+    will execute in the server the pre-commands::
+
+      $ v4l2-ctl -d /dev/video-TARGETNAME-0 -c focus_auto=0
+
+    and then start recording with::
+
+      $ ffmpeg -i /dev/video-TARGETNAME-0 -f avi -qscale:v 10 -y SOMEFILE
+
+    so that when we decide it is done, in the client::
+
+      $ tcf capture-get TARGETNAME hdmi0_vstream file.avi
+
+    it will stop recording and download the video file with the
+    recording to `file.avi`.
 
     :param str name: name for error messges from this capturer
     :param str cmdline: commandline to invoke the capturing of the
-      stream, eg::
-
-        capture-from-device -i /dev/video1 -o $OUTPUTFILENAME$
-
-      note how *$OUTPUTFILENAME$* is replaced with the outputfile.
-
-    :param list(str) pre_commands: (optional) list of commands to
+      stream
+    :param str mimetype: MIME type of the capture output, eg video/avi
+    :param list pre_commands: (optional) list of commands (str) to
       execute before the command line, to for example, set
-      volumes. eg:
-
-      >>> pre_commands = [
-      >>>     # set the input volume so it doesn't clip
-      >>>     "amixer -D sysdefault sset Capture 75%",
-      >>> ]
-
+      volumes.
     :param int wait_to_kill: (optional) time to wait since we send a
       SIGTERM to the capturing process until we send a SIGKILL, so it
       has time to close the capture file. Defaults to one second.
-    :param str mimetype: MIME type of the capture output, eg video/avi
+
+    Note all string parameters are `%(keyword)s` expanded from the
+    target's tags (as reported by `tcf list -vv TARGETNAME`), such as:
+
+    - output_file_name: name of the file where to dump the capture
+      output; file shall be overwritten.
+    - id: target's name
+    - type: target's type
+    - ... (more with `tcf list -vv TARGETNAME`)
+
+    For more information, look at :class:`ttbl.capture.generic_snapshot`.
     """
     def __init__(self, name, cmdline, pre_commands = None, wait_to_kill = 1,
                  mimetype = None):
@@ -511,7 +565,7 @@ class generic_stream(impl_c):
                              "list of pre_commands have to be strings"
         else:
             self.pre_commands = []
-        impl_c.__init__(self, True)
+        impl_c.__init__(self, True, mimetype)
 
 
     def start(self, target, capturer):
@@ -520,17 +574,19 @@ class generic_stream(impl_c):
                                "capturer-" + capturer + ".pid")
         file_name = "%s/%s-%s-%s" % (self.user_path, target.id, capturer,
                                      time.strftime("%Y%m%d-%H%M%S"))
+        kws = dict(output_file_name = file_name)
+        kws.update(target.kws)
         target.property_set("capturer-%s-output" % capturer, file_name)
         try:
             for command in self.pre_commands:
                 target.log.info("streaming pre-command: %s" % command)
-                subprocess.check_call(command.split())
+                subprocess.check_call((command % kws).split())
             # replace $OUTPUTFILENAME$ with the name of the output file
             cmdline = []
             for i in self.cmdline:
                 if '$OUTPUTFILENAME$' in i:
                     i = i.replace("$OUTPUTFILENAME$", file_name)
-                cmdline.append(i)
+                cmdline.append(i % kws)
             target.log.info("streaming command: %s" % " ".join(cmdline))
             p = subprocess.Popen(cmdline, cwd = "/tmp", shell = False,
                                  close_fds = True,
@@ -540,7 +596,7 @@ class generic_stream(impl_c):
         except subprocess.CalledProcessError as e:
             target.log.error(
                 "%s: starting capture of '%s' output with '%s' failed: (%d) %s"
-                % (target.id, self.name, " ".join(cmdline), e.returncode,
+                % (target.id, self.name % kws, " ".join(cmdline), e.returncode,
                    e.output))
             raise
 
@@ -548,11 +604,14 @@ class generic_stream(impl_c):
         impl_c.stop_and_get(self, target, capturer)
         pidfile = os.path.join(target.state_dir,
                                "capturer-" + capturer + ".pid")
+        file_name = target.property_get("capturer-%s-output" % capturer)
+        kws = dict(output_file_name = file_name)
+        kws.update(target.kws)
         try:
-            file_name = target.property_get("capturer-%s-output" % capturer)
             target.property_set("capturer-%s-output" % capturer, None)
-            commonl.process_terminate(pidfile, tag = "capture: ",
-                                      wait_to_kill = self.wait_to_kill)
+            commonl.process_terminate(
+                pidfile, tag = "capture:" + self.name % kws,
+                wait_to_kill = self.wait_to_kill)
             return dict(stream_file = file_name)
         except OSError as e:
             # adb might have died already

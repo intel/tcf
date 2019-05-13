@@ -3792,6 +3792,18 @@ def tinytile_add(name,
     )
 
 
+#: A capturer to take screenshots from VNC
+#:
+#: Note the fields are target's tags and others specified in
+#: :class:`ttbl.capture.generic_snapshot` and
+#: :class:`ttbl.capture.generic_stream`.
+capture_screenshot_vnc = ttbl.capture.generic_snapshot(
+    "%(id)s VNC @localhost:%(vnc_port)s",
+    # need to make sure vnc_port is defined in the target's tags
+    "gvnccapture -q localhost:%(vnc_port)s %(output_file_name)s",
+    mimetype = "image/png"
+)
+
 def nw_default_targets_add(letter, pairs = 5):
     """
     Add the default targets to a configuration
@@ -3849,11 +3861,7 @@ def nw_default_targets_add(letter, pairs = 5):
         target.interface_add("capture", ttbl.capture.interface(
             # capture screenshots from VNC, return a PNG
             screen = "vnc0",
-            vnc0 = ttbl.capture.generic_snapshot(
-                "VNC :%d" % count,
-                "gvnccapture -q localhost:%s $OUTPUTFILENAME$" % count,
-                mimetype = "image/png"
-            ),
+            vnc0 = capture_screenshot_vnc,
         ))
         count += 1
 
