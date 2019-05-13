@@ -1012,6 +1012,8 @@ provides access to functions to set TCF's configuration.
 You can add new paths to parse with ``--config-path`` and force
 specific files to be read with ``--config-file``. See *tcf --help*.
 
+.. _howto_release_target:
+
 How do I release a target I don't own?
 --------------------------------------
 
@@ -1029,9 +1031,49 @@ overusing a target). It will say something like::
   requests.exceptions.HTTPError: 400: TARGETNAME: tried to use busy target (owned by 'MYUSERNAME:TICKETSTRING')
 
 As a user, you can always force release any of your own locks with
-`-f`.
+`-f` or with `-t TICKETSTRING`::
 
+  $ tcf -t TICKETSTRING release TARGETNAME
 
+How do I keep a target(s) reserved and powered-on while I fuzz with
+them?
+-------------------------------------------------------------------
+
+First make sure you are not blocking anyone::
+
+  $ while tcf acquire TARGET1 TARGET2 TARGET3...; do sleep 15s; done &
+  $ tcf_pid=$!
+
+this keeps acquiring the target every 10 seconds, which tells the
+server you are actively using it, so it won't release them nor power
+them off.
+
+When done::
+
+  $ kill $tcf_pid
+  $ tcf release TARGET1 TARGET2 TARGET3...
+
+You can *tcf run* without releasing them::
+
+  $ tcf -t " " run --no-release -vvt "TARGET1 or TARGET2 or TARGET3 ..." test_mytc.py
+
+Note the following:
+
+-  ``-t " "`` tells TCF to *use no ticket*, as we have made the reservation
+   with no ticket
+
+- ``--no-release`` tells TCF to not release the targets when done
+
+this way, once the test completes (let's say, with failure), we can
+log in via the serial console to do some debugging::
+
+  $ tcf console-write -i TARGET2
+
+Do not forget to kill the *while* process and release the targets when
+done, otherwise others won't be able to use them. If someone has left
+a target taken, it can be released following :ref:`these instructions
+<howto_release_target>`
+  
 How can I debug a target?
 -------------------------
 
