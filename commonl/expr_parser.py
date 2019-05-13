@@ -267,7 +267,7 @@ def ast_expr(ast, env):
     elif ast[0] == "exists":
         return True if ast_sym(ast[1], env) else False
     elif ast[0] == ":":
-        return True if re.compile(ast[2]).match(ast_sym(ast[1], env)) else False
+        return True if re.compile(ast[2]).search(ast_sym(ast[1], env)) else False
 
 mutex = threading.Lock()
 
