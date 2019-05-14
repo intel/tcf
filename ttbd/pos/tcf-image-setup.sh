@@ -420,7 +420,7 @@ elif ! [ -d $destdir ]; then
         # we need to remove the initrd activation, as that's what
         # triggers the installation process 
         info $destdir: disabling installation process
-        sudo sed -i 's/^initrd/# Commented by $@#initrd/' \
+        sudo sed -i "s/^initrd/# Commented by $@\n#initrd/" \
              $destdir/boot/loader/entries/*.conf 
     fi
 
