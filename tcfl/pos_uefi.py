@@ -472,12 +472,24 @@ def efibootmgr_setup(target, boot_dev, partition):
         else:
             # if the entry wasn't in the original boot order, ignore it
             pass
-    target.shell.run("efibootmgr -o " + ",".join(
-        network_boot_order + local_boot_order + boot_order))
+
+    # only update the boot order if it did change -- some machines
+    # seem to get borked if we do this continuously
+    new_order = network_boot_order + local_boot_order + boot_order
+    if new_order != boot_order_original:
+        target.report_info(
+            "POS: updating EFI boot order to %s from %s"
+            % (",".join(new_order), ",".join(boot_order_original)))
+        target.shell.run("efibootmgr -o " + ",".join(
+            network_boot_order + local_boot_order + boot_order))
+    else:
+        target.report_info("POS: maintaining EFI boot order %s"
+                           % ",".join(boot_order_original))
 
     # We do not set the next boot order to be our system; why?
     # multiple times, the system gets confused when it has to do
-    # So we use syslinux to always control it
+    # So we use syslinux to always control it; also, seems that if we
+    # access too frequently, the BIOS API gets corrupted
 
 def boot_config_multiroot(target, boot_dev, image):
     """
