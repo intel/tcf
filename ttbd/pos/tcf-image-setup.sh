@@ -9,10 +9,20 @@ function help() {
     cat <<EOF
 $progname DIRECTORY IMAGEFILE [IMAGETYPE]
 
-Clearlinux:
+Clear Linux:
+
+  $ wget https://download.clearlinux.org/releases/29390/clear/clear-29390-live.img.xz
+  $ $progname clear:live:29390::x86_64 clear-29390-live.img.xz
+
+Clear Linux Desktop:
+
+  $ wget https://download.clearlinux.org/releases/29400/clear/clear-29400-live-desktop.iso.xz
+  $ $progname clear:desktop:29400::x86_64 clear-29400-live.img.xz
+
+Clear Linux (older versions):
 
   $ wget https://download.clearlinux.org/releases/25930/clear/clear-25930-live.img.xz
-  $ $progname clear:live:25930::x86_64 clear-25930-live.img.xz
+  $ $progname clear:live:25930::x86_64 clear-25930-live.img.xz clear
 
 Yocto:
 
@@ -33,7 +43,7 @@ rootfsimage:
 
   takes a whole image that is a single root filesystem
 
-Using QEMU
+Using QEMU (Any other distros, Ubuntu, SLES, etc...)
 
 1. create a 20G virtual disk:
 
@@ -164,9 +174,12 @@ if [ -z "$image_type" ]; then
         ubuntu-*.iso)
             # assuming these are common
             image_type=debian;;
+        clear-*-live-*.iso)
+            image_type=clear_live_iso
+            ;;
         # clear, yocto core image minimal
         clear*)
-            image_type=clear;;
+            image_type=clear2;;
         core*wic)
             image_type=yocto;;
         Fedora-*)
@@ -191,6 +204,9 @@ case "$image_type" in
     clear2)
         boot_part=p${BOOT_PARTITION:-1}
         root_part=p${ROOT_PARTITION:-3}
+        ;;
+    clear_live_iso)
+        root_part=p${ROOT_PARTITION:-1}
         ;;
     yocto)
         boot_part=p${BOOT_PARTITION:-1}
@@ -259,6 +275,31 @@ elif [ $image_type = android ]; then
     sudo mount -o loop ${loop_dev} $tmpdir/iso
     mounted_dirs="$tmpdir/iso ${mounted_dirs:-}"
     info mounted ${loop_dev} in $tmpdir/iso
+
+elif [ $image_type == clear_live_iso ]; then
+
+    # Newer clear versions
+    # losetup -Pf clear-live....iso
+    # mount /dev/loopXp1 /mnt
+    # ls -l /mnt
+    #drwxr-xr-x. 1 root root 2048 May 10 14:17 EFI
+    #drwxr-xr-x. 1 root root 2048 May 10 14:17 images
+    #drwxr-xr-x. 1 root root 2048 May 10 14:17 isolinux
+    #drwxr-xr-x. 1 root root 2048 May 10 14:17 kernel
+    #drwxr-xr-x. 1 root root 2048 May 10 14:17 loader
+    # no need for p0, all in p1
+    # /mnt/images/rootfs.img -> image
+    # mkdir ROOT/boot
+    # cp /mnt/EFI ROOT/boot/EFI
+    # cp /mnt/loader ROOT/boot/loader
+    mkdir -p $tmpdir/iso
+    sudo mount -o loop ${loop_dev}p1 $tmpdir/iso
+    mounted_dirs="$tmpdir/iso ${mounted_dirs:-}"
+    info mounted ${loop_dev}p1 in $tmpdir/iso
+
+    sudo mount -r -o loop $tmpdir/iso/images/rootfs.img $tmpdir/root
+    info mounted $tmpdir/iso/rootfs.img $tmpdir/root
+    mounted_dirs="$tmpdir/root ${mounted_dirs:-}"
 
 elif [ $image_type == fedoralive -o $image_type == tcflive ]; then
 
@@ -373,12 +414,22 @@ elif ! [ -d $destdir ]; then
     info $destdir: diffing verification
     sudo diff  --no-dereference -qrN $tmpdir/root/. $destdir/.
     info $destdir: setting up
+    if [ $image_type == clear_live_iso ]; then
+        sudo mkdir $destdir/boot
+        sudo cp -a $tmpdir/iso/EFI $tmpdir/iso/loader $destdir/boot
+        # we need to remove the initrd activation, as that's what
+        # triggers the installation process 
+        info $destdir: disabling installation process
+        sudo sed -i 's/^initrd/# Commented by $@#initrd/' \
+             $destdir/boot/loader/entries/*.conf 
+    fi
 
 else
 
     warning assuming image already in $destdir, setting up
 
 fi
+
 
 # Remove the root password and unset the counters so you are not
 # forced to change it -- we want passwordless login on the serial
