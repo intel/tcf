@@ -288,7 +288,7 @@ class ssh(tc.target_extension_c):
             s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             self._returncode_eval(e.returncode)
-            commonl.raise_from(non_zero_e(
+            commonl.raise_from(nonzero_e(
                 "failed SCP local:%s -> target:%s" % (src, dst),
                 dict(returncode = e.returncode,
                      output = e.output,
@@ -335,7 +335,7 @@ class ssh(tc.target_extension_c):
             s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             self._returncode_eval(e.returncode)
-            commonl.raise_from(non_zero_e(
+            commonl.raise_from(nonzero_e(
                 "failed SCP local:%s -> target:%s" % (src, dst),
                 dict(returncode = e.returncode,
                      output = e.output,
