@@ -61,25 +61,14 @@ def _disk_partition(target):
     # we assume we are going to work on the boot device
     device_basename = target.kws['pos_boot_dev']
     device = "/dev/" + device_basename
-    device_basename = os.path.basename(device)	    # /dev/BLAH -> BLAH
     target.shell.run('swapoff -a || true')	    # in case we autoswapped
 
     # find device size (FIXME: Linux specific)
-    output = target.shell.run(
-        'cat /sys/block/%s/size /sys/block/%s/queue/physical_block_size'
-        % (device_basename, device_basename), output = True)
-    regex = re.compile("^(?P<blocks>[0-9]+)\n"
-                       "(?P<block_size>[0-9]+)$", re.MULTILINE)
-    m = regex.search(output)
-    if not m:
-        raise tc.blocked_e(
-            "can't find block and physical blocksize",
-            { 'output': output, 'pattern': regex.pattern,
-              'target': target }
-        )
-    blocks = int(m.groupdict()['blocks'])
-    block_size = int(m.groupdict()['block_size'])
-    size_gb = blocks * block_size / 1024 / 1024 / 1024
+    dev_info = None
+    for blockdevice in target.pos.fsinfo.get('blockdevices', []):
+        if blockdevice['name'] == device_basename:
+            dev_info = blockdevice
+    size_gb = dev_info['size'] / 1024 / 1024 / 1024
     target.report_info("POS: %s is %d GiB in size" % (device, size_gb),
                        dlevel = 2)
 
