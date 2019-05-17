@@ -6,3 +6,5 @@ pymongo
 python-Levenshtein
 requests
 setuptools
+pykwalify
+
