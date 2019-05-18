@@ -109,6 +109,8 @@ import time
 import traceback
 import types
 
+# FIXME: rename want_name to role
+
 # We multithread to run testcases in parallel
 #
 # When massively running threads in production environments, we end up
@@ -936,7 +938,8 @@ class target_c(object):
         report.report_c.report(level, level + alevel, level + ulevel, self,
                                "INFO", message, attachments)
 
-    def report_data(self, domain, name, value, expand = True):
+    def report_data(self, domain, name, value, expand = True,
+                    level = None, dlevel = 0):
         """Report measurable data
 
         When running a testcase, if data is collected that has to be
@@ -975,8 +978,14 @@ class target_c(object):
         if expand:
             domain = domain % self.kws
             name = name % self.kws
+        if level == None:		# default args are computed upon def'on
+            level = 1
+        assert isinstance(level, int)
+        assert isinstance(dlevel, int)
+        level += dlevel
         report.report_c.report(
-            2, 1000, 1000, self, "DATA", domain + "::" + name + "::%s" % value,
+            level, 1000, 1000, self,
+            "DATA", domain + "::" + name + "::%s" % value,
             dict(domain = domain, name = name, value = value))
 
     def report_tweet(self, what, result, extra_report = "",
