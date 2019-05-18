@@ -591,53 +591,122 @@ def boot_config_multiroot(target, boot_dev, image):
     # is corrupted or whatever; we'll mount it in /boot (which now is
     # the POS /boot)
 
-    # mkfs.vfat /boot, mount it
-    target.report_info("mounting %(boot_part_dev)s in /boot" % kws)
-    target.shell.run(
-        "mkfs.fat -F32 /dev/%(boot_part_dev)s; "
-        " sync;"
-        " mount /dev/%(boot_part_dev)s /boot; "
-        " mkdir -p /boot/loader/entries; "
-        """\
-cat <<EOF > /boot/loader/entries/README
-This boot configuration was written by TCF's AFAPLI client hack; it is
-meant to boot multiple Linux distros coexisting in the
-same drive.
+    #
+    # Mount the /boot fs
+    #
+    # Try to assume it is ok, try to repair it if not; rsync the
+    # kernels in there, it is faster for repeated operation/
+    #
+    target.report_info("POS/EFI: checking %(boot_part_dev)s" % kws)
+    output = target.shell.run(
+        "fsck.fat -aw /dev/%(boot_part_dev)s || true" % kws,
+        output = True, trim = True)
 
-Uses systemd-boot/gumniboot; partition one is /boot (EFI System
-Partition), where this file is located. Partition 2 is dedicated to
-swap. Partition 3 is dedicated to home/scratch, which can be wiped
-and reset everytime a new test is run.
+    # FIXME: parse the output to tell if there was a problem; when bad
+    # but recovered, we'll see
+    #
+    # 0x41: Dirty bit is set. Fs was not properly unmounted and some data may be corrupt.
+    #  Automatically removing dirty bit.
+    # Performing changes.
+    # /dev/sda1: 11 files, 4173/261372 clusters
 
-Partitions 4-on are different root filesystems which can be reused by
-the system as needed for booting different images (aka: distros
-configured in particular ways).
-EOF
-""" % kws)
+    # When ok
+    #
+    ## $ sudo fsck.vfat -wa /dev/nvme0n1p1
+    ## fsck.fat 4.1 (2017-01-24)
+    ## /dev/sda1: 39 files, 2271/33259 clusters
+
+    # When really hosed it won't print the device line, so we look for
+    # that
+    #
+    ## $ fsck.vfat -wa /dev/trash
+    ## fsck.fat 4.1 (2017-01-24)
+    ## Logical sector size (49294 bytes) is not a multiple of the physical sector size.
+    good_regex = re.compile("^/dev/%(boot_part_dev)s: [0-9]+ files, "
+                            "[0-9]+/[0-9]+ clusters$" % kws, re.MULTILINE)
+    if not good_regex.search(output):
+        target.report_info(
+            "POS/EFI: /dev/%(boot_part_dev)s: formatting EFI "
+            "filesystem, fsck couldn't fix it"
+            % kws, dict(output = output))
+        target.shell.run("mkfs.fat -F32 /dev/%(boot_part_dev)s; sync" % kws)
+    target.report_info(
+        "POS/EFI: /dev/%(boot_part_dev)s: mounting in /boot" % kws)
+    target.shell.run(" mount /dev/%(boot_part_dev)s /boot; "
+                     " mkdir -p /boot/loader/entries " % kws)
+
+    # Do we have enough space? if not, remove the oldest stuff that is
+    # not the file we are looking for
+    # This prints
+    ## $ df --output=pcent /boot
+    ## Use%
+    ##   6%
+    output = target.shell.run("df --output=pcent /boot", output = True)
+    regex = re.compile(r"^\s*(?P<percent>[\.0-9]+)%$", re.MULTILINE)
+    match = regex.search(output)
+    if not match:
+        raise tc.error_e("Can't determine the amount of free space in /boot",
+                         dict(output = output))
+    used_space = float(match.groupdict()['percent'])
+    if used_space > 75:
+        target.report_info(
+            "POS/EFI: /dev/%(boot_part_dev)s: freeing up space" % kws)
+        # List files in /boot, sort by last update (when we rsynced
+        # them)
+        ## 2018-10-29+08:48:48.0000000000	84590	/boot/EFI/BOOT/BOOTX64.EFI
+        ## 2018-10-29+08:48:48.0000000000	84590	/boot/EFI/systemd/systemd-bootx64.efi
+        ## 2019-05-14+13:25:06.0000000000	7192832	/boot/vmlinuz-4.12.14-110-default
+        ## 2019-05-14+13:25:08.0000000000	9688340	/boot/initrd-4.12.14-110-default
+        ## 2019-05-14+13:25:14.0000000000	224	/boot/loader/entries/tcf-boot.conf
+        ## 2019-05-14+13:25:14.0000000000	54	/boot/loader/loader.conf
+        output = target.shell.run(
+            # that double \\ needed so the shell is the one using it
+            # as a \t, not python converting to a sequence
+            "find /boot/ -type f -printf '%T+\\t%s\\t%p\\n' | sort",
+            output = True, trim = True)
+        # delete the first half entries over 300k except those that
+        # match the kernels we are installing
+        to_remove = []
+        _linux_initrd_file = kws.get("linux_initrd_file", "%%NONE%%")
+        if linux_initrd_file == None:
+            _linux_initrd_file = "%%NONE%%"
+        for line in output.splitlines():
+            _timestamp, size_s, path = line.split(None, 3)
+            size = int(size_s)
+            if size > 300 * 1024 \
+               and not kws['linux_kernel_file_basename'] in path \
+               and not _linux_initrd_file in path:
+                to_remove.append(path)
+        # get older half and wipe it--this means the first half, as we
+        # sort from older to newer
+        to_remove = to_remove[:len(to_remove)//2]
+        for path in to_remove:
+            # we could do them in a single go, but we can exceed the
+            # command line length -- lazy to optimize it
+            target.shell.run("rm -f %s" % path)
 
     # Now copy all the files needed to boot to the root of the EFI
     # system partition mounted in /boot; remember they are in /mnt/,
     # our root partition
-    # use dd instead of cp, it won't ask to override random params and such
-    target.shell.run("dd if=/mnt/%(linux_kernel_file)s "
-                     "of=/boot/%(linux_kernel_file_basename)s" % kws)
+    target.shell.run(
+        "time -p rsync --force --inplace /mnt/%(linux_kernel_file)s"
+        " /boot/%(linux_kernel_file_basename)s" % kws)
+    if kws.get("linux_initrd_file", None):
+        target.shell.run(
+            "time -p rsync --force --inplace /mnt/%(linux_initrd_file)s"
+            " /boot/%(linux_initrd_file_basename)s" % kws)
     # remember paths to the bootloader are relative to /boot
-    target.shell.run("""\
+    # merge these two
+    tcf_boot_conf = """\
 cat <<EOF > /boot/loader/entries/tcf-boot.conf
 title TCF-driven local boot
 linux /%(linux_kernel_file_basename)s
 options %(linux_options)s
-EOF
-""" % kws)
+"""
     if kws.get("linux_initrd_file", None):
-        target.shell.run("dd if=/mnt/%(linux_initrd_file)s "
-                         "of=/boot/%(linux_initrd_file_basename)s" % kws)
-    # remember paths to the bootloader are relative to /boot
-        target.shell.run("""\
-cat <<EOF >> /boot/loader/entries/tcf-boot.conf
-initrd /%(linux_initrd_file_basename)s
-EOF
-""" % kws)
+        tcf_boot_conf += "initrd /%(linux_initrd_file_basename)s\n"
+    tcf_boot_conf += "EOF\n"
+    target.shell.run(tcf_boot_conf % kws)
 
     # Install new -- we wiped the /boot fs new anyway; if there are
     # multiple options already, bootctl shall be able to handle it.
