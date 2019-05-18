@@ -561,6 +561,8 @@ class extension(tc.target_extension_c):
             # None specified, let's take from the target config
             boot_to_pos_fn = self.cap_fn_get('boot_to_pos', 'pxe')
 
+        bios_boot_time = int(target.kws.get("bios_boot_time", 0))
+
         for tries in range(3):
             target.report_info("POS: rebooting into Provisioning OS [%d/3]"
                                % tries)
@@ -570,7 +572,7 @@ class extension(tc.target_extension_c):
             if pos_prompt:
                 target.shell.linux_shell_prompt_regex = pos_prompt
             try:
-                target.shell.up(timeout = timeout)
+                target.shell.up(timeout = bios_boot_time + timeout)
             except tc.error_e as e:
                 outputf = e.attachments_get().get('console output', None)
                 if outputf:

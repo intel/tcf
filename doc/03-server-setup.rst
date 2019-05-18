@@ -932,7 +932,7 @@ c. Make the kernel and initrd for POS available via Apache for
          # dracut -v -H --kver $(ls /home/ttbd/images/tcf-live/x86_64/lib/modules) \
                 -k /home/ttbd/images/tcf-live/x86_64/lib/modules/* \
                --kernel-image /home/ttbd/images/tcf-live/x86_64/boot/vmlinuz-* \
-               --add-drivers "r8169 virtio_net ftdi_sio" \
+               --add-drivers "igb r8169 virtio_net ftdi_sio" \
                -m "nfs base network kernel-modules kernel-network-modules" \
                /home/ttbd/public_html/x86_64/initramfs-tcf-live
 
@@ -944,6 +944,7 @@ c. Make the kernel and initrd for POS available via Apache for
        needed drivers:
        
        - *ftdi_sio* drivers for FTDI USB serial ports
+       - *igb* Intel Gigabit adapters
        - *r8169* for some Realtek network cards
        - *virtio* for running under QEMU
 
