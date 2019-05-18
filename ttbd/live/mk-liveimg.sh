@@ -85,6 +85,11 @@
 #   - Swap will be added if it has TCF-swap as a serial-number/label
 #
 
+if [ "${RELEASEVER:-}" != "" ]; then
+    releasever="--releasever=$RELEASEVER"
+else
+    releasever=""
+fi
 dirname=$(dirname $(readlink -e $0))
 
 if ! [ -d tcf-live ]; then
@@ -154,5 +159,5 @@ done
 rm -f tcf-live.iso
 # note tcf-live.ks will include the files we created here
 # give -E to sudo so the proxy environment we have set is included
-sudo -E livecd-creator -vvv --config=$dirname/tcf-live.ks --fslabel=tcf-live \
+sudo -E livecd-creator $releasever -vvv --config=$dirname/tcf-live.ks --fslabel=tcf-live \
      --cache=$PWD/cache --tmpdir=$PWD/tmp
