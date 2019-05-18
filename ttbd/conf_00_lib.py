@@ -3804,6 +3804,8 @@ capture_screenshot_vnc = ttbl.capture.generic_snapshot(
     mimetype = "image/png"
 )
 
+vnc_port_count = 0
+
 def nw_default_targets_add(letter, pairs = 5):
     """
     Add the default targets to a configuration
@@ -3838,7 +3840,8 @@ def nw_default_targets_add(letter, pairs = 5):
         ),
         ic_type = "ethernet"
     )
-
+    
+    global vnc_port_count
     count = 0
     # Add QEMU Fedora Linux targets with addresses .4+.5, .6+.7, .7+.8...
     # look in TCF's documentation for how to generate tcf-live.iso
@@ -3855,15 +3858,15 @@ def nw_default_targets_add(letter, pairs = 5):
                      ipv4_addr = "192.168.%d.%d" % (nw_idx, v),
                      ipv6_addr = "fc00::%02x:%02x" % (nw_idx, v),
                      extra_cmdline = "-cpu host" \
-                     " -display vnc=0.0.0.0:%d" % count)
+                     " -display vnc=0.0.0.0:%d" % vnc_port_count)
         target = ttbl.config.targets[target_name]
-        target.tags_update(dict(vnc_port = count))
+        target.tags_update(dict(vnc_port = vnc_port_count))
         target.interface_add("capture", ttbl.capture.interface(
             # capture screenshots from VNC, return a PNG
             screen = "vnc0",
             vnc0 = capture_screenshot_vnc,
         ))
-        count += 1
+        vnc_port_count += 1
 
 
 class minnowboard_EFI_boot_grub_pc(ttbl.tt_power_control_impl):
