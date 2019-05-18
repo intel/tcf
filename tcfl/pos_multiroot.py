@@ -68,7 +68,7 @@ def _disk_partition(target):
     for blockdevice in target.pos.fsinfo.get('blockdevices', []):
         if blockdevice['name'] == device_basename:
             dev_info = blockdevice
-    size_gb = dev_info['size'] / 1024 / 1024 / 1024
+    size_gb = int(dev_info['size']) / 1024 / 1024 / 1024
     target.report_info("POS: %s is %d GiB in size" % (device, size_gb),
                        dlevel = 2)
 
