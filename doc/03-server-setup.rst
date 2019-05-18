@@ -932,15 +932,24 @@ c. Make the kernel and initrd for POS available via Apache for
          # dracut -v -H --kver $(ls /home/ttbd/images/tcf-live/x86_64/lib/modules) \
                 -k /home/ttbd/images/tcf-live/x86_64/lib/modules/* \
                --kernel-image /home/ttbd/images/tcf-live/x86_64/boot/vmlinuz-* \
-               --add-drivers "r8169 virtio_net" \
+               --add-drivers "r8169 virtio_net ftdi_sio" \
                -m "nfs base network kernel-modules kernel-network-modules" \
                /home/ttbd/public_html/x86_64/initramfs-tcf-live
 
        .. warning:: ``--kver`` is needed to not default to the kernel
-                    version of the system running the command.
+                    version of the system running the co/mmand.
                     ``-H`` is needed to ensure a generic initrd that
                     works with multiple machines is created.
 
+       needed drivers:
+       
+       - *ftdi_sio* drivers for FTDI USB serial ports
+       - *r8169* for some Realtek network cards
+       - *virtio* for running under QEMU
+
+       Note if you run as non-root (not using *sudo* or *su*) *dracut*
+       will fail to generate the initrd properly due to some bugs.
+         
    iii. Make everything readable to the public::
 
           # chmod a+rX -R /home/ttbd/public_html
