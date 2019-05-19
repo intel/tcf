@@ -1311,6 +1311,43 @@ class tc_pos_base(tc.tc_c):
         tl.console_dump_on_failure(self)
 
 
+def cmdline_pos_capability_list(args):
+    if not args.target:
+        for name, data in capability_fns.iteritems():
+            for value, fn in data.iteritems():
+                print "%s: %s @%s.%s()" % (
+                    name, value, inspect.getsourcefile(fn), fn.__name__)
+    else:
+        for target in args.target:
+            _rtb, rt = tc.ttb_client._rest_target_find_by_id(target)
+            pos_capable = rt.get('pos_capable', {})
+            if isinstance(pos_capable, bool):
+                # backwards compat
+                pos_capable = {}
+            unknown_caps = set(pos_capable.keys())
+            for cap_name in capability_fns:
+                cap_value = pos_capable.get(cap_name, None)
+                cap_fn = capability_fns[cap_name].get(cap_value, None)
+                if cap_name in unknown_caps:
+                    unknown_caps.remove(cap_name)
+                if cap_value:
+                    print"%s.%s: %s @%s.%s" % (
+                        target, cap_name, cap_value,
+                        inspect.getsourcefile(cap_fn), cap_fn.__name__)
+                else:
+                    print "%s.%s: NOTDEFINED @n/a" % (target, cap_name)
+            if unknown_caps:
+                print "%s: unknown capabilities defined: %s" % (
+                    target, " ".join(unknown_caps))
+
+def cmdline_setup(argsp):
+    ap = argsp.add_parser("pos-capability-list", help = "List available "
+                          "POS capabilities or those each target exports")
+    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
+                    nargs = "*", default = None, help = "Target's name")
+    ap.set_defaults(func = cmdline_pos_capability_list)
+
+
 import pos_multiroot	# pylint: disable = wrong-import-order,wrong-import-position,relative-import
 import pos_uefi		# pylint: disable = wrong-import-order,wrong-import-position,relative-import
 capability_register('mount_fs', 'multiroot', pos_multiroot.mount_fs)
