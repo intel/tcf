@@ -15,7 +15,10 @@ Also allows basic file transmission over serial line.
 import binascii
 import collections
 import re
+import time
+
 import tc
+
 from . import msgid_c
 
 
@@ -71,7 +74,7 @@ class shell(tc.target_extension_c):
     linux_shell_prompt_regex = re.compile(r"[0-9]+ \$")
 
     def up(self, tempt = None,
-           user = None, login_regex = re.compile('login:'),
+           user = None, login_regex = re.compile('login:'), delay_login = 0,
            password = None, password_regex = re.compile('Password:'),
            shell_setup = True, timeout = 120):
         """
@@ -85,6 +88,10 @@ class shell(tc.target_extension_c):
         def _login(target):
             # If we have login info, login to get a shell prompt
             target.expect(login_regex)
+            if delay_login:
+                target.report_info("Delaying %ss before login in"
+                                   % delay_login)
+                time.sleep(delay_login)
             target.send(user)
             if password:
                 target.expect(password_regex)
