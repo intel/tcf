@@ -115,6 +115,11 @@ Metada is specified:
 Common metadata
 ---------------
 
+- *bios_boot_time* (int): approx time in seconds the system takes to
+  boot before it can be half useful (like BIOS can interact, etc).
+
+  Considered as zero if missing.
+
 - *id* (str): name of the target
 
 - *fullid* (str): Full name of the target that includes the server's
