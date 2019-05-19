@@ -7,14 +7,13 @@
 
 import logging
 import os
+import pprint
 import time
-
-import usb.core
-import usb.util
 
 import commonl
 import commonl.requirements
 import ttbl
+
 import pyghmi.ipmi.command
 
 class pci(ttbl.tt_power_control_impl):
@@ -40,8 +39,8 @@ class pci(ttbl.tt_power_control_impl):
     >>>          "machine1",
     >>>          power_control = [
     >>>              ttbl.cm_serial.pc(),
-    >>>              ttbl.ipmi.pci("server1.internal.net", "bmc_admin", "secret"),
-    >>>              ttbl.pc.delay(5),
+    >>>              ttbl.ipmi.pci("server1.internal.net", 
+    >>>                            "bmc_admin", "secret"),
     >>>          ],
     >>>          serial_ports = [
     >>>              "pc",
@@ -73,29 +72,37 @@ class pci(ttbl.tt_power_control_impl):
 
     def _setup(self):
         # this can run in multiple processes, so make sure this is
-        # setup for this process
-        if self.bmc == None:
-            self.bmc = pyghmi.ipmi.command.Command(self.bmc_hostname,
-                                                   self.user, self.password)
+        # setup for this process each time we connect, because we
+        # don't know how long this is going to be open and the session
+        # expires
+        self.bmc = pyghmi.ipmi.command.Command(self.bmc_hostname,
+                                               self.user, self.password)
 
     def power_on_do(self, target):
         self._setup()
         result = self.bmc.set_power('on', wait = True)
-        target.log.error("DEBUG: off returned %s" % result)
+        target.log.info("ipmi %s@%s on returned %s"
+                        % (self.user, self.bmc_hostname, result))
 
     def power_off_do(self, target):
         self._setup()
         result = self.bmc.set_power('off', wait = True)
-        target.log.error("DEBUG: off returned %s" % result)
+        target.log.info("ipmi %s@%s off returned %s"
+                        % (self.user, self.bmc_hostname, result))
 
     def power_get_do(self, target):
         self._setup()
         data = self.bmc.get_power()
-        state = data.get('power_state', None)
+        target.log.info("ipmi %s@%s get_power returned %s"
+                        % (self.user, self.bmc_hostname,
+                           pprint.pformat(data)))
+        state = data.get('powerstate', None)
         if state == 'on':
             return True
         elif state == 'off':
             return False
         else:
-            target.log.error("IPMI get_power() call returned no state")
+            target.log.info("ipmi %s@%s get_power returned no state: %s"
+                            % (self.user, self.bmc_hostname,
+                               pprint.pformat(data)))
             return None
