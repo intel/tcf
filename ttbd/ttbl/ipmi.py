@@ -8,6 +8,7 @@
 import logging
 import os
 import pprint
+import subprocess
 import time
 
 import commonl
@@ -17,9 +18,6 @@ import ttbl
 import pyghmi.ipmi.command
 
 class pci(ttbl.tt_power_control_impl):
-
-    class notfound_e(ValueError):
-        pass
 
     """
     Power controller to turn on/off a server via IPMI
@@ -106,3 +104,58 @@ class pci(ttbl.tt_power_control_impl):
                             % (self.user, self.bmc_hostname,
                                pprint.pformat(data)))
             return None
+
+class pci_ipmitool(ttbl.tt_power_control_impl):
+    """
+    Power controller to turn on/off a server via IPMI
+
+    Same as :class:`pci`, but executing *ipmitool* in the shell
+    instead of using a Python library.
+
+    """
+    def __init__(self, bmc_hostname, user = None, password = None):
+        ttbl.tt_power_control_impl.__init__(self)
+        self.bmc_hostname = bmc_hostname
+        self.bmc = None
+        self.env = dict()
+        # If I change the argument order, -E doesn't work ok and I get
+        # password asked in the command line
+        self.cmdline = [
+            "ipmitool",
+            "-H", bmc_hostname
+        ]
+        if user:
+            self.cmdline += [ "-U", user ]
+        self.cmdline += [ "-E", "-I", "lanplus" ]
+        if password:
+            self.env['IPMI_PASSWORD'] = password
+
+    def _run(self, target, command):
+        try:
+            result = subprocess.check_output(
+                self.cmdline + command, env = self.env, shell = False,
+                stderr = subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
+            target.log.error("ipmitool %s failed: %s"
+                             % (" ".join(command), e.output))
+            raise
+        return result
+
+    def power_on_do(self, target):
+        result = self._run(target, [ "chassis", "power", "on" ])
+        target.log.info("on returned %s" % result)
+
+    def power_off_do(self, target):
+        result = self._run(target, [ "chassis", "power", "off" ])
+        target.log.info("off returned %s" % result)
+
+    def power_get_do(self, target):
+        result = self._run(target, [ "chassis", "power", "status" ])
+        target.log.info("status returned %s" % result)
+        if 'Chassis Power is on' in result:
+            return True
+        elif 'Chassis Power is off' in result:
+            return False
+        target.log.error("ipmtool state returned unknown message: %s"
+                         % result)
+        return None
