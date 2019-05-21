@@ -57,7 +57,7 @@ class impl_c(object):
       return the capture as a file.
     :param str mimetype: MIME type of the capture output, eg image/png
     """
-    def __init__(self, stream, mimetype = None):
+    def __init__(self, stream, mimetype):
         # can be False (just gets), True (start/stop+get)
         self.stream = stream
         # Path to the user directory, updated on every request_process
@@ -441,7 +441,7 @@ class generic_snapshot(impl_c):
     call the video interface *video-SOMETHING* so that tools such as
     *ffmpeg* won't be confused.
     """
-    def __init__(self, name, cmdline, pre_commands = None, mimetype = None):
+    def __init__(self, name, cmdline, mimetype, pre_commands = None):
         assert isinstance(name, basestring)
         assert isinstance(cmdline, basestring)
         self.name = name
@@ -559,8 +559,8 @@ class generic_stream(impl_c):
 
     For more information, look at :class:`ttbl.capture.generic_snapshot`.
     """
-    def __init__(self, name, cmdline, pre_commands = None, wait_to_kill = 1,
-                 mimetype = None):
+    def __init__(self, name, cmdline, mimetype,
+                 pre_commands = None, wait_to_kill = 1):
         assert isinstance(name, basestring)
         assert isinstance(cmdline, basestring)
         assert wait_to_kill > 0
