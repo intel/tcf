@@ -155,8 +155,13 @@ def cmdline_capture_list(args):
     rtb, rt = ttb_client._rest_target_find_by_id(args.target)
     data = _rest_tb_target_capture_list(rtb, rt, ticket = args.ticket)
     capturers = data['capturers']
+    capture_spec = {}
+    for capture in rt['capture'].split():
+        capturer, streaming, mimetype = capture.split(":", 2)
+        capture_spec[capturer] = (streaming, mimetype)
     for name, state in capturers.iteritems():
-        print "%s:%s" % (name, state)
+        print "%s:%s:%s:%s" % (
+            name, capture_spec[name][0], capture_spec[name][1], state)
 
 
 def cmdline_setup(argsp):
