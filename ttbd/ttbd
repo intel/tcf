@@ -408,12 +408,12 @@ def _target_disable(target_id):
 @flask_login.login_required
 def _target_enable(target_id):
     ticket = flask.request.form.get('ticket', "")
-    if not current_user_is_admin():
-        raise ttbl.test_target_not_admin_e(target)
     if target_id not in ttbl.config.targets.keys():
         return flask.abort(404, "%s: can't find target" % target_id)
     with ttbl.config.targets_lock:
         target = ttbl.config.targets[target_id]
+    if not current_user_is_admin():
+        raise ttbl.test_target_not_admin_e(target)
     try:
         target.enable(who_make(ticket))
         target.timestamp()
