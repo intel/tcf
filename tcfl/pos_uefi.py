@@ -369,10 +369,125 @@ def _linux_boot_guess(target, image):
     return None, None, None
 
 
-def efibootmgr_setup(target, boot_dev, partition):
+pos_boot_names = [
+    # UEFI: PXE IP[46].*
+    # UEFI PXEv[46].*
+    re.compile(r"^UEFI:?\s+PXE[v ](IP)?[46].*$"),
+    # UEFI: IP4 Intel(R) Ethernet Connection I354
+    # UEFI : LAN : IP[46] Intel(R) Ethernet Connection (\(3\))? I218-V
+    # UEFI : LAN : IP[46] Realtek PCIe GBE Family Controller
+    # UEFI : LAN : PXE IP[46] Intel(R) Ethernet Connection (2) I219-LM
+    re.compile(r"^UEFI\s?:( LAN :)? (IP|PXE IP)[46].*$"),
+]
+
+local_boot_names = [
+    # TCF Localboot v2
+    re.compile("^TCF Localboot v2$"),
+    # UEFI : INTEL SSDPEKKW010T8 : PART 0 : OS Bootloader
+    # UEFI : SATA : PORT 0 : INTEL SSDSC2KW512G8 : PART 0 : OS Bootloader
+    # UEFI : M.2 SATA :INTEL SSDSCKJF240A5 : PART 0 : OS Bootloader
+    re.compile("^UEFI : .* PART [0-9]+ : OS Bootloader$"),
+]
+
+def _name_is_pos_boot(name):
+    for regex in pos_boot_names:
+        if regex.search(name):
+            return True
+    return False
+
+def _name_is_local_boot(name):
+    for regex in local_boot_names:
+        if regex.search(name):
+            return True
+    return False
+
+_boot_order_regex = re.compile(
+    r"^BootOrder: (?P<boot_order>[0-9a-fA-F,]+)$", re.MULTILINE)
+
+_entry_regex = re.compile(
+    r"^Boot(?P<entry>[0-9A-F]{4})\*? (?P<name>.*)$", re.MULTILINE)
+
+def _efibootmgr_output_parse(target, output):
+
+    boot_order_match = _boot_order_regex.search(output)
+    if not boot_order_match:
+        raise tc.error_e("can't extract boot order",
+                         attachments = dict(target = target, output = output))
+    boot_order = boot_order_match.groupdict()['boot_order'].split(',')
+
+    entry_matches = re.findall(_entry_regex, output)
+    # returns a list of [ ( HHHH, ENTRYNAME ) ], HHHH hex digits, all str
+
+    boot_entries = []
+    for entry in entry_matches:
+        if _name_is_pos_boot(entry[1]):
+            section = 0		# POS (PXE, whatever), boot first
+        elif _name_is_local_boot(entry[1]):
+            section = 10	# LOCAL, boot after
+        else:
+            section = 20	# others, whatever
+        try:
+            boot_index = boot_order.index(entry[0])
+            boot_entries.append(( entry[0], entry[1], section, boot_index ))
+        except ValueError:
+            # if the entry is not in the boot order, that is fine,
+            # ignore it
+            pass
+
+    return boot_order, boot_entries
+
+
+def _efibootmgr_ponder(target, output):
+    boot_order, boot_entries = _efibootmgr_output_parse(target, output)
+
+    # boot_entries has been sorted as it is in the current
+    # efibootmanager, and classified each entry in [2] as POS, LOCAL
+    # or leftover. We want POS, then LOCAL, then the rest.
+
+    # We want the same order being kept--why? Because some EFIs keep
+    # rearranging it, unknown why and if we keep updating they end up
+    # hitting some limit and crapping on themselves when we try to
+    # update (eg: they keep putting IPv6 PXE next to IPv4 PXE even if
+    # we put localboot after PXE IPv4).
+
+    # So we stop fighting it, maintain the order they want but make
+    # sure there is some kind of localboot after the POS entries
+    # section. Our PXEBOOTe controller will always redirect to
+    # localboot, be it IPv4 or IPv6.
+
+    tcf_local_boot_seen = False
+    boot_order_needed = []
+    # sorted does stable sorts; e[3] has current boot order, e[2] has
+    # 'section' order--we still enforce it, to be double sure
+    for entry in sorted(boot_entries, key = lambda e: (e[2], e[3])):
+        if entry[1] == "TCF Localboot v2" and tcf_local_boot_seen:
+            # excess TCF Localboot v2 entries, remove
+            target.shell.run("efibootmgr -b %s -B" % entry[0])
+        elif entry[1] == "TCF Localboot v2" and not tcf_local_boot_seen:
+            tcf_local_boot_seen = True	# will be added in the passwhtrough
+        elif entry[1] == "TCF Localboot":	# old stuff, remove
+            target.shell.run("efibootmgr -b %s -B" % entry[0])
+        # fallthrough
+        boot_order_needed.append(entry)
+
+    _boot_order_needed = [ e[0] for e in boot_order_needed ]
+    target.report_info("POS/EFI: current boot order: "
+                       + " ".join(boot_order),
+                       dict(boot_entries = pprint.pformat(boot_entries)),
+                       dlevel = 1)
+    target.report_info("POS/EFI: boot order needed: "
+                       + " ".join(_boot_order_needed),
+                       dict(boot_entries = pprint.pformat(_boot_order_needed)),
+                       dlevel = 1)
+
+    return boot_order, _boot_order_needed, not tcf_local_boot_seen
+
+
+def _efibootmgr_setup(target, boot_dev, partition):
     """
-    Ensure EFI Boot Manager boots first to IPv4 and then to an entry
-    we are creating called TCF Localboot
+    Ensure EFI Boot Manager boots first to what we consider our
+    Provisioning OS sections (mostly PXE boot), then to a localboot
+    entry (local bootloader or 'TCF Localboot v2').
 
     We do this because the configuration file the server drops in TFTP
     for syslinux to pick up for the MAC address of the target will
@@ -396,47 +511,19 @@ def efibootmgr_setup(target, boot_dev, partition):
     Note we only touch the boot order once we have the local boot
     entry created.
     """
-    # this allows getting metadata from the target that tells us what
-    # to look for in the UEFI thing
-    uefi_bm_ipv4_entries = [
-        "U?EFI Network.*$",
-        "UEFI PXEv4.*$",
-        ".*IPv?4.*$",
-    ]
-    # FIXME: validate better
-    if 'uefi_boot_manager_ipv4_regex' in target.kws:
-        uefi_bm_ipv4_entries.append(target.kws["uefi_boot_manager_ipv4_regex"])
-    ipv4_regex = re.compile(
-        # PXEv4 is QEMU's UEFI
-        # .*IPv4 are some NUCs I've found
-        "(" + "|".join(uefi_bm_ipv4_entries) + ")",
-        re.MULTILINE)
 
     # ok, get current EFI bootloader status
     output = target.shell.run("efibootmgr", output = True)
-
-    boot_order_regex = re.compile(
-        r"^BootOrder: (?P<boot_order>[0-9a-fA-F,]+)$", re.MULTILINE)
-    boot_order_match = boot_order_regex.search(output)
-    if not boot_order_match:
-        raise tc.error_e("can't extract boot order",
-                         attachments(target = target, output = output))
-    boot_order_original = boot_order_match.groupdict()['boot_order'].split(',')
-
-    # this respects the current bootorder besides just
-    # adding ipv4 and putting the local one first
-    entry_regex = re.compile(
-        r"^Boot(?P<entry>[0-9A-F]{4})\*? (?P<name>.*)$", re.MULTILINE)
-    matches = re.findall(entry_regex, output)
-    names = [ match[1] for match in matches ]
-    if not 'TCF Localboot v2' in names:
+    boot_order, boot_order_needed, need_to_add = \
+        _efibootmgr_ponder(target, output)
+    if need_to_add:
         # Create the TCF Localboot entry; we make it boot the local
         # default (BOOTX64) which in our case is installed by
         # boot_config_multiroot() running bootctl. No altering boot
         # order, we'll do it later atomically to make sure IPv4 PXE is
         # always first.
         output = target.shell.run(
-            "efibootmgr -C -d %s -p %d -L 'TCF Localboot v2'"
+            "efibootmgr -c -d %s -p %d -L 'TCF Localboot v2'"
             # Python backslashes \\ -> \, so \\\\ becomes \\ that the
             # shell convers to a single \. Yes, it was a very good
             # idea to use as directory separator the same character
@@ -444,47 +531,19 @@ def efibootmgr_setup(target, boot_dev, partition):
             # https://blogs.msdn.microsoft.com/larryosterman/2005/06/24/why-is-the-dos-path-character/
             " -l \\\\EFI\\\\BOOT\\\\BOOTX64.EFI" % (boot_dev, partition),
             output = True)
-        matches = re.findall(entry_regex, output)
-    boot_order = [ ]
-    local_boot_order = [ ]
-    network_boot_order = [ ]
-    seen = False
-    for entry, name in matches:
-        if name == 'TCF Localboot v2':
-            # delete repeated entries
-            if seen:
-                target.report_info("removing repeated EFI boot entry %s (%s)"
-                                   % (entry, name))
-                target.shell.run("efibootmgr -b %s -B" % entry)
-                continue	# don't add it to the boot order
-            seen = True
-            local_boot_order.append(entry)
-        elif name in [ 'TCF Localboot', 'Linux bootloader',
-                       'Linux Boot Manager', 'ubuntu' ]:
-            target.report_info("removing old EFI boot entry %s (%s)"
-                               % (entry, name))
-            target.shell.run("efibootmgr -b %s -B" % entry)
-        elif ipv4_regex.search(name):
-            # Ensure ipv4 boot is first
-            network_boot_order.append(entry)
-        elif entry in boot_order_original:
-            boot_order.append(entry)
-        else:
-            # if the entry wasn't in the original boot order, ignore it
-            pass
+        # yeah, lame, but simple...
+        boot_order, boot_order_needed, need_to_add = \
+            _efibootmgr_ponder(target, output)
+        assert need_to_add == False
 
-    # only update the boot order if it did change -- some machines
-    # seem to get borked if we do this continuously
-    new_order = network_boot_order + local_boot_order + boot_order
-    if new_order != boot_order_original:
+    if boot_order != boot_order_needed:
         target.report_info(
             "POS: updating EFI boot order to %s from %s"
-            % (",".join(new_order), ",".join(boot_order_original)))
-        target.shell.run("efibootmgr -o " + ",".join(
-            network_boot_order + local_boot_order + boot_order))
+            % (",".join(boot_order_needed), ",".join(boot_order)))
+        target.shell.run("efibootmgr -o " + ",".join(boot_order_needed))
     else:
         target.report_info("POS: maintaining EFI boot order %s"
-                           % ",".join(boot_order_original))
+                           % ",".join(boot_order))
 
     # We do not set the next boot order to be our system; why?
     # multiple times, the system gets confused when it has to do
@@ -721,7 +780,7 @@ options %(linux_options)s
     # Now mess with the EFIbootmgr
     # FIXME: make this a function and a configuration option (if the
     # target does efibootmgr)
-    efibootmgr_setup(target, "/dev/%s" % boot_dev, 1)
+    _efibootmgr_setup(target, "/dev/%s" % boot_dev, 1)
     # umount only if things go well
     # Shall we try to unmount in case of error? nope, we are going to
     # have to redo the whole thing anyway, so do not touch it, in case
@@ -740,6 +799,6 @@ def boot_config_fix(target):
         prompt_original = target.shell.linux_shell_prompt_regex
         target.shell.linux_shell_prompt_regex = tl.linux_root_prompts
         target.shell.up(user = 'root')
-        efibootmgr_setup(target, target.kws['pos_boot_dev'], 1)
+        _efibootmgr_setup(target, target.kws['pos_boot_dev'], 1)
     finally:
         target.shell.linux_shell_prompt_regex = prompt_original
