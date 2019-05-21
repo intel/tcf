@@ -1223,9 +1223,90 @@ def deploy_path(_ic, target, _kws, cache = True):
 
 # FIXME: when tc.py's import hell is fixed, this shall move to tl.py?
 
+class tc_pos0_base(tc.tc_c):
+    """
+    A template for testcases that install an image in a target that
+    can be provisioned with Provisioning OS.
+
+    Unlike :class:`tc_pos_base`, this class needs the targets being
+    declared and called *ic* and *target*, such as:
+
+    >>> @tc.interconnect("ipv4_addr")
+    >>> @tc.target('pos_capable')
+    >>> class my_test(tcfl.tl.tc_pos0_base):
+    >>>     def eval(self, ic, target):
+    >>>         target.shell.run("echo Hello'' World",
+    >>>                          "Hello World")
+
+    Please refer to :class:`tc_pos_base` for more information.
+    """
+
+
+    #: Image we want to install in the target
+    #:
+    #: Note this can be specialized in a subclass such as
+    #:
+    #: >>> class my_test(tcfl.tl.tc_pos_base):
+    #: >>>
+    #: >>>     image_requested = "fedora:desktop:29"
+    #: >>>
+    #: >>>     def eval(self, ic, target):
+    #: >>>         ...
+    image_requested = os.environ.get("IMAGE", None)
+
+    #: Once the image was deployed, this will be set with the name of
+    #: the image that was selected.
+    image = "image-not-deployed"
+    
+    #: extra parameters to the image deployment function
+    #: :func:`target.pos.deploy_image
+    #: <tcfl.pos.extension.deploy_image>`
+    #:
+    #: >>> class my_test(tcfl.tl.tc_pos_base):
+    #: >>>
+    #: >>>     deploy_image_args = dict(
+    #: >>>         timeout = 40,
+    #: >>>         extra_deploy_fns = [
+    #: >>>             tcfl.tl.deploy_tree,
+    #: >>>             tcfl.tl.deploy_linux_ssh_root_nopwd
+    #: >>>         ]
+    #: >>>     )
+    #: >>> ...
+
+    deploy_image_args = {}
+
+    #: Which user shall we login as
+    login_user = 'root'
+
+    #: How many seconds to delay before login in once the login prompt
+    #: is detected
+    delay_login = 0
+    
+    def deploy_50(self, ic, target):
+        # ensure network, DHCP, TFTP, etc are up and deploy
+        ic.power.on()
+        if not self.image_requested:
+            raise tc.blocked_e(
+                "No image to install specified, set envar IMAGE "
+                "or self.image_requested")
+        self.image = target.pos.deploy_image(ic, self.image_requested,
+                                             **self.deploy_image_args)
+
+    def start_50(self, ic, target):
+        ic.power.on()
+        # fire up the target, wait for a login prompt
+        target.pos.boot_normal()
+        target.shell.linux_shell_prompt_regex = tl.linux_root_prompts
+        target.shell.up(user = self.login_user, delay_login = self.delay_login)
+        target.report_pass("Deployed %s" % self.image)
+
+    def teardown_50(self):
+        tl.console_dump_on_failure(self)
+
+
 @tc.interconnect("ipv4_addr")
 @tc.target('pos_capable')
-class tc_pos_base(tc.tc_c):
+class tc_pos_base(tc_pos0_base):
     """
     A template for testcases that install an image in a target that
     can be provisioned with Provisioning OS.
@@ -1233,6 +1314,15 @@ class tc_pos_base(tc.tc_c):
     This basic template deploys an image specified in the environment
     variable ``IMAGE`` or in *self.requested_image*, power cycles into
     it and waits for a prompt in the serial console.
+
+    This forcefully declares this testcase needs:
+
+    - a network that supports IPv4 (for provisioning over it)
+    - a target that supports Provisioning OS
+
+    if you want more control over said conditions, use
+    class:`tc_pos0_base`, for which the targets have to be
+    declared. Also, more knobs are available there.
 
     To use:
 
@@ -1254,61 +1344,7 @@ class tc_pos_base(tc.tc_c):
     >>>                          "Hello World")
 
     """
-
-
-    #: Image we want to install in the target
-    #:
-    #: Note this can be specialized in a subclass such as
-    #:
-    #: >>> class my_test(tcfl.tl.tc_pos_base):
-    #: >>>
-    #: >>>     image_requested = "fedora:desktop:29"
-    #: >>>
-    #: >>>     def eval(self, ic, target):
-    #: >>>         ...
-    image_requested = os.environ.get("IMAGE", None)
-
-    image = "image-not-deployed"
-    
-    #: extra parameters to the image deployment function
-    #: :func:`target.pos.deploy_image
-    #: <tcfl.pos.extension.deploy_image>`
-    #:
-    #: >>> class my_test(tcfl.tl.tc_pos_base):
-    #: >>>
-    #: >>>     deploy_image_args = dict(
-    #: >>>         timeout = 40,
-    #: >>>         extra_deploy_fns = [
-    #: >>>             tcfl.tl.deploy_tree,
-    #: >>>             tcfl.tl.deploy_linux_ssh_root_nopwd
-    #: >>>         ]
-    #: >>>     )
-    #: >>> ...
-
-    deploy_image_args = {}
-
-    login_user = 'root'
-    
-    def deploy_50(self, ic, target):
-        # ensure network, DHCP, TFTP, etc are up and deploy
-        ic.power.on()
-        if not self.image_requested:
-            raise tc.blocked_e(
-                "No image to install specified, set envar IMAGE "
-                "or self.image_requested")
-        self.image = target.pos.deploy_image(ic, self.image_requested,
-                                             **self.deploy_image_args)
-
-    def start_50(self, ic, target):
-        ic.power.on()
-        # fire up the target, wait for a login prompt
-        target.pos.boot_normal()
-        target.shell.linux_shell_prompt_regex = tl.linux_root_prompts
-        target.shell.up(user = self.login_user)
-        target.report_pass("Deployed %s" % self.image)
-
-    def teardown_50(self):
-        tl.console_dump_on_failure(self)
+    pass
 
 
 def cmdline_pos_capability_list(args):
