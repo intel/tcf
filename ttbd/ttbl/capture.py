@@ -35,11 +35,16 @@ This can be used to, for example:
 import errno
 import json
 import os
+import re
 import subprocess
 import time
 
 import commonl
 import ttbl
+
+mime_type_regex = re.compile(
+    "^([_a-zA-Z0-9]+/[_a-zA-Z0-9]+)"
+    "(,[_a-zA-Z0-9]+/[_a-zA-Z0-9]+)*$")
 
 class impl_c(object):
     """
@@ -58,6 +63,10 @@ class impl_c(object):
         # Path to the user directory, updated on every request_process
         # call
         self.user_path = None
+        assert mime_type_regex.search(mimetype), \
+            "%s: MIME type specification not valid (only" \
+            "multiple [_a-zA-Z0-9]+/[_a-zA-Z0-9]+ separated by commas" \
+            % mimetype
         self.mimetype = mimetype
 
     def start(self, target, capturer):
