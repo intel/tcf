@@ -523,7 +523,7 @@ def _efibootmgr_setup(target, boot_dev, partition):
         # order, we'll do it later atomically to make sure IPv4 PXE is
         # always first.
         output = target.shell.run(
-            "efibootmgr -c -d %s -p %d -L 'TCF Localboot v2'"
+            "efibootmgr -c -d /dev/%s -p %d -L 'TCF Localboot v2'"
             # Python backslashes \\ -> \, so \\\\ becomes \\ that the
             # shell convers to a single \. Yes, it was a very good
             # idea to use as directory separator the same character
@@ -780,7 +780,7 @@ options %(linux_options)s
     # Now mess with the EFIbootmgr
     # FIXME: make this a function and a configuration option (if the
     # target does efibootmgr)
-    _efibootmgr_setup(target, "/dev/%s" % boot_dev, 1)
+    _efibootmgr_setup(target, boot_dev, 1)
     # umount only if things go well
     # Shall we try to unmount in case of error? nope, we are going to
     # have to redo the whole thing anyway, so do not touch it, in case
