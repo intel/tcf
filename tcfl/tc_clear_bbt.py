@@ -227,6 +227,24 @@ class tc_taps_subcase_c_base(tcfl.tc.tc_c):
         # complain that nothing was found to run
         pass
 
+#: Ignore t files
+#:
+#: List of individual .t files to ignore, since we can't filter
+#: those on the command line; this can be done  in a config file:
+#:
+#: >>> tcfl.tc_clear_bbt.ignore_ts = [
+#: >>>     'bundles/XYZ/somefile.t',
+#: >>>     'bundles/ABC/someother.t',
+#: >>> ]
+#:
+#: or from the command line, byt setting the BBT_IGNORE_TS
+#: environment variable::
+#:
+#:   $ export BBT_IGNORE_TS="bundles/XYZ/somefile.t bundles/ABC/someother.t"
+#:   $ tcf run bbt.git/bundles/XYZ bbt.git/bundles/ABC
+#:
+ignore_ts = os.environ.get("BBT_IGNORE_TS", "").split()
+    
 
 @tcfl.tc.interconnect('ipv4_addr')
 @tcfl.tc.target('pos_capable', mode = 'any')
@@ -507,6 +525,14 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
 
     def _eval_one(self, target, t_file, prefix):
         result = tcfl.tc.result_c(0, 0, 0, 0, 0)
+        rel_file_path = os.path.join(prefix, t_file)
+        if rel_file_path in ignore_ts:
+            target.report_skip(
+                "%s: skipped due to configuration "
+                "(tcfl.tc_clear_bbt.ignore_ts or BBT_IGNORE_TS environment)"
+                % rel_file_path)
+            result.skipped += 1
+            return result
         self.report_info("running %s%s" % (prefix, t_file))
         self.kw_set("t_file", t_file)
         output = target.shell.run(
