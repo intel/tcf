@@ -23,17 +23,18 @@ def _rest_tb_target_capture_start(rtb, rt, capturer, ticket = ''):
 def _rest_tb_target_capture_stop_and_get(rtb, rt, capturer, local_filename,
                                          ticket = ''):
     assert isinstance(capturer, basestring)
-    with open(local_filename, "w") as lf, \
-        contextlib.closing(rtb.send_request(
-            "POST", "targets/%s/capture/stop_and_get" % rt['id'],
-            data = { 'capturer': capturer, 'ticket': ticket },
-            stream = True, raw = True)) as r:
-        # http://docs.python-requests.org/en/master/user/quickstart/#response-content
-        chunk_size = 1024
-        total = 0
-        for chunk in r.iter_content(chunk_size):
-            os.write(lf.fileno(), chunk)
-            total += len(chunk)
+    total = 0
+    if local_filename != None:
+        with open(local_filename, "w") as lf, \
+            contextlib.closing(rtb.send_request(
+                "POST", "targets/%s/capture/stop_and_get" % rt['id'],
+                data = { 'capturer': capturer, 'ticket': ticket },
+                stream = True, raw = True)) as r:
+            # http://docs.python-requests.org/en/master/user/quickstart/#response-content
+            chunk_size = 1024
+            for chunk in r.iter_content(chunk_size):
+                os.write(lf.fileno(), chunk)
+                total += len(chunk)
     return total
 
 def _rest_tb_target_capture_list(rtb, rt, ticket = ''):
@@ -94,7 +95,7 @@ class extension(tc.target_extension_c):
         self.target.report_info("%s: started capture" % capturer)
         return r
 
-    def stop_and_get(self, capturer, local_filename):
+    def stop_and_get(self, capturer, local_filename = None):
         """
         If this is a streaming capturer, stop streaming and return the
         captured data or if no streaming, take a snapshot and return it.
@@ -105,6 +106,8 @@ class extension(tc.target_extension_c):
 
         :param str capturer: capturer to use, as listed in the
           target's *capture*
+        :param str local_filename: (optional) file to which to write
+          the capture; if *None*, the capture will not be downloaded.
         :returns: dictionary of values passed by the server
         """
         self.target.report_info("%s: stopping capture" % capturer, dlevel = 1)
@@ -117,7 +120,7 @@ class extension(tc.target_extension_c):
 
     def get(self, capturer, local_filename):
         """
-        This is the same :meth:`stop_and_get`
+        This is the same :meth:`stop_and_get`, but always gets the capture.
         """
         return self.stop_and_get(capturer, local_filename)
     
@@ -138,7 +141,6 @@ class extension(tc.target_extension_c):
         self.target.report_info("listed: %s" % capturers)
         return capturers
 
-
 def cmdline_capture_start(args):
     rtb, rt = ttb_client._rest_target_find_by_id(args.target)
     _rest_tb_target_capture_start(rtb, rt,
@@ -149,6 +151,13 @@ def cmdline_capture_stop_and_get(args):
     r = _rest_tb_target_capture_stop_and_get(
         rtb, rt,
         args.capturer, args.filename, ticket = args.ticket)
+    return r
+
+def cmdline_capture_stop(args):
+    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
+    r = _rest_tb_target_capture_stop_and_get(
+        rtb, rt,
+        args.capturer, None, ticket = args.ticket)
     return r
 
 def cmdline_capture_list(args):
@@ -172,8 +181,8 @@ def cmdline_setup(argsp):
                     type = str, help = "Name of capturer that should start")
     ap.set_defaults(func = cmdline_capture_start)
 
-    ap = argsp.add_parser("capture-get", help = "stop capturing "
-                          "and get the result to a file")
+    ap = argsp.add_parser("capture-get",
+                          help = "stop capturing and get the result to a file")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
     ap.add_argument("capturer", metavar = "CAPTURER-NAME", action = "store",
@@ -181,6 +190,24 @@ def cmdline_setup(argsp):
     ap.add_argument("filename", action = "store", type = str,
                     help = "File to which to dump the captured content")
     ap.set_defaults(func = cmdline_capture_stop_and_get)
+
+    ap = argsp.add_parser("capture-stop-and-get",
+                          help = "stop capturing and get the result to a file")
+    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
+                    default = None, help = "Target's name or URL")
+    ap.add_argument("capturer", metavar = "CAPTURER-NAME", action = "store",
+                    type = str, help = "Name of capturer that should stop")
+    ap.add_argument("filename", action = "store", type = str,
+                    help = "File to which to dump the captured content")
+    ap.set_defaults(func = cmdline_capture_stop_and_get)
+
+    ap = argsp.add_parser("capture-stop", help = "stop capturing, discarding "
+                          "the capture")
+    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
+                    default = None, help = "Target's name or URL")
+    ap.add_argument("capturer", metavar = "CAPTURER-NAME", action = "store",
+                    type = str, help = "Name of capturer that should stop")
+    ap.set_defaults(func = cmdline_capture_stop)
 
     ap = argsp.add_parser("capture-list", help = "List available capturers")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
