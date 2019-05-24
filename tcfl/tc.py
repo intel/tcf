@@ -2757,6 +2757,32 @@ class tc_c(object):
         self.ts_start = time.time()
         self.ts_end = None
 
+        global log_dir
+        if log_dir == None:
+            _log_dir = os.getcwd()
+        else:
+            _log_dir = log_dir
+        # note we set this after setting some of the kws
+        #: Report file prefix
+        #:
+        #: When needing to create report file collateral of any kind,
+        #: prefix it with this so it always shows in the same location
+        #: for all the collateral related to this testcase:
+        #:
+        #: >>>    target.shell.file_copy_from("remotefile",
+        #: >>>                                self.report_file_prefix + "remotefile")
+        #:
+        #: will produce *LOGDIR/report-RUNID:HASHID.remotefile* if
+        #: *--log-dir LOGDIR -i RUNID* was provided as command line.
+        #:
+        #: >>>    target.capture.get('screen',
+        #: >>>                       self.report_file_prefix + "screenshot.png")
+        #:
+        #: will produce *LOGDIR/report-RUNID:HASHID.screenshot.png*
+        #:
+        self.report_file_prefix = os.path.join(
+            _log_dir, "report-%(runid)s:%(tc_hash)s." % self.kws)
+
         # Always before we start, run the site hook
         for hook in self.hook_pre:
             hook(self)
