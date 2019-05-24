@@ -439,14 +439,18 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         # if we have video capture, get it to see if we are crashing
         # before booting
         if "screen_stream:stream" in target.kws.get('capture', ""):
+            capturing = True
             target.capture.start("screen_stream")
+        else:
+            capturing = False
         target.pos.boot_normal()
         target.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
         try:
             target.shell.up(user = 'root')
-            target.capture.stop("screen_stream")
+            if capturing:
+                target.capture.stop("screen_stream")
         except:
-            if "screen_stream:stream" in target.kws.get('capture', ""):
+            if capturing:
                 # done booting, get the boot sequence movie, in case we
                 # could record it
                 target.capture.get("screen_stream",
