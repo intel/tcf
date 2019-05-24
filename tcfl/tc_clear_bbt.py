@@ -380,7 +380,9 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         # configure_00_set_relpath_set(); this way if we call withtout
         # deploying, we still have them
 
-        target.shell.run("mkdir -p /mnt/persistent.tcf.d/bbt.git")
+        target.shell.run("mkdir -p /mnt/persistent.tcf.d/bbt.git\n"
+                         "# now copying the BBT tree from the client")
+
         # try rsyncing a seed bbt.git repo from -- this speeds up
         # first time transmisisons as the repo is quite close in the
         # server; further rsync from the local version in the client
@@ -432,10 +434,24 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
 
     def start(self, ic, target):
         ic.power.on()
+
         # fire up the target, wait for a login prompt
+        # if we have video capture, get it to see if we are crashing
+        # before booting
+        if "screen_stream:stream" in target.kws.get('capture', ""):
+            target.capture.start("screen_stream")
         target.pos.boot_normal()
         target.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
-        target.shell.up(user = 'root')
+        try:
+            target.shell.up(user = 'root')
+            target.capture.stop("screen_stream")
+        except:
+            if "screen_stream:stream" in target.kws.get('capture', ""):
+                # done booting, get the boot sequence movie, in case we
+                # could record it
+                target.capture.get("screen_stream",
+                                   self.report_file_prefix + "boot.avi")
+            raise
         target.report_pass("Booted %s" % self.image)
 
         target.shell.run(
