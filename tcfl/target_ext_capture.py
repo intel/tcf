@@ -95,7 +95,7 @@ class extension(tc.target_extension_c):
         self.target.report_info("%s: started capture" % capturer)
         return r
 
-    def stop_and_get(self, capturer, local_filename = None):
+    def stop_and_get(self, capturer, local_filename):
         """
         If this is a streaming capturer, stop streaming and return the
         captured data or if no streaming, take a snapshot and return it.
@@ -106,8 +106,7 @@ class extension(tc.target_extension_c):
 
         :param str capturer: capturer to use, as listed in the
           target's *capture*
-        :param str local_filename: (optional) file to which to write
-          the capture; if *None*, the capture will not be downloaded.
+        :param str local_filename: file to which to write the capture.
         :returns: dictionary of values passed by the server
         """
         self.target.report_info("%s: stopping capture" % capturer, dlevel = 1)
@@ -118,9 +117,25 @@ class extension(tc.target_extension_c):
                                 % (capturer, r))
         return r
 
+    def stop(self, capturer):
+        """
+        If this is a streaming capturer, stop streaming and discard
+        the captured content.
+
+        >>> target.capture.stop("screen_stream")
+
+        :param str capturer: capturer to use, as listed in the
+          target's *capture*
+        """
+        self.target.report_info("%s: stopping capture" % capturer, dlevel = 1)
+        _rest_tb_target_capture_stop_and_get(
+            self.target.rtb, self.target.rt,
+            capturer, None, ticket = self.target.ticket)
+        self.target.report_info("%s: stopped capture" % capturer)
+
     def get(self, capturer, local_filename):
         """
-        This is the same :meth:`stop_and_get`, but always gets the capture.
+        This is the same :meth:`stop_and_get`.
         """
         return self.stop_and_get(capturer, local_filename)
     
