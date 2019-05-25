@@ -306,8 +306,8 @@ class vnc(impl_c):
         impl_c.stop_and_get(self, target, capturer)
         file_name = "%s/%s-%s-%s.png" % (self.user_path, target.id, capturer,
                                          time.strftime("%Y%m%d-%H%M%S"))
+        cmdline = [ "gvnccapture", "localhost:%s" % self.port, file_name ]
         try:
-            cmdline = [ "gvnccapture", "localhost:%s" % self.port, file_name ]
             subprocess.check_call(cmdline, cwd = "/tmp",
                                   stderr = subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
@@ -336,17 +336,17 @@ class ffmpeg(impl_c):
         impl_c.stop_and_get(self, target, capturer)
         file_name = "%s/%s-%s-%s.png" % (self.user_path, target.id, capturer,
                                          time.strftime("%Y%m%d-%H%M%S"))
+        # might want to add -ss H:M:S to wait before starting
+        # capture for the device to stabilize
+        # -f video4linux can be ignored
+        cmdline = [
+            "ffmpeg",
+            "-i", self.video_device,
+            "-s", "1",
+            "-frames", str(1),	# only one frame
+            "-y", file_name	# force overwrite output file
+        ]
         try:
-            # might want to add -ss H:M:S to wait before starting
-            # capture for the device to stabilize
-            # -f video4linux can be ignored
-            cmdline = [
-                "ffmpeg",
-                "-i", self.video_device,
-                "-s", "1",
-                "-frames", str(1),	# only one frame
-                "-y", file_name	# force overwrite output file
-            ]
             subprocess.check_call(cmdline, cwd = "/tmp", stderr = subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             target.log.error(
@@ -465,14 +465,11 @@ class generic_snapshot(impl_c):
                                      time.strftime("%Y%m%d-%H%M%S"))
         kws = dict(output_file_name = file_name)
         kws.update(target.kws)
+        cmdline = []
         try:
             for command in self.pre_commands:
                 subprocess.check_call((command % kws).split())
-            # replace $OUTPUTFILENAME$ with the name of the output file
-            cmdline = []
             for i in self.cmdline:
-                if '$OUTPUTFILENAME$' in i:
-                    i = i.replace("$OUTPUTFILENAME$", file_name)
                 cmdline.append(i % kws)
             target.log.info("snapshot command: %s" % " ".join(cmdline))
             subprocess.check_call(cmdline, cwd = "/tmp", shell = False,
