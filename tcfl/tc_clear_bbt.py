@@ -375,6 +375,11 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         'todo': 'ERRR',
     }
 
+    #:
+    #: Disable efibootmgr and clr-boot-manager
+    #:
+    boot_mgr_disable = os.environ.get("BBT_BOOT_MGR_DISABLE", False)
+
     def _deploy_bbt(self, _ic, target, _kws):
         # note self.bbt_tree and self.rel_path_in_target are set by
         # configure_00_set_relpath_set(); this way if we call withtout
@@ -401,6 +406,20 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
                          persistent_name = 'bbt.git')
         # BBT checks will complain about the metadata file, so wipe it
         target.shell.run("rm -f /mnt/.tcf.metadata.yaml")
+        if self.boot_mgr_disable:
+            # tired of chasing ghosts who keep changing the EFI
+            # bootorder, let's try this
+            target.shell.run(r"""
+cat > /mnt/usr/bin/efibootmgr <<EOF
+#! /bin/sh
+echo "\$(basename \$0): DISABLED by TCF's tc_clear_bbt.py" 1>&2
+echo "\$(basename \$0): called by" 1>&2
+ps axf  1>&2
+EOF
+""")
+            target.shell.run("chmod a+x //mnt/usr/bin/efibootmgr")
+            target.shell.run("dd if=/mnt/usr/bin/efibootmgr"
+                             " of=/mnt/usr/bin/clr-boot-manager")
 
 
 #    @tcfl.tc.concurrently()
