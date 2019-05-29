@@ -436,6 +436,11 @@ def _efibootmgr_output_parse(target, output):
 
     return boot_order, boot_entries
 
+efi_entries_to_remove = [
+    "Linux bootloader",
+    "ACRN",
+    "debian",
+]
 
 def _efibootmgr_ponder(target, output):
     boot_order, boot_entries = _efibootmgr_output_parse(target, output)
@@ -463,10 +468,15 @@ def _efibootmgr_ponder(target, output):
         if entry[1] == "TCF Localboot v2" and tcf_local_boot_seen:
             # excess TCF Localboot v2 entries, remove
             target.shell.run("efibootmgr -b %s -B" % entry[0])
+            continue
         elif entry[1] == "TCF Localboot v2" and not tcf_local_boot_seen:
             tcf_local_boot_seen = True	# will be added in the passwhtrough
         elif entry[1] == "TCF Localboot":	# old stuff, remove
             target.shell.run("efibootmgr -b %s -B" % entry[0])
+            continue
+        elif entry[1] in efi_entries_to_remove:	# old stuff, remove
+            target.shell.run("efibootmgr -b %s -B" % entry[0])
+            continue
         # fallthrough
         boot_order_needed.append(entry)
 
@@ -754,6 +764,11 @@ def boot_config_multiroot(target, boot_dev, image):
         target.shell.run(
             "time -p rsync --force --inplace /mnt/%(linux_initrd_file)s"
             " /boot/%(linux_initrd_file_basename)s" % kws)
+    # we are the only one who cuts the cod here (yeah, direct Spanish
+    # translation for the reader's entertainment), and if not wipe'm to
+    # eternity; otherwise systemd will boot something prolly in
+    # alphabetical order, not what we want
+    target.shell.run("/usr/bin/rm -rf /boot/loader/entries/*.conf")
     # remember paths to the bootloader are relative to /boot
     # merge these two
     tcf_boot_conf = """\
