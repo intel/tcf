@@ -433,7 +433,7 @@ EOF
                     % (binary, binary))
                 target.shell.run(
                     "/usr/bin/ln -sf"
-                    " /mnt/usr/bin/tcf-disabled"
+                    " /usr/bin/tcf-disabled"
                     " /mnt/%s" % binary)
 
 
