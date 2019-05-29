@@ -14,6 +14,7 @@ class _test(tcfl.tc.tc_c):
     def eval(self, ic, target):
         ic.power.on()
         target.pos.boot_normal()
+        target.shell.up(user = 'root')
 
     def teardown(self):
         tcfl.tl.console_dump_on_failure(self)
