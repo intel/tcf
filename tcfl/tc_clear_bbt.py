@@ -407,19 +407,34 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         # BBT checks will complain about the metadata file, so wipe it
         target.shell.run("rm -f /mnt/.tcf.metadata.yaml")
         if self.boot_mgr_disable:
-            # tired of chasing ghosts who keep changing the EFI
-            # bootorder, let's try this
+            # FIXME: move this to configuration, check the binary
+            # exits before disabling it, move this whole thing to the
+            # deployment function
+            bins_disable = [
+                "/usr/bin/efibootmgr",
+                "/usr/bin/clr-boot-manager",
+            ]
             target.shell.run(r"""
-cat > /mnt/usr/bin/efibootmgr <<EOF
+cat > /mnt/usr/bin/tcf-disabled <<EOF
 #! /bin/sh
+# stub for a binary disabled by TCF for the system's good
 echo "\$(basename \$0): DISABLED by TCF's tc_clear_bbt.py" 1>&2
 echo "\$(basename \$0): called by" 1>&2
 ps axf  1>&2
+exit 1	# FAIL, on purpose--you are not allowed to run this
 EOF
 """)
-            target.shell.run("chmod a+x //mnt/usr/bin/efibootmgr")
-            target.shell.run("dd if=/mnt/usr/bin/efibootmgr"
-                             " of=/mnt/usr/bin/clr-boot-manager")
+            # tired of chasing ghosts who keep changing the EFI
+            # bootorder, let's try this
+            target.shell.run("chmod a+x /mnt/usr/bin/tcf-disabled")
+            for binary in bins_disable:
+                target.shell.run(
+                    "/usr/bin/mv --force /mnt/%s /mnt/%s.disabled"
+                    % (binary, binary))
+                target.shell.run(
+                    "/usr/bin/ln -sf"
+                    " /mnt/usr/bin/tcf-disabled"
+                    " /mnt/%s" % binary)
 
 
 #    @tcfl.tc.concurrently()
@@ -561,6 +576,7 @@ EOF
                                bundle, int(count))
             target.report_data("BBT bundle-add duration (seconds)",
                                bundle, float(m.groupdict()['seconds']))
+            self.targets_active(target)
 
     def _eval_one(self, target, t_file, prefix):
         result = tcfl.tc.result_c(0, 0, 0, 0, 0)
