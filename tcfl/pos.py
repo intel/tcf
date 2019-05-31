@@ -681,7 +681,7 @@ EOF""")
 
     def rsync(self, src = None, dst = None,
               persistent_name = None,
-              persistent_dir = '/persistent.tcf.d'):
+              persistent_dir = '/persistent.tcf.d', path_append = "/."):
         """
         rsync data from the local machine to a target
 
@@ -780,8 +780,8 @@ EOF""")
                 # sending a lot of files
                 "time -p rsync -HaAX --numeric-ids --delete"
                 " --port %%(rsync_port)s "
-                " %s/. %%(rsync_server)s::rootfs/%s/%s"
-                % (src, persistent_dir, persistent_name))
+                " %s%s %%(rsync_server)s::rootfs/%s/%s"
+                % (src, path_append, persistent_dir, persistent_name))
         target.testcase._targets_active()
         if dst != None:
             # There is a final destination specified, so now, in the
@@ -793,8 +793,8 @@ EOF""")
             target.shell.run(
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
-                "time -p rsync -HaAX --delete /mnt/%s/%s/. /mnt/%s"
-                % (persistent_dir, persistent_name, dst))
+                "time -p rsync -HaAX --delete /mnt/%s/%s%s /mnt/%s"
+                % (persistent_dir, path_append, persistent_name, dst))
 
 
     def rsync_np(self, src, dst, option_delete = False, path_append = "/."):
@@ -1212,9 +1212,12 @@ def deploy_path(_ic, target, _kws, cache = True):
     target.report_info("rsyncing file %s -> target:%s"
                        % (source_path, dst_path), dlevel = 1)
     target.testcase._targets_active()
-    # FIXME: implement cache (use rsync())
-    target.pos.rsync_np(source_path, dst_path, option_delete = True,
-                        path_append = "")
+    if cache:
+        # FIXME: do we need option_dlete here too? option_delete = True
+        target.pos.rsync(source_path, dst_path, path_append = "")
+    else:
+        target.pos.rsync_np(source_path, dst_path, option_delete = True,
+                            path_append = "")
     target.testcase._targets_active()
     target.report_pass("rsynced file %s -> target:%s"
                        % (source_path, dst_path))
