@@ -794,7 +794,7 @@ EOF""")
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
                 "time -p rsync -HaAX --delete /mnt/%s/%s%s /mnt/%s"
-                % (persistent_dir, path_append, persistent_name, dst))
+                % (persistent_dir, persistent_name, path_append, dst))
 
 
     def rsync_np(self, src, dst, option_delete = False, path_append = "/."):
