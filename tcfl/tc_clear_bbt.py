@@ -80,7 +80,7 @@ def tap_parse_output(output):
     :param str output: TAP formatted output
     :returns: dictionary keyed by test subject containing a dictionary
        of key/values:
-       - lines: list of line numbers in the output where data wsa found
+       - lines: list of line numbers in the output where data was found
        - plan_count: test case number according to the TAP plan
        - result: result of the testcase (ok or not ok)
        - directive: if any directive was found, the text for it
@@ -178,33 +178,24 @@ class tc_taps_subcase_c_base(tcfl.tc.tc_c):
     This is used by :class:`tc_clear_bbt_c` to report each TAP subcase
     individually for reporting control.
     """
-    def __init__(self, name, tc_file_path, origin,
-                 parent, data):
+    def __init__(self, name, tc_file_path, origin, parent):
         assert isinstance(name, basestring)
         assert isinstance(tc_file_path, basestring)
         assert isinstance(origin, basestring)
         assert isinstance(parent, tcfl.tc.tc_c)
-        assert isinstance(data, dict)
 
         tcfl.tc.tc_c.__init__(self, name, tc_file_path, origin)
+        self.tc_file_path = tc_file_path
         self.parent = parent
-        # create a result object with the data we parsed from the output
-        result = parent.mapping[data['result']]
-        if result == 'PASS':
-            self.result = tcfl.tc.result_c(1, 0, 0, 0, 0)
-        elif result == 'ERRR':
-            self.result = tcfl.tc.result_c(0, 1, 0, 0, 0)
-        elif result == 'FAIL':
-            self.result = tcfl.tc.result_c(0, 0, 1, 0, 0)
-        elif result == 'BLCK':
-            self.result = tcfl.tc.result_c(0, 0, 0, 1, 0)
-        elif result == 'SKIP':
-            self.result = tcfl.tc.result_c(0, 0, 0, 0, 1)
-        else:
-            raise AssertionError('bad mapping from %s to %s, unknown result'
-                                 % (data['result'], result))
-        self.data = data
         self.kw_set('tc_name_short', name)
+        self.result = None
+        self.data = dict()
+
+    def update(self, result, data):
+        assert isinstance(data, dict)
+        # create a result object with the data we parsed from the output
+        self.result = result
+        self.data = data
 
     def configure_50(self):	# pylint: disable = missing-docstring
 	# we don't need to manipulate the targets, so don't assign;
@@ -217,8 +208,15 @@ class tc_taps_subcase_c_base(tcfl.tc.tc_c):
                          "information" % self.parent.kws, dlevel = 1)
 
     def eval_50(self):		# pylint: disable = missing-docstring
-        self.result.report(self, "subcase execution", dlevel = 2,
-                           attachments = dict(output = self.data['output']))
+        if self.result == None:
+            self.result = self.parent.result
+            self.result.report(
+                self, "subcase didn't run; parent didn't complete execution?",
+                dlevel = 2, attachments = self.data)
+        else:
+            self.result.report(
+                self, "subcase reported '%s'" % self.data['result'],
+                dlevel = 2, attachments = self.data)
         return self.result
 
     @staticmethod
@@ -244,7 +242,7 @@ class tc_taps_subcase_c_base(tcfl.tc.tc_c):
 #:   $ tcf run bbt.git/bundles/XYZ bbt.git/bundles/ABC
 #:
 ignore_ts = os.environ.get("BBT_IGNORE_TS", "").split()
-    
+
 
 @tcfl.tc.interconnect('ipv4_addr')
 @tcfl.tc.target('pos_capable', mode = 'any')
@@ -303,8 +301,10 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         self.rel_path_in_target = None
         self.t_files = [ os.path.basename(t_file_path) ]
         self.deploy_done = False
+        self.subtc_list = []
+        self.subtcs = {}
 
-    def configure_10_set_relpath_set(self):
+    def configure_00_set_relpath_set(self):
         # calculate these here in case we skip deployment
         self.bbt_tree = subprocess.check_output(
             [
@@ -325,6 +325,30 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         self.rel_path_in_target = os.path.relpath(
             os.path.realpath(self.kws['srcdir']),
             os.path.realpath(self.bbt_tree))
+
+    # Because of unfortunate implementation decissions that have to be
+    # revisited, we need to initialize the list of
+    # sub-testcases here.
+    #
+    # Why? because once we create an instance of this testcase,
+    # instead of creating a new one for each target it has to run on
+    # in tcfl.tc.tc_c._run_on_targets(), we deepcopy() it in
+    # _clone(). So the constructor is never called again -- yeah, that
+    # has to change.
+    def configure_10(self):	# pylint: disable = missing-docstring
+        for key, name, tc_file_path, origin in self.subtc_list:
+            # note how we parent it to self, not subtcs's
+            # parent--because that'll be someone else. @self is the
+            # current running TC that this parents these guys
+            self.subtcs[key] = tc_taps_subcase_c_base(name, tc_file_path,
+                                                      origin, self)
+            self.post_tc_append(self.subtcs[key])
+        if self.subtcs:
+            self.report_pass("NOTE: this testcase will unfold subcases: %s" %
+                             " ".join(self.subtcs.keys()), dlevel = 1)
+        else:
+            self.report_pass("NOTE: this testcase does not provide subcases",
+                             dlevel = 1)
 
     #: Specification of image to install
     #:
@@ -352,7 +376,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
     #:   $ tcf list -vv nwa | grep MYFIELD
     #:     MYFIELD: someupdateserver.com
     swupd_url = os.environ.get("SWUPD_URL", None)
-    
+
     image_tree = os.environ.get("IMAGE_TREE", None)
 
     #: Do we add debug output to swupd?
@@ -362,17 +386,18 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
     #:
     #: This can be adjusted globally for all testcases or per testcase:
     #:
-    #: >>> tcfl.tc_clear_bbt.tc_clear_bbt_c.mapping['skip'] = 'BLCK'
+    #: >>> tcfl.tc_clear_bbt.tc_clear_bbt_c.mapping['skip'] \
+    #: >>>      = tcfl.tc.result_c(1, 0, 0, 0, 0)	# pass
     #:
     #: or for an specific testcase:
     #:
     #: >>> tcobject.mapping['skip'] = 'BLCK'
     #:
     mapping = {
-        'ok': 'PASS',
-        'not ok': 'FAIL',
-        'skip': 'SKIP',
-        'todo': 'ERRR',
+        'ok': tcfl.tc.result_c(1, 0, 0, 0, 0),
+        'not ok': tcfl.tc.result_c(0, 0, 1, 0, 0),
+        'skip': tcfl.tc.result_c(0, 0, 0, 0, 1),
+        'todo': tcfl.tc.result_c(0, 1, 0, 0, 0),
     }
 
     #:
@@ -497,7 +522,7 @@ EOF
             " && rm -rf /run/lock/clrtrust.lock"
             " && clrtrust -v generate"
             " && rm -f /etc/ca-certs/trusted/regenerate")
-        
+
         # Install bundles we need
         #
         # If there is a  'requirements' file alongside our .t file,
@@ -511,7 +536,7 @@ EOF
             bundles += open(requirements_fname).read().split()
         self.report_info("Bundle requirements: %s" % " ".join(bundles),
                          dlevel = 1)
-        
+
         # if there is no distro mirror, use proxies -- HACK
         tcfl.tl.sh_export_proxy(ic, target)
 
@@ -587,42 +612,43 @@ EOF
                 "(tcfl.tc_clear_bbt.ignore_ts or BBT_IGNORE_TS environment)"
                 % rel_file_path)
             result.skipped += 1
-            return result
-        self.report_info("running %s%s" % (prefix, t_file))
-        self.kw_set("t_file", t_file)
-        output = target.shell.run(
-            # remember we cd'ed into the directory
-            "bats --tap %s || echo FAILED''-%s"
-            % (t_file, self.kws['tc_hash']),
-            output = True)
-        if 'bats: command not found' in output:
-            raise tcfl.tc.blocked_e(
-                "'bats' tool not installed in the target",
-                dict(target = target, output = output))
-        # top level result
-        if 'FAILED-%(tc_hash)s' % self.kws in output:
-            result.failed += 1
         else:
-            result.passed += 1
+            self.report_info("running %s%s" % (prefix, t_file))
+            self.kw_set("t_file", t_file)
+            output = target.shell.run(
+                # remember we cd'ed into the directory, the way these
+                # BBTs are written, it is expected
+                "bats --tap %s || echo FAILED''-%s"
+                % (t_file, self.kws['tc_hash']),
+                output = True)
+            # top level result
+            if 'bats: command not found' in output:
+                self.report_error(
+                    "'bats' tool not installed in the target",
+                    dict(target = target, output = output))
+                result.errors += 1
+            elif 'FAILED-%(tc_hash)s' % self.kws in output:
+                result.failed += 1
+            else:
+                result.passed += 1
 
         # seems we had execution, so let's parse the output and
-        # make subcases
+        # make subcases of the .t
         tcs = tap_parse_output(output)
         for name, data in tcs.iteritems():
+            # get the subctc; see _scan_t_subcases() were we keyed
+            # them in
             _name = commonl.name_make_safe(name)
-            t_file_name = t_file.replace(".t", "")
-            subcase = tc_taps_subcase_c_base(
-                prefix + t_file_name + "." + _name,
-                self.kws['thisfile'], self.origin,
-                self, data)
-            self.post_tc_append(subcase)
-            result += subcase.result
+            subtc = self.subtcs[t_file + "." + _name]
+            # translate the taps result to a TCF result, record it
+            subtc.update(self.mapping[data['result']], data)
+            result += subtc.result
         return result
 
     def eval(self, ic, target):
 
         tcfl.tl.sh_export_proxy(ic, target)
-        # most testcases assume they are running from the same
+        # testcases assume they are running from the same
         # directory where the .t is.
         target.shell.run("cd /opt/bbt.git/%s" % self.rel_path_in_target)
         result = tcfl.tc.result_c(0, 0, 0, 0, 0)
@@ -662,6 +688,34 @@ EOF
     paths = {}
     filename_regex = re.compile(r"^.*\.t$")
 
+    _regex_t_subcases = re.compile(
+        r"^\s*@test\s+['\"](?P<name>.+)['\"]\s+{.*", re.MULTILINE)
+
+    def _scan_t_subcases(self, path, prefix):
+        # we just create here the list of parameters we'll use to
+        # create the subtestcase on every execution of the testcase
+        # itself (done in configure_10 when the TC is executed). Read
+        # that for reasons...
+        with open(path) as tf:
+            subcases = re.findall(self._regex_t_subcases, tf.read())
+        for name in subcases:
+            # make sure to remove leading/trailing whitespace
+            _name = commonl.name_make_safe(name.strip())
+            t_file_name = os.path.basename(path)
+            self.subtc_list.append((
+                # note we'll key on the .t file basename and the subtest name
+                # inside the .t file, otherwise if two different .t files
+                # in the dir have same subtest names, they'd override.
+                # In _eval_one() we'll refer to this dict
+                # We keep this, even if is basically the same because
+                # it will easily make configure_10 later print a
+                # shorter list for reference in reports...
+                t_file_name + "." + _name,
+                # testcase full name / unique ID
+                prefix + t_file_name.replace(".t", "") + "." + _name,
+                self.kws['thisfile'], self.origin
+            ))
+
     @classmethod
     def is_testcase(cls, path):
         # the any-bundle directory of bbt.git is only to run after
@@ -685,17 +739,31 @@ EOF
         # it. Otherwise we create a new one.
         # As a result, we only create a testcase per directory that
         # has entries for each .t file in the directory.
-        dir_name = os.path.dirname(path)
-        if dir_name in cls.paths:
+        srcdir = os.path.dirname(path)
+        if srcdir in cls.paths:
             # there is a testcase for this directory already, append
             # the .t
-            tc = cls.paths[dir_name]
+            tc = cls.paths[srcdir]
             tc.t_files.append(os.path.basename(path))
-            tc.report_info("%s will be run by %s" % (file_name, dir_name),
+            tc._scan_t_subcases(path, srcdir + "/")
+            tc.report_info("%s will be run by %s" % (file_name, srcdir),
                            dlevel = 3)
         else:
             # there is no testcase for this directory, go create it;
             # set the full filename as origin.
-            tc = cls(dir_name, path)
-            cls.paths[dir_name] = tc
+            tc = cls(srcdir, path)
+            tc._scan_t_subcases(path, srcdir + "/")
+            cls.paths[srcdir] = tc
+
+            # now, we will also run anything in the any-bundle
+            # directory -- per directory, so we add it now, as we
+            # won't be able to do it later FIXME this might make it
+            # not work when we just point to a .t
+            # any_bundle's are at ../../any-bundle from the
+            # per-bundle directories where the .ts are.
+            any_bundle_path = os.path.join(srcdir, "..", "..", "any-bundle",
+                                           "*.t")
+            for any_t_file_path in glob.glob(any_bundle_path):
+                tc._scan_t_subcases(any_t_file_path, srcdir + "/any#")
+
         return [ tc ]
