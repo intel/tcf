@@ -573,10 +573,11 @@ class file_c(report_c):
             try:
                 for line in attachment:
                     self._write(
-                        f, u"%s %s: %s\n" % (prefix, key, line.rstrip()))
+                        f, u"%s %s: %s\n" % (prefix, key, line))
             except TypeError:
                 # FIXME: shouldn't this write about the exception?
-                self._write(f, u"%s %s: %s\n" % (prefix, key, attachment))
+                self._write(f, u"%s %s: [can't represent type %s]\n"
+                            % (prefix, key, type(attachment).__name__))
 
     @staticmethod
     def _get_code():
