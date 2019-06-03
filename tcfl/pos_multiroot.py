@@ -47,6 +47,7 @@ transfer (and thus slowest to fastest operation):
 """
 import operator
 import os
+import pprint
 import random
 import re
 
@@ -68,6 +69,13 @@ def _disk_partition(target):
     for blockdevice in target.pos.fsinfo.get('blockdevices', []):
         if blockdevice['name'] == device_basename:
             dev_info = blockdevice
+            break
+    else:
+        raise tc.error_e(
+            "%s: can't find information about this block device -- is "
+            "the right pos_boot_device set in the configuration?"
+            % device_basename,
+            dict(fsinfo = pprint.pformat(target.pos.fsinfo)))
     size_gb = int(dev_info['size']) / 1024 / 1024 / 1024
     target.report_info("POS: %s is %d GiB in size" % (device, size_gb),
                        dlevel = 2)
@@ -325,16 +333,10 @@ def mount_fs(target, image, boot_dev):
             if 'special device ' + root_part_dev \
                + ' does not exist.' in output:
                 _disk_partition(target)
-            elif 'mount: /mnt: wrong fs type, bad option, ' \
-               'bad superblock on ' + root_part_dev + ', missing ' \
-               'codepage or helper program, or other error.' in output:
-                # ok, this means probably the partitions are not
-                # formatted; FIXME: support other filesystemmakeing?
-                _mkfs(target, root_part_dev, fstype, mkfs_opts)
             else:
-                raise tc.blocked_e(
-                    "POS: Can't recover unknown error condition: %s"
-                    % output, dict(target = target, output = output))
+                # ok, this probably means probably the partitions are not
+                # formatted; so let's just reformat and retry 
+                _mkfs(target, root_part_dev, fstype, mkfs_opts)
         else:
             target.report_info("POS: mounted %s onto /mnt to image"
                                % root_part_dev)
