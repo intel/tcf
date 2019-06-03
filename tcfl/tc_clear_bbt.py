@@ -632,18 +632,18 @@ EOF
             else:
                 result.passed += 1
 
-        # seems we had execution, so let's parse the output and
-        # make subcases of the .t
-        tcs = tap_parse_output(output)
-        for name, data in tcs.iteritems():
-            # get the subctc; see _scan_t_subcases() were we keyed
-            # them in
-            _name = commonl.name_make_safe(name)
-            subtc = self.subtcs[t_file + "." + _name]
-            # translate the taps result to a TCF result, record it
-            subtc.update(self.mapping[data['result']], data)
-            result += subtc.result
-        return result
+            # seems we had execution, so let's parse the output and
+            # make subcases of the .t
+            tcs = tap_parse_output(output)
+            for name, data in tcs.iteritems():
+                # get the subctc; see _scan_t_subcases() were we keyed
+                # them in
+                _name = commonl.name_make_safe(name)
+                subtc = self.subtcs[t_file + "." + _name]
+                # translate the taps result to a TCF result, record it
+                subtc.update(self.mapping[data['result']], data)
+                result += subtc.result
+            return result
 
     def eval(self, ic, target):
 
