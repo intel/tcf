@@ -103,6 +103,7 @@ def tap_parse_output(output):
 
     linecnt = 0
     _plan_count = 1
+    tc = None
     for line in output.split("\n"):
         linecnt += 1
         m = tc_plan.search(line)
@@ -162,8 +163,13 @@ def tap_parse_output(output):
         m = tc_output.search(line)
         if m:
             d = m.groupdict()
-            tc['output'] += d['data'] + "\n"
-            tc['lines'].append(linecnt)
+            if tc:
+                tc['output'] += d['data'] + "\n"
+                tc['lines'].append(linecnt)
+            else:
+                raise tcfl.tc.blocked_e(
+                    "Can't parse output; corrupted? didn't find a header",
+                    dict(output = output, line = linecnt))
             continue
     return tcs
 
@@ -633,8 +639,16 @@ EOF
                 result.passed += 1
 
             # seems we had execution, so let's parse the output and
-            # make subcases of the .t
-            tcs = tap_parse_output(output)
+            # make subcases of the .t -- if anything fails, catch and
+            # convert to a TCF exception so it only affects *this*
+            # testcase in the result accounting--note
+            # report_from_exception() will report exceptio data so we
+            # can debug if it is an infra or TC problem.
+            try:
+                tcs = tap_parse_output(output)
+            except Exception as e:
+                tcs = dict()
+                result += tcfl.tc.result_c.report_from_exception(self, e)
             for name, data in tcs.iteritems():
                 # get the subctc; see _scan_t_subcases() were we keyed
                 # them in
