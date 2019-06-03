@@ -617,6 +617,10 @@ EOF
                 "%s: skipped due to configuration "
                 "(tcfl.tc_clear_bbt.ignore_ts or BBT_IGNORE_TS environment)"
                 % rel_file_path)
+            for name, subtc in self.subtcs.iteritems():
+                if name.startswith(t_file):
+                    subtc.result = tcfl.tc.result_c(0, 0, 0, 0, 1)
+                    subtc.data = dict(result = "skipped")
             result.skipped += 1
         else:
             self.report_info("running %s%s" % (prefix, t_file))
@@ -657,7 +661,7 @@ EOF
                 # translate the taps result to a TCF result, record it
                 subtc.update(self.mapping[data['result']], data)
                 result += subtc.result
-            return result
+        return result
 
     def eval(self, ic, target):
 
