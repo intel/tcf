@@ -571,9 +571,7 @@ class file_c(report_c):
                         f, u"%s %s: %s\n" % (prefix, key, line.rstrip()))
         else:
             try:
-                for line in attachment:
-                    self._write(
-                        f, u"%s %s: %s\n" % (prefix, key, line))
+                self._write(f, u"%s %s: %s\n" % (prefix, key, attachment))
             except TypeError:
                 # FIXME: shouldn't this write about the exception?
                 self._write(f, u"%s %s: [can't represent type %s]\n"
