@@ -60,6 +60,7 @@ the server::
 
 import logging
 import glob
+import multiprocess
 import os
 import re
 import subprocess
@@ -239,16 +240,36 @@ class tc_taps_subcase_c_base(tcfl.tc.tc_c):
 #: >>> tcfl.tc_clear_bbt.ignore_ts = [
 #: >>>     'bundles/XYZ/somefile.t',
 #: >>>     'bundles/ABC/someother.t',
+#: >>>     '.*/any#somefile.sometestcase",
 #: >>> ]
 #:
 #: or from the command line, byt setting the BBT_IGNORE_TS
 #: environment variable::
 #:
-#:   $ export BBT_IGNORE_TS="bundles/XYZ/somefile.t bundles/ABC/someother.t"
+#:   $ export BBT_IGNORE_TS="bundles/XYZ/somefile.t #bundles/ABC/someother.t .*/any#somefile.sometestcase"
 #:   $ tcf run bbt.git/bundles/XYZ bbt.git/bundles/ABC
 #:
+#: Note all entries will be compiled as Python regular expressions
+#: that have to match from the beginning. A whole .t file can be
+#: excluded with:
+#:
+#: >>>     'bundles/XYZ/somefile.t'
+#:
+#: where as a particular testcase in said file:
+#:
+#: >>>     'bundles/XYZ/somefile.subcasename'
+#:
+#: note those subcases still will be executed (there is no way for the
+#: *bats* tool to be told to ignore) but their results will be ignored.
 ignore_ts = os.environ.get("BBT_IGNORE_TS", "").split()
 
+# read / write only under the mutex -- the mutex is used just to read
+# it and the first person that sees it None, will re.compile() each
+# entry to ignore_ts_regex, then release the mutex. So it is
+# guaranteed that if you take the mutex, read it and not None, it'll
+# be a valid list you can use without the mutex
+ignore_ts_mutex = multiprocess.Lock()
+ignore_ts_regex = None
 
 @tcfl.tc.interconnect('ipv4_addr')
 @tcfl.tc.target('pos_capable', mode = 'any')
@@ -523,6 +544,14 @@ EOF
             raise
         target.report_pass("Booted %s" % self.image)
 
+        # Why this? because a lot of the test output can be confused
+        # with a prompt and the prompt regex then trips on it and
+        # everything gets out of sync
+        target.shell.linux_shell_prompt_regex = re.compile("BBT-PS1-PROMPT% ")
+        target.shell.run(
+            'export PS1="BBT-PS1-PROMPT% " # do a very simple prompt, ' \
+            'difficult to confuse with test output')
+
         target.shell.run(
             "test -f /etc/ca-certs/trusted/regenerate"
             " && rm -rf /run/lock/clrtrust.lock"
@@ -609,10 +638,31 @@ EOF
                                bundle, float(m.groupdict()['seconds']))
             self.targets_active(target)
 
+    def _ts_ignore(self, subtcname):
+        global ignore_ts_regex
+        with ignore_ts_mutex:
+            if ignore_ts_regex == None:
+                # ops, list not compiled, let's do it under the mutex
+                # so none steps on us
+                ignore_ts_regex = []
+                count = 0
+                for spec in ignore_ts:
+                    try:
+                        ignore_ts_regex.append(re.compile(spec))
+                    except:
+                        self.log.error("#%d: can't compile '%s' as a regex"
+                                       % (count, spec))
+                        raise
+                    count += 1
+        for spec in ignore_ts_regex:
+            if spec.match(subtcname):
+                return True
+        return False
+
     def _eval_one(self, target, t_file, prefix):
         result = tcfl.tc.result_c(0, 0, 0, 0, 0)
         rel_file_path = os.path.join(prefix, t_file)
-        if rel_file_path in ignore_ts:
+        if self._ts_ignore(rel_file_path):
             target.report_skip(
                 "%s: skipped due to configuration "
                 "(tcfl.tc_clear_bbt.ignore_ts or BBT_IGNORE_TS environment)"
@@ -654,12 +704,20 @@ EOF
                 tcs = dict()
                 result += tcfl.tc.result_c.report_from_exception(self, e)
             for name, data in tcs.iteritems():
-                # get the subctc; see _scan_t_subcases() were we keyed
+                # get the subtc; see _scan_t_subcases() were we keyed
                 # them in
                 _name = commonl.name_make_safe(name)
-                subtc = self.subtcs[t_file + "." + _name]
-                # translate the taps result to a TCF result, record it
-                subtc.update(self.mapping[data['result']], data)
+                tc_name = t_file + "." + _name
+                subtc = self.subtcs[tc_name]
+                if self._ts_ignore(subtc.name):
+                    data['result'] += \
+                        "result skipped due to configuration " \
+                        "(tcfl.tc_clear_bbt.ignore_ts or " \
+                        "BBT_IGNORE_TS environment)"
+                    subtc.update(tcfl.tc.result_c(0, 0, 0, 0, 1), data)
+                else:
+                    # translate the taps result to a TCF result, record it
+                    subtc.update(self.mapping[data['result']], data)
                 result += subtc.result
         return result
 
