@@ -706,7 +706,7 @@ EOF
             for name, data in tcs.iteritems():
                 # get the subtc; see _scan_t_subcases() were we keyed
                 # them in
-                _name = commonl.name_make_safe(name)
+                _name = commonl.name_make_safe(name.strip()).rstrip("_")
                 tc_name = t_file + "." + _name
                 subtc = self.subtcs[tc_name]
                 if self._ts_ignore(subtc.name):
@@ -775,8 +775,11 @@ EOF
         with open(path) as tf:
             subcases = re.findall(self._regex_t_subcases, tf.read())
         for name in subcases:
-            # make sure to remove leading/trailing whitespace
-            _name = commonl.name_make_safe(name.strip())
+            # make sure to remove leading/trailing whitespace and then
+            # trailing _--this allows it to match what the bats tool
+            # scans, which we'll need to match in the output of
+            # tap_parse_output() in _eval_one()
+            _name = commonl.name_make_safe(name.strip()).rstrip("_")
             t_file_name = os.path.basename(path)
             self.subtc_list.append((
                 # note we'll key on the .t file basename and the subtest name
