@@ -75,16 +75,55 @@ class shell(tc.target_extension_c):
 
     def up(self, tempt = None,
            user = None, login_regex = re.compile('login:'), delay_login = 0,
-           password = None, password_regex = re.compile('Password:'),
+           password = None, password_regex = re.compile('[Pp]assword:'),
            shell_setup = True, timeout = 120):
-        """
-        Giving it ample time to boot, wait for a shell prompt and set
-        up the shell so that if an error happens, it will print an error
-        message and raise a block exception.
+        """Wait for the shell in a console to be ready
+
+        Giving it ample time to boot, wait for a :data:`shell prompt
+        <linux_shell_prompt_regex>` and set up the shell so that if an
+        error happens, it will print an error message and raise a
+        block exception. Optionally login as a user and password.
+
+        >>> target.shell.up(user = 'root', password = '123456')
+
+        :param str tempt: (optional) string to send before waiting for
+          the loging prompt (for example, to send a newline that
+          activates the login)
+
+        :param str user: (optional) if provided, it will wait for
+          *login_regex* before trying to login with this user name.
+
+        :param str password: (optional) if provided, and a password
+          prompt is found, send this password.
+
+        :param str login_regex: (optional) if provided (string
+          or compiled regex) and *user* is provided, it will wait for
+          this prompt before sending the username.
+
+        :param str password_regex: (optional) if provided (string
+          or compiled regex) and *password* is provided, it will wait for
+          this prompt before sending the password.
+
+        :param int delay_login: (optional) wait this many seconds
+          before sending the user name after finding the login prompt.
+
+        :param bool shell_setup: (optional, default) setup the shell
+          up by disabling command line editing (makes it easier for
+          the automation) and set up hooks that will raise an
+          exception if a shell command fails.
 
         :param int timeout: [optional] seconds to wait for the login
           prompt to appear
+
         """
+        assert tempt == None or isinstance(tempt, basestring)
+        assert user == None or isinstance(user, basestring)
+        assert isinstance(login_regex, ( basestring, re._pattern_type ))
+        assert delay_login >= 0
+        assert password == None or isinstance(password, basestring)
+        assert isinstance(password_regex, ( basestring, re._pattern_type ))
+        assert isinstance(shell_setup, bool)
+        assert timeout > 0
         def _login(target):
             # If we have login info, login to get a shell prompt
             target.expect(login_regex)
@@ -101,7 +140,6 @@ class shell(tc.target_extension_c):
             original_timeout = self.target.testcase.tls.expecter.timeout
             self.target.testcase.tls.expecter.timeout = timeout
             if tempt:
-                assert isinstance(tempt, basestring)
                 tries = 0
                 while tries < self.target.testcase.tls.expecter.timeout:
                     try:
