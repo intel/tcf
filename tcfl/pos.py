@@ -1049,6 +1049,8 @@ EOF""")
             )
             kws.update(target.kws)
 
+            # keep console more or less clean, so we can easily parse it
+            target.shell.run("dmesg -l alert")
             original_timeout = testcase.tls.expecter.timeout
             try:
                 testcase.tls.expecter.timeout = 800
