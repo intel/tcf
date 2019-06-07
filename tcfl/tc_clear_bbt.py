@@ -60,7 +60,7 @@ the server::
 
 import logging
 import glob
-import multiprocess
+import threading
 import os
 import re
 import subprocess
@@ -268,8 +268,10 @@ ignore_ts = os.environ.get("BBT_IGNORE_TS", "").split()
 # it and the first person that sees it None, will re.compile() each
 # entry to ignore_ts_regex, then release the mutex. So it is
 # guaranteed that if you take the mutex, read it and not None, it'll
-# be a valid list you can use without the mutex
-ignore_ts_mutex = multiprocess.Lock()
+# be a valid list you can use without the mutex.
+# Note we don't care if we re under a multiprocess (vs multithread)
+# environment, as long as we have a single copy
+ignore_ts_mutex = threading.Lock()
 ignore_ts_regex = None
 
 @tcfl.tc.interconnect('ipv4_addr')
