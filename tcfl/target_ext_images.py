@@ -14,8 +14,8 @@ import time
 
 import requests
 
-import tc
-import ttb_client
+from . import tc
+from . import ttb_client
 
 from . import msgid_c
 

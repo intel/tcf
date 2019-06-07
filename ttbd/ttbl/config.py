@@ -107,9 +107,9 @@ def target_add(target, _id = None, tags = None, target_type = None):
         else:
             _id = target.id
     else:
-        assert isinstance(_id, basestring)
+        assert isinstance(_id, str)
     if target_type != None:
-        assert isinstance(target_type, basestring)
+        assert isinstance(target_type, str)
         target.type = target_type
     regex = re.compile("^[-a-zA-Z0-9_]+$")
     if not regex.match(_id):
@@ -117,7 +117,7 @@ def target_add(target, _id = None, tags = None, target_type = None):
                          % (_id, regex.pattern))
 
     with targets_lock:
-        if id in targets.keys():
+        if id in list(targets.keys()):
             raise ValueError("target ID %s already exists" % _id)
         targets[_id] = target
     if isinstance(target, ttbl.test_target_console_mixin):

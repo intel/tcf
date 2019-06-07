@@ -35,7 +35,7 @@ def template_rexpand(text, kws):
 
     Stop after ten iterations
     """
-    assert isinstance(text, basestring)
+    assert isinstance(text, str)
     assert isinstance(kws, dict)
     count = 0
     while '%(' in text:
@@ -245,7 +245,7 @@ class pci(ttbl.tt_power_control_impl):
         #   }
         first = True
         res = ""
-        for arch_name, arch_data in pxe_architectures.iteritems():
+        for arch_name, arch_data in pxe_architectures.items():
             if first:
                 if_s = "if"
                 first = False
@@ -325,7 +325,7 @@ subnet6 %(if_net)s/%(if_len)s {
         #
         # FIXME: This leaves a gap, as targets in other servers could
         # be connected to this network. Sigh.
-        for target_id, target in ttbl.config.targets.iteritems():
+        for target_id, target in ttbl.config.targets.items():
             interconnects = target.tags.get('interconnects', {})
             ic = self.target
 
@@ -348,7 +348,7 @@ subnet6 %(if_net)s/%(if_len)s {
                                    % (target_id, boot_ic))
 
             if not 'bsp' in target.tags:
-                bsps = target.tags['bsps'].keys()
+                bsps = list(target.tags['bsps'].keys())
                 kws['bsp'] = sorted(bsps)[0]
             kws.update(dict(
                 ipv4_gateway = ic.tags.get('ipv4_gateway', ""),
@@ -365,7 +365,7 @@ subnet6 %(if_net)s/%(if_len)s {
             _tag_get_from_ic_target(kws, 'pos_nfs_server', ic, target)
             _tag_get_from_ic_target(kws, 'pos_nfs_path', ic, target)
 
-            for ic_id, interconnect in interconnects.iteritems():
+            for ic_id, interconnect in interconnects.items():
                 if '#' in ic_id:
                     real_ic_id, instance = ic_id.split("#", 1)
                     kws['hostname'] = target.id + "-" + instance
@@ -487,7 +487,7 @@ host %(hostname)s {
         commonl.makedirs_p(os.path.join(tftp_dir, tftp_prefix,
                                         "pxelinux.cfg"),
                            0o0775)
-        for arch_name, arch_data in pxe_architectures.iteritems():
+        for arch_name, arch_data in pxe_architectures.items():
             tftp_arch_dir = os.path.join(tftp_dir, tftp_prefix, arch_name)
             commonl.makedirs_p(tftp_arch_dir, 0o0775)
             cmdline = [ "rsync", "-a", "--delete" ] \
@@ -575,7 +575,7 @@ def power_on_pre_pos_setup(target):
         # The service
         kws = dict(target.tags)
         if not 'bsp' in target.tags:
-            bsps = target.tags['bsps'].keys()
+            bsps = list(target.tags['bsps'].keys())
             kws['bsp'] = sorted(bsps)[0]
         kws.update(dict(
             ipv4_addr = interconnect['ipv4_addr'],

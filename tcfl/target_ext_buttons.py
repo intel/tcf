@@ -11,8 +11,8 @@ Press and release buttons in the target
 """
 import json
 
-import tc
-import ttb_client
+from . import tc
+from . import ttb_client
 import logging
 
 def _rest_tb_target_button_sequence(rtb, rt, sequence, ticket = ''):
@@ -144,12 +144,12 @@ def cmdline_button_click(args):
 def cmdline_button_list(args):
     rtb, rt = ttb_client._rest_target_find_by_id(args.target)
     data = _rest_tb_target_buttons_get(rtb, rt, ticket = args.ticket)
-    for name, state in data['buttons'].iteritems():
+    for name, state in data['buttons'].items():
         if state:
             _state = 'pressed'
         else:
             _state = 'released'
-        print "%s:%s" % (name, _state)
+        print("%s:%s" % (name, _state))
 
 
 def cmdline_setup(argsp):

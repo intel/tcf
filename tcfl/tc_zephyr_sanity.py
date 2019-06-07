@@ -20,7 +20,7 @@ new descriptions. Details are explained in
 """
 import codecs
 import collections
-import ConfigParser
+import configparser
 import contextlib
 import copy
 import errno
@@ -36,11 +36,11 @@ import threading
 import traceback
 
 # Needed so I can also import from tc to initialize -- ugly
-import commonl.expr_parser
-import expecter
+from . import commonl.expr_parser
+from . import expecter
 import tcfl
-import tc
-import tc_zephyr_scl
+from . import tc
+from . import tc_zephyr_scl
 
 from . import msgid_c
 
@@ -106,7 +106,7 @@ class SanityConfigParser:
 
         :param str filename: Source .ini file to read
         """
-        cp = ConfigParser.SafeConfigParser()
+        cp = configparser.SafeConfigParser()
         cp.readfp(open(filename))
         self.filename = filename
         self.cp = cp
@@ -202,7 +202,7 @@ class SanityConfigParser:
                     % (k, section))
             d[k] = v
 
-        for k, kinfo in valid_keys.items():
+        for k, kinfo in list(valid_keys.items()):
             if k not in d:
                 if "required" in kinfo:
                     required = kinfo["required"]
@@ -275,7 +275,7 @@ class _harness_console_c(harness_c):	# pylint: disable = too-few-public-methods
     def __init__(self, ordered, repeat, regexs):
         assert isinstance(ordered, bool)
         assert repeat > 0
-        assert all([ isinstance(regex, basestring)
+        assert all([ isinstance(regex, str)
                      for regex in regexs ])
         harness_c.__init__(self)
         self.repeat = repeat
@@ -424,10 +424,10 @@ class tc_zephyr_subsanity_c(tc.tc_c):
     # pass/errr/fail/block/skip line.
     def __init__(self, name, tc_file_path, origin,
                  zephyr_name, parent, attachments = None):
-        assert isinstance(name, basestring)
-        assert isinstance(tc_file_path, basestring)
-        assert isinstance(origin, basestring)
-        assert isinstance(zephyr_name, basestring)
+        assert isinstance(name, str)
+        assert isinstance(tc_file_path, str)
+        assert isinstance(origin, str)
+        assert isinstance(zephyr_name, str)
         assert isinstance(parent, tcfl.tc.tc_c)
         assert not attachments or isinstance(attachments, dict)
 
@@ -446,7 +446,7 @@ class tc_zephyr_subsanity_c(tc.tc_c):
         # will be faster -- do it like this so we can use the same
         # class for normal sanity check testcases that require a
         # target and unit test cases that don't.
-        for target in self.targets.values():
+        for target in list(self.targets.values()):
             target.acquire = False
         self.report_pass("NOTE: This is a subtestcase of %(tc_name)s "
                          "(%(runid)s:%(tc_hash)s); refer to it for full "
@@ -466,7 +466,7 @@ class tc_zephyr_subsanity_c(tc.tc_c):
                 self._result = "SKIP"
             else:
                 self._result = "PASS"
-        for target_want_name, target in self.targets.iteritems():
+        for target_want_name, target in self.targets.items():
             self.attachments[target_want_name] = target
         if 'description' in self.attachments:
             append = ": " + self.attachments['description']
@@ -775,7 +775,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         # Patch 'hw_requires'
         tc_dict.setdefault('hw_requires', set())
         myname = os.path.normpath(self.name)
-        for name, hw_requires in self.patch_hw_requires.iteritems():
+        for name, hw_requires in self.patch_hw_requires.items():
             if myname.endswith(os.path.normpath(name)):
                 for hw_require in hw_requires:
                     tc_dict['hw_requires'].add(hw_require)
@@ -785,7 +785,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
             
         # depends_on and hw_requires are the same
         if tc_dict.get('hw_requires', None):
-            if isinstance(tc_dict['hw_requires'], basestring):
+            if isinstance(tc_dict['hw_requires'], str):
                 # .ini format gives us a list
                 tc_dict['hw_requires'] = tc_dict['hw_requires'].split()
             target_spec.append("( " + " and ".join(tc_dict['hw_requires'])
@@ -793,7 +793,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
 
         # This we have to match later
         if tc_dict.get('depends_on', None):
-            if isinstance(tc_dict['depends_on'], basestring):
+            if isinstance(tc_dict['depends_on'], str):
                 # .ini format gives us a list
                 tc_dict['depends_on'] = tc_dict['depends_on'].split()
             self.zephyr_depends_on = tc_dict['depends_on']
@@ -811,7 +811,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
 
         # These are variables we add for the default rules to pick up
         if tc_dict.get("extra_args", None):
-            if isinstance(tc_dict['extra_args'], basestring):
+            if isinstance(tc_dict['extra_args'], str):
                 self.extra_args = tc_dict["extra_args"]
             else:
                 # .ini format gives us a list
@@ -832,7 +832,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
                                app_zephyr_options = self.extra_args)
 
         tags = tc_dict.get("tags", [])
-        if isinstance(tags, basestring):
+        if isinstance(tags, str):
             tags = tags.split()
         for tag in tags:
             self._tags[tag] = (True, origin)
@@ -851,7 +851,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
             self._tags['slow'] = (True, origin)
 
         # Patch tags
-        for name, tags in self.patch_tags.iteritems():
+        for name, tags in self.patch_tags.items():
             if myname.endswith(os.path.normpath(name)):
                 for tag in tags:
                     if isinstance(tags, collections.Mapping):
@@ -1022,7 +1022,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         board_arch = board_yaml['arch']
         board_platform = board_yaml['identifier']
         if tc_dict.get('arch_whitelist', None):
-            if isinstance(tc_dict['arch_whitelist'], basestring):
+            if isinstance(tc_dict['arch_whitelist'], str):
                 # .ini format gives us a list
                 tc_dict['arch_whitelist'] = tc_dict['arch_whitelist'].split()
             if board_arch not in tc_dict['arch_whitelist']:
@@ -1031,7 +1031,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
                     % (board_arch, " ".join(tc_dict['arch_whitelist'])))
 
         if tc_dict.get('platform_whitelist', None):
-            if isinstance(tc_dict['platform_whitelist'], basestring):
+            if isinstance(tc_dict['platform_whitelist'], str):
                 # .ini format gives us a list
                 tc_dict['platform_whitelist'] = tc_dict['platform_whitelist'].split()
             if board_platform not in tc_dict['platform_whitelist']:
@@ -1040,14 +1040,14 @@ class tc_zephyr_sanity_c(tc.tc_c):
                     % (board_platform, " ".join(tc_dict['platform_whitelist'])))
 
         if tc_dict.get('arch_exclude', None):
-            if isinstance(tc_dict['arch_exclude'], basestring):
+            if isinstance(tc_dict['arch_exclude'], str):
                 # .ini format gives us a list
                 tc_dict['arch_exclude'] = tc_dict['arch_exclude'].split()
             if board_arch in tc_dict['arch_exclude']:
                 raise tcfl.tc.skip_e("architecture %s excluded" % board_arch)
 
         if tc_dict.get('platform_exclude', None):
-            if isinstance(tc_dict['platform_exclude'], basestring):
+            if isinstance(tc_dict['platform_exclude'], str):
                 # .ini format gives us a list
                 tc_dict['platform_exclude'] = tc_dict['platform_exclude'].split()
             if board_platform in tc_dict['platform_exclude']:
@@ -1067,7 +1067,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
                             (self.tc_dict['min_flash'], board_flash))
 
         ignore_tags = board_yaml.get('testing', {}).get('ignore_tags', [])
-        for tag, (_value, origin) in self._tags.iteritems():
+        for tag, (_value, origin) in self._tags.items():
             if tag in ignore_tags:
                 raise tc.skip_e(
                     "skipped: testcase tagged %s (@%s), marked to ignore "
@@ -1150,7 +1150,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
     @staticmethod
     def _in_file(f, regex):
         f.seek(0, 0)
-        if isinstance(regex, basestring):
+        if isinstance(regex, str):
             regex = re.compile(re.escape(regex))
         for line in f:
             if regex.search(line):
@@ -1274,17 +1274,17 @@ class tc_zephyr_sanity_c(tc.tc_c):
           function.
 
         """
-        assert isinstance(domain, basestring)
-        assert isinstance(name, basestring)
-        assert isinstance(regex, basestring)
+        assert isinstance(domain, str)
+        assert isinstance(name, str)
+        assert isinstance(regex, str)
         if main_trigger_regex:
-            assert isinstance(main_trigger_regex, basestring)
+            assert isinstance(main_trigger_regex, str)
         if trigger_regex:
-            assert isinstance(trigger_regex, basestring)
+            assert isinstance(trigger_regex, str)
         if not origin:
             origin = commonl.origin_get()
         else:
-            assert isinstance(origin, basestring)
+            assert isinstance(origin, str)
         cls._data_parse_regexs[domain, name] = (
             main_trigger_regex, trigger_regex, regex, origin)
 
@@ -1295,7 +1295,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         # might be field formatting in domain name, name and regex
         # patterns
         for (domain, name), (main_trigger_regex, trigger_regex, regex, origin) \
-            in self._data_parse_regexs.iteritems():
+            in self._data_parse_regexs.items():
             try:
                 regex_list.append((
                     domain % target.kws,
@@ -1443,7 +1443,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         # we due to a previous failure or condition
         outputf.seek(0)
         expected_testcases = set(self.subtestcases.keys())
-        for testname, td in results.iteritems():
+        for testname, td in results.items():
             if not 'start' in td:
                 self.report_blck("%s: no way to determine start of output" %
                                  testname)
@@ -1502,13 +1502,13 @@ class tc_zephyr_sanity_c(tc.tc_c):
         if self.unit_test:
             self._subtestcases_grok(None)
         else:
-            for target in self.targets.values():
+            for target in list(self.targets.values()):
                 self._subtestcases_grok(target)
 
     def teardown(self):
         if self.result_eval.summary().passed == 0:
             return
-        for target in self.targets.values():
+        for target in list(self.targets.values()):
             self._report_data_from_target(target)
 
     def clean(self):
@@ -1592,10 +1592,10 @@ class tc_zephyr_sanity_c(tc.tc_c):
     def _get_test(cls, name, test_data, common, valid_keys):
 
         d = {}
-        for k, v in common.iteritems():
+        for k, v in common.items():
             d[k] = v
 
-        for k, v in test_data.iteritems():
+        for k, v in test_data.items():
             if k not in valid_keys:
                 raise ConfigurationError(
                     name,
@@ -1608,7 +1608,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
             else:
                 d[k] = v
 
-        for k, kinfo in valid_keys.iteritems():
+        for k, kinfo in valid_keys.items():
             if k not in d:
                 if "required" in kinfo:
                     required = kinfo["required"]
@@ -1720,7 +1720,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         # excludes, etc... try to guess who comes fro the YAML level,
         # who is a subtest in the source.
         src_subcases = set()
-        yaml_subcases = mapping.keys()
+        yaml_subcases = list(mapping.keys())
         for subcase in subcases:
             if subcase not in yaml_subcases:
                 top_subcase, src_subcase = os.path.splitext(subcase)
@@ -1732,7 +1732,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
                            " ".join(yaml_subcases)))
                 src_subcases.add(src_subcase[1:])
 
-        for tc_name, _tc_vals in mapping.iteritems():
+        for tc_name, _tc_vals in mapping.items():
             tc_vals = cls._get_test(tc_name, _tc_vals, common, testcase_valid_keys)
             origin = path + "#" + tc_name
             _tc = cls(origin, path, origin, tc_name, src_subcases)

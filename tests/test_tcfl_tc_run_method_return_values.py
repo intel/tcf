@@ -20,12 +20,10 @@ class _mc(tcfl.tc._tc_mc):
         tcfl.tc._tc_mc.__init__(cls, name, bases, d)
         cls.exception_to_result[AssertionError] = tcfl.tc.failed_e
 
-class _01_pass(tcfl.tc.tc_c):
+class _01_pass(tcfl.tc.tc_c, metaclass=_mc):
     """
     Return different things that mean "pass"
     """
-
-    __metaclass__ = _mc
 
     @staticmethod
     def test_00_nothing():
@@ -55,12 +53,10 @@ class _01_pass(tcfl.tc.tc_c):
         assert self.result_eval.summary() == tcfl.tc.result_c(1, 0, 0, 0, 0)
 
 
-class _02_fail(tcfl.tc.tc_c):
+class _02_fail(tcfl.tc.tc_c, metaclass=_mc):
     """
     Return different things that mean "fail"
     """
-
-    __metaclass__ = _mc
 
     @staticmethod
     def test_02():
@@ -89,12 +85,10 @@ class _02_fail(tcfl.tc.tc_c):
         # result with a pass
         self.result_eval = tcfl.tc.result_c(1, 0, 0, 0, 0)
 
-class _03_block(tcfl.tc.tc_c):
+class _03_block(tcfl.tc.tc_c, metaclass=_mc):
     """
     Return different things that mean "block"
     """
-
-    __metaclass__ = _mc
 
     @staticmethod
     def test_02():
@@ -118,12 +112,10 @@ class _03_block(tcfl.tc.tc_c):
         # result with a pass
         self.result_eval = tcfl.tc.result_c(1, 0, 0, 0, 0)
 
-class _04_skip(tcfl.tc.tc_c):
+class _04_skip(tcfl.tc.tc_c, metaclass=_mc):
     """
     Return different things that mean "skip"
     """
-
-    __metaclass__ = _mc
 
     @staticmethod
     def test_03():

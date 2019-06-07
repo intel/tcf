@@ -73,7 +73,7 @@ def console_dump_on_failure(testcase):
        and not testcase.result_eval.errors \
        and not testcase.result_eval.blocked:
         return
-    for target in testcase.targets.values():
+    for target in list(testcase.targets.values()):
         if not hasattr(target, "console"):
             continue
         if testcase.result_eval.failed:
@@ -159,7 +159,7 @@ def teardown_targets_power_off(testcase):
     you want to keep them on to be able to inspect them.
     """
     assert isinstance(testcase, tcfl.tc.tc_c)
-    for dummy_twn, target  in reversed(list(testcase.targets.iteritems())):
+    for dummy_twn, target  in reversed(list(testcase.targets.items())):
         target.power.off()
 
 def tcpdump_enable(ic):
@@ -196,7 +196,7 @@ def tcpdump_collect(ic, filename = None):
         count)
     """
     assert isinstance(ic, tcfl.tc.target_c)
-    assert filename == None or isinstance(filename, basestring)
+    assert filename == None or isinstance(filename, str)
     if filename == None:
         filename = \
             "report-%(runid)s:%(tc_hash)s" % ic.kws \

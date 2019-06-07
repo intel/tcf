@@ -10,7 +10,7 @@ Access target's debugging capabilities
 
 """
 
-import tc
+from . import tc
 
 class debug(tc.target_extension_c):
     """

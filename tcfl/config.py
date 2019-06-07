@@ -14,10 +14,10 @@ import inspect
 import logging
 import os
 import re
-import urlparse
+import urllib.parse
 
-import commonl
-import ttb_client
+from . import commonl
+from . import ttb_client
 
 logger = logging.getLogger("tcfl.config")
 #: The list of paths where we find configuration information
@@ -44,7 +44,7 @@ def url_add(url, ssl_ignore = False, aka = None, ca_path = None):
     :param bool ssl_ignore: if True, skips verifying SSL certificates
     :param str aka: Short form for this server, to use in display messages
     """
-    u = urlparse.urlparse(url)
+    u = urllib.parse.urlparse(url)
     if u.scheme == "" or u.netloc == "":
         raise Exception("%s: malformed URL?" % url)
     o = inspect.stack()[1]

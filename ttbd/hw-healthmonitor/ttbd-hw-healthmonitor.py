@@ -329,10 +329,10 @@ def config_watch_add(bus_name, driver_name, device_name, actions):
 
     """
 
-    assert isinstance(bus_name, basestring)
-    assert isinstance(driver_name, basestring)
+    assert isinstance(bus_name, str)
+    assert isinstance(driver_name, str)
     if device_name:
-        if isinstance(device_name, basestring):
+        if isinstance(device_name, str):
             _device_name = "/" + device_name
         elif isinstance(device_name, re._pattern_type):
             _device_name = "/" + device_name.pattern
@@ -349,8 +349,8 @@ def config_watch_add(bus_name, driver_name, device_name, actions):
     origin = commonl.origin_get(2)
     # verify arguments and transform all the actions to a unique
     # form (all have to be a list)
-    for condition, action in actions.iteritems():
-        assert isinstance(condition, basestring), \
+    for condition, action in actions.items():
+        assert isinstance(condition, str), \
             "Key passed as condition is not a string"
         try:
             action_fn = action[0]
@@ -407,7 +407,7 @@ def _entry_matched(entry, bus_name, driver_name, devname, actions, origin):
     # if we have a driver name, we try to match against that
     _driver_name = msg.split(None, 1)[0]
     if driver_name:
-        if isinstance(driver_name, basestring) \
+        if isinstance(driver_name, str) \
            and driver_name == _driver_name:
             logging.debug("%s/%s: match on driver name @%s",
                           driver_name, devname, origin)
@@ -424,7 +424,7 @@ def _entry_matched(entry, bus_name, driver_name, devname, actions, origin):
         driver_name = _driver_name
 
     found_actions = False
-    for condition, action in actions.iteritems():
+    for condition, action in actions.items():
         if condition in msg:
             action_fn = action[0]
             _args = action[1:]
@@ -505,7 +505,7 @@ def _check_entry(entry):
     for bus_name, driver_name, device_name, actions, origin \
         in _watch_rules:
         if device_name and _device_name:
-            if isinstance(device_name, basestring) \
+            if isinstance(device_name, str) \
                and device_name == _device_name:
                 logging.debug("%s: match on device name @%s",
                               _device_name, origin)
@@ -524,7 +524,7 @@ def _check_entry(entry):
         if device_name and _kernel_name:
             # lookup by kernel device name (for example, for USB
             # they look like +usb:3-2
-            if isinstance(device_name, basestring) \
+            if isinstance(device_name, str) \
                and device_name == _kernel_name:
                 logging.debug("%s: match on kernel name @%s",
                               _kernel_name, origin)

@@ -28,7 +28,7 @@ class _test_00(tcfl.tc.tc_c):
     @staticmethod
     def eval(target):
         consoles = target.console.list()
-        assert sorted(consoles) == sorted([u'c1', u'c2', u'c3', u'c4']), \
+        assert sorted(consoles) == sorted(['c1', 'c2', 'c3', 'c4']), \
             "List of read consoles (%s) differs from set" % consoles
         for console in consoles:
             ts = time.time()

@@ -66,7 +66,7 @@ import re
 import subprocess
 import time
 
-import commonl
+from . import commonl
 import tcfl
 import tcfl.pos
 import tcfl.tl
@@ -187,9 +187,9 @@ class tc_taps_subcase_c_base(tcfl.tc.tc_c):
     individually for reporting control.
     """
     def __init__(self, name, tc_file_path, origin, parent):
-        assert isinstance(name, basestring)
-        assert isinstance(tc_file_path, basestring)
-        assert isinstance(origin, basestring)
+        assert isinstance(name, str)
+        assert isinstance(tc_file_path, str)
+        assert isinstance(origin, str)
         assert isinstance(parent, tcfl.tc.tc_c)
 
         tcfl.tc.tc_c.__init__(self, name, tc_file_path, origin)
@@ -209,7 +209,7 @@ class tc_taps_subcase_c_base(tcfl.tc.tc_c):
 	# we don't need to manipulate the targets, so don't assign;
         # will be faster -- do it like this so we can use the same
         # class testcases that require a target and those that don't.
-        for target in self.targets.values():
+        for target in list(self.targets.values()):
             target.acquire = False
         self.report_pass("NOTE: This is a subtestcase of %(tc_name)s "
                          "(%(runid)s:%(tc_hash)s); refer to it for full "
@@ -375,7 +375,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
             self.post_tc_append(self.subtcs[key])
         if self.subtcs:
             self.report_pass("NOTE: this testcase will unfold subcases: %s" %
-                             " ".join(self.subtcs.keys()), dlevel = 1)
+                             " ".join(list(self.subtcs.keys())), dlevel = 1)
         else:
             self.report_pass("NOTE: this testcase does not provide subcases",
                              dlevel = 1)
@@ -670,7 +670,7 @@ EOF
                 "%s: skipped due to configuration "
                 "(tcfl.tc_clear_bbt.ignore_ts or BBT_IGNORE_TS environment)"
                 % rel_file_path)
-            for name, subtc in self.subtcs.iteritems():
+            for name, subtc in self.subtcs.items():
                 if name.startswith(t_file):
                     subtc.result = tcfl.tc.result_c(0, 0, 0, 0, 1)
                     subtc.data = dict(result = "skipped")
@@ -706,7 +706,7 @@ EOF
             except Exception as e:
                 tcs = dict()
                 result += tcfl.tc.result_c.report_from_exception(self, e)
-            for name, data in tcs.iteritems():
+            for name, data in tcs.items():
                 # get the subtc; see _scan_t_subcases() were we keyed
                 # them in
                 _name = commonl.name_make_safe(name.strip()).rstrip("_")

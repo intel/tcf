@@ -8,7 +8,7 @@
 import os
 import re
 import types
-import urlparse
+import urllib.parse
 
 import requests
 import tcfl.tc
@@ -104,7 +104,7 @@ class _test(tcfl.tc.tc_c):
         self.port = zephyr.tunnel.add(80)
         self.report_info("Tunnel added")
         # To connect to the tunnel, we need to know the server's hostname
-        url = urlparse.urlparse(zephyr.rt['url'])
+        url = urllib.parse.urlparse(zephyr.rt['url'])
         self.report_info("Sending request")
         try:
             # Send the request to the server's tunnel end that will go
@@ -172,7 +172,7 @@ class _test(tcfl.tc.tc_c):
     def teardown_dump_console(self):
         if not self.result_eval.failed and not self.result_eval.blocked:
             return
-        for target in self.targets.values():
+        for target in list(self.targets.values()):
             if not hasattr(target, "console"):
                 continue
             if self.result_eval.failed:

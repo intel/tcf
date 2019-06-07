@@ -16,8 +16,8 @@ import re
 import shutil
 import subprocess
 
-import commonl
-import tc
+from . import commonl
+from . import tc
 import tcfl.app
 import __main__
 
@@ -229,7 +229,7 @@ CONFIG_BOOT_DELAY=0
 
         # Add stubs for other BSPs in this board if there are none
         # We will run this each time we go for a BSP build, but it is fine
-        for bsp_stub in target.bsps_stub.keys():
+        for bsp_stub in list(target.bsps_stub.keys()):
             target.stub_app_add(
                 bsp_stub, app_zephyr,
                 os.path.join(ZEPHYR_BASE, 'tests', 'booting', 'stub'))
@@ -342,21 +342,21 @@ CONFIG_BOOT_DELAY=0
         # stub we don't get the config file from the non-stub BSPs
         config = target.zephyr.config_file_read(bsp = target.bsp)
         # unicode -> so weird chars don't make us panic
-        kernelname = unicode(config['CONFIG_KERNEL_BIN_NAME'])
+        kernelname = str(config['CONFIG_KERNEL_BIN_NAME'])
         # Build the kernel
         if target.kws['zephyr_is_cmake']:
             target.shcmd_local(
-                u'%(MAKE)s -C %(zephyr_objdir)s')
+                '%(MAKE)s -C %(zephyr_objdir)s')
             symbols = subprocess.check_output([
                 'nm',
                 os.path.join(
                     target.kws['zephyr_objdir'],
                     "zephyr",
-                    kernelname + u".elf")
+                    kernelname + ".elf")
                 ])
         else:
             target.shcmd_local(
-                u'%(MAKE)s -C %(zephyr_srcdir)s'
+                '%(MAKE)s -C %(zephyr_srcdir)s'
                 ' EXTRA_CFLAGS="-Werror -Wno-error=deprecated-declarations"'
                 ' KCPPFLAGS=-DTC_RUNID=%(runid)s:%(tg_hash)s'
                 ' BOARD=%(zephyr_board)s ARCH=%(bsp)s %(zephyr_extra_args)s'
@@ -365,7 +365,7 @@ CONFIG_BOOT_DELAY=0
                 'nm',
                 os.path.join(
                     target.kws['zephyr_objdir'],
-                    kernelname + u".elf")
+                    kernelname + ".elf")
             ])
         for line in symbols.splitlines():
             token = line.split()
@@ -470,13 +470,13 @@ class zephyr(tc.target_extension_c):
         # Translate Zephyr's concept/name architecture / calling
         # convention and SDK location to something the SDK
         # understands.
-        assert isinstance(variant, basestring) or variant == "", (
+        assert isinstance(variant, str) or variant == "", (
             "SDK variant not defined (usually from the environment "
             "variable ZEPHYR_TOOLCHAIN_VARIANT); "
             "app_zephyr needs that to build Zephyr applications. "
             "Please set on environment or in a configuration file "
             "{/etc/tcf,~/.tcf,.tcf}/conf_*.py")
-        assert isinstance(arch, basestring)
+        assert isinstance(arch, str)
 
         # This translation dictionary has to be defined in a config
         # file in {/etc/tcf,~/.tcf,.tcf}/conf_*.py; the initial
@@ -705,7 +705,7 @@ class zephyr(tc.target_extension_c):
 
         _defconfig = self.config_file_read()
         defconfig = {}
-        for key, value in _defconfig.iteritems():
+        for key, value in _defconfig.items():
             # The testcase.ini filter language doesn't prefix the
             # CONFIG_ stuff, so we are going to strip it with [7:]
             if key.startswith("CONFIG_"):
@@ -750,10 +750,10 @@ def _zephyr_components_from_path(filename, roots):
         path = os.path.dirname(filename)
     else:
         path = filename
-    if isinstance(roots, basestring):
+    if isinstance(roots, str):
         roots = [ roots ]
     else:
-        assert all(isinstance(root, basestring) for root in roots)
+        assert all(isinstance(root, str) for root in roots)
     # remove the prefix ZEPHYR_BASE/tests and the left over is our
     # component path
     components = []
@@ -817,7 +817,7 @@ def _zephyr_testcase_patcher_for_components(testcase):
     # yeah, wouldn't cover all the basis, but then properly tag the
     # components in your testcase, this is just a guesser for backward
     # compat
-    for _target_name, target_data in testcase._targets.iteritems():
+    for _target_name, target_data in testcase._targets.items():
         kws = target_data.get('kws', {})
         if 'app_zephyr' in kws:
             # yay, at least one Zephyr target, we takes

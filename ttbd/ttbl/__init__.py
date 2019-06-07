@@ -30,7 +30,7 @@ import threading
 import time
 import traceback
 import types
-import urlparse
+import urllib.parse
 
 import __main__
 import requests
@@ -38,9 +38,9 @@ import usb.core
 
 import commonl
 import ttbl.config
-import fsdb
-import mutex
-import user_control
+from . import fsdb
+from . import mutex
+from . import user_control
 
 logger = logging.root.getChild("ttb")
 
@@ -169,12 +169,12 @@ class tt_interface(object):
         For an example, see :class:`ttbl.buttons.interface`.
         """
         assert isinstance(target, test_target)
-        assert isinstance(who, basestring)
-        assert isinstance(method, basestring) \
+        assert isinstance(who, str)
+        assert isinstance(method, str) \
             and method in ( 'POST', 'GET', 'DELETE', 'PUT' )
-        assert isinstance(call, basestring)
+        assert isinstance(call, str)
         assert isinstance(args, dict)
-        assert user_path != None and isinstance(user_path, basestring)
+        assert user_path != None and isinstance(user_path, str)
         raise NotImplementedError
         # Note that upon return, the calling layer will add a field
         # 'diagnostics', so don't use that
@@ -335,7 +335,7 @@ class test_target(object):
 
     @type.setter
     def type(self, new_type):
-        assert isinstance(new_type, basestring)
+        assert isinstance(new_type, str)
         self.tags['type'] = new_type
         return self.tags['type']
 
@@ -367,19 +367,19 @@ class test_target(object):
                              "'%s' that is not local, cannot verify; "
                              "if it is local, declare it before the targets "
                              "using it" % real_name)
-        for key, val in data.iteritems():
+        for key, val in data.items():
             # FIXME: verify duped addresses
             if key in ["ipv4_addr", "ipv6_addr"]:
                 proto = key.replace("_addr", "")
                 # Just to verify if it checks as an address
-                _ic_addr = ipaddress.ip_address(unicode(val))
+                _ic_addr = ipaddress.ip_address(str(val))
                 net = ipaddress.ip_network(
-                    unicode(val + "/" + str(data[proto + "_prefix_len"])),
+                    str(val + "/" + str(data[proto + "_prefix_len"])),
                     strict = False)
                 if ic:
                     _ic_addr = ic.tags[key]
                     ic_net = ipaddress.ip_network(
-                        unicode(_ic_addr + "/"
+                        str(_ic_addr + "/"
                                 + str(ic.tags[proto + "_prefix_len"])),
                         strict = False)
                     if ic_net != net:
@@ -410,12 +410,12 @@ class test_target(object):
                 "Value of tag 'bsp_models' has to be a dictionary " \
                 "of NAME=LIST-OF-STRS|None"
             for bsp_model in self.tags['bsp_models']:
-                assert isinstance(bsp_model, basestring), \
+                assert isinstance(bsp_model, str), \
                 "Keys in tag's 'bsp_models' dictionary " \
                 "have to be strings"
                 # FIXME: so fugly, better use kwailify's schema validator
                 assert (isinstance(self.tags['bsp_models'][bsp_model], list) \
-                        and all(isinstance(i, basestring)
+                        and all(isinstance(i, str)
                                 for i in self.tags['bsp_models'][bsp_model]))\
                     or self.tags['bsp_models'][bsp_model] == None, \
                     "Value of tag 'bsp_models'/%s has to be a list " \
@@ -423,7 +423,7 @@ class test_target(object):
         if 'idle_poweroff' in self.tags:
             # must be an integer
             assert self.tags['idle_poweroff'] >= 0
-        for name, data in  self.tags['interconnects'].iteritems():
+        for name, data in  self.tags['interconnects'].items():
             self._tags_verify_interconnect(name, data)
 
     def add_to_interconnect(self, ic_id, ic_tags = None):
@@ -447,7 +447,7 @@ class test_target(object):
           tags for this target on this interconnect.
 
         """
-        assert isinstance(ic_id, basestring)
+        assert isinstance(ic_id, str)
         if ic_tags == None:
             ic_tags = {}
         self.tags_update(ic_tags, ic = ic_id)
@@ -474,7 +474,7 @@ class test_target(object):
         if d != None:
             assert isinstance(d, dict)
         if ic:
-            assert isinstance(ic, basestring)
+            assert isinstance(ic, str)
 
         if ic == None:
             self.tags.update(d)
@@ -517,7 +517,7 @@ class test_target(object):
         :param str who: User that is claiming the target
         :raises: :class:`test_target_busy_e` if already taken
         """
-        assert isinstance(who, basestring)
+        assert isinstance(who, str)
         _mutex = mutex.mutex_symlink(self.mutex_location, who)
         try:
             if _mutex.acquire():
@@ -566,7 +566,7 @@ class test_target(object):
         :param str prop: Property name
         :param str value: Value for the property (None for deleting)
         """
-        assert isinstance(who, basestring)
+        assert isinstance(who, str)
         with self.target_owned_and_locked(who):
             self.fsdb.set(prop, value)
 
@@ -589,7 +589,7 @@ class test_target(object):
         :param str who: User that is claiming the target
         :param str prop: Property name
         """
-        assert isinstance(who, basestring)
+        assert isinstance(who, str)
         with self.target_owned_and_locked(who):
             r = self.fsdb.get(prop)
         if r == None and default != None:
@@ -604,7 +604,7 @@ class test_target(object):
         :returns: bool
         """
         for prop in self.properties_user:
-            if isinstance(prop, basestring):
+            if isinstance(prop, str):
                 if prop == name:
                     return True
                 continue
@@ -612,9 +612,8 @@ class test_target(object):
                 if prop.match(name):
                     return True
                 continue
-            raise AssertionError, \
-                "user property %s: not a string or regex, but %s" \
-                % (prop, type(prop).__name__)
+            raise AssertionError("user property %s: not a string or regex, but %s" \
+                % (prop, type(prop).__name__))
         return False
             
     def property_keep_value(self, name):
@@ -622,7 +621,7 @@ class test_target(object):
         Return *True* if a user property's value needs to be kept.
         """
         for prop in self.properties_keep_on_release:
-            if isinstance(prop, basestring):
+            if isinstance(prop, str):
                 if prop == name:
                     return True
                 continue
@@ -630,9 +629,8 @@ class test_target(object):
                 if prop.match(name):
                     return True
                 continue
-            raise AssertionError, \
-                "user property %s: not a string or regex, but %s" \
-                % (prop, type(prop).__name__)
+            raise AssertionError("user property %s: not a string or regex, but %s" \
+                % (prop, type(prop).__name__))
         return False
             
     def thing_add(self, name, plugger):
@@ -648,7 +646,7 @@ class test_target(object):
           For example, this can be an instance of
           :class:`ttbl.usbrly08b.plugger`.
         """
-        assert isinstance(name, basestring)
+        assert isinstance(name, str)
         assert isinstance(plugger, thing_plugger_mixin)
         assert name in ttbl.config.targets, \
             "thing '%s' has to be a defined target" % name
@@ -679,8 +677,8 @@ class test_target(object):
 
         The user who is plugging must own this target *and* the thing.
         """
-        assert isinstance(who, basestring)
-        assert isinstance(thing_name, basestring)
+        assert isinstance(who, str)
+        assert isinstance(thing_name, str)
         if not thing_name in self.things:
             raise IndexError("%s: unknown thing, can't plug" % thing_name)
         thing_target, plugger = self.things[thing_name]
@@ -707,8 +705,8 @@ class test_target(object):
         things.
 
         """
-        assert isinstance(who, basestring)
-        assert isinstance(thing_name, basestring)
+        assert isinstance(who, str)
+        assert isinstance(thing_name, str)
         if not thing_name in self.things:
             raise IndexError("%s: unknown thing, can't unplug" % thing)
         thing_target, plugger = self.things[thing_name]
@@ -720,7 +718,7 @@ class test_target(object):
         List the things available for connection and their current
         connection state
         """
-        assert isinstance(who, basestring)
+        assert isinstance(who, str)
         things = {}
         with self.target_owned_and_locked(who):
             for thing_name in self.things:
@@ -741,7 +739,7 @@ class test_target(object):
         :returns: list of tuples (protocol, target-ip-address, port,
           port-in-server)
         """
-        assert isinstance(who, basestring)
+        assert isinstance(who, str)
         with self.target_owned_and_locked(who):
             tunnel_descs = self.fsdb.keys("tunnel-id-*")
             tunnels = []
@@ -756,24 +754,24 @@ class test_target(object):
             return tunnels
 
     def _ip_addr_validate(self, _ip_addr):
-        ip_addr = ipaddress.ip_address(unicode(_ip_addr))
-        for ic_data in self.tags.get('interconnects', {}).itervalues():
+        ip_addr = ipaddress.ip_address(str(_ip_addr))
+        for ic_data in self.tags.get('interconnects', {}).values():
             if not ic_data:
                 continue
-            for key, value in ic_data.iteritems():
+            for key, value in ic_data.items():
                 if not key.endswith("_addr"):
                     continue
                 if not key.startswith("ip"):
                     # this has to be an IP address...
                     continue
-                itr_ip_addr = ipaddress.ip_address(unicode(value))
+                itr_ip_addr = ipaddress.ip_address(str(value))
                 if ip_addr == itr_ip_addr:
                     return
         # if this is an interconnect, the IP addresses are at the top level
-        for key, value in self.tags.iteritems():
+        for key, value in self.tags.items():
             if not key.endswith("_addr"):
                 continue
-            itr_ip_addr = ipaddress.ip_address(unicode(value))
+            itr_ip_addr = ipaddress.ip_address(str(value))
             if ip_addr == itr_ip_addr:
                 return
         raise ValueError('Cannot setup IP tunnel to IP "%s" which is '
@@ -815,7 +813,7 @@ class test_target(object):
         :returns int local_port: port in the server where to connect
           to in order to access the target.
         """
-        assert isinstance(who, basestring)
+        assert isinstance(who, str)
         ip_addr, port, proto = self._ip_tunnel_args(ip_addr, port, proto)
         with self.target_owned_and_locked(who):
             tunnel_id = "%s__%s__%d" % (proto, ip_addr, port)
@@ -829,7 +827,7 @@ class test_target(object):
 
             local_port = commonl.tcp_port_assigner(
                 port_range = ttbl.config.tcp_port_range)
-            ip_addr = ipaddress.ip_address(unicode(ip_addr))
+            ip_addr = ipaddress.ip_address(str(ip_addr))
             if isinstance(ip_addr, ipaddress.IPv6Address):
                 # beacause socat (and most others) likes it like that
                 ip_addr = "[%s]" % ip_addr
@@ -876,7 +874,7 @@ class test_target(object):
         :param str proto: (optional) Protocol to tunnel:
           {udp,sctp,tcp}[{4,6}] (defaults to v4 and to TCP)
         """
-        assert isinstance(who, basestring)
+        assert isinstance(who, str)
         ip_addr, port, proto = self._ip_tunnel_args(ip_addr, port, proto)
         with self.target_owned_and_locked(who):
             self._ip_tunnel_remove("%s:%s:%d" % (proto, ip_addr, port))
@@ -897,17 +895,17 @@ class test_target(object):
         for tunnel_id in self.fsdb.keys("tunnel-id-*"):
             self._ip_tunnel_remove(tunnel_id)
         # unplug all the things this target has
-        for _, (thing_target, plugger) in self.things.iteritems():
+        for _, (thing_target, plugger) in self.things.items():
             self._thing_unplug(thing_target, plugger)
         # if this target is a thing to other targets, unplug
         # itself from them
-        for _, (target, plugger) in self.thing_to.iteritems():
+        for _, (target, plugger) in self.thing_to.items():
             target._thing_unplug(self, plugger)
         for release_hook in self.release_hooks:
             release_hook(self, force)
         # Any property set in target.properties_user gets cleared when
         # releasing.
-        for prop in self.fsdb.keys():
+        for prop in list(self.fsdb.keys()):
             if self.property_is_user(prop) and not self.property_keep_value(prop):
                 self.fsdb.set(prop, None)
 
@@ -922,7 +920,7 @@ class test_target(object):
           someone else (requires admin privilege)
         :raises: :class:`test_target_not_acquired_e` if not taken
         """
-        assert isinstance(who, basestring)
+        assert isinstance(who, str)
         _mutex = mutex.mutex_symlink(self.mutex_location, who)
         try:
             if self.target_is_owned_and_locked(who):
@@ -944,7 +942,7 @@ class test_target(object):
           not acquired by anyone, :class:`test_target_busy_e` if the
           target is owned by someone else.
         """
-        assert isinstance(who, basestring)
+        assert isinstance(who, str)
         if self.owner_get() == None:
             raise test_target_not_acquired_e(self)
         if who != self.owner_get():
@@ -960,7 +958,7 @@ class test_target(object):
         :returns: True if @who owns the target or is admin, False
           otherwise or if the target is not owned
         """
-        assert isinstance(who, basestring)
+        assert isinstance(who, str)
         if self.owner_get() == None:
             return False
         if who != self.owner_get():
@@ -1659,7 +1657,7 @@ class test_target_console_mixin(object):
                 # Find expectations
                 count = 0
                 for expectation in expectations:
-                    if isinstance(expectation, basestring):
+                    if isinstance(expectation, str):
                         expectation = re.compile(re.escape(expectation))
                     elif isinstance(expectation, re._pattern_type):
                         pass
@@ -1851,7 +1849,7 @@ class test_target_images_mixin(object):
         :type images: dict
         :raises: Exception on failure
         """
-        for t, n in images.iteritems():
+        for t, n in images.items():
             self.image_type_check(t)
             with self.target_owned_and_locked(who):
                 self.log.debug("setting image %s:%s" % (t, n))
@@ -2082,8 +2080,8 @@ class authenticator_c(object):
           FIXME: left as a dictionary so we can add more information later
 
         """
-        assert isinstance(token, basestring)
-        assert isinstance(password, basestring)
+        assert isinstance(token, str)
+        assert isinstance(password, str)
         raise NotImplementedError
 
     class error_e(ValueError):

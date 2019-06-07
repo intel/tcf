@@ -141,23 +141,23 @@ class flasher_c(object):
 
     def image_write(self, image_type, file_name, timeout_factor = 1,
                     verify = True):
-        assert isinstance(image_type, basestring)
-        assert isinstance(file_name, basestring)
+        assert isinstance(image_type, str)
+        assert isinstance(file_name, str)
         self._image_write(image_type, file_name, timeout_factor, verify)
 
     def image_erase(self, image_type, size):
-        assert isinstance(image_type, basestring)
+        assert isinstance(image_type, str)
         assert isinstance(size, int)
         self._image_erase(image_type, size)
 
     def image_hash(self, image_type, size, timeout_factor = 1):
-        assert isinstance(image_type, basestring)
+        assert isinstance(image_type, str)
         assert isinstance(size, int)
         return self._image_hash(image_type, size, timeout_factor)
 
     def target_halt(self, targets = None, for_what = ""):
         if targets:
-            assert isinstance(targets, list) or isinstance(targets, basestring)
+            assert isinstance(targets, list) or isinstance(targets, str)
         return self._target_halt(targets, for_what)
 
     def target_reset(self, for_what = ""):
@@ -168,7 +168,7 @@ class flasher_c(object):
 
     def target_resume(self, targets = None, for_what = ""):
         if targets:
-            assert isinstance(targets, list) or isinstance(targets, basestring)
+            assert isinstance(targets, list) or isinstance(targets, str)
         return self._target_resume(targets, for_what)
 
     def debug(self):
@@ -552,7 +552,7 @@ source [find board/snps_em_sk.cfg]
     def _pattern_or_str(self, expect):
         if hasattr(expect, "pattern"):
             waiting_for = expect.pattern
-        elif isinstance(expect, basestring):
+        elif isinstance(expect, str):
             waiting_for = expect
         else:	# Iterable?
             try:
@@ -766,8 +766,8 @@ source [find board/snps_em_sk.cfg]
         if not self.board_name in self._boards:
             raise ValueError("Unknown board '%s' (expected %s %s)" %
                              (self.board_name,
-                              " ".join(self._boards.keys()),
-                              " ".join(self._board_synonyms.keys())))
+                              " ".join(list(self._boards.keys())),
+                              " ".join(list(self._board_synonyms.keys()))))
         self.debug = debug
         self.board = self._boards[self.board_name]
         if 'addrmap' in self.board:
@@ -1223,7 +1223,7 @@ source [find board/snps_em_sk.cfg]
     def _target_halt(self, targets = None, for_what = ""):
         if not targets:
             targets = self.board['targets']
-        elif isinstance(targets, basestring):
+        elif isinstance(targets, str):
             targets = [ targets ]
         self.log.action = "target halt init"
         with self._expect_mgr():
@@ -1312,7 +1312,7 @@ source [find board/snps_em_sk.cfg]
         with self._expect_mgr():
             if not targets:
                 targets = reversed(self.board['targets'])
-            elif isinstance(targets, basestring):
+            elif isinstance(targets, str):
                 targets = [ targets ]
             for target in targets:
                 self.__target_id_resume(

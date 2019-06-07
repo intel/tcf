@@ -10,8 +10,8 @@ Create and remove network tunnels to the target via the server
 
 """
 
-import tc
-import ttb_client
+from . import tc
+from . import ttb_client
 
 class tunnel(tc.target_extension_c):
     """
@@ -86,7 +86,7 @@ class tunnel(tc.target_extension_c):
         if proto == None:
             proto = 'tcp'
         else:
-            assert isinstance(proto, basestring)
+            assert isinstance(proto, str)
         assert isinstance(port, int)
         target = self.target
         ip_addr = self._ip_addr_get(ip_addr)
@@ -113,7 +113,7 @@ class tunnel(tc.target_extension_c):
         if proto == None:
             proto = 'tcp'
         else:
-            assert isinstance(proto, basestring)
+            assert isinstance(proto, str)
         assert isinstance(port, int)
         ip_addr = self._ip_addr_get(ip_addr)
 
@@ -140,7 +140,7 @@ def cmdline_tunnel_add(args):
     port = rtb.rest_tb_target_ip_tunnel_add(rt, args.ip_addr,
                                             args.port, args.protocol,
                                             ticket = args.ticket)
-    print "%s:%d" % (rtb.parsed_url.hostname, port)
+    print("%s:%d" % (rtb.parsed_url.hostname, port))
 
 def cmdline_tunnel_remove(args):
     rtb, rt = ttb_client._rest_target_find_by_id(args.target)
@@ -152,9 +152,9 @@ def cmdline_tunnel_list(args):
     rtb, rt = ttb_client._rest_target_find_by_id(args.target)
     tunnels = rtb.rest_tb_target_ip_tunnel_list(rt, ticket = args.ticket)
     for tunnel in tunnels:
-        print "%s %s:%s %s:%s" % (tunnel[0],
+        print("%s %s:%s %s:%s" % (tunnel[0],
                                   rtb.parsed_url.hostname, tunnel[3],
-                                  tunnel[1], tunnel[2])
+                                  tunnel[1], tunnel[2]))
 
 def cmdline_setup(argsp):
     ap = argsp.add_parser("tunnel-add", help = "create an IP tunnel")

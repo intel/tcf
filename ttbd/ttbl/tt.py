@@ -93,7 +93,7 @@ class tt_power(
           off, *None* does nothing.
 
         """
-        assert isinstance(id, basestring)
+        assert isinstance(id, str)
         ttbl.test_target.__init__(self, id)
         ttbl.tt_power_control_mixin.__init__(self, power_control)
         if power == True:
@@ -214,7 +214,7 @@ class tt_arduino2(
                 { 'port': serial_port, 'baudrate': 115200 }
             ])
         if bossac_cmd:
-            assert isinstance(bossac_cmd, basestring)
+            assert isinstance(bossac_cmd, str)
             self.bossac_cmd = bossac_cmd
 
     def image_do_set(self, image_type, image_name):
@@ -346,8 +346,8 @@ class tt_esp32(
         - Needs power control for proper operation; FIXME: pending to
           make it operate without power control, using ``esptool.py``.
         """
-        assert isinstance(_id, basestring)
-        assert isinstance(serial_number, basestring)
+        assert isinstance(_id, str)
+        assert isinstance(serial_number, str)
         assert isinstance(power_control, ttbl.tt_power_control_impl) \
             or isinstance(power_control, list)
 
@@ -402,7 +402,7 @@ class tt_esp32(
         if not image_type.startswith("kernel-"):
             raise RuntimeError(
                 "Unknown image type '%s' (valid: kernel-{%s})"
-                % (image_type, ",".join(self.tags['bsps'].keys())))
+                % (image_type, ",".join(list(self.tags['bsps'].keys()))))
         image_name_bin = image_name + ".bin"
         try:
             cmdline = cmdline_convert + [ image_name,
@@ -697,7 +697,7 @@ class tt_flasher(
         verify = self.tags.get('flash_verify', 'True') == 'True'
         # FIXME: replace this check for verifying which image types
         # the flasher supports
-        for t, n in images.iteritems():
+        for t, n in images.items():
             if t == "kernel-x86":
                 it = "x86"
             elif t == "kernel":
@@ -849,8 +849,8 @@ class tt_dfu(
         >>> )
 
         """
-        assert isinstance(_id, basestring)
-        assert isinstance(serial_number, basestring)
+        assert isinstance(_id, str)
+        assert isinstance(serial_number, str)
         assert isinstance(power_control, ttbl.tt_power_control_impl) \
             or isinstance(power_control, list)
 
@@ -883,19 +883,19 @@ class tt_dfu(
             "/usr/bin/dfu-util",
             "-S", self.serial_number
         ]
-        for image_type, image_name in images.iteritems():
+        for image_type, image_name in images.items():
             if image_type == "kernel":
                 image_type = "kernel-x86"
             if not image_type.startswith("kernel-"):
                 raise RuntimeError(
                     "Unknown image type '%s' (valid: kernel-{%s})"
-                    % (image_type, ",".join(self.tags['bsps'].keys())))
+                    % (image_type, ",".join(list(self.tags['bsps'].keys()))))
             bsp = image_type[len("kernel-"):]
             tags_bsp = self.tags.get('bsps', {}).get(bsp, None)
             if tags_bsp == None:
                 raise RuntimeError(
                     "Unknown BSP %s from image type '%s' (valid: %s)"
-                    % (bsp, image_type, " ".join(self.tags['bsps'].keys())))
+                    % (bsp, image_type, " ".join(list(self.tags['bsps'].keys()))))
             dfu_if_name = tags_bsp.get('dfu_interface_name', None)
             if dfu_if_name == None:
                 raise RuntimeError(
@@ -998,8 +998,8 @@ class tt_max10(
 
     def __init__(self, _id, device_id,
                  power_control, serial_port = None):
-        assert isinstance(_id, basestring)
-        assert isinstance(device_id, basestring)
+        assert isinstance(_id, str)
+        assert isinstance(device_id, str)
         assert isinstance(power_control, ttbl.tt_power_control_impl) \
             or isinstance(power_control, list)
 
@@ -1123,7 +1123,7 @@ AlteraEnd;"""
         if not image_type.startswith("kernel-"):
             raise RuntimeError(
                 "Unknown image type '%s' (valid: kernel-{%s})"
-                % (image_type, ",".join(self.tags['bsps'].keys())))
+                % (image_type, ",".join(list(self.tags['bsps'].keys()))))
         self._power_cycle_do()
         # This code snippet lifted from Zephyr's
         # scripts/support/quartus-flash.py -- thx
@@ -1408,8 +1408,8 @@ class simics(
 
     def __init__(self, _id, simics_cmds, _tags = None,
                  image_size_mb = 100):
-        assert isinstance(_id, basestring)
-        assert isinstance(simics_cmds, basestring)
+        assert isinstance(_id, str)
+        assert isinstance(simics_cmds, str)
         assert image_size_mb > 0
         if self.base_package == None:
             raise RuntimeError(

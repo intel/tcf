@@ -25,19 +25,19 @@ class cm_loopback(ttbl.test_target_console_mixin):
 
     def consoles_close(self):
         # Tell the logger process to stop logging
-        for f in self.__consoles.itervalues():
+        for f in self.__consoles.values():
             f.close()
             self.__consoles[f] = None
             del f
 
     def consoles_open(self):
-        for name in self.__consoles.keys():
+        for name in list(self.__consoles.keys()):
             f = open(os.path.join(self.state_dir, "console-%s.log" % name),
                      "w+")
             self.__consoles[name] = f
 
     def consoles_reset(self):
-        for f in self.__consoles.values():
+        for f in list(self.__consoles.values()):
             f.truncate()
 
     def __init__(self, state_dir, names = None):
@@ -49,10 +49,10 @@ class cm_loopback(ttbl.test_target_console_mixin):
         """
         if names == None:
             names = [ 'default' ]
-        elif isinstance(names, basestring):
+        elif isinstance(names, str):
             names = [ names ]
         elif isinstance(names, list):
-            assert all([isinstance(l, basestring) for l in names])
+            assert all([isinstance(l, str) for l in names])
         else:
             raise AssertionError("Bad type, need [STRING|LIST(STRINGS)]")
 
@@ -68,7 +68,7 @@ class cm_loopback(ttbl.test_target_console_mixin):
 
     # Console mixin
     def console_do_list(self):
-        return self.__consoles.keys()
+        return list(self.__consoles.keys())
 
     def console_do_read(self, console_id = None, offset = 0):
         if console_id == None:

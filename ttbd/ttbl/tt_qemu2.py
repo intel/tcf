@@ -226,11 +226,11 @@ class tt_qemu(
     """
 
     def __init__(self, name, qemu_cmdline, consoles = None,_tags = None):
-        assert isinstance(name, basestring)
-        assert isinstance(qemu_cmdline, basestring)
+        assert isinstance(name, str)
+        assert isinstance(qemu_cmdline, str)
         assert consoles == None or \
-            all(isinstance(i, basestring) for i in consoles)
-        isinstance(qemu_cmdline, basestring)
+            all(isinstance(i, str) for i in consoles)
+        isinstance(qemu_cmdline, str)
         assert _tags == None or isinstance(_tags, dict)
         if _tags == None:
             _tags = {}
@@ -243,7 +243,7 @@ class tt_qemu(
         self.qemu_cmdline = qemu_cmdline
         self.qemu_cmdline_append = ""
         self.pidfile = None
-        self.bsp = self.tags['bsp_models'].keys()[0]
+        self.bsp = list(self.tags['bsp_models'].keys())[0]
         if not self.bsp in self.tags['bsps']:
             raise ValueError('%s: BSP not described in tags' % self.bsp)
         if len(self.tags['bsps']) > 1:
@@ -354,12 +354,12 @@ class tt_qemu(
         # find the actual binary being used.
         kws = dict(self.kws)
         # Get fresh values for these keys
-        for key in self.fsdb.keys():
+        for key in list(self.fsdb.keys()):
             if key.startswith("qemu-"):
                 kws[key] = self.fsdb.get(key)
 
         # Setup network stuff, create virtual tap interfaces
-        for ic_name, ic_kws in self.tags.get('interconnects', {}).iteritems():
+        for ic_name, ic_kws in self.tags.get('interconnects', {}).items():
             if 'ipv4_addr' in ic_kws or 'ipv6_addr' in ic_kws:
                 _kws = dict(kws)
                 _kws.update(ic_kws)
@@ -427,7 +427,7 @@ class tt_qemu(
 
     def _power_off_post_nw(self):
         # Tear down network stuff
-        for ic_name, _ in self.tags.get('interconnects', {}).iteritems():
+        for ic_name, _ in self.tags.get('interconnects', {}).items():
             commonl.if_remove_maybe("t%s%s" % (ic_name, self.id))
 
     def _qmp_start(self):
@@ -460,7 +460,7 @@ class tt_qemu(
         # file desctriptor 0 to it, then leave it open for Qemu to
         # tap into it.
         count = 0
-        for ic_name, ic_kws in self.tags.get('interconnects', {}).iteritems():
+        for ic_name, ic_kws in self.tags.get('interconnects', {}).items():
             if not 'ipv4_addr' in ic_kws and not 'ipv6_addr' in ic_kws:
                 continue
             if count > 0:
@@ -623,7 +623,7 @@ class tt_qemu(
         self._power_off_do()
         kws = dict(bsp = self.bsp)
         kws.update(self.kws)
-        for key in self.fsdb.keys():
+        for key in list(self.fsdb.keys()):
             if key.startswith("qemu-"):
                 kws[key] = self.fsdb.get(key)
         # try to start qemu, retrying if we have to

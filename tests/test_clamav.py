@@ -78,7 +78,7 @@ Scanned directories: (?P<scanned_directories>[0-9]+)
 Scanned files: (?P<scanned_files>[0-9]+)
 Infected files: (?P<infected_files>[0-9]+)
 """, re.MULTILINE)
-        output = unicode(output.decode('UTF-8'))
+        output = str(output.decode('UTF-8'))
         self.report_info("ClamAV output", dlevel = 1, alevel = 0,
                          attachments = dict(output = output))
         m = data_regex.search(output)

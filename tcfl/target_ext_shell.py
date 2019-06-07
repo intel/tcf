@@ -17,7 +17,7 @@ import collections
 import re
 import time
 
-import tc
+from . import tc
 
 from . import msgid_c
 
@@ -116,12 +116,12 @@ class shell(tc.target_extension_c):
           prompt to appear
 
         """
-        assert tempt == None or isinstance(tempt, basestring)
-        assert user == None or isinstance(user, basestring)
-        assert isinstance(login_regex, ( basestring, re._pattern_type ))
+        assert tempt == None or isinstance(tempt, str)
+        assert user == None or isinstance(user, str)
+        assert isinstance(login_regex, ( str, re._pattern_type ))
         assert delay_login >= 0
-        assert password == None or isinstance(password, basestring)
-        assert isinstance(password_regex, ( basestring, re._pattern_type ))
+        assert password == None or isinstance(password, str)
+        assert isinstance(password_regex, ( str, re._pattern_type ))
         assert isinstance(shell_setup, bool)
         assert timeout > 0
         def _login(target):
@@ -182,13 +182,13 @@ class shell(tc.target_extension_c):
     def _run(self, cmd = None, expect = None, prompt_regex = None,
              output = False, output_filter_crlf = True, trim = False):
         if cmd:
-            assert isinstance(cmd, basestring)
+            assert isinstance(cmd, str)
         assert expect == None \
-            or isinstance(expect, basestring) \
+            or isinstance(expect, str) \
             or isinstance(expect, re._pattern_type) \
             or isinstance(expect, list)
         assert prompt_regex == None \
-            or isinstance(prompt_regex, basestring) \
+            or isinstance(prompt_regex, str) \
             or isinstance(prompt_regex, re._pattern_type)
 
         if output:
@@ -199,7 +199,7 @@ class shell(tc.target_extension_c):
         if expect:
             if isinstance(expect, list):
                 for expectation in expect:
-                    assert isinstance(expectation, basestring) \
+                    assert isinstance(expectation, str) \
                         or isinstance(expectation, re._pattern_type)
                     self.target.expect(expectation)
             else:
@@ -303,7 +303,7 @@ class shell(tc.target_extension_c):
         """
         Remove a remote file (if the target supports it)
         """
-        assert isinstance(remote_filename, basestring)
+        assert isinstance(remote_filename, str)
         
         self.run("rm -f " + remote_filename)
 
@@ -335,8 +335,8 @@ class shell(tc.target_extension_c):
                   you are.
 
         """
-        assert isinstance(local_filename, basestring)
-        assert isinstance(remote_filename, basestring)
+        assert isinstance(local_filename, str)
+        assert isinstance(remote_filename, str)
         self.files_remove(remote_filename, "/tmp/file.b64")
         with open(local_filename, "rb") as f:
             s = binascii.b2a_base64(f.read())
@@ -376,8 +376,8 @@ class shell(tc.target_extension_c):
                   you are.
 
         """
-        assert isinstance(local_filename, basestring)
-        assert isinstance(remote_filename, basestring)
+        assert isinstance(local_filename, str)
+        assert isinstance(remote_filename, str)
 
         # Now we do a python3 command in there (as cloud
         # versions don't include python2. good) to encode the file in

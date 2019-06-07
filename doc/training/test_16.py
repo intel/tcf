@@ -75,7 +75,7 @@ class _test(tcfl.tc.tc_c):
         for count in range(1,10):
             time.sleep(20)
             zephyr_client.report_info("Running for 30s (%d/10)"  % count)
-            [ target.active() for target in self.targets.values() ]
+            [ target.active() for target in list(self.targets.values()) ]
         # Ensure we have at least one "all ok" message or fail
         r = re.compile("Compared [0-9]+ bytes, all ok")
         zephyr_client.expect(r)

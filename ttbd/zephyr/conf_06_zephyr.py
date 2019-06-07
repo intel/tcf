@@ -19,7 +19,7 @@ def nw_default_targets_zephyr_add(letter, bsps = [ 'x86', 'arm', 'nios2',
     This adds a configuration which consists of a network and five
     QEMU Linux and five QEMU Zephyr (times available BSPSs)
     """
-    assert isinstance(letter, basestring)
+    assert isinstance(letter, str)
     assert len(letter) == 1
 
     nw_idx = ord(letter)

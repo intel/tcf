@@ -39,7 +39,7 @@ class _(tcfl.tc.tc_c):
         # so we parse for 5 fields, take last
         imagel = tcfl.pos.image_list_from_rsync_output(output)
         for image in imagel:
-            print ic.fullid, ":".join(image)
+            print(ic.fullid, ":".join(image))
 
         if image_env:
             image_match = tcfl.pos.image_select_best(image_env, imagel, ic)

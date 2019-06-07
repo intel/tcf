@@ -53,9 +53,9 @@ import re
 
 import Levenshtein
 
-import commonl
-import pos
-import tc
+from . import commonl
+from . import pos
+from . import tc
 
 # FIXME: deprecate that _device
 def _disk_partition(target):
@@ -151,7 +151,7 @@ def _rootfs_guess_by_image(target, image, boot_dev):
     empties = []
     # refresh target information FIXME: need a better method
     target.rt = target.rtb.rest_tb_target_update(target.id)
-    for tag, value in target.rt.iteritems():
+    for tag, value in target.rt.items():
         if not tag.startswith("pos_root_"):
             continue
         dev_basename = tag.replace("pos_root_", "")
@@ -165,7 +165,7 @@ def _rootfs_guess_by_image(target, image, boot_dev):
     target.report_info("POS: %s: imaged partitions: %s"
                        % (boot_dev,
                           " ".join([ i[0] + "|" + i[1]
-                                     for i in partl.items() ])),
+                                     for i in list(partl.items()) ])),
                        dlevel = 2)
     if not partl and not empties:
         # there were no pos_root_XYZ entries, so that means we are not
@@ -189,7 +189,7 @@ def _rootfs_guess_by_image(target, image, boot_dev):
             target.report_info("POS: picked up empty root partition %s"
                                % root_part_dev, dlevel = 2)
         else:
-            root_part_dev = random.choice(partl.keys())
+            root_part_dev = random.choice(list(partl.keys()))
             target.report_info(
                 "POS: picked up random partition %s, because none of the "
                 "existing installed ones was a good match and there "
@@ -253,7 +253,7 @@ def mount_fs(target, image, boot_dev):
         # setting pos_repartition to anything
         target.report_info("POS: repartitioning per pos_reinitialize "
                            "property")
-        for tag in target.rt.keys():
+        for tag in list(target.rt.keys()):
             # remove pos_root_*, as they don't apply anymore
             if tag.startswith("pos_root_"):
                 target.property_set(tag, None)

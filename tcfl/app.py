@@ -89,11 +89,11 @@ elif mp.lower() == 'pathos':
 else:
     raise RuntimeError('Invalid value to TCF_USE_MP (%s)' % mp)
 
-import commonl
+from . import commonl
 import tcfl.tc
 
 def _app_src_validate(app_name, app_src):
-    assert isinstance(app_name, basestring), \
+    assert isinstance(app_name, str), \
         "app_name is '%s', expected str" % type(app_name).__name__
     # validate and transform an specification of an app_src, that can be:
     #
@@ -101,14 +101,14 @@ def _app_src_validate(app_name, app_src):
     # - (path, str2, ...): a tuple of strings
     #   - path: path to a source
     #   - str2...: more strings, optional, app builder specific interpretation
-    if isinstance(app_src, basestring):
+    if isinstance(app_src, str):
         return (app_src, )
     elif isinstance(app_src, tuple) \
-         and all([ isinstance(k, basestring) for k in app_src ]):
+         and all([ isinstance(k, str) for k in app_src ]):
         return app_src
     elif isinstance(app_src, dict):
-        for k, v in app_src.iteritems():
-            if not isinstance(k, basestring):
+        for k, v in app_src.items():
+            if not isinstance(k, str):
                 raise tcfl.tc.blocked_e(
                     "%s: key in dictionary has to be a string, found %s"
                     % (app_name, type(k).__name__))
@@ -126,7 +126,7 @@ def _args_check(ab, testcase, target, app_src = None):
     assert isinstance(target, tcfl.tc.target_c)
     assert target.bsp != None, "BUG: %s: target's BSP must be set" \
                          % target.fulid
-    for app_name, app_driver in _drivers.iteritems():
+    for app_name, app_driver in _drivers.items():
         if app_driver[0] == ab:
             app_src = _app_src_validate(app_name, app_src)
             break
@@ -156,7 +156,7 @@ def driver_add(cls, name = None):
     if name == None:
         name = cls.__name__
     else:
-        assert isinstance(name, basestring)
+        assert isinstance(name, str)
     if name in _drivers:
         raise ValueError('%s: already registered by @%s'
                          % (name, _drivers[name][1]))

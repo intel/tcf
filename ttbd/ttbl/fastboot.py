@@ -106,7 +106,7 @@ class interface(ttbl.tt_interface):
 
     """
     def __init__(self, usb_serial_number, allowed_commands):
-        assert isinstance(usb_serial_number, basestring), \
+        assert isinstance(usb_serial_number, str), \
             "usb_serial_number must be a string, found %s" \
             % type(usb_serial_number).__name__
         assert isinstance(allowed_commands, dict), \
@@ -114,8 +114,8 @@ class interface(ttbl.tt_interface):
             "allowed command name, got %s" \
             % type(allowed_commands).__name__
         count = 0
-        for key, data in allowed_commands.iteritems():
-            assert isinstance(key, basestring), \
+        for key, data in allowed_commands.items():
+            assert isinstance(key, str), \
                 "allowed_commands: item #%d: keys must be strings, found %s" \
                 % (count, type(key).__name__)
             assert isinstance(data, list), \
@@ -130,17 +130,17 @@ class interface(ttbl.tt_interface):
                             "expected for allowed argument"
                             % type(item).__name__)
                     assert isinstance(item[0],
-                                      ( basestring, re._pattern_type )), \
+                                      ( str, re._pattern_type )), \
                         "allowed_commands: item #%d/%d[0]: first value must " \
                         "be a string or compiled regex, found a %s" \
                         % (count, count2, type(item).__name__)
-                    assert isinstance(item[1], basestring), \
+                    assert isinstance(item[1], str), \
                         "allowed_commands: item #%d/%d[1]: second value " \
                         "must be a string, found a %s" \
                         % (count, count2, type(item).__name__)
                 else:
                     assert isinstance(item,
-                                      ( basestring, re._pattern_type )), \
+                                      ( str, re._pattern_type )), \
                         "allowed_commands: item #%d/%d: values in list must " \
                         "be strings or compiled regexs, found a %s" \
                         % (count, count2, type(item).__name__)
@@ -166,7 +166,7 @@ class interface(ttbl.tt_interface):
 
     @staticmethod
     def _regex_make(arg):
-        if isinstance(arg, basestring):
+        if isinstance(arg, str):
             return re.compile(re.escape(arg))
         elif isinstance(arg, re._pattern_type):
             return arg
@@ -255,13 +255,13 @@ class interface(ttbl.tt_interface):
 
     def _list(self, _who, _target):
         data = dict()
-        for command, param_list in self.allowed_commands.iteritems():
+        for command, param_list in self.allowed_commands.items():
             _param_list = []
             count = 0
             for param in param_list:
                 if isinstance(param, tuple):
                     value = param[0]
-                    if isinstance(value, basestring):
+                    if isinstance(value, str):
                         _param_list.append(value)
                     elif isinstance(value, re._pattern_type):
                         _param_list.append(value.pattern)

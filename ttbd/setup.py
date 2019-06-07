@@ -57,16 +57,16 @@ class _install_data(setupl._install_data):
         setupl._install_data.run(self)
         for filename in self.outfiles:
             if filename.endswith("var/lib/ttbd"):
-                os.chmod(filename, 02775)
+                os.chmod(filename, 0o2775)
         # add ttbd to supplementalgroups in ttbd@.service
         for filename in self.outfiles:
             if filename.endswith(".ttbd@.service"):
                 with fileinput.FileInput(filename, inplace = True,
                                          backup = None) as f:
                     for line in f:
-                        print line.replace("SupplementalGroups = ",
+                        print(line.replace("SupplementalGroups = ",
                                            "SupplementalGroups = ttbd ",
-                                           end = '')
+                                           end = ''))
 
 class _bdist_rpm(distutils.command.bdist_rpm.bdist_rpm):
     def _make_spec_file(self):

@@ -9,14 +9,14 @@ import os
 import re
 import unittest
 
-import expecter
-import tc
+from . import expecter
+from . import tc
 
 def debug_log(msg, attachments = None):
-    print msg
+    print(msg)
     if attachments:
-        for attachment, content in attachments.iteritems():
-            print "attachment %s: %s" % (attachment, content)
+        for attachment, content in attachments.items():
+            print("attachment %s: %s" % (attachment, content))
 
 
 text = """ Lorem ipsum dolor sit amet, consectetuer adipiscing elit.  Mauris

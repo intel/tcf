@@ -63,8 +63,8 @@ class _test(tcfl.tc.tc_c):
                                     { "output": s })
         for section in sections:
             name = section['section_name']
-            for key, val in section.iteritems():
+            for key, val in section.items():
                 target.report_data("Footprint %(zephyr_board)s",
                                    name + "/" + key, val)
-        for key, val in totals.iteritems():
+        for key, val in totals.items():
             target.report_data("Footprint %(zephyr_board)s", key, val)

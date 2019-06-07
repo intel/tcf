@@ -42,7 +42,7 @@ class report_ex_c(tcfl.report.report_c):
         with self.lock, open(self.log_file_name, "w") as f:
             f.write("%s DEBUG HASHID %s TC %s RESULT %s\n" %
                     (time.time(), _tc.ticket, _tc.name, tag))
-            for twn, target in _tc.targets.iteritems():
+            for twn, target in _tc.targets.items():
                 f.write("DEBUG    TARGET %s = %s:%s\n" % (twn, target.fullid,
                                                           target.bsp_model))
 

@@ -37,7 +37,7 @@ class authenticator_localdb_c(ttbl.authenticator_c):
         :param str name: FIXME
         :param dict users: map of roles to users and groups
         """
-        assert isinstance(name, basestring)
+        assert isinstance(name, str)
         assert isinstance(users, list)
 
         self.name = name
@@ -48,7 +48,7 @@ class authenticator_localdb_c(ttbl.authenticator_c):
                 raise ValueError("user specification '%s' must be "
                                  "a list of strings" % user)
             for tag in user:
-                if tag != None and not isinstance(tag, basestring):
+                if tag != None and not isinstance(tag, str):
                     raise ValueError("user specification '%s' must be "
                                      "a list of strings" % user)
             user_name = user[0]
@@ -79,8 +79,8 @@ class authenticator_localdb_c(ttbl.authenticator_c):
         :raises: authenticator_c.error_e if any kind of error
           during the process happens
         """
-        assert isinstance(email, basestring)
-        assert isinstance(password, basestring)
+        assert isinstance(email, str)
+        assert isinstance(password, str)
 
         if email not in self.passwords:
             raise self.unknown_user_e(

@@ -6,7 +6,7 @@
 #
 import errno
 import os
-import cPickle
+import pickle
 import logging
 import shutil
 import threading
@@ -50,7 +50,7 @@ class User():
         with self.file_access_lock:
             try:
                 with open(self.filename, 'rb') as file:
-                    data = cPickle.load(file)
+                    data = pickle.load(file)
                     self.roles.update(data['roles'])
                     logging.log(3, "%s: new user object created from %s",
                                 userid, self.filename)
@@ -87,7 +87,7 @@ class User():
         return 'admin' in self.roles
 
     def get_id(self):
-        return unicode(self.userid)
+        return str(self.userid)
 
     # handle roles
     def set_role(self, role):
@@ -103,7 +103,7 @@ class User():
             'roles': self.roles
         }
         with open(self.filename, "w+b") as f:
-            cPickle.dump(data, f, protocol = 2)
+            pickle.dump(data, f, protocol = 2)
 
     def save_data(self):
         with self.file_access_lock:

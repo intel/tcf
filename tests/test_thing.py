@@ -29,7 +29,7 @@ class _test_00(tcfl.tc.tc_c):
     @staticmethod
     def eval(target):
         things = target.thing_list()
-        assert all(state == False for state in things.values()), \
+        assert all(state == False for state in list(things.values())), \
             "initial thing list shall be all unplugged (got %s)" % things
 
         try:

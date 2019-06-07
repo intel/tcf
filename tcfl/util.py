@@ -7,49 +7,49 @@
 
 import logging
 
-import commonl
+from . import commonl
 import tcfl
 
 
 def healthcheck_power(rtb, rt):
-    print "Powering off"
+    print("Powering off")
     rtb.rest_tb_target_power_off(rt)
-    print "Powered off"
+    print("Powered off")
 
-    print "Querying power status"
+    print("Querying power status")
     power = rtb.rest_tb_target_power_get(rt)
     if power != 0:
         msg = "Power should be 0, reported %d" % power
         raise Exception(msg)
-    print "Power is reported correctly as %d" % power
+    print("Power is reported correctly as %d" % power)
 
-    print "Powering on"
+    print("Powering on")
     rtb.rest_tb_target_power_on(rt)
-    print "Powered on"
+    print("Powered on")
 
-    print "Querying power status"
+    print("Querying power status")
     power = rtb.rest_tb_target_power_get(rt)
     if power == 0:
         msg = "Power should be !0, reported %d" % power
         raise Exception(msg)
-    print "Power is reported correctly as %d" % power
+    print("Power is reported correctly as %d" % power)
 
-    print "power test passed"
+    print("power test passed")
 
 
 def healthcheck(args):
     rtb, rt = tcfl.ttb_client._rest_target_find_by_id(args.target)
 
-    print "Acquiring"
+    print("Acquiring")
     rtb.rest_tb_target_acquire(rt)
-    print "Acquired"
+    print("Acquired")
     try:
         healthcheck_power(rtb, rt)
     finally:
-        print "Releasing"
+        print("Releasing")
         rtb.rest_tb_target_release(rt)
-        print "Released"
-    print "%s: healthcheck completed" % rt['id']
+        print("Released")
+    print("%s: healthcheck completed" % rt['id'])
 
 def argp_setup(arg_subparsers):
     ap = arg_subparsers.add_parser("healthcheck",

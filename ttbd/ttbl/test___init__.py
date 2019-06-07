@@ -13,7 +13,7 @@ import tempfile
 import time
 import unittest
 
-import __init__
+from . import __init__
 import testing
 
 class _test_subpython(unittest.TestCase):

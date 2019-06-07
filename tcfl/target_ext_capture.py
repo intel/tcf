@@ -12,17 +12,17 @@ Capture screenshots or video/audio stream from the target
 import contextlib
 import os
 
-import tc
-import ttb_client
+from . import tc
+from . import ttb_client
 
 def _rest_tb_target_capture_start(rtb, rt, capturer, ticket = ''):
-    assert isinstance(capturer, basestring)
+    assert isinstance(capturer, str)
     return rtb.send_request("POST", "targets/%s/capture/start" % rt['id'],
                             data = { 'capturer': capturer, 'ticket': ticket })
 
 def _rest_tb_target_capture_stop_and_get(rtb, rt, capturer, local_filename,
                                          ticket = ''):
-    assert isinstance(capturer, basestring)
+    assert isinstance(capturer, str)
     total = 0
     if local_filename != None:
         with open(local_filename, "w") as lf, \
@@ -183,9 +183,9 @@ def cmdline_capture_list(args):
     for capture in rt['capture'].split():
         capturer, streaming, mimetype = capture.split(":", 2)
         capture_spec[capturer] = (streaming, mimetype)
-    for name, state in capturers.iteritems():
-        print "%s:%s:%s:%s" % (
-            name, capture_spec[name][0], capture_spec[name][1], state)
+    for name, state in capturers.items():
+        print("%s:%s:%s:%s" % (
+            name, capture_spec[name][0], capture_spec[name][1], state))
 
 
 def cmdline_setup(argsp):

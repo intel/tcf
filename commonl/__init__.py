@@ -168,7 +168,7 @@ def logging_verbosity_inc(level):
 
 def logfile_open(tag, cls = None, delete = True, bufsize = 0,
                  suffix = ".log", who = None, directory = None):
-    assert isinstance(tag, basestring)
+    assert isinstance(tag, str)
     if who == None:
         frame = inspect.stack(0)[1][0]
         who = frame.f_code.co_name + ":%d" % frame.f_lineno
@@ -602,7 +602,7 @@ def symlink_f(source, dest):
 def _pid_grok(pid):
     if pid == None:
         return None, None
-    if isinstance(pid, basestring):
+    if isinstance(pid, str):
         # Is it a PID encoded as string?
         try:
             return int(pid), None
@@ -792,12 +792,12 @@ def kws_update_type_string(kws, rt, kws_origin = None, origin = None,
     if not isinstance(rt, dict):
         # FIXME: this comes from the remote server...
         return
-    for key, value in rt.iteritems():
+    for key, value in rt.items():
         if value == None:
             kws[prefix + key] = ""
             if kws_origin and origin:
                 kws_origin[prefix + key] = origin
-        elif isinstance(value, basestring) \
+        elif isinstance(value, str) \
            or isinstance(value, numbers.Integral):
             kws[prefix + key] = value
             if kws_origin and origin:
@@ -817,7 +817,7 @@ def _kws_update(kws, rt, kws_origin = None, origin = None,
     assert isinstance(kws, dict)
     if not isinstance(rt, dict):
         return
-    for key, value in rt.iteritems():
+    for key, value in rt.items():
         if value == None:
             kws[prefix + key] = ""
             if kws_origin and origin:
@@ -846,7 +846,7 @@ def kws_update_from_rt(kws, rt, kws_origin = None, origin = None,
     if origin == None:
         origin = origin_get(2)
     else:
-        assert isinstance(origin, basestring)
+        assert isinstance(origin, str)
 
     _kws_update(kws, rt, kws_origin = kws_origin,
                 origin = origin, prefix = prefix)
@@ -907,7 +907,7 @@ def if_find_by_mac(mac, physical = True):
       */sys/class/net/DEVICE/*
     :returns: Name of the interface if it exists, None otherwise
     """
-    assert isinstance(mac, basestring)
+    assert isinstance(mac, str)
     for path in glob.glob("/sys/class/net/*/address"):
         if physical and not os.path.exists(os.path.dirname(path) + "/device"):
             continue

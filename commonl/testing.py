@@ -39,7 +39,7 @@ def mkprefix(tag = None, cls = None):
     :returns: the prefix
     :rtype: str
     """
-    assert isinstance(tag, basestring)
+    assert isinstance(tag, str)
     if cls == None:
         cls_str = ""
     else:
@@ -258,7 +258,7 @@ class test_tcf_mixin(object):
         Raise an assertion with the given message if the regex is
         found in the file f.
         """
-        if isinstance(regex, basestring):
+        if isinstance(regex, str):
             regex = re.compile(re.escape(regex))
         with open(f, "r") as f:
             for line in f:
@@ -280,7 +280,7 @@ class test_tcf_mixin(object):
         Raise an assertion with the given message if the regex is
         NOT found in the file f.
         """
-        if isinstance(regex, basestring):
+        if isinstance(regex, str):
             regex = re.compile(re.escape(regex))
         with open(f, "r") as f:
             for line in f:

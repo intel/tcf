@@ -173,13 +173,13 @@ else:
 
 import requests.exceptions
 
-import app
-import commonl
-import commonl.expr_parser
-import expecter
-import report
+from . import app
+from . import commonl
+from . import commonl.expr_parser
+from . import expecter
+from . import report
 import tcfl
-import ttb_client
+from . import ttb_client
 
 from . import msgid_c
 
@@ -429,7 +429,7 @@ class target_c(object):
         #: Testcase that this target is currently executing
         self.testcase = testcase
         #: All of BSPs supported by this target
-        self._bsps_all = rt.get('bsps', {}).keys()
+        self._bsps_all = list(rt.get('bsps', {}).keys())
         #: :term:`BSP model` this target is currently configured for
         self.bsp_model = None
         #: List of BSPs supported by this target's currently selected
@@ -518,7 +518,7 @@ class target_c(object):
         else:
             self._report_mk_prefix()
         # Fire up the extensions
-        for name, extension in self.__extensions.iteritems():
+        for name, extension in self.__extensions.items():
             try:
                 self.report_info("%s: %s: initializing target extension"
                                  % (self.want_name, name),
@@ -567,10 +567,10 @@ class target_c(object):
           the class name)
         """
         assert issubclass(ext_cls, target_extension_c)
-        assert name == None or isinstance(name, basestring)
+        assert name == None or isinstance(name, str)
         if name == None:
             name = ext_cls.__name__
-        if name in target_c.__dict__.keys():
+        if name in list(target_c.__dict__.keys()):
             raise RuntimeError("%s: can't register extension, there is "
                                "already a field in class target_c with "
                                "said name that would be overriden"
@@ -595,7 +595,7 @@ class target_c(object):
         :param str name: (optional) name of the extension (defaults to
           the class name)
         """
-        assert name == None or isinstance(name, basestring)
+        assert name == None or isinstance(name, str)
         if name == None:
             name = ext_cls.__name__
         del cls.__extensions[name]
@@ -624,7 +624,7 @@ class target_c(object):
           be one of the ones listed in target.bsp_models.
 
         """
-        if 'bsp_models' not in self.rt.keys() \
+        if 'bsp_models' not in list(self.rt.keys()) \
            or not bsp_model in self.rt['bsp_models']:
             raise blocked_e("target %s: BSP model '%s' not supported"
                             % (self.fullid, bsp_model))
@@ -666,7 +666,7 @@ class target_c(object):
             bsp = self.bsps[0]
         if bsp == False:
             self.bsp = None
-        elif isinstance(bsp, basestring):
+        elif isinstance(bsp, str):
             if not bsp in self.bsps_all:
                 raise blocked_e(
                     "%s: can't set BSP '%s'; target's BSP model "
@@ -690,10 +690,10 @@ class target_c(object):
         # we'll put those addresses at the top level
         for ic_name in sorted(interconnects):
             for tg_ic_name, tg_ic_dict \
-                in self.rt.get('interconnects', {}).iteritems():
+                in self.rt.get('interconnects', {}).items():
                 if tg_ic_name != ic_name:
                     continue
-                for key, value in tg_ic_dict.iteritems():
+                for key, value in tg_ic_dict.items():
                     if not key.endswith("_addr"):
                         continue
                     self._kws[key] = value
@@ -708,8 +708,8 @@ class target_c(object):
           target
         """
         assert isinstance(d, dict)
-        for kw in d.keys():
-            assert isinstance(kw, basestring)
+        for kw in list(d.keys()):
+            assert isinstance(kw, str)
         if bsp == None:
             self._kws.update(d)
         else:
@@ -727,7 +727,7 @@ class target_c(object):
           keyword; if omitted, we are setting the keyword for the whole
           target
         """
-        assert isinstance(kw, basestring)
+        assert isinstance(kw, str)
         if bsp == None:
             self._kws[kw] = val
         else:
@@ -744,7 +744,7 @@ class target_c(object):
           keyword; if omitted, we are setting the keyword for the whole
           target
         """
-        assert isinstance(kw, basestring)
+        assert isinstance(kw, str)
         if bsp == None:
             if kw in self._kws:
                 del self._kws[kw]
@@ -762,7 +762,7 @@ class target_c(object):
         assert isinstance(kws, list)
         missing = []
         for kw in kws:
-            if not kw in self.kws.keys():
+            if not kw in list(self.kws.keys()):
                 missing.append(kw)
         if missing:
             raise tcfl.tc.blocked_e(
@@ -788,7 +788,7 @@ class target_c(object):
         >>>                         target2.ic_field_get(ic, 'ipv4_addr_len'))
         """
         assert isinstance(ic, tcfl.tc.target_c)
-        assert isinstance(field, basestring)
+        assert isinstance(field, str)
 
         if not 'interconnects' in self.rt:
             raise RuntimeError('target provides no interconnect information')
@@ -853,7 +853,7 @@ class target_c(object):
 
         """
         if instance:
-            assert isinstance(instance, basestring)
+            assert isinstance(instance, str)
             ic = ic + "#" + instance
         return self.ic_field_get(ic, tech + "_addr", "(address)")
 
@@ -973,8 +973,8 @@ class target_c(object):
           measurements for target %(type)s" which will automatically
           create a different domain for each type of target.
         """
-        assert isinstance(domain, basestring)
-        assert isinstance(name, basestring)
+        assert isinstance(domain, str)
+        assert isinstance(name, str)
         if expand:
             domain = domain % self.kws
             name = name % self.kws
@@ -1093,7 +1093,7 @@ class target_c(object):
         :param str value: (optional) Value to set; *None* to unset it
         """
         if value:
-            assert isinstance(value, basestring)
+            assert isinstance(value, str)
         self.report_info("setting property '%s' to '%s'"
                          % (property_name, value), dlevel = 1)
         self.rtb.rest_tb_property_set(
@@ -1109,7 +1109,7 @@ class target_c(object):
         """
         if isinstance(thing, target_c):
             thing = thing.id
-        assert isinstance(thing, basestring)
+        assert isinstance(thing, str)
         self.report_info("plugging thing '%s'" % thing, dlevel = 3)
         self.rtb.rest_tb_thing_plug(self.rt, thing, ticket = self.ticket)
         self.report_info("plugged thing '%s'" % thing, dlevel = 2)
@@ -1123,7 +1123,7 @@ class target_c(object):
         """
         if isinstance(thing, target_c):
             thing = thing.id
-        assert isinstance(thing, basestring)
+        assert isinstance(thing, str)
         self.report_info("unplugging thing '%s'" % thing, dlevel = 3)
         self.rtb.rest_tb_thing_unplug(self.rt, thing, ticket = self.ticket)
         self.report_info("unplugged thing '%s'" % thing, dlevel = 2)
@@ -1180,7 +1180,7 @@ class target_c(object):
 
     @crlf.setter
     def crlf(self, __crlf):
-        assert isinstance(__crlf, basestring)
+        assert isinstance(__crlf, str)
         self._crlf = __crlf
         return self._crlf
 
@@ -1207,7 +1207,7 @@ class target_c(object):
           - ``ANYSTRING``: append *ANYSTRING*
 
         """
-        assert isinstance(data, basestring)
+        assert isinstance(data, str)
         if crlf == None:
             crlf = self._crlf
         self.console_tx(str(data) + crlf, console)
@@ -1338,7 +1338,7 @@ class target_c(object):
         if timeout:
             assert isinstance(timeout, int)
         if console:
-            assert isinstance(console, basestring)
+            assert isinstance(console, str)
 
         try:
             with self.on_console_rx_cm(regex_or_str, timeout = timeout,
@@ -1375,7 +1375,7 @@ class target_c(object):
         if timeout:
             assert isinstance(timeout, int)
         if console:
-            assert isinstance(console, basestring)
+            assert isinstance(console, str)
 
         try:
             uid = "just_me" # There is only one target.expect()
@@ -1479,10 +1479,10 @@ class target_c(object):
         >>> del target.bsps_stub[BSPNAME]
         >>> target.stub_app_add(BSPNAME, etc etc)
         """
-        assert isinstance(bsp, basestring)
+        assert isinstance(bsp, str)
         assert issubclass(_app, app.app_c)
-        assert isinstance(app_src, basestring)
-        assert isinstance(app_src_options, basestring)
+        assert isinstance(app_src, str)
+        assert isinstance(app_src_options, str)
         if not bsp in self.bsps_stub \
            or self.bsps_stub[bsp] == None \
            or self.bsps_stub[bsp][0] == None:
@@ -1503,7 +1503,7 @@ class target_c(object):
         self.kws_origin.update(self._kws_origin)
         commonl.kws_update_from_rt(self.kws, self.rt)
         kws_bsp = dict()
-        if 'bsps' in self.rt.keys() and bsp and bsp in self.rt['bsps']:
+        if 'bsps' in list(self.rt.keys()) and bsp and bsp in self.rt['bsps']:
             commonl.kws_update_type_string(kws_bsp, self.rt['bsps'][bsp])
             kws_bsp.update(self._kws_bsp.get(bsp, {}))
             kws_bsp['bsp'] = bsp
@@ -1523,19 +1523,19 @@ class target_c(object):
 
         """
         # FIXME: override kws __setitem__ to fill it out automagically?
-        assert isinstance(kw, basestring)
-        assert isinstance(value, basestring)
+        assert isinstance(kw, str)
+        assert isinstance(value, str)
         if origin == None:
             o = inspect.stack()[1]
             origin = "%s:%s" % (o[1], o[2])
         else:
-            assert isinstance(origin, basestring)
+            assert isinstance(origin, str)
         self._kws[kw] = value
         self._kws_origin.setdefault(kw, []).append(origin)
 
     @staticmethod
     def _report_argcheck(message, attachments, level, dlevel, alevel, ulevel):
-        assert isinstance(message, basestring)
+        assert isinstance(message, str)
         if attachments:
             assert isinstance(attachments, dict)
         assert isinstance(level, int)
@@ -1612,10 +1612,10 @@ class target_c(object):
             raise tcfl.tc.blocked_e("%sNo App builders defined for "
                                     "target '%s', can't figure out "
                                     "what to do" % (what, self.want_name))
-        elif bsp in twapp.keys():
+        elif bsp in list(twapp.keys()):
             _app = twapp[bsp][0]
             app_src = twapp[bsp][1]
-        elif "*" in twapp.keys():
+        elif "*" in list(twapp.keys()):
             _app = twapp["*"][0]
             app_src = twapp["*"][1]
         else:
@@ -1651,7 +1651,7 @@ class target_group_c(object):
     >>>
     """
     def __init__(self, descr):
-        assert isinstance(descr, basestring)
+        assert isinstance(descr, str)
         # This is needed so that things can be initialized in the same
         # order (by default) as declared in the testcase
         self._targets = collections.OrderedDict()
@@ -1680,7 +1680,7 @@ class target_group_c(object):
         return self._targets[target_name]
 
     def target_add(self, target_name, _target):
-        assert isinstance(target_name, basestring)
+        assert isinstance(target_name, str)
         assert isinstance(_target, target_c)
         self._targets[target_name] = _target
 
@@ -1817,7 +1817,7 @@ class result_c():
     def report(self, tc, message, attachments = None,
                level = None, dlevel = 0, alevel = 2):
         assert isinstance(tc, tcfl.tc.tc_c)
-        assert isinstance(message, basestring)
+        assert isinstance(message, str)
         if attachments:
             assert isinstance(attachments, dict)
         if level:
@@ -2035,7 +2035,7 @@ def tags(*args, **kwargs):
         for name in args:
             cls._tags[name] = (True, origin)
         if kwargs:
-            for key, val in kwargs.iteritems():
+            for key, val in kwargs.items():
                 cls._tags[key] = (val, origin)
         return cls
     return decorate_class
@@ -2110,7 +2110,7 @@ def _target_app_setup(obj, cls_name, target_want_name):
                target_want_name, fnname, target_want_name),
             tcfl.origin_get(2) + "|" + tcfl.origin_get(), 'exec')
         eval(object_code)
-        if type(obj) == types.TypeType:
+        if type(obj) == type:
             # Bind to the class, no need to bind to an instance, will
             # self itself in __method_trampoline_call()
             # Note how we cast with the instance set to None, so in
@@ -2120,7 +2120,7 @@ def _target_app_setup(obj, cls_name, target_want_name):
             # Bind to an object, force not binding to an instance,
             # setting it to None, so in __method_trampoline_call() we
             # can tell we need to bind it.
-            if isinstance(obj, types.TypeType):
+            if isinstance(obj, type):
                 # We are binding to a class
                 value = types.MethodType(eval(dest_method_name), None, obj)
             else:
@@ -2139,7 +2139,7 @@ def _target_app_add(obj, target_want_name, app_name, app_src):
         _app = app._driver_get(app_name)
         app_src = app._app_src_validate(app_name, app_src)
         if isinstance(app_src, dict):
-            for bsp, src in app_src.iteritems():
+            for bsp, src in app_src.items():
                 twapp[bsp] = (_app, src)
         else:
             twapp["*"] = (_app, app_src)
@@ -2184,7 +2184,7 @@ def _target_want_decorate_class(obj, cls_name,
     #
     # Will need to remove hack `FIXME: reversed for decorator workaround`_
     if name != None:
-        assert isinstance(name, basestring)
+        assert isinstance(name, str)
         if name in obj._targets:
             raise blocked_e("%s name '%s' @%s already defined, "
                             "choose another"
@@ -2223,7 +2223,7 @@ def _target_want_add(obj, cls_name, name, spec, origin, **kwargs):
         obj, cls_name, name, "target", "target", obj._target_count, **kwargs)
     obj._targets[target_want_name]['spec'] = spec
     obj._targets[target_want_name]['origin'] = origin
-    for key, val in kwargs.iteritems():
+    for key, val in kwargs.items():
         valid = _target_want_add_check_key(obj, cls_name, target_want_name,
                                            key, val)
         if not valid:
@@ -2420,7 +2420,7 @@ def interconnect(spec = None, name = None, **kwargs):
         cls._targets[ic_want_name]['spec'] = spec
         cls._targets[ic_want_name]['origin'] = origin
         cls._interconnects.add(ic_want_name)
-        for key, val in kwargs.iteritems():
+        for key, val in kwargs.items():
             valid = _target_want_add_check_key(
                 cls, cls.__name__, ic_want_name,
                 key, val)
@@ -2462,7 +2462,7 @@ class _tc_mc(type):
 #
 # The core testcase object
 #
-class tc_c(object):
+class tc_c(object, metaclass=_tc_mc):
     r"""
     A testcase, with instructions for configuring, building, deploying,
     setting up, running, evaluating, tearing down and cleaning up.
@@ -2902,8 +2902,8 @@ class tc_c(object):
           measurements for target %(type)s" which will automatically
           create a different domain for each type of target.
         """
-        assert isinstance(domain, basestring)
-        assert isinstance(name, basestring)
+        assert isinstance(domain, str)
+        assert isinstance(name, str)
         if expand:
             domain = domain % self.kws
             name = name % self.kws
@@ -2980,9 +2980,9 @@ class tc_c(object):
         :param str origin: [optional] string describing where this
           regular expression comes from (eg: FILE:LINENO).
         """
-        assert isinstance(regex, basestring)
+        assert isinstance(regex, str)
         if origin != None:
-            assert isinstance(origin, basestring)
+            assert isinstance(origin, str)
         if origin == None:
             o = inspect.stack()[1]
             origin = "%s:%s" % (o[1], o[2])
@@ -2999,9 +2999,9 @@ class tc_c(object):
         :param str origin: [optional] string describing where this
           regular expression comes from (eg: FILE:LINENO).
         """
-        assert isinstance(regex, basestring)
+        assert isinstance(regex, str)
         if origin != None:
-            assert isinstance(origin, basestring)
+            assert isinstance(origin, str)
         if origin == None:
             o = inspect.stack()[1]
             origin = "%s:%s" % (o[1], o[2])
@@ -3245,8 +3245,6 @@ class tc_c(object):
     # Will targets be released at the end of the testcase
     release = True
 
-    __metaclass__ = _tc_mc
-
     #
     # App Builder entry points; when you define an app_NAME builder in
     # the @target() decorator, _target_app_setup() creates
@@ -3265,7 +3263,7 @@ class tc_c(object):
             _app, app_src = _target._app_get_for_bsp("configure")
             app.configure(_app, self, _target, app_src)
         for bsp, (_app, app_src, _) \
-            in _target.bsps_stub.iteritems():
+            in _target.bsps_stub.items():
             if _app == None:
                 raise blocked_e("%s: BSP has to be stubbed, but no "
                                 "stubbing information was provided" % bsp)
@@ -3286,7 +3284,7 @@ class tc_c(object):
             _app, app_src = _target._app_get_for_bsp("build")
             app.build(_app, self, _target, app_src)
         for bsp, (_app, app_src, _) \
-            in _target.bsps_stub.iteritems():
+            in _target.bsps_stub.items():
             if _app == None:
                 raise blocked_e("%s: BSP has to be stubbed, but no "
                                 "stubbing information was provided" % bsp)
@@ -3313,7 +3311,7 @@ class tc_c(object):
             assert isinstance(r, result_c)
             result += r
         for bsp, (_app, app_src, _) \
-            in _target.bsps_stub.iteritems():
+            in _target.bsps_stub.items():
             if _app == None:
                 raise blocked_e("%s: BSP has to be stubbed, but no "
                                 "stubbing information was provided" % bsp)
@@ -3381,7 +3379,7 @@ class tc_c(object):
             _app, app_src = _target._app_get_for_bsp("clean")
             app.clean(_app, self, _target, app_src)
         for bsp, (_app, app_src, _) \
-            in _target.bsps_stub.iteritems():
+            in _target.bsps_stub.items():
             if _app == None:
                 raise blocked_e("%s: BSP has to be stubbed, but no "
                                 "stubbing information was provided" % bsp)
@@ -3397,7 +3395,7 @@ class tc_c(object):
 
     @staticmethod
     def _report_argcheck(message, attachments, level, dlevel, alevel, ulevel):
-        assert isinstance(message, basestring)
+        assert isinstance(message, str)
         if attachments:
             assert isinstance(attachments, dict)
         assert isinstance(level, int)
@@ -3416,7 +3414,7 @@ class tc_c(object):
             self._report_prefix = \
                 self.name \
                 + " @" \
-                + self.target_group.targets.values()[0].fullid
+                + list(self.target_group.targets.values())[0].fullid
         else:
             self._report_prefix = self.name + " @" + self.target_group.name
 
@@ -3512,7 +3510,7 @@ class tc_c(object):
                     "valid Python identifier"
                     % (cls.__name__, fname,
                        tcfl.origin_get_object(fn), argname))
-            if not argname in self._targets.keys():
+            if not argname in list(self._targets.keys()):
                 raise blocked_e(
                     "%s @ %s.%s() %s: needs target named '%s', which hasn't "
                     "been declared with the @target class decorator "
@@ -3724,7 +3722,7 @@ class tc_c(object):
                        tcfl.origin_get_object(fn), wanted_target,
                        self.target_group.name,
                        ", ".join([
-                           i for i in self.target_group.targets.keys()
+                           i for i in list(self.target_group.targets.keys())
                        ])))
         return _args
 
@@ -3747,7 +3745,7 @@ class tc_c(object):
                              % (type(self).__name__, fname, fn.__name__),
                              dlevel = 3)
         if type(fn) == types.MethodType:	# instance needed
-            if fn.im_self == None:
+            if fn.__self__ == None:
                 # This was added from target_wanted_add(), binding to an
                 # specific object; we forced it unbound, so we have to
                 # call it with 'self'
@@ -3852,10 +3850,10 @@ class tc_c(object):
                      dict(expecter_parent = self.tls.expecter)))
             thread_pool.close()
             thread_pool.join()
-            for thread in threads.values():
+            for thread in list(threads.values()):
                 r = thread.get()
                 if r[1] != None:	# re-raise thrown exceptions
-                    raise r[1][0], r[1][1], r[1][2]
+                    raise r[1][0](r[1][1]).with_traceback(r[1][2])
                 result += r[0]
             del thread_pool
         return result
@@ -4070,7 +4068,7 @@ class tc_c(object):
         # Tag/s were updated, see if there are any special ones we
         # need to handle
         if not tags:
-            tags = self._tags.keys()
+            tags = list(self._tags.keys())
         for tagname in tags:
             value, origin = self._tags[tagname]
             if tagname == 'build_only' and value == True:
@@ -4101,17 +4099,17 @@ class tc_c(object):
           instantiation.
         """
 
-        assert isinstance(tagname, basestring), (
+        assert isinstance(tagname, str), (
             "tagname has to be a string, not a %s" % type(tagname).__name__)
         if value == None:
             value = True
         else:
-            assert isinstance(value, basestring) \
+            assert isinstance(value, str) \
                 or isinstance(value, bool)
         if origin == None:
             origin = "[builtin default] " + tcfl.origin_get(1)
         else:
-            assert isinstance(origin, basestring)
+            assert isinstance(origin, str)
         self._tags[tagname] = (value, origin)
         self._tags_update([ tagname ])
 
@@ -4126,14 +4124,14 @@ class tc_c(object):
         Same notes as for :meth:`tag_set` apply
         """
 
-        for tagname, (value, _origin) in _tags.iteritems():
-            assert isinstance(tagname, basestring), \
+        for tagname, (value, _origin) in _tags.items():
+            assert isinstance(tagname, str), \
                 "tagname has to be a string, not a %s" \
                 % type(tagname).__name__
             if value == None:
                 value = True
             else:
-                assert isinstance(value, (basestring, bool)), \
+                assert isinstance(value, (str, bool)), \
                     "tag value has to be None (taken as True), bool, " \
                     "string, not a %s" % type(value).__name__
             if origin:
@@ -4143,7 +4141,7 @@ class tc_c(object):
             if tagname in self._tags and overwrite == False:
                 continue
             self._tags[tagname] = (value, _origin)
-        self._tags_update(_tags.keys())
+        self._tags_update(list(_tags.keys()))
 
     def kw_set(self, key, value, origin = None):
         """
@@ -4161,7 +4159,7 @@ class tc_c(object):
 
         :param str kw: keyword name
         """
-        assert isinstance(kw, basestring)
+        assert isinstance(kw, str)
         if kw in self.kws:
             del self.kws[kw]
         if kw in self.kws_origin:
@@ -4178,8 +4176,8 @@ class tc_c(object):
             o = inspect.stack()[1]
             origin = "%s:%s" % (o[1], o[2])
         else:
-            assert isinstance(origin, basestring)
-        for key, value in d.iteritems():
+            assert isinstance(origin, str)
+        for key, value in d.items():
             self._kw_set(key, value, origin)
     #
     # Helpers for private APIs
@@ -4215,7 +4213,7 @@ class tc_c(object):
         retval = False
         if not phase in self._phases:
             self.report_info("phase %s not in [%s]"
-                             % (phase, ', '.join(self._phases.keys())),
+                             % (phase, ', '.join(list(self._phases.keys()))),
                              dlevel = 5)
             retval = True
         if phase in self._phases_skip:
@@ -4234,13 +4232,13 @@ class tc_c(object):
         :param str origin: origin of this setting; if none, it will be
           taken from the stack
         """
-        assert isinstance(kw, basestring)
-        assert isinstance(value, basestring)
+        assert isinstance(kw, str)
+        assert isinstance(value, str)
         if origin == None:
             o = inspect.stack()[1]
             origin = "%s:%s" % (o[1], o[2])
         else:
-            assert isinstance(origin, basestring)
+            assert isinstance(origin, str)
         self.kws[kw] = value
         self.kws_origin.setdefault(kw, []).append(origin)
 
@@ -4326,7 +4324,7 @@ class tc_c(object):
 
         acquired = []
         pending = []
-        for target in self.target_group.targets.values():
+        for target in list(self.target_group.targets.values()):
             if target.acquire:
                 pending.append(target)
         if not pending:
@@ -4481,7 +4479,7 @@ class tc_c(object):
         >>>         self.targets_active(target)
         >>>         ...
         """
-        for target in self.targets.values():
+        for target in list(self.targets.values()):
             if not target in skip_targets and target.keep_active:
                 target.active()
 
@@ -4697,7 +4695,7 @@ class tc_c(object):
         spec = target_want.get('spec', None)
         if spec == None:
             wanted_by_specs = True
-        elif isinstance(spec, basestring):
+        elif isinstance(spec, str):
             wanted_by_specs = self._targets_select_by_spec(
                 target_want_name, rt, bsp_model,
                 spec, target_want['origin'], _kws = kws)
@@ -4809,7 +4807,7 @@ class tc_c(object):
         rts_bsp_models = []
         candidates = {}
         # Pregenerate a list of <rt_fullid, bspmodel>
-        for rt_full_id, bsp_models in rt_selected.items():
+        for rt_full_id, bsp_models in list(rt_selected.items()):
             if bsp_models:
                 for bsp_model in bsp_models:
                     rts_bsp_models.append((rt_full_id, bsp_model))
@@ -4826,12 +4824,12 @@ class tc_c(object):
     @staticmethod
     def _selected_str(rt_selected):
         return " ".join([fullid + ":" + ",".join(bsp_models)
-                         for fullid, bsp_models in rt_selected.iteritems()])
+                         for fullid, bsp_models in rt_selected.items()])
 
     @staticmethod
     def _tg_str(icg):
         s=""
-        for twn, (rt_full_id, bsp_model) in sorted(icg.iteritems(),
+        for twn, (rt_full_id, bsp_model) in sorted(iter(icg.items()),
                                                    key = lambda x: x[0]):
             if bsp_model == None:
                 s += "%s=%s " % (twn, rt_full_id)
@@ -4844,7 +4842,7 @@ class tc_c(object):
 
         # Compute how many unique candidates we have
         candidates = set()
-        for c in target_want_candidates.values():
+        for c in list(target_want_candidates.values()):
             candidates |= c
 
         # max_repeats is how many repetitions we will allow before we
@@ -4889,7 +4887,7 @@ class tc_c(object):
                 # command line to control that.
                 if len(target_want_candidates) == 1:
                     _n = 0
-                    for rt_fullid, rt in self.rt_all.iteritems():
+                    for rt_fullid, rt in self.rt_all.items():
                         # Yes, if no BSP model, count as 1
                         bsp_model_count = len(rt.get('bsp_models', [None ]))
                         _n += bsp_model_count
@@ -5030,7 +5028,7 @@ class tc_c(object):
             perm_types_id = " ".join([
                 twn + "=" + rt_type + \
                   ((":" + bsp_model) if bsp_model else "")\
-                for twn, (rt_type, bsp_model) in sorted(_types.iteritems(),
+                for twn, (rt_type, bsp_model) in sorted(iter(_types.items()),
                                                         key = lambda x: x[0])])
             # Have we seen that permutations of target wants / remote
             # target types?
@@ -5312,7 +5310,7 @@ class tc_c(object):
                 try:
                     self.report_info("will run on target group '%s'"
                                      % (self.target_group.descr))
-                    for _target in self.target_group.targets.values():
+                    for _target in list(self.target_group.targets.values()):
                         # We need to update all the target's KWS, as we
                         # have added KWS to the tescase (tc_hash and
                         # tg_hash!) , which we could only add once we had
@@ -5357,7 +5355,7 @@ class tc_c(object):
             # Well, this is quite a hack -- for reporting to work ok,
             # rebind each's target's testcase pointer to this
             # subtestcase.
-            for _target in self.targets.values():
+            for _target in list(self.targets.values()):
                 _target.testcase = tc
             tc.target_group = self.target_group
             tc._targets = self._targets
@@ -5369,7 +5367,7 @@ class tc_c(object):
 
         # Undo the hack from before, as we might need these values to
         # be proper for reporting later on
-        for _target in self.targets.values():
+        for _target in list(self.targets.values()):
             _target.testcase = self
 
         return results
@@ -5490,7 +5488,7 @@ class tc_c(object):
             if self.is_static():
                 if self._dry_run:
                     self.report_info("will run")
-                rt_selected = { 'local': rt_all['local']['bsp_models'].keys() }
+                rt_selected = { 'local': list(rt_all['local']['bsp_models'].keys()) }
                 ic_selected = { }
 
             # This will be now testcase-specific, so make a deep copy
@@ -5549,7 +5547,7 @@ class tc_c(object):
                 # Cheat, when we don't use interconnects, just define an empty
                 # one so we enter into the loop below
                 ic_permutations = { "all": { } }
-            for icgid, icg in ic_permutations.iteritems():
+            for icgid, icg in ic_permutations.items():
                 self.report_info("interconnect group %s: %s"
                                  % (icgid, self._tg_str(icg)), dlevel = 5)
 
@@ -5564,10 +5562,10 @@ class tc_c(object):
                              "targets available for each",
                              dlevel = 6)
             icg_selected = collections.defaultdict(dict)
-            for icgid, icg in ic_permutations.iteritems():
-                for icwn, (rtic, _) in icg.iteritems():
+            for icgid, icg in ic_permutations.items():
+                for icwn, (rtic, _) in icg.items():
                     rtic_id = self.rt_all[rtic]['id']
-                    for rt_full_id, bsp_models in rt_selected.iteritems():
+                    for rt_full_id, bsp_models in rt_selected.items():
                         rt = self.rt_all[rt_full_id]
                         if rtic_id in rt.get('interconnects', {}):
                             icg_selected[icgid][rt_full_id] = bsp_models
@@ -5600,11 +5598,11 @@ class tc_c(object):
             rt_candidates = {}
             rt_permutations = {}
             target_want_list = set(self._targets.keys()) - self._interconnects
-            for icgid, rt_selected in icg_selected.iteritems():
+            for icgid, rt_selected in icg_selected.items():
                 # Generate keywords that describe the current
                 # interconnects
                 kws_ics = dict()
-                for icwn, ic in ic_permutations[icgid].iteritems():
+                for icwn, ic in ic_permutations[icgid].items():
                     commonl.kws_update_from_rt(kws_ics, self.rt_all[ic[0]],
                                                prefix = icwn + ".")
                 # list candidates to targets in this interconnect group
@@ -5631,7 +5629,7 @@ class tc_c(object):
                 tgs = self._target_wants_list_permutations(
                     rt_candidates, max_permutations, name_prefix = icgid)
                 if tgs:
-                    for tgid, tg in tgs.iteritems():
+                    for tgid, tg in tgs.items():
                         rt_permutations[(icgid, tgid)] = tg
                 elif len(self._targets) == 0: # static TC
                     ic_permutations["localic"] = {}
@@ -5648,7 +5646,7 @@ class tc_c(object):
                                      dlevel = 4)
 
             # So now we are going to iterate over all the groups
-            for (icgid, tgid), tg in rt_permutations.iteritems():
+            for (icgid, tgid), tg in rt_permutations.items():
                 if tgid == None:
                     # no targets, but interconnects
                     tg_name = icgid
@@ -5679,7 +5677,7 @@ class tc_c(object):
                 target_group = target_group_c(group_str)
                 # Ids of the interconnect targets we'll be using
                 icg_ids = set()
-                for target_want_name in reversed(self._targets.keys()):
+                for target_want_name in reversed(list(self._targets.keys())):
                     # iterate over the list of wanted targets to add
                     # them in the right order to the
                     # target_group.
@@ -5701,7 +5699,7 @@ class tc_c(object):
                 target_group.name_set(tg_name)
                 tc_for_tg.target_group = target_group
                 tc_for_tg.targets = target_group.targets
-                for target in target_group.targets.values():
+                for target in list(target_group.targets.values()):
                     target._kws_update_interconnect_addrs(icg_ids)
                     # this just updates the core keys, but later calls
                     # to kw_set() and company will refresh the main
@@ -5937,7 +5935,7 @@ def find(args):
             tcd_find_in_path = getattr(tcd, "find_in_path", None)
             if tcd_find_in_path is not None and\
                id(getattr(tcd_find_in_path, "im_func", tcd_find_in_path)) \
-               != id(tc_c.find_in_path.im_func):
+               != id(tc_c.find_in_path.__func__):
                 tcd.find_in_path(tcs, tc_path)
     if len(tcs) == 0:
         logger.warning("No testcases found")
@@ -5958,11 +5956,11 @@ def _testcase_match_tags(tc, tags_spec, origin = None):
         tc.report_info("selected by no-tag specification", dlevel = 4)
         return
     else:
-        assert isinstance(tags_spec, basestring)
+        assert isinstance(tags_spec, str)
     if origin == None:
         origin = "[builtin]"
     kws = dict()
-    for name, (value, _vorigin) in tc._tags.iteritems():
+    for name, (value, _vorigin) in tc._tags.items():
         kws[name] = value
     if not commonl.conditional_eval("testcase tag match", kws, tags_spec,
                                     origin, kind = "specification"):
@@ -6007,7 +6005,7 @@ def testcases_discover(tcs_filtered, args):
             tcd_find_in_path = getattr(tcd, "find_in_path", None)
             if tcd_find_in_path is not None and\
                id(getattr(tcd_find_in_path, "im_func", tcd_find_in_path)) \
-               != id(tc_c.find_in_path.im_func):
+               != id(tc_c.find_in_path.__func__):
                 result += tcd.find_in_path(tcs, tc_path)
     if len(tcs) == 0:
         logger.error("WARNING! No testcases found")
@@ -6022,7 +6020,7 @@ def testcases_discover(tcs_filtered, args):
     else:
         tags_spec = "(" + ") or (".join(args.tags_spec) +  ")"
 
-    for tc_path, tc in tcs.iteritems():
+    for tc_path, tc in tcs.items():
         try:
             # This is a TC unit testcase aid
             if args.testcase_name and tc.name != args.testcase_name:
@@ -6038,7 +6036,7 @@ def testcases_discover(tcs_filtered, args):
             # Anything with a skip tag shall be skipped
             skip_value, skip_origin = tc.tag_get('skip', False)
             if skip_value != False:
-                if isinstance(skip_value, basestring):
+                if isinstance(skip_value, str):
                     raise skip_e("because of 'skip' tag @%s: %s"
                                  % (skip_origin, skip_value))
                 else:
@@ -6057,7 +6055,7 @@ def testcases_discover(tcs_filtered, args):
                      "line -s options")
         return result
     logger.warning("Testcases filtered by command line to: %s",
-                   ", ".join(tcs_filtered.keys()))
+                   ", ".join(list(tcs_filtered.keys())))
     return result
 
 def _targets_discover_local(targets_all):
@@ -6118,7 +6116,7 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
         spec = "(" + ") or (".join(args.target) +  ")"
 
         # Select interconnects
-        for rt_fullid, bsp_models in ic_selected_all.iteritems():
+        for rt_fullid, bsp_models in ic_selected_all.items():
             rt = rt_all[rt_fullid]
             # Introduce two symbols after the ID and fullid, so "-t
             # TARGETNAME" works
@@ -6135,7 +6133,7 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
                     ic_selected.setdefault(rt_fullid, set())
 
         # Select targets
-        for rt_fullid, bsp_models in rt_selected_all.iteritems():
+        for rt_fullid, bsp_models in rt_selected_all.items():
             rt = rt_all[rt_fullid]
             # Introduce two symbols after the ID and fullid, so "-t
             # TARGETNAME" works
@@ -6369,7 +6367,7 @@ def _run(args):
         threads = []
         time_start = time.time()
         tc_c.jobs = len(tcs_filtered)
-        for tc in tcs_filtered.values():
+        for tc in list(tcs_filtered.values()):
             tc.mkticket()
             with msgid_c(tc.ticket, l = 4) as _msgid:
                 tc._ident = msgid_c.ident()
@@ -6395,7 +6393,7 @@ def _run(args):
         # Run the class' teardown processes, if any -- mostly used for
         # self-testing. Note this is run in the top level process.
         seen_classes = set()
-        for tc in tcs_filtered.values():
+        for tc in list(tcs_filtered.values()):
             cls = type(tc)
             if cls in seen_classes:
                 continue
@@ -6612,33 +6610,33 @@ def argp_setup(arg_subparsers):
 import tcfl.app_sketch
 tcfl.app.driver_add(tcfl.app_sketch.app_sketch)
 
-import app_manual
+from . import app_manual
 tcfl.app.driver_add(app_manual.app_manual)
 
 # Target API extensions
-import target_ext_broker_files
+from . import target_ext_broker_files
 target_c.extension_register(target_ext_broker_files.broker_files)
-import target_ext_console
+from . import target_ext_console
 target_c.extension_register(target_ext_console.console)
-import target_ext_power
+from . import target_ext_power
 target_c.extension_register(target_ext_power.power)
-import target_ext_images
+from . import target_ext_images
 target_c.extension_register(target_ext_images.images)
-import target_ext_debug
+from . import target_ext_debug
 target_c.extension_register(target_ext_debug.debug)
-import target_ext_tunnel
+from . import target_ext_tunnel
 target_c.extension_register(target_ext_tunnel.tunnel)
-import target_ext_shell
+from . import target_ext_shell
 target_c.extension_register(target_ext_shell.shell)
-import target_ext_ssh
+from . import target_ext_ssh
 target_c.extension_register(target_ext_ssh.ssh)
-import target_ext_ioc_flash_server_app
+from . import target_ext_ioc_flash_server_app
 target_c.extension_register(target_ext_ioc_flash_server_app.extension)
-import target_ext_buttons
+from . import target_ext_buttons
 target_c.extension_register(target_ext_buttons.buttons)
-import target_ext_capture
+from . import target_ext_capture
 target_c.extension_register(target_ext_capture.extension, "capture")
-import target_ext_fastboot
+from . import target_ext_fastboot
 target_c.extension_register(target_ext_fastboot.fastboot)
-import pos
+from . import pos
 target_c.extension_register(pos.extension, "pos")

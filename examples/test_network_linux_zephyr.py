@@ -142,7 +142,7 @@ class _test(tcfl.tc.tc_c):
     def teardown_dump_console(self):
         if not self.result_eval.failed and not self.result_eval.blocked:
             return
-        for target in self.targets.values():
+        for target in list(self.targets.values()):
             if not hasattr(target, "console"):
                 continue
             if self.result_eval.failed:
@@ -156,5 +156,5 @@ class _test(tcfl.tc.tc_c):
 
 
     def teardown(self):
-        for _twn, target  in reversed(list(self.targets.iteritems())):
+        for _twn, target  in reversed(list(self.targets.items())):
             target.power.off()

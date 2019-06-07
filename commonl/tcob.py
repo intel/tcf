@@ -207,8 +207,8 @@ def validate_pin_map(pin_map):
         raise ValueError("Bad pin_map data: shall be a dictionary")
 
     errors = ""
-    for key, val in pin_map.iteritems():
-        if not isinstance(key, basestring):
+    for key, val in pin_map.items():
+        if not isinstance(key, str):
             errors += "%s: invalid key type (must be string) " % key
             continue
 
@@ -217,7 +217,7 @@ def validate_pin_map(pin_map):
                       "commonl.tcob.valid_keys) " % key
             continue
 
-        if not isinstance(val, basestring):
+        if not isinstance(val, str):
             errors += " %s: invalid value type for key (must be string) " % key
             continue
 
@@ -232,8 +232,8 @@ def validate_connections(connections):
         raise ValueError("Bad connections data: shall be a dictionary")
 
     errors = ""
-    for key, val in connections.iteritems():
-        if not isinstance(key, basestring):
+    for key, val in connections.items():
+        if not isinstance(key, str):
             errors += "%s: invalid key type (must be string) " % key
             continue
 
@@ -242,7 +242,7 @@ def validate_connections(connections):
                       "commonl.tcob.valid_keys) " % key
             continue
 
-        if isinstance(val, basestring):
+        if isinstance(val, str):
             _value1, _value2 = val.split(None, 2)
             try:
                 value1 = int(_value1)

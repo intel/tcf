@@ -12,8 +12,8 @@ Flash the target with fastboot
 
 import json
 
-import tc
-import ttb_client
+from . import tc
+from . import ttb_client
 
 def _rest_tb_target_fastboot_run(rtb, rt, parameters, ticket = ''):
     return rtb.send_request("POST", "targets/%s/fastboot/run" % rt['id'],
@@ -64,7 +64,7 @@ class fastboot(tc.target_extension_c):
     def run(self, command_name, *args):
         count = 0
         for arg in args:
-            assert isinstance(arg, basestring), \
+            assert isinstance(arg, str), \
                 "arg #%d to '%s' has to be a string, got %s" \
                 % (count, command_name, type(arg).__name__)
             count += 1
@@ -95,8 +95,8 @@ def cmdline_fastboot(args):
 def cmdline_fastboot_list(args):
     rtb, rt = ttb_client._rest_target_find_by_id(args.target)
     r = _rest_tb_target_fastboot_list(rtb, rt, ticket = args.ticket)
-    for command, params in r['commands'].iteritems():
-        print "%s: %s" % (command, params)
+    for command, params in r['commands'].items():
+        print("%s: %s" % (command, params))
 
 
 def cmdline_setup(argsp):

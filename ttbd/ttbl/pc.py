@@ -16,7 +16,7 @@ import re
 import sys
 import time
 import traceback
-import urlparse
+import urllib.parse
 
 import requests
 import usb.core
@@ -415,9 +415,9 @@ class dlwps7(ttbl.tt_power_control_impl):
     driver fail.
     """
     def __init__(self, _url, reboot_wait_s = 0.5):
-        assert isinstance(_url, basestring)
+        assert isinstance(_url, str)
         assert isinstance(reboot_wait_s, (int, float))
-        url = urlparse.urlparse(_url)
+        url = urllib.parse.urlparse(_url)
         self.reboot_wait_s = reboot_wait_s
         self.url = "%s://%s" % (url.scheme, url.netloc)
         self.url_no_password = "%s://%s" % (url.scheme, url.hostname)

@@ -1,5 +1,5 @@
 #! /usr/bin/python2
-from __future__ import print_function
+
 import collections
 import glob
 import os
@@ -201,11 +201,11 @@ class _run(tcfl.tc.tc_c, pylint.reporters.BaseReporter):
             os.environ['PYTHONPATH'] = ":".join([ _python_path ] + paths)
             pylint.lint.Run(_args + files, reporter = self, exit = False)
 
-        for key, val in self.mbcs.iteritems():
+        for key, val in self.mbcs.items():
             self.report_data("Code statistics", key, val)
-        for key, val in self.raw_metrics.iteritems():
+        for key, val in self.raw_metrics.items():
             self.report_data("Code statistics", key, val)
-        for key, val in sorted(self.mbid.iteritems(), key = lambda x: x[1]):
+        for key, val in sorted(iter(self.mbid.items()), key = lambda x: x[1]):
             self.report_data("PYLint Messages", key, val)
 
         if False and self.mbcs['error'] > 0:

@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-import __init__
+from . import __init__
 
 class authenticator_party_c(__init__.authenticator_c):
     """Life is a party! Authenticator that allows anyone to log in and be
@@ -39,7 +39,7 @@ class authenticator_party_c(__init__.authenticator_c):
             self.local_addresses = []
             assert isinstance(local_addresses, set)
             for local_address in local_addresses:
-                assert isinstance(local_address, basestring)
+                assert isinstance(local_address, str)
                 self.local_addresses.append(local_address)
         else:
             self.local_addresses = None
@@ -69,8 +69,8 @@ class authenticator_party_c(__init__.authenticator_c):
         :raises: authenticator_c.error_e if any kind of error
           during the process happens
         """
-        assert isinstance(email, basestring)
-        assert isinstance(password, basestring)
+        assert isinstance(email, str)
+        assert isinstance(password, str)
         if self.local_addresses != None and 'remote_address' in kwargs:
             for local_address in self.local_addresses:
                 if local_address == kwargs['remote_address']:

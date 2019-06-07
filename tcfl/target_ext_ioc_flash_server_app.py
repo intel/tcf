@@ -10,8 +10,8 @@ Flash the target with *ioc_flash_server_app*
 
 """
 
-import tc
-import ttb_client
+from . import tc
+from . import ttb_client
 
 def _rest_tb_target_ioc_flash_server_app(
         rtb, rt,

@@ -74,7 +74,7 @@ class _test(unittest.TestCase, commonl.testing.test_tcf_mixin):
         self.assertEqual(r, 127)
 
     def test_03(self):
-        with self.assertRaisesRegexp(tcfl.tc.blocked_e,
+        with self.assertRaisesRegex(tcfl.tc.blocked_e,
                                      "invalid_keyword: unknown key"):
             @tcfl.tc.target(invalid_keyword = 'invalid_value')  # pylint: disable = unused-variable
             class _test_03(tcfl.tc.tc_c):
@@ -245,7 +245,7 @@ class _test2(unittest.TestCase, commonl.testing.test_ttbd_mixin):
         self.assertEqual(r, 0)
 
     def test2_07(self):
-        with self.assertRaisesRegexp(tcfl.tc.blocked_e,
+        with self.assertRaisesRegex(tcfl.tc.blocked_e,
                                      "target: unknown App builder "
                                      "'app_nonexistant' "):
             @tcfl.tc.target(app_nonexistant = "doesn't matter") # pylint: disable = unused-variable

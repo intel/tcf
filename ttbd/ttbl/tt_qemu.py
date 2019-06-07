@@ -270,7 +270,7 @@ class tt_qemu(
 
         if not bsp in self.tags['bsps']:
             raise IndexError("Unsupported bsp %s (expected %s)"
-                             % (bsp, ", ".join(self.tags['bsps'].keys())))
+                             % (bsp, ", ".join(list(self.tags['bsps'].keys()))))
         if _image_type == "kernel":
             self.fsdb.set("qemu-image-kernel-%s" % bsp, image_name)
         else:
@@ -427,7 +427,7 @@ class tt_qemu(
             self._power_off_do_bsp(bsp)
             kws = dict(bsp = bsp)
             kws.update(self.kws)
-            for key in self.fsdb.keys():
+            for key in list(self.fsdb.keys()):
                 if key.startswith("qemu-"):
                     kws[key] = self.fsdb.get(key)
             # try to start qemu, retrying if we have to

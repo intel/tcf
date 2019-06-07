@@ -14,7 +14,7 @@ import __main__
 
 import testing
 import ttbl
-import user_control
+from . import user_control
 
 # Yeah, ugly hack -- FIXME pending a better solution
 __main__.log_format = "%(levelname)s %(module)s.%(funcName)s():%(lineno)d: %(message)s"

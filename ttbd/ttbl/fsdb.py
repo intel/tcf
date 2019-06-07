@@ -67,7 +67,7 @@ class fsdb(object):
         :param str value: value to stored; None to remove that field
         """
         if value != None:
-            assert isinstance(value, basestring)
+            assert isinstance(value, str)
             assert len(value) < 1023
         location = os.path.join(self.location, field)
         if value == None:
@@ -124,7 +124,7 @@ if __name__ == "__main__":
             cls = type(self)
             location = os.path.join(cls.tmpdir, "test_2")
             os.makedirs(location)
-            print "LOCATION ", location
+            print("LOCATION ", location)
             f1 = fsdb(location)
             f2 = fsdb(location)
             f1.set("field1", "value1")

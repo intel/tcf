@@ -6,7 +6,7 @@
 #
 
 import logging
-import urlparse
+import urllib.parse
 
 import ldap
 
@@ -50,16 +50,16 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         """
         if not roles:
             roles = {}
-        assert isinstance(url, basestring)
+        assert isinstance(url, str)
         assert isinstance(roles, dict)
 
-        u = urlparse.urlparse(url)
+        u = urllib.parse.urlparse(url)
         if u.scheme == "" or u.netloc == "":
             raise ValueError("%s: malformed LDAP URL?" % url)
         self.url = u.geturl()
 
         for role in roles:
-            if not isinstance(role, basestring):
+            if not isinstance(role, str):
                 raise ValueError("role specification keys must be strings")
             for tag in roles[role]:
                 if not tag in ('users', 'groups'):
@@ -69,7 +69,7 @@ class authenticator_ldap_c(ttbl.authenticator_c):
                     raise ValueError("value of role[%s][%s] must be a "
                                      "list of strings" % (role, tag))
                 for value in roles[role][tag]:
-                    if not isinstance(value, basestring):
+                    if not isinstance(value, str):
                         raise ValueError("members of role[%s][%s] must "
                                          "be  strings; '%s' is not" %
                                          (role, tag, value))
@@ -94,8 +94,8 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         :raises: authenticator_c.error_e if any kind of error
           during the process happens
         """
-        assert isinstance(email, basestring)
-        assert isinstance(password, basestring)
+        assert isinstance(email, str)
+        assert isinstance(password, str)
 
         # Always use a new connection, so it doesn't get invalidated
         # after a while
@@ -125,7 +125,7 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         # So the token/password combination exists and is valid, so
         # now let's see what roles we need to assign the user
         # depending on if it shows in the user list for that role
-        for role_name, role in self.roles.iteritems():
+        for role_name, role in self.roles.items():
             if email in role.get('users', []):
                 token_roles.add(role_name)
 
@@ -142,7 +142,7 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         if record and record[0] and record[0][1]:
             data_record = record[0][1]
 
-            for key in data_record.keys():
+            for key in list(data_record.keys()):
                 # here we extract the information from the dict, wich is a list
                 # if we have only 1 element, we remove the list object
                 data[key] = data_record[key][0] \
@@ -162,7 +162,7 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         # Given the group list @groups, check which more roles we
         # need to add based on group membership
         for group in groups:
-            for role_name, role in self.roles.iteritems():
+            for role_name, role in self.roles.items():
                 if group in role.get('groups', []):
                     token_roles.add(role_name)
         return token_roles

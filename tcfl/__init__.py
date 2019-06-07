@@ -76,22 +76,22 @@ class msgid_c(object):
 
         # First call, set the root if we have it
         if root:
-            assert isinstance(root, basestring)
+            assert isinstance(root, str)
             self._ident += root
         # that then can be overriden
         if s != None:
-            assert isinstance(s, basestring)
+            assert isinstance(s, str)
             if root:
                 self._ident += ":" + s
             else:
                 self._ident += s
         elif s_encode:
-            assert isinstance(s_encode, basestring)
+            assert isinstance(s_encode, str)
             self._ident += self.encode(hashlib.sha256(s_encode).digest(), l)
         else:
             self._ident += self.generate(l)
         if phase:
-            assert isinstance(phase, basestring)
+            assert isinstance(phase, str)
             self._phase = phase
         if depth != None:
             assert isinstance(depth, int)
@@ -108,7 +108,7 @@ class msgid_c(object):
 
     @classmethod
     def encode(cls, s, l):
-        assert isinstance(s, basestring)
+        assert isinstance(s, str)
         assert isinstance(l, int)
         # Instead of +/ we use AZ, even if it removes some key-space,
         # it shall be good enough

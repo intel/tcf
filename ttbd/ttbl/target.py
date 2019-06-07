@@ -45,7 +45,7 @@ def expect_send_sequence(logger, e, _list):
     assert isinstance(e, expect_base)
     count = 0
     for s in _list:
-        if isinstance(s, basestring):
+        if isinstance(s, str):
             expect = s
         else:
             expect = s[0]
@@ -61,7 +61,7 @@ def expect_send_sequence(logger, e, _list):
         elif r == 2:
             raise Exception("expect/send phase %d: Timeout waiting for '%s'"
                             % (count, expect))
-        if not isinstance(s, basestring) and len(s) > 1:
+        if not isinstance(s, str) and len(s) > 1:
             send = s[1]
             if len(s) > 2:	# there is a wait period
                 time.sleep(float(s[2]))

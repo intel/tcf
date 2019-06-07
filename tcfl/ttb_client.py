@@ -29,7 +29,7 @@ daemon; it is divided in two main blocks:
 
 """
 # FIXME: this is crap, need to move all the functions to core or something
-import cPickle
+import pickle
 import contextlib
 import errno
 import fcntl
@@ -47,9 +47,9 @@ import termios
 import threading
 import time
 import tty
-import urlparse
+import urllib.parse
 
-import commonl
+from . import commonl
 # We multithread to run testcases in parallel
 #
 # When massively running threads in production environments, we end up
@@ -90,7 +90,7 @@ elif mp.lower() == 'pathos':
 else:
     raise RuntimeError('Invalid value to TCF_USE_MP (%s)' % mp)
 
-import commonl
+from . import commonl
 import requests
 
 logger = logging.getLogger("tcfl.ttb_client")
@@ -147,20 +147,20 @@ class rest_target_broker(object):
         else:
             self.verify_ssl = True
         self.lock = threading.Lock()
-        self.parsed_url = urlparse.urlparse(url)
+        self.parsed_url = urllib.parse.urlparse(url)
         if aka == None:
             self.aka = self.parsed_url.hostname.split('.')[0]
         else:
-            assert isinstance(aka, basestring)
+            assert isinstance(aka, str)
             self.aka = aka
         # Load state
         url_safe = commonl.file_name_make_safe(url)
         file_name = state_path + "/cookies-%s.pickle" % url_safe
         try:
             with open(file_name, "r") as f:
-                self.cookies = cPickle.load(f)
+                self.cookies = pickle.load(f)
             logger.info("%s: loaded state", file_name)
-        except cPickle.UnpicklingError as e: #invalid state, clean file
+        except pickle.UnpicklingError as e: #invalid state, clean file
             os.remove(file_name)
         except IOError as e:
             if e.errno != errno.ENOENT:
@@ -206,12 +206,12 @@ class rest_target_broker(object):
             # it to serialize properly
             tp = _multiprocessing_pool_c(processes = len(rest_target_brokers))
             threads = {}
-            for rtb in sorted(rest_target_brokers.itervalues()):
+            for rtb in sorted(rest_target_brokers.values()):
                 threads[rtb] = tp.apply_async(cls._rts_get, (rtb,))
             tp.close()
             tp.join()
             cls._rts_cache = {}
-            for thread in threads.values():
+            for thread in list(threads.values()):
                 cls._rts_cache.update(thread.get())
             return cls._rts_cache
 
@@ -236,7 +236,7 @@ class rest_target_broker(object):
         with os.fdopen(os.open(fname, os.O_CREAT | os.O_WRONLY, 0o600),
                        "w") as f, \
                 self.lock:
-            cPickle.dump(self.cookies, f, protocol = 2)
+            pickle.dump(self.cookies, f, protocol = 2)
             logger.debug("%s: state saved %s",
                          self._url, pprint.pformat(self.cookies))
 
@@ -264,11 +264,11 @@ class rest_target_broker(object):
         """
         # create the url to send request based on API version
         if not self._base_url:
-            self._base_url = urlparse.urljoin(
+            self._base_url = urllib.parse.urljoin(
                 self._url, rest_target_broker.API_PREFIX)
         if url.startswith("/"):
             url = url[1:]
-        url_request = urlparse.urljoin(self._base_url, url)
+        url_request = urllib.parse.urljoin(self._base_url, url)
         logger.debug("send_request: %s %s", method, url_request)
         with self.lock:
             cookies = self.cookies
@@ -302,7 +302,7 @@ class rest_target_broker(object):
                 # it will have the stuff we need to auth with the
                 # server (like the remember_token)
                 # FIXME: maybe filter to those two only?
-                for cookie, value in r.cookies.iteritems():
+                for cookie, value in r.cookies.items():
                     self.cookies[cookie] = value
         commonl.request_response_maybe_raise(r)
         if raw:
@@ -673,7 +673,7 @@ def rest_shutdown(path):
     :param path: Path to where to save state information
     :type path: str
     """
-    for rtb in rest_target_brokers.itervalues():
+    for rtb in rest_target_brokers.values():
         rtb.tb_state_save(path)
 
 def rest_login(args):
@@ -685,7 +685,7 @@ def rest_login(args):
     :returns: True if it can be logged into at least 1 remote server.
     """
     logged = False
-    for rtb in rest_target_brokers.itervalues():
+    for rtb in rest_target_brokers.values():
         logger.info("%s: checking for a valid session", rtb._url)
         if not rtb.valid_session:
             if args.quiet:
@@ -709,7 +709,7 @@ def rest_login(args):
                             "TCF_USER/PASSWORD", rtb._url)
             else:
                 if args.userid == None:
-                    userid = raw_input('Login for %s [%s]: ' \
+                    userid = input('Login for %s [%s]: ' \
                                        % (rtb._url, getpass.getuser()))
                     if userid == "":
                         userid = getpass.getuser()
@@ -734,7 +734,7 @@ def rest_login(args):
         exit(1)
 
 def rest_logout(args):
-    for rtb in rest_target_brokers.itervalues():
+    for rtb in rest_target_brokers.values():
         logger.info("%s: checking for a valid session", rtb._url)
         if rtb.valid_session:
             rtb.logout()
@@ -750,7 +750,7 @@ def rest_target_print(rt, verbosity = 0):
     """
 
     if verbosity == 0:
-        print "%(fullid)s" % rt
+        print("%(fullid)s" % rt)
     elif verbosity == 1:
         # Simple list, just show owner and power state
         if 'powered' in rt:
@@ -764,26 +764,26 @@ def rest_target_print(rt, verbosity = 0):
             owner = "[" + rt['owner'] + "]"
         else:
             owner = ""
-        print "%s %s%s" % (rt['fullid'], owner, power)
+        print("%s %s%s" % (rt['fullid'], owner, power))
     elif verbosity == 2:
-        print rt['url']
+        print(rt['url'])
         for key in sorted(rt.keys()):
             val = rt[key]
             if key == "url":
                 continue
             elif key == "interfaces" or key == "consoles":
-                print "  %s: %s" % (key, ' '.join(sorted(val)))
+                print("  %s: %s" % (key, ' '.join(sorted(val))))
             elif key == "bsp_models":
-                print "  %s: %s" % (key, ' '.join(sorted(val.keys())))
+                print("  %s: %s" % (key, ' '.join(sorted(val.keys()))))
             elif isinstance(val, list) or isinstance(val, dict):
-                print "  %s: %s" % (key, pprint.pformat(val))
+                print("  %s: %s" % (key, pprint.pformat(val)))
             else:
-                print "  %s: %s" % (key, val)
+                print("  %s: %s" % (key, val))
     elif verbosity == 3:
         pprint.pprint(rt)
     else:
         rtb =  rt.pop('rtb')	# DIRTY: Can't get skipkeys to work that well
-        print json.dumps(rt, skipkeys = True, indent = 8)
+        print(json.dumps(rt, skipkeys = True, indent = 8))
         rt['rbt'] = rtb
 
 def _rest_target_find_by_id(_target):
@@ -799,7 +799,7 @@ def _rest_target_find_by_id(_target):
     if rt != None:
         return rt['rtb'], rt
     # Dirty messy search
-    for rt in rest_target_broker.rts_cache.itervalues():
+    for rt in rest_target_broker.rts_cache.values():
         if rt['id'] == _target \
            or rt['url'] == _target:
             return rt['rtb'], rt
@@ -822,7 +822,7 @@ def _target_select_by_spec( rt, spec, _kws = None):
     # We are going to modify the _kws dict, so make a copy!
     kws = dict(_kws)
     # We don't consider BSP models, just iterate over all the BSPs
-    bsps = rt.get('bsps', {}).keys()
+    bsps = list(rt.get('bsps', {}).keys())
     kws['bsp_count'] = len(bsps)
     kws_bsp = dict()
     commonl.kws_update_from_rt(kws, rt)
@@ -873,7 +873,7 @@ def rest_target_list_table(args, spec):
     # where suffix will be *! (* if powered, ! if owned)
 
     l = []
-    for rt_fullid, rt in sorted(rest_target_broker.rts_cache.iteritems(),
+    for rt_fullid, rt in sorted(iter(rest_target_broker.rts_cache.items()),
                                 key = lambda x: x[0]):
         try:
             if spec and not _target_select_by_spec(rt, spec):
@@ -914,7 +914,7 @@ def rest_target_list_table(args, spec):
             if index >= len(l):
                 break
             i = l[index]
-            sys.stdout.write(u"{fullid:{column_width}} {suffix:2} ".format(
+            sys.stdout.write("{fullid:{column_width}} {suffix:2} ".format(
                 fullid = i[0], suffix = i[1], column_width = maxlen))
         sys.stdout.write("\n")
 
@@ -932,7 +932,7 @@ def rest_target_list(args):
         rest_target_list_table(args, spec)
         return
     else:
-        for rt_fullid, rt in sorted(rest_target_broker.rts_cache.iteritems(),
+        for rt_fullid, rt in sorted(iter(rest_target_broker.rts_cache.items()),
                                     key = lambda x: x[0]):
             try:
                 if spec and not _target_select_by_spec(rt, spec):
@@ -952,7 +952,7 @@ def rest_target_find_all(all_targets = False):
     if all_targets == True:
         return list(rest_target_broker.rts_cache.values())
     targets = []
-    for rt in rest_target_broker.rts_cache.values():
+    for rt in list(rest_target_broker.rts_cache.values()):
         if rt.get('disabled', 'False') in ('True', True):
             continue
         targets.append(rt)
@@ -1008,7 +1008,7 @@ def rest_target_property_get(args):
     rtb, rt = _rest_target_find_by_id(args.target)
     value = rtb.rest_tb_property_get(rt, args.property, ticket = args.ticket)
     if value != None:
-        print value
+        print(value)
 
 def rest_target_release(args):
     """
@@ -1100,7 +1100,7 @@ def rest_target_debug_openocd(args):
     rtb, rt = _rest_target_find_by_id(args.target)
     res = rtb.rest_tb_target_debug_openocd(rt, args.command,
                                            ticket = args.ticket)
-    print res
+    print(res)
 
 def rest_target_power_cycle(args):
     """
@@ -1142,7 +1142,7 @@ def rest_tb_target_images_upload(rtb, _images):
 
     """
     images = []
-    if isinstance(_images, basestring):
+    if isinstance(_images, str):
         for image_spec in _images:
             try:
                 t, f = image_spec.split(":", 1)
@@ -1152,7 +1152,7 @@ def rest_tb_target_images_upload(rtb, _images):
                                  "(expecting TYPE:FILE)" % image_spec)
     elif isinstance(_images, set) or isinstance(_images, list):
         for image_spec in _images:
-            if isinstance(image_spec, basestring):
+            if isinstance(image_spec, str):
                 t, f = image_spec.split(":", 1)
                 images.append((t, f))
             elif isinstance(image_spec, tuple) and len(image_spec) == 2:
@@ -1207,9 +1207,9 @@ def rest_target_power_get(args):
     rtb, rt = _rest_target_find_by_id(args.target)
     powered =  rtb.rest_tb_target_power_get(rt)
     if powered:
-        print "%s: on" % args.target
+        print("%s: on" % args.target)
     else:
-        print "%s: off" % args.target
+        print("%s: off" % args.target)
 
 def rest_broker_file_upload(args):
     """
@@ -1238,8 +1238,8 @@ def rest_broker_file_list(args):
 
     """
     rtb = _rest_target_broker_find_by_id_url(args.target)
-    for name, hexdigest in rtb.rest_tb_file_list().iteritems():
-        print name, hexdigest
+    for name, hexdigest in rtb.rest_tb_file_list().items():
+        print(name, hexdigest)
 
 
 def _rest_target_console_read(rtb, target, console, offset, filter_ansi,
@@ -1252,7 +1252,7 @@ def _rest_target_console_read(rtb, target, console, offset, filter_ansi,
     else:
         data = _data.text
     try:
-        sys.stdout.write(unicode(data).encode('utf-8', errors = 'ignore'))
+        sys.stdout.write(str(data).encode('utf-8', errors = 'ignore'))
         sys.stdout.flush()
     except IOError as e:
         if e.errno != errno.EAGAIN:
@@ -1307,10 +1307,10 @@ def _rest_target_console_write_interactive(rtb, rt, console, filter_ansi, crlf,
     """
     Poor mans interactive
     """
-    print """\
+    print("""\
 WARNING: This is a very limited interactive console
          Escape character twice ^[^[ to exit
-"""
+""")
     time.sleep(1)
     console_read_thread = threading.Thread(
         target = _console_read_thread_fn,
@@ -1385,7 +1385,7 @@ def rest_target_debug_info(args):
     """
     for target in args.target:
         rtb, rt = _rest_target_find_by_id(target)
-        print rtb.rest_tb_target_debug_info(rt, ticket = args.ticket)
+        print(rtb.rest_tb_target_debug_info(rt, ticket = args.ticket))
 
 def rest_target_debug_start(args):
     """
@@ -1418,5 +1418,5 @@ def rest_target_thing_unplug(args):
 def rest_target_thing_list(args):
     rtb, rt = _rest_target_find_by_id(args.target)
     r = rtb.rest_tb_thing_list(rt, ticket = args.ticket)
-    for thing_name, status in sorted(r.iteritems()):
-        print thing_name + (": plugged" if status is True else ": unplugged")
+    for thing_name, status in sorted(r.items()):
+        print(thing_name + (": plugged" if status is True else ": unplugged"))

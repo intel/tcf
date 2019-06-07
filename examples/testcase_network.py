@@ -15,7 +15,7 @@ class _base(tcfl.tc.tc_c):
     A bunch of linux targets networked can ping each other and the router.
     """
     def start(self):
-        for _twn, target in self.targets.iteritems():
+        for _twn, target in self.targets.items():
             target.power.cycle()
 
     @staticmethod
@@ -33,24 +33,24 @@ class _base(tcfl.tc.tc_c):
 
     def eval_targets_are_up(self):
         # Each target is up
-        for twn, target  in self.targets.iteritems():
+        for twn, target  in self.targets.items():
             if twn == 'ic':
                 continue
             self._target_up(target)
 
     def eval_targets_can_ping4_router(self, ic):
         # Each target can ping the router
-        for twn, target  in self.targets.iteritems():
+        for twn, target  in self.targets.items():
             if twn == 'ic':
                 continue
             self._ping_addr(target, ic.kws['ipv4_addr'])
 
     def eval_targets_can_ping_eachother(self):
         # Each target can ping each other
-        for twna, targeta in self.targets.iteritems():
+        for twna, targeta in self.targets.items():
             if twna == 'ic':
                 continue
-            for twnb, targetb in self.targets.iteritems():
+            for twnb, targetb in self.targets.items():
                 if twnb == 'ic':
                     continue
                 self._ping_addr(targeta, targetb.kws['ipv4_addr'])
@@ -58,7 +58,7 @@ class _base(tcfl.tc.tc_c):
     def teardown_dump_console(self):
         if not self.result_eval.failed and not self.result_eval.blocked:
             return
-        for target in self.targets.values():
+        for target in list(self.targets.values()):
             if not hasattr(target, "console"):
                 continue
             if self.result_eval.failed:
@@ -73,7 +73,7 @@ class _base(tcfl.tc.tc_c):
 
     def teardown(self):
         # FIXME: move this to the library of common test functions
-        for _twn, target  in reversed(list(self.targets.iteritems())):
+        for _twn, target  in reversed(list(self.targets.items())):
             target.power.off()
 
 @tcfl.tc.interconnect("ipv4_addr")

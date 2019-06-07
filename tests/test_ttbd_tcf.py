@@ -60,7 +60,7 @@ class _test_tcf(unittest.TestCase, commonl.testing.test_ttbd_mixin):
             r, 0,
             msg = sp.output_str + type(self).ttbd_info())
         for target_name in self.target_names:
-            self.assertRegexpMatches(
+            self.assertRegex(
                 "".join(sp.stdout_lines), re.compile(target_name),
                 msg = "exit: target_name '%s' not found\n" % target_name \
                 + sp.output_str + type(self).ttbd_info())
@@ -124,7 +124,7 @@ tcfl.config.url_add("%s")
             + type(self).ttbd_info())
 
         for target_name in self.target_names:
-            self.assertRegexpMatches(
+            self.assertRegex(
                 "".join(sp.stdout_lines), re.compile(target_name),
                 msg = "exit: target_name '%s' not found\n" % target_name \
                 + sp.output_str \
@@ -137,7 +137,7 @@ tcfl.config.url_add("%s")
             "/tcf --config-path : -vvv --url %s acquire non_existant"
             % self.url)
         sp.join()
-        self.assertRegexpMatches(
+        self.assertRegex(
             sp.output_str,
             "IndexError: target-id 'non_existant': not found$",
             msg = "IndexError not raised by tcf\n" \

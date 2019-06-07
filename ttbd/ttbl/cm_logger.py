@@ -18,7 +18,7 @@ import serial
 _spec_queue = None
 
 def _spec_open_one(spec):
-    if isinstance(spec, basestring):
+    if isinstance(spec, str):
         descr = serial.serial_for_url(spec)
         descr.nonblocking()
         return descr
@@ -186,7 +186,7 @@ def _reader_fn():
                             spec = o[2]
                             _reopen(spec, logfile_name)
                         elif o[0] == 'write':
-                            for fd in reader_dict.keys():
+                            for fd in list(reader_dict.keys()):
                                 if reader_dict[fd][1].name == logfile_name:
                                     _write(fd, o[2], o[3])
                         elif o[0] == 'rm':
@@ -286,7 +286,7 @@ def spec_add(logfile_name, spec):
     """
     FIXME
     """
-    assert isinstance(logfile_name, basestring)
+    assert isinstance(logfile_name, str)
     assert isinstance(spec, dict)
     global _spec_queue
     if _spec_queue == None:

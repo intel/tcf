@@ -19,17 +19,17 @@ class impl(object):
     """
     def press(self, target, button):
         assert isinstance(target, ttbl.test_target)
-        assert isinstance(button, basestring)
+        assert isinstance(button, str)
         raise NotImplementedError
 
     def release(self, target, button):
         assert isinstance(target, ttbl.test_target)
-        assert isinstance(button, basestring)
+        assert isinstance(button, str)
         raise NotImplementedError
 
     def get(self, target, button):
         assert isinstance(target, ttbl.test_target)
-        assert isinstance(button, basestring)
+        assert isinstance(button, str)
         # return True/False (press/release)
         raise NotImplementedError
 
@@ -104,7 +104,7 @@ class interface(ttbl.tt_interface):
             % type(impls).__name__
         ttbl.tt_interface.__init__(self)
         # Verify arguments
-        for button_name, button_impl in impls.iteritems():
+        for button_name, button_impl in impls.items():
             assert isinstance(button_impl, impl), \
                 "button implementation is type %s, expected ttbl.buttons.impl " \
                 % type(button_impl)._name__
@@ -112,12 +112,12 @@ class interface(ttbl.tt_interface):
         self.impls = impls
 
     def press(self, who, target, button):
-        assert button in self.impls.keys(), "button %s unknown" % button
+        assert button in list(self.impls.keys()), "button %s unknown" % button
         with self.target_owned_and_locked(who):
             self.impls[button].press(target, button)
 
     def release(self, who, target, button):
-        assert button in self.impls.keys(), "button %s unknown" % button
+        assert button in list(self.impls.keys()), "button %s unknown" % button
         with self.target_owned_and_locked(who):
             self.impls[button].release(target, button)
 
@@ -139,7 +139,7 @@ class interface(ttbl.tt_interface):
         Execute a sequence of button actions on a target
         """
         assert all([
-            isinstance(name, basestring) and (
+            isinstance(name, str) and (
                 action > 0 or action == 'press' or action == 'release')
             for name, action in seq
         ])
@@ -152,12 +152,12 @@ class interface(ttbl.tt_interface):
         List button on a target
         """
         res = {}
-        for name, impl in self.impls.iteritems():
+        for name, impl in self.impls.items():
             res[name] = impl.get(target, name)
         return dict(buttons = res)
 
     def _release_hook(self, target, _force):
-        for button, impl in self.impls.iteritems():
+        for button, impl in self.impls.items():
             impl.release(target, button)
 
 
@@ -188,7 +188,7 @@ class pci_button_click(ttbl.tt_power_control_impl):
     power on or off something on a target.
     """
     def __init__(self, button, time_on = 5, time_off = 20):
-        assert isinstance(button, basestring)
+        assert isinstance(button, str)
         self.button = button
         self.time_on = time_on
         self.time_off = time_off

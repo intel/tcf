@@ -10,7 +10,7 @@ Power the target on or off
 
 """
 
-import tc
+from . import tc
 
 class power(tc.target_extension_c):
     """

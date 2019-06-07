@@ -73,7 +73,7 @@ tcf_to_zephyr = dict()
 zephyr_boards_available = set()
 for rt in rt_all:
     tcf_type = rt.get('type', None)
-    for bsp, data in rt.get('bsps', {}).iteritems():
+    for bsp, data in rt.get('bsps', {}).items():
         zephyr_board = data.get('zephyr_board', None)
         if zephyr_board:
             zephyr_boards_available.add(zephyr_board)
@@ -91,13 +91,13 @@ logging.warning("Zephyr boards available: %s",
 if args.map:
     with open(args.map, "w") as mapf:
         mapf.write("type_map = {\n")
-        for tcf_type, zephyr_type in tcf_to_zephyr.iteritems():
+        for tcf_type, zephyr_type in tcf_to_zephyr.items():
             mapf.write("    '%s': '%s',\n" % (tcf_type, zephyr_type))
         mapf.write("}\n")
 
 boards = toolchain_boards & zephyr_boards_available
 # Now compute which boards we have available
 if boards:
-    print '(zephyr_board in [ \"' + '\", \"'.join(sorted(boards)) + '\" ])'
+    print('(zephyr_board in [ \"' + '\", \"'.join(sorted(boards)) + '\" ])')
 else:
-    print '(zephyr_board in [ \"\" ])'
+    print('(zephyr_board in [ \"\" ])')
