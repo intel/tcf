@@ -69,6 +69,7 @@ import time
 import commonl
 import tcfl
 import tcfl.pos
+import tcfl.tl
 
 logger = logging.getLogger("tcfl.tc_clear_bbt")
 
@@ -746,6 +747,9 @@ EOF
             result += self._eval_one(target, any_t_file, srcdir + "/any#")
 
         return result
+
+    def teardown_50(self):
+        tcfl.tl.console_dump_on_failure(self)
 
     @staticmethod
     def clean():
