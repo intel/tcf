@@ -778,7 +778,7 @@ EOF""")
             target.shcmd_local(
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
-                "time -p rsync -HaAX --numeric-ids --delete"
+                "time -p rsync -cHaAX --numeric-ids --delete"
                 " --port %%(rsync_port)s "
                 " %s%s %%(rsync_server)s::rootfs/%s/%s"
                 % (src, path_append, persistent_dir, persistent_name))
@@ -793,7 +793,7 @@ EOF""")
             target.shell.run(
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
-                "time -p rsync -HaAX --delete /mnt/%s/%s%s /mnt/%s"
+                "time -p rsync -cHaAX --delete /mnt/%s/%s%s /mnt/%s"
                 % (persistent_dir, persistent_name, path_append, dst))
 
 
@@ -858,7 +858,7 @@ EOF""")
         # don't be verbose, makes it too slow and timesout when
         # sending a lot of files
         cmdline = \
-            "time sudo rsync -HaAX --numeric-ids %s" \
+            "time sudo rsync -cHaAX --numeric-ids %s" \
             " --inplace" \
             " --exclude=persistent.tcf.d --exclude='persistent.tcf.d/*'" \
             " --port %%(rsync_port)s %s%s %%(rsync_server)s::rootfs/%s%s" \
@@ -901,7 +901,7 @@ EOF""")
             # ensure we remove any possibly existing one
             "rm -f /tmp/tcf.metadata.yaml;"
             # rsync the metadata file to target's /tmp
-            " time -p rsync -HaAX --numeric-ids --delete --inplace -L -vv"
+            " time -p rsync -cHaAX --numeric-ids --delete --inplace -L -vv"
             # don't really complain if there is none
             " --ignore-missing-args"
             " %(rsync_server)s/%(image)s/.tcf.metadata.yaml"
@@ -1077,7 +1077,7 @@ EOF""")
                                    % kws,
                                    dlevel = -2)
                 target.shell.run(
-                    "time -p rsync -HaAX --numeric-ids --delete --inplace"
+                    "time -p rsync -cHaAX --numeric-ids --delete --inplace"
                     " --exclude=/persistent.tcf.d"
                     " --exclude='/persistent.tcf.d/*'"
                     " %(rsync_server)s/%(image)s/. /mnt/." % kws)
