@@ -175,7 +175,7 @@ import requests.exceptions
 
 from . import app
 from . import commonl
-from . import commonl.expr_parser
+from .commonl import expr_parser
 from . import expecter
 from . import report
 import tcfl
