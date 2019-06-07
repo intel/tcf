@@ -1,4 +1,4 @@
-#! /usr/bin/python2
+#! /usr/bin/python
 #
 # Copyright (c) 2017 Intel Corporation
 #
@@ -21,7 +21,7 @@ def mk_version_py(base_dir, version):
     """
     with open(os.path.join(base_dir, "version.py"), "w") as f:
         f.write("""\
-#! /usr/bin/python2
+#! /usr/bin/python
 #
 # Copyright (c) 2017 Intel Corporation
 #

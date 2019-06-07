@@ -1,4 +1,4 @@
-#! /usr/bin/python2
+#! /usr/bin/python
 import tcfl.tc
 @tcfl.tc.target('zephyr_board and bsp == "x86"')
 class _test(tcfl.tc.tc_c):

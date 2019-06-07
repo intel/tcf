@@ -1,4 +1,4 @@
-#! /usr/bin/python2
+#! /usr/bin/python
 """Generate an expression for `tcf run`'s -t (or for tcf list) to
 list Zephyr targets that support working with a given toolchain
 """

@@ -1,4 +1,4 @@
-#! /usr/bin/python2
+#! /usr/bin/python
 import os
 import tcfl.tc
 import tcfl.tl

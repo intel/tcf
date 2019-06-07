@@ -1,4 +1,4 @@
-#! /usr/bin/python2
+#! /usr/bin/python
 import tcfl.tc
 @tcfl.tc.interconnect()
 @tcfl.tc.target()
