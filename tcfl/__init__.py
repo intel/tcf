@@ -112,7 +112,7 @@ class msgid_c(object):
         assert isinstance(l, int)
         # Instead of +/ we use AZ, even if it removes some key-space,
         # it shall be good enough
-        m = hashlib.sha256(s)
+        m = hashlib.sha256(s.encode('utf-8'))
         # FIXME: jus tmove this to base32 to use only lowercase
         return base64.b64encode(m.digest(), "AZ")[:l].lower()
 
