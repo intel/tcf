@@ -5304,6 +5304,9 @@ class tc_c(object):
 
             self._kw_set("tmpdir", self.tmpdir)
             self._kw_set("tc_hash", self.ticket)
+            global log_dir
+            self.report_file_prefix = os.path.join(
+                log_dir, "report-%(runid)s:%(tc_hash)s." % self.kws)
             with msgid_c(self.ticket, depth = 1, l = 4) as msgid:
                 self._ident = msgid_c.ident()
                 try:
