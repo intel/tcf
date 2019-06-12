@@ -1,10 +1,15 @@
 Jinja2
 PyYAML
+ipaddress
 junit_xml
 ply
+pykwalify
+pylint
 pymongo
+pyserial
 python-Levenshtein
+pyusb
 requests
 setuptools
-pykwalify
-
+sphinx
+sphinx_rtd_theme
