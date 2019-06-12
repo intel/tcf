@@ -37,7 +37,7 @@ extensions = [
     'sphinx.ext.todo', 'sphinx.ext.autodoc', 'sphinx.ext.coverage',
     'sphinx.ext.intersphinx'
 ]
-autodoc_default_flags = [ 'members', 'undoc-members' ]
+autodoc_default_options = { 'members': None, 'undoc-members': None }
 autoclass_content = 'both'
 autodoc_member_order = 'bysource'
 
