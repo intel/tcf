@@ -2745,14 +2745,14 @@ class tc_c(object, metaclass=_tc_mc):
         # Initialize prefixes and a few keywords we need -- we might
         # override these later if/when we assign a target group.
         self.mkticket()
-        self.tmpdir = os.path.join(tc_c.tmpdir, self.ticket)
+        self.tmpdir = os.path.join(tc_c.tmpdir, self.ticket.decode('UTF-8'))
         try:
             os.makedirs(self.tmpdir)
         except OSError:
             if not os.path.isdir(self.tmpdir):
                 raise
         self._kw_set("tmpdir", self.tmpdir)
-        self._kw_set("tc_hash", self.ticket)
+        self._kw_set("tc_hash", self.ticket.decode('UTF-8'))
 
         self.ts_start = time.time()
         self.ts_end = None

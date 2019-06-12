@@ -62,7 +62,7 @@ import distutils.version
 import Levenshtein
 
 from . import commonl
-from .common import yamll
+from .commonl import yamll
 from . import tc
 from . import tl
 from . import msgid_c

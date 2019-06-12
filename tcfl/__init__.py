@@ -113,8 +113,8 @@ class msgid_c(object):
         # Instead of +/ we use AZ, even if it removes some key-space,
         # it shall be good enough
         m = hashlib.sha256(s.encode('utf-8'))
-        # FIXME: jus tmove this to base32 to use only lowercase
-        return base64.b64encode(m.digest(), "AZ")[:l].lower()
+        # FIXME: just move this to base32 to use only lowercase
+        return base64.b64encode(bytes(m.digest()), b'AZ')[:l].lower()
 
     @classmethod
     def generate(cls, l = 4):

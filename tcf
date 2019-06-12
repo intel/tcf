@@ -480,6 +480,13 @@ if __name__ == "__main__":
     if args.chdir:
         os.chdir(args.chdir)
 
+    # No command specified
+    # Rather than a cryptic error, print usage
+    if 'func' not in args:
+        arg_parser.print_help()
+        retval=1
+        sys.exit(retval)
+
     if args.func == tcfl.tc._run:
         if args.make_jobserver == None:
             # Okie, notice the hack! When doing the 'run' command, we may be
