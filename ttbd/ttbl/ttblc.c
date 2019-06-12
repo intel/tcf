@@ -32,5 +32,23 @@ static PyMethodDef ttblc_funcs[] = {
 
 void initttblc(void)
 {
+#if PY_MAJOR_VERSION >= 3
+    static struct PyModuleDef moduledef = {
+	    PyModuleDef_HEAD_INIT,
+	    "ttblc",             /* m_name */
+	    "TTBL C functions!", /* m_doc */
+	    -1,                  /* m_size */
+	    ttblc_funcs,         /* m_methods */
+	    NULL,                /* m_reload */
+	    NULL,                /* m_traverse */
+	    NULL,                /* m_clear */
+	    NULL,                /* m_free */
+    };
+#endif
+
+#if PY_MAJOR_VERSION >= 3
+    PyModule_Create(&moduledef);
+#else
     Py_InitModule3("ttblc", ttblc_funcs, "TTBL C functions!");
+#endif
 }
