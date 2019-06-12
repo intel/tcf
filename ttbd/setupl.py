@@ -77,8 +77,8 @@ else:
         git_version = subprocess.check_output(
             "git describe --tags --always --abbrev=7 --dirty".split(),
             cwd = _srcdir, stderr = subprocess.PIPE)
-        version = git_version.strip()
-        if re.match("^v[0-9]+.[0-9]+", version):
+        version = git_version.strip().decode('UTF-8')
+        if re.match(r'^v[0-9]+.[0-9]+', version):
             version = version[1:]
     except subprocess.CalledProcessError as _e:
         version = "vNA"
