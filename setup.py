@@ -56,7 +56,7 @@ distutils.core.setup(
     long_description = """\
 This is the client and meta-testcase runner for the TCF test case framework.
 """,
-    version = setupl.version,
+    version = setupl.version.decode('utf-8'),
     url = None,
     author = "Inaky Perez-Gonzalez",
     author_email = "inaky.perez-gonzalez@intel.com",
