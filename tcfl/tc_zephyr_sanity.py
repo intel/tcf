@@ -36,6 +36,7 @@ import threading
 import traceback
 
 # Needed so I can also import from tc to initialize -- ugly
+from . import commonl
 from .commonl import expr_parser
 from . import expecter
 import tcfl
