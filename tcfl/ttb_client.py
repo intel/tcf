@@ -157,7 +157,7 @@ class rest_target_broker(object):
         url_safe = commonl.file_name_make_safe(url)
         file_name = state_path + "/cookies-%s.pickle" % url_safe
         try:
-            with open(file_name, "r") as f:
+            with open(file_name, "rb") as f:
                 self.cookies = pickle.load(f)
             logger.info("%s: loaded state", file_name)
         except pickle.UnpicklingError as e: #invalid state, clean file
@@ -234,7 +234,7 @@ class rest_target_broker(object):
             os.mkdir(filepath)
         fname = filepath + "/cookies-%s.pickle" % url_safe
         with os.fdopen(os.open(fname, os.O_CREAT | os.O_WRONLY, 0o600),
-                       "w") as f, \
+                       "wb") as f, \
                 self.lock:
             pickle.dump(self.cookies, f, protocol = 2)
             logger.debug("%s: state saved %s",
