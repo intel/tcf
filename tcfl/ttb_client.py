@@ -309,8 +309,8 @@ class rest_target_broker(object):
             return r
         rdata = r.json()
         diagnostics = rdata.get('diagnostics', "").encode("utf-8", 'replace')
-        if diagnostics != "":
-            for line in diagnostics.split("\n"):
+        if diagnostics:
+            for line in diagnostics.splitlines():
                 logger.warning("diagnostics: " + line)
         return rdata
 
@@ -724,8 +724,9 @@ def rest_login(args):
                     logger.error("%s (%s): cannot login: with given "
                                  "credentials %s", rtb._url, rtb.aka, userid)
             except Exception as e:
-                logger.error("%s (%s): cannot login: %s",
-                             rtb._url, rtb.aka, e)
+                logger.exception("%s (%s): cannot login: %s",
+                                 rtb._url, rtb.aka, e)
+                raise
         else:
             logged = True
     if not logged:
