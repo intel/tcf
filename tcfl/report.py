@@ -231,7 +231,7 @@ class report_console_c(report_c):
             # FIXME: hack -- avoid issues with different encoding
             # environments--I dislike this, but I don't have a better
             # solution
-            sys.stdout.write(s.encode('utf-8', errors = 'replace'))
+            sys.stdout.write(s)
         # note we always want to log messages with verbosity greater
         # or equal to 1000, as those are used for control.
         if self.logf and (l >= 1000 or l <= self.verbosity_logf):
@@ -248,7 +248,7 @@ class report_console_c(report_c):
                 # FIXME: hack -- avoid issues with different encoding
                 # environments--I dislike this, but I don't have a better
                 # solution
-                sys.stdout.write(s.encode('utf-8', errors = 'replace'))
+                sys.stdout.write(s)
             elif maxlines_hit == False:
                 if alevel <= self.verbosity:
                     msg = "%s: %s: SS <more output abridged>\n" % (prefix, key)
@@ -529,10 +529,7 @@ class file_c(report_c):
 
     @staticmethod
     def _write(f, s):
-        if isinstance(s, str):
-            f.write(s)
-        else:
-            f.write(str(s).encode('utf-8', errors = 'ignore'))
+        f.write(s)
 
     def __init__(self, log_dir):
         assert isinstance(log_dir, str)

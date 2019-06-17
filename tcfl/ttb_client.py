@@ -314,10 +314,10 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
         if raw:
             return r
         rdata = r.json()
-        diagnostics = rdata.get('diagnostics', "").encode("utf-8", 'replace')
+        diagnostics = rdata.get('diagnostics', "")
         if diagnostics:
             for line in diagnostics.splitlines():
-                logger.warning("diagnostics: " + line)
+                logger.warning("diagnostics: %s", str(line))
         return rdata
 
     def login(self, email, password):
@@ -1259,7 +1259,7 @@ def _rest_target_console_read(rtb, target, console, offset, filter_ansi,
     else:
         data = _data.text
     try:
-        sys.stdout.write(str(data).encode('utf-8', errors = 'ignore'))
+        sys.stdout.write(data)
         sys.stdout.flush()
     except IOError as e:
         if e.errno != errno.EAGAIN:
