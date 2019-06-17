@@ -113,7 +113,47 @@ def tls_var(name, factory, *args, **kwargs):
 global rest_target_brokers
 rest_target_brokers = {}
 
-class rest_target_broker(object):
+class _rest_target_broker_mc(type):
+    """
+    This metaclass is used to create the methods that are needed on
+    the initialization of each instance.
+    """
+    @classmethod
+    def _rts_get(cls, rtb):
+        try:
+            rt_list = rtb.rest_tb_target_list(all_targets = True)
+        except requests.exceptions.RequestException as e:
+            logger.error("%s: can't use: %s", rtb._url, e)
+            return {}
+        return rtb._rt_list_to_dict(rt_list)
+
+    @property
+    def rts_cache(cls):
+        if cls._rts_cache != None:
+            return cls._rts_cache
+        if not rest_target_brokers:
+            cls._rts_cache = {}
+            return cls._rts_cache
+        # Collect the targets into a list of tuples (FULLID, SUFFIX),
+        # where suffix will be *! (* if powered, ! if owned)
+        # Yes, there are better ways to do this, but this one
+        # is simple -- just launch one thread per server and
+        # then collect the data in a single cache -- shall use
+        # process pool, for better performance, but can't get
+        # it to serialize properly
+        tp = _multiprocessing_pool_c(processes = len(rest_target_brokers))
+        threads = {}
+        for rtb in sorted(rest_target_brokers.values()):
+            threads[rtb] = tp.apply_async(cls._rts_get, (rtb,))
+        tp.close()
+        tp.join()
+        cls._rts_cache = {}
+        for thread in list(threads.values()):
+            cls._rts_cache.update(thread.get())
+        return cls._rts_cache
+
+
+class rest_target_broker(object, metaclass = _rest_target_broker_mc):
 
     # Hold the information about the remote target, as acquired from
     # the servers
@@ -180,40 +220,6 @@ class rest_target_broker(object):
             rts[rt_fullid] = rt
         return rts
 
-    class __metaclass__(type):
-        @classmethod
-        def _rts_get(cls, rtb):
-            try:
-                rt_list = rtb.rest_tb_target_list(all_targets = True)
-            except requests.exceptions.RequestException as e:
-                logger.error("%s: can't use: %s", rtb._url, e)
-                return {}
-            return rtb._rt_list_to_dict(rt_list)
-
-        @property
-        def rts_cache(cls):
-            if cls._rts_cache != None:
-                return cls._rts_cache
-            if not rest_target_brokers:
-                cls._rts_cache = {}
-                return cls._rts_cache
-            # Collect the targets into a list of tuples (FULLID, SUFFIX),
-            # where suffix will be *! (* if powered, ! if owned)
-            # Yes, there are better ways to do this, but this one
-            # is simple -- just launch one thread per server and
-            # then collect the data in a single cache -- shall use
-            # process pool, for better performance, but can't get
-            # it to serialize properly
-            tp = _multiprocessing_pool_c(processes = len(rest_target_brokers))
-            threads = {}
-            for rtb in sorted(rest_target_brokers.values()):
-                threads[rtb] = tp.apply_async(cls._rts_get, (rtb,))
-            tp.close()
-            tp.join()
-            cls._rts_cache = {}
-            for thread in list(threads.values()):
-                cls._rts_cache.update(thread.get())
-            return cls._rts_cache
 
     @classmethod
     def rts_cache_flush(cls):
