@@ -468,7 +468,9 @@ class generic_snapshot(impl_c):
         cmdline = []
         try:
             for command in self.pre_commands:
-                subprocess.check_call((command % kws).split())
+                # yup, run with shell -- this is not a user level
+                # command, the configurator has full control
+                subprocess.check_call(command % kws, shell = True)
             for i in self.cmdline:
                 cmdline.append(i % kws)
             target.log.info("snapshot command: %s" % " ".join(cmdline))
@@ -586,7 +588,9 @@ class generic_stream(impl_c):
         try:
             for command in self.pre_commands:
                 target.log.info("streaming pre-command: %s" % command)
-                subprocess.check_call((command % kws).split())
+                # yup, run with shell -- this is not a user level
+                # command, the configurator has full control
+                subprocess.check_call(command % kws, shell = True)
             # replace $OUTPUTFILENAME$ with the name of the output file
             cmdline = []
             for i in self.cmdline:
