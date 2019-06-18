@@ -2942,11 +2942,16 @@ class vlan_pci(ttbl.tt_power_control_impl):
             raise AssertionError("Unknown mode %s" % mode)
 
         # Configure the IP addresses for the top interface
-        subprocess.check_call(
-            # clean up existing address, set new ones
-            "/usr/sbin/ip add flush dev b%(id)s; "
+        subprocess.check_call(		# clean up existing address
+            "/usr/sbin/ip add flush dev b%(id)s "
+            % target.kws, shell = True)
+        subprocess.check_call(		# add IPv6
+            # if this fails, check Network Manager hasn't disabled ipv6
+            # sysctl -a | grep disable_ipv6 must show all to 0
             "/usr/sbin/ip addr add"
-            "  %(ipv6_addr)s/%(ipv6_prefix_len)s dev b%(id)s; "
+            "  %(ipv6_addr)s/%(ipv6_prefix_len)s dev b%(id)s "
+            % target.kws, shell = True)
+        subprocess.check_call(		# add IPv4
             "/usr/sbin/ip addr add"
             "  %(ipv4_addr)s/%(ipv4_prefix_len)d"
             "  dev b%(id)s" % target.kws, shell = True)
@@ -3800,8 +3805,11 @@ def tinytile_add(name,
 capture_screenshot_vnc = ttbl.capture.generic_snapshot(
     "%(id)s VNC @localhost:%(vnc_port)s",
     # need to make sure vnc_port is defined in the target's tags
-    "gvnccapture -q localhost:%(vnc_port)s %(output_file_name)s",
-    mimetype = "image/png"
+    # needs the .png, otherwise it balks at guessing extensions
+    # don't do -q, otherwise when it fails, it fails silently
+    "gvnccapture localhost:%(vnc_port)s %(output_file_name)s",
+    mimetype = "image/png",
+    extension = ".png"
 )
 
 vnc_port_count = 0

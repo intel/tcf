@@ -421,6 +421,15 @@ class generic_snapshot(impl_c):
     - type: target's type
     - ... (more with `tcf list -vv TARGETNAME`)
 
+    :param str extension: (optional) string to append to the filename,
+      like for example, an extension. This is needed because some
+      capture programs *insist* on guessing the file type from the
+      file name and balk of there is no proper extension; eg:
+
+      >>> extension = ".png"
+
+      avoid adding the extension to the command name you are asking to
+      execute, as the system needs to know the full file name.
 
     **System configuration**
 
@@ -441,9 +450,11 @@ class generic_snapshot(impl_c):
     call the video interface *video-SOMETHING* so that tools such as
     *ffmpeg* won't be confused.
     """
-    def __init__(self, name, cmdline, mimetype, pre_commands = None):
+    def __init__(self, name, cmdline, mimetype, pre_commands = None,
+                 extension = ""):
         assert isinstance(name, basestring)
         assert isinstance(cmdline, basestring)
+        assert isinstance(extension, basestring)
         self.name = name
         self.cmdline = cmdline.split()
         if pre_commands:
@@ -453,6 +464,7 @@ class generic_snapshot(impl_c):
                              "list of pre_commands have to be strings"
         else:
             self.pre_commands = []
+        self.extension = extension
         impl_c.__init__(self, False, mimetype)
 
     def start(self, target, capturer):
@@ -461,8 +473,9 @@ class generic_snapshot(impl_c):
 
     def stop_and_get(self, target, capturer):
         impl_c.stop_and_get(self, target, capturer)
-        file_name = "%s/%s-%s-%s" % (self.user_path, target.id, capturer,
-                                     time.strftime("%Y%m%d-%H%M%S"))
+        file_name = "%s/%s-%s-%s%s" % (
+            self.user_path, target.id, capturer,
+            time.strftime("%Y%m%d-%H%M%S"), self.extension)
         kws = dict(output_file_name = file_name)
         kws.update(target.kws)
         cmdline = []
