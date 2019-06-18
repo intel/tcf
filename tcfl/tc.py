@@ -3041,8 +3041,9 @@ class tc_c(object):
 
         This is currently quite a dirty hack, but it is what we
         have. We use it when we clone the object to run in a target
-        group or when we spawn thredas to run methods in parallel.
+        group or when we spawn threads to run methods in parallel.
         """
+        self.tls.buffers = {}
         self.tls.expecter = expecter.expecter_c(
             self._expecter_log, self, poll_period = poll_period,
             timeout = expecter_parent.timeout)
