@@ -2593,6 +2593,257 @@ def interconnect(spec = None, name = None, **kwargs):
 
     return decorate_class
 
+class expectation_c(object):
+    '''
+    Expectations are something we expect to find in the data polled
+    from a source.
+
+    An object implementing this interface can be given to
+    :meth:`tcfl.tc.tc_c.expect` as something to expect, which can be,
+    for example:
+
+    - text in a serial console output
+    - templates in an image capture
+    - audio in an audio capture
+    - network data in a network data capture
+    - ...
+
+    when what is being expected is found, :meth:`tcfl.tc.tc_c.expect`
+    can return data about it (implementation specific) can be
+    returned to the caller or exceptions can be raised (eg: if we see
+    an error), or if not found, timeout exceptions can be raised.
+
+    See :meth:`tcfl.tc.tc_c.expect` for more details and FIXME for
+    implementation examples.
+
+    .. note:: the :meth:`poll` and :meth:`detect` methods will be
+              called in a loop until all the expectations have been
+              detected.
+
+              It is recommended that internal state is only saved in
+              the *buffers* and *buffers_poll* storage areas provided
+              (vs storing inside the object).
+
+    :param tcfl.tc.target_c target: target on which this expectation
+      is operating.
+
+    :param float poll_period: how often this data needs to be polled
+      in seconds (default *1s*).
+
+    :param int timeout: maximum time to wait for this expectation;
+      raises an exception of type *raise_on_timeout* if the timeout is
+      exceeded. If zero (default), no timeout is raised, which
+      effectively treats an expectation as optional or along with
+      *raise_on_found* above, to raise an exception if an expectation
+      is to be associated with an error condition.
+
+    :param tcfl.tc.exception raise_on_timeout: (optional) a *type*
+      (**not an instance**) to throw when not found before the
+      timeout; a subclass of :class:`tcfl.tc.exception`.
+
+    :param tcfl.tc.exception raise_on_found: an *instance* (**not a
+      type**) to throw when found; this is useful to implement errors,
+      such as *if I see this image in the screen, bail out*:
+
+      >>> self.expect("wait for boot",
+      >>>             crash = image_on_screenshot(
+      >>>                 target, 'screen', 'icon-crash.png',
+      >>>                 raise_on_found = tcfl.tc.error_e("Crash found"),
+      >>>                 timeout = 0),
+      >>>             login_prompt = image_on_screenshot(
+      >>>                 target, 'screen', 'canary-login-prompt.png',
+      >>>                 timeout = 4),
+      >>> )
+
+      Note you need to tell it also *zero* timeout, otherwise it will
+      complain if it didn't find it.
+
+    '''
+
+    def __init__(self, target, poll_period, timeout = 0,
+                 raise_on_timeout = error_e,
+                 raise_on_found = None):
+        assert target == None or isinstance(target, target_c)
+        assert issubclass(raise_on_timeout, exception), \
+            'expected subclass of tcfl.tc.exception, got %s' \
+            % type(raise_on_timeout).__name__
+        assert raise_on_found == None \
+            or isinstance(raise_on_found, exception), \
+            'expected instance of tcfl.tc.exception, got %s' \
+            % type(raise_on_found).__name__
+        assert poll_period > 0
+        # FIXME: if too frequent, set some warning
+        assert timeout >= 0
+        self.target = target
+        self.poll_period = poll_period
+        self.poll_name = None	# will be set by :meth:tcfl.tc.tc_c.expect()
+        self.timeout = timeout
+        self.raise_on_timeout = raise_on_timeout
+        self.raise_on_found = raise_on_found
+        # this is a default, in case it is not overriden by the class
+        # that implements this interface
+        self.name = commonl.mkid('%s' % id(self), 4)
+
+    def poll_context(self):
+        """
+        Return a string that uniquely identifies the polling source for
+        this expectation so multiple expectations that are polling
+        from the same place don't plot repeatedly.
+
+        For example, if we are looking for multiple image templates in
+        a screenshot, it does not make sense to take one screenshot
+        per image. It can take one screenshot and look for the images
+        in the same place.
+
+        Thus:
+
+        - if we are polling from target with role *target.want_name*
+          from it's screen capturer called *VGA*, our context becomes:
+
+          >>> return '%s-%s' % (self.target.want_name, "VGA")
+
+          so it follows that for a generic expectation from a
+          screenshot capturer stored in *self.capturer*:
+
+          >>> return '%s-%s' % (self.target.want_name, self.capturer)
+
+        - for a serial console, it would become:
+
+          >>> return '%s-%s' % (self.target.want_name, self.console_name)
+
+        """
+        raise NotImplementedError
+
+    def poll(self, testcase, run_name, buffers_poll):
+        """
+        Poll a given expectation for new data from their data source
+
+        The expect engine will call this from
+        :meth:`tcfl.tc.tc_c.expect` periodically to get data where to
+        detect what we are expecting. This data could be serial
+        console output, video output, screenshots, network data,
+        anything.
+
+        The implementation of this interface will store the data
+        (append, replace, depending on the nature of it) in
+        *buffers_poll*.
+
+        For example, a serial console reader might read from the
+        serial console and append to a file; a screenshot capturer
+        might capture the screenshot and put it in a file and make the
+        file name available in *buffers_poll['filename']*.
+
+        Note that when we are working with multiple expectations, if a
+        number of them share the same data source (as determined by
+        :meth:`poll_context`), only one poll per each will be done and
+        they will be expected to share the polled data stored in
+        *buffers_poll*.
+
+        :param tcfl.tc.tc_c testcase: testcase for which we are
+          polling.
+
+        :param str run_name: name of this run of
+          :meth:`tcfl.tc.tc_c.expect`--they are always different.
+
+        :param dict buffers_poll: dictionary where we can store state
+          for this poll so it can be shared between calls. Detection
+          methods that use the same poling source (as given by
+          :meth:`poll_context`) will all be given the same storage
+          space.
+
+        """
+        raise NotImplementedError
+
+    def detect(self, testcase, run_name, buffers_poll, buffers):
+        """
+        Look for what is being expected in the polled data
+
+        After the :meth:`tcfl.tc.tc_c.expect` has polled data (with
+        :meth:`poll` above) and stored it in *buffers_poll*, this
+        function is called to detect what we are expecting in that
+        data.
+
+        Note the form of the data is completely specific to this
+        expectation object. It can be data saved into the
+        *buffers_poll* dictionary or that can be referring to a file
+        in the filesystem. See FIXME examples.
+
+        For example, a serial console detector might take the data
+        polled by :meth:`poll`, load it and look for a string in there.
+
+        :param tcfl.tc.tc_c testcase: testcase for which we are
+          detecting.
+
+        :param str run_name: name of this run of
+          :meth:`tcfl.tc.tc_c.expect`--they are always different.
+
+        :param dict buffers_poll: dictionary where the polled data has
+          is available. Note Detection methods that use the same
+          poling source (as given by :meth:`poll_context`) will all be
+          given the same storage space. as per :meth:`poll` above.
+
+        :param dict buffers: dictionary available exclusively to this
+          expectation object to keep data from run to run.
+
+        :returns: information about the detection; if *None*, this
+          means the detection process didn't find what is being looked
+          for and the detection process will continue.
+
+          If not *None* is returned, whatever it is, it is considered
+          what was expected has been found.
+
+          :meth:`tcfl.tc.tc_c.expect` will save this in a dictionary
+          of results specific to each expectation object that
+          will be returned to the user as the return value of
+          :meth:`tcfl.tc.tc_c.expect`.
+
+        """
+        raise NotImplementedError
+
+
+    def flush(self, testcase, run_name, buffers_poll, buffers, results):
+        """
+        Generate collateral for this expectation
+
+        This is called by :meth:`tcfl.tc.tc_c.expect` when all the
+        expectations are completed and can be used to for example, add
+        marks to an image indicating where a template or icon was
+        detected.
+
+        Note different expectations might be creating collateral from
+        the same source, on which case you need to pile on (eg: adding
+        multiple detectio marks to the same image)
+
+        Collateral files shall be generated with name
+        :data:`tcfl.tc.tc_c.report_file_prefix` such as:
+
+        >>> collateral_filename = testcase.report_file_prefix + "something"
+
+        will generate filename `report-RUNID:HASHID.something`; thus,
+        when multiple testcases are executed in parallel, they will
+        not override each other's collateral.
+
+        :param tcfl.tc.tc_c testcase: testcase for which we are
+          detecting.
+
+        :param str run_name: name of this run of
+          :meth:`tcfl.tc.tc_c.expect`--they are always different.
+
+        :param dict buffers_poll: dictionary where the polled data has
+          is available. Note Detection methods that use the same
+          poling source (as given by :meth:`poll_context`) will all be
+          given the same storage space. as per :meth:`poll` above.
+
+        :param dict buffers: dictionary available exclusively to this
+          expectation object to keep data from run to run. This was
+          used by :meth:`detect` to store data needed during the
+          detection process.
+
+        :param dict results: dictionary of results generated by
+          :meth:`detect` as a result of the detection process.
+        """
+        raise NotImplementedError
+
 
 #
 # Metaclass for tc_c, to initialize class specific fields
@@ -3022,6 +3273,7 @@ class tc_c(object):
         self.log = tc_logadapter_c(logging, None)
         # instance specific list of files/paths to wipe at the end
         self._cleanup_files = set()
+
         self.tls.expecter = expecter.expecter_c(
             self._expecter_log, c, poll_period = poll_period,
             timeout = self.tls.expecter.timeout)
@@ -3032,6 +3284,10 @@ class tc_c(object):
             subtc_copy = subtc._clone()
             subtc_copy.parent = self
             self.subtc[subtc_name] = subtc_copy
+
+        # sequentially incremented everytime we call expect()
+        self._expect_count = 0
+        self._expectations_global = []
 
 
     def __thread_init__(self, expecter_parent):
@@ -3044,6 +3300,7 @@ class tc_c(object):
         group or when we spawn threads to run methods in parallel.
         """
         self.tls.buffers = {}
+        self.tls._expectations = []
         self.tls.expecter = expecter.expecter_c(
             self._expecter_log, self, poll_period = poll_period,
             timeout = expecter_parent.timeout)
@@ -4477,10 +4734,367 @@ class tc_c(object):
             assert isinstance(origin, basestring)
         for key, value in d.iteritems():
             self._kw_set(key, value, origin)
+
+    def _expect_append(self, run_name, expectations_required, exps,
+                       poll_period, exp, name):
+        # FIXME: print the origin of this
+        assert isinstance(exp, expectation_c), \
+            'argument %s is not an instance of expectation_c but %s' \
+            % (exp, type(exp).__name__)
+        assert name == None or isinstance(name, basestring)
+
+        # if we forced a name, use it, otherwise use whichever if
+        # there; if there is none, create a default
+        if name:
+            exp.name = name
+        elif not exp.name:
+            exp.name = '%03d' % (len(exps) - 1)
+        exp.poll_name = run_name + '-' + exp.poll_context()
+        poll_period.setdefault(exp.poll_name, 3) # FIXME: default
+        if exp.name in [ i.name for i in exps ]:
+            raise AssertionError(
+                "an expectation named '%s' is already present" % exp.name)
+        exps.append(exp)
+        if exp.timeout > 0:
+            expectations_required.add(exp)
+        if exp.poll_period < poll_period[exp.poll_name]:
+            self.report_info(
+                '%s/%s: reducing poll period from %.2fs to %.2fs for poll '
+                'context %s'
+                % (run_name, exp.name, poll_period[exp.poll_name],
+                   exp.poll_period, exp.poll_name), dlevel = 4)
+            poll_period[exp.poll_name] = exp.poll_period
+
+    def expect_global_append(self, exp):
+        """
+        Append an expectation to the testcase global expectation list
+
+        Refer to :meth:`expect` for more information
+        """
+        assert isinstance(exp, expectation_c), \
+            'argument %s is not an instance of expectation_c but %s' \
+            % (exp, type(exp).__name__)
+        self._expectations_global.append(exp)
+
+    def expect_tls_append(self, exp):
+        """
+        Append an expectation to the thread-specific expectation list
+
+        Refer to :meth:`expect` for more information
+        """
+        assert isinstance(exp, expectation_c), \
+            'argument %s is not an instance of expectation_c but %s' \
+            % (exp, type(exp).__name__)
+        self.tls._expectations.append(exp)
+
+    def expect(self, *exps_args, **exps_kws):
+        """Wait for a list of things we expect to happen
+
+        This is a generalization of the pattern *expect this string in
+        a serial console* where we can wait, in the same loop for many
+        things (expectations) from multiple sources such as serial
+        console, screen shots, network captures, audio captures, etc...
+
+        Each expectation is an object that implements the
+        :class:`expectation_c` interface which indicates how to:
+
+         - poll from a data source
+
+         - detect what we are expecting in the polled data
+
+         - generate collateral for said detected data
+
+        This function will enter into a loop, polling the different
+        expectation data sources according to the poll periods they
+        establish, then detecting data and reporting the results back
+        to the user and raising exceptions if so the user indicates want
+        (eg: raise an exception if timeout looking for a shell prompt,
+        or raise an exception if a *kernel panic* string is found).
+
+        For example:
+
+        >>> self.expect(
+        >>>     name = "waiting for desktop to boot",
+        >>>     timeout = 30,
+        >>>     text_on_console(target, "Kernel Panic",
+        >>>                     name = "kernel panic watchdog",
+        >>>                     raise_on_found = tcfl.tc.error_e(
+        >>>                         "Kernel Panic found!"),
+        >>>     image_on_screenshot(target, 'screen', 'icon-power.png'),
+        >>>     config_button = image_on_screenshot(target, 'screen',
+        >>>                                         'icon-config.png')
+        >>> )
+
+        The first expectation will be called *kernel panic watchdog*
+        and will raise an exception if the console print a
+        (oversimplified for the sake of the example) kernel panic
+        message. If not found, nothing happens.
+
+        The second will default to be called whatever the
+        :class:`image_on_screenshot` calls it (*icon-power.png*),
+        while the second will have it's name overriden to
+        *config_button*. These last two will capture an screenshot
+        from the target's screenshot capturer called *screen* and the
+        named icons need to be found for the call to be
+        succesful. Otherwise, error exceptions due to timeout will be
+        raised.
+
+        The list of expectations that will be always scanned is in
+        this order:
+
+        - testcase's global list of expectations (add with
+          :meth:`expect_global_append`)
+
+        - testcase's thread specific list of expectations (add with
+          :meth:`expect_tls_append`)
+
+        - list of expectations in the arguments
+
+        :param expectation_c exps_args: expectation objects which are
+          expected to be self-named (their implementations will assign
+          names or a default will be given). eg:
+
+          >>> self.expect(tcfl.tc.tc_c.text_on_console(args..etc),
+          >>>             tcfl.tc.tc_c.image_on_screenshot(args..etc))
+
+        :param expectation_c exps_kws: expectation objects named after
+          the keyword they are assigned to; note the keywords *name*
+          and *timeout* are reserved. eg:
+
+          >>> self.expect(
+          >>>     shell_prompt = tcfl.tc.tc_c.text_on_console(args..etc),
+          >>>     firefox_icon = tcfl.tc.tc_c.image_on_screenshot(args..etc)
+          >>> )
+
+        :param int timeout: Maximum time of seconds to wait for all
+          non-optional expectations to be met.
+
+          >>> timeout = 4
+
+        :param str name: a name for this execution, used for reporting
+          and generation of collateral; it defaults to a test-specific
+          monotonically increasing number shared amongst all the
+          threads running in this testcase. eg:
+
+          >>> name = "shell prompt received"
+
+        """
+        # where pollers store polled data, keyed by poller context
+        buffers_poll = dict()
+        # where detectors store detection data, keyed by expectation
+        buffers = dict()
+        # where results are dumped, keyed by expectation
+        results = dict()
+
+        if 'name' in exps_kws:
+            name = exps_kws['name']
+            del exps_kws['name']
+            assert isinstance(name, basestring), \
+                "argument 'name' has to be a string, found %s" \
+                % type(name).__name__
+        else:
+            name = ""
+
+        if 'timeout' in exps_kws:
+            assert exps_kws['timeout'] > 0
+            timeout = exps_kws['timeout']
+            del exps_kws['timeout']
+        else:
+            timeout = 60 # FIXME: default
+
+        with self.lock:
+            run_name = '%02d' % self._expect_count
+            self._expect_count += 1
+        if name:
+            run_name += "." + commonl.name_make_safe(name)
+
+        exps = []	# has to be a list to maintain declaration order
+        poll_period = dict()
+        # these are the expectations that are required to be detected
+        # in some form; it is a subset of them all because there might
+        # be some we only want to detect optionally (timeout == 0)
+        expectations_required = set()
+
+        # at the end add the thread specific expectations, then the
+        # global ones -- we always check first the ones from the
+        # arguments
+        for exp in self._expectations_global:
+            self._expect_append(run_name, expectations_required, exps,
+                                poll_period, exp, None)
+
+        for exp in self.tls._expectations:
+            self._expect_append(run_name, expectations_required, exps,
+                                poll_period, exp, None)
+
+        # read in all the expectations without name from *exps_args, the
+        # ones with names in **exps_kws
+        for exp in exps_args:
+            self._expect_append(run_name, expectations_required, exps,
+                                poll_period, exp, None)
+
+        # kws is at this point just a named list of expectations and
+        # their implementation
+        for exp_name, exp in exps_kws.iteritems():
+            self._expect_append(run_name, expectations_required, exps,
+                                poll_period, exp, exp_name)
+
+
+        expectations_pending = list(exps)
+
+        time_ts0 = time.time()
+        time_ts = time_ts0
+        time_out = time_ts0 + timeout
+        poll_ts = dict()
+        detect_ts = dict()
+        min_poll_period = min(poll_period.values())
+        self.report_info('%s: poll_period %.2f, timeout %.2f'
+                         % (run_name, min_poll_period, timeout), dlevel = 5)
+        try:
+            while time_ts <= time_out:
+                # iterate over this copy, we'll remove from the original,
+                # so next iteration doesn't take the original; respect
+                # the original order
+                _expectations_pending = list(expectations_pending)
+                for exp in _expectations_pending:
+                    poll_context = exp.poll_context()
+                    time_ts = time.time()
+                    # if it is the first run, set these timestamps so
+                    # we kick in a poll
+                    poll_ts.setdefault(exp.poll_name, time_ts)
+                    detect_ts.setdefault(exp.name, time_ts)
+                    buffers.setdefault(exp.name, dict())
+                    buffers_poll.setdefault(exp.poll_name, dict())
+                    if exp.target:
+                        reporter = exp.target
+                    else:
+                        reporter = self
+
+                    # Poll the expectation if the poll period has
+                    # ellapsed; remember we might be sharing this poll
+                    # source between multiple expectations
+                    last_poll_ts = poll_ts[exp.poll_name]
+                    ellapsed = time_ts - time_ts0
+                    poll_ellapsed = time_ts - last_poll_ts
+                    # == 0 -> first time we run, so poll
+                    if poll_ellapsed == 0 \
+                       or poll_ellapsed >= poll_period[exp.poll_name]:
+                        reporter.report_info(
+                            '%s/%s: polling on %s @%.1f/%.1fs '
+                            '(%.1fs ellapsed on a %.1fs period)'
+                            % (run_name, exp.name, poll_context,
+                               ellapsed, timeout, poll_ellapsed,
+                               poll_period[exp.poll_name]), dlevel = 3)
+                        exp.poll(self, run_name,
+                                 buffers_poll[exp.poll_name])
+                        poll_ts[exp.poll_name] = time_ts
+                        last_poll_ts = time_ts
+                    else:
+                        reporter.report_info(
+                            '%s/%s: not polling on %s @%.1f/%.1fs '
+                            '(only %.1fs ellapsed on a %.1fs period)'
+                            % (run_name, exp.name, poll_context,
+                               ellapsed, timeout, poll_ellapsed,
+                               poll_period[exp.poll_name]), dlevel = 3)
+
+                    # Detect this expectation from the poll -- only if
+                    # there has been a more recent poll
+                    # If it detection is succesful, we are done, remove it
+                    # from the list. Check if it times out (each
+                    # expectation can timeout shorter than the global
+                    # timeout)
+                    last_detect_ts = detect_ts[exp.name]
+                    last_detect_ellapsed = last_poll_ts - time_ts
+                    if last_detect_ellapsed == 0 \
+                       or last_detect_ts < last_poll_ts:
+                        reporter.report_info(
+                            "%s/%s: detecting expectation on '%s' "
+                            "@%.1f/%.1fs (last detect %.1fs before "
+                            "last poll on %.1fs)"
+                            % (run_name, exp.name, poll_context, ellapsed,
+                               timeout, last_detect_ts, last_poll_ts),
+                            dlevel = 3)
+                        r = exp.detect(self, run_name,
+                                       buffers_poll[exp.poll_name],
+                                       buffers[exp.name])
+                        if r:
+                            # this is done
+                            results[exp.name] = r
+                            expectations_pending.remove(exp)
+                            if exp in expectations_required:
+                                expectations_required.remove(exp)
+                            if exp.raise_on_found:
+                                raise exp.raise_on_found
+                        if exp.timeout > 0 and ellapsed > exp.timeout:
+                            # timeout for this specific expectation
+                            raise exp.raise_on_timeout(
+                                "%s/%s: timed out finding expectation in "
+                                "'%s' @%.1f/%.1fs/%.1fs)"
+                                % (run_name, exp.name, poll_context,
+                                   ellapsed, timeout, exp.timeout),
+                                dict())
+                        detect_ts[exp.name] = time_ts
+                    else:
+                        reporter.report_info(
+                            '%s/%s: not re-detecting on %s (no new poll) '
+                            '@%.1f/%.1fs (last detect %.1fs after last poll '
+                            'on %.1fs)'
+                            % (run_name, exp.name, poll_context, ellapsed,
+                               timeout, last_detect_ts, last_poll_ts),
+                            dlevel = 3)
+
+                # if all the required expectations are done, get out!
+                if not expectations_required:
+                    break
+                time.sleep(min_poll_period)
+                time_ts += min_poll_period
+            if time_ts > time_out:
+                # timeout exceeded; look at the expectations we
+                # required to pass, sort them by timeout and raise the
+                # one with the lowest timeout and exception...or do nothing
+                for exp in sorted(expectations_required,
+                                  key = lambda exp: exp.timeout):
+                    if exp.timeout > 0 and exp.raise_on_timeout:
+                        raise exp.raise_on_timeout(
+                            "%s: timed out finding expectation '%s' in "
+                            "'%s' @%.1f/%.1fs/%.1fs)"
+                            % (run_name, exp.name, poll_context,
+                               ellapsed, exp.timeout, timeout),
+                            dict())
+
+        except Exception as e:
+            result_c.report_from_exception(self, e)
+            raise
+        finally:
+            # we got them all, return the results dictionary
+            time_ts = time.time()
+            self.report_info('%s: completed after @%.1fs, found %d matches'
+                             % (run_name, time_ts - time_ts0,
+                                len(results)), dlevel = 3)
+
+            # flush the expectations
+            # this will generate collaterals as needed
+            for exp in exps:
+                try:
+                    exp.flush(self, run_name, buffers_poll[exp.poll_name],
+                              buffers[exp.name], results.get(exp.name, None))
+                except Exception as e:
+                    result_c.report_from_exception(
+                        self, e, dict(
+                            context = "flushing expectation %s/%s" % (
+                                run_name, exp.name)
+                        )
+                    )
+                    # do not re-raise this, this can be the raise path
+                    # of an exception in our main body
+                    # FIXME: detect if we are not in a raise path and
+                    # raise then?
+
+        return results
+
+
     #
     # Helpers for private APIs
     #
-
 
     def tag_get(self, tagname, value_default, origin_default = None):
         """
@@ -6188,7 +6802,7 @@ class tc_c(object):
             sys.path.insert(0, os.path.dirname(path))
             name = path.translate(string.maketrans("/.", "__"))
             module = imp.load_source(name, path)
-        except tcfl.tc.exception as e:
+        except exception as e:
             raise
         except (ImportError, Exception) as e:
             if 'base.util.tag' in e.message \
