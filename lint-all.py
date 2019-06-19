@@ -221,8 +221,8 @@ def generic_line_linter(
         assert isinstance(log, logging.Logger)
     else:
         log = _repo.log
-    assert isinstance(regex_error, re._pattern_type)
-    assert isinstance(regex_warning, re._pattern_type)
+    assert isinstance(regex_error, re.Pattern)
+    assert isinstance(regex_warning, re.Pattern)
 
     try:
         if os.path.isabs(_repo.relpath):
