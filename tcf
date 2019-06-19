@@ -509,11 +509,11 @@ if __name__ == "__main__":
             with tempfile.NamedTemporaryFile(suffix = '.mk', prefix = 'tcf-',
                                              delete = False) as tf:
                 logd("%s: creating makefile for jobserver run" % tf.name)
-                tf.write("""\
+                tf.write(("""\
 tcf-jobserver-run:
 \t+@%s --make-jobserver=%s %s
 """ % (sys.argv[0], tf.name,
-       join_args_for_make_shell_command(sys.argv[1:])))
+       join_args_for_make_shell_command(sys.argv[1:]))).encode('utf-8'))
                 tf.flush()
                 tf.seek(0)
                 logd("%s: makefile:\n%s" % (tf.name, tf.read()))
