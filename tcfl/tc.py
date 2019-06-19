@@ -5772,7 +5772,7 @@ class tc_c(object, metaclass=_tc_mc):
             # Include where path is in the sys.path, so modules that
             # are in the same directory are loaded
             sys.path.insert(0, os.path.dirname(path))
-            name = path.translate(string.maketrans("/.", "__"))
+            name = path.translate(str.maketrans("/.", "__"))
             module = imp.load_source(name, path)
         except tcfl.tc.exception as e:
             raise
@@ -6369,7 +6369,7 @@ def _run(args):
         tc_c.jobs = len(tcs_filtered)
         for tc in list(tcs_filtered.values()):
             tc.mkticket()
-            with msgid_c(tc.ticket, l = 4) as _msgid:
+            with msgid_c(tc.ticket.decode('utf-8'), l = 4) as _msgid:
                 tc._ident = msgid_c.ident()
                 _threads = tc._run_on_targets(tp, rt_all,
                                               rt_selected, ic_selected)
@@ -6399,7 +6399,7 @@ def _run(args):
                 continue
             else:
                 seen_classes.add(cls)
-                with msgid_c(tc.ticket, l = 4, depth = 0,
+                with msgid_c(tc.ticket.decode('utf-8'), l = 4, depth = 0,
                              phase = "class_teardown") as _msgid:
                     result += tc._class_teardowns_run()
         # If something failed or blocked, report totals verbosely
