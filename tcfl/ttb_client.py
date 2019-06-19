@@ -143,8 +143,8 @@ class _rest_target_broker_mc(type):
         # it to serialize properly
         tp = _multiprocessing_pool_c(processes = len(rest_target_brokers))
         threads = {}
-        for rtb in sorted(rest_target_brokers.values()):
-            threads[rtb] = tp.apply_async(cls._rts_get, (rtb,))
+        for rtb in sorted(rest_target_brokers.keys()):
+            threads[rtb] = tp.apply_async(cls._rts_get, (rest_target_brokers[rtb],))
         tp.close()
         tp.join()
         cls._rts_cache = {}
