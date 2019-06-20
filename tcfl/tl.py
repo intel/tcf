@@ -321,7 +321,7 @@ def sh_export_proxy(ic, target):
         # local networks
         proxy_cmd += \
             " no_proxy=127.0.0.1,%(ipv4_addr)s/%(ipv4_prefix_len)s," \
-            "%(ipv6_addr)s/%(ipv6_prefix_len)d" \
+            "%(ipv6_addr)s/%(ipv6_prefix_len)d,localhost" \
             " NO_PROXY=127.0.0.1,%(ipv4_addr)s/%(ipv4_prefix_len)s," \
-            "%(ipv6_addr)s/%(ipv6_prefix_len)d"
+            "%(ipv6_addr)s/%(ipv6_prefix_len)d,localhost"
         target.shell.run("export " + proxy_cmd % ic.kws)
