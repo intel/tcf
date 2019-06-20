@@ -4977,8 +4977,7 @@ class tc_c(object, metaclass=_tc_mc):
             _types = dict()
             perm = {}
             cnt = 0
-            for target_want_name in random.sample(target_want_candidates,
-                                                  len(target_want_candidates)):
+            for target_want_name in random.sample(list(target_want_candidates.keys()), len(target_want_candidates)):
                 target_want = self._targets[target_want_name]
                 # Of the want's candidates, get which aren't taken already
                 rts_not_taken = set()

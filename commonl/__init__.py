@@ -251,7 +251,7 @@ def mkid(something, l = 10):
     :param something: anything from which an id has to be generated
     :type something: anything iterable
     """
-    h = hashlib.sha512(something)
+    h = hashlib.sha512(something.encode('utf-8'))
     return base64.b32encode(h.digest())[:l].lower()
 
 
