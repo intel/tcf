@@ -1333,7 +1333,12 @@ WARNING: This is a very limited interactive console
         old_flags = termios.tcgetattr(sys.stdin.fileno())
         tty.setraw(sys.stdin.fileno())
         flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFD)
+        """
+        Non-blocking mode is not supported
+        https://bugs.python.org/issue35762
         fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        """
+        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags)
         while True and console_read_thread.is_alive():
             try:
                 chars = sys.stdin.read()
