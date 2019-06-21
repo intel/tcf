@@ -88,11 +88,11 @@ class extension(tc.target_extension_c):
           target's *capture*
         :returns: dictionary of values passed by the server
         """
-        self.target.report_info("%s: starting capture" % capturer, dlevel = 1)
+        self.target.report_info("%s: starting capture" % capturer, dlevel = 3)
         r = _rest_tb_target_capture_start(self.target.rtb, self.target.rt,
                                           capturer,
                                           ticket = self.target.ticket)
-        self.target.report_info("%s: started capture" % capturer)
+        self.target.report_info("%s: started capture" % capturer, dlevel = 2)
         return r
 
     def stop_and_get(self, capturer, local_filename):
@@ -109,12 +109,12 @@ class extension(tc.target_extension_c):
         :param str local_filename: file to which to write the capture.
         :returns: dictionary of values passed by the server
         """
-        self.target.report_info("%s: stopping capture" % capturer, dlevel = 1)
+        self.target.report_info("%s: stopping capture" % capturer, dlevel = 3)
         r = _rest_tb_target_capture_stop_and_get(
             self.target.rtb, self.target.rt,
             capturer, local_filename, ticket = self.target.ticket)
         self.target.report_info("%s: stopped capture, %d bytes"
-                                % (capturer, r))
+                                % (capturer, r), dlevel = 2)
         return r
 
     def stop(self, capturer):
@@ -127,11 +127,11 @@ class extension(tc.target_extension_c):
         :param str capturer: capturer to use, as listed in the
           target's *capture*
         """
-        self.target.report_info("%s: stopping capture" % capturer, dlevel = 1)
+        self.target.report_info("%s: stopping capture" % capturer, dlevel = 3)
         _rest_tb_target_capture_stop_and_get(
             self.target.rtb, self.target.rt,
             capturer, None, ticket = self.target.ticket)
-        self.target.report_info("%s: stopped capture" % capturer)
+        self.target.report_info("%s: stopped capture" % capturer, dlevel = 2)
 
     def get(self, capturer, local_filename):
         """
@@ -149,11 +149,11 @@ class extension(tc.target_extension_c):
 
         :returns: dictionary of capturers and their state
         """
-        self.target.report_info("listing", dlevel = 1)
+        self.target.report_info("listing", dlevel = 3)
         data = _rest_tb_target_capture_list(self.target.rtb, self.target.rt,
                                             ticket = self.target.ticket)
         capturers = data['capturers']
-        self.target.report_info("listed: %s" % capturers)
+        self.target.report_info("listed: %s" % capturers, dlevel = 2)
         return capturers
 
 def cmdline_capture_start(args):
