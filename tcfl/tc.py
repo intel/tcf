@@ -4023,7 +4023,7 @@ class tc_c(object, metaclass=_tc_mc):
                 target_types = target_type
                 target_names = [ ]
             target_group_targets = ",".join(target_names)
-            target_group_name = target_group.name
+            target_group_name = target_group.name.decode('utf-8')
             target_group_info = target_group.descr
         else:
             self.targets = {}
