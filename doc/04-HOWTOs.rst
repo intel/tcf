@@ -2597,7 +2597,8 @@ the configuration process).
 
 Flash a new serial number or description on any FTDI based USB-to-TTY
 cable/adapter (like a Flyswatter2, Quark D2000 CRB, Quark C10000 CRB,
-etc) using ``ftdi_eeprom`` on your laptop::
+etc) using ``ftdi_eeprom`` on your laptop (:ref:`Windows utility
+<https://www.ftdichip.com/Support/Utilities.htm#FT_PROG>`)::
 
   $ sudo dnf install -y libftdi-devel
   $ cat > file.conf <<EOF
