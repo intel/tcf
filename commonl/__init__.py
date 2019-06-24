@@ -252,7 +252,7 @@ def mkid(something, l = 10):
     :type something: anything iterable
     """
     h = hashlib.sha512(something.encode('utf-8'))
-    return base64.b32encode(h.digest())[:l].lower()
+    return base64.b32encode(h.digest())[:l].lower().decode('utf-8', 'ignore')
 
 
 

@@ -1524,7 +1524,8 @@ class target_c(object):
         """
         # FIXME: override kws __setitem__ to fill it out automagically?
         assert isinstance(kw, str)
-        assert isinstance(value, str)
+        assert isinstance(value, str), \
+                "value: expected str, got %s: %s" % (type(value).__name__, value)
         if origin == None:
             o = inspect.stack()[1]
             origin = "%s:%s" % (o[1], o[2])
@@ -4023,7 +4024,7 @@ class tc_c(object, metaclass=_tc_mc):
                 target_types = target_type
                 target_names = [ ]
             target_group_targets = ",".join(target_names)
-            target_group_name = target_group.name.decode('utf-8')
+            target_group_name = target_group.name
             target_group_info = target_group.descr
         else:
             self.targets = {}
@@ -4233,7 +4234,8 @@ class tc_c(object, metaclass=_tc_mc):
           taken from the stack
         """
         assert isinstance(kw, str)
-        assert isinstance(value, str)
+        assert isinstance(value, str), \
+                "value: expected str, got %s: %s" % (type(value).__name__, value)
         if origin == None:
             o = inspect.stack()[1]
             origin = "%s:%s" % (o[1], o[2])
