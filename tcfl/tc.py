@@ -1994,11 +1994,13 @@ class tc_logadapter_c(logging.LoggerAdapter):
     Logging adapter to prefix test case's current :term:`BSP model`,
     bsp and target name.
     """
-    id = None
-    prefix = None
+    id = 0
+    prefix = ""
     def process(self, msg, kwargs):
         return '[%08x] %s: %s ' % (self.id, self.prefix, msg), kwargs
 
+    def isEnabledFor(self, level):
+        return True
 
 
 #
