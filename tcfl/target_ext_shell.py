@@ -76,7 +76,8 @@ class shell(tc.target_extension_c):
     def up(self, tempt = None,
            user = None, login_regex = re.compile('login:'), delay_login = 0,
            password = None, password_regex = re.compile('[Pp]assword:'),
-           shell_setup = True, timeout = 120):
+           shell_setup = True, timeout = 120,
+           early_prompt_regex = re.compile(r"[\$#>][^\$#>]*$", re.MULTILINE)):
         """Wait for the shell in a console to be ready
 
         Giving it ample time to boot, wait for a :data:`shell prompt
@@ -115,6 +116,24 @@ class shell(tc.target_extension_c):
         :param int timeout: [optional] seconds to wait for the login
           prompt to appear
 
+        :param early_prompt_regex: (optional) regex describing how
+          find an early prompt.
+
+          Some distros set really complicated prompts which include
+          ANSI characters that make matching extremely difficult.
+
+          This function thus tries, after login, to detect a prompt
+          using the most minimalistic approach to then set a more
+          simple one to match against.
+
+          The defaults try to find any combination of the most common
+          ones--minding that in between all chars, there might be ANSI
+          stuff::
+
+            PROMPT#
+            PROMPT$
+            PROMPT>
+
         """
         assert tempt == None or isinstance(tempt, basestring)
         assert user == None or isinstance(user, basestring)
@@ -124,6 +143,9 @@ class shell(tc.target_extension_c):
         assert isinstance(password_regex, ( basestring, re._pattern_type ))
         assert isinstance(shell_setup, bool)
         assert timeout > 0
+
+        target = self.target
+
         def _login(target):
             # If we have login info, login to get a shell prompt
             target.expect(login_regex)
@@ -146,8 +168,7 @@ class shell(tc.target_extension_c):
                         self.target.send(tempt)
                         if user:
                             _login(self.target)
-                        self.target.expect(self.linux_shell_prompt_regex,
-                                           timeout = 1)
+                        target.expect(early_prompt_regex)
                         break
                     except tc.error_e as _e:
                         if tries == self.target.testcase.tls.expecter.timeout:
@@ -160,11 +181,16 @@ class shell(tc.target_extension_c):
             else:
                 if user:
                     _login(self.target)
-                self.target.expect(self.linux_shell_prompt_regex)
+                target.expect(early_prompt_regex)
         finally:
             self.target.testcase.tls.expecter.timeout = original_timeout
 
         if shell_setup:
+            # set a sane simple prompt with no ANSI colors
+            target.shell.run(r"export PS1='\u@\h:\w \$ '")
+            # set our prompt regex to this sane setting
+            self.linux_shell_prompt_regex_pattern = \
+                re.compile(r'[^@]+@[^:]+:.+ [#\$] ')
             # disable line editing for proper recording of command line
             # when running bash; otherwise the scrolling readline does
             # messes up the output
