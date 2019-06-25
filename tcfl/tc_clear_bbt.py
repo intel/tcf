@@ -813,7 +813,7 @@ EOF
             ))
 
     @classmethod
-    def is_testcase(cls, path):
+    def is_testcase(cls, path, _from_path):
         # the any-bundle directory of bbt.git is only to run after
         # other testcases--lame case to avoid it. IFFF you run from
         # inside it, it won't catch it, but so what...
