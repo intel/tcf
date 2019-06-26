@@ -45,7 +45,6 @@ class _build_py(distutils.command.build_py.build_py):
         if not self.dry_run:
             target_dir = os.path.join(self.build_lib, 'tcfl')
             self.mkpath(target_dir)
-            setupl.mk_version_py(target_dir, self.distribution.get_version())
 
         # distutils uses old-style classes, so no super()
         distutils.command.build_py.build_py.run(self)
@@ -57,7 +56,7 @@ setuptools.setup(
     long_description = """\
 This is the client and meta-testcase runner for the TCF test case framework.
 """,
-    version = setupl.version.decode('utf-8'),
+    version = setupl.version,
     url = "https://github.com/intel/tcf",
     author = "Inaky Perez-Gonzalez",
     author_email = "inaky.perez-gonzalez@intel.com",
