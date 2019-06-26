@@ -539,7 +539,6 @@ EOF
         else:
             capturing = False
         target.pos.boot_normal()
-        target.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
         try:
             target.shell.up(user = 'root')
             if capturing:
@@ -556,7 +555,7 @@ EOF
         # Why this? because a lot of the test output can be confused
         # with a prompt and the prompt regex then trips on it and
         # everything gets out of sync
-        target.shell.linux_shell_prompt_regex = re.compile("BBT-PS1-PROMPT% ")
+        target.shell.shell_prompt_regex = re.compile("BBT-PS1-PROMPT% ")
         target.shell.run(
             'export PS1="BBT-PS1-PROMPT% " # do a very simple prompt, ' \
             'difficult to confuse with test output')
