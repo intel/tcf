@@ -80,7 +80,8 @@ class msgid_c(object):
             self._ident += root
         # that then can be overriden
         if s != None:
-            assert isinstance(s, str)
+            if not isinstance(s, str):
+                raise TypeError('expected str, but got {!r}'.format(type(s)))
             if root:
                 self._ident += ":" + s
             else:

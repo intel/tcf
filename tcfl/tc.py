@@ -2748,14 +2748,14 @@ class tc_c(object, metaclass=_tc_mc):
         # Initialize prefixes and a few keywords we need -- we might
         # override these later if/when we assign a target group.
         self.mkticket()
-        self.tmpdir = os.path.join(tc_c.tmpdir, self.ticket.decode('UTF-8'))
+        self.tmpdir = os.path.join(tc_c.tmpdir, self.ticket)
         try:
             os.makedirs(self.tmpdir)
         except OSError:
             if not os.path.isdir(self.tmpdir):
                 raise
         self._kw_set("tmpdir", self.tmpdir)
-        self._kw_set("tc_hash", self.ticket.decode('UTF-8'))
+        self._kw_set("tc_hash", self.ticket)
 
         self.ts_start = time.time()
         self.ts_end = None
@@ -5279,9 +5279,9 @@ class tc_c(object, metaclass=_tc_mc):
                             if self.target_group else 'n/a'
         if ticket == None:
             self.ticket = msgid_c.encode(
-                self._hash_salt + self.name + target_group_name, 4)
+                self._hash_salt + self.name + target_group_name, 4).decode('UTF-8')
         else:
-            self.ticket = self._ident
+            self.ticket = self._ident.decode('UTF-8')
 
     def _run(self, msgid, thread_init_args):
         """
@@ -6372,7 +6372,7 @@ def _run(args):
         tc_c.jobs = len(tcs_filtered)
         for tc in list(tcs_filtered.values()):
             tc.mkticket()
-            with msgid_c(tc.ticket.decode('utf-8'), l = 4) as _msgid:
+            with msgid_c(tc.ticket, l = 4) as _msgid:
                 tc._ident = msgid_c.ident()
                 _threads = tc._run_on_targets(tp, rt_all,
                                               rt_selected, ic_selected)
@@ -6402,7 +6402,7 @@ def _run(args):
                 continue
             else:
                 seen_classes.add(cls)
-                with msgid_c(tc.ticket.decode('utf-8'), l = 4, depth = 0,
+                with msgid_c(tc.ticket, l = 4, depth = 0,
                              phase = "class_teardown") as _msgid:
                     result += tc._class_teardowns_run()
         # If something failed or blocked, report totals verbosely
