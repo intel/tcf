@@ -1745,7 +1745,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         return tcs
 
     @classmethod
-    def is_testcase(cls, path):
+    def is_testcase(cls, path, _from_path):
         if cls.filename_regex.match(os.path.basename(path)):
             return cls._testcase_ini_mktcs(path)
         if cls.filename_yaml_regex.match(os.path.basename(path)):

@@ -206,21 +206,18 @@ class pc(ttbl.tt_power_control_impl):
       - this object
       - power control implementation for the tatrget
     """
-    # Note we don't store the power state, as it follows that of the
-    # main target. We just return it as the same as the target's
     def __init__(self):
         ttbl.tt_power_control_impl.__init__(self)
-        self.powered = False
 
     def power_on_do(self, target):
         target.log.debug("serial ports power on / start")
         target.consoles_open()
-        self.powered = True
+        target.fsdb.set('consoles-recording', 'True')
 
     def power_off_do(self, target):
-        self.powered = False
         target.log.debug("serial ports power off / stop")
+        target.fsdb.set('consoles-recording', None)
         target.consoles_close()
 
     def power_get_do(self, target):
-        return self.powered
+        return target.fsdb.get('consoles-recording') != None

@@ -566,7 +566,7 @@ class extension(tc.target_extension_c):
 
             # Sequence for TCF-live based on Fedora
             if pos_prompt:
-                target.shell.linux_shell_prompt_regex = pos_prompt
+                target.shell.shell_prompt_regex = pos_prompt
             try:
                 target.shell.up(timeout = bios_boot_time + timeout)
             except tc.error_e as e:
@@ -1297,7 +1297,6 @@ class tc_pos0_base(tc.tc_c):
         ic.power.on()
         # fire up the target, wait for a login prompt
         target.pos.boot_normal()
-        target.shell.linux_shell_prompt_regex = tl.linux_root_prompts
         target.shell.up(user = self.login_user, delay_login = self.delay_login)
         target.report_pass("Deployed %s" % self.image)
 

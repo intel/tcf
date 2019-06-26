@@ -217,6 +217,48 @@ OpenSSL:
  Instructions taken from:
  http://kracekumar.com/post/54437887454/ssl-for-flask-local-development
 
+.. _configure_udev:
+
+Configuring and reloading UDEV
+------------------------------
+
+*udev* is the Linux low-level service that acts when devices are
+added/removed from/to the system to set them up. TCF relies on it to
+create device alias named after the targets to make administration
+easier.
+
+- *udev* rule configuration files are stored in */etc/udev/rules.d/*
+  and are called *NN-FILENAME.rules*, where *NN* is a number to sort
+  inclusion. Most commonly you can use *90-ttbd.rules*
+
+- When the rule file is changed, it can be reloaded with::
+
+    # udevadm control --reload-rules
+
+- Information about a given device can be obtained with::
+
+    $ udevadm info /dev/snd/controlC0 
+    P: /devices/pci0000:00/0000:00:1f.3/sound/card0/controlC0
+    N: snd/controlC0
+    S: snd/by-path/pci-0000:00:1f.3
+    E: DEVLINKS=/dev/snd/by-path/pci-0000:00:1f.3
+    E: DEVNAME=/dev/snd/controlC0
+    E: DEVPATH=/devices/pci0000:00/0000:00:1f.3/sound/card0/controlC0
+    E: ID_PATH=pci-0000:00:1f.3
+    E: ID_PATH_TAG=pci-0000_00_1f_3
+    E: MAJOR=116
+    E: MINOR=11
+    E: SUBSYSTEM=sound
+    E: TAGS=:uaccess:
+    E: USEC_INITIALIZED=30391111
+
+  those *KEYS=* we can use to match in the *udev* rule files to do
+  actions.
+    
+- Verbosity can be controlled with::
+
+    # udevadm control -l LEVEL    (see --help)
+
 .. _find_usb_info:
 
 Finding USB device information
@@ -289,7 +331,7 @@ Once we know a device node of any time has been established (eg:
 :file:`/dev/ttyUSB9`), use ``udevadm info`` to find information about
 it::
 
-  # udevadm info /dev/ttyUSB0	# or whichever device node it is
+  # udevadm info /dev/ttyUSB0	# or whichever device node (eg: /dev/video or /dev/snd/XYZ)
   P: /devices/pci0000:00/0000:00:14.0/usb1/1-2/1-2:1.0/ttyUSB0/tty/ttyUSB0
   N: ttyUSB0
   S: serial/by-id/pci-Prolific_Technology_Inc._USB-Serial_Controller-if00-port0
@@ -332,7 +374,7 @@ the USB device (that can be found using the :ref:`tricks above
   SUBSYSTEM == "tty", ENV{ID_SERIAL_SHORT} == "SERIALNUMBER", \
     SYMLINK += "tty-TARGETNAME"
 
-Remember to update udev::
+Remember to :ref:`update udev <configure_udev>`::
 
     # udevadm control --reload-rules
 
@@ -362,7 +404,7 @@ find the path by plugging the device, using `dmesg -w` to find which
   # udevadm info /dev/ttyUSBX | grep ID_PATH=
   ID_PATH=pciblahblah-usb-0:1.2.2:1.0
 
-reload udev configuration::
+:ref:`reload udev config <configure_udev>`::
 
   # udevadm control --reload-rules
 
@@ -406,7 +448,7 @@ In :file:`/etc/udev/rules.d/90-ttbd.rules`::
 note the ``*2:1.0``; that selects port 2, where we connect the
 serial port adapter. Port 1 would be ``*1:1.0``, etc.
 
-Remember to update udev::
+Remember to :ref:`update udev <configure_udev>`::
 
   # udevadm control --reload-rules
 
@@ -2555,7 +2597,8 @@ the configuration process).
 
 Flash a new serial number or description on any FTDI based USB-to-TTY
 cable/adapter (like a Flyswatter2, Quark D2000 CRB, Quark C10000 CRB,
-etc) using ``ftdi_eeprom`` on your laptop::
+etc) using ``ftdi_eeprom`` on your laptop (:ref:`Windows utility
+<https://www.ftdichip.com/Support/Utilities.htm#FT_PROG>`)::
 
   $ sudo dnf install -y libftdi-devel
   $ cat > file.conf <<EOF

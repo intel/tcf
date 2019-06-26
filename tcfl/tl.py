@@ -13,6 +13,7 @@ import os
 import re
 
 import tcfl.tc
+import target_ext_shell
 
 #! Place where the Zephyr tree is located
 # Note we default to empty string so it can be pased
@@ -273,17 +274,7 @@ def linux_ipv4_addr_get_from_console(target, ifname):
     return matches.groupdict()['name']
 
 # common linux root prompts
-linux_root_prompts = re.compile(
-    '('
-    # clear, Fedora
-    r'[^@]+@.*[#\$] '
-    '|'
-    # SLES; make sure there is no trailing space, otherwise it gets
-    # confused with the ANSI colouring sequences that come between them
-    # and the space.
-    r'[^:]+:.*[#\$]'
-    ')'
-)
+linux_root_prompts = target_ext_shell._shell_prompt_regex
 
 def sh_export_proxy(ic, target):
     """

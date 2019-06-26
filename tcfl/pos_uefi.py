@@ -810,10 +810,5 @@ def boot_config_fix(target):
     # In the case of UEFI systems, this booted into a OS because the
     # EFI bootmgr order got munged, so let's try to get that fixed
     # (IPv4 and IPv6 boot first).
-    try:
-        prompt_original = target.shell.linux_shell_prompt_regex
-        target.shell.linux_shell_prompt_regex = tl.linux_root_prompts
-        target.shell.up(user = 'root')
-        _efibootmgr_setup(target, target.kws['pos_boot_dev'], 1)
-    finally:
-        target.shell.linux_shell_prompt_regex = prompt_original
+    target.shell.up(user = 'root')
+    _efibootmgr_setup(target, target.kws['pos_boot_dev'], 1)

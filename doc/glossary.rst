@@ -21,11 +21,23 @@ Glossary
      In the context of *tcf run*, a hash is a four character code that
      uniquely identifies the test case name and the target where it ran.
 
+   herd
+
+     Group of TCF servers that are meant to be used together, they all
+     provide redundancy for targets of the same style.
+
    RunID
 
      A unique identifier for a run of testcases that groups the output
      and results of testcases. When specified, it will be prefixed to
      testcase output to clarify when it was generated.
+
+   site
+   
+     Server herds can be split into *sites*, which is a subgroup of
+     servers of the same herd that are physically located in the same
+     place and might be sharing physical infrastructure
+     
 
    NUT
 

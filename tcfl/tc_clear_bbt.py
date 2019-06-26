@@ -58,6 +58,7 @@ the server::
 #
 # - add suggested timeouts
 
+import datetime
 import logging
 import glob
 import threading
@@ -435,6 +436,11 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
     #:
     boot_mgr_disable = os.environ.get("BBT_BOOT_MGR_DISABLE", False)
 
+    #: if environ SWUPD_FIX_TIME is defined, set the target's time to
+    #: the client's time
+    fix_time = os.environ.get("SWUPD_FIX_TIME", None)
+
+    
     def _deploy_bbt(self, _ic, target, _kws):
         # note self.bbt_tree and self.rel_path_in_target are set by
         # configure_00_set_relpath_set(); this way if we call withtout
@@ -533,7 +539,6 @@ EOF
         else:
             capturing = False
         target.pos.boot_normal()
-        target.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
         try:
             target.shell.up(user = 'root')
             if capturing:
@@ -550,11 +555,16 @@ EOF
         # Why this? because a lot of the test output can be confused
         # with a prompt and the prompt regex then trips on it and
         # everything gets out of sync
-        target.shell.linux_shell_prompt_regex = re.compile("BBT-PS1-PROMPT% ")
+        target.shell.shell_prompt_regex = re.compile("BBT-PS1-PROMPT% ")
         target.shell.run(
             'export PS1="BBT-PS1-PROMPT% " # do a very simple prompt, ' \
             'difficult to confuse with test output')
 
+        if self.fix_time:
+            target.shell.run(
+                "date -us '%s' && hwclock -wu"
+                % str(datetime.datetime.utcnow()))
+        
         target.shell.run(
             "test -f /etc/ca-certs/trusted/regenerate"
             " && rm -rf /run/lock/clrtrust.lock"
@@ -802,7 +812,7 @@ EOF
             ))
 
     @classmethod
-    def is_testcase(cls, path):
+    def is_testcase(cls, path, _from_path):
         # the any-bundle directory of bbt.git is only to run after
         # other testcases--lame case to avoid it. IFFF you run from
         # inside it, it won't catch it, but so what...

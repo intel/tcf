@@ -22,6 +22,31 @@ from . import tc
 from . import msgid_c
 
 
+# From http://ascii-table.com/ansi-escape-sequences.php
+# add any character that can be in a prompt to specify user names,
+# paths, etc  -- note we make the ANSI pattern fully optional (*), in
+# case we have prompts that don't use it.
+ansi_pattern =                r"[\x1b=;\[0-9A-Za-z]*"
+ansi_pattern_prompt = r"[-/\@_~: \x1b=;\[0-9A-Za-z]+"
+
+shell_prompts = [
+    # multicolor prompts (eggg. ANSI sequences)
+    # 'SOMETHING # ' or 'SOMETHING $ '
+    ansi_pattern_prompt + " " + ansi_pattern + r"[#\$]" + ansi_pattern + " ",
+    # Fedora
+    r'[^@]+@.*[#\$] ',
+    # SLES; make sure there is no trailing space, otherwise it gets
+    # confused with the ANSI colouring sequences that come between them
+    # and the space.
+    # > makes ACRN match too
+    r'[^:]+:.*[#\$>]',
+    # Provisioning OS
+    r' [0-9] \$ ',
+]
+
+_shell_prompt_regex = \
+    re.compile('^\r?(' + "|".join(shell_prompts) + ')', re.MULTILINE)
+
 class shell(tc.target_extension_c):
     """
     Extension to :py:class:`tcfl.tc.target_c` for targets that support
@@ -36,7 +61,7 @@ class shell(tc.target_extension_c):
     Waits for the shell to be up and ready; sets it up so that if an
     error happens, it will print an error message and raise a block
     exception. Note you can change what is expected as a :data:`shell
-    prompt <linux_shell_prompt_regex>`.
+    prompt <shell_prompt_regex>`.
 
     >>> target.shell.run("some command")
 
@@ -63,15 +88,36 @@ class shell(tc.target_extension_c):
     #: This is a Python regex that can be set to recognize what the
     #: shell prompt looks like. Multiple catchas here:
     #:
-    #:  - use a fixed string or compile the regex
+    #: - use a fixed string or compile the regex
     #:
-    #:  - if using ^ and/or $, even with re.MULTILINE, things tend not
-    #:    to work so well because of \r\n line conventions vs \n
+    #: - if using ^ and/or $, even with re.MULTILINE, things tend not
+    #:   to work so well because of \r\n line conventions vs \n...YMMV
+    #:
+    #: - ANSI chars...
+    #:
+    #:
+    #: Note we don't force it has to start at the beginning of a line
+    #: with ^ because then we might hit problems with different \r\n
+    #: sequences when some kernel messages are intermixed in the
+    #: console output, like when we mount.
+    #:
+    #: \Z means match the end of the string, the prompt is the last
+    #: thing, period -- this means if something is printing spurious
+    #: messages...yeah, it will fail to detect the prompt.
+    #:
+    #: The defaults are collected by joining the list
+    #: :data:`shell_prompts`, which contains multiple prompt patterns
+    #: that work for a bunch of OSes. More can be added FIXME: procedure
     #:
     #: Examples:
     #:
-    #: >>> target.shell.linux_shell_prompt_regex = re.compile(r'root@.*# ')
-    linux_shell_prompt_regex = re.compile(r"[0-9]+ \$")
+    #: >>> target.shell
+    #:
+    # default is set by the global variable
+    shell_prompt_regex = _shell_prompt_regex
+
+    #: Deprecated, use :data:`shell_prompt_regex`
+    linux_shell_prompt_regex = shell_prompt_regex
 
     def up(self, tempt = None,
            user = None, login_regex = re.compile('login:'), delay_login = 0,
@@ -80,7 +126,7 @@ class shell(tc.target_extension_c):
         """Wait for the shell in a console to be ready
 
         Giving it ample time to boot, wait for a :data:`shell prompt
-        <linux_shell_prompt_regex>` and set up the shell so that if an
+        <shell_prompt_regex>` and set up the shell so that if an
         error happens, it will print an error message and raise a
         block exception. Optionally login as a user and password.
 
@@ -124,6 +170,9 @@ class shell(tc.target_extension_c):
         assert isinstance(password_regex, ( str, re._pattern_type ))
         assert isinstance(shell_setup, bool)
         assert timeout > 0
+
+        target = self.target
+
         def _login(target):
             # If we have login info, login to get a shell prompt
             target.expect(login_regex)
@@ -146,8 +195,7 @@ class shell(tc.target_extension_c):
                         self.target.send(tempt)
                         if user:
                             _login(self.target)
-                        self.target.expect(self.linux_shell_prompt_regex,
-                                           timeout = 1)
+                        target.expect(self.linux_prompt_regex)
                         break
                     except tc.error_e as _e:
                         if tries == self.target.testcase.tls.expecter.timeout:
@@ -155,12 +203,12 @@ class shell(tc.target_extension_c):
                                 "Waited too long (%ds) for shell to come up "
                                 "(did not receive '%s')" %
                                 (self.target.testcase.tls.expecter.timeout,
-                                 self.linux_shell_prompt_regex.pattern))
+                                 self.shell_prompt_regex.pattern))
                         continue
             else:
                 if user:
                     _login(self.target)
-                self.target.expect(self.linux_shell_prompt_regex)
+                target.expect(self.shell_prompt_regex)
         finally:
             self.target.testcase.tls.expecter.timeout = original_timeout
 
@@ -205,7 +253,7 @@ class shell(tc.target_extension_c):
             else:
                 self.target.expect(expect)
         if prompt_regex == None:
-            self.target.expect(self.linux_shell_prompt_regex)
+            self.target.expect(self.shell_prompt_regex)
         else:
             self.target.expect(prompt_regex)
         if output:

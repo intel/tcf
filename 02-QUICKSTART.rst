@@ -18,7 +18,16 @@
    (see :ref:`installation
    troubleshooting<tcf_client_install_troubleshooting>` for things
    that can go wrong)
+
+   .. note:: Ensure your PATH includes *$HOME/.local/bin*, where *install
+             --user* puts things, by adding to *~/.bashrc*::
      
+               $ echo 'test -z "${PATH##*$HOME/.local/bin*}" || export PATH=$PATH:$HOME/.local/bin' >> ~/.bashrc
+
+             source bashrc to ensure the setting is there::
+
+               $ source ~/.bashrc
+               
    You can also run *tcf* from the :ref:`source directory
    <tcf_run_from_source_tree>`.
      

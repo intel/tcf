@@ -5768,7 +5768,7 @@ class tc_c(object, metaclass=_tc_mc):
     # Default driver loader; most test case drivers would over load
     # this to determine if a file is a testcase or not.
     @classmethod
-    def is_testcase(cls, path):
+    def is_testcase(cls, path, _from_path):
         if not cls.file_regex.search(os.path.basename(path)):
             return []
         try:
@@ -5811,13 +5811,15 @@ class tc_c(object, metaclass=_tc_mc):
         return tcs
 
     @classmethod
-    def _create_from_file_name(cls, tcis, file_name):
+    def _create_from_file_name(cls, tcis, file_name, from_path):
         """
         Given a filename that contains a possible test case, create one or
         more TC structures from it and return them in a list
 
         :param list tcis: list where to append found test case instances
         :param str file_name: path to file to consider
+        :param str from_path: original path from which this file was
+          scanned (this will be a parent path of this file)
         :returns: result_c with counts of tests passed/failed (zero,
           as at this stage we cannot know), blocked (due to error
           importing) or skipped(due to whichever condition).
@@ -5830,10 +5832,27 @@ class tc_c(object, metaclass=_tc_mc):
                            file_name, ignore_regex.pattern, origin)
                 return result
 
+        def _style_get(_tc_driver):
+            argspec = inspect.getargspec(_tc_driver.is_testcase)
+            if len(argspec.args) == 2:
+                return 2
+            elif len(argspec.args) == 3:
+                return 3
+            else:
+                raise AssertionError(
+                    "%s: unknown # of arguments %d to is_testcase()"
+                    % (_tc_driver, len(argspec.args)))
+            
         for _tc_driver in cls._tc_drivers:
             tc_instances = []
             try:
-                tc_instances += _tc_driver.is_testcase(file_name)
+                style = _style_get(_tc_driver)
+                # hack to support multiple versions of the interface
+                if style == 2:
+                    tc_instances += _tc_driver.is_testcase(file_name)
+                elif style == 3:
+                    tc_instances += _tc_driver.is_testcase(file_name,
+                                                           from_path)
             except Exception as e:
                 tc_fake = tc_c(file_name, file_name, "builtin")
                 tc_fake.mkticket()
@@ -5901,12 +5920,14 @@ class tc_c(object, metaclass=_tc_mc):
                 for filename in sorted(_filenames):
                     tc_instances = []
                     file_name = os.path.join(tc_path, filename)
-                    result += cls._create_from_file_name(tc_instances, file_name)
+                    result += cls._create_from_file_name(tc_instances,
+                                                         file_name, path)
                     for _tc in tc_instances:
                         tcs[_tc.name] = _tc
         elif os.path.isfile(path):
             tc_instances = []
-            result += cls._create_from_file_name(tc_instances, path)
+            result += cls._create_from_file_name(tc_instances, path,
+                                                 os.path.dirname(path))
             for _tc in tc_instances:
                 tcs[_tc.name] = _tc
         return result
