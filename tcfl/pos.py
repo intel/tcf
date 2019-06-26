@@ -99,7 +99,7 @@ def image_list_from_rsync_output(output):
         tokens = line.split(None, 5)
         if len(tokens) != 5:
             continue
-        image = tokens[4]
+        image = tokens[4].decode('UTF-8')
         if not ':' in image:
             continue
         imagel.append(image_spec_to_tuple(image))
