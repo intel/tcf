@@ -18,6 +18,7 @@ import distutils.command.build_py
 import distutils.command.sdist
 import distutils.core
 import distutils.sysconfig
+import setuptools
 
 import setupl
 
@@ -50,16 +51,17 @@ class _build_py(distutils.command.build_py.build_py):
         distutils.command.build_py.build_py.run(self)
 
 
-distutils.core.setup(
+setuptools.setup(
     name = 'tcf',
     description = "TCF client",
     long_description = """\
 This is the client and meta-testcase runner for the TCF test case framework.
 """,
     version = setupl.version.decode('utf-8'),
-    url = None,
+    url = "https://github.com/intel/tcf",
     author = "Inaky Perez-Gonzalez",
     author_email = "inaky.perez-gonzalez@intel.com",
+    license = "Apache-2.0",
     packages = [
         'commonl',
         'tcfl',
@@ -73,6 +75,8 @@ This is the client and meta-testcase runner for the TCF test case framework.
         install_data = setupl._install_data,
         sdist = _sdist,
     ),
+    package_data = {'': ['LICENSE']},
+    include_package_data=True,
     data_files = [
         # No default configuration files; confusing
         ('@sysconfigdir@/tcf/', [

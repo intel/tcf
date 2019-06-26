@@ -1,4 +1,5 @@
 # needed to generate RPMs with setup.py bdist_rpm
+include LICENSE
 include setupl.py
 include *.rst
 include doc/*
