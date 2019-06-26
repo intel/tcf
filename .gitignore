@@ -14,3 +14,4 @@ _doc/
 tags
 ttbd/ttbl/version.py
 *.swp
+report-*.txt
