@@ -498,6 +498,7 @@ def request_response_maybe_raise(response):
         e = requests.HTTPError(
             "%d: %s" % (response.status_code, message))
         e.status_code = response.status_code
+        e.message = response.reason
         raise e
 
 def _os_path_split_full(path):
