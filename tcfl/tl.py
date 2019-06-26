@@ -13,7 +13,7 @@ import os
 import re
 
 import tcfl.tc
-import target_ext_shell
+from tcfl import target_ext_shell
 
 #! Place where the Zephyr tree is located
 # Note we default to empty string so it can be pased
