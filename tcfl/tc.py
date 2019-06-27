@@ -4448,7 +4448,7 @@ class tc_c(object, metaclass=_tc_mc):
                             _target.rt, force = False, ticket = self.ticket)
                     except requests.HTTPError as e:
                         # the script has released the target itself
-                        if 'tried to use non-acquired target' in e:
+                        if 'tried to use non-acquired target' in e.message:
                             pass
                     _target.report_info("released", dlevel = 5)
             else:

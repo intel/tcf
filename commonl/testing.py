@@ -25,6 +25,8 @@ import time
 
 import requests
 
+from typing import Pattern
+
 import commonl
 import tcfl.config
 import tcfl.tc
@@ -671,7 +673,7 @@ host = '127.0.0.1'
         line = line.strip()
         if self.error_regex.search(line):
             for exclude in self.errors_ignore:
-                if isinstance(exclude, re._pattern_type) \
+                if isinstance(exclude, Pattern) \
                    and exclude.search(line):
                     return
                 elif exclude in line:
@@ -681,7 +683,7 @@ host = '127.0.0.1'
                 { 'stdout': open(self.stdout), 'stderr': open(self.stderr) })
         if self.warning_regex.search(line):
             for exclude in self.warnings_ignore:
-                if isinstance(exclude, re._pattern_type) \
+                if isinstance(exclude, Pattern) \
                    and exclude.search(line):
                     return
                 elif exclude in line:

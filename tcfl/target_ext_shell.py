@@ -17,6 +17,8 @@ import collections
 import re
 import time
 
+from typing import Pattern
+
 from . import tc
 
 from . import msgid_c
@@ -41,11 +43,11 @@ shell_prompts = [
     # > makes ACRN match too
     r'[^:]+:.*[#\$>]',
     # Provisioning OS
-    r' [0-9] \$ ',
+    r' [0-9]+ \$ ',
 ]
 
 _shell_prompt_regex = \
-    re.compile('^\r?(' + "|".join(shell_prompts) + ')', re.MULTILINE)
+    re.compile('\r?(> )*(' + "|".join(shell_prompts) + ')', re.MULTILINE)
 
 class shell(tc.target_extension_c):
     """
@@ -164,10 +166,10 @@ class shell(tc.target_extension_c):
         """
         assert tempt == None or isinstance(tempt, str)
         assert user == None or isinstance(user, str)
-        assert isinstance(login_regex, ( str, re._pattern_type ))
+        assert isinstance(login_regex, ( str, Pattern ))
         assert delay_login >= 0
         assert password == None or isinstance(password, str)
-        assert isinstance(password_regex, ( str, re._pattern_type ))
+        assert isinstance(password_regex, ( str, Pattern ))
         assert isinstance(shell_setup, bool)
         assert timeout > 0
 
@@ -233,11 +235,11 @@ class shell(tc.target_extension_c):
             assert isinstance(cmd, str)
         assert expect == None \
             or isinstance(expect, str) \
-            or isinstance(expect, re._pattern_type) \
+            or isinstance(expect, Pattern) \
             or isinstance(expect, list)
         assert prompt_regex == None \
             or isinstance(prompt_regex, str) \
-            or isinstance(prompt_regex, re._pattern_type)
+            or isinstance(prompt_regex, Pattern)
 
         if output:
             offset = self.target.console.size()
@@ -248,7 +250,7 @@ class shell(tc.target_extension_c):
             if isinstance(expect, list):
                 for expectation in expect:
                     assert isinstance(expectation, str) \
-                        or isinstance(expectation, re._pattern_type)
+                        or isinstance(expectation, Pattern)
                     self.target.expect(expectation)
             else:
                 self.target.expect(expect)

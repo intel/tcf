@@ -32,6 +32,8 @@ import traceback
 import types
 import urllib.parse
 
+from typing import Pattern
+
 import __main__
 import requests
 import usb.core
@@ -608,7 +610,7 @@ class test_target(object):
                 if prop == name:
                     return True
                 continue
-            if isinstance(prop, re._pattern_type):
+            if isinstance(prop, Pattern):
                 if prop.match(name):
                     return True
                 continue
@@ -625,7 +627,7 @@ class test_target(object):
                 if prop == name:
                     return True
                 continue
-            if isinstance(prop, re._pattern_type):
+            if isinstance(prop, Pattern):
                 if prop.match(name):
                     return True
                 continue
@@ -1659,7 +1661,7 @@ class test_target_console_mixin(object):
                 for expectation in expectations:
                     if isinstance(expectation, str):
                         expectation = re.compile(re.escape(expectation))
-                    elif isinstance(expectation, re._pattern_type):
+                    elif isinstance(expectation, Pattern):
                         pass
                     elif expectation == self.EXPECT_TIMEOUT:
                         count += 1

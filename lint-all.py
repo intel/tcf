@@ -23,6 +23,8 @@ import sys
 import traceback
 import urllib.parse
 
+from typing import Pattern
+
 import git
 import github
 
@@ -204,7 +206,7 @@ def generic_line_linter(
     - *[EWCR]NUMBER*: pylint and co
     - *error*: yamlint...
 
-    :param re._pattern_type regex_error: compiled regular expression
+    :param Pattern regex_error: compiled regular expression
       to match the lines reporting errors that have to be reported; it
       must contain a group match *(?P<line_number>[0-9]+)* to extract
       the line number for.
@@ -212,7 +214,7 @@ def generic_line_linter(
       If a line is considered as an error, it won't be considered for
       a warning -- to simplify the pattern matching
 
-    :param re._pattern_type regex_warning: same thing, for warnings
+    :param Pattern regex_warning: same thing, for warnings
     """
     assert isinstance(_repo, git.Repo)
     assert isinstance(cf, changedfile_c)

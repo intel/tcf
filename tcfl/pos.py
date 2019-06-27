@@ -56,6 +56,7 @@ import operator
 import os
 import random
 import re
+import time
 import traceback
 
 import distutils.version
@@ -99,7 +100,10 @@ def image_list_from_rsync_output(output):
         tokens = line.split(None, 5)
         if len(tokens) != 5:
             continue
-        image = tokens[4].decode('UTF-8')
+        if isinstance(tokens[4], str):
+            image = tokens[4]
+        else:
+            image = tokens[4].decode('UTF-8')
         if not ':' in image:
             continue
         imagel.append(image_spec_to_tuple(image))
@@ -1047,6 +1051,15 @@ EOF""")
 
             # keep console more or less clean, so we can easily parse it
             target.shell.run("dmesg -l alert")
+
+            # Loop until the screen is clear, for particularly chatty systems
+            for attempt in range(30):
+                output = target.shell.run("echo {}".format(attempt),
+                        output=True, output_filter_crlf=True, trim=True)
+                if str(attempt) == output.strip():
+                    break
+                time.sleep(1)
+
             original_timeout = testcase.tls.expecter.timeout
             try:
                 testcase.tls.expecter.timeout = 800

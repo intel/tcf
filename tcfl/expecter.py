@@ -312,11 +312,11 @@ def console_mk_uid(target, what, console, _timeout, result):
     # Create a unique identifier for this evaluator, we'll use it to
     # save the offset at which we are reading
     huid = hashlib.sha256()		# No need for crypto strength
-    huid.update(target.fullid)
-    huid.update(what)
-    huid.update("%s" % console)
-    huid.update("%s" % _timeout)
-    huid.update("%s" % result)
+    huid.update(target.fullid.encode('UTF-8'))
+    huid.update(what.encode('UTF-8'))
+    huid.update("{}".format(console).encode('UTF-8'))
+    huid.update("{}".format(_timeout).encode('UTF-8'))
+    huid.update("{}".format(result).encode('UTF-8'))
     return huid.hexdigest()
 
 def console_rx_poller(expecter, target, console = None):
@@ -331,7 +331,7 @@ def console_rx_poller(expecter, target, console = None):
                           "console-%s:%s-%s.log" % (
                               commonl.file_name_make_safe(target.fullid),
                               target.kws['tc_hash'], console_id_name)),
-             "a+", 0))
+             "a+b", 0))
     ofd = of.fileno()
     expecter.buffers.setdefault(console_code + "-ts0", time.time())
 
@@ -466,7 +466,7 @@ def console_rx_eval(expecter, target,
                            % (what, target.fullid, console_id_name, offset,
                               stat_info.st_size, ts - expecter.ts0, of.name),
                            dlevel = 3)
-        m = regex.search(mapping[offset:])
+        m = regex.search(mapping[offset:].decode('UTF-8', 'ignore'))
         if m:
             new_offset = offset + m.end()
             expecter.buffers_persistent[uid] = new_offset

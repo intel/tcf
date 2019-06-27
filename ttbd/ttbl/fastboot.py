@@ -12,6 +12,8 @@ import json
 import re
 import subprocess
 
+from typing import Pattern
+
 import ttbl
 
 class interface(ttbl.tt_interface):
@@ -130,7 +132,7 @@ class interface(ttbl.tt_interface):
                             "expected for allowed argument"
                             % type(item).__name__)
                     assert isinstance(item[0],
-                                      ( str, re._pattern_type )), \
+                                      ( str, Pattern )), \
                         "allowed_commands: item #%d/%d[0]: first value must " \
                         "be a string or compiled regex, found a %s" \
                         % (count, count2, type(item).__name__)
@@ -140,7 +142,7 @@ class interface(ttbl.tt_interface):
                         % (count, count2, type(item).__name__)
                 else:
                     assert isinstance(item,
-                                      ( str, re._pattern_type )), \
+                                      ( str, Pattern )), \
                         "allowed_commands: item #%d/%d: values in list must " \
                         "be strings or compiled regexs, found a %s" \
                         % (count, count2, type(item).__name__)
@@ -168,7 +170,7 @@ class interface(ttbl.tt_interface):
     def _regex_make(arg):
         if isinstance(arg, str):
             return re.compile(re.escape(arg))
-        elif isinstance(arg, re._pattern_type):
+        elif isinstance(arg, Pattern):
             return arg
         raise ValueError("Bad type given (%s); str or re.compile() expected"
                          % type(arg).__name__)
@@ -263,12 +265,12 @@ class interface(ttbl.tt_interface):
                     value = param[0]
                     if isinstance(value, str):
                         _param_list.append(value)
-                    elif isinstance(value, re._pattern_type):
+                    elif isinstance(value, Pattern):
                         _param_list.append(value.pattern)
                     else:
                         assert(
                             "BUG: bad type %s in item #%d, expected "
-                            "str or re._pattern_type"
+                            "str or Pattern"
                             % (type(value).__name__, count))
                 else:
                     _param_list.append(param)
