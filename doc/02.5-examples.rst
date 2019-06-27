@@ -1,0 +1,29 @@
+========
+Examples
+========
+
+.. automodule:: examples.test_tagging
+.. automodule:: examples.test_deploy_files
+.. automodule:: examples.test_audio_capture
+
+Keywords that are available to this testcase while running on a target
+======================================================================
+
+Any of the keywords reported here can be used in a testcase script
+
+.. code:: python
+
+   class _test(tcfl.tc.tc_c):
+       ...
+       dev eval(self, target, target1):
+           ...
+           something = self.kws[KEYWORDZ]
+           ...
+           somethingelse = target.kws[KEYWORDY]
+           ...
+           andthis = target1.kws[KEYWORDZ]
+           ...
+
+.. automodule:: examples.test_dump_kws
+.. automodule:: examples.test_dump_kws_one_target
+.. automodule:: examples.test_dump_kws_two_targets
