@@ -1034,10 +1034,13 @@ EOF""")
             "ic must be an instance of tc.target_c, but found %s" \
             % type(ic).__name__
         assert isinstance(image, basestring)
-        if not pos_prompt:
-            pos_prompt = re.compile(r' [0-9]+ \$ ')
         target = self.target
         testcase = target.testcase
+        if not pos_prompt:
+            # soft prompt until we login and update it
+            _pos_prompt = re.compile(r' [0-9]+ \$ ')
+        else:
+            _pos_prompt = pos_prompt
         boot_dev = self._boot_dev_guess(boot_dev)
         with msgid_c("POS"):
 
@@ -1045,14 +1048,19 @@ EOF""")
             original_prompt = target.shell.shell_prompt_regex
             try:
                 # ensure we use the POS prompt
-                target.shell.shell_prompt_regex = pos_prompt
-                # 500s bc rsync takes a long time, but FIXME, we need
-                # to break this up and just increase timeout on the
-                # rsyncs
-                testcase.tls.expecter.timeout = 500
+                target.shell.shell_prompt_regex = _pos_prompt
 
-                self.boot_to_pos(pos_prompt = pos_prompt, timeout = timeout,
+                self.boot_to_pos(pos_prompt = _pos_prompt, timeout = timeout,
                                  boot_to_pos_fn = target_power_cycle_to_pos)
+                if not pos_prompt:
+                    # Adopt a harder to false positive prompt regex;
+                    # the TCF-HASHID is set by target.shell.up() after
+                    # we logged in; so if no prompt was specified, use
+                    # this.
+                    target.shell.shell_prompt_regex = \
+                        _pos_prompt = re.compile(r'TCF-%s: [0-9]+ \$ '
+                                                 % testcase.kws['tc_hash'])
+                    
                 testcase.targets_active()
                 kws = dict(
                     rsync_server = ic.kws['pos_rsync_server'],
@@ -1089,7 +1097,11 @@ EOF""")
                     "time -p rsync -cHaAX --numeric-ids --delete --inplace"
                     " --exclude=/persistent.tcf.d"
                     " --exclude='/persistent.tcf.d/*'"
-                    " %(rsync_server)s/%(image)s/. /mnt/." % kws)
+                    " %(rsync_server)s/%(image)s/. /mnt/." % kws,
+                    # 500s bc rsync takes a long time, but FIXME, we need
+                    # to break this up and just increase timeout on the
+                    # rsyncs -- and maybe guesstimate from the image size?
+                    timeout = 500)
                 target.report_info("POS: rsynced %(image)s from "
                                    "%(rsync_server)s to %(root_part_dev)s"
                                    % kws)
@@ -1116,15 +1128,12 @@ EOF""")
                     # maybe something, maybe nothing
                     boot_config_fn(target, boot_dev, image_final)
 
-                testcase.tls.expecter.timeout = timeout_sync
             except Exception as e:
                 target.report_info(
                     "BUG? exception %s: %s %s" %
                     (type(e).__name__, e, traceback.format_exc()))
                 raise
             finally:
-                target.shell.shell_prompt_regex = original_prompt
-                testcase.tls.expecter.timeout = original_timeout
                 # FIXME: document
                 # sync, kill any processes left over in /mnt, unmount it
                 # don't fail if this fails, as it'd trigger another exception
@@ -1137,6 +1146,8 @@ EOF""")
                     "cd /; "
                     "for device in %s; do umount -l $device || true; done"
                     % " ".join(reversed(target.pos.umount_list)))
+                target.shell.shell_prompt_regex = original_prompt
+                testcase.tls.expecter.timeout = original_timeout
 
             target.report_info("POS: deployed %(image)s" % kws)
             return kws['image']
