@@ -569,8 +569,6 @@ class extension(tc.target_extension_c):
             boot_to_pos_fn(target)
 
             # Sequence for TCF-live based on Fedora
-            if pos_prompt:
-                target.shell.shell_prompt_regex = pos_prompt
             try:
                 target.shell.up(timeout = bios_boot_time + timeout)
             except tc.error_e as e:
@@ -1034,6 +1032,8 @@ EOF""")
             "ic must be an instance of tc.target_c, but found %s" \
             % type(ic).__name__
         assert isinstance(image, basestring)
+        if not pos_prompt:
+            pos_prompt = re.compile(r' [0-9]+ \$ ')
         target = self.target
         testcase = target.testcase
         boot_dev = self._boot_dev_guess(boot_dev)
@@ -1052,7 +1052,10 @@ EOF""")
             # keep console more or less clean, so we can easily parse it
             target.shell.run("dmesg -l alert")
             original_timeout = testcase.tls.expecter.timeout
+            original_prompt = target.shell.shell_prompt_regex
             try:
+                # ensure we use the POS prompt
+                target.shell.shell_prompt_regex = pos_prompt
                 testcase.tls.expecter.timeout = 800
 
                 self._fsinfo_load()
@@ -1114,6 +1117,7 @@ EOF""")
                     (type(e).__name__, e, traceback.format_exc()))
                 raise
             finally:
+                target.shell.shell_prompt_regex = original_prompt
                 testcase.tls.expecter.timeout = original_timeout
                 # FIXME: document
                 # sync, kill any processes left over in /mnt, unmount it

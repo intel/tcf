@@ -10,6 +10,34 @@ Run commands a shell available on a target's serial console
 -----------------------------------------------------------
 
 Also allows basic file transmission over serial line.
+
+Shell prompts
+^^^^^^^^^^^^^
+
+Waiting for a shell prompt is quite a harder problem that it seems to
+be at the beginning.
+
+Problems:
+
+- Background processes or (in the serial console, the kernel) printing
+  lines in the middle.
+
+  Even with line buffered output, when there are different CRLF
+  conventions, a misplaced newline or carriage return can break havoc.
+
+  As well, if a background process / kernel prints a message after the
+  prompt is printed, a ``$`` will no longer match. The ``\Z`` regex
+  operator cannot be used for the same reason.
+
+- CRLF conventions make it harder to use the ``^`` and ``$`` regex
+  expression metacharacteds.
+
+- ANSI sequences, human doesn't see/notice them, but to the computer /
+  regular expression they are 
+
+Thus, resorting to match a single line is the best bet; however, it is
+almost impossible to guarantee that it is the last one as the multiple
+formats of prompts could be matching other text.
 """
 
 import binascii
@@ -29,23 +57,26 @@ from . import msgid_c
 ansi_pattern =                r"[\x1b=;\[0-9A-Za-z]*"
 ansi_pattern_prompt = r"[-/\@_~: \x1b=;\[0-9A-Za-z]+"
 
+#: .. _waiting_shell_prompts::
+#:
+#:
+#: What is in a shell prompt?
+#:
 shell_prompts = [
-    # multicolor prompts (eggg. ANSI sequences)
-    # 'SOMETHING # ' or 'SOMETHING $ '
+    #: - multicolor prompts (eggg. ANSI sequences)
+    #:   'SOMETHING # ' or 'SOMETHING $ '
     ansi_pattern_prompt + " " + ansi_pattern + r"[#\$]" + ansi_pattern + " ",
-    # Fedora
+    #: - Fedora
     r'[^@]+@.*[#\$] ',
     # SLES; make sure there is no trailing space, otherwise it gets
     # confused with the ANSI colouring sequences that come between them
     # and the space.
     # > makes ACRN match too
     r'[^:]+:.*[#\$>]',
-    # Provisioning OS
-    r' [0-9] \$ ',
 ]
 
 _shell_prompt_regex = \
-    re.compile('^\r?(' + "|".join(shell_prompts) + ')', re.MULTILINE)
+    re.compile('(TCF-[0-9a-zA-Z]{4})?(' + "|".join(shell_prompts) + ')')
 
 class shell(tc.target_extension_c):
     """
@@ -213,6 +244,8 @@ class shell(tc.target_extension_c):
             self.target.testcase.tls.expecter.timeout = original_timeout
 
         if shell_setup:
+            # 
+            self.run('export PS1="TCF-%s:$PS1"' % target.kws['tc_hash'])
             # disable line editing for proper recording of command line
             # when running bash; otherwise the scrolling readline does
             # messes up the output
