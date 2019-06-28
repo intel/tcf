@@ -17,8 +17,9 @@ This allows to login via SSH, copy and rsync files around, etc.
    :language: python
    :pyobject: _test
 
-Execute with (where *IMAGE* is the name of a Linux OS image
-:ref:`installed in the server <pos_list_images>`)::
+Execute :download:`the testcase <../examples/test_ssh_in.py>`
+with (where *IMAGE* is the name of a Linux OS image :ref:`installed in
+the server <pos_list_images>`)::
 
   $ IMAGE=clear  tcf run -Dvvvt 'nwa or qu04a' tcf.git/examples/test_ssh_in.py
   INFO1/l79r	.../test_ssh_in.py#_test @zsqj-uwny: will run on target group 'ic=SERVER/nwa target=SERVER/qu04a:x86_64'

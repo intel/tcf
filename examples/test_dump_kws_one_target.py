@@ -5,8 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
-"""
-Testcase using one target
+"""Testcase using one target
 -------------------------
 
 Note the data offered for the target is a superse of the testcase's
@@ -16,7 +15,8 @@ augmented with all the target metadata exported by the server
    :language: python
    :pyobject: _test
 
-Execute with::
+Execute :download:`the testcase
+<../examples/test_dump_kws_one_target.py>` with::
 
   $ tcf run -vv /usr/share/tcf/examples/test_dump_kws_one_target.py
   INFO0/gcoyBwifr	/usr/share/tcf/examples/test_dump_kws_one_target.py#_test @localhost/qz31b-x86: Keywords for testcase:
@@ -59,6 +59,7 @@ Execute with::
 
 (depending on your installation method, location might be
 *~/.local/share/tcf/examples*)
+
 """
 import pprint
 import tcfl.tc

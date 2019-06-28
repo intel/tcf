@@ -26,7 +26,9 @@ are the same by using the MD5 sum.
    :language: python
    :pyobject: _test
 
-Execute with::
+Execute :download:`the testcase <../examples/test_deploy_files.py>`
+with (where *IMAGE* is the name of a Linux OS image :ref:`installed in
+the server <pos_list_images>`)::
 
   $ IMAGE=clear tcf run -v /usr/share/tcf/examples/test_deploy_files.py
   INFO1/ubio     .../test_deploy_files.py#_test @n6hi-da7e: will run on target group 'ic=server1/nwd target=server1/nuc-07d:x86_64'
