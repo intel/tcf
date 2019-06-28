@@ -5,6 +5,7 @@ Examples and HOWTOs
 Automation/testcase script examples
 ===================================
 
+.. automodule:: examples.test_yielding_results
 .. automodule:: examples.test_tagging
 .. automodule:: examples.test_deploy_files
 .. automodule:: examples.test_audio_capture
