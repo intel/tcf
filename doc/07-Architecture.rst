@@ -414,7 +414,8 @@ The most common setup is the target PXE-booting to the Provisioning OS
 but other variations are also possible.
 
 Provisioning OS is configured following the steps described in the
-:ref:`guide <pos_setup>`. Usage examples are described in FIXME.
+:ref:`guide <pos_setup>`. Usage examples are described in :ref:`the
+examples <examples_pos>` section.
 
 The client side module :mod:`tcfl.pos` provides the client side
 frontend to perform this features via the :class:`target.pos

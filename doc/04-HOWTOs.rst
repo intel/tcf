@@ -7,7 +7,37 @@ Automation/testcase script examples
 
 .. automodule:: examples.test_yielding_results
 .. automodule:: examples.test_tagging
+
+.. _examples_pos:
+                
+Deploying OS images and files to targets over the network
+---------------------------------------------------------
+
+TCF can do very fast :ref:`OS deployment <provisioning_os>` by
+rsyncing images over the network instead of just overwritting
+evertything:
+
+- for simple testcases that just need a target provisioned, use test
+  case templates :ref:`tc_pos_base <example_pos_base>`
+
+- to have more control over the target selection process, use template
+  :ref:`tc_pos0_base <example_pos0_base>`
+
+- to have full control over the deployment process or find more
+  details on how this process works in :ref:`here
+  <example_pos_deploy>`
+
+- to copy other content to the image after deploying the OS, see
+  :ref:`this example <example_test_deploy_files>`
+
+.. automodule:: examples.test_pos_base
+.. automodule:: examples.test_pos0_base
+.. automodule:: examples.test_pos_deploy
 .. automodule:: examples.test_deploy_files
+
+Capturing data, doing SSH
+-------------------------
+
 .. automodule:: examples.test_audio_capture
 .. automodule:: examples.test_ssh_in
 

@@ -1300,13 +1300,13 @@ class tc_pos0_base(tc.tc_c):
                 "or self.image_requested")
         self.image = target.pos.deploy_image(ic, self.image_requested,
                                              **self.deploy_image_args)
+        target.report_pass("deployed %s" % self.image)
 
     def start_50(self, ic, target):
         ic.power.on()
         # fire up the target, wait for a login prompt
         target.pos.boot_normal()
         target.shell.up(user = self.login_user, delay_login = self.delay_login)
-        target.report_pass("Deployed %s" % self.image)
 
     def teardown_50(self):
         tl.console_dump_on_failure(self)

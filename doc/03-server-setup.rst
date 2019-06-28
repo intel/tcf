@@ -746,7 +746,8 @@ Configuring Provisioning OS support
 
 POS allows for a method to provision/flash/image certain devices using
 a :mod:`Provisioning OS <tcfl.pos>` which is faster than imaging using
-standard OS installation procedures.
+standard OS installation procedures. See the :ref:`architectural
+refence <provisioning_os>`
 
 POS needs, depending on the setup:
 
@@ -778,8 +779,10 @@ POS needs, depending on the setup:
 
 Current known POS limitations:
 
-- Only UEFI PXE boot supported
+- Only UEFI PXE boot supported, others device specific
 - Single partitioning scheme supported
+
+Refer to :ref:`the examples <examples_pos>` section for usage.
 
 POS: Server setup
 ^^^^^^^^^^^^^^^^^

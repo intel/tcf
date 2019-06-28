@@ -5,7 +5,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
-"""Send a file during deployment to the target
+"""
+.. _example_test_deploy_files:
+
+Send a file during deployment to the target
 ===========================================
 
 Given a target that can be provisioned with :ref:`Provisioning OS
