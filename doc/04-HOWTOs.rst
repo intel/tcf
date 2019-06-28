@@ -2299,6 +2299,125 @@ FPM, fast package manager
 Platform firmware / BIOS update procedures
 ==========================================
 
+
+.. _fs2_serial_update:
+
+Updating the serial number and / or description of a FTDI serial device
+-----------------------------------------------------------------------
+
+These devices are used in multiple USB to serial dongles and embedded
+in a number of devices, for example:
+
+- Flyswatter JTAGs, which come all with the same serial number
+  (usually *FS20000*).
+
+- standalone dongles
+
+- MCU boards, embedded computers
+
+These usually come as USB vendor ID 0x0403, product ID starting with
+0x6NNN.
+  
+When there are multiple FTDI devices that have the same serial number,
+the system needs to be able to tell them apart, so we can flash a new
+serial number in them, which we usually make match the target name, or
+whatever is needed.
+
+.. warning:: this process should be done in a separate machine; if you
+             do it in a server with multiple of these devices
+             connected, the tool can't tell them apart and might flash
+             the wrong device.
+
+To flash a new serial number or descriptionusing ``ftdi_eeprom`` on
+your laptop (`Windows utility
+<https://www.ftdichip.com/Support/Utilities.htm#FT_PROG>`_)::
+
+  $ sudo dnf install -y libftdi-devel
+  $ cat > file.conf <<EOF
+  vendor_id=0x0403
+  product_id=0x6010
+  serial="NEWSERIALNUMBER"
+  use_serial=true
+  EOF
+
+Now plug the USB cable to your server or laptop, making sure it is the
+only one and run, as super user::
+
+  # ftdi_eeprom --flash-eeprom file.conf
+
+Reconnect it to have the system read the new serial number / description.
+
+Notes:
+
+ - if you have the unit you are re-flashing connected to a USB
+   power switching hub (like a YKush), make sure to power it on and to
+   power off any other device that has a 0x0403/6010 USB vendor ID /
+   product ID code, which you can find with::
+
+     $ lsusb.py  | grep 0403:6010
+       1-1.2.1      0403:6010 00  2.00  480MBit/s 0mA 2IFs (Acme Inc. Flyswatter2 Flyswatter2-galileo-04)
+
+ - make *NEWSERIALNUMBER* shorter if you receive this error
+   message::
+
+     FTDI eeprom generator v0.17(c) Intra2net AG and the libftdi developers <opensource@intra2net.com (opensource%40intra2net.com)>
+     FTDI read eeprom: 0
+     EEPROM size: 128
+     Sorry, the eeprom can only contain 128 bytes (100 bytes for your strings).
+     You need to short your string by: -1 bytes
+     FTDI close: 0
+
+ - For **Flyswatter2** devices, add::
+
+     product="Flyswatter2"
+
+   to the configuration file so the product name is set to
+   *Flyswatter2*, needed for OpenOCD to find the device.
+
+.. _cp210x_serial_update:
+
+Updating the serial number and / or description of a CP210x serial device
+-------------------------------------------------------------------------
+
+Some hardware use serial-to-USB converters based on the CP210x series
+by `Silicon Labs <http://www.silabs.com/>`_.
+
+If the serial number programed on it is not unique enough, it can be
+programmed with the tool ``cp120x-program``, available from
+http://cp210x-program.sourceforge.net/.
+
+Once installed:
+
+1. identify the device to operate with::
+
+     $ lsusb | grep -i CP210x
+     Bus 002 Device 085: ID 10c4:ea60 Cygnal Integrated Products, Inc. CP210x UART Bridge / myAVR mySmartUSB light
+
+   .. note:: your device might show differnt vendor or product ID and
+             strings, in such case, adjust your grepping.
+
+2. take the bus and device numbers (`002/085` in the example) and feed
+   it to the `cp219x-program` tool with the new serial number you
+   want::
+
+     # cp210x-program -m 002/085 -w --set-serial-number "NEWSERIALNUMBER"
+
+   it is always a good idea to set as new serial number the name of
+   the target it is going to be assigned to.
+
+3. Reconnect the device and verify the new serial number is set with
+   ``lsusb.py``::
+
+     $ lsusb.py -ciu
+     ...
+       2-2.4          10c4:ea60 00  1.10   12MBit/s 100mA 1IF  (Silicon Labs CP2102 USB to UART Bridge Controller esp32-39)
+         2-2.4:1.0      (IF) ff:00:00 2EPs (Vendor Specific Class) cp210x ttyUSB0
+     ..
+
+   in this case, we set *esp32-39* as new serial number, which is
+   displayed at the end of the line.
+
+
 .. _a101_fw_upgrade:
 
 Updating the firmware in an Arduino101 to factory settings
@@ -2535,120 +2654,3 @@ Updating the FPGA image in Synopsys EMSK boards
    OFF   ON   ARC_EM11D
    ON    ON   Reserved
    ===== ==== =============
-
-.. _fs2_serial_update:
-
-Updating the serial number and / or description of a FTDI serial device
------------------------------------------------------------------------
-
-These devices are used in multiple USB to serial dongles and embedded
-in a number of devices, for example:
-
-- Flyswatter JTAGs, which come all with the same serial number
-  (usually *FS20000*).
-
-- standalone dongles
-
-- MCU boards, embedded computers
-
-These usually come as USB vendor ID 0x0403, product ID starting with
-0x6NNN.
-  
-When there are multiple FTDI devices that have the same serial number,
-the system needs to be able to tell them apart, so we can flash a new
-serial number in them, which we usually make match the target name, or
-whatever is needed.
-
-.. warning:: this process should be done in a separate machine; if you
-             do it in a server with multiple of these devices
-             connected, the tool can't tell them apart and might flash
-             the wrong device.
-
-To flash a new serial number or descriptionusing ``ftdi_eeprom`` on
-your laptop (`Windows utility
-<https://www.ftdichip.com/Support/Utilities.htm#FT_PROG>`_)::
-
-  $ sudo dnf install -y libftdi-devel
-  $ cat > file.conf <<EOF
-  vendor_id=0x0403
-  product_id=0x6010
-  serial="NEWSERIALNUMBER"
-  use_serial=true
-  EOF
-
-Now plug the USB cable to your server or laptop, making sure it is the
-only one and run, as super user::
-
-  # ftdi_eeprom --flash-eeprom file.conf
-
-Reconnect it to have the system read the new serial number / description.
-
-Notes:
-
- - if you have the unit you are re-flashing connected to a USB
-   power switching hub (like a YKush), make sure to power it on and to
-   power off any other device that has a 0x0403/6010 USB vendor ID /
-   product ID code, which you can find with::
-
-     $ lsusb.py  | grep 0403:6010
-       1-1.2.1      0403:6010 00  2.00  480MBit/s 0mA 2IFs (Acme Inc. Flyswatter2 Flyswatter2-galileo-04)
-
- - make *NEWSERIALNUMBER* shorter if you receive this error
-   message::
-
-     FTDI eeprom generator v0.17(c) Intra2net AG and the libftdi developers <opensource@intra2net.com (opensource%40intra2net.com)>
-     FTDI read eeprom: 0
-     EEPROM size: 128
-     Sorry, the eeprom can only contain 128 bytes (100 bytes for your strings).
-     You need to short your string by: -1 bytes
-     FTDI close: 0
-
- - For **Flyswatter2** devices, add::
-
-     product="Flyswatter2"
-
-   to the configuration file so the product name is set to
-   *Flyswatter2*, needed for OpenOCD to find the device.
-
-.. _cp210x_serial_update:
-
-Updating the serial number and / or description of a CP210x serial device
--------------------------------------------------------------------------
-
-Some hardware use serial-to-USB converters based on the CP210x series
-by `Silicon Labs <http://www.silabs.com/>`_.
-
-If the serial number programed on it is not unique enough, it can be
-programmed with the tool ``cp120x-program``, available from
-http://cp210x-program.sourceforge.net/.
-
-Once installed:
-
-1. identify the device to operate with::
-
-     $ lsusb | grep -i CP210x
-     Bus 002 Device 085: ID 10c4:ea60 Cygnal Integrated Products, Inc. CP210x UART Bridge / myAVR mySmartUSB light
-
-   .. note:: your device might show differnt vendor or product ID and
-             strings, in such case, adjust your grepping.
-
-2. take the bus and device numbers (`002/085` in the example) and feed
-   it to the `cp219x-program` tool with the new serial number you
-   want::
-
-     # cp210x-program -m 002/085 -w --set-serial-number "NEWSERIALNUMBER"
-
-   it is always a good idea to set as new serial number the name of
-   the target it is going to be assigned to.
-
-3. Reconnect the device and verify the new serial number is set with
-   ``lsusb.py``::
-
-     $ lsusb.py -ciu
-     ...
-       2-2.4          10c4:ea60 00  1.10   12MBit/s 100mA 1IF  (Silicon Labs CP2102 USB to UART Bridge Controller esp32-39)
-         2-2.4:1.0      (IF) ff:00:00 2EPs (Vendor Specific Class) cp210x ttyUSB0
-     ..
-
-   in this case, we set *esp32-39* as new serial number, which is
-   displayed at the end of the line.
