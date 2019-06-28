@@ -10,10 +10,14 @@ Automation/testcase script examples
 .. automodule:: examples.test_audio_capture
 .. automodule:: examples.test_ssh_in
 
+.. _finding_testcase_metadata:
+
 Keywords that are available to this testcase while running on a target
 ----------------------------------------------------------------------
 
-Any of the keywords reported here can be used in a testcase script
+Any of the keywords reported here can be used in a testcase script, in
+multiple places of TCF configuration as Python templates with fields
+such as `%(tc_name)s` and in report templates.
 
 .. code:: python
 
@@ -82,9 +86,8 @@ As a user, you can always force release any of your own locks with
 
   $ tcf -t TICKETSTRING release TARGETNAME
 
-How do I keep a target(s) reserved and powered-on while I fuzz with
-them?
--------------------------------------------------------------------
+How do I keep a target(s) reserved and powered-on while I fuzz with them?
+-------------------------------------------------------------------------
 
 First make sure you are not blocking anyone::
 
@@ -120,6 +123,16 @@ Do not forget to kill the *while* process and release the targets when
 done, otherwise others won't be able to use them. If someone has left
 a target taken, it can be released following :ref:`these instructions
 <howto_release_target>`
+
+Some details:
+
+ - use *while tcf acquire* vs *while true; do tcf acquire* because
+   that way, if the server fails, connection drops (eg: you close your
+   laptop), then the process tops and won't restart unless you do it
+   manually.
+
+ - if you depend on the network, do not forget to also acquire the
+   network, otherwise it will be powered off and routing won't work.
   
 How can I debug a target?
 -------------------------
@@ -723,100 +736,6 @@ that take a *timeout* parameter that has to be less than
 - :func:`target.wait <tcfl.tc.target_c.wait>`
 - :func:`target.expect <tcfl.tc.target_c.expect>`
 
-.. _finding_testcase_metadata:
-
-Finding testcase's keywords / metadata available for templating
----------------------------------------------------------------
-
-Use the `test_dump_kws.py` script::
-
-  $ tcf run /usr/share/tcf/examples/test_dump_kws.py
-  INFO0/h3ydB	/usr/share/tcf/examples/test_dump_kws.py#_print_kws @localic-localtg: Keywords for testcase:
-  {'runid': '',
-   'srcdir': '../../../../../usr/share/tcf/examples',
-   'srcdir_abs': '/usr/share/tcf/examples',
-   'target_group_info': 'localic-localtg',
-   'target_group_name': 'localic-localtg',
-   'target_group_servers': '',
-   'target_group_targets': '',
-   'target_group_types': 'static',
-   'tc_hash': 'h3yd',
-   'tc_name': '/usr/share/tcf/examples/test_dump_kws.py#_print_kws',
-   'tc_name_short': '/usr/share/tcf/examples/test_dump_kws.py#_print_kws',
-   'tc_origin': '/usr/share/tcf/examples/test_dump_kws.py:12',
-   'thisfile': '/usr/share/tcf/examples/test_dump_kws.py',
-   'tmpdir': '/tmp/tcf.run-xRPr_j/h3yd',
-   'type': 'static'}
-  PASS0/	toplevel @local: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:00:00.318177) - passed
-
-These fields can be used in multiple places of TCF configuration
-Python templates with fields such as `%(tc_name)s`.
-
-If there was a target, the keywords extend to::
-
-
-  $ tcf run -y /usr/share/tcf/examples/test_dump_kws_one_target.py
-  INFO0/crfvByd1h	/usr/share/tcf/examples/test_dump_kws_one_target.py#_print_kws @localhost/qz37a-riscv32: Keywords for testcase:
-  ... < abbreviated, similar to above > ...
-  INFO0/crfvByd1h	/usr/share/tcf/examples/test_dump_kws_one_target.py#_print_kws @localhost/qz37a-riscv32: Keywords for target 0:
-  {u'board': u'qemu_riscv32',
-   'bsp': u'riscv32',
-   u'bsp_models': {u'riscv32': [u'riscv32']},
-   u'bsps': {u'riscv32': {u'board': u'qemu_riscv32',
-                          u'console': u'riscv32',
-                          u'kernelname': u'zephyr.elf',
-                          u'quark_se_stub': False,
-                          u'zephyr_board': u'qemu_riscv32',
-                          u'zephyr_kernelname': u'zephyr.elf'}},
-   u'console': u'riscv32',
-   u'consoles': [],
-   u'disabled': False,
-   'fullid': u'localhost/qz37a-riscv32',
-   u'id': u'qz37a-riscv32',
-   u'interconnects': {u'nwa': {u'ic_index': 37,
-                               u'ipv4_addr': u'192.168.97.37',
-                               u'ipv4_prefix_len': 24,
-                               u'ipv6_addr': u'fc00::61:25',
-                               u'ipv6_prefix_len': 112,
-                               u'mac_addr': u'02:61:00:00:00:25'}},
-   u'interfaces': [u'tt_power_control_mixin',
-                   u'test_target_images_mixin',
-                   u'test_target_console_mixin',
-                   u'tt_debug_mixin'],
-   u'interfaces_names': u'tt_power_control_mixin test_target_images_mixin test_target_console_mixin tt_debug_mixin',
-   u'kernelname': u'zephyr.elf',
-   u'localhost/qz37a-riscv32': True,
-   u'owner': '',
-   u'path': u'/var/run/ttbd-production/qz37a-riscv32',
-   u'powered': False,
-   u'quark_se_stub': False,
-   u'qz37a-riscv32': True,
-   'rtb': <tcfl.ttb_client.rest_target_broker object at 0x7f61687dc490>,
-   'runid': '',
-   'srcdir': '../../../../../usr/share/tcf/examples',
-   'srcdir_abs': '/usr/share/tcf/examples',
-   'target': u'localhostqz37a-riscv32',
-   'target_group_info': u'target=localhost/qz37a-riscv32:riscv32',
-   'target_group_name': 'pupv',
-   'target_group_servers': 'localhost',
-   'target_group_targets': u'localhost/qz37a-riscv32:riscv32',
-   'target_group_types': u'qemu-zephyr-riscv32',
-   'tc_hash': 'crfv',
-   'tc_name': '/usr/share/tcf/examples/test_dump_kws_one_target.py#_print_kws',
-   'tc_name_short': '/usr/share/tcf/examples/test_dump_kws_one_target.py#_print_kws',
-   'tc_origin': '/usr/share/tcf/examples/test_dump_kws_one_target.py:13',
-   'tg_hash': 'z5ao',
-   u'things': [],
-   'thisfile': '/usr/share/tcf/examples/test_dump_kws_one_target.py',
-   'tmpdir': '/tmp/tcf.run-JowSyh/crfv',
-   'type': u'qemu-zephyr-riscv32',
-   'url': u'https://localhost:5000/ttb-v1/targets/qz37a-riscv32',
-   u'zephyr_board': u'qemu_riscv32',
-   u'zephyr_kernelname': u'zephyr.elf'}
-  PASS0/	toplevel @local: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:00:00.314833) - passed
-
-note how the keywords for the first target are a superset of those for
-the testcase and will be only available when on target context.
 
 .. _report_always:
 
