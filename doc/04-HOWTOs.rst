@@ -27,12 +27,16 @@ evertything:
   details on how this process works in :ref:`here
   <example_pos_deploy>`
 
+- to deploy multiple targets at the same time, for client/server
+  tests, see :ref:`here <example_pos_deploy_2>`
+
 - to copy other content to the image after deploying the OS, see
   :ref:`this example <example_test_deploy_files>`
 
 .. automodule:: examples.test_pos_base
 .. automodule:: examples.test_pos0_base
 .. automodule:: examples.test_pos_deploy
+.. automodule:: examples.test_pos_deploy_2
 .. automodule:: examples.test_deploy_files
 
 Capturing data, doing SSH
