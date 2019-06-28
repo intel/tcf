@@ -7,6 +7,7 @@
 
    02-QUICKSTART
    doc/02-guides
+   doc/02.5-examples
    doc/03-server-setup
    doc/04-HOWTOs
    doc/05-RFAQs

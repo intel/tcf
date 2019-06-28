@@ -6,6 +6,7 @@ SPHINXOPTS    = -q -n
 SPHINXBUILD   = sphinx-build
 PAPER         =
 BUILDDIR      ?= build
+srcdir := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # Internal variables.
 PAPEROPT_a4     = -D latex_paper_size=a4
@@ -42,7 +43,7 @@ clean:
 	-rm -rf $(BUILDDIR)/*
 
 html:
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
+	$(SPHINXBUILD) -v -v -v -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 
 dirhtml:
 	$(SPHINXBUILD) -b dirhtml $(ALLSPHINXOPTS) $(BUILDDIR)/dirhtml
