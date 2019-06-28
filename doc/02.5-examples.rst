@@ -5,6 +5,7 @@ Examples
 .. automodule:: examples.test_tagging
 .. automodule:: examples.test_deploy_files
 .. automodule:: examples.test_audio_capture
+.. automodule:: examples.test_ssh_in
 
 Keywords that are available to this testcase while running on a target
 ======================================================================

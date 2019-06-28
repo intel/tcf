@@ -1399,7 +1399,8 @@ you can also get the output by adding ``output = True``:
                                      "3 packets transmitted, 3 received",
                                      output = True)
            ...
-                            
+
+.. _tunnels_linux_ssh:
 
 Linux targets: ssh login from a testcase / client
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
