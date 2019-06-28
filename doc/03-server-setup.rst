@@ -1491,6 +1491,8 @@ the POS image itself in the system as an initial smoke test, using
 FIXME: this will fail now because we don't have the right regex to
 catch tcf:live's root prompt (``[0-9]+ $``).
 
+.. _pos_list_images:
+
 List available images::
 
   $ tcf run /usr/share/tcf/examples/test_pos_list_images.py

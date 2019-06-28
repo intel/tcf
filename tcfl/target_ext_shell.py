@@ -57,7 +57,7 @@ from . import msgid_c
 ansi_pattern =                r"[\x1b=;\[0-9A-Za-z]*"
 ansi_pattern_prompt = r"[-/\@_~: \x1b=;\[0-9A-Za-z]+"
 
-#: .. _waiting_shell_prompts::
+#: .. _waiting_shell_prompts:
 #:
 #:
 #: What is in a shell prompt?

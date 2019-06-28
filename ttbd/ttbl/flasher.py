@@ -754,7 +754,7 @@ source [find board/snps_em_sk.cfg]
 
         :param str board_name: name of the board to use, to select
           proper configuration parameters. Needs to be declared in
-          :data:`ttbl.flasher.openocd_c._boards` [FIXME: link broken].
+          *ttbl.flasher.openocd_c._boards*.
 
         """
         flasher_c.__init__(self)

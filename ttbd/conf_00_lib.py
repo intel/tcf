@@ -2681,9 +2681,12 @@ class vlan_pci(ttbl.tt_power_control_impl):
     *FILENAME* must be a valid file name, with no directory
     components.
 
-    .. note:: Note this requires the property *tcpdump* being listed
-              in :data:`ttbl.test_target.user_properties` so normal
-              users.
+    .. note:: Note this requires the property *tcpdump* being
+              registered in the configuration with
+    
+              >>> ttbl.test_target.properties_user.add('tcpdump')
+
+              so normal users can set/unset it.
 
     Example configuration (see :ref:`naming networks <bp_naming_networks>`):
 
@@ -2817,7 +2820,7 @@ class vlan_pci(ttbl.tt_power_control_impl):
       bring the network up up and also turn on the network switch.
 
     - add the tag *vlan* to also be a member of an ethernet VLAN
-      network (requires also a *mac_addr*)::
+      network (requires also a *mac_addr*):
 
       .. code-block:: python
 

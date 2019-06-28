@@ -230,7 +230,7 @@ class tt_qemu(
         assert isinstance(qemu_cmdline, basestring)
         assert consoles == None or \
             all(isinstance(i, basestring) for i in consoles)
-        isinstance(qemu_cmdline, basestring)
+        assert isinstance(qemu_cmdline, basestring)
         assert _tags == None or isinstance(_tags, dict)
         if _tags == None:
             _tags = {}
@@ -240,7 +240,9 @@ class tt_qemu(
         ttbl.test_target_images_mixin.__init__(self)
         ttbl.test_target_console_mixin.__init__(self)
         ttbl.tt_debug_mixin.__init__(self)
+        #: Command line to launch QEMU
         self.qemu_cmdline = qemu_cmdline
+        #: Runtime additions to QEMU's command line
         self.qemu_cmdline_append = ""
         self.pidfile = None
         self.bsp = self.tags['bsp_models'].keys()[0]

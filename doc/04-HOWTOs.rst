@@ -2538,25 +2538,40 @@ Updating the FPGA image in Synopsys EMSK boards
 
 .. _fs2_serial_update:
 
-Updating the serial number and / or description of a FTDI / Flyswatter
-----------------------------------------------------------------------
+Updating the serial number and / or description of a FTDI serial device
+-----------------------------------------------------------------------
 
-FlySwatter2 come all with the same serial number (usually *FS20000*).
+These devices are used in multiple USB to serial dongles and embedded
+in a number of devices, for example:
 
-The system needs to be able to tell all the different FlySwatter2s
-apart; for that we update the serial to *TARGETNAME-fs2* (to simplify
-the configuration process).
+- Flyswatter JTAGs, which come all with the same serial number
+  (usually *FS20000*).
 
-Flash a new serial number or description on any FTDI based USB-to-TTY
-cable/adapter (like a Flyswatter2, Quark D2000 CRB, Quark C10000 CRB,
-etc) using ``ftdi_eeprom`` on your laptop (:ref:`Windows utility
-<https://www.ftdichip.com/Support/Utilities.htm#FT_PROG>`)::
+- standalone dongles
+
+- MCU boards, embedded computers
+
+These usually come as USB vendor ID 0x0403, product ID starting with
+0x6NNN.
+  
+When there are multiple FTDI devices that have the same serial number,
+the system needs to be able to tell them apart, so we can flash a new
+serial number in them, which we usually make match the target name, or
+whatever is needed.
+
+.. warning:: this process should be done in a separate machine; if you
+             do it in a server with multiple of these devices
+             connected, the tool can't tell them apart and might flash
+             the wrong device.
+
+To flash a new serial number or descriptionusing ``ftdi_eeprom`` on
+your laptop (`Windows utility
+<https://www.ftdichip.com/Support/Utilities.htm#FT_PROG>`_)::
 
   $ sudo dnf install -y libftdi-devel
   $ cat > file.conf <<EOF
   vendor_id=0x0403
   product_id=0x6010
-  product="Flyswatter2"
   serial="NEWSERIALNUMBER"
   use_serial=true
   EOF
@@ -2568,7 +2583,9 @@ only one and run, as super user::
 
 Reconnect it to have the system read the new serial number / description.
 
-.. note:: if you have the unit you are re-flashing connected to a USB
+Notes:
+
+ - if you have the unit you are re-flashing connected to a USB
    power switching hub (like a YKush), make sure to power it on and to
    power off any other device that has a 0x0403/6010 USB vendor ID /
    product ID code, which you can find with::
@@ -2576,9 +2593,7 @@ Reconnect it to have the system read the new serial number / description.
      $ lsusb.py  | grep 0403:6010
        1-1.2.1      0403:6010 00  2.00  480MBit/s 0mA 2IFs (Acme Inc. Flyswatter2 Flyswatter2-galileo-04)
 
-   it might be easier to do this process in a separate system.
-
-.. note:: make *NEWSERIALNUMBER* shorter if you receive this error
+ - make *NEWSERIALNUMBER* shorter if you receive this error
    message::
 
      FTDI eeprom generator v0.17(c) Intra2net AG and the libftdi developers <opensource@intra2net.com (opensource%40intra2net.com)>
@@ -2588,10 +2603,12 @@ Reconnect it to have the system read the new serial number / description.
      You need to short your string by: -1 bytes
      FTDI close: 0
 
-.. admonition:: Rationales
+ - For **Flyswatter2** devices, add::
 
-   The *product="Flyswatter2"* line is necessary so the default
-   OpenOCD configuration finds the device.
+     product="Flyswatter2"
+
+   to the configuration file so the product name is set to
+   *Flyswatter2*, needed for OpenOCD to find the device.
 
 .. _cp210x_serial_update:
 

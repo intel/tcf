@@ -355,8 +355,8 @@ Provisioning OS specific metadata
   >>>     'uefi_boot_manager_ipv4_regex': 'UEFI Network'
   >>> })
 
-  :func:`tcfl.pos_uefi.efibootmgr_setup` can use this if the defaults do
-  not work :func:`target.pos.deploy_image()
+  Function (tcfl.pos_uefi._efibootmgr_setup()* can use this if the
+  defaults do not work :func:`target.pos.deploy_image()
   <tcfl.pos.extension.deploy_image>` reports::
 
     Cannot find IPv4 boot entry, enable manually
