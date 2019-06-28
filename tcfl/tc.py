@@ -3497,12 +3497,8 @@ class tc_c(object, metaclass=_tc_mc):
                     "%s.%s(): not a valid method (missing 'self'?), "
                     "@classmethod or @staticmethod @%s"
                     % (cls.__name__, fname, tcfl.origin_get_object(fn)))
-        elif isinstance(fn, types.UnboundMethodType) == False:
-            _type = False
         else:
-            raise blocked_e(
-                "%s.%s() (%s): can't figure out function type"
-                % (cls.__name__, fname, tcfl.origin_get_object(fn)))
+            _type = False
 
         # Any arguments left MUST be names of targets that have been
         # declared with the @target decorator to the class
@@ -3942,7 +3938,7 @@ class tc_c(object, metaclass=_tc_mc):
             ex_trace = "trace"
         # Make the tag file-name approved -- FIXME: do this in logfiel_open
         if phase:
-            _phase = "-" + phase.translate(string.maketrans("/.", "__"))
+            _phase = "-" + phase.translate(str.maketrans("/.", "__"))
             phase += " "
         else:
             _phase = ""

@@ -346,7 +346,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
             ],
             stderr = subprocess.STDOUT,
             cwd = os.path.dirname(self.kws['thisfile'])
-        ).strip()
+        ).strip().decode('UTF-8')
 
         # later we'll need to change to the path where the .t is to
         # run bats on it (otherwise it seems to fail, FIXME: why?). So

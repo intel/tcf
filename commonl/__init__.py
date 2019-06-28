@@ -181,7 +181,7 @@ def logfile_open(tag, cls = None, delete = True, bufsize = 0,
     return tempfile.NamedTemporaryFile(
         prefix = os.path.basename(sys.argv[0]) + ":"
         + clstag + who + "-" + tag,
-        suffix = suffix, delete = delete, bufsize = bufsize, dir = directory)
+        suffix = suffix, delete = delete, buffering = bufsize, dir = directory)
 
 class _Action_increase_level(argparse.Action):
     def __init__(self, option_strings, dest, default = None, required = False,
