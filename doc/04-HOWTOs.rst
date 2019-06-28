@@ -46,8 +46,9 @@ Where is the TCF client configuration taken from?
 
 - *.tcf* (a subdirectory of the current working directory)
 - *~/.tcf*
-- */etc/tcf* (if installed globally)
-- *~/.local/etc/tcf* (if installed in user's home only)
+- *~/.local/etc/tcf* (if installed in user's home only with *python
+  setup.py install --user* or *pip install --user*)
+- */etc/tcf* (if installed globally, eg with a package manager)
 
 Configuration files are called *conf_WHATEVER.py* and imported in
 **alphabetical** order from each directory before proceeding to the
