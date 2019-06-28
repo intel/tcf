@@ -570,6 +570,8 @@ class extension(tc.target_extension_c):
 
             # Sequence for TCF-live based on Fedora
             try:
+                # POS prints this when it boots before login
+                target.expect("TCF test node")
                 target.shell.up(timeout = bios_boot_time + timeout)
             except tc.error_e as e:
                 outputf = e.attachments_get().get('console output', None)
@@ -1039,25 +1041,29 @@ EOF""")
         boot_dev = self._boot_dev_guess(boot_dev)
         with msgid_c("POS"):
 
-            self.boot_to_pos(pos_prompt = pos_prompt, timeout = timeout,
-                             boot_to_pos_fn = target_power_cycle_to_pos)
-            testcase.targets_active()
-            kws = dict(
-                rsync_server = ic.kws['pos_rsync_server'],
-                image = image,
-                boot_dev = boot_dev,
-            )
-            kws.update(target.kws)
-
-            # keep console more or less clean, so we can easily parse it
-            target.shell.run("dmesg -l alert")
             original_timeout = testcase.tls.expecter.timeout
             original_prompt = target.shell.shell_prompt_regex
             try:
                 # ensure we use the POS prompt
                 target.shell.shell_prompt_regex = pos_prompt
-                testcase.tls.expecter.timeout = 800
+                # 500s bc rsync takes a long time, but FIXME, we need
+                # to break this up and just increase timeout on the
+                # rsyncs
+                testcase.tls.expecter.timeout = 500
 
+                self.boot_to_pos(pos_prompt = pos_prompt, timeout = timeout,
+                                 boot_to_pos_fn = target_power_cycle_to_pos)
+                testcase.targets_active()
+                kws = dict(
+                    rsync_server = ic.kws['pos_rsync_server'],
+                    image = image,
+                    boot_dev = boot_dev,
+                )
+                kws.update(target.kws)
+
+
+                # keep console more or less clean, so we can easily parse it
+                target.shell.run("dmesg -l alert")
                 self._fsinfo_load()
 
                 # List the available images and decide if we have the
