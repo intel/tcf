@@ -264,7 +264,24 @@ class skip_e(exception):
     """
     pass
 
-#: list of valid results and translations in present and past tense
+#: List of valid results and translations in present and past tense
+#:
+#: - *pass*: the testcase has passed (raise :py:exc:`tcfl.tc.pass_e`)
+#:
+#: - *fail*: the testcase found a problem it **was** looking for, like an
+#:   assertion failure or inconsistency in the code being exercised (raise
+#:   :py:exc:`tcfl.tc.failed_e`)
+#:
+#: - *errr*: the testcase found a problem it **was not** looking for,
+#:   like a driver crash; raise :py:exc:`tcfl.tc.error_e`,
+#:
+#: - *blck*: the testcase has blocked due to an infrastructure issue
+#:   which forbids from telling if it passed, failed or errored (raise
+#:   :py:exc:`tcfl.tc.blocked_e`) 
+#:
+#: - *skip*: the testcase has detected a condition that deems it not
+#:   applicable and thus shall be skipped (raise
+#    :py:exc:`tcfl.tc.skipped_e`)
 valid_results = dict(
     PASS = ( 'pass', 'passed' ),
     ERRR = ( 'error', 'errored' ),
