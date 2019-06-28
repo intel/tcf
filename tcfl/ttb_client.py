@@ -168,6 +168,9 @@ class rest_target_broker(object):
             else:
                 logger.debug("%s: no state-file, will not load", file_name)
 
+    def __str__(self):
+        return self.parsed_url.geturl()
+
     @classmethod
     def _rt_list_to_dict(cls, rt_list):
         rts = {}
@@ -739,6 +742,16 @@ def rest_logout(args):
         if rtb.valid_session:
             rtb.logout()
 
+def _dict_print_dotted(d, _prefix = ""):
+    for key, val in sorted(d.items(), key = lambda i: i[0]):
+        prefix = _prefix + key
+        if isinstance(val, dict):
+            _dict_print_dotted(val, prefix + ".")
+        elif isinstance(val, list):
+            print prefix + ": [ " + ", ".join(str(i) for i in val) + " ]"
+        else:
+            print prefix + ": " + str(val)
+
 def rest_target_print(rt, verbosity = 0):
     """
     Print information about a REST target taking into account the
@@ -766,19 +779,8 @@ def rest_target_print(rt, verbosity = 0):
             owner = ""
         print "%s %s%s" % (rt['fullid'], owner, power)
     elif verbosity == 2:
-        print rt['url']
-        for key in sorted(rt.keys()):
-            val = rt[key]
-            if key == "url":
-                continue
-            elif key == "interfaces" or key == "consoles":
-                print "  %s: %s" % (key, ' '.join(sorted(val)))
-            elif key == "bsp_models":
-                print "  %s: %s" % (key, ' '.join(sorted(val.keys())))
-            elif isinstance(val, list) or isinstance(val, dict):
-                print "  %s: %s" % (key, pprint.pformat(val))
-            else:
-                print "  %s: %s" % (key, val)
+        print rt['fullid']
+        _dict_print_dotted(rt, "  ")
     elif verbosity == 3:
         pprint.pprint(rt)
     else:
