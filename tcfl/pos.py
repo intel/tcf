@@ -49,6 +49,7 @@ Note installation in the server side is needed, as described in
 :ref:`POS setup <pos_setup>`.
 """
 
+import collections
 import inspect
 import json
 import logging
@@ -770,7 +771,10 @@ EOF""")
             assert src != None, \
                 "no `src` parameter is given, `persistent_name` must " \
                 "then be specified"
-            persistent_name = os.path.basename(src)
+            # when we are not given a name, rsync will take the
+            # source's name; this allows it to override files of
+            # different types in the cache
+            persistent_name = "."
         if src != None:
             target.report_info(
                 "rsyncing %s to target's persistent area /mnt%s/%s"
@@ -778,7 +782,7 @@ EOF""")
             target.shcmd_local(
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
-                "time -p rsync -cHaAX --numeric-ids --delete"
+                "time -p rsync -cHaAX --force --numeric-ids --delete"
                 " --port %%(rsync_port)s "
                 " %s%s %%(rsync_server)s::rootfs/%s/%s"
                 % (src, path_append, persistent_dir, persistent_name))
@@ -1232,20 +1236,30 @@ def deploy_path(_ic, target, _kws, cache = True):
                            "*target.deploy_path_src is missing or None ",
                            dlevel = 2)
         return
-    target.report_info("rsyncing file %s -> target:%s"
-                       % (source_path, dst_path), dlevel = 1)
-    target.testcase._targets_active()
-    if cache:
-        # FIXME: do we need option_dlete here too? option_delete = True
-        target.pos.rsync(source_path, dst_path, path_append = "")
+
+    def _rsync_path(_source_path, dst_path):
+        target.report_info("rsyncing file %s -> target:%s"
+                           % (_source_path, dst_path), dlevel = 1)
+        target.testcase._targets_active()
+        if cache:
+            # FIXME: do we need option_dlete here too? option_delete = True
+            target.pos.rsync(_source_path, dst_path, path_append = "")
+        else:
+            target.pos.rsync_np(_source_path, dst_path, option_delete = True,
+                                path_append = "")
+        target.testcase._targets_active()
+        target.report_pass("rsynced file %s -> target:%s"
+                           % (_source_path, dst_path))
+
+    if isinstance(source_path, basestring):
+        _rsync_path(source_path, dst_path)
+    elif isinstance(source_path, collections.Iterable):
+        for _source_path in source_path:
+            _rsync_path(_source_path, dst_path)
     else:
-        target.pos.rsync_np(source_path, dst_path, option_delete = True,
-                            path_append = "")
-    target.testcase._targets_active()
-    target.report_pass("rsynced file %s -> target:%s"
-                       % (source_path, dst_path))
-
-
+        raise AssertionError(
+            "argument source_path needs to be a string or a "
+            "list of such, got a %s" % type(source_path).__name__)
 
 # FIXME: when tc.py's import hell is fixed, this shall move to tl.py?
 
