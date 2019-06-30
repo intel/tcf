@@ -1260,7 +1260,8 @@ class target_c(object):
         it will append a CRLF sequence at the end of the given
         string. As well, it will *flush* the receive pipe so that next
         time we :meth:`expect` something, it will be only for anything
-        received after we called this function.
+        received after we called this function (so we'll expect to see
+        even the sending of the command).
 
         :param str data: string of data to send
         :param str console: (optional) name of console over which to
