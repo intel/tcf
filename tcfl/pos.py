@@ -682,7 +682,8 @@ EOF""")
 
     def rsync(self, src = None, dst = None,
               persistent_name = None,
-              persistent_dir = '/persistent.tcf.d', path_append = "/."):
+              persistent_dir = '/persistent.tcf.d', path_append = "/.",
+              rsync_extra = ""):
         """
         rsync data from the local machine to a target
 
@@ -774,7 +775,7 @@ EOF""")
             # when we are not given a name, rsync will take the
             # source's name; this allows it to override files of
             # different types in the cache
-            persistent_name = "."
+            persistent_name = ""
         if src != None:
             target.report_info(
                 "rsyncing %s to target's persistent area /mnt%s/%s"
@@ -782,10 +783,11 @@ EOF""")
             target.shcmd_local(
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
-                "time -p rsync -cHaAX --force --numeric-ids --delete"
+                "time -p rsync -cHaAX %s --force --numeric-ids --delete"
                 " --port %%(rsync_port)s "
                 " %s%s %%(rsync_server)s::rootfs/%s/%s"
-                % (src, path_append, persistent_dir, persistent_name))
+                % (rsync_extra, src, path_append, persistent_dir,
+                   persistent_name))
         target.testcase._targets_active()
         if dst != None:
             # There is a final destination specified, so now, in the
@@ -797,11 +799,13 @@ EOF""")
             target.shell.run(
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
-                "time -p rsync -cHaAX --delete /mnt/%s/%s%s /mnt/%s"
-                % (persistent_dir, persistent_name, path_append, dst))
+                "time -p rsync -cHaAX %s --delete /mnt/%s/%s%s /mnt/%s"
+                % (rsync_extra, persistent_dir, persistent_name, path_append,
+                   dst))
 
 
-    def rsync_np(self, src, dst, option_delete = False, path_append = "/."):
+    def rsync_np(self, src, dst, option_delete = False, path_append = "/.",
+                 rsync_extra = "",):
         """rsync data from the local machine to a target
 
         The local machine is the machine executing the test script (where
@@ -862,11 +866,11 @@ EOF""")
         # don't be verbose, makes it too slow and timesout when
         # sending a lot of files
         cmdline = \
-            "time sudo rsync -cHaAX --numeric-ids %s" \
+            "time sudo rsync -cHaAX %s --numeric-ids %s" \
             " --inplace" \
             " --exclude=persistent.tcf.d --exclude='persistent.tcf.d/*'" \
             " --port %%(rsync_port)s %s%s %%(rsync_server)s::rootfs/%s%s" \
-            % (_delete, src, path_append, dst, path_append)
+            % (rsync_extra, _delete, src, path_append, dst, path_append)
         target.report_info(
             "POS: rsyncing %s to target's %s" % (src, dst), dlevel = -1,
             attachments = dict(cmdline = cmdline))
