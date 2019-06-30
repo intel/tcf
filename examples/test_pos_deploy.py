@@ -5,7 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
-""".. _example_pos_deploy:
+"""
+.. _example_pos_deploy:
 
 Deploy an OS image to a target
 ==============================
@@ -15,7 +16,7 @@ Given a target that can be provisioned with :ref:`Provisioning OS
 server <pos_list_images>`.
 
 - to copy other content to the image after deploying the OS, see
-  :ref:`this example <example_test_deploy_files>`
+  :ref:`this example <example_deploy_files>`
 
 This test will select two targets: a computer to provision and the
 network it is connected to; the deploying happens over the network

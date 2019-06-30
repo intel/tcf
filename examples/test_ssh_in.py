@@ -5,7 +5,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
-"""Enabling target's SSH server and executing an SSH command
+"""
+.. _example_ssh_in:
+
+Enabling target's SSH server and executing an SSH command
 ==========================================================
 
 Given a target that can be provisioned with :ref:`Provisioning OS

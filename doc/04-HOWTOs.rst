@@ -31,7 +31,7 @@ evertything:
   tests, see :ref:`here <example_pos_deploy_2>`
 
 - to copy other content to the image after deploying the OS, see
-  :ref:`this example <example_test_deploy_files>`
+  :ref:`this example <example_deploy_files>`
 
 .. automodule:: examples.test_pos_base
 .. automodule:: examples.test_pos0_base

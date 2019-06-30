@@ -5,22 +5,23 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
-"""
-.. _example_test_deploy_files:
+""".. _example_deploy_files:
 
-Send a file during deployment to the target
-===========================================
+Send a file or directory tree during deployment to the target
+=============================================================
 
 Given a target that can be provisioned with :ref:`Provisioning OS
-<pos_setup>`, send a file to it during the deployment phase.
+<pos_setup>`, send a directory tree to it during the deployment phase.
 
-This allows to send test content to the target right after flashing
-the OS, so once the target is rebooted into the provisioned OS, the
-test the content is there.
+This allows to copy one or more files, directories etc to the target,
+right after flashing the OS, so once the target is rebooted into the
+provisioned OS, it is there. Note that the content itself is cached in
+the target (in subdirectory */persistent.tcf.d*), so next time it is
+transferred it will be faster (with sizeable files).
 
-Note that the content itself is cached in the target (in a
-subdirectory of the root filesystem), so next time it is transferred
-it will be faster (with sizeable files).
+You can also send/receive files :class:`via SSH
+<tcfl.target_ext_ssh.ssh>` once the target is running (:ref:`example
+<example_ssh_in>`).
 
 This also demonstrates a method to test if a local and remote files
 are the same by using the MD5 sum.
@@ -67,14 +68,24 @@ class _test(tcfl.pos.tc_pos0_base):
     def deploy_00(self, target):
         # the format is still a wee bit pedestrian, we'll improve the
         # argument passing
-        target.deploy_path_src = self.kws['srcdir'] + "/data/beep.wav"
+        # This could be a single path not necessarily a list of them
+        target.deploy_path_src = [
+            # send a directory tree, the one containing this file
+            self.kws['srcdir'],
+            # send just a file, ../README.rst
+            os.path.join(self.kws['srcdir'], "..", "README.rst")
+        ]
+
+        # note ending this in / will create a new entry under /home/,
+        # otherwise it would overwrite /home
         target.deploy_path_dest = "/home/"
         self.deploy_image_args = dict(extra_deploy_fns = [
             tcfl.pos.deploy_path ])
 	
     def eval(self, target):
+        target.shell.run("ls -lR /home/examples")
         # verify the file exists and is the same
-        remote = target.shell.run("md5sum < /home/beep.wav",
+        remote = target.shell.run("md5sum < /home/examples/data/beep.wav",
                                   output = True, trim = True).strip()
         local = subprocess.check_output(
             "md5sum < %s" % self.kws['srcdir'] + "/data/beep.wav",
