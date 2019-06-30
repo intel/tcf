@@ -39,6 +39,7 @@ import traceback
 import commonl.expr_parser
 import tcfl
 import tc
+import tl
 import tc_zephyr_scl
 
 from . import msgid_c
@@ -283,13 +284,20 @@ class _harness_console_c(harness_c):	# pylint: disable = too-few-public-methods
 
     def _evaluate_ordered(self, testcase):
         target = testcase.targets['target']
+        count = 0
         for regex in self.regexs:
-            target.expect(regex)
+            target.expect(regex, name = "console harness #%d" % count,
+                          console = target.kws.get("console", None))
+            count += 1
 
     def _evaluate_unordered(self, testcase):
         target = testcase.targets['target']
+        count = 0
         for regex in self.regexs:
-            target.on_console_rx(regex)
+            testcase.expect_global_append(target.console.text(
+                regex, name = "harness console #%d" % count,
+                console = target.kws.get("console", None)))
+            count += 1
         testcase.expect()
 
     def evaluate(self, testcase):
@@ -1196,14 +1204,23 @@ class tc_zephyr_sanity_c(tc.tc_c):
             # timeout (eg: first expect passes, thr process is put to
             # sleep for a long time before the next expect can run and
             # decide it was a timeout, when it wasn't).
-            target.on_console_rx("RunID: %(runid)s:%(tg_hash)s" % target.kws,
-                                 console = target.kws.get("console", None))
-            target.on_console_rx(
+            console = target.kws.get("console", None)
+            # add success expectations in the right order, wait for them
+            self.expect_global_append(target.console.text(
                 re.compile("\*\*\*\*\* Booting Zephyr OS [^\*]*\*\*\*\*\*"),
-                console = target.kws.get("console", None))
-            target.on_console_rx("PROJECT EXECUTION SUCCESSFUL",
-                                 console = target.kws.get("console", None))
-            # And wait for them to happen
+                name = "Zephyr boot banner",
+                console = console
+            ))
+            self.expect_global_append(target.console.text(
+                "RunID: %(runid)s:%(tg_hash)s" % target.kws,
+                name = "testcase RunID tag",
+                console = console
+            ))
+            self.expect_global_append(target.console.text(
+                "PROJECT EXECUTION SUCCESSFUL",
+                name = "testcase successful",
+                console = console
+            ))
             self.expect()
 
     _data_parse_regexs = {}
@@ -1401,8 +1418,8 @@ class tc_zephyr_sanity_c(tc.tc_c):
         else:
             # The output has been captured already by the expecter's
             # polling loop, so tap it
-            outputf = open(target.console.capture_filename(
-                target.kws.get('console', None)))
+            outputf = target.console.text_capture_file(
+                target.kws.get('console', None))
             if not outputf:
                 return	# *shrug* no output to parse
         results = collections.defaultdict(dict)
@@ -1500,10 +1517,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
                 self._subtestcases_grok(target)
 
     def teardown(self):
-        if self.result_eval.summary().passed == 0:
-            return
-        for target in self.targets.values():
-            self._report_data_from_target(target)
+        tl.console_dump_on_failure(self)
 
     def clean(self):
         if not self.unit_test:

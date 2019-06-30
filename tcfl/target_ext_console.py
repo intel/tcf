@@ -233,28 +233,22 @@ class expect_text_on_console_c(tc.expectation_c):
           relative and absolute coordinates, e.g:
         """
         target = self.target
-
-        # see poll() above for why we ignore the poll buffers given by
-        # the expect system and take the global testcase buffers
-        context = self.poll_context()
-        with testcase.lock:
-            buffers_poll = testcase.buffers.get(context, None)
-        if buffers_poll == None:
+        of = target.console.text_capture_file(self.console)
+        if of == None:
             target.report_info('%s/%s: not detecting, no console data yet'
                                % (run_name, self.name))
             return None
-
-        # last time we looked we looked from search_offset
-        if context + 'search_offset' not in testcase.tls.buffers:
-            testcase.tls.buffers[context + 'search_offset'] = 0
-        search_offset = testcase.tls.buffers[context + 'search_offset']
-
-        # this is set if the filename is set
-        of = buffers_poll['of']
-        ofd = buffers_poll['ofd']
+        ofd = of.fileno()
         stat_info = os.fstat(ofd)
         if stat_info.st_size == 0:	# Nothing to read
             return None
+
+        context = self.poll_context()
+        # last time we looked and found, we updated the search_offset,
+        # so search from there on
+        if context + 'search_offset' not in testcase.tls.buffers:
+            testcase.tls.buffers[context + 'search_offset'] = 0
+        search_offset = testcase.tls.buffers[context + 'search_offset']
 
         # we mmap because we don't want to (a) read a lot of a huger
         # file line by line and (b) share file pointers -- we'll look
@@ -677,6 +671,19 @@ class entension(tc.target_extension_c):
         return os.path.relpath(
             self.target.testcase.report_file_prefix + "console.%s.txt"
             % _poll_context(self.target, console))
+
+    def text_capture_file(self, console = None):
+        """
+        Return a descriptor to the file where this console is being
+        capture to
+        """
+        # see poll() above for why we ignore the poll buffers given by
+        # the expect system and take the global testcase buffers
+        context = self.text_poll_context(console)
+        testcase = self.target.testcase
+        with testcase.lock:
+            buffers_poll = testcase.buffers.get(context, {})
+            return buffers_poll.get('of', None)
 
     def text_poll_context(self, console = None):
         """

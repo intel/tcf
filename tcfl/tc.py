@@ -5023,8 +5023,10 @@ class tc_c(object):
             # this will generate collaterals as needed
             for exp in exps:
                 try:
-                    exp.flush(self, run_name, buffers_poll[exp.poll_name],
-                              buffers[exp.name], results.get(exp.name, None))
+                    exp.flush(self, run_name,
+                              buffers_poll.get(exp.poll_name, {}),
+                              buffers.get(exp.name, {}),
+                              results.get(exp.name, {}))
                 except Exception as e:
                     result_c.report_from_exception(
                         self, e, dict(

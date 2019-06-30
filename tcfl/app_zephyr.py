@@ -412,19 +412,24 @@ CONFIG_BOOT_DELAY=0
                 "USAGE FAULT",
                 "Unknown Fatal Error",
             ]
-
-            target.on_console_rx(
+            testcase.expect_global_append(target.console.text(
                 re.compile("(" + "|".join(faults) + ")"),
-                console = console, timeout = False, result = "error")
+                name = "kernel fault watchdog",
+                console = console,
+                timeout = 0, poll_period = 1,
+                raise_on_found = tcfl.tc.error_e("kernel fault detected")))
         else:
             raise tcfl.tc.blocked_e(
                 "Unsupported value for tag 'ignore_faults' "
                 " @%s: only boolean True or False supported"
                 % ignore_faults_origin)
         if getattr(testcase, "sanity_check", False) == True:
-            target.on_console_rx("PROJECT EXECUTION FAILED",
-                                 console = console,
-                                 timeout = False, result = "fail")
+            testcase.expect_global_append(target.console.text(
+                "PROJECT EXECUTION FAILED",
+                name = "sanity check failure",
+                console = console,
+                timeout = 0, poll_period = 1,
+                raise_on_found = tcfl.tc.error_e("sanity check failed")))
 
     @staticmethod
     def clean(testcase, target, app_src):
