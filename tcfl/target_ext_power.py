@@ -83,9 +83,6 @@ class extension(tc.target_extension_c):
         assert component == None or isinstance(component, basestring)
         self.target.report_info("powering on", dlevel = 1)
         self.target.ttbd_iface_call("power", "on", component = component)
-        if component == None and hasattr(self.target, 'console'):
-            self.target.console._power_on_post()
-            self.target.testcase.tls.expecter.power_on_post(self.target)
         self.target.report_info("powered on")
 
     def cycle(self, wait = None, component = None):
@@ -101,9 +98,6 @@ class extension(tc.target_extension_c):
         self.target.report_info("power cycling", dlevel = 1)
         self.target.ttbd_iface_call("power", "cycle",
                                     component = component, wait = wait)
-        if component == None and hasattr(self.target, 'console'):
-            self.target.console._power_on_post()
-            self.target.testcase.tls.expecter.power_on_post(self.target)
         self.target.report_info("power cycled")
 
     def reset(self):
@@ -276,5 +270,3 @@ def _cmdline_setup(arg_subparser):
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target")
     ap.set_defaults(func = _cmdline_power_get)
-
-

@@ -35,6 +35,14 @@ import commonl
 import tc
 from . import msgid_c
 
+def _poll_context(target, console):
+    # we are polling from target with role TARGET.WANT_NAME from
+    # it's console CONSOLE, so this is our context, so anyone
+    # who will capture from that reuses the capture.
+    # Note we also use this for naming the collateral file
+    return '%s.%s.%s' % (target.want_name, target.id,
+                         console if console else "default")
+
 class expect_text_on_console_c(tc.expectation_c):
     """
     Object that expectes to find a string or regex in a target's
@@ -92,12 +100,7 @@ class expect_text_on_console_c(tc.expectation_c):
     max_size = 65536
         
     def poll_context(self):
-        # we are polling from target with role TARGET.WANT_NAME from
-        # it's console CONSOLE, so this is our context, so anyone
-        # who will capture from that reuses the capture.
-        # Note we also use this for naming the collateral file
-        return '%s.%s.%s' % (self.target.want_name, self.target.id,
-                             self.console_name)
+        return _poll_context(self.target, self.console)
 
     def _poll_init(self, testcase, run_name, buffers_poll):
         # NOTE: this is called with target.lock held
@@ -116,8 +119,8 @@ class expect_text_on_console_c(tc.expectation_c):
         # target's console--see poll() for how we get there.
         #
         # so then, remove the existing collateral file, register it
-        filename = os.path.relpath(testcase.report_file_prefix \
-                                   + "console.%s.txt" % self.poll_context())
+        filename = target.console.capture_filename(console = self.console)
+
         with testcase.lock:
             testcase.collateral.add(filename)
         # rename any existing file, we are starting from scratch
@@ -184,10 +187,11 @@ class expect_text_on_console_c(tc.expectation_c):
             os.fsync(ofd)
             buffers_poll['read_offset'] = read_offset + total_bytes
             target.report_info(
-                "%s/%s: read from console %s:%s @%d %dB on %.2fs (%.2fs) to %s"
+                "%s/%s: read from console %s:%s @%d %dB (total %dB) "
+                "on %.2fs (%.2fs) to %s"
                 % (run_name, self.name, target.fullid, self.console_name,
-                   read_offset, total_bytes, ts_end, ts_end - ts_start,
-                   of.name),
+                   read_offset, total_bytes, read_offset + total_bytes,
+                   ts_end, ts_end - ts_start, of.name),
                 dlevel = 4)
 
         except requests.exceptions.HTTPError as e:
@@ -213,7 +217,8 @@ class expect_text_on_console_c(tc.expectation_c):
 
         with testcase.lock:
             context = self.poll_context()
-            testcase.buffers.setdefault(context, dict())
+            if context not in testcase.buffers:
+                testcase.buffers[context] = dict()
             buffers_poll = testcase.buffers[context]
 
         target = self.target
@@ -240,7 +245,8 @@ class expect_text_on_console_c(tc.expectation_c):
             return None
 
         # last time we looked we looked from search_offset
-        testcase.tls.buffers.setdefault(context + 'search_offset', 0)
+        if context + 'search_offset' not in testcase.tls.buffers:
+            testcase.tls.buffers[context + 'search_offset'] = 0
         search_offset = testcase.tls.buffers[context + 'search_offset']
 
         # this is set if the filename is set
@@ -264,8 +270,9 @@ class expect_text_on_console_c(tc.expectation_c):
                                   of.name), dlevel = 4)
             match = self.regex.search(mapping[search_offset:])
             if match:
-                output = mapping[search_offset
-                                 : search_offset + match.end()]
+                output = unicode(mapping[search_offset
+                                         : search_offset + match.end()],
+                                 encoding = 'utf-8', errors = 'replace')
                 testcase.tls.buffers[context + 'search_offset'] = \
                     search_offset + match.end()
                 # take care of printing a meaningful message here, as
@@ -663,10 +670,31 @@ class entension(tc.target_extension_c):
     def list(self):
         return self.target.rt.get('consoles', [])
 
-    def expect_text(self, *args, **kwargs):
+    def capture_filename(self, console = None):
+        """
+        Return the name of the file where this console is being captured to
+        """
+        return os.path.relpath(
+            self.target.testcase.report_file_prefix + "console.%s.txt"
+            % _poll_context(self.target, console))
+
+    def text_poll_context(self, console = None):
+        """
+        Return the polling context that will be associated with a
+        target's console.
+
+        :param str console: (optional) console name or take default
+        """
+        return _poll_context(self.target, console)
+
+    def text(self, *args, **kwargs):
         """
         Return an object to expect a string or regex in this target's
-        console.
+        console. This can be fed to :meth:`tcfl.tc.tc_c.expect`:
+
+        >>> self.expect(
+        >>>     target.console.text(re.compile("DONE.*$"), timeout = 30)
+        >>> )
 
         :param str text_or_regex: string to find; this can also be a
           regular expression.
@@ -676,7 +704,6 @@ class entension(tc.target_extension_c):
         (other parameters are the same as described in
         :class:`tcfl.tc.expectation_c`.)
 
-        >>> target.console.expect_text(re.compile("DONE.*$"), timeout = 30)
         """
         return expect_text_on_console_c(*args, target = self.target, **kwargs)
 

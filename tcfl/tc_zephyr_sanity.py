@@ -37,7 +37,6 @@ import traceback
 
 # Needed so I can also import from tc to initialize -- ugly
 import commonl.expr_parser
-import expecter
 import tcfl
 import tc
 import tc_zephyr_scl
@@ -291,7 +290,7 @@ class _harness_console_c(harness_c):	# pylint: disable = too-few-public-methods
         target = testcase.targets['target']
         for regex in self.regexs:
             target.on_console_rx(regex)
-        testcase.tls.expecter.run()
+        testcase.expect()
 
     def evaluate(self, testcase):
         if self.repeat == 1:
@@ -865,7 +864,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
 
 
         if 'timeout' in tc_dict:
-            self.tls.expecter.timeout = int(tc_dict['timeout'])
+            self.tls.expect_timeout = int(tc_dict['timeout'])
 
         self.zephyr_filter = tc_dict.get("filter", None)
         self.zephyr_filter_origin = origin
@@ -1205,7 +1204,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
             target.on_console_rx("PROJECT EXECUTION SUCCESSFUL",
                                  console = target.kws.get("console", None))
             # And wait for them to happen
-            self.tls.expecter.run()
+            self.expect()
 
     _data_parse_regexs = {}
 
@@ -1321,14 +1320,10 @@ class tc_zephyr_sanity_c(tc.tc_c):
         if self.unit_test:
             f = codecs.open(self.unit_test_output, 'r', encoding = 'utf-8')
         else:
-            console_id = target.kws.get('console', None)
-            f_existing = self.tls.expecter.console_get_file(target, console_id)
-            # this gives a file descriptor whose pointer might be in
-            # any location, so we are going to reopen a new one to
-            # read from the start--because we don't want to modify the
-            # file pointer
-            if f_existing:
-                f = open(f_existing.name)
+            f = codecs.open(
+                target.console.capture_filename(target.kws.get('console', None)),
+                encoding = 'utf-8', errors = 'replace')
+
         main_triggered = set()
         triggered = set()
         # Note the triggers; each regex might depend on a trigger and
@@ -1400,19 +1395,14 @@ class tc_zephyr_sanity_c(tc.tc_c):
         # a separate subtestcase using the tcfl.tc_c.post_tc_append()
         # facility.
 
-        # The output has been captured already by the expecter's
-        # polling loop, but (FIXME) I don't really like much how we
-        # are using internal details on the buffers, we are kind of
-        # breaking inside the knowledge of expecter.console_*
-        # functions
         if self.unit_test:
             outputf = codecs.open(self.unit_test_output, 'r',
                                   encoding = 'utf-8')
         else:
-            console = target.kws.get('console', None)
-            _console_id_name, console_code = expecter.console_mk_code(
-                target, console)
-            outputf = self.tls.expecter.buffers.get(console_code, None)
+            # The output has been captured already by the expecter's
+            # polling loop, so tap it
+            outputf = open(target.console.capture_filename(
+                target.kws.get('console', None)))
             if not outputf:
                 return	# *shrug* no output to parse
         results = collections.defaultdict(dict)

@@ -184,7 +184,6 @@ import requests.exceptions
 import app
 import commonl
 import commonl.expr_parser
-import expecter
 import report
 import tcfl
 import ttb_client
@@ -297,6 +296,11 @@ valid_results = dict(
     BLCK = ( 'block', 'blocked' ),
     SKIP = ( 'skip', 'skipped' ),
 )
+
+
+class _simple_namespace:
+    def __init__(self, kw):
+        self.__dict__.update(kw)
 
 #
 # I dislike globals, but sometimes they are needed
@@ -1210,7 +1214,8 @@ class target_c(object):
            send the data (otherwise use the default one).
 
         Note this function is equivalent to
-        :meth:`tcfl.target_ext_console.extension.write`, which is the raw
+        :meth:`target.console.write
+        <tcfl.target_ext_console.console.write>`, which is the raw
         version of this function.
 
         However, this function works with the send/expect engine and
@@ -1224,7 +1229,7 @@ class target_c(object):
         # console_rx_eval function that will get it's offset
         # to be zero and thus it'll initialize to the offset from the
         # poller, which this _flush() call is resetting.
-        expecter.console_rx_flush(self.testcase.tls.expecter, self, console)
+        #FIXME: expecter.console_rx_flush(self.testcase.tls.expecter, self, console)
         # the console member is only present if the member extension has
         # been loaded for the target (determined at runtime), hence
         # pylint gets confused
@@ -1273,50 +1278,21 @@ class target_c(object):
         assert isinstance(data, basestring)
         if crlf == None:
             crlf = self._crlf
+        context = self.console.text_poll_context(console)
+        # If we are sending something, the next expect we want to
+        # start searching from the output of that something. So we set
+        # the output to the current size of the capture file so we
+        # start seaching only off what came next.
+        search_offset = 0
+        if context in self.testcase.buffers:
+            buffers_poll = self.testcase.buffers[context]
+            fd = buffers_poll.get('ofd', None)
+            if fd:
+                stat_info = os.fstat(fd)
+                search_offset = stat_info.st_size
+        self.testcase.tls.buffers[context + 'search_offset'] = search_offset
         self.console_tx(str(data) + crlf, console)
 
-
-    # FIXME: add console_rx_itr() to return an iterator over the read
-    # file that closes it on file delete
-    # http://stackoverflow.com/a/14798115
-
-    def console_rx_read(self, console = None, offset = 0):
-        """
-        Return the data that has been read for a console until now.
-
-        :param str console: (optional) name of console on which the
-           the data was received (otherwie use the default one).
-        :param int offset: (optional) offset into the recorded data
-           from which to read. If negative, it is offset from the last
-           data received.
-        """
-        console = self.console._console_get(console)
-        _, console_code = expecter.console_mk_code(self, console)
-        of = self.testcase.tls.expecter.buffers.get(console_code, None)
-        if of == None:
-            return None
-        with open(of.name) as f:
-            if offset < 0:
-                f.seek(-offset, 2)
-            else:
-                f.seek(offset)
-            return f.read()
-
-    def console_rx_size(self, console = None):
-        """
-        Return how many bytes have returned for a console
-
-        :param str console: (optional) name of console on which the
-           the data was received (otherwie use the default one).
-        """
-        console = self.console._console_get(console)
-        _, console_code = expecter.console_mk_code(self, console)
-        of = self.testcase.tls.expecter.buffers.get(console_code, None)
-        if of == None:
-            return 0
-        with open(of.name) as f:
-            stat_info = os.fstat(of.fileno())
-            return stat_info.st_size
 
     def on_console_rx(self, regex_or_str, timeout = None, console = None,
                       result = "pass"):
@@ -1372,14 +1348,29 @@ class target_c(object):
           testcase's expecter loop, *False* otherwise.
 
         """
-        # Won't be re-added if already there
-        added = self.testcase.tls.expecter.add(
-            False, expecter.console_rx_poller, (self, console),)
-        has_to_pass = True if result == "pass" else False
-        self.testcase.tls.expecter.add(has_to_pass, expecter.console_rx_eval,
-                                       (self, regex_or_str, console, timeout,
-                                        result))
-        return added
+        self.report_info("on_console_rx is deprecated, use expect_global_append")
+        if timeout == False:
+            timeout = 0
+        elif timeout == None:
+            timeout = self.testcase.tls.expecter.timeout
+
+        if result == "pass":
+            raise_on_found = None
+        elif result == "block":
+            raise_on_found = blocked_e
+        elif result == "error":
+            raise_on_found = error_e
+        elif result == "failed":
+            raise_on_found = failed_e
+        elif result == "skip":
+            raise_on_found = skip_e
+        else:
+            raise AssertionError("unknown result %s" % result)
+
+        self.testcase.expect_global_append(
+            self.console.text(regex_or_str, timeout = timeout,
+                              console = console,
+                              raise_on_found = raise_on_found))
 
     def wait(self, regex_or_str, timeout = None, console = None):
         """
@@ -1400,21 +1391,23 @@ class target_c(object):
         :returns: *True* if the output was received before the
           timeout, *False* otherwise.
         """
-        if timeout:
-            assert isinstance(timeout, int)
-        console = self.console._console_get(console)
+        if timeout == False:
+            timeout = 0
+        elif timeout == None:
+            timeout = self.testcase.tls.expect_timeout
+
+        class _timeout_e(failed_e):
+            pass
 
         try:
-            with self.on_console_rx_cm(regex_or_str, timeout = timeout,
-                                       console = console, result = "pass"):
-                # Run the expect loop
-                self.testcase.tls.expecter.run()
-        except pass_e:
+            self.expect(regex_or_str, timeout, console,
+                        raise_on_timeout = _timeout_e)
             return True
-        except error_e:
+        except _timeout_e:
             return False
 
-    def expect(self, regex_or_str, timeout = None, console = None):
+    def expect(self, regex_or_str, timeout = None, console = None,
+               name = None, raise_on_timeout = failed_e):
         """
         Wait for a particular regex/string to be received on a given
         console of this target before a given timeout.
@@ -1436,77 +1429,14 @@ class target_c(object):
           :py:exc:`tcfl.tc.error_e` if not received,
           any other runtime exception.
         """
-        if timeout:
-            assert isinstance(timeout, int)
+        if timeout == False:
+            timeout = 0
+        elif timeout == None:
+            timeout = self.testcase.tls.expect_timeout
 
-        try:
-            uid = "just_me" # There is only one target.expect()
-                            # running at a single time
-            with self.on_console_rx_cm(regex_or_str, timeout = timeout,
-                                       console = console, result = "pass",
-                                       uid = uid):
-                # Run the expect loop
-                self.testcase.tls.expecter.run()
-        except pass_e:
-            pass
-        finally:
-            if uid in self.testcase.tls.expecter.buffers_persistent:
-                del self.testcase.tls.expecter.buffers_persistent[uid]
-
-    @contextlib.contextmanager
-    def on_console_rx_cm(self, regex_or_str, timeout = None, console = None,
-                         result = "pass", uid = None):
-        """
-        When regex_or_str is received on the given console (default
-        console), execute the action given by result.
-
-        Context Manager version of :py:meth:`on_console_rx`.
-
-        :param regex_or_str: string or regular expression (compiled
-          with :py:func:`re.compile`.
-
-        :param result: what to do when that regex_or_str is found on
-          the given console:
-
-          - *pass*, raise :py:exc:`tcfl.tc.pass_e`
-          - *block*, raise :py:exc:`tcfl.tc.blocked_e`
-          - *failed*, raise :py:exc:`tcfl.tc.error_e`,
-          - *failed*, raise :py:exc:`tcfl.tc.failed_e`,
-          - *blocked*, raise :py:exc:`tcfl.tc.blocked_e`
-
-        :raises: :py:exc:`tcfl.tc.pass_e`,
-          :py:exc:`tcfl.tc.blocked_e`,
-          :py:exc:`tcfl.tc.error_e`,
-          :py:exc:`tcfl.tc.failed_e`,
-          :py:exc:`tcfl.tc.skip_e`).
-
-        :returns: Nothing
-        """
-        has_to_pass = True if result == "pass" else False
-        _tc = self.testcase
-        if isinstance(timeout, numbers.Number) \
-           and timeout > _tc.tls.expecter.timeout:
-            raise ValueError(
-                "Asked for a timeout of %s that is higher than the "
-                "testcase's timeout of %s; you can adjust the testcases's "
-                "global timeout with `self.tls.expecter.timeout = VALUE`"
-                % (timeout, _tc.tls.expecter.timeout))
-        added = False
-        try:
-            added = _tc.tls.expecter.add(False, expecter.console_rx_poller,
-                                         (self, console))
-            has_to_pass = True if result == "pass" else False
-            _tc.tls.expecter.add(has_to_pass, expecter.console_rx_eval,
-                                 (self, regex_or_str, console, timeout,
-                                  result, uid))
-            yield
-        finally:
-            _tc.tls.expecter.remove(expecter.console_rx_eval,
-                                    (self, regex_or_str, console, timeout,
-                                     result, uid))
-            if added:
-                _tc.tls.expecter.remove(expecter.console_rx_poller,
-                                        (self, console))
+        return self.testcase.expect(self.console.text(
+            regex_or_str, console = console, timeout = timeout, name = name,
+            raise_on_timeout = raise_on_timeout))
 
     def stub_app_add(self, bsp, _app, app_src, app_src_options = ""):
         """\
@@ -3089,9 +3019,8 @@ class tc_c(object):
         self._kw_set("thisfile", thisfile)
 
         #: Expect loop to wait for things to happen
-        self.tls.expecter = expecter.expecter_c(self._expecter_log, self,
-                                                poll_period = poll_period,
-                                                timeout = 60)
+        self.tls.expect_timeout = 60
+        # FIXME: alias self.tls.expecter.timeout for backwards compat
         # Ticket ID for this testcase / target group
         self.ticket = None
         # The group of targets where the TC is running
@@ -3290,7 +3219,7 @@ class tc_c(object):
         self._expectations_global = []
 
 
-    def __thread_init__(self, expecter_parent):
+    def __thread_init__(self, tls_parent):
         """
         When we run some methods of this object in a different thread,
         we need to initialize some parts first.
@@ -3301,9 +3230,8 @@ class tc_c(object):
         """
         self.tls.buffers = {}
         self.tls._expectations = []
-        self.tls.expecter = expecter.expecter_c(
-            self._expecter_log, self, poll_period = poll_period,
-            timeout = expecter_parent.timeout)
+        if tls_parent:
+            self.tls.expect_timeout = tls_parent.expect_timeout
 
     def is_static(self):
         """
@@ -4327,7 +4255,7 @@ class tc_c(object):
                    type(r).__name))
 
     def __method_trampoline_thread(self, msgid, fname, fn, _type, targets,
-                                   thread_init_args):
+                                   tls_parent):
         # runs a function and returns a tuple (result, exception
         # info). If there was no exception, [1] will be None;
         # otherwise it will contain the exception information so it
@@ -4335,13 +4263,9 @@ class tc_c(object):
         #
         # Because we are in the context of a newly initialized thread,
         # we need to initialize some things
-        if thread_init_args == None:
-            thread_init_args = {}
-        else:
-            assert isinstance(thread_init_args, dict)
         try:
             with msgid_c(parent = msgid, l = 2):
-                self.__thread_init__(**thread_init_args)
+                self.__thread_init__(tls_parent)
                 return (
                     self.__method_trampoline_call(fname, fn, _type, targets),
                     None)
@@ -4398,7 +4322,8 @@ class tc_c(object):
                 threads[fname] = thread_pool.apply_async(
                     self.__method_trampoline_thread,
                     (msgid_c(l = 2), fname, fn, _type, targets,
-                     dict(expecter_parent = self.tls.expecter)))
+                     _simple_namespace(self.tls.__dict__))
+                )
                 # so we can Ctrl-C right away--the system is designed
                 # to cleanup top bottom, with everything being
                 # expendable
@@ -4776,6 +4701,17 @@ class tc_c(object):
             % (exp, type(exp).__name__)
         self._expectations_global.append(exp)
 
+    def expect_global_remove(self, exp):
+        """
+        Remove an expectation from the testcase global expectation list
+
+        Refer to :meth:`expect` for more information
+        """
+        assert isinstance(exp, expectation_c), \
+            'argument %s is not an instance of expectation_c but %s' \
+            % (exp, type(exp).__name__)
+        self._expectations_global.remove(exp)
+
     def expect_tls_append(self, exp):
         """
         Append an expectation to the thread-specific expectation list
@@ -4786,6 +4722,17 @@ class tc_c(object):
             'argument %s is not an instance of expectation_c but %s' \
             % (exp, type(exp).__name__)
         self.tls._expectations.append(exp)
+
+    def expect_tl_remove(self, exp):
+        """
+        Remove an expectation from the testcase global expectation list
+
+        Refer to :meth:`expect` for more information
+        """
+        assert isinstance(exp, expectation_c), \
+            'argument %s is not an instance of expectation_c but %s' \
+            % (exp, type(exp).__name__)
+        self.tls._expectations.remove(exp)
 
     def expect(self, *exps_args, **exps_kws):
         """Wait for a list of things we expect to happen
@@ -4900,7 +4847,7 @@ class tc_c(object):
             timeout = exps_kws['timeout']
             del exps_kws['timeout']
         else:
-            timeout = 60 # FIXME: default
+            timeout = self.tls.expect_timeout
 
         with self.lock:
             run_name = '%02d' % self._expect_count
@@ -5154,10 +5101,6 @@ class tc_c(object):
         self.kws[kw] = value
         self.kws_origin.setdefault(kw, []).append(origin)
 
-
-    def _expecter_log(self, msg, **attachments):
-        # FIXME: move this to report to the target it is expecting from
-        self.report_info(msg, **attachments)
 
     def _components_fixup(self):
         # Based on tags called component/COMPONENTNAME define a tag
@@ -5995,18 +5938,6 @@ class tc_c(object):
     # and spawns on one thread per TC/targetgroup _run(), which calls
     # _run_on_target_group()
 
-    def _eval_prepare(self, cnt1, name):
-        # Make each run a fresh run
-        self.buffers.clear()
-        self.tls.expecter.buffers.clear()
-        self.tls.expecter.buffers_persistent.clear()
-        self.buffersdir = os.path.join(self.tmpdir,
-                                       "eval-buffers-%02d-%s" % (cnt1, name))
-        # Wipe the directory (if it exists, and recreate it fresh)
-        # --nothing interesting should be left over here anyway.
-        shutil.rmtree(self.buffersdir, True)
-        os.makedirs(self.buffersdir)
-
     def _do_the_eval(self):
         # on each eval repetition, we want self.result_eval to only
         # have the eval data for that repetition; for all the
@@ -6023,7 +5954,6 @@ class tc_c(object):
                 with msgid_c("E#%d" % (self.eval_count + 1), phase = 'eval'):
                     self.result_eval = result_c(0, 0, 0, 0, 0)
                     if self._eval_serial:
-                        self._eval_prepare(self.eval_count, 0)
                         retval = self._methods_call("setup")
                         self.result_eval += retval
                         if retval.errors or retval.failed or retval.blocked:
@@ -6038,7 +5968,6 @@ class tc_c(object):
                         self._methods_call("teardown")
                     for fname, fn, _type, args in self._test_serial:
                         self.result_eval = result_c(0, 0, 0, 0, 0)
-                        self._eval_prepare(self.eval_count, fname)
                         retval = self._methods_call("setup")
                         self.result_eval += retval
                         if retval.errors or retval.failed or retval.blocked:
@@ -6140,7 +6069,6 @@ class tc_c(object):
                 with self._targets_assign():
                     if not deploy_skip:
                         with msgid_c("D", phase = "deploy"):
-                            self._eval_prepare(0, "deploy")
                             retval = self._methods_call("deploy")
                         result += retval
                         # We don't report deploy as much as build/eval
@@ -6224,7 +6152,7 @@ class tc_c(object):
         else:
             self.ticket = self._ident
 
-    def _run(self, msgid, thread_init_args):
+    def _run(self, msgid, tls_parent):
         """
         High level executor for the five phases of the testcase
 
@@ -6235,7 +6163,7 @@ class tc_c(object):
         TLS.
         """
         try:
-            self.__thread_init__(**thread_init_args)
+            self.__thread_init__(tls_parent)
             result = result_c(0, 0, 0, 0, 0)
             self.mkticket()
             # temporary directory specialization for this TC
@@ -6315,7 +6243,7 @@ class tc_c(object):
             tc._methods_prepare()	# setup phase running methods
             # remember this returns a list, so we have to concatenate them
             results += tc._run(msgid_c.parent(),
-                               dict(expecter_parent = self.tls.expecter))
+                               _simple_namespace(self.tls.__dict__))
             del tc	# not needed any more
 
         # Undo the hack from before, as we might need these values to
@@ -6669,7 +6597,7 @@ class tc_c(object):
                     tc_for_tg._run,
                     (
                         msgid_c.current(),
-                        dict(expecter_parent = self.tls.expecter)
+                        _simple_namespace(self.tls.__dict__)
                     )
                 )
                 # so we can Ctrl-C easily; we don't care for the
