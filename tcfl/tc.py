@@ -3218,6 +3218,7 @@ class tc_c(object):
         # sequentially incremented everytime we call expect()
         self._expect_count = 0
         self._expectations_global = []
+        self._expectations_global_names = set()
 
 
     def __thread_init__(self, tls_parent):
@@ -4691,7 +4692,7 @@ class tc_c(object):
                    exp.poll_period, exp.poll_name), dlevel = 4)
             poll_period[exp.poll_name] = exp.poll_period
 
-    def expect_global_append(self, exp):
+    def expect_global_append(self, exp, skip_duplicate = False):
         """
         Append an expectation to the testcase global expectation list
 
@@ -4700,7 +4701,15 @@ class tc_c(object):
         assert isinstance(exp, expectation_c), \
             'argument %s is not an instance of expectation_c but %s' \
             % (exp, type(exp).__name__)
+        if exp.name in self._expectations_global_names:
+            if skip_duplicate:
+                return
+            else:
+                raise tcfl.tc.blocked(
+                    "expectation '%s' already exists in testcase "
+                    "global list" % exp.name)
         self._expectations_global.append(exp)
+        self._expectations_global_names.add(exp.name)
 
     def expect_global_remove(self, exp):
         """
@@ -4711,6 +4720,7 @@ class tc_c(object):
         assert isinstance(exp, expectation_c), \
             'argument %s is not an instance of expectation_c but %s' \
             % (exp, type(exp).__name__)
+        self._expectations_global_names.remove(exp.name)
         self._expectations_global.remove(exp)
 
     def expect_tls_append(self, exp):

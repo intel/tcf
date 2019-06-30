@@ -170,10 +170,13 @@ class shell(tc.target_extension_c):
         # See that '' in the middle, is so the catcher later doesn't
         # get tripped by the command we sent to set it up
         self.run("trap 'echo ERROR''-IN-SHELL' ERR")
-        testcase.expect_global_append(target.console.text(
-            "ERROR-IN-SHELL", name = "shell error",
-            timeout = 0, poll_period = 1,
-            raise_on_found = tc.error_e("error detected in shell")))
+        testcase.expect_global_append(
+            target.console.text(
+                "ERROR-IN-SHELL", name = "shell error",
+                timeout = 0, poll_period = 1,
+                raise_on_found = tc.error_e("error detected in shell")),
+            skip_duplicate = True
+        )
 
     def up(self, tempt = None,
            user = None, login_regex = re.compile('login:'), delay_login = 0,
