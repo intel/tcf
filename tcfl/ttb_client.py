@@ -755,9 +755,9 @@ def _dict_print_dotted(d, _prefix = ""):
         if isinstance(val, dict):
             _dict_print_dotted(val, prefix + ".")
         elif isinstance(val, list):
-            print prefix + ": [ " + ", ".join(str(i) for i in val) + " ]"
+            print(prefix + ": [ " + ", ".join(str(i) for i in val) + " ]")
         else:
-            print prefix + ": " + str(val)
+            print(prefix + ": " + str(val))
 
 def rest_target_print(rt, verbosity = 0):
     """
@@ -786,7 +786,7 @@ def rest_target_print(rt, verbosity = 0):
             owner = ""
         print("%s %s%s" % (rt['fullid'], owner, power))
     elif verbosity == 2:
-        print rt['fullid']
+        print(rt['fullid'])
         _dict_print_dotted(rt, "  ")
     elif verbosity == 3:
         pprint.pprint(rt)
