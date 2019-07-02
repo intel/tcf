@@ -1255,7 +1255,7 @@ def deploy_path(_ic, target, _kws, cache = True):
         target.report_pass("rsynced file %s -> target:%s"
                            % (_source_path, dst_path))
 
-    if isinstance(source_path, basestring):
+    if isinstance(source_path, str):
         _rsync_path(source_path, dst_path)
     elif isinstance(source_path, collections.Iterable):
         for _source_path in source_path:
