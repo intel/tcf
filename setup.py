@@ -20,6 +20,8 @@ import distutils.core
 import distutils.sysconfig
 import setuptools
 
+from setuptools import find_packages
+
 import setupl
 
 # Hook in the source distribution to generate tcfl.version with
@@ -61,10 +63,7 @@ This is the client and meta-testcase runner for the TCF test case framework.
     author = "Inaky Perez-Gonzalez",
     author_email = "inaky.perez-gonzalez@intel.com",
     license = "Apache-2.0",
-    packages = [
-        'commonl',
-        'tcfl',
-    ],
+    packages = find_packages(),
     scripts = [ "tcf" ],
     # This is needed so when data is to be installed, our
     # _install_data class is used.
