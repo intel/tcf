@@ -5,8 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
-"""
-Static testcases (no targets, run local)
+"""Static testcases (no targets, run local)
 ----------------------------------------
 
 Notice the test group values are slightly different between the
@@ -16,7 +15,7 @@ multiple targets, the single target or no targets (static) cases.
    :language: python
    :pyobject: _test
 
-Execute with::
+Execute :download:`the testcase <../examples/test_dump_kws.py>` with::
 
   $ tcf run -vv /usr/share/tcf/examples/test_dump_kws.py
   INFO0/vxmvB	/usr/share/tcf/examples/test_dump_kws.py#_test @localic-localtg: Keywords for testcase:
@@ -40,6 +39,7 @@ Execute with::
 
 (depending on your installation method, location might be
 *~/.local/share/tcf/examples*)
+
 """
 import pprint
 import tcfl.tc

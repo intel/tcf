@@ -38,6 +38,10 @@ Glossary
      servers of the same herd that are physically located in the same
      place and might be sharing physical infrastructure
      
+   static testcase
+
+     A :term:`test case` that doesn't run on remote targets but in the
+     local host where the test runner is executing.
 
    NUT
 

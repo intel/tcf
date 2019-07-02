@@ -1,6 +1,996 @@
-======
-HOWTOs
-======
+===================
+Examples and HOWTOs
+===================
+
+Automation/testcase script examples
+===================================
+
+.. automodule:: examples.test_yielding_results
+.. automodule:: examples.test_tagging
+
+.. _examples_pos:
+                
+Deploying OS images and files to targets over the network
+---------------------------------------------------------
+
+TCF can do very fast :ref:`OS deployment <provisioning_os>` by
+rsyncing images over the network instead of just overwritting
+evertything:
+
+- for simple testcases that just need a target provisioned, use test
+  case templates :ref:`tc_pos_base <example_pos_base>`
+
+- to have more control over the target selection process, use template
+  :ref:`tc_pos0_base <example_pos0_base>`
+
+- to have full control over the deployment process or find more
+  details on how this process works in :ref:`here
+  <example_pos_deploy>`
+
+- to deploy multiple targets at the same time, for client/server
+  tests, see :ref:`here <example_pos_deploy_2>`
+
+- to copy other content to the image after deploying the OS, see
+  :ref:`this example <example_deploy_files>`
+
+.. automodule:: examples.test_pos_base
+.. automodule:: examples.test_pos0_base
+.. automodule:: examples.test_pos_deploy
+.. automodule:: examples.test_pos_deploy_2
+.. automodule:: examples.test_deploy_files
+
+Capturing data, doing SSH
+-------------------------
+
+.. automodule:: examples.test_audio_capture
+.. automodule:: examples.test_ssh_in
+
+.. _finding_testcase_metadata:
+
+Keywords that are available to this testcase while running on a target
+----------------------------------------------------------------------
+
+Any of the keywords reported here can be used in a testcase script, in
+multiple places of TCF configuration as Python templates with fields
+such as `%(tc_name)s` and in report templates.
+
+.. code:: python
+
+   class _test(tcfl.tc.tc_c):
+       ...
+       dev eval(self, target, target1):
+           ...
+           something = self.kws[KEYWORDZ]
+           ...
+           somethingelse = target.kws[KEYWORDY]
+           ...
+           andthis = target1.kws[KEYWORDZ]
+           ...
+
+.. automodule:: examples.test_dump_kws
+.. automodule:: examples.test_dump_kws_one_target
+.. automodule:: examples.test_dump_kws_two_targets
+
+
+
+TCF client tricks
+=================
+
+.. _tcf_client_configuration:
+
+Where is the TCF client configuration taken from?
+-------------------------------------------------
+
+*tcf* reads configuration files from (in this order):
+
+- *.tcf* (a subdirectory of the current working directory)
+- *~/.tcf*
+- *~/.local/etc/tcf* (if installed in user's home only with *python
+  setup.py install --user* or *pip install --user*)
+- */etc/tcf* (if installed globally, eg with a package manager)
+
+Configuration files are called *conf_WHATEVER.py* and imported in
+**alphabetical** order from each directory before proceeding to the
+next one. They are written in plain Python code, so you can do
+anything, even extend TCF from them. The module :mod:`tcfl.config`
+provides access to functions to set TCF's configuration.
+
+You can add new paths to parse with ``--config-path`` and force
+specific files to be read with ``--config-file``. See *tcf --help*.
+
+.. _howto_release_target:
+
+How do I release a target I don't own?
+--------------------------------------
+
+Someone owns the target and they have gone home...::
+
+  $ tcf release -f TARGETNAME
+
+But this only works if you have admin permissions.
+
+The exception is if you have locked yourself the target with a
+*ticket* (used by *tcf run* and others so that the same user running
+different processes in parallel can still exclude itself from
+overusing a target). It will say something like::
+
+  requests.exceptions.HTTPError: 400: TARGETNAME: tried to use busy target (owned by 'MYUSERNAME:TICKETSTRING')
+
+As a user, you can always force release any of your own locks with
+`-f` or with `-t TICKETSTRING`::
+
+  $ tcf -t TICKETSTRING release TARGETNAME
+
+How do I keep a target(s) reserved and powered-on while I fuzz with them?
+-------------------------------------------------------------------------
+
+First make sure you are not blocking anyone::
+
+  $ while tcf acquire TARGET1 TARGET2 TARGET3...; do sleep 15s; done &
+  $ tcf_pid=$!
+
+this keeps acquiring the target every 10 seconds, which tells the
+server you are actively using it, so it won't release them nor power
+them off.
+
+When done::
+
+  $ kill $tcf_pid
+  $ tcf release TARGET1 TARGET2 TARGET3...
+
+You can *tcf run* without releasing them::
+
+  $ tcf -t " " run --no-release -vvt "TARGET1 or TARGET2 or TARGET3 ..." test_mytc.py
+
+Note the following:
+
+-  ``-t " "`` tells TCF to *use no ticket*, as we have made the reservation
+   with no ticket
+
+- ``--no-release`` tells TCF to not release the targets when done
+
+this way, once the test completes (let's say, with failure), we can
+log in via the serial console to do some debugging::
+
+  $ tcf console-write -i TARGET2
+
+Do not forget to kill the *while* process and release the targets when
+done, otherwise others won't be able to use them. If someone has left
+a target taken, it can be released following :ref:`these instructions
+<howto_release_target>`
+
+Some details:
+
+ - use *while tcf acquire* vs *while true; do tcf acquire* because
+   that way, if the server fails, connection drops (eg: you close your
+   laptop), then the process tops and won't restart unless you do it
+   manually.
+
+ - if you depend on the network, do not forget to also acquire the
+   network, otherwise it will be powered off and routing won't work.
+  
+How can I debug a target?
+-------------------------
+
+TCF provides for means to connect remote debuggers to targets that
+support them; if the target supports the
+:py:class:`ttbl.tt_debug_mixin` (which you can find with `tcf list -vv
+TARGETNAME | grep interfaces`).
+
+How it is done and what are the capabilities depends on the target,
+but in general, assuming you have a target with an image deployed::
+
+  $ tcf acquire TARGETNAME
+  $ tcf debug-start TARGETNAME
+  $ tcf power-on TARGETNAME
+  $ tcf debug-info TARGETNAME
+  GDB server: tcp:myhostname:3744 (when target is on; currently ON)
+
+at this point, the target is waiting for the debugger to connect
+before powering up, so start (in this case) GDB pointing it to the
+*elf* version of the image file uploaded and issue::
+
+  gdb> target remote tcp:myhostname:3744
+
+Some targets might support starting debugging after power up.
+
+Find more:
+
+- `tcf --help | grep debug-`
+
+- the :class:`debug extension API <tcfl.target_ext_debug.debug>` to
+  :class:`target objects <tcfl.tc.target_c>` for use inside Python testcases
+
+- the :class:`*ttbd*\'s Debug interface <ttbl.tt_debug_mixin>`
+
+Zephyr debugging with TCF run
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When using targets in a high usage environment, it is easier to use
+TCF run and a few switches:
+
+- Make sure the target is acquired for a max of 30min while you work with it::
+
+    $ for ((count = 0; count < 240; count++)); do tcf -t 1234 acquire TARGETNAME; sleep 15s; done &
+
+  be sure to kill this process when done, to free it for other people;
+  every 15s this re-acquires, as a way to tell the daemon you are
+  still using it, to not free it from you.
+
+  Note `-t 1234`; this says *use ticket 1234* to reserve this target;
+  we'll use it later.
+
+- Create a temporary directory::
+
+    $ mkdir tmp
+
+- Build and deploy::
+
+    $ tcf -t 1234 run -vvvv -E --tmpdir tmp -t TARGETNAME --no-release PATH-TO-TC
+
+  note the following:
+
+  - `-t 1234` says to use ticket 1234, as the one we used for the reservation
+
+  - `-E` tells it not to evaluate -- it will just build and deploy / flash
+
+  - `--no-release` says do not release the target when done (because
+    you want to do other stuff, like debug)
+
+  - In the case of Zephyr, the ELF file will be in
+    `tmp/1234/outdir-1234-SOMETHING/zephyr/zephyr.elf`, which you can
+    find with::
+
+      $ find tmp/1234/ -iname zephyr.elf
+      tmp/1234/outdir-1234-j38h-quark_d2000_crb/zephyr/zephyr.elf
+
+- Tell the target to start debugging::
+
+    $ tcf -t 1234 debug-start TARGETNAME
+
+- Now reset / power cycle it, so it goes fresh to start. Because we
+  told it to start debugging, it will start but stop the CPU until you
+  attach a debugger (only for OpenOCD targets or targets that support
+  debugging, anyway)::
+
+    $ tcf -t 1234 reset TARGETNAME
+    $ tcf -t 1234 debug-info TARGETNAME
+    OpenOCD telnet server: srrsotc03.iind.intel.com 20944
+    GDB server: x86: tcp:srrsotc03.iind.intel.com:20946
+    Debugging available as target is ON
+
+- Note we now can start the debugger; find it first::
+
+    $ find /opt/zephyr-sdk-0.9.5/ -iname \*gdb
+    ...
+    /opt/zephyr-sdk-0.9.5/sysroots/x86_64-pokysdk-linux/usr/bin/i586-zephyr-elf/i586-zephyr-elf-gdb
+    ...
+
+  run the debugger to the ELF file we found above::
+
+    $ /opt/zephyr-sdk-0.9.5/sysroots/x86_64-pokysdk-linux/usr/bin/i586-zephyr-elf/i586-zephyr-elf-gdb \
+        tmp/1234/outdir-1234-j38h-quark_d2000_crb/zephyr/zephyr.elf
+    ...
+    Reading symbols from tmp/1234/outdir-1234-j38h-quark_d2000_crb/zephyr/zephyr.elf...done.
+
+  tell the debugger to connect to the GDB server found by running
+  `debug-info` before::
+
+    (gdb) target remote tcp:srrsotc03.iind.intel.com:20946
+    Remote debugging using tcp:srrsotc03.iind.intel.com:20946
+    0x0000fff0 in ?? ()
+
+  Debug away!::
+
+    (gdb) b _main
+    Breakpoint 1 at 0x180f71: file /home/inaky/z/kernel.git/kernel/init.c, line 182.
+    (gdb) c
+    Continuing.
+    target running
+    redirect to PM, tapstatus=0x08302c1c
+    hit software breakpoint at 0x00180f71
+
+    Breakpoint 1, _main (unused1=0x0, unused2=0x0, unused3=unused3@entry=0x0) at /home/inaky/z/kernel.git/kernel/init.c:182
+    182	{
+    (gdb)
+    ...
+
+- on a separate terminal, you can:
+
+  - read the target's console output with::
+
+      $ tcf console-read --follow TARGETNAME
+
+  - issue CPU resets, halts, resumes or OpenOCD commands (for targets
+    that support it)::
+
+      $ tcf debug-reset TARGETNAME
+      $ tcf debug-halt TARGETNAME
+      $ tcf debug-resume TARGETNAME
+      $ tcf debug-openocd TARGETNAME OPENOCDCOMMAND
+
+Note that resetting or power-cycling the board will create a new GDB
+target with a different port, so you will have to reconnect that GDB
+wo the new target remote reported by *tcf debug-info*.
+
+.. _howto_pos_list_deploy:
+
+How can I quickly flash a Linux target
+--------------------------------------
+
+When your server and targets are configured for Provisisoning OS
+support (target exports the *pos_capable* tag in ``tcf list -vv
+TARGET``), you can quickly flash the target *target1A*, which is
+connected to network *nwA* with::
+
+  $ IMAGE=fedora::29 tcf run -vvvt 'nwA or target1A' /usr/share/tcf/examples/test_pos_deploy.py
+
+to find our which images your server has available
+
+.. _howto_pos_list_images:
+
+To find out available images::
+
+  $ tcf run /usr/share/tcf/examples/test_pos_list_images.py
+  server10/nwa clear:live:25550::x86_64
+  server10/nwa clear:live:25890::x86_64
+  server10/nwa fedora::29::x86_64
+  server10/nwa yocto:core-minimal:2.5.1::x86_64
+  PASS0/	toplevel @local: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:00:06.635452) - passed
+
+See how to :ref:`install more images <ttbd_pos_deploying_images>`.
+
+
+How can I quickly build and deploy an image to a Zephyr target?
+---------------------------------------------------------------
+
+You can use the boilerplate testcase :download:`test_zephyr_boots.py
+<../examples/test_zephyr_boots.py>`, which will build any Zephyr app
+and try to boot it and see if it prints the Zephyr boot banner::
+
+  $ ZEPHYR_APP=path/to/source tcf run -t TARGETNAME /usr/share/tcf/examples/test_zephyr_boots.py
+  $ tcf acquire TARGENAME
+  $ <work on it> ...
+
+TCF will build your code configuring it properly for the chosen target
+and deploy it. You want to inmediately acquire so it is not
+powered-off by the daemon.
+
+
+TCF's `run` says something failed, can I get more detail?
+---------------------------------------------------------
+
+FIXME: update
+
+TCF's ``run`` tries to be quiet to the console, so when you run a lot
+of tests on a lot of targets, the forest lets you see the trees.
+
+When you need more detail, you can:
+
+- add `-v`\s after ``run`` (but then it gives you detail everywhere)
+
+- log to a file with `--log-file=FILENAME` and when something fails,
+  grep for it::
+
+    FAIL0/kaoe ../Makefile[quark]@.../frankie: (dynamic) build failed
+    PASS1/tctp ../Makefile[x86]@.../mv-03: (dynamic) build passed
+
+  that build failed; take those four letters next to the ``FAIL0``
+  message (`kaoe`) -- that's a unique identifier for each message, and
+  look for it with `grep`, printing 30 lines of context before the match::
+
+    $ grep -B 100 kaoe FILENAME
+    ....
+    FAIL3/iigx ../Makefile[quark]@.../frankie: @build failed [2] ('make -j -C samples/hello_world/nanokernel BOARD=quark_se_sss_ctb  O=outdir-httpsSERVER5000ttb-v0targetsfrankie-quark_se_sss_ctb-quark_se_sss_ctb' from /home/inaky/z/kernel.git/samples/.tcdefaults:48)
+    FAIL3/iigx ../Makefile[quark]@.../frankie: output: FF make: Entering directory '/home/inaky/z/kernel.git/samples/hello_world/nanokernel'
+    FAIL3/iigx ../Makefile[quark]@.../frankie: output: FF make[1]: Entering directory '/home/inaky/z/kernel.git'
+    ...
+
+  most likely, the complete failure message will be right before the
+  final failure message -- and you can now tell what happened. In this
+  case, there is no good configuration for the chosen target
+
+  The output driver can be changed to lay out the information
+  diferently; look at :class:`tcfl.report.report_c`.
+
+Linux targets: Common tricks
+----------------------------
+
+.. _linux_c_c:
+
+Linux targets: sending Ctrl-C to a target
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Trick over the serial console is that it is a pure pipe, there is no
+special characters. So a quick way to do it is::
+
+  $ tcf console-write TARGETNAME $(echo -e \\x03)
+
+where that *\\x03* is the hex code of Ctrl-C. *man ascii* can tell you
+the quick shortcuts for others.
+
+.. _linux_send_command_target:
+
+Linux targets: running a Linux shell command
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Try::
+
+  $ tcf console-write TARGETNAME "ping -c 3 localhost"
+
+Note that once the command is sent, the console, for whatever the
+target cares, is still connected, even if the *console-write* command
+returned for you. The command might still be executing; see
+:ref:`Sending a Ctrl-C <linux_c_c>` is not as in a usual, synchronous,
+Linux console.
+
+From a script, you can use :func:`tcfl.tc.target_c.shell.run
+<tcfl.target_ext_shell.shell.run>` or :func:`tcfl.tc.target_c.send`:
+
+.. code-block:: python
+
+   ...
+   @tcfl.tc.target("linux")
+   class some_test(tcfl.tc.tc_c):
+
+       def eval_something(self, target):
+           ...
+           target.shell.send("ping localhost")
+           target.shell.expect("3 packets transmitted, 3 received")
+           ...
+           # better to use
+           ...
+           target.shell.run("ping -c 3 localhost",
+                            "3 packets transmitted, 3 received")
+
+you can also get the output by adding ``output = True``:
+  
+.. code-block:: python
+
+           ...
+           output = target.shell.run("ping -c 3 localhost",
+                                     "3 packets transmitted, 3 received",
+                                     output = True)
+           ...
+
+.. _tunnels_linux_ssh:
+
+Linux targets: ssh login from a testcase / client
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The :term:`ttbd` server can create tunnels that allow you to reach the
+target's ports, assuming the target is
+
+- connected to a network to which the server is also connected
+- on and listening on a port
+
+In your test scripts, use the :class:`tunnel
+<tcfl.target_ext_tunnel.tunnel>` extension to create a port
+redirection, adding to your script:
+
+.. code-block:: python
+
+   ...
+   @tcfl.tc.interconnect("ipv4_addr")
+   @tcfl.tc.target(...)
+   class some_test(tcfl.tc.tc_c):
+
+       def eval_something(self, ic, target):
+           ...
+           # ensure target and interconnect is powered up and the
+           # script is logged in.
+           # Indicate to the tunnel system the target's address in the
+           # interconnect
+           target.tunnel.ip_addr = target.addr_get(ic, "ipv4")
+
+           # create a tunnel from server_name:server_port -> to target:22
+           server_name = target.rtb.parsed_url.hostname
+           server_port = target.tunnel.add(22)
+
+           # use SSH to get the content's of the target's /etc/passwd
+           output = subprocess.check_output(
+                        "ssh -p %d root@%s cat /etc/passwd"
+                        % (server_port, server_name),
+                        shell = True)
+
+Tunnels can also be created with the command line::
+
+  $ tcf tunnel-add TARGETNAME 22 tcp TARGETADDR
+  SERVERNAME:19893
+  $ ssh -p 19893 SERVERNAME cat /etc/passwd
+  root:x:0:0:root:/root:/bin/bash
+  bin:x:1:1:bin:/bin:/sbin/nologin
+  daemon:x:2:2:daemon:/sbin:/sbin/nologin
+  adm:x:3:4:adm:/var/adm:/sbin/nologin
+  ...
+
+Note you might need first the steps in the next section to allow SSH
+to login with a passwordless root.
+
+.. _target_pos_manually:
+
+How do I boot a target to PXE boot mode manually?
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A target can be told to boot to PXE Provisioning OS by issuing the
+following commands::
+
+  $ while tcf acquire NETWORKNAME TARGETNAME; do sleep 10s; done &
+  $ tcf power-on NETWORKNAME
+  $ tcf property-set TARGETNAME pos_mode pxe
+  $ tcf power-cycle TARGETNAME
+
+.. FIXME: make an entry explaining well the while loop thing
+
+The *while* loop in the background keeps the target acquired, do not
+forget to release them by killing it. Then we ensure the network is on
+and finally, we set the target to *POS mode* PXE and we power cycle
+the target.
+
+To have it boot back in local mode::
+
+  $ tcf property-set TARGETNAME pos_mode
+  $ tcf power-cycle TARGETNAME
+
+.. _pos_boot_http_tftp:
+
+POS: booting from HTTP or TFTP
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When a target is given a syslinux configuration file to boot from, the
+places where it loads the Provisioning OS kernels can be forced with
+:ref:`pos_http_url_prefix <pos_http_url_prefix>`.
+
+By default (no prefix) the boot loader will tend to load with
+TFTP. But by specifying an HTTP or FTP URL prefix, it can boot over
+any of those protocols (which can be faster).
+
+When specified in an interconnect's tags, it will be taken as default
+for that interconnect, but this can be overriden specifying it for
+each target; for the example in :ref:`POS: Configuring networks
+<ttbd_pos_network_config>`, we can add::
+
+  pos_http_url_prefix = "http://192.168.97.1/ttbd-pos/%(bsp)s/"
+
+This will replace in the syslinux configuration file any occurrence of
+``pos_http_url_prefix`` with
+``http://192.168.97.1/ttbd-pos/ARCHNAME/``, where ``ARCHNAME`` is the
+architecture of the target.
+
+.. _linux_target_pos_kernel_options:
+
+Linux targets: POS: setting default linux kernel options
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When a Linux target is botted using :term:`POS`, default kernel
+options can be fed to the POS scripts for bootloader consumption by
+setting the following tags or properties (all optional):
+
+- ``linux_serial_console_default``: sets which is the default serial
+  console. For */dev/NAME*, specify *NAME*, as this will be given as
+  the Linux kernel command line option *console=NAME,115200*
+
+- ``linux_options_append``: a space separated string with any other
+  Linux kernel command line options to add.
+
+For example, when adding the target:
+
+>>> ttbl.config.target_add(
+>>>     ...
+>>>     tags = {
+>>>         ...
+>>>         'linux_serial_console_default': 'ttyS2',
+>>>         'linux_options_append': 'rw foo=bar',
+>>>         ...
+>>>     })
+
+which can also be done once the target is added with
+:meth:`tags_update <ttbl.test_target.tags_update>`::
+
+>>> ttbl.config.targets['TARGETNAME'].tags_update({
+>>>         ...
+>>>         'linux_serial_console_default': 'ttyS2',
+>>>         'linux_options_append': 'rw foo=bar',
+>>>         ...
+>>>     })
+
+.. _tcf_testcase_proxy:
+
+Linux targets: using proxies
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:term:`NUT`\s to which targets are connected are usually setup very
+isolated from upstream or other networks; there is a common practice
+to declare a proxy availability in an interconnect by it exporting any
+of the following variables::
+
+  $ tcf list -vv nwb | grep -i proxy
+  ftp_proxy: http://192.168.98.1:911
+  http_proxy: http://192.168.98.1:911
+  https_proxy: http://192.168.98.1:911
+
+so in a test script running a Linux target, one could do:
+
+.. code-block:: python
+
+   @tcfl.tc.interconnect("ipv4_addr")
+   @tcfl.tc.target('pos_capable')
+   class _test(tcfl.tc.tc_c):
+
+       def eval_something(self, ic, target):
+           ...
+           if 'http_proxy' in ic.kws:
+              target.shell.run("export http_proxy=%s" % ic.kws.get('http_proxy'))
+              target.shell.run("export HTTP_PROXY=%s" % ic.kws.get('http_proxy'))
+           if 'https_proxy' in ic.kws:
+              target.shell.run("export https_proxy=%s" % ic.kws.get('https_proxy'))
+              target.shell.run("export HTTPS_PROXY=%s" % ic.kws.get('https_proxy'))
+           ...
+
+note however, that those settings will apply only to the shell being
+run in that console. You can make more permanent settings in the
+target by for example, modifying ``/etc/bashrc``::
+
+   @tcfl.tc.interconnect("ipv4_addr")
+   @tcfl.tc.target('pos_capable')
+   class _test(tcfl.tc.tc_c):
+
+       def eval_something(self, ic, target):
+           ...
+           if 'http_proxy' in ic.kws:
+              target.shell.run("echo http_proxy=%s >> /etc/bashrc" % ic.kws.get('http_proxy'))
+              target.shell.run("echo HTTP_PROXY=%s >> /etc/bashrc" % ic.kws.get('http_proxy'))
+           if 'https_proxy' in ic.kws:
+              target.shell.run("echo https_proxy=%s >> /etc/bashrc" % ic.kws.get('https_proxy'))
+              target.shell.run("echo HTTPS_PROXY=%s >> /etc/bashrc" % ic.kws.get('https_proxy'))
+           ...
+
+and those will also apply if your script logs in via SSH or other methods.
+
+
+Linux targets: removing the root password
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If your target is not connected to any networks or to an isolated
+network, you can remove the root password.
+
+.. code-block:: python
+
+   ...
+   @tcfl.tc.interconnect("ipv4_addr")
+   @tcfl.tc.target("linux")
+   class some_test(tcfl.tc.tc_c):
+
+       # ensure target is powered up and the script is logged in
+       def eval_something(self, ic, target):
+           ...
+           target.shell.run("passwd -d root")
+           ...
+
+or from the console::
+
+  $ tcf console-write TARGETNAME "passwd -d root"
+  $ tcf console-read TARGETNAME
+  ...
+  # passwd -d root
+  Removing password for user root.
+  passwd: Success
+
+.. _linux_ssh_no_root_password:
+
+Linux targets: allowing SSH as root with no passwords
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Most Linux deployments default configure SSH to be very conservative;
+for testing, you might want to open it up.
+
+To allow login in with SSH, add to your test script:
+
+.. code-block:: python
+
+   ...
+   @tcfl.tc.interconnect("ipv4_addr")
+   @tcfl.tc.target("linux")
+   class some_test(tcfl.tc.tc_c):
+
+       # ensure target is powered up and the script is logged in
+       def eval_something(self, ic, target):
+           target.shell.run("""\
+   cat <<EOF >> /etc/ssh/sshd_config
+   PermitRootLogin yes
+   PermitEmptyPasswords yes
+   EOF""")
+           target.shell.run("systemctl restart sshd")
+
+or using the :func:`library function tcfl.tl.linux_ssh_root_nopwd
+<tcfl.tl.linux_ssh_root_nopwd>`:
+
+.. code-block:: python
+
+   import tcfl.tl
+   ...
+   @tcfl.tc.interconnect("ipv4_addr")
+   @tcfl.tc.target("linux")
+   class some_test(tcfl.tc.tc_c):
+
+       # ensure target is powered up and the script is logged in
+       def eval_something(self, ic, target):
+           ...
+           tcfl.tl.linux_ssh_root_nopwd(target)
+           ...
+           target.shell.run("systemctl restart sshd")
+
+or even having that done in deployment time when flashing with POS:
+
+.. code-block:: python
+
+   @tcfl.tc.interconnect("ipv4_addr")
+   @tcfl.tc.target('pos_capable', mode = 'any')
+   class _test(tcfl.tc.tc_c):
+
+       def deploy(self, ic, target):
+           # ensure network, DHCP, TFTP, etc are up and deploy
+           ic.power.on()
+           ic.report_pass("powered on")
+
+           image = target.pos.deploy_image(
+               ic, "clear",
+               extra_deploy_fns = [ tcfl.pos.deploy_linux_ssh_root_nopwd ])
+
+
+or from the shell::
+
+  $ tcf console-write TARGETNAME "echo PermitRootLogin yes >> /etc/ssh/sshd_config"
+  $ tcf console-write TARGETNAME "echo PermitEmptyPasswords yes >> /etc/ssh/sshd_config"
+
+.. _tcf_client_timetout:
+
+How do I change the default timeout in my test scripts
+------------------------------------------------------
+
+The default timeout different parts of the *tcf run* engines wait for
+the target to respond can be changed by setting the variable
+*self.tls.expecter.timeout* (note *self* is a testcase class):
+
+.. code-block:: python
+
+   class some_tc(tcfl.tc.tc_c):
+       ...
+       def eval_some(self):
+           # wait a max of 40 seconds
+           self.tls.expecter.timeout = 40
+           ...
+
+It is a bit awkward and we'll make a better way to do it. Other places
+that take a *timeout* parameter that has to be less than
+*self.tls.expecter.timeout*:
+
+- :func:`target.shell.up <tcfl.target_ext_shell.shell.up>`
+- :func:`target.on_console_rx <tcfl.tc.target_c.on_console_rx>`
+  and :func:`target.on_console_rx_cm <tcfl.tc.target_c.on_console_rx_cm>`
+- :func:`target.wait <tcfl.tc.target_c.wait>`
+- :func:`target.expect <tcfl.tc.target_c.expect>`
+
+
+.. _report_always:
+
+Making the client always generate report files
+----------------------------------------------
+
+*tcf run* will normally generate a report file if a testcase does not
+*pass*. If you want report files generated always, you can add to any
+:ref:`configuration file <tcf_client_configuration>`:
+
+.. code-block:: python
+
+   tcfl.report.file_c.templates['text']['report_pass'] = True
+
+Reporting is handled by the :mod:`reporting API <tcfl.report>` and the
+*report* files are created by the Jinja2 :class:`reporter
+<tcfl.report.file_c>` based on a template called *text*.
+
+.. _report_domain_breakup:
+
+Splitting report files by domain
+--------------------------------
+
+You could want to break your testcases by a domain, mapping to any
+categories and you can want the report files to be stored in specific
+subdirectories.
+
+You can define a hook that calculates that domain and generates
+metadata for it, so the templating engine can use it
+
+>>> ...
+>>> tcfl.tc.tc_c.hook_pre.append(_my_hook_fn)
+>>> filename = tcfl.report.templates["text"]["output_file_name"]
+>>> tcfl.report.templates["text"]["output_file_name"] = \
+>>>     "%(category)s/" + file_name
+
+The `_my_hook_fn()` would look as:
+
+>>> def _my_hook_fn(testcase):
+>>>     # define some calculations that generates category
+>>>     testcase.tag_set("category", categoryvalue)
+
+If the data needed is not available until after the testcase executes,
+you can use :class:`reporting hooks <tcfl.report.file_c.hooks>`.
+
+Capturing network traffic
+-------------------------
+
+TCF servers (*ttbd*) can capture the traffic in a :term:NUT network if
+they are connected to it.
+
+For this to happen, when the network is powered up, it must contain a
+property called *tcpdump* set to a file name where to capture it::
+
+  $ tcf property-set nwb tcpdump somename.cap
+  $ tcf power-cycle nwb
+
+when all the network traffic is done, it can be downloaded::
+
+  $ tcf power-off nwb
+  $ tcf broker-file-dnload nwb somename.cap local_somename.cap
+
+which now can be opened with wireshark to see what happened (or
+analyzed with other tools).
+
+In a script, ensure your start routine contains:
+
+>>> class sometest(tcfl.tc.tc_c):
+>>>
+>>>     def start_something(self, ic, ...):
+>>>         ...
+>>>         # before powering up the interconnect
+>>>         ic.property_set('tcpdump', self.kws['tc_hash'] + ".cap")
+>>>         ...
+>>>         ic.power.cycle()
+
+and on teardown:
+
+>>>
+>>>     def teardown_whatever(self, ic, ...):
+>>>         ic.broker_files.dnload(
+>>>              self.kws['tc_hash'] + ".cap",
+>>>              "report-%(runid)s:%(tc_hash)s.tcpdump" % self.kws)
+>>>         self.report_info("tcpdump available in file "
+>>>                          "report-%(runid)s:%(tc_hash)s.tcpdump" % self.kws)
+
+the file will be made available in the same directory where *tcf run*
+was executed from.
+
+
+.. _tcf_ci:
+
+Continuous Integration
+----------------------
+
+*TCF run* can be used in a CI system to run testcases as part of the
+continuous integration process. A few helpful tricks:
+
+Generate a unique ID for each run and feed it to TCF
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+It is common practice to generate a unique ID for each build or
+continuous integration run. It should include:
+
+- timestamp (YYMMDD-HHMM): allows to tell when the build happened and
+  to map to logs in other parts of the system; might not be sufficient
+  if more than one build can be started in the same hour/minute/second
+
+- monotonic counter (BBB): CI engines like Jenkins will refer to
+  builds by their internal build monotonic counter--it also helps
+  distinguish in the unlikely case two builds were started on the same
+  second (or minute)
+
+- branch/project identifier (PROJECT-BRANCH): if a single build might
+  be running on multiple branches or projects, it helps to add a short
+  version of it -- thus, when the Unique ID is propagated to other
+  parts of the CI system, we can see who is causing whatever action.
+
+*tcf run* supports the concept of a :ref:`RunID <tcf_run_runid>`,
+which will be then used in all the reports.
+
+A good RunID specification for *TCF run* would be something like::
+
+  PROJECT-BRANCH-YYMMDD-HHMM-BBB
+
+it is a good idea to also give it to the hashing engine as salt so
+that the :term:`hash` identifiers used to acquire targets don't
+conflict with other projects that might be using the same
+testcase. e.g.::
+
+  $ tcf run --hash-salt PROJECT-BRANCH-YYMMDD-HHMM-BBB \
+      --runid PROJECT-BRANCH-YYMMDD-HHMM-BBB -v path/to/testcases
+
+add to the hash salt any other factors that might contribute to the
+same testcase/target combination being run as the same but that shall
+be considered different (eg: using a different toolchain).
+
+Splitting in multiple shards
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When running CI in multiple slaves in parallel, the CI engine can tell
+*tcf run* to only run an specific shard of the whole list of
+testcases. Assuming all the slaves have the same list of testcases,
+the list will be evenly split::
+
+  slave1$ tcf run --shard 1-3 --runid X path/to/testcases
+  slave2$ tcf run --shard 2-3 --runid X path/to/testcases
+  slave3$ tcf run --shard 3-3 --runid X path/to/testcases
+
+will split the deck of testcases in 3 shards and run one on each slave
+in parallel.
+
+Note that if the availability of targets to run the shards doesn't
+allow them to run testcases in parallel, you might not gain much by
+the paralallelization of *tcf run*.
+
+Controlling output location
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+*tcf run* can be given ``--log-dir`` to specify the location where
+most default output files will be placed, including:
+
+- failure/error/block/skip reports
+- tcpdump outputs
+
+this defaults to the directory where *tcf run* was invoked from.
+
+.. _general_catchas:
+
+General catchas
+===============
+
+Some common issues that make it automating hard
+
+Hidden characters in console output
+-----------------------------------
+
+This happens very commonly when console prompts or text produce ANSI
+escape sequences to colorize output; as a human on the console, we see
+clearly the *root@hostname:DIR* prompt, but our regex for the console
+is expecting:
+
+``root@SOMETHING:DIR``
+
+however, the chain of bytes that the serial port is reading might be
+
+``ESC[ 38;5;2rootESC[ 38;5;2SOMETHING:DIR``
+
+(where ESC is the escape character, ASCII 0x1b dev 27) and hence why
+the regular expression is not working.
+
+Parsing ANSI escape sequences is quite tricky and if this is a command
+prompt, a more simple sollution is to remove them from the prompt
+configuration.
+
+Newlines when reading output of a command
+-----------------------------------------
+
+Let's say we are reading the top level tree of a git directory:
+
+>>> tree = subprocess.check_output(
+>>>      [
+>>>          'git', 'rev-parse', '--flags', '--show-toplevel',
+>>>          'SOMEFILENAME'
+>>>      ],
+>>>      stderr = subprocess.STDOUT,
+>>>      cwd = os.path.dirname('SOMEFILENAME')
+>>> )
+
+then we try to use *tree* and it does not exist. Why? because::
+
+  $ git rev-parse --flags --show-toplevel SOMEFILENAME
+  SOMEPATH
+  $
+
+which means that after *SOMEPATH* there is a newline and thus the
+output we are getting is *SOMEPATH\\n*. So :func:`strip
+<string.strip>` it:
+
+>>> tree = tree.strip()
 
 General Linux system
 ====================
@@ -1029,1009 +2019,6 @@ Reread *systemd*'s configuration and restart the server::
 
 Remember to toggle it back to the default ``-vv``--it gets chatty.
 
-
-TCF client tricks
-=================
-
-.. _tcf_client_configuration:
-
-Where is the TCF client configuration taken from?
--------------------------------------------------
-
-*tcf* reads configuration files from (in this order):
-
-- *.tcf* (a subdirectory of the current working directory)
-- *~/.tcf*
-- */etc/tcf* (if installed globally)
-- *~/.local/etc/tcf* (if installed in user's home only)
-
-Configuration files are called *conf_WHATEVER.py* and imported in
-**alphabetical** order from each directory before proceeding to the
-next one. They are written in plain Python code, so you can do
-anything, even extend TCF from them. The module :mod:`tcfl.config`
-provides access to functions to set TCF's configuration.
-
-You can add new paths to parse with ``--config-path`` and force
-specific files to be read with ``--config-file``. See *tcf --help*.
-
-.. _howto_release_target:
-
-How do I release a target I don't own?
---------------------------------------
-
-Someone owns the target and they have gone home...::
-
-  $ tcf release -f TARGETNAME
-
-But this only works if you have admin permissions.
-
-The exception is if you have locked yourself the target with a
-*ticket* (used by *tcf run* and others so that the same user running
-different processes in parallel can still exclude itself from
-overusing a target). It will say something like::
-
-  requests.exceptions.HTTPError: 400: TARGETNAME: tried to use busy target (owned by 'MYUSERNAME:TICKETSTRING')
-
-As a user, you can always force release any of your own locks with
-`-f` or with `-t TICKETSTRING`::
-
-  $ tcf -t TICKETSTRING release TARGETNAME
-
-How do I keep a target(s) reserved and powered-on while I fuzz with
-them?
--------------------------------------------------------------------
-
-First make sure you are not blocking anyone::
-
-  $ while tcf acquire TARGET1 TARGET2 TARGET3...; do sleep 15s; done &
-  $ tcf_pid=$!
-
-this keeps acquiring the target every 10 seconds, which tells the
-server you are actively using it, so it won't release them nor power
-them off.
-
-When done::
-
-  $ kill $tcf_pid
-  $ tcf release TARGET1 TARGET2 TARGET3...
-
-You can *tcf run* without releasing them::
-
-  $ tcf -t " " run --no-release -vvt "TARGET1 or TARGET2 or TARGET3 ..." test_mytc.py
-
-Note the following:
-
--  ``-t " "`` tells TCF to *use no ticket*, as we have made the reservation
-   with no ticket
-
-- ``--no-release`` tells TCF to not release the targets when done
-
-this way, once the test completes (let's say, with failure), we can
-log in via the serial console to do some debugging::
-
-  $ tcf console-write -i TARGET2
-
-Do not forget to kill the *while* process and release the targets when
-done, otherwise others won't be able to use them. If someone has left
-a target taken, it can be released following :ref:`these instructions
-<howto_release_target>`
-  
-How can I debug a target?
--------------------------
-
-TCF provides for means to connect remote debuggers to targets that
-support them; if the target supports the
-:py:class:`ttbl.tt_debug_mixin` (which you can find with `tcf list -vv
-TARGETNAME | grep interfaces`).
-
-How it is done and what are the capabilities depends on the target,
-but in general, assuming you have a target with an image deployed::
-
-  $ tcf acquire TARGETNAME
-  $ tcf debug-start TARGETNAME
-  $ tcf power-on TARGETNAME
-  $ tcf debug-info TARGETNAME
-  GDB server: tcp:myhostname:3744 (when target is on; currently ON)
-
-at this point, the target is waiting for the debugger to connect
-before powering up, so start (in this case) GDB pointing it to the
-*elf* version of the image file uploaded and issue::
-
-  gdb> target remote tcp:myhostname:3744
-
-Some targets might support starting debugging after power up.
-
-Find more:
-
-- `tcf --help | grep debug-`
-
-- the :class:`debug extension API <tcfl.target_ext_debug.debug>` to
-  :class:`target objects <tcfl.tc.target_c>` for use inside Python testcases
-
-- the :class:`*ttbd*\'s Debug interface <ttbl.tt_debug_mixin>`
-
-Zephyr debugging with TCF run
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-When using targets in a high usage environment, it is easier to use
-TCF run and a few switches:
-
-- Make sure the target is acquired for a max of 30min while you work with it::
-
-    $ for ((count = 0; count < 240; count++)); do tcf -t 1234 acquire TARGETNAME; sleep 15s; done &
-
-  be sure to kill this process when done, to free it for other people;
-  every 15s this re-acquires, as a way to tell the daemon you are
-  still using it, to not free it from you.
-
-  Note `-t 1234`; this says *use ticket 1234* to reserve this target;
-  we'll use it later.
-
-- Create a temporary directory::
-
-    $ mkdir tmp
-
-- Build and deploy::
-
-    $ tcf -t 1234 run -vvvv -E --tmpdir tmp -t TARGETNAME --no-release PATH-TO-TC
-
-  note the following:
-
-  - `-t 1234` says to use ticket 1234, as the one we used for the reservation
-
-  - `-E` tells it not to evaluate -- it will just build and deploy / flash
-
-  - `--no-release` says do not release the target when done (because
-    you want to do other stuff, like debug)
-
-  - In the case of Zephyr, the ELF file will be in
-    `tmp/1234/outdir-1234-SOMETHING/zephyr/zephyr.elf`, which you can
-    find with::
-
-      $ find tmp/1234/ -iname zephyr.elf
-      tmp/1234/outdir-1234-j38h-quark_d2000_crb/zephyr/zephyr.elf
-
-- Tell the target to start debugging::
-
-    $ tcf -t 1234 debug-start TARGETNAME
-
-- Now reset / power cycle it, so it goes fresh to start. Because we
-  told it to start debugging, it will start but stop the CPU until you
-  attach a debugger (only for OpenOCD targets or targets that support
-  debugging, anyway)::
-
-    $ tcf -t 1234 reset TARGETNAME
-    $ tcf -t 1234 debug-info TARGETNAME
-    OpenOCD telnet server: srrsotc03.iind.intel.com 20944
-    GDB server: x86: tcp:srrsotc03.iind.intel.com:20946
-    Debugging available as target is ON
-
-- Note we now can start the debugger; find it first::
-
-    $ find /opt/zephyr-sdk-0.9.5/ -iname \*gdb
-    ...
-    /opt/zephyr-sdk-0.9.5/sysroots/x86_64-pokysdk-linux/usr/bin/i586-zephyr-elf/i586-zephyr-elf-gdb
-    ...
-
-  run the debugger to the ELF file we found above::
-
-    $ /opt/zephyr-sdk-0.9.5/sysroots/x86_64-pokysdk-linux/usr/bin/i586-zephyr-elf/i586-zephyr-elf-gdb \
-        tmp/1234/outdir-1234-j38h-quark_d2000_crb/zephyr/zephyr.elf
-    ...
-    Reading symbols from tmp/1234/outdir-1234-j38h-quark_d2000_crb/zephyr/zephyr.elf...done.
-
-  tell the debugger to connect to the GDB server found by running
-  `debug-info` before::
-
-    (gdb) target remote tcp:srrsotc03.iind.intel.com:20946
-    Remote debugging using tcp:srrsotc03.iind.intel.com:20946
-    0x0000fff0 in ?? ()
-
-  Debug away!::
-
-    (gdb) b _main
-    Breakpoint 1 at 0x180f71: file /home/inaky/z/kernel.git/kernel/init.c, line 182.
-    (gdb) c
-    Continuing.
-    target running
-    redirect to PM, tapstatus=0x08302c1c
-    hit software breakpoint at 0x00180f71
-
-    Breakpoint 1, _main (unused1=0x0, unused2=0x0, unused3=unused3@entry=0x0) at /home/inaky/z/kernel.git/kernel/init.c:182
-    182	{
-    (gdb)
-    ...
-
-- on a separate terminal, you can:
-
-  - read the target's console output with::
-
-      $ tcf console-read --follow TARGETNAME
-
-  - issue CPU resets, halts, resumes or OpenOCD commands (for targets
-    that support it)::
-
-      $ tcf debug-reset TARGETNAME
-      $ tcf debug-halt TARGETNAME
-      $ tcf debug-resume TARGETNAME
-      $ tcf debug-openocd TARGETNAME OPENOCDCOMMAND
-
-Note that resetting or power-cycling the board will create a new GDB
-target with a different port, so you will have to reconnect that GDB
-wo the new target remote reported by *tcf debug-info*.
-
-.. _howto_pos_list_deploy:
-
-How can I quickly flash a Linux target
---------------------------------------
-
-When your server and targets are configured for Provisisoning OS
-support (target exports the *pos_capable* tag in ``tcf list -vv
-TARGET``), you can quickly flash the target *target1A*, which is
-connected to network *nwA* with::
-
-  $ IMAGE=fedora::29 tcf run -vvvt 'nwA or target1A' /usr/share/tcf/examples/test_pos_deploy.py
-
-to find our which images your server has available
-
-.. _howto_pos_list_images:
-
-To find out available images::
-
-  $ tcf run /usr/share/tcf/examples/test_pos_list_images.py
-  server10/nwa clear:live:25550::x86_64
-  server10/nwa clear:live:25890::x86_64
-  server10/nwa fedora::29::x86_64
-  server10/nwa yocto:core-minimal:2.5.1::x86_64
-  PASS0/	toplevel @local: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:00:06.635452) - passed
-
-See how to :ref:`install more images <ttbd_pos_deploying_images>`.
-
-
-How can I quickly build and deploy an image to a Zephyr target?
----------------------------------------------------------------
-
-You can use the boilerplate testcase :download:`test_zephyr_boots.py
-<../examples/test_zephyr_boots.py>`, which will build any Zephyr app
-and try to boot it and see if it prints the Zephyr boot banner::
-
-  $ ZEPHYR_APP=path/to/source tcf run -t TARGETNAME /usr/share/tcf/examples/test_zephyr_boots.py
-  $ tcf acquire TARGENAME
-  $ <work on it> ...
-
-TCF will build your code configuring it properly for the chosen target
-and deploy it. You want to inmediately acquire so it is not
-powered-off by the daemon.
-
-
-TCF's `run` says something failed, can I get more detail?
----------------------------------------------------------
-
-FIXME: update
-
-TCF's ``run`` tries to be quiet to the console, so when you run a lot
-of tests on a lot of targets, the forest lets you see the trees.
-
-When you need more detail, you can:
-
-- add `-v`\s after ``run`` (but then it gives you detail everywhere)
-
-- log to a file with `--log-file=FILENAME` and when something fails,
-  grep for it::
-
-    FAIL0/kaoe ../Makefile[quark]@.../frankie: (dynamic) build failed
-    PASS1/tctp ../Makefile[x86]@.../mv-03: (dynamic) build passed
-
-  that build failed; take those four letters next to the ``FAIL0``
-  message (`kaoe`) -- that's a unique identifier for each message, and
-  look for it with `grep`, printing 30 lines of context before the match::
-
-    $ grep -B 100 kaoe FILENAME
-    ....
-    FAIL3/iigx ../Makefile[quark]@.../frankie: @build failed [2] ('make -j -C samples/hello_world/nanokernel BOARD=quark_se_sss_ctb  O=outdir-httpsSERVER5000ttb-v0targetsfrankie-quark_se_sss_ctb-quark_se_sss_ctb' from /home/inaky/z/kernel.git/samples/.tcdefaults:48)
-    FAIL3/iigx ../Makefile[quark]@.../frankie: output: FF make: Entering directory '/home/inaky/z/kernel.git/samples/hello_world/nanokernel'
-    FAIL3/iigx ../Makefile[quark]@.../frankie: output: FF make[1]: Entering directory '/home/inaky/z/kernel.git'
-    ...
-
-  most likely, the complete failure message will be right before the
-  final failure message -- and you can now tell what happened. In this
-  case, there is no good configuration for the chosen target
-
-  The output driver can be changed to lay out the information
-  diferently; look at :class:`tcfl.report.report_c`.
-
-Linux targets: Common tricks
-----------------------------
-
-.. _linux_c_c:
-
-Linux targets: sending Ctrl-C to a target
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Trick over the serial console is that it is a pure pipe, there is no
-special characters. So a quick way to do it is::
-
-  $ tcf console-write TARGETNAME $(echo -e \\x03)
-
-where that *\\x03* is the hex code of Ctrl-C. *man ascii* can tell you
-the quick shortcuts for others.
-
-.. _linux_send_command_target:
-
-Linux targets: running a Linux shell command
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Try::
-
-  $ tcf console-write TARGETNAME "ping -c 3 localhost"
-
-Note that once the command is sent, the console, for whatever the
-target cares, is still connected, even if the *console-write* command
-returned for you. The command might still be executing; see
-:ref:`Sending a Ctrl-C <linux_c_c>` is not as in a usual, synchronous,
-Linux console.
-
-From a script, you can use :func:`tcfl.tc.target_c.shell.run
-<tcfl.target_ext_shell.shell.run>` or :func:`tcfl.tc.target_c.send`:
-
-.. code-block:: python
-
-   ...
-   @tcfl.tc.target("linux")
-   class some_test(tcfl.tc.tc_c):
-
-       def eval_something(self, target):
-           ...
-           target.shell.send("ping localhost")
-           target.shell.expect("3 packets transmitted, 3 received")
-           ...
-           # better to use
-           ...
-           target.shell.run("ping -c 3 localhost",
-                            "3 packets transmitted, 3 received")
-
-you can also get the output by adding ``output = True``:
-  
-.. code-block:: python
-
-           ...
-           output = target.shell.run("ping -c 3 localhost",
-                                     "3 packets transmitted, 3 received",
-                                     output = True)
-           ...
-                            
-
-Linux targets: ssh login from a testcase / client
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The :term:`ttbd` server can create tunnels that allow you to reach the
-target's ports, assuming the target is
-
-- connected to a network to which the server is also connected
-- on and listening on a port
-
-In your test scripts, use the :class:`tunnel
-<tcfl.target_ext_tunnel.tunnel>` extension to create a port
-redirection, adding to your script:
-
-.. code-block:: python
-
-   ...
-   @tcfl.tc.interconnect("ipv4_addr")
-   @tcfl.tc.target(...)
-   class some_test(tcfl.tc.tc_c):
-
-       def eval_something(self, ic, target):
-           ...
-           # ensure target and interconnect is powered up and the
-           # script is logged in.
-           # Indicate to the tunnel system the target's address in the
-           # interconnect
-           target.tunnel.ip_addr = target.addr_get(ic, "ipv4")
-
-           # create a tunnel from server_name:server_port -> to target:22
-           server_name = target.rtb.parsed_url.hostname
-           server_port = target.tunnel.add(22)
-
-           # use SSH to get the content's of the target's /etc/passwd
-           output = subprocess.check_output(
-                        "ssh -p %d root@%s cat /etc/passwd"
-                        % (server_port, server_name),
-                        shell = True)
-
-Tunnels can also be created with the command line::
-
-  $ tcf tunnel-add TARGETNAME 22 tcp TARGETADDR
-  SERVERNAME:19893
-  $ ssh -p 19893 SERVERNAME cat /etc/passwd
-  root:x:0:0:root:/root:/bin/bash
-  bin:x:1:1:bin:/bin:/sbin/nologin
-  daemon:x:2:2:daemon:/sbin:/sbin/nologin
-  adm:x:3:4:adm:/var/adm:/sbin/nologin
-  ...
-
-Note you might need first the steps in the next section to allow SSH
-to login with a passwordless root.
-
-.. _target_pos_manually:
-
-How do I boot a target to PXE boot mode manually?
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-A target can be told to boot to PXE Provisioning OS by issuing the
-following commands::
-
-  $ while tcf acquire NETWORKNAME TARGETNAME; do sleep 10s; done &
-  $ tcf power-on NETWORKNAME
-  $ tcf property-set TARGETNAME pos_mode pxe
-  $ tcf power-cycle TARGETNAME
-
-.. FIXME: make an entry explaining well the while loop thing
-
-The *while* loop in the background keeps the target acquired, do not
-forget to release them by killing it. Then we ensure the network is on
-and finally, we set the target to *POS mode* PXE and we power cycle
-the target.
-
-To have it boot back in local mode::
-
-  $ tcf property-set TARGETNAME pos_mode
-  $ tcf power-cycle TARGETNAME
-
-.. _pos_boot_http_tftp:
-
-POS: booting from HTTP or TFTP
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-When a target is given a syslinux configuration file to boot from, the
-places where it loads the Provisioning OS kernels can be forced with
-:ref:`pos_http_url_prefix <pos_http_url_prefix>`.
-
-By default (no prefix) the boot loader will tend to load with
-TFTP. But by specifying an HTTP or FTP URL prefix, it can boot over
-any of those protocols (which can be faster).
-
-When specified in an interconnect's tags, it will be taken as default
-for that interconnect, but this can be overriden specifying it for
-each target; for the example in :ref:`POS: Configuring networks
-<ttbd_pos_network_config>`, we can add::
-
-  pos_http_url_prefix = "http://192.168.97.1/ttbd-pos/%(bsp)s/"
-
-This will replace in the syslinux configuration file any occurrence of
-``pos_http_url_prefix`` with
-``http://192.168.97.1/ttbd-pos/ARCHNAME/``, where ``ARCHNAME`` is the
-architecture of the target.
-
-.. _linux_target_pos_kernel_options:
-
-Linux targets: POS: setting default linux kernel options
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-When a Linux target is botted using :term:`POS`, default kernel
-options can be fed to the POS scripts for bootloader consumption by
-setting the following tags or properties (all optional):
-
-- ``linux_serial_console_default``: sets which is the default serial
-  console. For */dev/NAME*, specify *NAME*, as this will be given as
-  the Linux kernel command line option *console=NAME,115200*
-
-- ``linux_options_append``: a space separated string with any other
-  Linux kernel command line options to add.
-
-For example, when adding the target:
-
->>> ttbl.config.target_add(
->>>     ...
->>>     tags = {
->>>         ...
->>>         'linux_serial_console_default': 'ttyS2',
->>>         'linux_options_append': 'rw foo=bar',
->>>         ...
->>>     })
-
-which can also be done once the target is added with
-:meth:`tags_update <ttbl.test_target.tags_update>`::
-
->>> ttbl.config.targets['TARGETNAME'].tags_update({
->>>         ...
->>>         'linux_serial_console_default': 'ttyS2',
->>>         'linux_options_append': 'rw foo=bar',
->>>         ...
->>>     })
-
-.. _tcf_testcase_proxy:
-
-Linux targets: using proxies
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-:term:`NUT`\s to which targets are connected are usually setup very
-isolated from upstream or other networks; there is a common practice
-to declare a proxy availability in an interconnect by it exporting any
-of the following variables::
-
-  $ tcf list -vv nwb | grep -i proxy
-  ftp_proxy: http://192.168.98.1:911
-  http_proxy: http://192.168.98.1:911
-  https_proxy: http://192.168.98.1:911
-
-so in a test script running a Linux target, one could do:
-
-.. code-block:: python
-
-   @tcfl.tc.interconnect("ipv4_addr")
-   @tcfl.tc.target('pos_capable')
-   class _test(tcfl.tc.tc_c):
-
-       def eval_something(self, ic, target):
-           ...
-           if 'http_proxy' in ic.kws:
-              target.shell.run("export http_proxy=%s" % ic.kws.get('http_proxy'))
-              target.shell.run("export HTTP_PROXY=%s" % ic.kws.get('http_proxy'))
-           if 'https_proxy' in ic.kws:
-              target.shell.run("export https_proxy=%s" % ic.kws.get('https_proxy'))
-              target.shell.run("export HTTPS_PROXY=%s" % ic.kws.get('https_proxy'))
-           ...
-
-note however, that those settings will apply only to the shell being
-run in that console. You can make more permanent settings in the
-target by for example, modifying ``/etc/bashrc``::
-
-   @tcfl.tc.interconnect("ipv4_addr")
-   @tcfl.tc.target('pos_capable')
-   class _test(tcfl.tc.tc_c):
-
-       def eval_something(self, ic, target):
-           ...
-           if 'http_proxy' in ic.kws:
-              target.shell.run("echo http_proxy=%s >> /etc/bashrc" % ic.kws.get('http_proxy'))
-              target.shell.run("echo HTTP_PROXY=%s >> /etc/bashrc" % ic.kws.get('http_proxy'))
-           if 'https_proxy' in ic.kws:
-              target.shell.run("echo https_proxy=%s >> /etc/bashrc" % ic.kws.get('https_proxy'))
-              target.shell.run("echo HTTPS_PROXY=%s >> /etc/bashrc" % ic.kws.get('https_proxy'))
-           ...
-
-and those will also apply if your script logs in via SSH or other methods.
-
-
-Linux targets: removing the root password
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If your target is not connected to any networks or to an isolated
-network, you can remove the root password.
-
-.. code-block:: python
-
-   ...
-   @tcfl.tc.interconnect("ipv4_addr")
-   @tcfl.tc.target("linux")
-   class some_test(tcfl.tc.tc_c):
-
-       # ensure target is powered up and the script is logged in
-       def eval_something(self, ic, target):
-           ...
-           target.shell.run("passwd -d root")
-           ...
-
-or from the console::
-
-  $ tcf console-write TARGETNAME "passwd -d root"
-  $ tcf console-read TARGETNAME
-  ...
-  # passwd -d root
-  Removing password for user root.
-  passwd: Success
-
-.. _linux_ssh_no_root_password:
-
-Linux targets: allowing SSH as root with no passwords
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Most Linux deployments default configure SSH to be very conservative;
-for testing, you might want to open it up.
-
-To allow login in with SSH, add to your test script:
-
-.. code-block:: python
-
-   ...
-   @tcfl.tc.interconnect("ipv4_addr")
-   @tcfl.tc.target("linux")
-   class some_test(tcfl.tc.tc_c):
-
-       # ensure target is powered up and the script is logged in
-       def eval_something(self, ic, target):
-           target.shell.run("""\
-   cat <<EOF >> /etc/ssh/sshd_config
-   PermitRootLogin yes
-   PermitEmptyPasswords yes
-   EOF""")
-           target.shell.run("systemctl restart sshd")
-
-or using the :func:`library function tcfl.tl.linux_ssh_root_nopwd
-<tcfl.tl.linux_ssh_root_nopwd>`:
-
-.. code-block:: python
-
-   import tcfl.tl
-   ...
-   @tcfl.tc.interconnect("ipv4_addr")
-   @tcfl.tc.target("linux")
-   class some_test(tcfl.tc.tc_c):
-
-       # ensure target is powered up and the script is logged in
-       def eval_something(self, ic, target):
-           ...
-           tcfl.tl.linux_ssh_root_nopwd(target)
-           ...
-           target.shell.run("systemctl restart sshd")
-
-or even having that done in deployment time when flashing with POS:
-
-.. code-block:: python
-
-   @tcfl.tc.interconnect("ipv4_addr")
-   @tcfl.tc.target('pos_capable', mode = 'any')
-   class _test(tcfl.tc.tc_c):
-
-       def deploy(self, ic, target):
-           # ensure network, DHCP, TFTP, etc are up and deploy
-           ic.power.on()
-           ic.report_pass("powered on")
-
-           image = target.pos.deploy_image(
-               ic, "clear",
-               extra_deploy_fns = [ tcfl.pos.deploy_linux_ssh_root_nopwd ])
-
-
-or from the shell::
-
-  $ tcf console-write TARGETNAME "echo PermitRootLogin yes >> /etc/ssh/sshd_config"
-  $ tcf console-write TARGETNAME "echo PermitEmptyPasswords yes >> /etc/ssh/sshd_config"
-
-.. _tcf_client_timetout:
-
-How do I change the default timeout in my test scripts
-------------------------------------------------------
-
-The default timeout different parts of the *tcf run* engines wait for
-the target to respond can be changed by setting the variable
-*self.tls.expecter.timeout* (note *self* is a testcase class):
-
-.. code-block:: python
-
-   class some_tc(tcfl.tc.tc_c):
-       ...
-       def eval_some(self):
-           # wait a max of 40 seconds
-           self.tls.expecter.timeout = 40
-           ...
-
-It is a bit awkward and we'll make a better way to do it. Other places
-that take a *timeout* parameter that has to be less than
-*self.tls.expecter.timeout*:
-
-- :func:`target.shell.up <tcfl.target_ext_shell.shell.up>`
-- :func:`target.on_console_rx <tcfl.tc.target_c.on_console_rx>`
-  and :func:`target.on_console_rx_cm <tcfl.tc.target_c.on_console_rx_cm>`
-- :func:`target.wait <tcfl.tc.target_c.wait>`
-- :func:`target.expect <tcfl.tc.target_c.expect>`
-
-.. _finding_testcase_metadata:
-
-Finding testcase's keywords / metadata available for templating
----------------------------------------------------------------
-
-Use the `test_dump_kws.py` script::
-
-  $ tcf run /usr/share/tcf/examples/test_dump_kws.py
-  INFO0/h3ydB	/usr/share/tcf/examples/test_dump_kws.py#_print_kws @localic-localtg: Keywords for testcase:
-  {'runid': '',
-   'srcdir': '../../../../../usr/share/tcf/examples',
-   'srcdir_abs': '/usr/share/tcf/examples',
-   'target_group_info': 'localic-localtg',
-   'target_group_name': 'localic-localtg',
-   'target_group_servers': '',
-   'target_group_targets': '',
-   'target_group_types': 'static',
-   'tc_hash': 'h3yd',
-   'tc_name': '/usr/share/tcf/examples/test_dump_kws.py#_print_kws',
-   'tc_name_short': '/usr/share/tcf/examples/test_dump_kws.py#_print_kws',
-   'tc_origin': '/usr/share/tcf/examples/test_dump_kws.py:12',
-   'thisfile': '/usr/share/tcf/examples/test_dump_kws.py',
-   'tmpdir': '/tmp/tcf.run-xRPr_j/h3yd',
-   'type': 'static'}
-  PASS0/	toplevel @local: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:00:00.318177) - passed
-
-These fields can be used in multiple places of TCF configuration
-Python templates with fields such as `%(tc_name)s`.
-
-If there was a target, the keywords extend to::
-
-
-  $ tcf run -y /usr/share/tcf/examples/test_dump_kws_one_target.py
-  INFO0/crfvByd1h	/usr/share/tcf/examples/test_dump_kws_one_target.py#_print_kws @localhost/qz37a-riscv32: Keywords for testcase:
-  ... < abbreviated, similar to above > ...
-  INFO0/crfvByd1h	/usr/share/tcf/examples/test_dump_kws_one_target.py#_print_kws @localhost/qz37a-riscv32: Keywords for target 0:
-  {u'board': u'qemu_riscv32',
-   'bsp': u'riscv32',
-   u'bsp_models': {u'riscv32': [u'riscv32']},
-   u'bsps': {u'riscv32': {u'board': u'qemu_riscv32',
-                          u'console': u'riscv32',
-                          u'kernelname': u'zephyr.elf',
-                          u'quark_se_stub': False,
-                          u'zephyr_board': u'qemu_riscv32',
-                          u'zephyr_kernelname': u'zephyr.elf'}},
-   u'console': u'riscv32',
-   u'consoles': [],
-   u'disabled': False,
-   'fullid': u'localhost/qz37a-riscv32',
-   u'id': u'qz37a-riscv32',
-   u'interconnects': {u'nwa': {u'ic_index': 37,
-                               u'ipv4_addr': u'192.168.97.37',
-                               u'ipv4_prefix_len': 24,
-                               u'ipv6_addr': u'fc00::61:25',
-                               u'ipv6_prefix_len': 112,
-                               u'mac_addr': u'02:61:00:00:00:25'}},
-   u'interfaces': [u'tt_power_control_mixin',
-                   u'test_target_images_mixin',
-                   u'test_target_console_mixin',
-                   u'tt_debug_mixin'],
-   u'interfaces_names': u'tt_power_control_mixin test_target_images_mixin test_target_console_mixin tt_debug_mixin',
-   u'kernelname': u'zephyr.elf',
-   u'localhost/qz37a-riscv32': True,
-   u'owner': '',
-   u'path': u'/var/run/ttbd-production/qz37a-riscv32',
-   u'powered': False,
-   u'quark_se_stub': False,
-   u'qz37a-riscv32': True,
-   'rtb': <tcfl.ttb_client.rest_target_broker object at 0x7f61687dc490>,
-   'runid': '',
-   'srcdir': '../../../../../usr/share/tcf/examples',
-   'srcdir_abs': '/usr/share/tcf/examples',
-   'target': u'localhostqz37a-riscv32',
-   'target_group_info': u'target=localhost/qz37a-riscv32:riscv32',
-   'target_group_name': 'pupv',
-   'target_group_servers': 'localhost',
-   'target_group_targets': u'localhost/qz37a-riscv32:riscv32',
-   'target_group_types': u'qemu-zephyr-riscv32',
-   'tc_hash': 'crfv',
-   'tc_name': '/usr/share/tcf/examples/test_dump_kws_one_target.py#_print_kws',
-   'tc_name_short': '/usr/share/tcf/examples/test_dump_kws_one_target.py#_print_kws',
-   'tc_origin': '/usr/share/tcf/examples/test_dump_kws_one_target.py:13',
-   'tg_hash': 'z5ao',
-   u'things': [],
-   'thisfile': '/usr/share/tcf/examples/test_dump_kws_one_target.py',
-   'tmpdir': '/tmp/tcf.run-JowSyh/crfv',
-   'type': u'qemu-zephyr-riscv32',
-   'url': u'https://localhost:5000/ttb-v1/targets/qz37a-riscv32',
-   u'zephyr_board': u'qemu_riscv32',
-   u'zephyr_kernelname': u'zephyr.elf'}
-  PASS0/	toplevel @local: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:00:00.314833) - passed
-
-note how the keywords for the first target are a superset of those for
-the testcase and will be only available when on target context.
-
-.. _report_always:
-
-Making the client always generate report files
-----------------------------------------------
-
-*tcf run* will normally generate a report file if a testcase does not
-*pass*. If you want report files generated always, you can add to any
-:ref:`configuration file <tcf_client_configuration>`:
-
-.. code-block:: python
-
-   tcfl.report.file_c.templates['text']['report_pass'] = True
-
-Reporting is handled by the :mod:`reporting API <tcfl.report>` and the
-*report* files are created by the Jinja2 :class:`reporter
-<tcfl.report.file_c>` based on a template called *text*.
-
-.. _report_domain_breakup:
-
-Splitting report files by domain
---------------------------------
-
-You could want to break your testcases by a domain, mapping to any
-categories and you can want the report files to be stored in specific
-subdirectories.
-
-You can define a hook that calculates that domain and generates
-metadata for it, so the templating engine can use it
-
->>> ...
->>> tcfl.tc.tc_c.hook_pre.append(_my_hook_fn)
->>> filename = tcfl.report.templates["text"]["output_file_name"]
->>> tcfl.report.templates["text"]["output_file_name"] = \
->>>     "%(category)s/" + file_name
-
-The `_my_hook_fn()` would look as:
-
->>> def _my_hook_fn(testcase):
->>>     # define some calculations that generates category
->>>     testcase.tag_set("category", categoryvalue)
-
-If the data needed is not available until after the testcase executes,
-you can use :class:`reporting hooks <tcfl.report.file_c.hooks>`.
-
-Capturing network traffic
--------------------------
-
-TCF servers (*ttbd*) can capture the traffic in a :term:NUT network if
-they are connected to it.
-
-For this to happen, when the network is powered up, it must contain a
-property called *tcpdump* set to a file name where to capture it::
-
-  $ tcf property-set nwb tcpdump somename.cap
-  $ tcf power-cycle nwb
-
-when all the network traffic is done, it can be downloaded::
-
-  $ tcf power-off nwb
-  $ tcf broker-file-dnload nwb somename.cap local_somename.cap
-
-which now can be opened with wireshark to see what happened (or
-analyzed with other tools).
-
-In a script, ensure your start routine contains:
-
->>> class sometest(tcfl.tc.tc_c):
->>>
->>>     def start_something(self, ic, ...):
->>>         ...
->>>         # before powering up the interconnect
->>>         ic.property_set('tcpdump', self.kws['tc_hash'] + ".cap")
->>>         ...
->>>         ic.power.cycle()
-
-and on teardown:
-
->>>
->>>     def teardown_whatever(self, ic, ...):
->>>         ic.broker_files.dnload(
->>>              self.kws['tc_hash'] + ".cap",
->>>              "report-%(runid)s:%(tc_hash)s.tcpdump" % self.kws)
->>>         self.report_info("tcpdump available in file "
->>>                          "report-%(runid)s:%(tc_hash)s.tcpdump" % self.kws)
-
-the file will be made available in the same directory where *tcf run*
-was executed from.
-
-
-.. _tcf_ci:
-
-Continuous Integration
-----------------------
-
-*TCF run* can be used in a CI system to run testcases as part of the
-continuous integration process. A few helpful tricks:
-
-Generate a unique ID for each run and feed it to TCF
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-It is common practice to generate a unique ID for each build or
-continuous integration run. It should include:
-
-- timestamp (YYMMDD-HHMM): allows to tell when the build happened and
-  to map to logs in other parts of the system; might not be sufficient
-  if more than one build can be started in the same hour/minute/second
-
-- monotonic counter (BBB): CI engines like Jenkins will refer to
-  builds by their internal build monotonic counter--it also helps
-  distinguish in the unlikely case two builds were started on the same
-  second (or minute)
-
-- branch/project identifier (PROJECT-BRANCH): if a single build might
-  be running on multiple branches or projects, it helps to add a short
-  version of it -- thus, when the Unique ID is propagated to other
-  parts of the CI system, we can see who is causing whatever action.
-
-*tcf run* supports the concept of a :ref:`RunID <tcf_run_runid>`,
-which will be then used in all the reports.
-
-A good RunID specification for *TCF run* would be something like::
-
-  PROJECT-BRANCH-YYMMDD-HHMM-BBB
-
-it is a good idea to also give it to the hashing engine as salt so
-that the :term:`hash` identifiers used to acquire targets don't
-conflict with other projects that might be using the same
-testcase. e.g.::
-
-  $ tcf run --hash-salt PROJECT-BRANCH-YYMMDD-HHMM-BBB \
-      --runid PROJECT-BRANCH-YYMMDD-HHMM-BBB -v path/to/testcases
-
-add to the hash salt any other factors that might contribute to the
-same testcase/target combination being run as the same but that shall
-be considered different (eg: using a different toolchain).
-
-Splitting in multiple shards
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-When running CI in multiple slaves in parallel, the CI engine can tell
-*tcf run* to only run an specific shard of the whole list of
-testcases. Assuming all the slaves have the same list of testcases,
-the list will be evenly split::
-
-  slave1$ tcf run --shard 1-3 --runid X path/to/testcases
-  slave2$ tcf run --shard 2-3 --runid X path/to/testcases
-  slave3$ tcf run --shard 3-3 --runid X path/to/testcases
-
-will split the deck of testcases in 3 shards and run one on each slave
-in parallel.
-
-Note that if the availability of targets to run the shards doesn't
-allow them to run testcases in parallel, you might not gain much by
-the paralallelization of *tcf run*.
-
-Controlling output location
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-*tcf run* can be given ``--log-dir`` to specify the location where
-most default output files will be placed, including:
-
-- failure/error/block/skip reports
-- tcpdump outputs
-
-this defaults to the directory where *tcf run* was invoked from.
-
-.. _general_catchas:
-
-General catchas
-===============
-
-Some common issues that make it automating hard
-
-Hidden characters in console output
------------------------------------
-
-This happens very commonly when console prompts or text produce ANSI
-escape sequences to colorize output; as a human on the console, we see
-clearly the *root@hostname:DIR* prompt, but our regex for the console
-is expecting:
-
-``root@SOMETHING:DIR``
-
-however, the chain of bytes that the serial port is reading might be
-
-``ESC[ 38;5;2rootESC[ 38;5;2SOMETHING:DIR``
-
-(where ESC is the escape character, ASCII 0x1b dev 27) and hence why
-the regular expression is not working.
-
-Parsing ANSI escape sequences is quite tricky and if this is a command
-prompt, a more simple sollution is to remove them from the prompt
-configuration.
-
-Newlines when reading output of a command
------------------------------------------
-
-Let's say we are reading the top level tree of a git directory:
-
->>> tree = subprocess.check_output(
->>>      [
->>>          'git', 'rev-parse', '--flags', '--show-toplevel',
->>>          'SOMEFILENAME'
->>>      ],
->>>      stderr = subprocess.STDOUT,
->>>      cwd = os.path.dirname('SOMEFILENAME')
->>> )
-
-then we try to use *tree* and it does not exist. Why? because::
-
-  $ git rev-parse --flags --show-toplevel SOMEFILENAME
-  SOMEPATH
-  $
-
-which means that after *SOMEPATH* there is a newline and thus the
-output we are getting is *SOMEPATH\\n*. So :func:`strip
-<string.strip>` it:
-
->>> tree = tree.strip()
-
 .. _manual_install:
 
 Manual installation of TCF from source
@@ -2347,6 +2334,125 @@ FPM, fast package manager
 Platform firmware / BIOS update procedures
 ==========================================
 
+
+.. _fs2_serial_update:
+
+Updating the serial number and / or description of a FTDI serial device
+-----------------------------------------------------------------------
+
+These devices are used in multiple USB to serial dongles and embedded
+in a number of devices, for example:
+
+- Flyswatter JTAGs, which come all with the same serial number
+  (usually *FS20000*).
+
+- standalone dongles
+
+- MCU boards, embedded computers
+
+These usually come as USB vendor ID 0x0403, product ID starting with
+0x6NNN.
+  
+When there are multiple FTDI devices that have the same serial number,
+the system needs to be able to tell them apart, so we can flash a new
+serial number in them, which we usually make match the target name, or
+whatever is needed.
+
+.. warning:: this process should be done in a separate machine; if you
+             do it in a server with multiple of these devices
+             connected, the tool can't tell them apart and might flash
+             the wrong device.
+
+To flash a new serial number or descriptionusing ``ftdi_eeprom`` on
+your laptop (`Windows utility
+<https://www.ftdichip.com/Support/Utilities.htm#FT_PROG>`_)::
+
+  $ sudo dnf install -y libftdi-devel
+  $ cat > file.conf <<EOF
+  vendor_id=0x0403
+  product_id=0x6010
+  serial="NEWSERIALNUMBER"
+  use_serial=true
+  EOF
+
+Now plug the USB cable to your server or laptop, making sure it is the
+only one and run, as super user::
+
+  # ftdi_eeprom --flash-eeprom file.conf
+
+Reconnect it to have the system read the new serial number / description.
+
+Notes:
+
+ - if you have the unit you are re-flashing connected to a USB
+   power switching hub (like a YKush), make sure to power it on and to
+   power off any other device that has a 0x0403/6010 USB vendor ID /
+   product ID code, which you can find with::
+
+     $ lsusb.py  | grep 0403:6010
+       1-1.2.1      0403:6010 00  2.00  480MBit/s 0mA 2IFs (Acme Inc. Flyswatter2 Flyswatter2-galileo-04)
+
+ - make *NEWSERIALNUMBER* shorter if you receive this error
+   message::
+
+     FTDI eeprom generator v0.17(c) Intra2net AG and the libftdi developers <opensource@intra2net.com (opensource%40intra2net.com)>
+     FTDI read eeprom: 0
+     EEPROM size: 128
+     Sorry, the eeprom can only contain 128 bytes (100 bytes for your strings).
+     You need to short your string by: -1 bytes
+     FTDI close: 0
+
+ - For **Flyswatter2** devices, add::
+
+     product="Flyswatter2"
+
+   to the configuration file so the product name is set to
+   *Flyswatter2*, needed for OpenOCD to find the device.
+
+.. _cp210x_serial_update:
+
+Updating the serial number and / or description of a CP210x serial device
+-------------------------------------------------------------------------
+
+Some hardware use serial-to-USB converters based on the CP210x series
+by `Silicon Labs <http://www.silabs.com/>`_.
+
+If the serial number programed on it is not unique enough, it can be
+programmed with the tool ``cp120x-program``, available from
+http://cp210x-program.sourceforge.net/.
+
+Once installed:
+
+1. identify the device to operate with::
+
+     $ lsusb | grep -i CP210x
+     Bus 002 Device 085: ID 10c4:ea60 Cygnal Integrated Products, Inc. CP210x UART Bridge / myAVR mySmartUSB light
+
+   .. note:: your device might show differnt vendor or product ID and
+             strings, in such case, adjust your grepping.
+
+2. take the bus and device numbers (`002/085` in the example) and feed
+   it to the `cp219x-program` tool with the new serial number you
+   want::
+
+     # cp210x-program -m 002/085 -w --set-serial-number "NEWSERIALNUMBER"
+
+   it is always a good idea to set as new serial number the name of
+   the target it is going to be assigned to.
+
+3. Reconnect the device and verify the new serial number is set with
+   ``lsusb.py``::
+
+     $ lsusb.py -ciu
+     ...
+       2-2.4          10c4:ea60 00  1.10   12MBit/s 100mA 1IF  (Silicon Labs CP2102 USB to UART Bridge Controller esp32-39)
+         2-2.4:1.0      (IF) ff:00:00 2EPs (Vendor Specific Class) cp210x ttyUSB0
+     ..
+
+   in this case, we set *esp32-39* as new serial number, which is
+   displayed at the end of the line.
+
+
 .. _a101_fw_upgrade:
 
 Updating the firmware in an Arduino101 to factory settings
@@ -2583,103 +2689,3 @@ Updating the FPGA image in Synopsys EMSK boards
    OFF   ON   ARC_EM11D
    ON    ON   Reserved
    ===== ==== =============
-
-.. _fs2_serial_update:
-
-Updating the serial number and / or description of a FTDI / Flyswatter
-----------------------------------------------------------------------
-
-FlySwatter2 come all with the same serial number (usually *FS20000*).
-
-The system needs to be able to tell all the different FlySwatter2s
-apart; for that we update the serial to *TARGETNAME-fs2* (to simplify
-the configuration process).
-
-Flash a new serial number or description on any FTDI based USB-to-TTY
-cable/adapter (like a Flyswatter2, Quark D2000 CRB, Quark C10000 CRB,
-etc) using ``ftdi_eeprom`` on your laptop (:ref:`Windows utility
-<https://www.ftdichip.com/Support/Utilities.htm#FT_PROG>`)::
-
-  $ sudo dnf install -y libftdi-devel
-  $ cat > file.conf <<EOF
-  vendor_id=0x0403
-  product_id=0x6010
-  product="Flyswatter2"
-  serial="NEWSERIALNUMBER"
-  use_serial=true
-  EOF
-
-Now plug the USB cable to your server or laptop, making sure it is the
-only one and run, as super user::
-
-  # ftdi_eeprom --flash-eeprom file.conf
-
-Reconnect it to have the system read the new serial number / description.
-
-.. note:: if you have the unit you are re-flashing connected to a USB
-   power switching hub (like a YKush), make sure to power it on and to
-   power off any other device that has a 0x0403/6010 USB vendor ID /
-   product ID code, which you can find with::
-
-     $ lsusb.py  | grep 0403:6010
-       1-1.2.1      0403:6010 00  2.00  480MBit/s 0mA 2IFs (Acme Inc. Flyswatter2 Flyswatter2-galileo-04)
-
-   it might be easier to do this process in a separate system.
-
-.. note:: make *NEWSERIALNUMBER* shorter if you receive this error
-   message::
-
-     FTDI eeprom generator v0.17(c) Intra2net AG and the libftdi developers <opensource@intra2net.com (opensource%40intra2net.com)>
-     FTDI read eeprom: 0
-     EEPROM size: 128
-     Sorry, the eeprom can only contain 128 bytes (100 bytes for your strings).
-     You need to short your string by: -1 bytes
-     FTDI close: 0
-
-.. admonition:: Rationales
-
-   The *product="Flyswatter2"* line is necessary so the default
-   OpenOCD configuration finds the device.
-
-.. _cp210x_serial_update:
-
-Updating the serial number and / or description of a CP210x serial device
--------------------------------------------------------------------------
-
-Some hardware use serial-to-USB converters based on the CP210x series
-by `Silicon Labs <http://www.silabs.com/>`_.
-
-If the serial number programed on it is not unique enough, it can be
-programmed with the tool ``cp120x-program``, available from
-http://cp210x-program.sourceforge.net/.
-
-Once installed:
-
-1. identify the device to operate with::
-
-     $ lsusb | grep -i CP210x
-     Bus 002 Device 085: ID 10c4:ea60 Cygnal Integrated Products, Inc. CP210x UART Bridge / myAVR mySmartUSB light
-
-   .. note:: your device might show differnt vendor or product ID and
-             strings, in such case, adjust your grepping.
-
-2. take the bus and device numbers (`002/085` in the example) and feed
-   it to the `cp219x-program` tool with the new serial number you
-   want::
-
-     # cp210x-program -m 002/085 -w --set-serial-number "NEWSERIALNUMBER"
-
-   it is always a good idea to set as new serial number the name of
-   the target it is going to be assigned to.
-
-3. Reconnect the device and verify the new serial number is set with
-   ``lsusb.py``::
-
-     $ lsusb.py -ciu
-     ...
-       2-2.4          10c4:ea60 00  1.10   12MBit/s 100mA 1IF  (Silicon Labs CP2102 USB to UART Bridge Controller esp32-39)
-         2-2.4:1.0      (IF) ff:00:00 2EPs (Vendor Specific Class) cp210x ttyUSB0
-     ..
-
-   in this case, we set *esp32-39* as new serial number, which is
-   displayed at the end of the line.

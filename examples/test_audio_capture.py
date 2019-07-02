@@ -5,8 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
-"""
-Reproducing audio and capturing the output
+"""Reproducing audio and capturing the output
 ==========================================
 
 Given a target from which we can record audio, play a beep sound,
@@ -29,7 +28,9 @@ output, plays the *beep*, and then downloads the recording.
    :language: python
    :pyobject: _test
 
-Execute with::
+Execute :download:`the testcase <../examples/test_audio_capture.py>`
+with (where *IMAGE* is the name of a Linux OS image :ref:`installed in
+the server <pos_list_images>`)::
 
   $ IMAGE=clear tcf run -vv /usr/share/tcf/examples/test_audio_capture.py
 

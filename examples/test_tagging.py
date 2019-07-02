@@ -5,8 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
-"""
-Tag a testcase
+"""Tag a testcase
 ==============
 
 A testcase can be given one or more tags with the :func:`tcfl.tc.tags`
@@ -22,12 +21,14 @@ to be generated listing all the components found.
 
 Tags, for example, can be used later to filter from the command line
 to select all testcases with that expose a tag *color* with value
-*red*, in this case, only this one, *test_tagging.py*::
+*red*, in this case, only :download:`this one
+<../examples/test_tagging.py>`::
 
   $ tcf run -vv -s 'color == "red"' /usr/share/tcf/examples/
 
 (depending on your installation method, location might be
 *~/.local/share/tcf/examples*)
+
 """
 import os
 

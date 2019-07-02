@@ -80,6 +80,7 @@ class impl_c(object):
         :param str capturer: name of this capturer
         :returns: dictionary of values to pass to the client, usually
           nothing
+
         """
         assert isinstance(target, ttbl.test_target)
         assert isinstance(capturer, str)
@@ -313,7 +314,7 @@ class vnc(impl_c):
         except subprocess.CalledProcessError as e:
             target.log.error(
                 "%s: capturing VNC output with '%s' failed: (%d) %s"
-                % (target.id, " ".join(cmdline), e.returncode, e.output))
+                % (target.id, " ".join(e.cmd), e.returncode, e.output))
             raise
         # tell the caller to stream this file to the client
         return dict(stream_file = file_name)
@@ -351,7 +352,7 @@ class ffmpeg(impl_c):
         except subprocess.CalledProcessError as e:
             target.log.error(
                 "%s: capturing ffmpeg output with '%s' failed: (%d) %s"
-                % (target.id, " ".join(cmdline), e.returncode,
+                % (target.id, " ".join(e.cmd), e.returncode,
                    e.output))
             raise
         # tell the caller to stream this file to the client
@@ -443,7 +444,7 @@ class generic_snapshot(impl_c):
       SUBSYSTEM == "video4linux", ACTION == "add", \
           KERNEL=="video*", \
           ENV{ID_SERIAL} == "SERIALNUMBER", \
-          SYMLINK += "video-TARGETNAME" \
+          SYMLINK += "video-TARGETNAME"
 
     where *SERIALNUMBER* is the serial number of the device that
     captures the screen for *TARGETNAME*. Note it is recommended to
@@ -493,7 +494,7 @@ class generic_snapshot(impl_c):
         except subprocess.CalledProcessError as e:
             target.log.error(
                 "%s: capturing of '%s' with '%s' failed: (%d) %s"
-                % (target.id, self.name % kws, " ".join(cmdline), e.returncode,
+                % (target.id, self.name % kws, " ".join(e.cmd), e.returncode,
                    e.output))
             raise
         # tell the caller to stream this file to the client
@@ -619,7 +620,7 @@ class generic_stream(impl_c):
         except subprocess.CalledProcessError as e:
             target.log.error(
                 "%s: starting capture of '%s' output with '%s' failed: (%d) %s"
-                % (target.id, self.name % kws, " ".join(cmdline), e.returncode,
+                % (target.id, self.name % kws, e.cmd, e.returncode,
                    e.output))
             raise
 

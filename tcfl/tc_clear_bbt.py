@@ -455,16 +455,16 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         target.report_info("POS: rsyncing bbt.git from %(rsync_server)s "
                            "to /mnt/persistent.tcf.git/bbt.git" % _kws,
                            dlevel = -1)
-        target.shell.run("time rsync -aAX --numeric-ids"
-                         " %(rsync_server)s/misc/bbt.git/."
-                         " /mnt/persistent.tcf.d/bbt.git/."
+        target.shell.run("time rsync -cHaAX --exclude '.git/*' --numeric-ids"
+                         " %(rsync_server)s/misc/bbt.git"
+                         " /mnt/persistent.tcf.d/"
                          " || echo FAILED-%(tc_hash)s"
                          % _kws)
         target.report_info("POS: rsynced bbt.git from %(rsync_server)s "
                            "to /mnt/persistent.tcf.d/bbt.git" % _kws)
 
-        target.pos.rsync(self.bbt_tree, dst = '/opt/bbt.git',
-                         persistent_name = 'bbt.git')
+        target.pos.rsync(self.bbt_tree, dst = '/opt/', path_append = "",
+                         rsync_extra = "--exclude '.git/*'")
         # BBT checks will complain about the metadata file, so wipe it
         target.shell.run("rm -f /mnt/.tcf.metadata.yaml")
         if self.boot_mgr_disable:

@@ -5,8 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
-"""
-Testcase using two targets
+"""Testcase using two targets
 --------------------------
 
 Note n this case the target group names are listing two targets and
@@ -16,7 +15,8 @@ each target obejct has different values.
    :language: python
    :pyobject: _test
 
-Execute with::
+Execute :download:`the testcase
+<../examples/test_dump_kws_two_targets.py>` with::
 
   $ tcf run -vv /usr/share/tcf/examples/test_dump_kws_twp_targets.py
   INFO0/ato4B	/usr/share/tcf/examples/test_dump_kws_two_targets.py#_test @2psg: Keywords for testcase:
@@ -47,6 +47,7 @@ Execute with::
 
 (depending on your installation method, location might be
 *~/.local/share/tcf/examples*)
+
 """
 
 import pprint

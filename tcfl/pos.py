@@ -49,6 +49,7 @@ Note installation in the server side is needed, as described in
 :ref:`POS setup <pos_setup>`.
 """
 
+import collections
 import inspect
 import json
 import logging
@@ -570,6 +571,8 @@ class extension(tc.target_extension_c):
 
             # Sequence for TCF-live based on Fedora
             try:
+                # POS prints this when it boots before login
+                target.expect("TCF test node")
                 target.shell.up(timeout = bios_boot_time + timeout)
             except tc.error_e as e:
                 outputf = e.attachments_get().get('console output', None)
@@ -679,7 +682,8 @@ EOF""")
 
     def rsync(self, src = None, dst = None,
               persistent_name = None,
-              persistent_dir = '/persistent.tcf.d', path_append = "/."):
+              persistent_dir = '/persistent.tcf.d', path_append = "/.",
+              rsync_extra = ""):
         """
         rsync data from the local machine to a target
 
@@ -768,7 +772,10 @@ EOF""")
             assert src != None, \
                 "no `src` parameter is given, `persistent_name` must " \
                 "then be specified"
-            persistent_name = os.path.basename(src)
+            # when we are not given a name, rsync will take the
+            # source's name; this allows it to override files of
+            # different types in the cache
+            persistent_name = ""
         if src != None:
             target.report_info(
                 "rsyncing %s to target's persistent area /mnt%s/%s"
@@ -776,10 +783,11 @@ EOF""")
             target.shcmd_local(
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
-                "time -p rsync -cHaAX --numeric-ids --delete"
+                "time -p rsync -cHaAX %s --force --numeric-ids --delete"
                 " --port %%(rsync_port)s "
                 " %s%s %%(rsync_server)s::rootfs/%s/%s"
-                % (src, path_append, persistent_dir, persistent_name))
+                % (rsync_extra, src, path_append, persistent_dir,
+                   persistent_name))
         target.testcase._targets_active()
         if dst != None:
             # There is a final destination specified, so now, in the
@@ -791,11 +799,13 @@ EOF""")
             target.shell.run(
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
-                "time -p rsync -cHaAX --delete /mnt/%s/%s%s /mnt/%s"
-                % (persistent_dir, persistent_name, path_append, dst))
+                "time -p rsync -cHaAX %s --delete /mnt/%s/%s%s /mnt/%s"
+                % (rsync_extra, persistent_dir, persistent_name, path_append,
+                   dst))
 
 
-    def rsync_np(self, src, dst, option_delete = False, path_append = "/."):
+    def rsync_np(self, src, dst, option_delete = False, path_append = "/.",
+                 rsync_extra = "",):
         """rsync data from the local machine to a target
 
         The local machine is the machine executing the test script (where
@@ -856,11 +866,11 @@ EOF""")
         # don't be verbose, makes it too slow and timesout when
         # sending a lot of files
         cmdline = \
-            "time sudo rsync -cHaAX --numeric-ids %s" \
+            "time sudo rsync -cHaAX %s --numeric-ids %s" \
             " --inplace" \
             " --exclude=persistent.tcf.d --exclude='persistent.tcf.d/*'" \
             " --port %%(rsync_port)s %s%s %%(rsync_server)s::rootfs/%s%s" \
-            % (_delete, src, path_append, dst, path_append)
+            % (rsync_extra, _delete, src, path_append, dst, path_append)
         target.report_info(
             "POS: rsyncing %s to target's %s" % (src, dst), dlevel = -1,
             attachments = dict(cmdline = cmdline))
@@ -1032,41 +1042,44 @@ EOF""")
             "ic must be an instance of tc.target_c, but found %s" \
             % type(ic).__name__
         assert isinstance(image, str)
-        if not pos_prompt:
-            pos_prompt = re.compile(r' [0-9]+ \$ ')
         target = self.target
         testcase = target.testcase
+        if not pos_prompt:
+            # soft prompt until we login and update it
+            _pos_prompt = re.compile(r' [0-9]+ \$ ')
+        else:
+            _pos_prompt = pos_prompt
         boot_dev = self._boot_dev_guess(boot_dev)
         with msgid_c("POS"):
-
-            self.boot_to_pos(pos_prompt = pos_prompt, timeout = timeout,
-                             boot_to_pos_fn = target_power_cycle_to_pos)
-            testcase.targets_active()
-            kws = dict(
-                rsync_server = ic.kws['pos_rsync_server'],
-                image = image,
-                boot_dev = boot_dev,
-            )
-            kws.update(target.kws)
-
-            # keep console more or less clean, so we can easily parse it
-            target.shell.run("dmesg -l alert")
-
-            # Loop until the screen is clear, for particularly chatty systems
-            for attempt in range(30):
-                output = target.shell.run("echo {}".format(attempt),
-                        output=True, output_filter_crlf=True, trim=True)
-                if str(attempt) == output.strip():
-                    break
-                time.sleep(1)
 
             original_timeout = testcase.tls.expecter.timeout
             original_prompt = target.shell.shell_prompt_regex
             try:
                 # ensure we use the POS prompt
-                target.shell.shell_prompt_regex = pos_prompt
-                testcase.tls.expecter.timeout = 800
+                target.shell.shell_prompt_regex = _pos_prompt
 
+                self.boot_to_pos(pos_prompt = _pos_prompt, timeout = timeout,
+                                 boot_to_pos_fn = target_power_cycle_to_pos)
+                if not pos_prompt:
+                    # Adopt a harder to false positive prompt regex;
+                    # the TCF-HASHID is set by target.shell.up() after
+                    # we logged in; so if no prompt was specified, use
+                    # this.
+                    target.shell.shell_prompt_regex = \
+                        _pos_prompt = re.compile(r'TCF-%s: [0-9]+ \$ '
+                                                 % testcase.kws['tc_hash'])
+                    
+                testcase.targets_active()
+                kws = dict(
+                    rsync_server = ic.kws['pos_rsync_server'],
+                    image = image,
+                    boot_dev = boot_dev,
+                )
+                kws.update(target.kws)
+
+
+                # keep console more or less clean, so we can easily parse it
+                target.shell.run("dmesg -n alert")
                 self._fsinfo_load()
 
                 # List the available images and decide if we have the
@@ -1092,7 +1105,11 @@ EOF""")
                     "time -p rsync -cHaAX --numeric-ids --delete --inplace"
                     " --exclude=/persistent.tcf.d"
                     " --exclude='/persistent.tcf.d/*'"
-                    " %(rsync_server)s/%(image)s/. /mnt/." % kws)
+                    " %(rsync_server)s/%(image)s/. /mnt/." % kws,
+                    # 500s bc rsync takes a long time, but FIXME, we need
+                    # to break this up and just increase timeout on the
+                    # rsyncs -- and maybe guesstimate from the image size?
+                    timeout = 500)
                 target.report_info("POS: rsynced %(image)s from "
                                    "%(rsync_server)s to %(root_part_dev)s"
                                    % kws)
@@ -1119,15 +1136,12 @@ EOF""")
                     # maybe something, maybe nothing
                     boot_config_fn(target, boot_dev, image_final)
 
-                testcase.tls.expecter.timeout = timeout_sync
             except Exception as e:
                 target.report_info(
                     "BUG? exception %s: %s %s" %
                     (type(e).__name__, e, traceback.format_exc()))
                 raise
             finally:
-                target.shell.shell_prompt_regex = original_prompt
-                testcase.tls.expecter.timeout = original_timeout
                 # FIXME: document
                 # sync, kill any processes left over in /mnt, unmount it
                 # don't fail if this fails, as it'd trigger another exception
@@ -1140,6 +1154,8 @@ EOF""")
                     "cd /; "
                     "for device in %s; do umount -l $device || true; done"
                     % " ".join(reversed(target.pos.umount_list)))
+                target.shell.shell_prompt_regex = original_prompt
+                testcase.tls.expecter.timeout = original_timeout
 
             target.report_info("POS: deployed %(image)s" % kws)
             return kws['image']
@@ -1224,20 +1240,30 @@ def deploy_path(_ic, target, _kws, cache = True):
                            "*target.deploy_path_src is missing or None ",
                            dlevel = 2)
         return
-    target.report_info("rsyncing file %s -> target:%s"
-                       % (source_path, dst_path), dlevel = 1)
-    target.testcase._targets_active()
-    if cache:
-        # FIXME: do we need option_dlete here too? option_delete = True
-        target.pos.rsync(source_path, dst_path, path_append = "")
+
+    def _rsync_path(_source_path, dst_path):
+        target.report_info("rsyncing file %s -> target:%s"
+                           % (_source_path, dst_path), dlevel = 1)
+        target.testcase._targets_active()
+        if cache:
+            # FIXME: do we need option_dlete here too? option_delete = True
+            target.pos.rsync(_source_path, dst_path, path_append = "")
+        else:
+            target.pos.rsync_np(_source_path, dst_path, option_delete = True,
+                                path_append = "")
+        target.testcase._targets_active()
+        target.report_pass("rsynced file %s -> target:%s"
+                           % (_source_path, dst_path))
+
+    if isinstance(source_path, basestring):
+        _rsync_path(source_path, dst_path)
+    elif isinstance(source_path, collections.Iterable):
+        for _source_path in source_path:
+            _rsync_path(_source_path, dst_path)
     else:
-        target.pos.rsync_np(source_path, dst_path, option_delete = True,
-                            path_append = "")
-    target.testcase._targets_active()
-    target.report_pass("rsynced file %s -> target:%s"
-                       % (source_path, dst_path))
-
-
+        raise AssertionError(
+            "argument source_path needs to be a string or a "
+            "list of such, got a %s" % type(source_path).__name__)
 
 # FIXME: when tc.py's import hell is fixed, this shall move to tl.py?
 
@@ -1309,13 +1335,13 @@ class tc_pos0_base(tc.tc_c):
                 "or self.image_requested")
         self.image = target.pos.deploy_image(ic, self.image_requested,
                                              **self.deploy_image_args)
+        target.report_pass("deployed %s" % self.image)
 
     def start_50(self, ic, target):
         ic.power.on()
         # fire up the target, wait for a login prompt
         target.pos.boot_normal()
         target.shell.up(user = self.login_user, delay_login = self.delay_login)
-        target.report_pass("Deployed %s" % self.image)
 
     def teardown_50(self):
         tl.console_dump_on_failure(self)
