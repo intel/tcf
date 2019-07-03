@@ -334,8 +334,8 @@ def linux_wait_online(ic, target, loops = 10, wait_s = 0.5):
     target.shell.run(
         "for i in {1..%d}; do"
         " hostname -I | grep -Fq %s && break;"
-        " date +'waiting %f.1s @ %%c';"
-        " sleep %f.1s;"
+        " date +'waiting %.1f @ %%c';"
+        " sleep %.1fs;"
         "done; "
         "hostname -I "
         "# block until the expected IP is assigned, we are online"
