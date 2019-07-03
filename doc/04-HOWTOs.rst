@@ -37,6 +37,7 @@ evertything:
 .. automodule:: examples.test_pos0_base
 .. automodule:: examples.test_pos_deploy
 .. automodule:: examples.test_pos_deploy_2
+.. automodule:: examples.test_pos_boot
 .. automodule:: examples.test_deploy_files
 
 Capturing data, doing SSH
