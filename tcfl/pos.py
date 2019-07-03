@@ -776,6 +776,13 @@ EOF""")
             # source's name; this allows it to override files of
             # different types in the cache
             persistent_name = ""
+            _persistent_name = os.path.basename(src)
+        else:
+            assert isinstance(persistent_name, basestring) \
+                and not os.path.sep in persistent_name, \
+                "persistent_name  can't be a subdirectory" \
+                " and has to be a string"
+            _persistent_name = persistent_name
         if src != None:
             target.report_info(
                 "rsyncing %s to target's persistent area /mnt%s/%s"
@@ -800,7 +807,7 @@ EOF""")
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
                 "time -p rsync -cHaAX %s --delete /mnt/%s/%s%s /mnt/%s"
-                % (rsync_extra, persistent_dir, persistent_name, path_append,
+                % (rsync_extra, persistent_dir, _persistent_name, path_append,
                    dst))
 
 
