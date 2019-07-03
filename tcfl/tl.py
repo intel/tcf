@@ -316,3 +316,28 @@ def sh_export_proxy(ic, target):
             " NO_PROXY=127.0.0.1,%(ipv4_addr)s/%(ipv4_prefix_len)s," \
             "%(ipv6_addr)s/%(ipv6_prefix_len)d,localhost"
         target.shell.run("export " + proxy_cmd % ic.kws)
+
+def linux_wait_online(ic, target, loops = 10, wait_s = 0.5):
+    """
+    Wait on the serial console until the system is assigned an IP
+
+    We make the assumption that once the system is assigned the IP
+    that is expected on the configuration, the system has upstream
+    access and thus is online.
+    """
+    assert isinstance(target, tcfl.tc.target_c)
+    assert isinstance(ic, tcfl.tc.target_c) \
+        and "interconnect_c" in ic.kws['interfaces'], \
+        "argument 'ic' shall be an interconnect/network target"
+    assert loops > 0
+    assert wait_s > 0
+    target.shell.run(
+        "for i in {1..%d}; do"
+        " hostname -I | grep -Fq %s && break;"
+        " date +'waiting %f.1s @ %%c';"
+        " sleep %f.1s;"
+        "done; "
+        "hostname -I "
+        "# block until the expected IP is assigned, we are online"
+        % (loops, target.addr_get(ic, "ipv4"), wait_s, wait_s),
+        timeout = (loops + 1) * wait_s)
