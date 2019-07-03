@@ -584,9 +584,12 @@ EOF
             bundles += open(requirements_fname).read().split()
         self.report_info("Bundle requirements: %s" % " ".join(bundles),
                          dlevel = 1)
-
+        
         # if there is no distro mirror, use proxies -- HACK
         tcfl.tl.sh_export_proxy(ic, target)
+
+        # If need be, wait for network to become available
+        tcfl.tl.sh_wait_for_network(ic, target)
 
         distro_mirror = ic.kws.get('distro_mirror', None)
         if self.swupd_url:
@@ -737,6 +740,8 @@ EOF
     def eval(self, ic, target):
 
         tcfl.tl.sh_export_proxy(ic, target)
+        tcfl.tl.sh_wait_for_network(ic, target)
+
         # testcases assume they are running from the same
         # directory where the .t is.
         target.shell.run("cd /opt/bbt.git/%s" % self.rel_path_in_target)

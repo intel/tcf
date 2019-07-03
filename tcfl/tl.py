@@ -316,3 +316,16 @@ def sh_export_proxy(ic, target):
             " NO_PROXY=127.0.0.1,%(ipv4_addr)s/%(ipv4_prefix_len)s," \
             "%(ipv6_addr)s/%(ipv6_prefix_len)d,localhost"
         target.shell.run("export " + proxy_cmd % ic.kws)
+
+def sh_wait_for_network(ic, target):
+    """
+    Wait for network to be available
+    """
+    target.shell.run("""
+        # block until an IP is assigned, indicating it's online
+        for i in {1..25}; do
+            echo "IP Check try $i of 25"
+            hostname -I | grep -q %s && break;
+            sleep 2s;
+            done""" % target.addr_get(ic, "ipv4"), timeout=45)
+    target.shell.run("""echo "IP is $(hostname -I)" """)
