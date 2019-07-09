@@ -20,7 +20,7 @@ import distutils.core
 import distutils.sysconfig
 import setuptools
 
-from setuptools import find_packages
+from setuptools import setup, find_packages
 
 import setupl
 
@@ -52,7 +52,7 @@ class _build_py(distutils.command.build_py.build_py):
         distutils.command.build_py.build_py.run(self)
 
 
-setuptools.setup(
+setup(
     name = 'tcf',
     description = "TCF client",
     long_description = """\
@@ -63,7 +63,7 @@ This is the client and meta-testcase runner for the TCF test case framework.
     author = "Inaky Perez-Gonzalez",
     author_email = "inaky.perez-gonzalez@intel.com",
     license = "Apache-2.0",
-    packages = find_packages(),
+    packages = find_packages(exclude=['build','examples','ttbd']),
     scripts = [ "tcf" ],
     # This is needed so when data is to be installed, our
     # _install_data class is used.
