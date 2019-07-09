@@ -90,7 +90,7 @@ class msgid_c(object):
             assert isinstance(s_encode, str)
             self._ident += self.encode(hashlib.sha256(s_encode).digest(), l)
         else:
-            self._ident += self.generate(l)
+            self._ident += self.generate(l).decode('utf-8')
         if phase:
             assert isinstance(phase, str)
             self._phase = phase

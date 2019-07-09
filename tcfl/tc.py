@@ -5793,11 +5793,11 @@ class tc_c(object, metaclass=_tc_mc):
         except tcfl.tc.exception as e:
             raise
         except (ImportError, Exception) as e:
-            if 'base.util.tag' in e.message \
-               or 'util.const' in e.message \
-               or 'util.tag' in e.message:
+            if 'base.util.tag' in e.args \
+               or 'util.const' in e.args \
+               or 'util.tag' in e.args :
                 raise skip_e(
-                    "unsupported: %s" % e.message,
+                    "unsupported: %s" % e,
                     { "ex_trace": traceback.format_exc(), "dlevel": 4 })
             else:
                 raise blocked_e(
