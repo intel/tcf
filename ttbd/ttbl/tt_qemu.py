@@ -17,7 +17,7 @@ import socket
 import subprocess
 import time
 
-import commonl
+from tcfl import commonl
 import ttbl
 
 class qmp_c(object):

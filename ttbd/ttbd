@@ -19,7 +19,7 @@ FIXME: write up in progress
 
 """
 
-import commonl.requirements
+from tcfl.commonl import requirements
 
 # Verify that we can run TTBD
 commonl.requirements.verify_python_version()

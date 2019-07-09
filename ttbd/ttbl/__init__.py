@@ -38,7 +38,7 @@ import __main__
 import requests
 import usb.core
 
-import commonl
+from tcfl import commonl
 import ttbl.config
 from . import fsdb
 from . import mutex

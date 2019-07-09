@@ -12,7 +12,7 @@ import sys
 
 import requests
 
-import commonl.testing
+from tcfl import commonl.testing
 import tcfl.tc
 
 srcdir = os.path.dirname(__file__)

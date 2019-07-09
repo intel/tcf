@@ -15,7 +15,7 @@ import shutil
 import subprocess
 import time
 
-import commonl
+from tcfl import commonl
 import ttbl
 import ttbl.capture
 import ttbl.cm_serial

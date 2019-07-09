@@ -16,7 +16,7 @@ import re
 import subprocess
 import time
 
-import commonl
+from tcfl import commonl
 import tcfl.tc
 import tcfl.tl
 import tcfl.pos

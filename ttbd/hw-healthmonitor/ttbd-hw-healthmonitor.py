@@ -29,7 +29,7 @@ from typing import Pattern
 
 import systemd.journal
 import systemd.daemon
-import commonl
+from tcfl import commonl
 
 
 usb_root_regex = re.compile("^(?P<bus>[0-9]+)-(?P<port>[0-9]+)$")

@@ -11,7 +11,7 @@ import sys
 import time
 import unittest
 
-import commonl.testing
+from tcfl import commonl.testing
 import tcfl.tc
 
 srcdir = os.path.dirname(__file__)

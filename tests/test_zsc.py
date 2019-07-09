@@ -10,7 +10,7 @@ import os
 import sys
 import unittest
 
-import commonl.testing
+from tcfl.commonl import testing
 import tcfl
 import tcfl.app_zephyr
 import tcfl.tc

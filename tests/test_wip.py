@@ -9,7 +9,7 @@ import os
 import sys
 import unittest
 
-import commonl.testing
+from tcfl.commonl import testing
 import tcfl
 import tcfl.tl
 

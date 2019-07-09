@@ -19,7 +19,7 @@ import time
 
 import serial
 
-import commonl
+from tcfl import commonl
 import ttbl
 import ttbl.cm_loopback
 import ttbl.cm_serial

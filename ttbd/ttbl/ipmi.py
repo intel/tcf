@@ -11,8 +11,8 @@ import pprint
 import subprocess
 import time
 
-import commonl
-import commonl.requirements
+from tcfl import commonl
+from tcfl.commonl import requirements
 import ttbl
 
 import pyghmi.ipmi.command

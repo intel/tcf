@@ -7,7 +7,7 @@
 
 import subprocess
 
-import commonl
+from tcfl import commonl
 import ttbl.pc
 import ttbl.tt
 

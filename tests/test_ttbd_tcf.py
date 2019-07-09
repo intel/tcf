@@ -15,8 +15,8 @@ import sys
 import tempfile
 import unittest
 
-import commonl
-import commonl.testing
+from tcfl import commonl
+from tcfl.commonl import testing
 
 _src = os.path.abspath(__file__)
 _srcdir = os.path.dirname(_src)

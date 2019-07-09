@@ -12,8 +12,8 @@ import time
 import usb.core
 import usb.util
 
-import commonl
-import commonl.requirements
+from tcfl import commonl
+from tcfl.commonl import requirements
 import ttbl
 
 # Verify that we can run TTBD

@@ -3,7 +3,7 @@ import errno
 import os
 import subprocess
 
-import commonl
+from tcfl import commonl
 import ttbl
 
 class pci(ttbl.tt_power_control_impl):

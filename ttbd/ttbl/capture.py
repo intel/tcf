@@ -39,7 +39,7 @@ import re
 import subprocess
 import time
 
-import commonl
+from tcfl import commonl
 import ttbl
 
 mime_type_regex = re.compile(

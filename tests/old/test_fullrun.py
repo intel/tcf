@@ -18,7 +18,7 @@ import sys
 import tempfile
 import time
 import ttbl
-import commonl.testing
+from tcfl import commonl.testing
 import unittest
 
 # I bet there is a better way to do this...but we need the symbol to

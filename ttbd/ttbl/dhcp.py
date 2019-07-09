@@ -15,7 +15,7 @@ import shutil
 import stat
 import subprocess
 
-import commonl
+from tcfl import commonl
 import ttbl
 import ttbl.config
 

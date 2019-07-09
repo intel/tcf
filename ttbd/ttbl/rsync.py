@@ -8,7 +8,7 @@ import subprocess
 
 import prctl
 
-import commonl
+from tcfl import commonl
 import ttbl
 import ttbl.config
 

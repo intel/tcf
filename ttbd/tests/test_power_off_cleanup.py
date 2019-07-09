@@ -10,7 +10,7 @@ import sys
 import time
 import unittest
 
-import commonl.testing
+from tcfl.commonl import testing
 import tcfl
 import tcfl.ttb_client
 import ttbl.config

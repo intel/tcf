@@ -14,7 +14,7 @@ access outside isolated test networks via the server.
 import os
 import subprocess
 
-import commonl
+from tcfl import commonl
 import ttbl
 import ttbl.config
 

@@ -13,7 +13,7 @@ import requests
 
 import tcfl
 import tcfl.tc
-import commonl.testing
+from tcfl import commonl.testing
 
 srcdir = os.path.dirname(__file__)
 ttbd = commonl.testing.test_ttbd(config_files = [
