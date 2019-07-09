@@ -12,15 +12,14 @@
 #   rest_tb, as they are target broker specific
 #
 
-import commonl.requirements
-
-# Verify that we can run TCF
-commonl.requirements.verify_python_version()
-
 import collections
 import argparse
 import os
-import commonl
+from tcfl import commonl
+from tcfl.commonl import requirements
+# Verify that we can run TCF
+commonl.requirements.verify_python_version()
+
 import tcfl.ttb_client as ttb_client
 import tcfl.config
 import tcfl.tc
