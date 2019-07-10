@@ -299,7 +299,7 @@ class report_console_c(report_c):
                 try:
                     for line in attachment:
                         self._report_line(prefix, key, cnt, maxlines,
-                                          line.rstrip(), alevel, ulevel,
+                                          str(line).rstrip(), alevel, ulevel,
                                           maxlines_hit)
                 except TypeError as e:
                     self._report_line(prefix, key, 0, maxlines,
