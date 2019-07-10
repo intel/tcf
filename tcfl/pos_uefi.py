@@ -810,5 +810,16 @@ def boot_config_fix(target):
     # In the case of UEFI systems, this booted into a OS because the
     # EFI bootmgr order got munged, so let's try to get that fixed
     # (IPv4 and IPv6 boot first).
-    target.shell.up(user = 'root')
-    _efibootmgr_setup(target, target.kws['pos_boot_dev'], 1)
+    #
+    # We are using a very simplistic regex, i.e. only detecting 
+    # the last character on the prompt to ensure maximum possible
+    # chances of finding the prompt.
+
+    old = target.shell.shell_prompt_regex
+    target.shell.shell_prompt_regex=re.compile(' (#|\$) ')
+    try:
+        target.shell.up(user = 'root')
+        _efibootmgr_setup(target, target.kws['pos_boot_dev'], 1)
+    finally:
+        target.shell.shell_prompt_regex = old
+
