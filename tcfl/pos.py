@@ -1108,7 +1108,7 @@ EOF""")
                                    "%(rsync_server)s to %(root_part_dev)s"
                                    % kws,
                                    dlevel = -2)
-                target.shell.run(
+                output = target.shell.run(
                     "time -p rsync -cHaAX --numeric-ids --delete --inplace"
                     " --exclude=/persistent.tcf.d"
                     " --exclude='/persistent.tcf.d/*'"
@@ -1116,7 +1116,18 @@ EOF""")
                     # 500s bc rsync takes a long time, but FIXME, we need
                     # to break this up and just increase timeout on the
                     # rsyncs -- and maybe guesstimate from the image size?
-                    timeout = 500)
+                    timeout = 500, output = True)
+                # see above on time -p
+                kpi_regex = re.compile(r"^real[ \t]+(?P<seconds>[\.0-9]+)$",
+                                       re.MULTILINE)
+                m = kpi_regex.search(output)
+                if not m:
+                    raise tcfl.tc.error_e(
+                        "Can't find regex %s in output" % kpi_regex.pattern,
+                        dict(output = output))
+                target.report_data("Deployment stats image %(image)s" % kws,
+                                   "image rsync to %s (s)" % target.fullid,
+                                   float(m.groupdict()['seconds']))
                 target.report_info("POS: rsynced %(image)s from "
                                    "%(rsync_server)s to %(root_part_dev)s"
                                    % kws)
