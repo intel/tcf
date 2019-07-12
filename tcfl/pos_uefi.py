@@ -381,9 +381,12 @@ pos_boot_names = [
     re.compile(r"^UEFI\s?:( LAN :)? (IP|PXE IP)[46].*$"),
 ]
 
-local_boot_names = [
+tcf_local_boot_names = [
     # TCF Localboot v2
     re.compile("^TCF Localboot v2$"),
+]
+
+local_boot_names = [
     # UEFI : INTEL SSDPEKKW010T8 : PART 0 : OS Bootloader
     # UEFI : SATA : PORT 0 : INTEL SSDSC2KW512G8 : PART 0 : OS Bootloader
     # UEFI : M.2 SATA :INTEL SSDSCKJF240A5 : PART 0 : OS Bootloader
@@ -392,6 +395,12 @@ local_boot_names = [
 
 def _name_is_pos_boot(name):
     for regex in pos_boot_names:
+        if regex.search(name):
+            return True
+    return False
+
+def _name_is_tcf_local_boot(name):
+    for regex in tcf_local_boot_names:
         if regex.search(name):
             return True
     return False
@@ -423,6 +432,9 @@ def _efibootmgr_output_parse(target, output):
     for entry in entry_matches:
         if _name_is_pos_boot(entry[1]):
             section = 0		# POS (PXE, whatever), boot first
+        elif _name_is_tcf_local_boot(entry[1]):
+            section = 05	# TCF local boots, always first so we
+                                # can control
         elif _name_is_local_boot(entry[1]):
             section = 10	# LOCAL, boot after
         else:
@@ -441,14 +453,19 @@ efi_entries_to_remove = [
     "Linux bootloader",
     "ACRN",
     "debian",
+    "Linux bootloader",
+    "Linux Boot Manager",
+    "Windows Boot Manager",
+    "ubuntu"
 ]
 
 def _efibootmgr_ponder(target, output):
     boot_order, boot_entries = _efibootmgr_output_parse(target, output)
 
     # boot_entries has been sorted as it is in the current
-    # efibootmanager, and classified each entry in [2] as POS, LOCAL
-    # or leftover. We want POS, then LOCAL, then the rest.
+    # efibootmanager, and classified each entry in [2] as POS,
+    # TCF-LOCAL, LOCAL or leftover. We want POS, then TCF-LOCAL, then
+    # LOCAL, then the rest.
 
     # We want the same order being kept--why? Because some EFIs keep
     # rearranging it, unknown why and if we keep updating they end up
@@ -817,6 +834,27 @@ def boot_config_fix(target):
         # will do for now
         target.shell.shell_prompt_regex = target_ext_shell._shell_prompt_regex
         target.shell.up(user = 'root')
+
+        # Clean house
+        output = target.shell.run("efibootmgr", output = True)
+        _boot_order, boot_entries = \
+            _efibootmgr_output_parse(target, output)
+        target.report_info("boot order: %s" %  ",".join(_boot_order))
+        for entry, name, _category, _index in boot_entries:
+            if name in efi_entries_to_remove:
+                target.shell.run("efibootmgr -b %s -B" % entry)
+                if entry in _boot_order:
+                    target.report_info(
+                        "removed %s %s: %s"
+                        %  (entry, name,  _boot_order))
+                    _boot_order.remove(entry)
+            target.report_info("boot order after %s %s remove: %s"
+                               % (entry, name,  _boot_order))
+        target.report_info("boot order after remove: %s"
+                           %  _boot_order, level = 0)
+        output = target.shell.run("efibootmgr -o %s" % ",".join(_boot_order),
+                                  output = True, trim = True)
+
         _efibootmgr_setup(target, target.kws['pos_boot_dev'], 1)
     finally:
         target.shell.shell_prompt_regex = prompt_orig
