@@ -1716,7 +1716,8 @@ class target_group_c(object):
         self._targets = targets
         return targets
 
-assign_period = 2
+assign_period = 5
+poll_period = 0.25
 
 class result_c():
     def __init__(self, passed = 0, errors = 0, failed = 0,
@@ -2709,6 +2710,7 @@ class tc_c(object):
         self.tls = threading.local()
         #: Expect loop to wait for things to happen
         self.tls.expecter = expecter.expecter_c(self._expecter_log, self,
+                                                poll_period = poll_period,
                                                 timeout = 60)
         # Ticket ID for this testcase / target group
         self.ticket = None
@@ -2814,7 +2816,8 @@ class tc_c(object):
         group or when we spawn thredas to run methods in parallel.
         """
         self.tls.expecter = expecter.expecter_c(
-            self._expecter_log, self, timeout = expecter_parent.timeout)
+            self._expecter_log, self, poll_period = poll_period,
+            timeout = expecter_parent.timeout)
 
     def is_static(self):
         """
