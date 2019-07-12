@@ -19,6 +19,7 @@ import pprint
 import re
 
 import tc
+import target_ext_shell
 import tl
 
 boot_entries_ignore = [
@@ -810,5 +811,12 @@ def boot_config_fix(target):
     # In the case of UEFI systems, this booted into a OS because the
     # EFI bootmgr order got munged, so let's try to get that fixed
     # (IPv4 and IPv6 boot first).
-    target.shell.up(user = 'root')
-    _efibootmgr_setup(target, target.kws['pos_boot_dev'], 1)
+    prompt_orig = target.shell.shell_prompt_regex
+    try:
+        # get the super-generic prompt -- not a really good fix, but
+        # will do for now
+        target.shell.shell_prompt_regex = target_ext_shell._shell_prompt_regex
+        target.shell.up(user = 'root')
+        _efibootmgr_setup(target, target.kws['pos_boot_dev'], 1)
+    finally:
+        target.shell.shell_prompt_regex = prompt_orig
