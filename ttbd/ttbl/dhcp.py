@@ -539,6 +539,35 @@ host %(hostname)s {
         else:
             return False
 
+#: List of string with Linux kernel command options to be passed by
+#: the bootloader
+pos_cmdline_opts = {
+    'tcf-live':  [
+        # no 'single' so it force starts getty on different ports
+        # this needs an initrd
+        "initrd=%(pos_http_url_prefix)sinitramfs-%(pos_image)s ",
+        # needed by Fedora running as live FS hack
+        "rd.live.image", "selinux=0", "audit=0",
+        # ip=dhcp so we get always the same IP address and NFS root
+        # info (in option root-path when writing the DHCP config file
+        # a few lines above in _dhcp_conf_write()); thus nfsroot
+        # defers to whatever we are given over DHCP, which has all the
+        # protocol and version settings
+        #
+        # IP specification is needed so the kernel acquires an IP address
+        # and can syslog/nfsmount, etc Note we know the fields from the
+        # target's configuration, as they are pre-assigned
+        "ip=dhcp",        
+        "root=/dev/nfs",		# we are NFS rooted
+        # no exotic storage options
+        "rd.luks=0", "rd.lvm=0", "rd.md=0", "rd.dm=0", "rd.multipath=0",
+        "ro",				# we are read only
+        "plymouth.enable=0 ",		# No installer to run
+        "loglevel=2",			# kernel, be quiet to avoid
+        				# your messages polluting the
+                                        # serial terminal
+    ]
+}
 
 def power_on_pre_pos_setup(target):
 
@@ -592,23 +621,11 @@ def power_on_pre_pos_setup(target):
         _tag_get_from_ic_target(kws, 'pos_http_url_prefix', ic, target)
         _tag_get_from_ic_target(kws, 'pos_nfs_server', ic, target)
         _tag_get_from_ic_target(kws, 'pos_nfs_path', ic, target)
+        _tag_get_from_ic_target(kws, 'pos_image', ic, target, 'tcf-live')
 
         # generate configuration for the target to boot the POS's linux
         # kernel with the root fs over NFS
-        # FIXME: the name of the pos image and the command line extras
-        # should go over configuration and the target's configuration
-        # should be able to say which image it wants (defaulting everyone
-        # to whichever).
-        kws['extra_kopts'] = ""
-        kws['pos_image'] = 'tcf-live'
-        kws['root_dev'] = '/dev/nfs'
-        # no 'single' so it force starts getty on different ports
-        # nfsroot: note we defer to whatever we are given over DHCP
-        kws['extra_kopts'] += \
-            "initrd=%(pos_http_url_prefix)sinitramfs-%(pos_image)s " \
-            "rd.live.image selinux=0 audit=0 ro " \
-            "rd.luks=0 rd.lvm=0 rd.md=0 rd.dm=0 rd.multipath=0 " \
-            "plymouth.enable=0 "
+        kws['extra_kopts'] = " ".join(pos_cmdline_opts[kws['pos_image']])
 
         # Generate the PXE linux configuration
         #
@@ -616,14 +633,9 @@ def power_on_pre_pos_setup(target):
         # breakage, so we use Python's \ for clearer, shorter lines which
         # will be pasted all together
         #
-        # FIXME: move somewhere else more central?
-        #
-        # IP specification is needed so the kernel acquires an IP address
-        # and can syslog/nfsmount, etc Note we know the fields from the
-        # target's configuration, as they are pre-assigned
-        #
-        # ip=DHCP so we get always the same IP address and NFS root
-        # info (in option root-path when writing the DHCP config file)
+        # Most of the juicy stuff comes from the pos_cmdline_opts for
+        # each image (see, eg: tcf-live's) which is filled in
+        # extra_opts a few lines above
         config = """\
 say TCF Network boot to Service OS
 #serial 0 115200
@@ -633,8 +645,7 @@ label boot
   # boot to %(pos_image)s
   linux %(pos_http_url_prefix)svmlinuz-%(pos_image)s
   append console=tty0 console=%(linux_serial_console_default)s,115200 \
-    ip=dhcp \
-    root=%(root_dev)s %(extra_kopts)s
+    %(extra_kopts)s
 """
         config = template_rexpand(config, kws)
     else:
