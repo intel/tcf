@@ -345,6 +345,16 @@ Provisioning OS specific metadata
   not present, the first BSP (in alphabetical order) declared in the
   target tags ``bsps`` will be used.
 
+.. _pos_image:
+
+- *pos_image*: string describing the image used to boot the target in
+  POS mode; defaults to *tcf-live*.
+
+  For each image, in the server, :data:`ttbl.dhcp.pos_cmdline_opts`
+  describes the kernel options to append to the kernel image, which is
+  expected to be found in *http://:data:`POS_HTTP_URL_PREFIX
+  <pos_http_url_prefix>`/vmlinuz-POS_IMAGE*
+
 .. _uefi_boot_manager_ipv4_regex:
 
 - *uefi_boot_manager_ipv4_regex*: allows specifying a Python regular
