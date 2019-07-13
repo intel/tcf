@@ -1159,8 +1159,8 @@ EOF""")
                     "BUG? exception %s: %s %s" %
                     (type(e).__name__, e, traceback.format_exc()))
                 raise
-            finally:
-                # FIXME: document
+            else:
+                # run this only when we are doing a clean exit
                 # sync, kill any processes left over in /mnt, unmount it
                 # don't fail if this fails, as it'd trigger another exception
                 # and hide whatever happened that make us fail. Just make a
@@ -1172,6 +1172,7 @@ EOF""")
                     "cd /; "
                     "for device in %s; do umount -l $device || true; done"
                     % " ".join(reversed(target.pos.umount_list)))
+            finally:
                 target.shell.shell_prompt_regex = original_prompt
                 testcase.tls.expecter.timeout = original_timeout
 
