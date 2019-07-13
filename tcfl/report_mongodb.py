@@ -140,6 +140,9 @@ class report_mongodb_c(tcfl.report.report_c):
         # Where we keep all the file descriptors to the different
         # files we are writing to based on the code
         self.docs = {}
+        self.mongo_client = None
+        self.db = None
+        self.results = None
 
     def _report(self, level, alevel, ulevel, _tc, tag, message, attachments):
         """
@@ -272,6 +275,13 @@ class report_mongodb_c(tcfl.report.report_c):
             del self.docs[(runid, hashid, tc_name)]
             del doc
 
+    def _mongo_setup(self):
+        # We open a connection each time because it might have
+        # been a long time in between and it might have timed out
+        self.mongo_client = pymongo.MongoClient(self.url, **self.extra_params)
+        self.db = self.mongo_client[self.db_name]
+        self.results = self.db[self.collection_name]
+
     def _complete(self, _tc, runid, hashid, tc_name, doc):
         """
         Deliver to mongodb after adding a few more fields
@@ -321,16 +331,21 @@ class report_mongodb_c(tcfl.report.report_c):
         for complete_hook in self.complete_hooks:
             complete_hook(_tc, runid, hashid, tc_name, doc)
 
-        # We open a connection each time because it might have
-        # been a long time in between and it might have timed out
-        mongo_client = pymongo.MongoClient(self.url, **self.extra_params)
-        db = mongo_client[self.db_name]
-        results = db[self.collection_name]
-
-        # We replace any existing reports for this _id -- if that
-        # is not to happen, provide a different runid...
-        results.find_one_and_replace(
-            { '_id': doc['_id'] }, doc, upsert = True)
-        del results
-        del db
-        del mongo_client
+        retry_count = 1
+        while retry_count <= 3:
+            if not self.results:
+                self._mongo_setup()
+            try:
+                # We replace any existing reports for this _id -- if that
+                # is not to happen, provide a different runid...
+                self.results.find_one_and_replace({ '_id': doc['_id'] },
+                                                  doc, upsert = True)
+                break
+            except pymongo.errors.PyMongoError as e:
+                if retry_count <= 3:
+                    raise tcfl.tc.blocked_e(
+                        "MongoDB error, can't record result: %s" % e)
+                else:
+                    self.results = None
+                    _tc.warning("MongoDB error, reconnecting (%d/3): %s"
+                                % (e, retry_count))
