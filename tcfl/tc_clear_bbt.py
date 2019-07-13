@@ -275,6 +275,17 @@ ignore_ts = os.environ.get("BBT_IGNORE_TS", "").split()
 ignore_ts_mutex = threading.Lock()
 ignore_ts_regex = None
 
+# This is now a hack because we don't have a good way to tell which
+# bundles take longer or not from the bundle itself, so for no we'll
+# hardcode it FIXME
+timeouts = {
+    'kvm-host': 480,
+    'os-clr-on-clr': 480,
+    'perl-basic': 480,
+    'telemetrics': 480,
+}
+
+
 @tcfl.tc.interconnect('ipv4_addr')
 @tcfl.tc.target('pos_capable', mode = 'any')
 class tc_clear_bbt_c(tcfl.tc.tc_c):
@@ -602,6 +613,15 @@ EOF
                 "swupd mirror -s %s/pub/mirrors/clearlinux/update/"
                 % distro_mirror)
 
+        short_name = os.path.basename(self.kws['srcdir'])
+        if short_name in timeouts:
+            timeout = timeouts[short_name]
+            self.report_info("adjusting timeout to %d per "
+                             "configuration tcfl.tc_clear_bbt.timeouts"
+                             % timeout)
+        else:
+            timeout = 240
+
         # Install them bundles
         #
         # installing can take too much time, so we do one bundle at a
@@ -610,7 +630,7 @@ EOF
         # As well, swupd doesn't seem to be able to recover well from
         # network glitches--so we do a loop where we retry a few times;
         # we record how many tries we did and the time it took as KPIs
-        self.tls.expecter.timeout = 240
+        self.tls.expecter.timeout = timeout
         for bundle in bundles:
             if self.swupd_debug:
                 debug = "--debug"
