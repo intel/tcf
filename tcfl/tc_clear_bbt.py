@@ -278,12 +278,74 @@ ignore_ts_regex = None
 # This is now a hack because we don't have a good way to tell which
 # bundles take longer or not from the bundle itself, so for no we'll
 # hardcode it FIXME
-timeouts = {
+bundle_run_timeouts = {
     'kvm-host': 480,
-    'os-clr-on-clr': 480,
+    # size
+    'os-clr-on-clr': 640,
     'perl-basic': 480,
     'telemetrics': 480,
+    # time?
+    'xfce4-desktop': 480,
+    'bat-xfce4-desktop-gui.t': 480,
+
+    # Needs way more time, more if the machine is slow ... way, about
+    # 16 min, 4k subcases this FIXME has to be split so it can be
+    # parallelized
+    'bat-perl-extras-perl-use.t': 1500,
+    'bat-os-testsuite-phoronix.t': 600,
+    'bat-mixer.t': 480,
 }
+
+#: Commands to execute before running bats on each .t file (key by .t
+#: file name or bundle-under-test name).
+#:
+#: Note these will be executed in the bundle directory and templated
+#: with ``STR % testcase.kws``.
+bundle_run_pre_sh = {
+    'bat-perl-basic-perl-use.t': [
+        "export PERL_CANARY_STABILITY_NOPROMPT=1",
+    ]
+}
+
+# FIXME: This has to be put in the tl.swupd_bundle_add helper too and
+# be configurable
+bundle_add_timeouts = {
+    'desktop': 480,
+    'desktop-autostart': 480,
+    'os-clr-on-clr': 1000,		# this is seriously big
+    'os-testsuite-phoronix': 1000,
+    'os-testsuite-phoronix-server': 1000,
+    'os-testsuite-phoronix-desktop': 1000,	# very big
+}
+
+
+def _bundle_add_timeout(tc, bundle_name, test_name):
+    timeout = 240
+    if bundle_name in bundle_add_timeouts:
+        timeout = bundle_add_timeouts[bundle_name]
+        tc.report_info("adjusting timeout to %d per "
+                       "configuration tcfl.tc_clear_bbt.bundle_add_timeouts"
+                       % timeout)
+    if test_name in bundle_add_timeouts:
+        timeout = bundle_add_timeouts[test_name]
+        tc.report_info("adjusting timeout to %d per "
+                       "configuration tcfl.tc_clear_bbt.bundle_add_timeouts"
+                       % timeout)
+    return timeout
+
+def _bundle_run_timeout(tc, bundle_name, test_name):
+    timeout = 240
+    if bundle_name in bundle_run_timeouts:
+        timeout = bundle_run_timeouts[bundle_name]
+        tc.report_info("adjusting timeout to %d per "
+                       "configuration tcfl.tc_clear_bbt.bundle_run_timeouts"
+                       % timeout)
+    if test_name in bundle_run_timeouts:
+        timeout = bundle_run_timeouts[test_name]
+        tc.report_info("adjusting timeout to %d per "
+                       "configuration tcfl.tc_clear_bbt.bundle_run_timeouts"
+                       % timeout)
+    return timeout
 
 
 @tcfl.tc.interconnect('ipv4_addr')
@@ -345,8 +407,12 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         self.deploy_done = False
         self.subtc_list = []
         self.subtcs = {}
+        self.test_bundle_name = os.path.basename(path)
 
-    def configure_00_set_relpath_set(self):
+    #: Shall we capture a boot video if possible?
+    capture_boot_video_source = "screen_stream"
+
+    def configure_00_set_relpath_set(self, target):
         # calculate these here in case we skip deployment
         self.bbt_tree = subprocess.check_output(
             [
@@ -367,6 +433,10 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         self.rel_path_in_target = os.path.relpath(
             os.path.realpath(self.kws['srcdir']),
             os.path.realpath(self.bbt_tree))
+
+        if self.capture_boot_video_source + ":" \
+           not in target.kws.get('capture', ""):
+            self.capture_boot_video_source = False
 
     # Because of unfortunate implementation decissions that have to be
     # revisited, we need to initialize the list of
@@ -450,7 +520,6 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
     #: if environ SWUPD_FIX_TIME is defined, set the target's time to
     #: the client's time
     fix_time = os.environ.get("SWUPD_FIX_TIME", None)
-
     
     def _deploy_bbt(self, _ic, target, _kws):
         # note self.bbt_tree and self.rel_path_in_target are set by
@@ -544,21 +613,21 @@ EOF
         # fire up the target, wait for a login prompt
         # if we have video capture, get it to see if we are crashing
         # before booting
-        if "screen_stream:stream" in target.kws.get('capture', ""):
+        if self.capture_boot_video_source:
             capturing = True
-            target.capture.start("screen_stream")
+            target.capture.start(self.capture_boot_video_source)
         else:
             capturing = False
         target.pos.boot_normal()
         try:
             target.shell.up(user = 'root')
             if capturing:
-                target.capture.stop("screen_stream")
+                target.capture.stop(self.capture_boot_video_source)
         except:
             if capturing:
                 # done booting, get the boot sequence movie, in case we
                 # could record it
-                target.capture.get("screen_stream",
+                target.capture.get(self.capture_boot_video_source,
                                    self.report_file_prefix + "boot.avi")
             raise
         target.report_pass("Booted %s" % self.image)
@@ -613,15 +682,6 @@ EOF
                 "swupd mirror -s %s/pub/mirrors/clearlinux/update/"
                 % distro_mirror)
 
-        short_name = os.path.basename(self.kws['srcdir'])
-        if short_name in timeouts:
-            timeout = timeouts[short_name]
-            self.report_info("adjusting timeout to %d per "
-                             "configuration tcfl.tc_clear_bbt.timeouts"
-                             % timeout)
-        else:
-            timeout = 240
-
         # Install them bundles
         #
         # installing can take too much time, so we do one bundle at a
@@ -630,7 +690,6 @@ EOF
         # As well, swupd doesn't seem to be able to recover well from
         # network glitches--so we do a loop where we retry a few times;
         # we record how many tries we did and the time it took as KPIs
-        self.tls.expecter.timeout = timeout
         for bundle in bundles:
             if self.swupd_debug:
                 debug = "--debug"
@@ -638,6 +697,7 @@ EOF
                 debug = ""
             count = 0
             top = 10
+            add_timeout = _bundle_add_timeout(self, self.test_bundle_name, bundle)
             for count in range(1, top + 1):
                 # We use -p so the format is the POSIX standard as
                 # defined in
@@ -645,7 +705,8 @@ EOF
                 # STDERR section
                 output = target.shell.run(
                     "time -p swupd bundle-add %s %s || echo FAILED''-%s"
-                    % (debug, bundle, self.kws['tc_hash']), output = True)
+                    % (debug, bundle, self.kws['tc_hash']),
+                    output = True, timeout = add_timeout)
                 if not 'FAILED-%(tc_hash)s' % self.kws in output:
                     # we assume it worked
                     break
@@ -708,12 +769,30 @@ EOF
         else:
             self.report_info("running %s%s" % (prefix, t_file))
             self.kw_set("t_file", t_file)
+
+            # patch any execution hot fixes
+            pre_sh_l = []
+            if self.test_bundle_name in bundle_run_pre_sh:
+                self.report_info("adding configured pre_sh steps from "
+                                 "tcfl.tc_clear_bbt.bundle_run_pre_sh[%s]"
+                                 % self.test_bundle_name)
+                pre_sh_l += bundle_run_pre_sh[self.test_bundle_name]
+            if t_file in bundle_run_pre_sh:
+                self.report_info("adding configured pre_sh steps from "
+                                 "tcfl.tc_clear_bbt.bundle_run_pre_sh[%s]"
+                                 % t_file)
+                pre_sh_l += bundle_run_pre_sh[t_file]
+            for pre_sh in pre_sh_l:
+                target.shell.run(pre_sh % self.kws)
+
+            # Run the t_file
+            # remember we cd'ed into the directory, the way these
+            # BBTs are written, it is expected
+            run_timeout = _bundle_run_timeout(self, self.test_bundle_name, t_file)
             output = target.shell.run(
-                # remember we cd'ed into the directory, the way these
-                # BBTs are written, it is expected
                 "bats --tap %s || echo FAILED''-%s"
                 % (t_file, self.kws['tc_hash']),
-                output = True)
+                output = True, timeout = run_timeout)
             # top level result
             if 'bats: command not found' in output:
                 self.report_error(
