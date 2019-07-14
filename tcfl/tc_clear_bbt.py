@@ -69,6 +69,7 @@ import time
 
 import commonl
 import tcfl
+import tcfl.tc
 import tcfl.pos
 import tcfl.tl
 
@@ -106,15 +107,21 @@ def tap_parse_output(output):
 
     linecnt = 0
     _plan_count = 1
+    plan_max = 0
     tc = None
     for line in output.split("\n"):
         linecnt += 1
         m = tc_plan.search(line)
         if m:
+            if plan_set_at and _plan_count > plan_max:
+                # only complain if we have not completed it, otherwise
+                # consider it spurious and ignore
+                continue
             if plan_set_at:
-                raise RuntimeError(
-                    "%d: setting range, but was already set at %d",
-                    linecnt, plan_set_at)
+                raise tcfl.tc.blocked_e(
+                    "%d: setting range, but was already set at %d"
+                    % (linecnt, plan_set_at),
+                    dict(output = output, line = line))
             plan_set_at = linecnt
             plan_min = int(m.groupdict()['plan_min'])
             plan_max = int(m.groupdict()['plan_max'])
@@ -287,14 +294,15 @@ bundle_run_timeouts = {
     # time?
     'xfce4-desktop': 480,
     'bat-xfce4-desktop-gui.t': 480,
-    'bat-desktop-kde-gui.t': 480,
+    'bat-desktop-kde-gui.t': 800,
+    'bat-desktop-kde-apps-gui.t': 800,
 
     # Needs way more time, more if the machine is slow ... way, about
     # 16 min, 4k subcases this FIXME has to be split so it can be
     # parallelized
     'bat-perl-extras-perl-use.t': 1500,
     'bat-os-testsuite-phoronix.t': 600,
-    'bat-mixer.t': 480,
+    'bat-mixer.t': 800,
 }
 
 #: Commands to execute before running bats on each .t file (key by .t
@@ -313,10 +321,12 @@ bundle_run_pre_sh = {
 bundle_add_timeouts = {
     'desktop': 480,
     'desktop-autostart': 480,
-    'os-clr-on-clr': 1000,		# this is seriously big
+    # these are seriously big and need plenty of room not to fail randomly
+    'os-clr-on-clr': 1500,
+    'os-testsuite': 1000,
     'os-testsuite-phoronix': 1000,
     'os-testsuite-phoronix-server': 1000,
-    'os-testsuite-phoronix-desktop': 1000,	# very big
+    'os-testsuite-phoronix-desktop': 1000,
 }
 
 
