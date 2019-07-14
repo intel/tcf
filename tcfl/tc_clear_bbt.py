@@ -287,6 +287,7 @@ bundle_run_timeouts = {
     # time?
     'xfce4-desktop': 480,
     'bat-xfce4-desktop-gui.t': 480,
+    'bat-desktop-kde-gui.t': 480,
 
     # Needs way more time, more if the machine is slow ... way, about
     # 16 min, 4k subcases this FIXME has to be split so it can be
