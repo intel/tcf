@@ -818,7 +818,7 @@ EOF
             for name, data in tcs.iteritems():
                 # get the subtc; see _scan_t_subcases() were we keyed
                 # them in
-                _name = commonl.name_make_safe(name.strip()).rstrip("_")
+                _name = commonl.name_make_safe(name.strip())
                 tc_name = t_file + "." + _name
                 subtc = self.subtcs[tc_name]
                 if self._ts_ignore(subtc.name):
@@ -879,8 +879,10 @@ EOF
     paths = {}
     filename_regex = re.compile(r"^.*\.t$")
 
+    # the initial ['"] has to be part of the name, as otherwise it
+    # mite strip parts that bats (the program) does consider...
     _regex_t_subcases = re.compile(
-        r"^\s*@test\s+['\"](?P<name>.+)['\"]\s+{.*", re.MULTILINE)
+        r"^\s*@test\s+(?P<name>['\"].+['\"])\s+{.*", re.MULTILINE)
 
     def _scan_t_subcases(self, path, prefix):
         # we just create here the list of parameters we'll use to
@@ -890,11 +892,21 @@ EOF
         with open(path) as tf:
             subcases = re.findall(self._regex_t_subcases, tf.read())
         for name in subcases:
-            # make sure to remove leading/trailing whitespace and then
-            # trailing _--this allows it to match what the bats tool
-            # scans, which we'll need to match in the output of
-            # tap_parse_output() in _eval_one()
-            _name = commonl.name_make_safe(name.strip()).rstrip("_")
+            # here we need to be careful to treat the scanned name
+            # exactly the same way the bats tool will do it, otherwise
+            # when we scan them from the bats output, they won't match
+            name = name.strip()
+            # strip the simple or double quotes from the name
+            # -> "Starting somethings --id=\"blah\""
+            # <- Starting somethings --id=\"blah\"
+            name = name[1:-1]
+            # ok, now somethings might have been escaped with \...we
+            # can ignore it, since we are not affected by it...
+            # -> Starting somethings --id=\"blah\"
+            # <- Starting somethings --id="blah"
+            name = name.replace("\\", "")
+            # strip here, as BATS will do too
+            _name = commonl.name_make_safe(name.strip())
             t_file_name = os.path.basename(path)
             self.subtc_list.append((
                 # note we'll key on the .t file basename and the subtest name
