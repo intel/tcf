@@ -839,6 +839,8 @@ def boot_config_fix(target):
         output = target.shell.run("efibootmgr", output = True)
         _boot_order, boot_entries = \
             _efibootmgr_output_parse(target, output)
+        removed = []
+        kept = []
         target.report_info("boot order: %s" %  ",".join(_boot_order))
         for entry, name, _category, _index in boot_entries:
             if name in efi_entries_to_remove:
@@ -846,15 +848,19 @@ def boot_config_fix(target):
                 if entry in _boot_order:
                     target.report_info(
                         "removed %s %s: %s"
-                        %  (entry, name,  _boot_order))
+                        %  (entry, name,  _boot_order), dlevel = -1)
+                    removed.append("%s:%s" % (entry, name))
                     _boot_order.remove(entry)
+                else:
+                    kept.append("%s:%s" % (entry, name))
             target.report_info("boot order after %s %s remove: %s"
                                % (entry, name,  _boot_order))
-        target.report_info("boot order after remove: %s"
-                           %  _boot_order, level = 0)
         output = target.shell.run("efibootmgr -o %s" % ",".join(_boot_order),
                                   output = True, trim = True)
-
+        target.report_info(
+            "EFI boot order RECOVERY executed",
+            dict(boot_order = "\n".join(kept), removed = "\n".join(removed),
+                 alevel = -1, level = -1))
         _efibootmgr_setup(target, target.kws['pos_boot_dev'], 1)
     finally:
         target.shell.shell_prompt_regex = prompt_orig
