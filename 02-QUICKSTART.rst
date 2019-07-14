@@ -6,6 +6,8 @@
 
 .. _install_tcf_client:
 
+.. include:: doc/02-client-setup-LL-00.rst
+
 1. Install the client software from source::
 
      $ git clone http://github.com/intel/tcf tcf.git
