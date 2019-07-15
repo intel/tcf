@@ -296,7 +296,8 @@ bundle_run_timeouts = {
     'bat-xfce4-desktop-gui.t': 480,
     'bat-desktop-kde-gui.t': 800,
     'bat-desktop-kde-apps-gui.t': 800,
-
+    # when this catches a lot of files, it can take a while
+    'quick-perms.t': 3000,
     # Needs way more time, more if the machine is slow ... way, about
     # 16 min, 4k subcases this FIXME has to be split so it can be
     # parallelized
@@ -321,7 +322,9 @@ bundle_run_pre_sh = {
 bundle_add_timeouts = {
     'desktop': 480,
     'desktop-autostart': 480,
+    'LyX': 500,
     'machine-learning-basic': 800,
+    'machine-learning-tensorflow': 800,
     'texlive': 800,
     'education': 800,
     'os-core-dev': 800,
