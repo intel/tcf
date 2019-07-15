@@ -812,7 +812,7 @@ EOF""")
 
 
     def rsync_np(self, src, dst, option_delete = False, path_append = "/.",
-                 rsync_extra = "",):
+                 rsync_extra = ""):
         """rsync data from the local machine to a target
 
         The local machine is the machine executing the test script (where
@@ -1239,7 +1239,7 @@ def deploy_tree(_ic, target, _kws):
     target.report_pass("rsynced tree %s -> target:/" % source_tree)
 
 
-def deploy_path(_ic, target, _kws, cache = True):
+def deploy_path(ic, target, _kws, cache = True):
     """
     Rsync a local tree to the target after imaging
 
@@ -1254,22 +1254,45 @@ def deploy_path(_ic, target, _kws, cache = True):
     """
     source_path = getattr(target, "deploy_path_src", None)
     dst_path = getattr(target, "deploy_path_dest", "/")
+    rsync_extra = getattr(target, "deploy_rsync_extra", None)
     if source_path == None:
         target.report_info("not deploying local path because "
                            "*target.deploy_path_src is missing or None ",
                            dlevel = 2)
         return
 
+    # try to sync first from the server cache
+    for src in source_path:
+        cache_name = os.path.basename(src)
+        target.shell.run("mkdir -p /mnt/persistent.tcf.d/%s\n"
+                         "# trying to seed %s from the server's cache"
+                         % (cache_name, cache_name))
+
+        rsync_server = ic.kws['pos_rsync_server']
+        target.report_info("POS: rsyncing %s from %s "
+                           "to /mnt/persistent.tcf.git/%s"
+                           % (cache_name, rsync_server, cache_name),
+                           dlevel = -1)
+        target.shell.run("time rsync --numeric-ids --delete --inplace "
+                         " -cHaAX %s %s/misc/%s /mnt/persistent.tcf.d/"
+                         " || true # ignore failures, might not be cached"
+                         % (rsync_extra, rsync_server,
+                            cache_name))
+        target.report_info("POS: rsynced %s from %s "
+                           "to /mnt/persistent.tcf.d/%s"
+                           % (cache_name, rsync_server, cache_name))
+
     def _rsync_path(_source_path, dst_path):
         target.report_info("rsyncing file %s -> target:%s"
                            % (_source_path, dst_path), dlevel = 1)
         target.testcase._targets_active()
         if cache:
-            # FIXME: do we need option_dlete here too? option_delete = True
-            target.pos.rsync(_source_path, dst_path, path_append = "")
+            # FIXME: do we need option_delete here too? option_delete = True
+            target.pos.rsync(_source_path, dst_path, path_append = "",
+                             rsync_extra = rsync_extra)
         else:
             target.pos.rsync_np(_source_path, dst_path, option_delete = True,
-                                path_append = "")
+                                path_append = "", rsync_extra = rsync_extra)
         target.testcase._targets_active()
         target.report_pass("rsynced file %s -> target:%s"
                            % (_source_path, dst_path))
