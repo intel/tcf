@@ -4337,9 +4337,32 @@ class tc_c(object):
                     continue
                 raise
 
+    #: Maximum time (seconds) to wait to succesfully acquire a set of targets
+    #:
+    #: In heavily contented scenarios or large executions, this
+    #: becomes oversimplistic and not that useful and shall be
+    #: delegated to something like Jenkins timing out after so long
+    #: running things.
+    #:
+    #: In that case set it to over that timeout (eg: 15 hours); it'll
+    #: keep trying to assign until killed; in a tcf :ref:`configuration
+    #: file <tcf_client_configuration>`, add:
+    #:
+    #: >>> tcfl.tc.tc_c.assign_timeout = 15 * 60 * 60
+    #:
+    #: or even in the testcase itself, before it assigns (in build or
+    #: config methods)
+    #:
+    #: >>> self.assign_timeout = 15 * 60 * 60
+    
+    assign_timeout = 1000
+
     # FIXME: add phase "assign"
     @contextlib.contextmanager
-    def _targets_assign(self, timeout = 1000, period = assign_period):
+    def _targets_assign(self):
+        timeout = self.assign_timeout
+        period = assign_period
+
         if self.is_static():
             yield
             return
