@@ -329,6 +329,36 @@ bundle_add_timeouts = {
     'os-testsuite-phoronix-desktop': 1000,
 }
 
+# ugly case here, as this is a hack made for a subdirectory that
+# contains .ts that we call from another .t looking sh.
+# it is a bad hack which calls for another bad hack
+# So do not try to run this subdir
+
+bundle_path_map = [
+    # each entry is a regex that is matched and what is replaced with
+    # re.sub()
+    ( re.compile("^(.*bundles/os-clr-on-clr)/t"), r"\g<1>" )
+]
+
+#: Sometime this works in conjunction with :data:`bundle_path_map`
+#: above, when a .t file is actually calling another one (maybe in
+#: another directory, then you need an entry in
+#: :data:`bundle_path_map`) to rename the directory to match the entry
+#: of this one.
+#:
+#: .. example::
+#:
+#:    In the hardcoded example, *bat-dev-tooling.t* is just doing
+#:    something to prep and then exec'ing bats to run
+#:    *t/build-package.t*.
+#:
+#:    So we need to map the directory *t* out and also rename the
+#:    entry from *build-package.t/something* that would be found from
+#:    scanning the output to what is expected from scanning the
+#:    testcases in disk.
+bundle_t_map = {
+    'bat-dev-tooling.t.autospec_nano': 'build-package.t.autospec_nano',
+}
 
 def _bundle_add_timeout(tc, bundle_name, test_name):
     timeout = 240
@@ -831,7 +861,15 @@ EOF
                 # them in
                 _name = commonl.name_make_safe(name.strip())
                 tc_name = t_file + "." + _name
-                subtc = self.subtcs[tc_name]
+                if tc_name in bundle_t_map:
+                    _tc_name = bundle_t_map[tc_name]
+                    self.report_info("subtestcase name %s mapped to %s "
+                                     "per configuration "
+                                     "tcfl.tc_clear_bbt.bundle_t_map"
+                                     % (tc_name, _tc_name))
+                else:
+                    _tc_name = tc_name
+                subtc = self.subtcs[_tc_name]
                 if self._ts_ignore(subtc.name):
                     data['result'] += \
                         "result skipped due to configuration " \
@@ -918,6 +956,7 @@ EOF
             name = name.replace("\\", "")
             # strip here, as BATS will do too
             _name = commonl.name_make_safe(name.strip())
+            logging.debug("%s contains subcase %s", path, _name)
             t_file_name = os.path.basename(path)
             self.subtc_list.append((
                 # note we'll key on the .t file basename and the subtest name
@@ -957,20 +996,31 @@ EOF
         # As a result, we only create a testcase per directory that
         # has entries for each .t file in the directory.
         srcdir = os.path.dirname(path)
-        if srcdir in cls.paths:
+        srcdir_real_path = os.path.realpath(srcdir)
+        for regex, replacement in bundle_path_map:
+            match = regex.match(srcdir_real_path)
+            if match:
+                _srcdir = re.sub(regex, replacement, srcdir_real_path)
+                logging.info("path '%s' mapped to '%s' per config "
+                             "tcfl.tc_clear_bbt.bundle_path_map",
+                             srcdir_real_path, _srcdir)
+                break
+        else:
+            _srcdir = srcdir_real_path
+        if _srcdir in cls.paths:
             # there is a testcase for this directory already, append
             # the .t
-            tc = cls.paths[srcdir]
+            tc = cls.paths[_srcdir]
             tc.t_files.append(os.path.basename(path))
-            tc._scan_t_subcases(path, srcdir + "/")
-            tc.report_info("%s will be run by %s" % (file_name, srcdir),
+            tc._scan_t_subcases(path, _srcdir + "/")
+            tc.report_info("%s will be run by %s" % (path, _srcdir),
                            dlevel = 3)
         else:
             # there is no testcase for this directory, go create it;
             # set the full filename as origin.
-            tc = cls(srcdir, path)
-            tc._scan_t_subcases(path, srcdir + "/")
-            cls.paths[srcdir] = tc
+            tc = cls(_srcdir, path)
+            tc._scan_t_subcases(path, _srcdir + "/")
+            cls.paths[_srcdir] = tc
 
             # now, we will also run anything in the any-bundle
             # directory -- per directory, so we add it now, as we
@@ -978,9 +1028,9 @@ EOF
             # not work when we just point to a .t
             # any_bundle's are at ../../any-bundle from the
             # per-bundle directories where the .ts are.
-            any_bundle_path = os.path.join(srcdir, "..", "..", "any-bundle",
+            any_bundle_path = os.path.join(_srcdir, "..", "..", "any-bundle",
                                            "*.t")
             for any_t_file_path in glob.glob(any_bundle_path):
-                tc._scan_t_subcases(any_t_file_path, srcdir + "/any#")
+                tc._scan_t_subcases(any_t_file_path, _srcdir + "/any#")
 
         return [ tc ]
