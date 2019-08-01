@@ -24,27 +24,19 @@
 
   
 
-  
-  
-    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-  
-
-  
-
-  
-        <link rel="index" title="Index"
-              href="../genindex.html"/>
-        <link rel="search" title="Search" href="../search.html"/>
-    <link rel="top" title="Test Case Framework 0.11 documentation" href="../index.html"/>
-        <link rel="next" title="10. Current status and plans" href="10-Status.html"/>
-        <link rel="prev" title="8. APIs" href="09-api.html"/> 
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="10. Current status and plans" href="10-Status.html" />
+    <link rel="prev" title="8. APIs" href="09-api.html" /> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
 
 </head>
 
-<body class="wy-body-for-nav" role="document">
+<body class="wy-body-for-nav">
 
    
   <div class="wy-grid-for-nav">
@@ -94,7 +86,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../02-QUICKSTART.html">1. Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="02-guides.html">2. Guides</a></li>
 <li class="toctree-l1"><a class="reference internal" href="03-server-setup.html">3. Server deployment guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="04-HOWTOs.html">4. HOWTOs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="04-HOWTOs.html">4. Examples and HOWTOs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="05-RFAQs.html">5. Rationales and Frequently Asked Questions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="06-troubleshooting.html">6. Support &amp; Troubleshooting</a></li>
 <li class="toctree-l1"><a class="reference internal" href="07-Architecture.html">7. Architecture</a></li>
@@ -113,7 +105,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
 
       
-      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+      <nav class="wy-nav-top" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="../index.html">Test Case Framework</a>
@@ -121,9 +113,10 @@
       </nav>
 
 
-      
       <div class="wy-nav-content">
+        
         <div class="rst-content">
+        
           
 
 
@@ -176,6 +169,30 @@
 independently or together, the following BSP models would be
 supported: <cite>x86</cite>, <cite>arc</cite> and <cite>x86+arc</cite>.</p>
 </dd>
+<dt id="term-hash">hash</dt>
+<dd>In the context of <em>tcf run</em>, a hash is a four character code that
+uniquely identifies the test case name and the target where it ran.</dd>
+<dt id="term-herd">herd</dt>
+<dd>Group of TCF servers that are meant to be used together, they all
+provide redundancy for targets of the same style.</dd>
+<dt id="term-runid">RunID</dt>
+<dd>A unique identifier for a run of testcases that groups the output
+and results of testcases. When specified, it will be prefixed to
+testcase output to clarify when it was generated.</dd>
+<dt id="term-site">site</dt>
+<dd>Server herds can be split into <em>sites</em>, which is a subgroup of
+servers of the same herd that are physically located in the same
+place and might be sharing physical infrastructure</dd>
+<dt id="term-static-testcase">static testcase</dt>
+<dd>A <a class="reference internal" href="#term-test-case"><span class="xref std std-term">test case</span></a> that doesn’t run on remote targets but in the
+local host where the test runner is executing.</dd>
+<dt id="term-nut">NUT</dt>
+<dd>Network Under Test or test network, to which <a class="reference internal" href="#term-test-target"><span class="xref std std-term">test target</span></a>s
+are connected. Usually isolated from the test infrastructure
+itself.</dd>
+<dt id="term-pos">POS</dt>
+<dd>Provisioning OS; operating system running on the <a class="reference internal" href="#term-test-target"><span class="xref std std-term">test
+target</span></a> that is used to provision the target’s drive.</dd>
 <dt id="term-test-case">test case</dt>
 <dd><p class="first">A test case is a flow to evaluate a single requirement, feature
 or functionality.</p>
@@ -226,9 +243,7 @@ cases in a set of targets</dd>
 
 
            </div>
-           <div class="articleComments">
-            
-           </div>
+           
           </div>
           <footer>
   
@@ -246,11 +261,11 @@ cases in a set of targets</dd>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2015, Author.
+        &copy; Copyright 2015, Author
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -265,35 +280,33 @@ cases in a set of targets</dd>
 
   
 
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'../',
-            VERSION:'0.11',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="../_static/jquery.js"></script>
-      <script type="text/javascript" src="../_static/underscore.js"></script>
-      <script type="text/javascript" src="../_static/doctools.js"></script>
+    
+    
+      <script type="text/javascript">
+          var DOCUMENTATION_OPTIONS = {
+              URL_ROOT:'../',
+              VERSION:'0.11',
+              LANGUAGE:'None',
+              COLLAPSE_INDEX:false,
+              FILE_SUFFIX:'.html',
+              HAS_SOURCE:  true,
+              SOURCELINK_SUFFIX: '.txt'
+          };
+      </script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+    
 
   
 
-  
-  
-    <script type="text/javascript" src="../_static/js/theme.js"></script>
-  
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
 
-  
-  
   <script type="text/javascript">
       jQuery(function () {
-          SphinxRtdTheme.StickyNav.enable();
+          SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-   
+  </script> 
 
 </body>
 </html>

@@ -24,26 +24,18 @@
 
   
 
-  
-  
-    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  
-
-  
-
-  
-        <link rel="index" title="Index"
-              href="genindex.html"/>
-        <link rel="search" title="Search" href="search.html"/>
-    <link rel="top" title="Test Case Framework 0.11 documentation" href="index.html"/>
-        <link rel="prev" title="10. Current status and plans" href="doc/10-Status.html"/> 
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="10. Current status and plans" href="doc/10-Status.html" /> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
 
 </head>
 
-<body class="wy-body-for-nav" role="document">
+<body class="wy-body-for-nav">
 
    
   <div class="wy-grid-for-nav">
@@ -93,7 +85,7 @@
 <li class="toctree-l1"><a class="reference internal" href="02-QUICKSTART.html">1. Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="doc/02-guides.html">2. Guides</a></li>
 <li class="toctree-l1"><a class="reference internal" href="doc/03-server-setup.html">3. Server deployment guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="doc/04-HOWTOs.html">4. HOWTOs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="doc/04-HOWTOs.html">4. Examples and HOWTOs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="doc/05-RFAQs.html">5. Rationales and Frequently Asked Questions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="doc/06-troubleshooting.html">6. Support &amp; Troubleshooting</a></li>
 <li class="toctree-l1"><a class="reference internal" href="doc/07-Architecture.html">7. Architecture</a></li>
@@ -112,7 +104,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
 
       
-      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+      <nav class="wy-nav-top" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">Test Case Framework</a>
@@ -120,9 +112,10 @@
       </nav>
 
 
-      
       <div class="wy-nav-content">
+        
         <div class="rst-content">
+        
           
 
 
@@ -177,9 +170,9 @@ network, or in Bluetooth or Wifi radio proximity)</li>
 <li>things: allows the specification and control of things that can be
 plugged to a target (eg: a USB device,</li>
 <li>default to use Python as a testcase programming language, providing
-a well defined <a class="reference internal" href="doc/09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal"><span class="pre">API</span></code></a> to interact with the
+a well defined <a class="reference internal" href="doc/09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">API</span></code></a> to interact with the
 system running the testcase and report information and to manipulate
-the <a class="reference internal" href="doc/09-api.html#tcfl.tc.target_c" title="tcfl.tc.target_c"><code class="xref py py-class docutils literal"><span class="pre">targets</span></code></a>.</li>
+the <a class="reference internal" href="doc/09-api.html#tcfl.tc.target_c" title="tcfl.tc.target_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">targets</span></code></a>.</li>
 <li>many improvements to the documentation, with the addition of
 step-by-step guides for <a class="reference internal" href="02-QUICKSTART.html#quickstart"><span class="std std-ref">installation</span></a>,
 <a class="reference internal" href="doc/02-guides.html#tcf-guide-tests"><span class="std std-ref">testcase</span></a> <a class="reference internal" href="doc/02-guides.html#tcf-guide-test-training"><span class="std std-ref">development</span></a>, etc</li>
@@ -241,9 +234,7 @@ workaround, invoke <em>tcf –no-make-jobserver run OTHERARGS</em>).</li>
 
 
            </div>
-           <div class="articleComments">
-            
-           </div>
+           
           </div>
           <footer>
   
@@ -259,11 +250,11 @@ workaround, invoke <em>tcf –no-make-jobserver run OTHERARGS</em>).</li>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2015, Author.
+        &copy; Copyright 2015, Author
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -278,35 +269,33 @@ workaround, invoke <em>tcf –no-make-jobserver run OTHERARGS</em>).</li>
 
   
 
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'./',
-            VERSION:'0.11',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="_static/jquery.js"></script>
-      <script type="text/javascript" src="_static/underscore.js"></script>
-      <script type="text/javascript" src="_static/doctools.js"></script>
+    
+    
+      <script type="text/javascript">
+          var DOCUMENTATION_OPTIONS = {
+              URL_ROOT:'./',
+              VERSION:'0.11',
+              LANGUAGE:'None',
+              COLLAPSE_INDEX:false,
+              FILE_SUFFIX:'.html',
+              HAS_SOURCE:  true,
+              SOURCELINK_SUFFIX: '.txt'
+          };
+      </script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+    
 
   
 
-  
-  
-    <script type="text/javascript" src="_static/js/theme.js"></script>
-  
+  <script type="text/javascript" src="_static/js/theme.js"></script>
 
-  
-  
   <script type="text/javascript">
       jQuery(function () {
-          SphinxRtdTheme.StickyNav.enable();
+          SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-   
+  </script> 
 
 </body>
 </html>

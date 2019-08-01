@@ -9,24 +9,19 @@ import tcfl.app
 import tcfl.tc
 
 import tcfl.app_zephyr
-import tcfl.target_ext_tags
 import tcfl.tc_zephyr_sanity
 
 # Zephyr-specific drivers
 tcfl.app.driver_add(tcfl.app_zephyr.app_zephyr)
 tcfl.tc.target_c.extension_register(tcfl.app_zephyr.zephyr)
 tcfl.tc.tc_c.driver_add(tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c)
-tcfl.tc.target_c.extension_register(tcfl.target_ext_tags.patch_tags)
 
 # Don't scan for test cases in doc directories
 tcfl.tc.tc_c.dir_ignore_add_regex("^doc$")
 tcfl.tc.tc_c.dir_ignore_add_regex("^outdir.*$")
 
 # Set Zephyr's build environment (use .setdefault() to inherit existing values)
-os.environ.setdefault('ZEPHYR_GCC_VARIANT', 'zephyr')	# deprecated as of 2/18
 os.environ.setdefault('ZEPHYR_TOOLCHAIN_VARIANT', 'zephyr')
-os.environ.setdefault('ZEPHYR_SDK_INSTALL_DIR',
-                      os.path.expanduser('/opt/zephyr-sdk-0.9.3'))
 os.environ.setdefault('USE_CCACHE', "1")
 
 #: SDK mapping table
@@ -46,7 +41,7 @@ zephyr_sdks = {
     "zephyr": {
         "default": {
             "call_conv": "zephyr-elf",
-            # ZEPHYR-SDK-0.9.3/sysroots/x86_64-pokysdk-linux/usr/bin/riscv32-zephyr-elf/riscv32-zephyr-elf-gcc-nm
+            # zephyr-sdk-0.9.5/sysroots/x86_64-pokysdk-linux/usr/bin/riscv32-zephyr-elf/riscv32-zephyr-elf-gcc-nm
             "prefix": os.environ.get('ZEPHYR_SDK_INSTALL_DIR', 'ZEPHYR_SDK_NOT_INSTALLED') + \
                       "/sysroots/x86_64-pokysdk-linux" \
                       "/usr/bin/%(arch)s-%(call_conv)s" \
@@ -253,7 +248,7 @@ for field in [
         'Tick overhead',
 ]:
     tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.data_harvest(
-        "Timing info (%(zephyr_board)s)",
+        "Timing info (%(zephyr_board)s - %(tc_name_short)s)",
         "%s (ns)" % field,
         r"%s\s+:\s*[0-9]+ cycles\s*,\s*(?P<value>[0-9]+) ns" % field,
         main_trigger_regex = \

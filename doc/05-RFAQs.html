@@ -24,27 +24,19 @@
 
   
 
-  
-  
-    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-  
-
-  
-
-  
-        <link rel="index" title="Index"
-              href="../genindex.html"/>
-        <link rel="search" title="Search" href="../search.html"/>
-    <link rel="top" title="Test Case Framework 0.11 documentation" href="../index.html"/>
-        <link rel="next" title="6. Support &amp; Troubleshooting" href="06-troubleshooting.html"/>
-        <link rel="prev" title="4. HOWTOs" href="04-HOWTOs.html"/> 
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="6. Support &amp; Troubleshooting" href="06-troubleshooting.html" />
+    <link rel="prev" title="4. Examples and HOWTOs" href="04-HOWTOs.html" /> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
 
 </head>
 
-<body class="wy-body-for-nav" role="document">
+<body class="wy-body-for-nav">
 
    
   <div class="wy-grid-for-nav">
@@ -94,12 +86,16 @@
 <li class="toctree-l1"><a class="reference internal" href="../02-QUICKSTART.html">1. Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="02-guides.html">2. Guides</a></li>
 <li class="toctree-l1"><a class="reference internal" href="03-server-setup.html">3. Server deployment guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="04-HOWTOs.html">4. HOWTOs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="04-HOWTOs.html">4. Examples and HOWTOs</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">5. Rationales and Frequently Asked Questions</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#tcf-is-os-and-test-target-agnostic">5.1. TCF is OS and test target agnostic</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#separated-networks-for-infrastructure-and-test-target-hardware">5.2. Separated networks for infrastructure and test target hardware</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#mcu-test-fixture-for-highest-reliabiltiy">5.3. MCU test fixture for highest reliabiltiy</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#high-cost-of-fixtures">5.4. High cost of fixtures</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#zephyr">5.5. Zephyr</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tcf-run-s-will-not-filter-a-zephyr-subcase">5.5.1. <code class="docutils literal notranslate"><span class="pre">tcf</span> <span class="pre">run</span> <span class="pre">-s</span></code> will not filter a Zephyr subcase</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="06-troubleshooting.html">6. Support &amp; Troubleshooting</a></li>
@@ -119,7 +115,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
 
       
-      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+      <nav class="wy-nav-top" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="../index.html">Test Case Framework</a>
@@ -127,9 +123,10 @@
       </nav>
 
 
-      
       <div class="wy-nav-content">
+        
         <div class="rst-content">
+        
           
 
 
@@ -197,7 +194,7 @@ but it is out of the scope of this document.</p>
 </div>
 <div class="section" id="mcu-test-fixture-for-highest-reliabiltiy">
 <span id="arduino101-rationale"></span><h2>5.3. MCU test fixture for highest reliabiltiy<a class="headerlink" href="#mcu-test-fixture-for-highest-reliabiltiy" title="Permalink to this headline">¶</a></h2>
-<p>The fixture described in <a class="reference internal" href="09-api.html#conf_00_lib.arduino101_add" title="conf_00_lib.arduino101_add"><code class="xref py py-func docutils literal"><span class="pre">conf_00_lib.arduino101_add()</span></code></a> can be
+<p>The fixture described in <a class="reference internal" href="09-api.html#conf_00_lib.arduino101_add" title="conf_00_lib.arduino101_add"><code class="xref py py-func docutils literal notranslate"><span class="pre">conf_00_lib.arduino101_add()</span></code></a> can be
 considered complicated, but it is designed for maximum reliability
 when running thousands of test cases. These same points apply to other
 (most) MCUs under test.</p>
@@ -222,12 +219,12 @@ system does it by having all this power cutters completely isolating
 the board.</p>
 </li>
 <li><p class="first">Question: (on Zephyr) I’m a little confused why I actually need to
-power cycle the Arduino, when I compile zephyr and flash using <code class="docutils literal"><span class="pre">make</span>
+power cycle the Arduino, when I compile zephyr and flash using <code class="docutils literal notranslate"><span class="pre">make</span>
 <span class="pre">BOARD=Arduino_101_factory</span> <span class="pre">flash</span></code> I don’t need [any hardware] to
-power it down…  Zephyr <code class="docutils literal"><span class="pre">make</span> <span class="pre">flash</span></code> seems to be using OpenOCD just
+power it down…  Zephyr <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">flash</span></code> seems to be using OpenOCD just
 like TCF.</p>
 <p>It does, and it is misleadingly simple.</p>
-<p>When doing <code class="docutils literal"><span class="pre">make</span> <span class="pre">flash</span></code>, there is an OpenOCD-driven reset that is
+<p>When doing <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">flash</span></code>, there is an OpenOCD-driven reset that is
 done there; if it doesn’t work, a human retries, if it doesn’t work
 again, the mailing list wisdom has been <cite>disconnect every single
 cable to the board, let it rest a few seconds, reconnect again,
@@ -280,13 +277,68 @@ savings in human time (and their burn rate) and increased efficiency.</p>
 in bulk and have spares.</p>
 </div>
 </div>
+<div class="section" id="zephyr">
+<h2>5.5. Zephyr<a class="headerlink" href="#zephyr" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="tcf-run-s-will-not-filter-a-zephyr-subcase">
+<h3>5.5.1. <code class="docutils literal notranslate"><span class="pre">tcf</span> <span class="pre">run</span> <span class="pre">-s</span></code> will not filter a Zephyr subcase<a class="headerlink" href="#tcf-run-s-will-not-filter-a-zephyr-subcase" title="Permalink to this headline">¶</a></h3>
+<p>When trying to filter with <code class="docutils literal notranslate"><span class="pre">-s</span></code> a <a class="reference internal" href="09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c" title="tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">Zephyr</span> <span class="pre">SanityCheck</span></code></a> style
+<a class="reference internal" href="09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_subsanity_c" title="tcfl.tc_zephyr_sanity.tc_zephyr_subsanity_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">subcase</span></code></a>
+nothing gets executed; trying to filter
+<code class="docutils literal notranslate"><span class="pre">zephyr.git/tests/libc/c_lib/testcase.yaml#libraries.libc.strcmp</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run -vvv -t &#39;jfsotc05/esp32-42&#39; -s &#39;name:&quot;.*zephyr.git/tests/lib/c_lib/testcase.yaml#libraries.libc.strcmp$&quot;&#39; zephyr.git/tests/lib/c_lib/testcase.yaml
+INFO3/        toplevel @local: version 0.11-75-g5ebea2f
+INFO2/        toplevel @local: scanning for test cases
+E tc.testcases_discover():5890: All testcases skipped or filtered out by command line -s options
+SKIP0/        toplevel @local: 1 tests (0 passed, 0 error, 0 failed, 0 blocked, 1 skipped, in 0:00:00.104572) - skipped
+</pre></div>
+</div>
+<p>yields nothing, while if we remove the trailing <code class="docutils literal notranslate"><span class="pre">.strcmp</span></code> and filter
+for it <code class="docutils literal notranslate"><span class="pre">zephyr.git/tests/libc/c_lib/testcase.yaml#libraries.libc</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run -vvv -t &#39;jfsotc05/esp32-42&#39; -s &#39;name:&quot;.*zephyr.git/tests/lib/c_lib/testcase.yaml#libraries.libc$&quot;&#39; zephyr.git/tests/lib/c_lib/testcase.yaml
+...
+</pre></div>
+</div>
+<p>it runs all the testcases under <code class="docutils literal notranslate"><span class="pre">zephyr.git/tests/libc/c_lib/testcase.yaml#libraries.libc</span></code></p>
+<p>So it is effectively not possible to filter for a Zephyr subcase. This
+is because it is part of a bundle of testcases that can only be run as
+a bundle.</p>
+<p><strong>Technical details</strong></p>
+<ol class="arabic">
+<li><p class="first">Zephyr sanity checks are a container of multiple subcases.</p>
+</li>
+<li><p class="first">When they run, they always run all the subcases
+tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.eval_50() and capture the
+output.</p>
+</li>
+<li><p class="first">They then parse the subcases on the teardown path
+func:<cite>tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.teardown_subtestcases</cite>.</p>
+<p>This is done by looking out the captured output and <em>fake</em> subcases
+are created and executed when the container is done in sequence by
+the function <code class="docutils literal notranslate"><span class="pre">tcfl.tc.tc_c._run()</span></code> which just say the testcase
+passed/failed (no actual physical running is done)</p>
+</li>
+<li><p class="first">Then we extract KPIs
+<a class="reference internal" href="09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.teardown" title="tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.teardown"><code class="xref py py-func docutils literal notranslate"><span class="pre">tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.teardown()</span></code></a>.</p>
+</li>
+</ol>
+<p>So, <code class="docutils literal notranslate"><span class="pre">...testcase.yaml#libraries.libc.strcmp</span></code> is a subcase of
+<code class="docutils literal notranslate"><span class="pre">...testcase.yaml#libraries.libc</span></code>, which means it is <em>fake</em>, it is not
+really running, so it can’t really be filtered out as it is a
+subproduct of the output. Hence why <code class="docutils literal notranslate"><span class="pre">-s</span></code> is not filtering it, as it
+only filters against the testcases when loading them.</p>
+<p>Now the <code class="docutils literal notranslate"><span class="pre">libraries.libc</span></code> part works because it becomes part of the
+testcase name when loading
+(<code class="docutils literal notranslate"><span class="pre">zephyr.git/tests/lib/c_lib/testcase.yaml#libraries.libc</span></code>); this is
+done by <a class="reference internal" href="09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.is_testcase" title="tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.is_testcase"><code class="xref py py-func docutils literal notranslate"><span class="pre">tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.is_testcase()</span></code></a>
+(with <code class="docutils literal notranslate"><span class="pre">_testcasesample_yaml_mktcs()</span></code> function) when discovering the
+<code class="docutils literal notranslate"><span class="pre">testcase.yaml</span></code> file.</p>
+</div>
+</div>
 </div>
 
 
            </div>
-           <div class="articleComments">
-            
-           </div>
+           
           </div>
           <footer>
   
@@ -295,7 +347,7 @@ in bulk and have spares.</p>
         <a href="06-troubleshooting.html" class="btn btn-neutral float-right" title="6. Support &amp; Troubleshooting" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="04-HOWTOs.html" class="btn btn-neutral" title="4. HOWTOs" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="04-HOWTOs.html" class="btn btn-neutral" title="4. Examples and HOWTOs" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   
@@ -304,11 +356,11 @@ in bulk and have spares.</p>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2015, Author.
+        &copy; Copyright 2015, Author
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -323,35 +375,33 @@ in bulk and have spares.</p>
 
   
 
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'../',
-            VERSION:'0.11',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="../_static/jquery.js"></script>
-      <script type="text/javascript" src="../_static/underscore.js"></script>
-      <script type="text/javascript" src="../_static/doctools.js"></script>
+    
+    
+      <script type="text/javascript">
+          var DOCUMENTATION_OPTIONS = {
+              URL_ROOT:'../',
+              VERSION:'0.11',
+              LANGUAGE:'None',
+              COLLAPSE_INDEX:false,
+              FILE_SUFFIX:'.html',
+              HAS_SOURCE:  true,
+              SOURCELINK_SUFFIX: '.txt'
+          };
+      </script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+    
 
   
 
-  
-  
-    <script type="text/javascript" src="../_static/js/theme.js"></script>
-  
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
 
-  
-  
   <script type="text/javascript">
       jQuery(function () {
-          SphinxRtdTheme.StickyNav.enable();
+          SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-   
+  </script> 
 
 </body>
 </html>

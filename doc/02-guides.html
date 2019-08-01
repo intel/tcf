@@ -24,27 +24,19 @@
 
   
 
-  
-  
-    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-  
-
-  
-
-  
-        <link rel="index" title="Index"
-              href="../genindex.html"/>
-        <link rel="search" title="Search" href="../search.html"/>
-    <link rel="top" title="Test Case Framework 0.11 documentation" href="../index.html"/>
-        <link rel="next" title="3. Server deployment guide" href="03-server-setup.html"/>
-        <link rel="prev" title="1. Quickstart" href="../02-QUICKSTART.html"/> 
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="3. Server deployment guide" href="03-server-setup.html" />
+    <link rel="prev" title="1. Quickstart" href="../02-QUICKSTART.html" /> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
 
 </head>
 
-<body class="wy-body-for-nav" role="document">
+<body class="wy-body-for-nav">
 
    
   <div class="wy-grid-for-nav">
@@ -169,7 +161,7 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="03-server-setup.html">3. Server deployment guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="04-HOWTOs.html">4. HOWTOs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="04-HOWTOs.html">4. Examples and HOWTOs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="05-RFAQs.html">5. Rationales and Frequently Asked Questions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="06-troubleshooting.html">6. Support &amp; Troubleshooting</a></li>
 <li class="toctree-l1"><a class="reference internal" href="07-Architecture.html">7. Architecture</a></li>
@@ -188,7 +180,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
 
       
-      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+      <nav class="wy-nav-top" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="../index.html">Test Case Framework</a>
@@ -196,9 +188,10 @@
       </nav>
 
 
-      
       <div class="wy-nav-content">
+        
         <div class="rst-content">
+        
           
 
 
@@ -244,24 +237,14 @@
 <h1>2. Guides<a class="headerlink" href="#guides" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="configuring-the-tcf-client">
 <span id="tcf-configuring"></span><span id="tcf-guide-configuration"></span><h2>2.1. Configuring the TCF client<a class="headerlink" href="#configuring-the-tcf-client" title="Permalink to this headline">¶</a></h2>
-<p>The client looks for configuration files named <cite>conf_*.py</cite> in the
-following directories:</p>
-<ul class="simple">
-<li><cite>.tcf/</cite> subdirectory of the current working directory</li>
-<li><cite>~/.tcf/</cite>, a per-user configuration directory</li>
-<li><cite>/etc/tcf/</cite>, a system wide configuration directory</li>
-</ul>
-<p>The <cite>conf_*.py</cite> files are parsed in alphabetical order, written in
-plain Python code, so you can do anything, even extend TCF from
-them. The module <a class="reference internal" href="09-api.html#module-tcfl.config" title="tcfl.config"><code class="xref py py-mod docutils literal"><span class="pre">tcfl.config</span></code></a> provides access to functions to
-set TCF’s configuration.</p>
+<p>The client looks for configuration files in <a class="reference internal" href="04-HOWTOs.html#tcf-client-configuration"><span class="std std-ref">multiple places</span></a>.</p>
 <div class="section" id="configuring-access-to-ttbd-servers">
 <span id="tcf-config-servers"></span><h3>2.1.1. Configuring access to <em>ttbd</em> servers<a class="headerlink" href="#configuring-access-to-ttbd-servers" title="Permalink to this headline">¶</a></h3>
 <p>Each server you have access to is described by its URL
-<cite>https://HOSTNAME.DOMAIN:PORT</cite>, which can be passed to <code class="docutils literal"><span class="pre">tcf</span> <span class="pre">--url</span> <span class="pre">URL</span>
+<cite>https://HOSTNAME.DOMAIN:PORT</cite>, which can be passed to <code class="docutils literal notranslate"><span class="pre">tcf</span> <span class="pre">--url</span> <span class="pre">URL</span>
 <span class="pre">&lt;COMMAND&gt;</span></code> or more conveniently, set in a configuration file with
-<a class="reference internal" href="09-api.html#tcfl.config.url_add" title="tcfl.config.url_add"><code class="xref py py-func docutils literal"><span class="pre">tcfl.config.url_add()</span></code></a>:</p>
-<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">tcfl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">url_add</span><span class="p">(</span><span class="s1">&#39;https://HOSTNAME.DOMAIN:PORT&#39;</span><span class="p">,</span> <span class="n">ssl_ignore</span> <span class="o">=</span> <span class="bp">True</span><span class="p">)</span>
+<a class="reference internal" href="09-api.html#tcfl.config.url_add" title="tcfl.config.url_add"><code class="xref py py-func docutils literal notranslate"><span class="pre">tcfl.config.url_add()</span></code></a>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">tcfl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">url_add</span><span class="p">(</span><span class="s1">&#39;https://HOSTNAME.DOMAIN:PORT&#39;</span><span class="p">,</span> <span class="n">ssl_ignore</span> <span class="o">=</span> <span class="bp">True</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>optionally an argument <em>aka = NAME</em> can be added to add a nickname for
@@ -288,12 +271,12 @@ of the Zephyr SDK.</p>
 <p>To work with Zephyr OS applications without having to set the
 environment, a TCF configuration file <cite>conf_zephyr.py</cite> can be created
 with these settings:</p>
-<div class="highlight-python"><div class="highlight"><pre><span></span><span class="c1"># Set Zephyr&#39;s build environment (use .setdefault() to inherit</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Set Zephyr&#39;s build environment (use .setdefault() to inherit</span>
 <span class="c1"># existing values if present)</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;ZEPHYR_TOOLCHAIN_VARIANT&#39;</span><span class="p">,</span> <span class="s1">&#39;zephyr&#39;</span><span class="p">)</span>
 <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s1">&#39;ZEPHYR_SDK_INSTALL_DIR&#39;</span><span class="p">,</span>
-                      <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expanduser</span><span class="p">(</span><span class="s1">&#39;/opt/zephyr-sdk-0.9.3&#39;</span><span class="p">))</span>
+                      <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">expanduser</span><span class="p">(</span><span class="s1">&#39;/opt/zephyr-sdk-0.9.5&#39;</span><span class="p">))</span>
 </pre></div>
 </div>
 </div>
@@ -336,7 +319,7 @@ declaring a tag:</p>
 <div class="section" id="other-configuration-settings">
 <h3>2.1.4. Other configuration settings<a class="headerlink" href="#other-configuration-settings" title="Permalink to this headline">¶</a></h3>
 <ul>
-<li><p class="first">Ignoring directory names when <a class="reference internal" href="09-api.html#tcfl.tc.tc_c.dir_ignore_add_regex" title="tcfl.tc.tc_c.dir_ignore_add_regex"><code class="xref py py-func docutils literal"><span class="pre">scanning</span> <span class="pre">for</span> <span class="pre">test</span> <span class="pre">cases</span></code></a>:</p>
+<li><p class="first">Ignoring directory names when <a class="reference internal" href="09-api.html#tcfl.tc.tc_c.dir_ignore_add_regex" title="tcfl.tc.tc_c.dir_ignore_add_regex"><code class="xref py py-func docutils literal notranslate"><span class="pre">scanning</span> <span class="pre">for</span> <span class="pre">test</span> <span class="pre">cases</span></code></a>:</p>
 <p>will tell the scanner to ignore any directory called <em>docANYTHING</em></p>
 </li>
 </ul>
@@ -346,7 +329,7 @@ declaring a tag:</p>
 <h2>2.2. Running test cases with <em>tcf run</em><a class="headerlink" href="#running-test-cases-with-tcf-run" title="Permalink to this headline">¶</a></h2>
 <p><em>tcf run</em> builds and runs one or more testcases in one or more targets
 (or in none if the testcase does not require any):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run
 </pre></div>
 </div>
 <p>will recursively look for testcases from the current working directory
@@ -359,7 +342,7 @@ look for files that describe testcases:</p>
 </ul>
 </div></blockquote>
 <p>it can also be pointed to one or more files or directories:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run ../test1.py sub/dir/1 bat/file/testcase.ini
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run ../test1.py sub/dir/1 bat/file/testcase.ini
 </pre></div>
 </div>
 <p>for each testcase, if it needs targets, it evaluates which ones are
@@ -378,7 +361,7 @@ is useful to grep in long logs of multiple testcases and targets.</p>
 <p id="tcf-run-test-file-exists">Consider a simple testcase that checks if there is a file called
 <em>thisfile</em> in the current working directory (and thus requires no
 targets):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="c1">#</span>
 <span class="c1"># Copyright (c) 2017 Intel Corporation</span>
 <span class="c1">#</span>
@@ -400,7 +383,7 @@ targets):</p>
 </pre></div>
 </div>
 <p>we run it:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run /usr/share/tcf/examples/test_file_exists.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run /usr/share/tcf/examples/test_file_exists.py
 FAIL0/2kdb    /usr/share/tcf/examples/test_file_exists.py#_test @local: evaluation failed
 FAIL0/        toplevel @local: 1 tests (0 passed, 1 failed, 0 blocked, 0 skipped) - failed
 /tmp/tcf-Dw7AGw.mk:2: recipe for target &#39;tcf-jobserver-run&#39; failed
@@ -410,7 +393,7 @@ make: *** [tcf-jobserver-run] Error 1
 <p>you can ignore the messages from <em>make</em>, they just say <em>tcf</em> returned
 with an error code–because a testcase failed, as the file <em>thisfile</em>
 doesn’t exist; if you add more <em>-v</em>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run -vv /usr/share/tcf/examples/test_file_exists.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run -vv /usr/share/tcf/examples/test_file_exists.py
 INFO2/        toplevel @local: scanning for test cases
 INFO2/2kdb    /usr/share/tcf/examples/test_file_exists.py#_test @local: will run on target group &#39;local&#39;
 FAIL2/2kdbE#1 /usr/share/tcf/examples/test_file_exists.py#_test @local: eval failed: file &#39;testfile&#39;: does not exist
@@ -425,7 +408,7 @@ identifies the testcase/local-target combination. If the testcase
 fails, a <em>report-HASH.txt</em> file is created with failure information
 and instructions for reproduction.</p>
 <p>Let’s create <em>testfile</em>, so the test passes:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ touch testfile
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ touch testfile
 $ tcf run /usr/share/tcf/examples/test_file_exists.py
 PASS0/  toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped) - passed
 </pre></div>
@@ -435,7 +418,7 @@ failure, or bug in the testcase code), the testcase will be <em>blocked</em>;
 to diagnose why, add <em>-v</em>’s or look at the logfile (if <em>–logfile</em> was
 given) for all the details; let’s copy the example and introduce a
 Python error:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ cp /usr/share/examples/test_file_exists.py .
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cp /usr/share/examples/test_file_exists.py .
 $ echo error &gt;&gt; test_file_exists.py
 $ tcf run test_file_exists.py
 BLCK0/        test_file_exists.py @local: blocked: Cannot import: name &#39;error&#39; is not defined (NameError)
@@ -448,7 +431,7 @@ BLCK0/        toplevel @local: 0 tests (0 passed, 0 failed, 0 blocked, 0 skipped
 <p>Because we installed the <em>tcf-zephyr</em> package, it brings the
 dependencies needed to run Zephyr OS testcases and samples; let’s run
 Zephyr OS’s <em>Hello World</em> sample:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ git clone http://github.com/zephyrproject-rtos/zephyr
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git clone http://github.com/zephyrproject-rtos/zephyr
 $ cd zephyr
 $ export ZEPHYR_BASE=$PWD
 $ tcf run /usr/share/tcf/examples/test_zephyr_hello_world.py
@@ -465,15 +448,16 @@ access and it will take more or less based on your machine’s power.</p>
 <h3>2.2.2. Options to <em>tcf run</em><a class="headerlink" href="#options-to-tcf-run" title="Permalink to this headline">¶</a></h3>
 <p>There are many options to <em>tcf run</em> which you can find with <em>tcf run
 –help</em>; here is a summary of the most frequent ones:</p>
-<ul>
-<li><p class="first"><strong>-v</strong> Increases the verbosity of the console output, can be
-repeated for more information</p>
-</li>
-<li><p class="first"><strong>-i</strong> adds a <cite>Run ID</cite> (<code class="docutils literal"><span class="pre">-i</span> <span class="pre">RUNID</span></code>), which will be prefixed in
+<ul class="simple">
+<li><strong>-v</strong> Increases the verbosity of the console output, can be
+repeated for more information</li>
+</ul>
+<ul id="tcf-run-runid">
+<li><p class="first"><strong>-i</strong> adds a <a class="reference internal" href="glossary.html#term-runid"><span class="xref std std-term">RunID</span></a> (<code class="docutils literal notranslate"><span class="pre">-i</span> <span class="pre">RUNID</span></code>), which will be prefixed in
 most messages and reports; it’ll also generate a logfile called
-<code class="docutils literal"><span class="pre">RUNID.log</span></code> with lots of low-level details about the
+<code class="docutils literal notranslate"><span class="pre">RUNID.log</span></code> with lots of low-level details about the
 process. Failure reports will be created in files called
-<code class="docutils literal"><span class="pre">report-RUNID:HASH.txt</span></code>, where <cite>HASH</cite> is the code that uniquely
+<code class="docutils literal notranslate"><span class="pre">report-RUNID:HASH.txt</span></code>, where <a class="reference internal" href="glossary.html#term-hash"><span class="xref std std-term">hash</span></a> is the code that uniquely
 identifies the test case name and the target where it ran.</p>
 <p>This is very useful when running <em>tcf</em> from a continuous integration
 engine, such as Jenkins, to identify the reports and runs.</p>
@@ -495,16 +479,16 @@ select when determining where to run; see <a class="reference internal" href="#t
 </li>
 <li><p class="first"><strong>-s</strong> allows <em>tcf run</em> to filter which testcases are to be run; see
 <a class="reference internal" href="#tcf-evaluation-expressions"><span class="std std-ref">specifications</span></a>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run -s slow
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run -s slow
 </pre></div>
 </div>
 <p>This selects all testcases that have a <em>slow</em> tag; to select
 testcases that don’t sport the <em>slow</em> tag:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run -s &quot;not slow&quot;
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run -s &quot;not slow&quot;
 </pre></div>
 </div>
 <p>you can also select a tag by value:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run -s &#39;slow == &quot;very&quot;&#39;
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run -s &#39;slow == &quot;very&quot;&#39;
 </pre></div>
 </div>
 </li>
@@ -515,14 +499,14 @@ testcases that don’t sport the <em>slow</em> tag:</p>
 <p>TCF incorporates a simple expression language parser to allows to
 express boolean filters to select targets and tags in a programatic
 way, such as:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">tag</span> <span class="o">==</span> <span class="s1">&#39;value&#39;</span> <span class="ow">and</span> <span class="n">bsp</span> <span class="ow">in</span> <span class="p">[</span> <span class="s1">&#39;x86&#39;</span><span class="p">,</span> <span class="s1">&#39;arm&#39;</span> <span class="p">]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">tag</span> <span class="o">==</span> <span class="s1">&#39;value&#39;</span> <span class="ow">and</span> <span class="n">bsp</span> <span class="ow">in</span> <span class="p">[</span> <span class="s1">&#39;x86&#39;</span><span class="p">,</span> <span class="s1">&#39;arm&#39;</span> <span class="p">]</span>
 </pre></div>
 </div>
 <p>and is used by <em>tcf run</em>’s <em>-t</em> and <em>-s</em> options, to select targets
 and testcases, respectively. As well, testcases can use in the
-<a class="reference internal" href="09-api.html#tcfl.tc.target" title="tcfl.tc.target"><code class="xref py py-func docutils literal"><span class="pre">tcfl.tc.target()</span></code></a> and <a class="reference internal" href="09-api.html#tcfl.tc.interconnect" title="tcfl.tc.interconnect"><code class="xref py py-func docutils literal"><span class="pre">tcfl.tc.interconnect()</span></code></a> decorators to
+<a class="reference internal" href="09-api.html#tcfl.tc.target" title="tcfl.tc.target"><code class="xref py py-func docutils literal notranslate"><span class="pre">tcfl.tc.target()</span></code></a> and <a class="reference internal" href="09-api.html#tcfl.tc.interconnect" title="tcfl.tc.interconnect"><code class="xref py py-func docutils literal notranslate"><span class="pre">tcfl.tc.interconnect()</span></code></a> decorators to
 select tags.</p>
-<p>The grammar is formally defined in <a class="reference internal" href="09-api.html#module-commonl.expr_parser" title="commonl.expr_parser"><code class="xref py py-mod docutils literal"><span class="pre">commonl.expr_parser</span></code></a>, but in
+<p>The grammar is formally defined in <a class="reference internal" href="09-api.html#module-commonl.expr_parser" title="commonl.expr_parser"><code class="xref py py-mod docutils literal notranslate"><span class="pre">commonl.expr_parser</span></code></a>, but in
 general an valid expressions are:</p>
 <ul class="simple">
 <li><em>symbol</em></li>
@@ -536,7 +520,7 @@ general an valid expressions are:</p>
 evaluate as True; other symboles added are the active <a class="reference internal" href="glossary.html#term-bsp-model"><span class="xref std std-term">BSP
 model</span></a> and (if any) active BSP are also made symbols, so for given a
 target named <em>z3</em> with the following tags:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf list -vvv z3
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf list -vvv z3
   https://SERVER:5000/ttb-v0/targets/z3
     ...
     fullid: SERVER/z3
@@ -555,7 +539,7 @@ target named <em>z3</em> with the following tags:</p>
 </pre></div>
 </div>
 <p>The following expressions could be used to match it:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>- ``bsp == &#39;arm&#39;``
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>- ``bsp == &#39;arm&#39;``
 - ``z3 or z1``
 - ``zephyr_board in [ &#39;qemu_cortex_m3&#39;, &#39;frdm_k64f&#39; ]``
 </pre></div>
@@ -565,39 +549,39 @@ evaluates to true if available. It’s contents are available for
 matching.</p>
 <div class="section" id="examples-of-specifications">
 <h4>2.2.3.1. Examples of specifications<a class="headerlink" href="#examples-of-specifications" title="Permalink to this headline">¶</a></h4>
-<p>these examples can be passed to <em>tcf run -t</em> or <a class="reference internal" href="09-api.html#tcfl.tc.target" title="tcfl.tc.target"><code class="xref py py-func docutils literal"><span class="pre">tcfl.tc.target()</span></code></a>
-and <a class="reference internal" href="09-api.html#tcfl.tc.interconnect" title="tcfl.tc.interconnect"><code class="xref py py-func docutils literal"><span class="pre">tcfl.tc.interconnect()</span></code></a> in their <em>spec</em> parameter:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="s1">&#39;type == &quot;arduino101&quot;&#39;</span>
+<p>these examples can be passed to <em>tcf run -t</em> or <a class="reference internal" href="09-api.html#tcfl.tc.target" title="tcfl.tc.target"><code class="xref py py-func docutils literal notranslate"><span class="pre">tcfl.tc.target()</span></code></a>
+and <a class="reference internal" href="09-api.html#tcfl.tc.interconnect" title="tcfl.tc.interconnect"><code class="xref py py-func docutils literal notranslate"><span class="pre">tcfl.tc.interconnect()</span></code></a> in their <em>spec</em> parameter:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="s1">&#39;type == &quot;arduino101&quot;&#39;</span>
 </pre></div>
 </div>
 <p>filters to any target that declare’s its type is <em>Arduino 101</em>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="s1">&#39;bsp == &quot;x86&quot;&#39;</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="s1">&#39;bsp == &quot;x86&quot;&#39;</span>
 </pre></div>
 </div>
 <p>any target (and <a class="reference internal" href="glossary.html#term-bsp-model"><span class="xref std std-term">BSP model</span></a> of said target) that sports an x86
 BSP–if the target supports multiple BSPs and BSP models, then it will
 select all the BSP models that expose at least an ‘x86’ BSP):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="s1">&#39;zephyr_board : &quot;quark_.*&quot;&#39;</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="s1">&#39;zephyr_board : &quot;quark_.*&quot;&#39;</span>
 </pre></div>
 </div>
 <p>this selects any target that contains a BSP that exposes a
 <em>zephyr_board</em> tag whose content matches the Python regex <em>quark_.*</em>;
 this:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="s1">&#39;bsp == &quot;x86&quot; or bsp == &quot;arm&quot;&#39;</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="s1">&#39;bsp == &quot;x86&quot; or bsp == &quot;arm&quot;&#39;</span>
 <span class="s1">&#39;bsp in [ &quot;x86&quot;, &quot;arm&quot; ]&#39;</span>
 </pre></div>
 </div>
 <p>would run on any target that contains a BSP that declares itself as
 <em>x86</em> or <em>ARM</em>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="s1">&#39;TARGETNAME&#39;</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="s1">&#39;TARGETNAME&#39;</span>
 </pre></div>
 </div>
 <p>would match a target called <em>TARGETNAME</em> (in any server):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="s1">&#39;server/TARGETNAME&#39;</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="s1">&#39;server/TARGETNAME&#39;</span>
 </pre></div>
 </div>
 <p>would match <em>TARGETNAME</em> on server <em>server</em>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="s1">&#39;nwa or qz31a or ql06a&#39;</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="s1">&#39;nwa or qz31a or ql06a&#39;</span>
 </pre></div>
 </div>
 <p>This will allow only to run in network <em>nwa</em> and in targets <em>qz31a</em>
@@ -608,7 +592,7 @@ permutations of targets that fit those limitations.</p>
 <div class="section" id="interpreting-the-output-of-tcf-run">
 <span id="tcf-run-output-groking"></span><h3>2.2.4. Interpreting the output of <em>tcf run</em><a class="headerlink" href="#interpreting-the-output-of-tcf-run" title="Permalink to this headline">¶</a></h3>
 <p>In an output such as:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run -vv -t local/qz39c-arm test_zephyr_hello_world.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run -vv -t local/qz39c-arm test_zephyr_hello_world.py
 INFO2/        toplevel @local: scanning for test cases
 INFO2/n9gc    test_zephyr_hello_world.py#_test @local/qz39c-arm:arm: will run on target group &#39;xqkw (target=local/qz39c-arm:arm)&#39;
 PASS1/n9gc    test_zephyr_hello_world.py#_test @local/qz39c-arm:arm: configure passed
@@ -630,11 +614,11 @@ telling if there is a <em>PASS</em> or a <em>FAIL</em>; all followed by a number
 that indicates the depth ofthe message (0 most general, 1 more
 detailed, 2 more verbose, etc)</p>
 </li>
-<li><p class="first"><code class="docutils literal"><span class="pre">/XYZW[CBDEL].NN</span></code>, the message ID. this <strong>four</strong> character code is
+<li><p class="first"><code class="docutils literal notranslate"><span class="pre">/XYZW[CBDEL].NN</span></code>, the message ID. this <strong>four</strong> character code is
 a unique identifier of the test case name and when it applies of the
 testcase name and the name of the target where it is being ran along
 with its <a class="reference internal" href="glossary.html#term-bsp-model"><span class="xref std std-term">BSP model</span></a>. It stays stable across different runs. The
-letters <code class="docutils literal"><span class="pre">CBDEL</span></code> describe which phase it us running (Configure,
+letters <code class="docutils literal notranslate"><span class="pre">CBDEL</span></code> describe which phase it us running (Configure,
 Build, Deploy, Evaluation, cLean), followed by the step number when
 they are being executed. Each <cite>&#64;build</cite> command in the markup
 description would be a different step; such would it be each <cite>&#64;eval</cite>
@@ -644,13 +628,13 @@ log file (using <cite>–log-file FILE.log</cite>) and just let it print the
 most high level information to the console. The log has <em>way</em> more
 information than you would ever care for, but when something fails,
 grep for the message ID in the logfile (for example, if the build
-had failed, <code class="docutils literal"><span class="pre">grep</span> <span class="pre">33afB</span> <span class="pre">FILE.log</span></code> would give you the full build
+had failed, <code class="docutils literal notranslate"><span class="pre">grep</span> <span class="pre">33afB</span> <span class="pre">FILE.log</span></code> would give you the full build
 output for you to determine what is wrong. It is also passed to the
 server, so we can identify what the target was doing when.</p>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">TCF also generates reports when something fails (look for
-<code class="docutils literal"><span class="pre">report-MSGID.txt</span></code>) with all that detailed information.</p>
+<code class="docutils literal notranslate"><span class="pre">report-MSGID.txt</span></code>) with all that detailed information.</p>
 </div>
 </li>
 <li><p class="first">Testcase name, target name and <a class="reference internal" href="glossary.html#term-bsp-model"><span class="xref std std-term">BSP model</span></a>.</p>
@@ -662,10 +646,10 @@ server, so we can identify what the target was doing when.</p>
 </div>
 <div class="section" id="creating-testcases">
 <span id="tcf-guide-tests"></span><h2>2.3. Creating testcases<a class="headerlink" href="#creating-testcases" title="Permalink to this headline">¶</a></h2>
-<p>Most of the testcases use the APIs provided with <a class="reference internal" href="09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal"><span class="pre">tcfl.tc.tc_c</span></code></a>
-and <a class="reference internal" href="09-api.html#tcfl.tc.target_c" title="tcfl.tc.target_c"><code class="xref py py-class docutils literal"><span class="pre">tcfl.tc.target_c</span></code></a>, plus any other Python module library.</p>
+<p>Most of the testcases use the APIs provided with <a class="reference internal" href="09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">tcfl.tc.tc_c</span></code></a>
+and <a class="reference internal" href="09-api.html#tcfl.tc.target_c" title="tcfl.tc.target_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">tcfl.tc.target_c</span></code></a>, plus any other Python module library.</p>
 <p>Going back to the very simple testcase used <a class="reference internal" href="#tcf-run-test-file-exists"><span class="std std-ref">here</span></a>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="c1">#</span>
 <span class="c1"># Copyright (c) 2017 Intel Corporation</span>
 <span class="c1">#</span>
@@ -687,9 +671,9 @@ and <a class="reference internal" href="09-api.html#tcfl.tc.target_c" title="tcf
 </pre></div>
 </div>
 <p>this is a testcase that just checks for a file existing in the local
-directory. It inherits from <a class="reference internal" href="09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal"><span class="pre">tcfl.tc.tc_c</span></code></a> to create a
+directory. It inherits from <a class="reference internal" href="09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">tcfl.tc.tc_c</span></code></a> to create a
 testcase:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">_test</span><span class="p">(</span><span class="n">tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">tc_c</span><span class="p">):</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">_test</span><span class="p">(</span><span class="n">tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">tc_c</span><span class="p">):</span>
 </pre></div>
 </div>
 <p>this providing the basic glue to the meta test runner. The class can
@@ -697,7 +681,7 @@ be name whatever suits your needs.</p>
 <p>Note this testcase declares no targets; it is an <em>static</em> testcase,
 which evaluates by running on the local system with an <em>eval()</em>
 function:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>   <span class="k">def</span> <span class="nf">eval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>   <span class="k">def</span> <span class="nf">eval</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="gp">&gt;&gt;&gt; </span>       <span class="n">filename</span> <span class="o">=</span> <span class="s2">&quot;testfile&quot;</span>
 <span class="gp">&gt;&gt;&gt; </span>       <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
 <span class="gp">&gt;&gt;&gt; </span>           <span class="bp">self</span><span class="o">.</span><span class="n">report_info</span><span class="p">(</span><span class="s2">&quot;file &#39;</span><span class="si">%s</span><span class="s2">&#39;: exists! test passes&quot;</span> <span class="o">%</span> <span class="n">filename</span><span class="p">)</span>
@@ -707,17 +691,17 @@ function:</p>
 </div>
 <p>Multiple evaluation functions may be specified, as long as they are
 called <em>evalSOMETHING</em>. You could add:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">eval_2</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">eval_2</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="bp">self</span><span class="o">.</span><span class="n">shcmd_local</span><span class="p">(</span><span class="s2">&quot;cat /etc/passwd&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>this would use <a class="reference internal" href="09-api.html#tcfl.tc.tc_c.shcmd_local" title="tcfl.tc.tc_c.shcmd_local"><code class="xref py py-meth docutils literal"><span class="pre">tcfl.tc.tc_c.shcmd_local()</span></code></a> to run a system
-command. If it fails, it will raise a <a class="reference internal" href="09-api.html#tcfl.tc.failed_e" title="tcfl.tc.failed_e"><code class="xref py py-exc docutils literal"><span class="pre">tcfl.tc.failed_e</span></code></a>
+<p>this would use <a class="reference internal" href="09-api.html#tcfl.tc.tc_c.shcmd_local" title="tcfl.tc.tc_c.shcmd_local"><code class="xref py py-meth docutils literal notranslate"><span class="pre">tcfl.tc.tc_c.shcmd_local()</span></code></a> to run a system
+command. If it fails, it will raise a <a class="reference internal" href="09-api.html#tcfl.tc.failed_e" title="tcfl.tc.failed_e"><code class="xref py py-exc docutils literal notranslate"><span class="pre">tcfl.tc.failed_e</span></code></a>
 exception that will fail the testcase. When running again, it will run
 both functions in <em>alphabetical</em> order. For the testcase to pass, both
 functions have to pass.</p>
 <p>Running the modified version:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ cp /usr/share/tcf/examples/test_file_exists.py .
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cp /usr/share/tcf/examples/test_file_exists.py .
 # Edit test_file_exists.py to add eval_2
 $ tcf run -vv test_file_exists.py
 INFO2/        toplevel @local: scanning for test cases
@@ -738,7 +722,7 @@ as it fails the testcase execution is terminated, so <em>eval_2()</em> never
 gets to run.</p>
 <p>Create <em>testfile</em> in the local directory and re-run it, so <em>eval()</em>
 passes and <em>eval_2()</em> also runs:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ touch testfile
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ touch testfile
 INFO2/        toplevel @local: scanning for test cases
 INFO2/ryvi    test_file_exists.py#_test @local: will run on target group &#39;local&#39;
 INFO2/ryviE#1 test_file_exists.py#_test @local: file &#39;testfile&#39;: exists! test passes
@@ -756,7 +740,7 @@ repeat the evaluation two times adding <em>-r 2</em>.</p>
 as a test subject. Ensure the <em>tcf-zephyr</em> package was installed (with
 <em>dnf install -y tcf-zephyr</em>) and clone the Zephyr OS (or used an
 existing cloned tree):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span># dnf install -y tcf-zephyr   # If not yet installed
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span># dnf install -y tcf-zephyr   # If not yet installed
 $ git clone http://github.com/zephyrproject-rtos/zephyr
 $ cd zephyr
 $ export ZEPHYR_BASE=$PWD
@@ -764,7 +748,7 @@ $ export ZEPHYR_BASE=$PWD
 </div>
 <p>This is a very simple test case that cheks that the target where it
 runs prints <em>Hello World!</em>; :</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="c1">#</span>
 <span class="c1"># Copyright (c) 2017 Intel Corporation</span>
 <span class="c1">#</span>
@@ -793,7 +777,7 @@ runs prints <em>Hello World!</em>; :</p>
 </pre></div>
 </div>
 <p>running it on whichever suitable target (<em>-y</em>):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ cp /usr/share/tcf/examples/test_zephyr_hello_world.py .
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cp /usr/share/tcf/examples/test_zephyr_hello_world.py .
 $ tcf run -vvy test_zephyr_hello_world.py
 INFO2/        toplevel @local: scanning for test cases
 INFO2/9orv    test_zephyr_hello_world.py#_test @server2/arduino2-01:arm: will run on target group &#39;ixgq (target=server2/arduino2-01:arm)&#39;
@@ -810,9 +794,9 @@ PASS0/        toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped
 <p>This testcase:</p>
 <ul>
 <li><p class="first">declares it needs a target on which to run with the
-<a class="reference internal" href="09-api.html#tcfl.tc.target" title="tcfl.tc.target"><code class="xref py py-func docutils literal"><span class="pre">tcfl.tc.target()</span></code></a> class decorator, which by default will be
+<a class="reference internal" href="09-api.html#tcfl.tc.target" title="tcfl.tc.target"><code class="xref py py-func docutils literal notranslate"><span class="pre">tcfl.tc.target()</span></code></a> class decorator, which by default will be
 called <em>target</em>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">target</span><span class="p">(</span><span class="s2">&quot;zephyr_board&quot;</span><span class="p">,</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">target</span><span class="p">(</span><span class="s2">&quot;zephyr_board&quot;</span><span class="p">,</span>
 <span class="gp">&gt;&gt;&gt; </span>                <span class="n">app_zephyr</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tcfl</span><span class="o">.</span><span class="n">tl</span><span class="o">.</span><span class="n">ZEPHYR_BASE</span><span class="p">,</span>
 <span class="gp">&gt;&gt;&gt; </span>                                          <span class="s2">&quot;samples/hello_world&quot;</span><span class="p">))</span>
 </pre></div>
@@ -832,17 +816,17 @@ applications for different environments, how to load them into
 targets and how to start the targets.</p>
 </li>
 <li><p class="first">creates an evaluation function to be ran during the evaluation phase:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">eval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">eval</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="n">target</span><span class="o">.</span><span class="n">expect</span><span class="p">(</span><span class="s2">&quot;Hello World! </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">target</span><span class="o">.</span><span class="n">bsp_model</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>This function is passed arguments that represent the targets it has
 to operate on. Because we only declared a single target with
-<a class="reference internal" href="09-api.html#tcfl.tc.target" title="tcfl.tc.target"><code class="xref py py-func docutils literal"><span class="pre">tcfl.tc.target()</span></code></a> and we didn’t specify a name with the
+<a class="reference internal" href="09-api.html#tcfl.tc.target" title="tcfl.tc.target"><code class="xref py py-func docutils literal notranslate"><span class="pre">tcfl.tc.target()</span></code></a> and we didn’t specify a name with the
 <em>name</em> argument, it defaults to <em>target</em> (if you pass an argument
 that cannot be recognized like the name of a declared target, it
 will error out).</p>
-<p>For evaluating, we use <a class="reference internal" href="09-api.html#tcfl.tc.target_c.expect" title="tcfl.tc.target_c.expect"><code class="xref py py-meth docutils literal"><span class="pre">tcfl.tc.target_c.expect()</span></code></a> which
+<p>For evaluating, we use <a class="reference internal" href="09-api.html#tcfl.tc.target_c.expect" title="tcfl.tc.target_c.expect"><code class="xref py py-meth docutils literal notranslate"><span class="pre">tcfl.tc.target_c.expect()</span></code></a> which
 expects to receive in the target’s console the string <em>Hello World!
 BSPMODEL</em>; the <a class="reference internal" href="glossary.html#term-bsp-model"><span class="xref std std-term">BSP model</span></a> describes in which mode we are running
 the target when it has multiple cores/BSPs incorporated (such as the
@@ -850,9 +834,9 @@ the target when it has multiple cores/BSPs incorporated (such as the
 <p>So for a target with an ARM BSP declared on its tags, it will expect
 to receive <em>Hello World! ARM</em>; if the string is received, the
 function returns and the testcase is considered to pass. Otherwise,
-it raises a failure exception <a class="reference internal" href="09-api.html#tcfl.tc.failed_e" title="tcfl.tc.failed_e"><code class="xref py py-exc docutils literal"><span class="pre">tcfl.tc.failed_e</span></code></a>, which is used
+it raises a failure exception <a class="reference internal" href="09-api.html#tcfl.tc.failed_e" title="tcfl.tc.failed_e"><code class="xref py py-exc docutils literal notranslate"><span class="pre">tcfl.tc.failed_e</span></code></a>, which is used
 by the test runner to mark the test case as a failure. If any other
-exception is raised (or <a class="reference internal" href="09-api.html#tcfl.tc.blocked_e" title="tcfl.tc.blocked_e"><code class="xref py py-exc docutils literal"><span class="pre">tcfl.tc.blocked_e</span></code></a>), the meta test
+exception is raised (or <a class="reference internal" href="09-api.html#tcfl.tc.blocked_e" title="tcfl.tc.blocked_e"><code class="xref py py-exc docutils literal notranslate"><span class="pre">tcfl.tc.blocked_e</span></code></a>), the meta test
 runner will consider the test blocked.</p>
 </li>
 </ul>
@@ -866,7 +850,7 @@ connect to another (for simplicity of argument, we’ll omit how they
 connect).</p>
 <p>Declare the need for two Zephyr OS capable targets that are
 interconnected and indicate where to go to build the sources for them:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">interconnect</span><span class="p">()</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">interconnect</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">target</span><span class="p">(</span><span class="s2">&quot;zephyr_board&quot;</span><span class="p">,</span> <span class="n">app_zephyr</span> <span class="o">=</span> <span class="s2">&quot;node1&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">target</span><span class="p">(</span><span class="s2">&quot;zephyr_board&quot;</span><span class="p">,</span> <span class="n">app_zephyr</span> <span class="o">=</span> <span class="s2">&quot;node0&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">_test</span><span class="p">(</span><span class="n">tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">tc_c</span><span class="p">):</span>
@@ -874,10 +858,10 @@ interconnected and indicate where to go to build the sources for them:</p>
 </div>
 <p>Setup some hooks – if when receiving from the console on any target
 it prints a fatal fault, fail the test (this will be evaluated when
-calling <a class="reference internal" href="09-api.html#tcfl.tc.target_c.expect" title="tcfl.tc.target_c.expect"><code class="xref py py-meth docutils literal"><span class="pre">tcfl.tc.target_c.expect()</span></code></a> or the full testcase expect
-loop calling <a class="reference internal" href="09-api.html#tcfl.expecter.expecter_c.run" title="tcfl.expecter.expecter_c.run"><code class="xref py py-meth docutils literal"><span class="pre">run()</span></code></a> on
-<a class="reference internal" href="09-api.html#tcfl.tc.tc_c.expecter" title="tcfl.tc.tc_c.expecter"><code class="xref py py-attr docutils literal"><span class="pre">tcfl.tc.tc_c.expecter</span></code></a></p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">target1</span><span class="p">):</span>
+calling <a class="reference internal" href="09-api.html#tcfl.tc.target_c.expect" title="tcfl.tc.target_c.expect"><code class="xref py py-meth docutils literal notranslate"><span class="pre">tcfl.tc.target_c.expect()</span></code></a> or the full testcase expect
+loop calling <a class="reference internal" href="09-api.html#tcfl.expecter.expecter_c.run" title="tcfl.expecter.expecter_c.run"><code class="xref py py-meth docutils literal notranslate"><span class="pre">run()</span></code></a> on
+<a class="reference internal" href="09-api.html#tcfl.expecter.expecter_c" title="tcfl.expecter.expecter_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">tcfl.tc.tc_c.tls.expecter</span></code></a></p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">setup</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">target1</span><span class="p">):</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="n">target</span><span class="o">.</span><span class="n">on_console_rx</span><span class="p">(</span><span class="s2">&quot;FAILURE&quot;</span><span class="p">,</span> <span class="n">result</span> <span class="o">=</span> <span class="s1">&#39;fail&#39;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="n">target1</span><span class="o">.</span><span class="n">on_console_rx</span><span class="p">(</span><span class="s2">&quot;FAILURE&quot;</span><span class="p">,</span> <span class="n">result</span> <span class="o">=</span> <span class="s1">&#39;fail&#39;</span><span class="p">)</span>
 </pre></div>
@@ -889,12 +873,12 @@ functions to do it for us. Why? because he knows how to do start them
 better (as some boards might lose the flashed image if we power cycle
 them). It is possible to <a class="reference internal" href="#tcf-guide-app-builder-override"><span class="std std-ref">override</span></a> the default actions that
 <em>app_zephyr</em> (and other Application Builders introduce).</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="n">ic</span><span class="o">.</span><span class="n">power</span><span class="o">.</span><span class="n">cycle</span><span class="p">()</span>
 </pre></div>
 </div>
 <p>Now we are going to wait for both targets to boot and report readiness</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">eval_0</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">eval_0</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="n">target</span><span class="o">.</span><span class="n">expect</span><span class="p">(</span><span class="s2">&quot;I am ready&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="n">target</span><span class="o">.</span><span class="n">report_pass</span><span class="p">(</span><span class="s2">&quot;target ready&quot;</span><span class="p">)</span>
 <span class="go">&gt;&gt;&gt;</span>
@@ -907,8 +891,8 @@ them). It is possible to <a class="reference internal" href="#tcf-guide-app-buil
 <em>target</em> to connect to <em>target1</em> and then <em>target1</em> is told to  to
 accept the connection request–note each target exposes its address in
 the network in a tag called <em>address</em> – we can use
-<a class="reference internal" href="09-api.html#tcfl.tc.target_c.kws" title="tcfl.tc.target_c.kws"><code class="xref py py-attr docutils literal"><span class="pre">tcfl.tc.target_c.kws</span></code></a> to format messages:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">eval_3</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">target1</span><span class="p">):</span>
+<a class="reference internal" href="09-api.html#tcfl.tc.target_c.kws" title="tcfl.tc.target_c.kws"><code class="xref py py-attr docutils literal notranslate"><span class="pre">tcfl.tc.target_c.kws</span></code></a> to format messages:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">eval_3</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">target1</span><span class="p">):</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="n">target</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="s2">&quot;connect to </span><span class="si">%(address)s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">target1</span><span class="o">.</span><span class="n">kws</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="n">target</span><span class="o">.</span><span class="n">expect</span><span class="p">(</span><span class="s2">&quot;connecting to </span><span class="si">%(address)s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">target1</span><span class="o">.</span><span class="n">kws</span><span class="p">)</span>
 <span class="go">&gt;&gt;&gt;</span>
@@ -922,18 +906,18 @@ the network in a tag called <em>address</em> – we can use
 <p>Now we wait for both targets to print a heartbeat that they emit
 every five seconds–if we have to wait more than ten seconds for both
 heartbeats, it will consider it a failure:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">eval_4</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">target1</span><span class="p">):</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">eval_4</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">target1</span><span class="p">):</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="n">target</span><span class="o">.</span><span class="n">on_console_rx</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s2">&quot;heartbeat #[0-9]+ ok&quot;</span><span class="p">))</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="n">target1</span><span class="o">.</span><span class="n">on_console_rx</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s2">&quot;heartbeat #[0-9]+ ok&quot;</span><span class="p">))</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="bp">self</span><span class="o">.</span><span class="n">expecter</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>The <a class="reference internal" href="09-api.html#tcfl.tc.tc_c.expecter" title="tcfl.tc.tc_c.expecter"><code class="xref py py-attr docutils literal"><span class="pre">tcfl.tc.tc_c.expecter</span></code></a> is a generic expectation loop to
-which anything can be attach to poll and check while the loop
-runs. It will run until all the things it has been asked to expect
-have ocurred or fail with a timeout.</p>
+<p>The <a class="reference internal" href="09-api.html#tcfl.expecter.expecter_c" title="tcfl.expecter.expecter_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">tcfl.tc.tc_c.tls.expecter</span></code></a> is a
+generic expectation loop to which anything can be attach to poll and
+check while the loop runs. It will run until all the things it has
+been asked to expect have ocurred or fail with a timeout.</p>
 <p>It can be also used with context managers:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>   <span class="k">def</span> <span class="nf">eval_5</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>   <span class="k">def</span> <span class="nf">eval_5</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="n">times</span> <span class="o">=</span> <span class="mi">4</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="k">with</span> <span class="n">target</span><span class="o">.</span><span class="n">on_console_rx_cm</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s2">&quot;heartbeat #[0-9]+ failure&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span>                                    <span class="n">result</span> <span class="o">=</span> <span class="s2">&quot;fail&quot;</span><span class="p">):</span>
@@ -944,11 +928,11 @@ have ocurred or fail with a timeout.</p>
 <span class="gp">&gt;&gt;&gt; </span>            <span class="bp">self</span><span class="o">.</span><span class="n">expecter</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
 </pre></div>
 </div>
-<p>APIs <a class="reference internal" href="09-api.html#tcfl.tc.target_c.expect" title="tcfl.tc.target_c.expect"><code class="xref py py-meth docutils literal"><span class="pre">tcfl.tc.target_c.expect()</span></code></a> and <a class="reference internal" href="09-api.html#tcfl.tc.target_c.wait" title="tcfl.tc.target_c.wait"><code class="xref py py-meth docutils literal"><span class="pre">tcfl.tc.target_c.wait()</span></code></a>
+<p>APIs <a class="reference internal" href="09-api.html#tcfl.tc.target_c.expect" title="tcfl.tc.target_c.expect"><code class="xref py py-meth docutils literal notranslate"><span class="pre">tcfl.tc.target_c.expect()</span></code></a> and <a class="reference internal" href="09-api.html#tcfl.tc.target_c.wait" title="tcfl.tc.target_c.wait"><code class="xref py py-meth docutils literal notranslate"><span class="pre">tcfl.tc.target_c.wait()</span></code></a>
 are an example of doing something similar to this.</p>
 <p>With the test concluded, we power down all the targets in reverse
 order:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">teardown</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">teardown</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="k">for</span> <span class="n">_n</span><span class="p">,</span> <span class="n">target</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">targets</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()):</span>
 <span class="gp">&gt;&gt;&gt; </span>            <span class="n">target</span><span class="o">.</span><span class="n">power</span><span class="o">.</span><span class="n">off</span><span class="p">()</span>
 </pre></div>
@@ -960,16 +944,16 @@ powered down and when.</p>
 <h3>2.3.3. Connecting to network ports<a class="headerlink" href="#connecting-to-network-ports" title="Permalink to this headline">¶</a></h3>
 <p>A well designed target setup will have the test targets in an isolated
 network, so the client cannot access remotely. However, using the
-<a class="reference internal" href="09-api.html#tcfl.target_ext_tunnel.tunnel" title="tcfl.target_ext_tunnel.tunnel"><code class="xref py py-class docutils literal"><span class="pre">IP</span> <span class="pre">tunnel</span></code></a> extension, the
+<a class="reference internal" href="09-api.html#tcfl.target_ext_tunnel.tunnel" title="tcfl.target_ext_tunnel.tunnel"><code class="xref py py-class docutils literal notranslate"><span class="pre">IP</span> <span class="pre">tunnel</span></code></a> extension, the
 client can access the target’s network ports. This also allows to
-establish <a class="reference internal" href="09-api.html#tcfl.target_ext_ssh.ssh" title="tcfl.target_ext_ssh.ssh"><code class="xref py py-class docutils literal"><span class="pre">SSH</span> <span class="pre">connections</span></code></a>.</p>
+establish <a class="reference internal" href="09-api.html#tcfl.target_ext_ssh.ssh" title="tcfl.target_ext_ssh.ssh"><code class="xref py py-class docutils literal notranslate"><span class="pre">SSH</span> <span class="pre">connections</span></code></a>.</p>
 <p>Consider this example:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">r</span> <span class="o">=</span> <span class="n">target</span><span class="o">.</span><span class="n">ssh</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span><span class="s2">&quot;echo -n </span><span class="si">%s</span><span class="s2"> &gt; somefile&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">ts</span><span class="p">)</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">r</span> <span class="o">=</span> <span class="n">target</span><span class="o">.</span><span class="n">ssh</span><span class="o">.</span><span class="n">check_output</span><span class="p">(</span><span class="s2">&quot;echo -n </span><span class="si">%s</span><span class="s2"> &gt; somefile&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">ts</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">r</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
 <span class="gp">&gt;&gt;&gt; </span>   <span class="bp">self</span><span class="o">.</span><span class="n">report_pass</span><span class="p">(</span><span class="s2">&quot;created a file with SSH command&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>This is an excerpt of a longer <a class="reference download internal" href="../_downloads/test_linux_ssh.py" download=""><code class="xref download docutils literal"><span class="pre">example</span></code></a> that shows how to do different SSH
+<p>This is an excerpt of a longer <a class="reference download internal" href="../_downloads/test_linux_ssh.py" download=""><code class="xref download docutils literal notranslate"><span class="pre">example</span></code></a> that shows how to do different SSH
 and SCP operations.</p>
 <p>Tunnels are only valid while the target is acquired.</p>
 </div>
@@ -985,14 +969,14 @@ further analysis.</p>
 <p>A well designed test network will interconnect one or more targets and
 also will include one server interface, which usually is associated to
 the <em>interconnect</em> target that defines said test network.</p>
-<p>Using in the server the <a class="reference internal" href="09-api.html#conf_00_lib.vlan_pci" title="conf_00_lib.vlan_pci"><code class="xref py py-class docutils literal"><span class="pre">conf_00_lib.vlan_pci</span></code></a> to bring up the
+<p>Using in the server the <a class="reference internal" href="09-api.html#conf_00_lib.vlan_pci" title="conf_00_lib.vlan_pci"><code class="xref py py-class docutils literal notranslate"><span class="pre">conf_00_lib.vlan_pci</span></code></a> to bring up the
 network, like with the configuration functions
-<a class="reference internal" href="09-api.html#conf_00_lib.nw_default_targets_add" title="conf_00_lib.nw_default_targets_add"><code class="xref py py-func docutils literal"><span class="pre">conf_00_lib.nw_default_targets_add()</span></code></a> to create networks, those
+<a class="reference internal" href="09-api.html#conf_00_lib.nw_default_targets_add" title="conf_00_lib.nw_default_targets_add"><code class="xref py py-func docutils literal notranslate"><span class="pre">conf_00_lib.nw_default_targets_add()</span></code></a> to create networks, those
 targets will have the tcpdump capability.</p>
 <p>To use, you would, declare a test that uses an interconnect and before
 powering the interconnect, in any <em>start()</em> method, you would set the
 <em>tcpdump</em> property in the interconnect to unique file name:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">interconnect</span><span class="p">(</span><span class="n">spec</span> <span class="o">=</span> <span class="s2">&quot;ipv4_addr&quot;</span><span class="p">)</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">interconnect</span><span class="p">(</span><span class="n">spec</span> <span class="o">=</span> <span class="s2">&quot;ipv4_addr&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">target</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">target</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">class</span> <span class="nc">something</span><span class="p">(</span><span class="n">tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">tc_c</span><span class="p">):</span>
@@ -1008,7 +992,7 @@ powering the interconnect, in any <em>start()</em> method, you would set the
 <p>Later on, in the <em>teardown()</em> methods, bring the data back from the
 server to a file in the current work directory called
 <em>tcpdump-RUNID:HASHID.cap</em>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">teardown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ic</span><span class="p">):</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span>    <span class="k">def</span> <span class="nf">teardown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ic</span><span class="p">):</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="n">ic</span><span class="o">.</span><span class="n">power</span><span class="o">.</span><span class="n">off</span><span class="p">()</span>      <span class="c1"># ensure tcpdump flushes</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="c1"># Get the TCP dump from the interconnect to a file in the CWD</span>
 <span class="gp">&gt;&gt;&gt; </span>        <span class="c1"># called tcpdump-HASH.cap</span>
@@ -1017,7 +1001,7 @@ server to a file in the current work directory called
 </pre></div>
 </div>
 <p>From the command line, this would be:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf acquire NETWORKTARGET
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf acquire NETWORKTARGET
 $ tcf propert-set NETWORKTARGET tcpdump CAPTURENAME
 $ tcf power-cycle NETWORKTARGET
 ... do network operations ...
@@ -1034,19 +1018,19 @@ other tool for further analysis.</p>
 <p>Sometimes there is a need to keep files around for post analysis,
 there are different ways to do this:</p>
 <ul class="simple">
-<li>provide <code class="docutils literal"><span class="pre">--no-remove-tmpdir</span></code> to <em>tcf run</em>; it will provide the
+<li>provide <code class="docutils literal notranslate"><span class="pre">--no-remove-tmpdir</span></code> to <em>tcf run</em>; it will provide the
 name of the temporary directory where all the temporary files are
 maintained and will not delete it upon exit (as it does by default)</li>
-<li>provide <code class="docutils literal"><span class="pre">--tmpdir=DIR</span></code>, where <code class="docutils literal"><span class="pre">DIR</span></code> is an existing, empty
+<li>provide <code class="docutils literal notranslate"><span class="pre">--tmpdir=DIR</span></code>, where <code class="docutils literal notranslate"><span class="pre">DIR</span></code> is an existing, empty
 directory where <em>tcf run</em> will place all the temporary files.</li>
 </ul>
 <p>Whichever is the temporary directory (autogenerated or specified), the
 files are placed in subdirectories named after each test case run’s
 <a class="reference internal" href="09-api.html#tc-id"><span class="std std-ref">*HASH*</span></a>.</p>
 <p>If you need to create files (or copy files, etc) in the testcase,
-use to the <a class="reference internal" href="09-api.html#tcfl.tc.tc_c.tmpdir" title="tcfl.tc.tc_c.tmpdir"><code class="xref py py-attr docutils literal"><span class="pre">tmpdir</span></code></a> variable to generate
+use to the <a class="reference internal" href="09-api.html#tcfl.tc.tc_c.tmpdir" title="tcfl.tc.tc_c.tmpdir"><code class="xref py py-attr docutils literal notranslate"><span class="pre">tmpdir</span></code></a> variable to generate
 or copy files to the directory assigned to the testcase, for example:</p>
-<div class="highlight-python"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">&quot;somefile.orig&quot;</span><span class="p">))</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">&quot;somefile.orig&quot;</span><span class="p">))</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
    <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;original file&quot;</span><span class="p">)</span>
 <span class="n">target</span><span class="o">.</span><span class="n">ssh</span><span class="o">.</span><span class="n">copy_from</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">&quot;somefile.orig&quot;</span><span class="p">))</span>
 <span class="c1"># ... do something on the target</span>
@@ -1059,7 +1043,7 @@ or copy files to the directory assigned to the testcase, for example:</p>
 <span id="id1"></span><h3>2.3.7. Connecting things<a class="headerlink" href="#connecting-things" title="Permalink to this headline">¶</a></h3>
 <p>Some targets supports things (other targets) that can be connected or
 disconnected. If they do, their tags will show:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf list -vv qlf04a
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf list -vv qlf04a
 ...
 things: [u&#39;a101-05&#39;, u&#39;usb-key0&#39;]
 ...
@@ -1067,17 +1051,17 @@ things: [u&#39;a101-05&#39;, u&#39;usb-key0&#39;]
 </div>
 <p>How this is done is specific to the driver given in the configuration,
 but it might be a target that is physically connected to another via a
-USB cutter. The USB cutter is an object implementing a <a class="reference internal" href="09-api.html#ttbl.thing_plugger_mixin" title="ttbl.thing_plugger_mixin"><code class="xref py py-class docutils literal"><span class="pre">plugger</span>
+USB cutter. The USB cutter is an object implementing a <a class="reference internal" href="09-api.html#ttbl.thing_plugger_mixin" title="ttbl.thing_plugger_mixin"><code class="xref py py-class docutils literal notranslate"><span class="pre">plugger</span>
 <span class="pre">interface</span></code></a> which is given to the
-configuration method <a class="reference internal" href="09-api.html#ttbl.test_target.thing_add" title="ttbl.test_target.thing_add"><code class="xref py py-meth docutils literal"><span class="pre">ttbl.test_target.thing_add()</span></code></a> in the config
+configuration method <a class="reference internal" href="09-api.html#ttbl.test_target.thing_add" title="ttbl.test_target.thing_add"><code class="xref py py-meth docutils literal notranslate"><span class="pre">ttbl.test_target.thing_add()</span></code></a> in the config
 files.</p>
 <ul class="simple">
 <li>to find available things to connect, use the <cite>tcf thing-list</cite> or
-within a test script, <a class="reference internal" href="09-api.html#tcfl.tc.target_c.thing_list" title="tcfl.tc.target_c.thing_list"><code class="xref py py-meth docutils literal"><span class="pre">tcfl.tc.target_c.thing_list()</span></code></a></li>
+within a test script, <a class="reference internal" href="09-api.html#tcfl.tc.target_c.thing_list" title="tcfl.tc.target_c.thing_list"><code class="xref py py-meth docutils literal notranslate"><span class="pre">tcfl.tc.target_c.thing_list()</span></code></a></li>
 <li>to connect, use <cite>thing-plug</cite> or within a test script,
-<a class="reference internal" href="09-api.html#tcfl.tc.target_c.thing_plug" title="tcfl.tc.target_c.thing_plug"><code class="xref py py-meth docutils literal"><span class="pre">tcfl.tc.target_c.thing_plug()</span></code></a></li>
+<a class="reference internal" href="09-api.html#tcfl.tc.target_c.thing_plug" title="tcfl.tc.target_c.thing_plug"><code class="xref py py-meth docutils literal notranslate"><span class="pre">tcfl.tc.target_c.thing_plug()</span></code></a></li>
 <li>to disconnect, use <cite>thing-unplug</cite> or within a test script,
-<a class="reference internal" href="09-api.html#tcfl.tc.target_c.thing_unplug" title="tcfl.tc.target_c.thing_unplug"><code class="xref py py-meth docutils literal"><span class="pre">tcfl.tc.target_c.thing_unplug()</span></code></a></li>
+<a class="reference internal" href="09-api.html#tcfl.tc.target_c.thing_unplug" title="tcfl.tc.target_c.thing_unplug"><code class="xref py py-meth docutils literal notranslate"><span class="pre">tcfl.tc.target_c.thing_unplug()</span></code></a></li>
 </ul>
 <p>Note you must own both the target and the thing to be able to plug one
 into another.</p>
@@ -1104,7 +1088,7 @@ into another.</p>
 </div></blockquote>
 <div class="section" id="a-basic-testcase">
 <h3>2.4.1. A basic testcase<a class="headerlink" href="#a-basic-testcase" title="Permalink to this headline">¶</a></h3>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="kn">import</span> <span class="nn">tcfl.tc</span>
 
 <span class="k">class</span> <span class="nc">_test</span><span class="p">(</span><span class="n">tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">tc_c</span><span class="p">):</span>
@@ -1114,14 +1098,14 @@ into another.</p>
 </div>
 <p>Inherit the basic class and create an evaluation method (where we run
 the test), just print something</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run test_01.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run test_01.py
 PASS0/        toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped) - passed
 </pre></div>
 </div>
 <ul>
-<li><p class="first">Quite succint? append one more more <code class="docutils literal"><span class="pre">-v</span></code> to <em>tcf run</em>.</p>
+<li><p class="first">Quite succint? append one more more <code class="docutils literal notranslate"><span class="pre">-v</span></code> to <em>tcf run</em>.</p>
 </li>
-<li><p class="first">Increase its verbosity, add <code class="docutils literal"><span class="pre">dlevel</span> <span class="pre">=</span> <span class="pre">-1</span></code> or <code class="docutils literal"><span class="pre">-2</span></code> to <em>self.report_info()</em></p>
+<li><p class="first">Increase its verbosity, add <code class="docutils literal notranslate"><span class="pre">dlevel</span> <span class="pre">=</span> <span class="pre">-1</span></code> or <code class="docutils literal notranslate"><span class="pre">-2</span></code> to <em>self.report_info()</em></p>
 </li>
 <li><p class="first">Why not use Python’s <em>print()</em> instead of <em>self.report_info()</em>? it
 sidesteps TCF’s login mechanism and if you you want stuff logged and
@@ -1161,7 +1145,7 @@ fast flashing and whatever suits you</li>
 </div>
 <div class="section" id="breaking-it-up">
 <h3>2.4.3. Breaking it up<a class="headerlink" href="#breaking-it-up" title="Permalink to this headline">¶</a></h3>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="kn">import</span> <span class="nn">tcfl.tc</span>
 
 <span class="k">class</span> <span class="nc">_test</span><span class="p">(</span><span class="n">tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">tc_c</span><span class="p">):</span>
@@ -1177,7 +1161,7 @@ fast flashing and whatever suits you</li>
 called <em>eval_*()</em></li>
 <li>They are executed sequentially in <strong>alphabetical</strong> order</li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run -vv test_02.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run -vv test_02.py
 INFO2/       toplevel @local: scanning for test cases
 INFO1/gixj   test_02.py#_test @local: will run on target group &#39;localic-localtg&#39;
 INFO2/gixjE#1        test_02.py#_test @local: Hello 1
@@ -1189,7 +1173,7 @@ PASS0/       toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped)
 </div>
 <div class="section" id="give-me-a-target">
 <h3>2.4.4. Give me a target<a class="headerlink" href="#give-me-a-target" title="Permalink to this headline">¶</a></h3>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="kn">import</span> <span class="nn">tcfl.tc</span>
 
 <span class="hll"><span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">target</span><span class="p">(</span><span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;any&quot;</span><span class="p">)</span>
@@ -1204,21 +1188,21 @@ PASS0/       toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped)
 </pre></div>
 </div>
 <ul class="simple">
-<li><code class="docutils literal"><span class="pre">&#64;tcfl.tc.target()</span></code> allows the testcase to request a target..or
+<li><code class="docutils literal notranslate"><span class="pre">&#64;tcfl.tc.target()</span></code> allows the testcase to request a target..or
 two, or seven hundred. By default they are called <em>target</em>, <em>target1</em>…
-but you can use <code class="docutils literal"><span class="pre">name</span> <span class="pre">=</span> <span class="pre">&quot;NAME&quot;</span></code> to give your own name.</li>
+but you can use <code class="docutils literal notranslate"><span class="pre">name</span> <span class="pre">=</span> <span class="pre">&quot;NAME&quot;</span></code> to give your own name.</li>
 <li>The only arguments you can pass to the <em>eval_*()</em> methods are target
 names. Note how we pass that to <em>eval_01()</em> and use it to report;
 this will have an impact when using multiple targets.</li>
 <li>Targets can be selected to run a tescase on in any of three ways
-(which you can set with teh <code class="docutils literal"><span class="pre">mode</span> <span class="pre">=</span> <span class="pre">&quot;MODE&quot;</span></code> parameter):<ul>
+(which you can set with teh <code class="docutils literal notranslate"><span class="pre">mode</span> <span class="pre">=</span> <span class="pre">&quot;MODE&quot;</span></code> parameter):<ul>
 <li><em>any</em>: pick one, any one will do</li>
 <li><em>all</em>: pick all</li>
 <li><em>one-per-type</em>: pick one of each type</li>
 </ul>
 </li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run -vv test_03.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run -vv test_03.py
 INFO2/       toplevel @local: scanning for test cases
 INFO1/taqq   test_03.py#_test @local/qz46a-riscv32:riscv32: will run on target group &#39;target=local/qz46a-riscv32:riscv32&#39;
 INFO2/taqqE#1        test_03.py#_test @local/qz46a-riscv32:riscv32: Hello 1
@@ -1230,7 +1214,7 @@ PASS0/       toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped)
 </div>
 <div class="section" id="give-me-a-target-that-can-run-zephyr">
 <h3>2.4.5. Give me a target that can run Zephyr<a class="headerlink" href="#give-me-a-target-that-can-run-zephyr" title="Permalink to this headline">¶</a></h3>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="kn">import</span> <span class="nn">tcfl.tc</span>
 
 <span class="hll"><span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">target</span><span class="p">(</span><span class="s2">&quot;zephyr_board&quot;</span><span class="p">,</span> <span class="n">mode</span> <span class="o">=</span> <span class="s2">&quot;any&quot;</span><span class="p">)</span>
@@ -1245,13 +1229,13 @@ PASS0/       toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped)
 </pre></div>
 </div>
 <ul class="simple">
-<li><code class="docutils literal"><span class="pre">&#64;tcfl.tc.target()</span></code>’s first argument is a <a class="reference internal" href="#tcf-evaluation-expressions"><span class="std std-ref">logical expression</span></a> which can use the tags a target
-exports (which you can see with <code class="docutils literal"><span class="pre">tcf</span> <span class="pre">list</span> <span class="pre">-vv</span> <span class="pre">TARGETNAME</span></code>)</li>
+<li><code class="docutils literal notranslate"><span class="pre">&#64;tcfl.tc.target()</span></code>’s first argument is a <a class="reference internal" href="#tcf-evaluation-expressions"><span class="std std-ref">logical expression</span></a> which can use the tags a target
+exports (which you can see with <code class="docutils literal notranslate"><span class="pre">tcf</span> <span class="pre">list</span> <span class="pre">-vv</span> <span class="pre">TARGETNAME</span></code>)</li>
 <li><em>zephyr_board</em> means any target that exports a tag called
 zephyr_board with a value. That maps to the <em>BOARD</em> arg to the
 Zephyr build.</li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run -vv test_04.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run -vv test_04.py
 INFO2/       toplevel @local: scanning for test cases
 INFO1/vzqp   test_04.py#_test @local/qz39a-arm:arm: will run on target group &#39;target=local/qz39a-arm:arm&#39;
 INFO2/vzqpE#1        test_04.py#_test @local/qz39a-arm:arm: Hello 1
@@ -1263,7 +1247,7 @@ PASS0/       toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped)
 </div>
 <div class="section" id="give-me-a-target-that-can-run-zephyr-and-is-x86">
 <h3>2.4.6. Give me a target that can run Zephyr and is x86<a class="headerlink" href="#give-me-a-target-that-can-run-zephyr-and-is-x86" title="Permalink to this headline">¶</a></h3>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="kn">import</span> <span class="nn">tcfl.tc</span>
 <span class="hll"><span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">target</span><span class="p">(</span><span class="s1">&#39;zephyr_board and bsp == &quot;x86&quot;&#39;</span><span class="p">)</span>
 </span><span class="k">class</span> <span class="nc">_test</span><span class="p">(</span><span class="n">tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">tc_c</span><span class="p">):</span>
@@ -1277,16 +1261,16 @@ PASS0/       toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped)
 </div>
 <ul>
 <li><p class="first">many combinations are possible with logical expressions.</p>
-<p>Can get tricky, though; <code class="docutils literal"><span class="pre">-vvvv</span></code> will give you lots of details of the selection
+<p>Can get tricky, though; <code class="docutils literal notranslate"><span class="pre">-vvvv</span></code> will give you lots of details of the selection
 process; also the same expression can be passed to <em>tcf list</em> to
 figure out how it works.</p>
 </li>
-<li><p class="first">Removing <code class="docutils literal"><span class="pre">mode</span> <span class="pre">=</span> <span class="pre">&quot;any&quot;</span></code> defaults to running on one target of each
+<li><p class="first">Removing <code class="docutils literal notranslate"><span class="pre">mode</span> <span class="pre">=</span> <span class="pre">&quot;any&quot;</span></code> defaults to running on one target of each
 type..which might result on a lot of execution if you have many
 different types of targets.</p>
 </li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run -v test_05.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run -v test_05.py
 INFO1/1qvi   test_05.py#_test @srrsotc03/ti-01:x86+arc+arm/x86: will run on target group &#39;target=srrsotc03/ti-01:x86+arc+arm&#39;
 INFO1/lwq8   test_05.py#_test @srrsotc03/qc1000-01:x86+arc/x86: will run on target group &#39;target=srrsotc03/qc1000-01:x86+arc&#39;
 INFO1/dvj6   test_05.py#_test @jfsotc03/a101-16:x86: will run on target group &#39;target=jfsotc03/a101-16:x86&#39;
@@ -1301,7 +1285,7 @@ PASS0/       toplevel @local: 9 tests (9 passed, 0 failed, 0 blocked, 0 skipped)
 </div>
 <div class="section" id="but-put-some-zephyr-into-it">
 <h3>2.4.7. But put some Zephyr into it?<a class="headerlink" href="#but-put-some-zephyr-into-it" title="Permalink to this headline">¶</a></h3>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="hll"><span class="kn">import</span> <span class="nn">os</span>
 </span><span class="kn">import</span> <span class="nn">tcfl.tc</span>
 <span class="kn">import</span> <span class="nn">tcfl.tl</span>
@@ -1318,15 +1302,15 @@ PASS0/       toplevel @local: 9 tests (9 passed, 0 failed, 0 blocked, 0 skipped)
 </pre></div>
 </div>
 <ul class="simple">
-<li>feed <code class="docutils literal"><span class="pre">&#64;target()</span></code> a path to a Zephyr App.</li>
-<li><code class="docutils literal"><span class="pre">app_zephyr</span></code> enables a plugin that will monkey patch methods in
+<li>feed <code class="docutils literal notranslate"><span class="pre">&#64;target()</span></code> a path to a Zephyr App.</li>
+<li><code class="docutils literal notranslate"><span class="pre">app_zephyr</span></code> enables a plugin that will monkey patch methods in
 your test class that tells it how to build, flash and startup a
 target running Zephyr (functions called
-<code class="docutils literal"><span class="pre">(configure|build|deploy|start)_50_for_target()</span></code>)</li>
+<code class="docutils literal notranslate"><span class="pre">(configure|build|deploy|start)_50_for_target()</span></code>)</li>
 <li>The app is built, flashed and the target reset before <em>eval_*()</em> are
 called</li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run -vv test_06.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run -vv test_06.py
 INFO1/bxot   test_06.py#_test @jfsotc02/a101-01:x86: will run on target group &#39;target=jfsotc02/a101-01:x86&#39;
 PASS2/bxot   test_06.py#_test @jfsotc02/a101-01:x86: configure passed
 PASS1/bxot   test_06.py#_test @jfsotc02/a101-01:x86: build passed
@@ -1343,31 +1327,31 @@ PASS0/       toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped)
 <h3>2.4.8. Now we are building all the time, some time savers<a class="headerlink" href="#now-we-are-building-all-the-time-some-time-savers" title="Permalink to this headline">¶</a></h3>
 <ul>
 <li><p class="first">create a temporary directory to save the build products:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ mkdir tmp
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ mkdir tmp
 </pre></div>
 </div>
 </li>
-<li><p class="first">add <code class="docutils literal"><span class="pre">--tmpddir</span> <span class="pre">tmp</span></code> to <code class="docutils literal"><span class="pre">tcf</span> <span class="pre">run</span></code>–this way the builder will be
+<li><p class="first">add <code class="docutils literal notranslate"><span class="pre">--tmpddir</span> <span class="pre">tmp</span></code> to <code class="docutils literal notranslate"><span class="pre">tcf</span> <span class="pre">run</span></code>–this way the builder will be
 able to reuse those build products</p>
 <p>by default, a temporary directory is created and removed when
 done–this helps when you have a lot of code being run in many
 targets and you just care about the results.</p>
 </li>
-<li><p class="first">as a bonus, in <code class="docutils literal"><span class="pre">tmp/run.log</span></code> you’ll get a log file with all the
-step by step details, <code class="docutils literal"><span class="pre">--log-file</span></code> also gets you that.</p>
+<li><p class="first">as a bonus, in <code class="docutils literal notranslate"><span class="pre">tmp/run.log</span></code> you’ll get a log file with all the
+step by step details, <code class="docutils literal notranslate"><span class="pre">--log-file</span></code> also gets you that.</p>
 </li>
 <li><p class="first">work just with one target–this means that we don’t have to
 recompile for new targets constantly (as they are assigned randomly)
 and reuse what is already built in the temporary directory:</p>
 <p>Let a target be assigned running normally:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp test_06.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp test_06.py
 ...
 INFO1/bxot  test_06.py#_test @jfsotc02/a101-01:x86: will run on target group &#39;target=jfsotc02/a101-01:x86&#39;
 </pre></div>
 </div>
 <p>Save that <em>jfsotc02/a101-01</em>, that’s your target ID that you feed to
-<code class="docutils literal"><span class="pre">tcf</span> <span class="pre">run</span></code> with <code class="docutils literal"><span class="pre">-t</span></code>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -t jfsotc02/a101-01 test_06.py
+<code class="docutils literal notranslate"><span class="pre">tcf</span> <span class="pre">run</span></code> with <code class="docutils literal notranslate"><span class="pre">-t</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -t jfsotc02/a101-01 test_06.py
 INFO1/bxot  test_06.py#_test @jfsotc02/a101-01:x86: will run on target group &#39;target=jfsotc02/a101-01:x86&#39;...
 </pre></div>
 </div>
@@ -1376,7 +1360,7 @@ INFO1/bxot  test_06.py#_test @jfsotc02/a101-01:x86: will run on target group &#3
 </div>
 <div class="section" id="so-is-zephyr-booting">
 <h3>2.4.9. So, is Zephyr booting?<a class="headerlink" href="#so-is-zephyr-booting" title="Permalink to this headline">¶</a></h3>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">tcfl.tc</span>
 <span class="kn">import</span> <span class="nn">tcfl.tl</span>
@@ -1401,21 +1385,21 @@ INFO1/bxot  test_06.py#_test @jfsotc02/a101-01:x86: will run on target group &#3
 <ul class="simple">
 <li><em>build*()</em> are build methods, things that have to happen when we
 build (akin to <em>eval*()</em>)</li>
-<li>Use the target’s <a class="reference internal" href="09-api.html#tcfl.app_zephyr.zephyr" title="tcfl.app_zephyr.zephyr"><code class="xref py py-class docutils literal"><span class="pre">zephyr</span></code></a> API
+<li>Use the target’s <a class="reference internal" href="09-api.html#tcfl.app_zephyr.zephyr" title="tcfl.app_zephyr.zephyr"><code class="xref py py-class docutils literal notranslate"><span class="pre">zephyr</span></code></a> API
 extension to enable the boot banner with a config fragment
-introduced with <a class="reference internal" href="09-api.html#tcfl.app_zephyr.zephyr.config_file_write" title="tcfl.app_zephyr.zephyr.config_file_write"><code class="xref py py-meth docutils literal"><span class="pre">config_file_write</span></code></a></li>
+introduced with <a class="reference internal" href="09-api.html#tcfl.app_zephyr.zephyr.config_file_write" title="tcfl.app_zephyr.zephyr.config_file_write"><code class="xref py py-meth docutils literal notranslate"><span class="pre">config_file_write</span></code></a></li>
 <li>Use <em>expect()</em> to wait for something on the default console; in this
-case, Zephyr’s boot banner (it can be a <a class="reference external" href="https://docs.python.org/2.7/library/re.html#module-re" title="(in Python v2.7)"><code class="xref py py-mod docutils literal"><span class="pre">Python</span> <span class="pre">regex</span></code></a>
-<code class="docutils literal"><span class="pre">re.compile(REGEX)</span></code>) and if it timeouts, it raises a failure
+case, Zephyr’s boot banner (it can be a <a class="reference external" href="https://docs.python.org/2.7/library/re.html#module-re" title="(in Python v2.7)"><code class="xref py py-mod docutils literal notranslate"><span class="pre">Python</span> <span class="pre">regex</span></code></a>
+<code class="docutils literal notranslate"><span class="pre">re.compile(REGEX)</span></code>) and if it timeouts, it raises a failure
 exception, no more <em>eval*()</em> will execute.</li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_08.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_08.py
 </pre></div>
 </div>
 </div>
 <div class="section" id="and-is-the-code-doing-what-i-want-hello-world">
 <h3>2.4.10. And is the code doing what I want? Hello World?<a class="headerlink" href="#and-is-the-code-doing-what-i-want-hello-world" title="Permalink to this headline">¶</a></h3>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">tcfl.tc</span>
 <span class="kn">import</span> <span class="nn">tcfl.tl</span>
@@ -1442,7 +1426,7 @@ exception, no more <em>eval*()</em> will execute.</li>
 <li>Same as before, use <em>expect()</em> to require the console to print
 <em>Hello World!</em> to determine if the testcase is passing.</li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_08.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_08.py
 INFO2/       toplevel @local: scanning for test cases
 INFO1/lyse   test_08.py#_test @local/qz36b-arm:arm: will run on target group &#39;target=local/qz36b-arm:arm&#39;
 PASS2/lyse   test_08.py#_test @local/qz36b-arm:arm: configure passed
@@ -1460,7 +1444,7 @@ PASS0/       toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped)
 </div>
 <div class="section" id="what-happens-when-it-fails-let-s-make-it-fail">
 <h3>2.4.11. What happens when it fails? Let’s make it fail<a class="headerlink" href="#what-happens-when-it-fails-let-s-make-it-fail" title="Permalink to this headline">¶</a></h3>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">tcfl.tc</span>
 <span class="kn">import</span> <span class="nn">tcfl.tl</span>
@@ -1487,14 +1471,14 @@ PASS0/       toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped)
 <li>Instead of <em>Hello World</em>, look for <em>Hello Kitty</em></li>
 <li>After waiting for sixy seconds to receive <em>Hello Kitty</em>, it raises
 an exception and fails.<ul>
-<li>This will generate a file called <code class="docutils literal"><span class="pre">report-HASHID.txt</span></code> in the current
+<li>This will generate a file called <code class="docutils literal notranslate"><span class="pre">report-HASHID.txt</span></code> in the current
 directory with detailed information</li>
-<li><code class="docutils literal"><span class="pre">HASHID</span></code> is a UUID from the testcase name and the target(s) where it
+<li><code class="docutils literal notranslate"><span class="pre">HASHID</span></code> is a UUID from the testcase name and the target(s) where it
 ran, <em>azus</em> in the example below.</li>
 </ul>
 </li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_09.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_09.py
 INFO2/       toplevel @local: scanning for test cases
 INFO1/azus   test_09.py#_test @local/qz36a-arm:arm: will run on target group &#39;target=local/qz36a-arm:arm&#39;
 PASS2/azus   test_09.py#_test @local/qz36a-arm:arm: configure passed
@@ -1519,13 +1503,13 @@ using <em>make</em>’s jobserver.</p>
 <div class="section" id="running-a-zephyr-sanity-check-testcase">
 <h3>2.4.12. Running a Zephyr sanity check testcase<a class="headerlink" href="#running-a-zephyr-sanity-check-testcase" title="Permalink to this headline">¶</a></h3>
 <ul class="simple">
-<li>A <a class="reference internal" href="09-api.html#module-tcfl.tc_zephyr_sanity" title="tcfl.tc_zephyr_sanity"><code class="xref py py-mod docutils literal"><span class="pre">builtin</span> <span class="pre">driver</span></code></a> understand’s Zephyr’s
+<li>A <a class="reference internal" href="09-api.html#module-tcfl.tc_zephyr_sanity" title="tcfl.tc_zephyr_sanity"><code class="xref py py-mod docutils literal notranslate"><span class="pre">builtin</span> <span class="pre">driver</span></code></a> understand’s Zephyr’s
 Sanity Check <em>testcase.ini</em> files and by default runs them on all
 available targets (one of each type)</li>
-<li>You can use <code class="docutils literal"><span class="pre">-u</span></code> to override and force it to run on <em>all</em> targets
-(stress test) or <code class="docutils literal"><span class="pre">-y</span></code> to run on any.</li>
+<li>You can use <code class="docutils literal notranslate"><span class="pre">-u</span></code> to override and force it to run on <em>all</em> targets
+(stress test) or <code class="docutils literal notranslate"><span class="pre">-y</span></code> to run on any.</li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ cd $ZEPHYR_BASE
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cd $ZEPHYR_BASE
 $ mkdir tmp
 $ tcf run --tmpdir tmp -v tests/kernel/common
 INFO1/ihuu   tests/kernel/common/testcase.ini#test @local/qz35a-arm:arm: will run on target group &#39;target=local/qz35a-arm:arm&#39;
@@ -1546,7 +1530,7 @@ PASS0/       toplevel @local: 4 tests (4 passed, 0 failed, 0 blocked, 0 skipped)
 </div>
 <div class="section" id="double-down">
 <h3>2.4.13. Double down<a class="headerlink" href="#double-down" title="Permalink to this headline">¶</a></h3>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">tcfl.tc</span>
 <span class="kn">import</span> <span class="nn">tcfl.tl</span>
@@ -1571,7 +1555,7 @@ PASS0/       toplevel @local: 4 tests (4 passed, 0 failed, 0 blocked, 0 skipped)
 <li>Wait first for <em>target</em> and then <em>target1</em> to both print <em>Hello
 World!</em></li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_10.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_10.py
 INFO1/zdad   test_10.py#_test @zc7o: will run on target group &#39;target=local/qz40a-nios2:nios2 target1=local/qz48b-riscv32:riscv32&#39;
 PASS2/zdad   test_10.py#_test @zc7o: configure passed
 PASS1/zdad   test_10.py#_test @zc7o: build passed
@@ -1596,7 +1580,7 @@ prefixed to the target name (as in <em>&#64;zc7o|local/qz48b-riscv32</em>).</p>
 running at the same time. We can set expectations and then wait for
 them to happen in parallel.</p>
 <p><em>Expectation</em>: poll and check</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">tcfl.tc</span>
 <span class="kn">import</span> <span class="nn">tcfl.tl</span>
@@ -1620,7 +1604,7 @@ received or it timesout (meaning failure).</li>
 <li>That said, you will only notice speed ups on things that take longer
 to execute and thus, parallelize well :)</li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_11.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_11.py
 INFO2/       toplevel @local: scanning for test cases
 INFO1/0d6z   test_11.py#_test @6hj6: will run on target group &#39;target=local/qz44b-nios2:nios2 target1=local/qz41b-nios2:nios2&#39;
 PASS2/0d6z   test_11.py#_test @6hj6: configure passed
@@ -1661,13 +1645,13 @@ available<ul>
 </li>
 </ul>
 <p><em>tcf run</em> limits by default to 10 permutations, but you can tweak that
-with <code class="docutils literal"><span class="pre">-PNUMBER</span></code></p>
+with <code class="docutils literal notranslate"><span class="pre">-PNUMBER</span></code></p>
 </div>
 <div class="section" id="two-interconnected-targets">
 <h3>2.4.16. Two interconnected targets?<a class="headerlink" href="#two-interconnected-targets" title="Permalink to this headline">¶</a></h3>
-<p>Use <code class="docutils literal"><span class="pre">&#64;tcfl.tc.interconnect()</span></code> (a target–maybe conceptual–which
+<p>Use <code class="docutils literal notranslate"><span class="pre">&#64;tcfl.tc.interconnect()</span></code> (a target–maybe conceptual–which
 connects other targets together)</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="kn">import</span> <span class="nn">tcfl.tc</span>
 <span class="hll"><span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">interconnect</span><span class="p">()</span>
 </span><span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">target</span><span class="p">()</span>
@@ -1686,7 +1670,7 @@ targets that are in the same room, etc).</li>
 <li>By requesting an interconnect and two targets that belong to it, we
 will get a lot of permutations of two interconnected targets.</li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -v test_12.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -v test_12.py
 INFO1/0hgf   test_12.py#_test @qlan-tfdh: will run on target group &#39;ic=local/nwa target=local/qz34a-x86:x86 target1=local/qz45a-riscv32:riscv32&#39;
 INFO1/20i5   test_12.py#_test @qlan-xk2u: will run on target group &#39;ic=local/nwa target=local/qz43a-nios2:nios2 target1=local/qz39a-arm:arm&#39;
 INFO1/9rdg   test_12.py#_test @qlan-xo7w: will run on target group &#39;ic=local/nwa target=local/qz34a-x86:x86 target1=local/qz40a-nios2:nios2&#39;
@@ -1701,7 +1685,7 @@ PASS0/       toplevel @local: 10 tests (10 passed, 0 failed, 0 blocked, 0 skippe
 </div>
 <p>Note that because 4 target types were available (QEMU Zephyr for x86,
 NIOS2, ARM and Risc v32), it has generated 16 different permutations
-and only taken the first 10 (because of the default <code class="docutils literal"><span class="pre">-P10</span></code>
+and only taken the first 10 (because of the default <code class="docutils literal notranslate"><span class="pre">-P10</span></code>
 setting).</p>
 </div>
 <div class="section" id="networking-and-the-zephyr-echo-server">
@@ -1709,7 +1693,7 @@ setting).</p>
 <p>Let’s get a Zephyr network application, the Echo Server, built and
 deployed in a target along with a network. Being part of a network
 assigns IP addresses to targets, which we can query for building:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="hll"><span class="kn">import</span> <span class="nn">tcfl.tc</span>
 </span><span class="hll"><span class="kn">import</span> <span class="nn">tcfl.tl</span>
@@ -1751,13 +1735,13 @@ assigns IP addresses to targets, which we can query for building:</p>
 </pre></div>
 </div>
 <ul>
-<li><p class="first">Use <code class="docutils literal"><span class="pre">&#64;tcfl.tc.interconnect(&quot;ipv4_addr&quot;)</span></code> to request an
+<li><p class="first">Use <code class="docutils literal notranslate"><span class="pre">&#64;tcfl.tc.interconnect(&quot;ipv4_addr&quot;)</span></code> to request an
 interconnect that declares having an IPv4 address.</p>
 </li>
-<li><p class="first">Request a Zephyr capable target; use <code class="docutils literal"><span class="pre">name</span></code> to name them and
-<code class="docutils literal"><span class="pre">spec</span></code> to <a class="reference internal" href="#tcf-evaluation-expressions"><span class="std std-ref">filter</span></a> the
+<li><p class="first">Request a Zephyr capable target; use <code class="docutils literal notranslate"><span class="pre">name</span></code> to name them and
+<code class="docutils literal notranslate"><span class="pre">spec</span></code> to <a class="reference internal" href="#tcf-evaluation-expressions"><span class="std std-ref">filter</span></a> the
 targets where the echo server can run (based on the configuration
-files available). Use <code class="docutils literal"><span class="pre">app_zephyr</span></code> to point to the right source.</p>
+files available). Use <code class="docutils literal notranslate"><span class="pre">app_zephyr</span></code> to point to the right source.</p>
 </li>
 <li><p class="first">Use <em>build_*()</em> to set configuration values, as these applications
 need to know their IP addresses at build time. These are available
@@ -1765,14 +1749,14 @@ in the target’s <em>kws</em> dictionary, which export the target’s tags.</p>
 </li>
 <li><p class="first">Use <em>start_*()</em> to power cycle the network before starting the
 test, otherwise it will not work. <em>ic</em> is the default name assigned by
-<code class="docutils literal"><span class="pre">&#64;tcfl.tc.interconnect()</span></code>.</p>
+<code class="docutils literal notranslate"><span class="pre">&#64;tcfl.tc.interconnect()</span></code>.</p>
 <p>Before evaluating, the <em>setup*()</em> and <em>start*()</em> functions are
 executed serially in alphabetical order. That’s why we call it
 <em>_00_</em> to make sure it gets run before the default Zephyr’s start
 function (<em>start_50_*()</em>).</p>
 </li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_13.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_13.py
 INFO2/       toplevel @local: scanning for test cases
 INFO1/pz15   test_13.py#_test @qlan-4coc: will run on target group &#39;ic=local/nwa zephyr_server=local/qz33a-x86:x86&#39;
 PASS2/pz15   test_13.py#_test @qlan-4coc: configure passed
@@ -1793,7 +1777,7 @@ PASS0/       toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped)
 <h3>2.4.18. Add on the Zephyr echo client<a class="headerlink" href="#add-on-the-zephyr-echo-client" title="Permalink to this headline">¶</a></h3>
 <p>A full Zephyr network echo client/server needs the client code too, so
 we add it:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">re</span>
 <span class="kn">import</span> <span class="nn">tcfl.tc</span>
@@ -1870,7 +1854,7 @@ we add it:</p>
 <li><p class="first">Note how <em>build_00_client_config</em> takes as argument both the
 <em>zephyr_client</em> and <em>zephyr_server</em> targets, because it needs to
 know the server’s IP address to configure the client build.</p>
-<p>This is the reason for <code class="docutils literal"><span class="pre">&#64;tcfl.tc.serially</span></code>. <em>build*()</em> functions
+<p>This is the reason for <code class="docutils literal notranslate"><span class="pre">&#64;tcfl.tc.serially</span></code>. <em>build*()</em> functions
 that take target arguments will be executed in parallel and cause an
 error if the targets overlap. The decorator forces them to execute
 serially to avoid race conditions in the use of resources (eg:
@@ -1880,7 +1864,7 @@ temporary directories) associated to each target.</p>
 it runs after the server’s evaluation function.</p>
 </li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_14.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_14.py
 INFO2/       toplevel @local: scanning for test cases
 INFO1/51yw   test_14.py#_test @v2xd-d4h6: will run on target group &#39;ic=local/nwb zephyr_client=local/qz32b-x86:x86 zephyr_server=local/qz31b-x86:x86&#39;
 PASS2/51yw   test_14.py#_test @v2xd-d4h6: configure passed
@@ -1908,7 +1892,7 @@ PASS0/       toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped)
 are starting is more under our control, because we need to make sure
 the <em>network</em> (interconnect) is powered on first, then the server and
 then finally the client.</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">re</span>
 <span class="kn">import</span> <span class="nn">tcfl.tc</span>
@@ -1997,7 +1981,7 @@ then call to start the client.</li>
 <li>This renders <em>eval_00_server()</em> unnecesary, as we did that check on
 <em>start_00()</em> to ensure it had started properly.</li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_14.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_14.py
 ...
 INFO2/jgszE#1        test_14.py#_test @v2xd-xwv4|local/nwb: Power cycled
 INFO2/jgszE#1        test_14.py#_test @v2xd-xwv4|local/qz30b-x86: Reset
@@ -2019,7 +2003,7 @@ PASS0/       toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped)
 <h3>2.4.20. But let’s test Zephyr’s echo server/client better<a class="headerlink" href="#but-let-s-test-zephyr-s-echo-server-client-better" title="Permalink to this headline">¶</a></h3>
 <p>We should be looking for more than just one occurrence of the <em>all ok</em>
 message:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">re</span>
 <span class="kn">import</span> <span class="nn">time</span>
@@ -2115,13 +2099,13 @@ message:</p>
 <li>note how after we detect the client has started running, we let the
 client run, watiting a couple of times for thirty seconds…</li>
 <li>… so we can mark all the targets as active using
-<a class="reference internal" href="09-api.html#tcfl.tc.target_c.active" title="tcfl.tc.target_c.active"><code class="xref py py-meth docutils literal"><span class="pre">tcfl.tc.target_c.active()</span></code></a> to avoid the server powering them
+<a class="reference internal" href="09-api.html#tcfl.tc.target_c.active" title="tcfl.tc.target_c.active"><code class="xref py py-meth docutils literal notranslate"><span class="pre">tcfl.tc.target_c.active()</span></code></a> to avoid the server powering them
 off due to inactivity.</li>
 <li>once the target has had at least a minute to run, we read all the
 console output and count how many <em>allow ok</em> messages have been
 received</li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_16.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vv test_16.py
 ...
 PASS2/4odfE#1        test_16.py#_test @qlan-pbuz|local/qz34a-x86: found expected `init_app: Run echo client` in console `local/qz34a-x86:default` at 0.08s
 PASS2/4odfE#1        test_16.py#_test @qlan-pbuz|local/qz34a-x86: eval pass: found expected `init_app: Run echo client` in console `local/qz34a-x86:default` at 0.08s
@@ -2138,8 +2122,8 @@ PASS0/       toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped)
 </div>
 <div class="section" id="developing-zephyr-apps-with-the-tcf-s-help">
 <h3>2.4.21. Developing Zephyr apps with the TCF’s help<a class="headerlink" href="#developing-zephyr-apps-with-the-tcf-s-help" title="Permalink to this headline">¶</a></h3>
-<p>Let’s write our own Zephyr App, <code class="docutils literal"><span class="pre">test_18/src/main.c</span></code></p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">/*</span>
+<p>Let’s write our own Zephyr App, <code class="docutils literal notranslate"><span class="pre">test_18/src/main.c</span></code></p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">/*</span>
  <span class="o">*</span> <span class="n">Copyright</span> <span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="mi">2017</span> <span class="n">Intel</span> <span class="n">Corp</span>
  <span class="o">*</span>
  <span class="o">*</span> <span class="n">SPDX</span><span class="o">-</span><span class="n">License</span><span class="o">-</span><span class="n">Identifier</span><span class="p">:</span> <span class="n">Apache</span><span class="o">-</span><span class="mf">2.0</span>
@@ -2167,29 +2151,29 @@ PASS0/       toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped)
 <p>This is a random test case, sometimes <em>passes</em>, sometimes <em>fails</em>.</p>
 <p>Our app some assistance:</p>
 <ul>
-<li><p class="first"><code class="docutils literal"><span class="pre">test_18</span></code>: a directory where to place all the information for it</p>
+<li><p class="first"><code class="docutils literal notranslate"><span class="pre">test_18</span></code>: a directory where to place all the information for it</p>
 </li>
-<li><p class="first"><code class="docutils literal"><span class="pre">test_18/Makefile</span></code>: Makefile to integrate into Zephyr</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>BOARD ?= qemu_x86
+<li><p class="first"><code class="docutils literal notranslate"><span class="pre">test_18/Makefile</span></code>: Makefile to integrate into Zephyr</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>BOARD ?= qemu_x86
 CONF_FILE = prj.conf
 
 include ${ZEPHYR_BASE}/Makefile.test
 </pre></div>
 </div>
 </li>
-<li><p class="first"><code class="docutils literal"><span class="pre">test_18/src</span></code>: directory where to place the source</p>
+<li><p class="first"><code class="docutils literal notranslate"><span class="pre">test_18/src</span></code>: directory where to place the source</p>
 </li>
-<li><p class="first"><code class="docutils literal"><span class="pre">test_18/src/Makefile</span></code>: Makefile Zephyr will call to build the app</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>include $(ZEPHYR_BASE)/tests/Makefile.test
+<li><p class="first"><code class="docutils literal notranslate"><span class="pre">test_18/src/Makefile</span></code>: Makefile Zephyr will call to build the app</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>include $(ZEPHYR_BASE)/tests/Makefile.test
 obj-y = main$(SUBSAMPLE).o
 </pre></div>
 </div>
-<p>We use the <code class="docutils literal"><span class="pre">$(SUBPHASE)</span></code> append to the file name so we can control
+<p>We use the <code class="docutils literal notranslate"><span class="pre">$(SUBPHASE)</span></code> append to the file name so we can control
 from the environment which file we compile, as we evolve the
 testcase.</p>
 </li>
-<li><p class="first"><code class="docutils literal"><span class="pre">test_18/test.py</span></code>: TCF test script integration</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">time</span><span class="o">,</span> <span class="nn">tcfl.tc</span>
+<li><p class="first"><code class="docutils literal notranslate"><span class="pre">test_18/test.py</span></code>: TCF test script integration</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">time</span><span class="o">,</span> <span class="nn">tcfl.tc</span>
 <span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">target</span><span class="p">(</span><span class="s1">&#39;zephyr_board&#39;</span><span class="p">,</span> <span class="n">app_zephyr</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">))</span>
 <span class="k">class</span> <span class="nc">_test</span><span class="p">(</span><span class="n">tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">tc_c</span><span class="p">):</span>
 <span class="hll">    <span class="k">def</span> <span class="nf">setup_catch_failures</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
@@ -2201,11 +2185,11 @@ testcase.</p>
 </div>
 <p>The <em>setup*()</em> functions are called before <em>starting</em> the targets
 and in this case we setup a hook on the console to fail the testcase
-if we receive a <code class="docutils literal"><span class="pre">FAIL</span></code> string.</p>
+if we receive a <code class="docutils literal notranslate"><span class="pre">FAIL</span></code> string.</p>
 </li>
 </ul>
 <p>When you run it and passes:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vvy test_18/
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vvy test_18/
 INFO2/        toplevel @local: scanning for test cases
 INFO1/vdac    test_18/test.py#_test @srrsotc03/qz37g-riscv32:riscv32: will run on target group &#39;target=srrsotc03/qz37g-riscv32:riscv32&#39;
 PASS2/vdac    test_18/test.py#_test @srrsotc03/qz37g-riscv32:riscv32: configure passed
@@ -2219,7 +2203,7 @@ PASS0/        toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped
 </pre></div>
 </div>
 <p>and when it fails:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vvy test_18/
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -vvy test_18/
 INFO2/        toplevel @local: scanning for test cases
 INFO1/f95t    test_18/test.py#_test @srrsotc03/qz35h-nios2:nios2: will run on target group &#39;target=srrsotc03/qz35h-nios2:nios2&#39;
 PASS2/f95t    test_18/test.py#_test @srrsotc03/qz35h-nios2:nios2: configure passed
@@ -2237,8 +2221,8 @@ FAIL0/        toplevel @local: 1 tests (0 passed, 1 failed, 0 blocked, 0 skipped
 <p>Anything can be used to comunicate via the console if it passes or
 fails, however, to be consistent and make it easy, Zephyr has
 standarized on the <em>TC</em> macros and the <em>ztest</em> framework; copy
-<code class="docutils literal"><span class="pre">main.c</span></code> to <code class="docutils literal"><span class="pre">main-b.c</span></code> and edit it adding:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">/*</span>
+<code class="docutils literal notranslate"><span class="pre">main.c</span></code> to <code class="docutils literal notranslate"><span class="pre">main-b.c</span></code> and edit it adding:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">/*</span>
  <span class="o">*</span> <span class="n">Copyright</span> <span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="mi">2017</span> <span class="n">Intel</span> <span class="n">Corp</span>
  <span class="o">*</span>
  <span class="o">*</span> <span class="n">SPDX</span><span class="o">-</span><span class="n">License</span><span class="o">-</span><span class="n">Identifier</span><span class="p">:</span> <span class="n">Apache</span><span class="o">-</span><span class="mf">2.0</span>
@@ -2272,7 +2256,7 @@ standarized on the <em>TC</em> macros and the <em>ztest</em> framework; copy
 values) and they just have to call <em>ztest</em> functions to indicate a
 failure. A suite is declared to tie them all together and launch
 it. Error messages will be printed.</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">time</span><span class="o">,</span> <span class="nn">tcfl.tc</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">time</span><span class="o">,</span> <span class="nn">tcfl.tc</span>
 <span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">target</span><span class="p">(</span><span class="s1">&#39;zephyr_board&#39;</span><span class="p">,</span> <span class="n">app_zephyr</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">))</span>
 <span class="k">class</span> <span class="nc">_test</span><span class="p">(</span><span class="n">tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">tc_c</span><span class="p">):</span>
     <span class="k">def</span> <span class="nf">setup_catch_failures</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">):</span>
@@ -2285,14 +2269,14 @@ it. Error messages will be printed.</p>
 </pre></div>
 </div>
 <p>Now run:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ (export SUBSAMPLE=-c; tcf run --tmpdir tmp -vvvy test_18/test$SUBSAMPLE.py)
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ (export SUBSAMPLE=-c; tcf run --tmpdir tmp -vvvy test_18/test$SUBSAMPLE.py)
 </pre></div>
 </div>
 <p>(remember that for the sake of brevity in the training, we use the
 <em>SUBSAMPLE</em> environment variable to select which Python test file
 script and which C source files we want to use)</p>
 <p>produces:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">...</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">...</span>
 <span class="n">PASS2</span><span class="o">/</span><span class="n">rmk0E</span><span class="c1">#1 test_18/test.py#_test @srrsotc03/qc1000-01:x86: found expected `PASS` in console `srrsotc03/qc1000-01:default` at 1.17s</span>
 <span class="n">PASS3</span><span class="o">/</span><span class="n">rmk0E</span><span class="c1">#1 test_18/test.py#_test @srrsotc03/qc1000-01:x86: console output: ***** BOOTING ZEPHYR OS v1.7.99 - BUILD: Jun  4 2017 12:31:00 *****</span>
 <span class="n">PASS3</span><span class="o">/</span><span class="n">rmk0E</span><span class="c1">#1 test_18/test.py#_test @srrsotc03/qc1000-01:x86: console output: tc_start() - random test</span>
@@ -2305,8 +2289,8 @@ script and which C source files we want to use)</p>
 <span class="o">...</span>
 </pre></div>
 </div>
-<p>The message <code class="docutils literal"><span class="pre">RunID:</span> <span class="pre">:wpgl</span></code> from this line:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">PASS3</span><span class="o">/</span><span class="n">rmk0E</span><span class="c1">#1 test_18/test.py#_test @srrsotc03/qc1000-01:x86: console output: RunID: :wpgl</span>
+<p>The message <code class="docutils literal notranslate"><span class="pre">RunID:</span> <span class="pre">:wpgl</span></code> from this line:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">PASS3</span><span class="o">/</span><span class="n">rmk0E</span><span class="c1">#1 test_18/test.py#_test @srrsotc03/qc1000-01:x86: console output: RunID: :wpgl</span>
 </pre></div>
 </div>
 <p>will be unique for each combination of testcase name, target group
@@ -2314,7 +2298,7 @@ where it runs and the app itself (in our case <em>test_18/src</em>) and it is
 always good to verify it was printed to ensure the right image was
 found. For that, we can use <em>target.kws</em>’s <em>tghash</em> and <em>runid</em>
 keys:</p>
-<div class="highlight-python"><div class="highlight"><pre><span></span><span class="n">target</span><span class="o">.</span><span class="n">expect</span><span class="p">(</span><span class="s2">&quot;RunID: </span><span class="si">%(runid)s</span><span class="s2">:%(tghash)&quot;</span> <span class="o">%</span> <span class="n">target</span><span class="o">.</span><span class="n">kws</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">target</span><span class="o">.</span><span class="n">expect</span><span class="p">(</span><span class="s2">&quot;RunID: </span><span class="si">%(runid)s</span><span class="s2">:%(tghash)&quot;</span> <span class="o">%</span> <span class="n">target</span><span class="o">.</span><span class="n">kws</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -2322,9 +2306,9 @@ keys:</p>
 <h4>2.4.21.2. Evolving into a ztest test case<a class="headerlink" href="#evolving-into-a-ztest-test-case" title="Permalink to this headline">¶</a></h4>
 <p><em>ztest</em> is a unit test library, whose API can be found in
 <em>tests/ztest/include</em>.</p>
-<p>Copy <code class="docutils literal"><span class="pre">src/main-b.c</span></code> to <code class="docutils literal"><span class="pre">src/main-c.c</span></code> and introduce the
+<p>Copy <code class="docutils literal notranslate"><span class="pre">src/main-b.c</span></code> to <code class="docutils literal notranslate"><span class="pre">src/main-c.c</span></code> and introduce the
 highlighted modifications:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">/*</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">/*</span>
  <span class="o">*</span> <span class="n">Copyright</span> <span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="mi">2017</span> <span class="n">Intel</span> <span class="n">Corp</span>
  <span class="o">*</span>
  <span class="o">*</span> <span class="n">SPDX</span><span class="o">-</span><span class="n">License</span><span class="o">-</span><span class="n">Identifier</span><span class="p">:</span> <span class="n">Apache</span><span class="o">-</span><span class="mf">2.0</span>
@@ -2356,10 +2340,10 @@ highlighted modifications:</p>
 </span><span class="p">}</span>
 </pre></div>
 </div>
-<p>Thus when a testcase passes, it will print <code class="docutils literal"><span class="pre">PROJECT</span> <span class="pre">EXECUTION</span>
-<span class="pre">SUCCESSFUL</span></code> or <code class="docutils literal"><span class="pre">PROJECT</span> <span class="pre">EXECUTION</span> <span class="pre">FAILED</span></code> and a few other
-messages; copy <code class="docutils literal"><span class="pre">test.py</span></code> to <code class="docutils literal"><span class="pre">test-b.py</span></code> and add:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">time</span><span class="o">,</span> <span class="nn">tcfl.tc</span>
+<p>Thus when a testcase passes, it will print <code class="docutils literal notranslate"><span class="pre">PROJECT</span> <span class="pre">EXECUTION</span>
+<span class="pre">SUCCESSFUL</span></code> or <code class="docutils literal notranslate"><span class="pre">PROJECT</span> <span class="pre">EXECUTION</span> <span class="pre">FAILED</span></code> and a few other
+messages; copy <code class="docutils literal notranslate"><span class="pre">test.py</span></code> to <code class="docutils literal notranslate"><span class="pre">test-b.py</span></code> and add:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">time</span><span class="o">,</span> <span class="nn">tcfl.tc</span>
 <span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">target</span><span class="p">(</span><span class="s1">&#39;zephyr_board&#39;</span><span class="p">,</span> <span class="n">app_zephyr</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">))</span>
 <span class="k">class</span> <span class="nc">_test</span><span class="p">(</span><span class="n">tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">tc_c</span><span class="p">):</span>
 
@@ -2376,10 +2360,10 @@ messages; copy <code class="docutils literal"><span class="pre">test.py</span></
         <span class="n">target</span><span class="o">.</span><span class="n">expect</span><span class="p">(</span><span class="s2">&quot;PROJECT EXECUTION SUCCESSFUL&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>A new configuration setting is needed <code class="docutils literal"><span class="pre">CONFIG_ZTEST</span></code>, which we can
-do using a <em>build</em> method or by modifying <code class="docutils literal"><span class="pre">prj.conf</span></code>.</p>
+<p>A new configuration setting is needed <code class="docutils literal notranslate"><span class="pre">CONFIG_ZTEST</span></code>, which we can
+do using a <em>build</em> method or by modifying <code class="docutils literal notranslate"><span class="pre">prj.conf</span></code>.</p>
 <p>Runing a case that fails:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ (export SUBSAMPLE=-c; ~/z/v0.11-tcf.git/tcf run --tmpdir tmp -vyvvvv test_18/test$SUBSAMPLE.py)
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ (export SUBSAMPLE=-c; ~/z/v0.11-tcf.git/tcf run --tmpdir tmp -vyvvvv test_18/test$SUBSAMPLE.py)
 INFO1/tgdh    test_18/test-c.py#_test @local/qz30a-x86:x86: will run on target group &#39;target=local/qz30a-x86:x86&#39;
 PASS2/tgdh    test_18/test-c.py#_test @local/qz30a-x86:x86: configure passed
 PASS1/tgdh    test_18/test-c.py#_test @local/qz30a-x86:x86: build passed
@@ -2410,7 +2394,7 @@ PASS0/        toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped
 <div class="section" id="change-of-pace-input-to-a-zephyr-test-case">
 <h3>2.4.22. Change of pace, input to a Zephyr test case<a class="headerlink" href="#change-of-pace-input-to-a-zephyr-test-case" title="Permalink to this headline">¶</a></h3>
 <p>Let’s play with a Zephyr shell example:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">tcfl.tc</span>
 <span class="kn">import</span> <span class="nn">tcfl.tl</span>
 <span class="nd">@tcfl</span><span class="o">.</span><span class="n">tc</span><span class="o">.</span><span class="n">target</span><span class="p">(</span>
@@ -2435,10 +2419,10 @@ PASS0/        toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped
 <ul class="simple">
 <li>you can use shell based apps to implement <em>multiple</em> test cases on a
 single Zephyr app using the <em>TC</em> framework.</li>
-<li>Use <a class="reference internal" href="09-api.html#tcfl.tc.target_c.send" title="tcfl.tc.target_c.send"><code class="xref py py-meth docutils literal"><span class="pre">target.send</span></code></a> to send data to the
+<li>Use <a class="reference internal" href="09-api.html#tcfl.tc.target_c.send" title="tcfl.tc.target_c.send"><code class="xref py py-meth docutils literal notranslate"><span class="pre">target.send</span></code></a> to send data to the
 target’s console, as if you were typing it.</li>
 </ul>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -yvv test_17.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run --tmpdir tmp -yvv test_17.py
 INFO2/       toplevel @local: scanning for test cases
 INFO1/3daq   test_17.py#_test @local/qz36a-arm:arm: will run on target group &#39;target=local/qz36a-arm:arm&#39;
 PASS2/3daq   test_17.py#_test @local/qz36a-arm:arm: configure passed
@@ -2455,7 +2439,7 @@ PASS0/       toplevel @local: 1 tests (1 passed, 0 failed, 0 blocked, 0 skipped)
 </pre></div>
 </div>
 <p>Note how now, you can acquire the target and interact with it:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf acquire qz36a-arm
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf acquire qz36a-arm
 $ tcf console-write -i qz36a-arm
 WARNING: This is a very limited interactive console
          Escape character twice ^[^[ to exit
@@ -2474,7 +2458,7 @@ sample_module&gt;
 <p class="first admonition-title">Warning</p>
 <p>Make sure it is on and it is not taken away from you in the middle
 due to inactivity, a trick for that is to run:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ while true; do tcf acquire qz36a-arm || true; sleep 30s; done &amp;
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ while true; do tcf acquire qz36a-arm || true; sleep 30s; done &amp;
 </pre></div>
 </div>
 <p>this is a loop, in the background, that is twice a minute
@@ -2509,24 +2493,24 @@ some stop working half way (SAMe70).</p>
 different components of the TCF client test runner.</p>
 <p>The APIs that are the entry points for reporting are:</p>
 <ul class="simple">
-<li>target <a class="reference internal" href="09-api.html#tcfl.tc.target_c" title="tcfl.tc.target_c"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a>:
-<a class="reference internal" href="09-api.html#tcfl.tc.target_c.report_info" title="tcfl.tc.target_c.report_info"><code class="xref py py-meth docutils literal"><span class="pre">report_info</span></code></a>,
-<a class="reference internal" href="09-api.html#tcfl.tc.target_c.report_pass" title="tcfl.tc.target_c.report_pass"><code class="xref py py-meth docutils literal"><span class="pre">report_pass</span></code></a>,
-<a class="reference internal" href="09-api.html#tcfl.tc.target_c.report_fail" title="tcfl.tc.target_c.report_fail"><code class="xref py py-meth docutils literal"><span class="pre">report_fail</span></code></a>,
-<a class="reference internal" href="09-api.html#tcfl.tc.target_c.report_blck" title="tcfl.tc.target_c.report_blck"><code class="xref py py-meth docutils literal"><span class="pre">report_blck</span></code></a>,
-<a class="reference internal" href="09-api.html#tcfl.tc.target_c.report_skip" title="tcfl.tc.target_c.report_skip"><code class="xref py py-meth docutils literal"><span class="pre">report_skip</span></code></a></li>
-<li>testcase <a class="reference internal" href="09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal"><span class="pre">object</span></code></a>:
-<a class="reference internal" href="09-api.html#tcfl.tc.tc_c.report_info" title="tcfl.tc.tc_c.report_info"><code class="xref py py-meth docutils literal"><span class="pre">report_info</span></code></a>,
-<a class="reference internal" href="09-api.html#tcfl.tc.tc_c.report_pass" title="tcfl.tc.tc_c.report_pass"><code class="xref py py-meth docutils literal"><span class="pre">report_pass</span></code></a>,
-<a class="reference internal" href="09-api.html#tcfl.tc.tc_c.report_fail" title="tcfl.tc.tc_c.report_fail"><code class="xref py py-meth docutils literal"><span class="pre">report_fail</span></code></a>,
-<a class="reference internal" href="09-api.html#tcfl.tc.tc_c.report_blck" title="tcfl.tc.tc_c.report_blck"><code class="xref py py-meth docutils literal"><span class="pre">report_blck</span></code></a>,
-<a class="reference internal" href="09-api.html#tcfl.tc.tc_c.report_skip" title="tcfl.tc.tc_c.report_skip"><code class="xref py py-meth docutils literal"><span class="pre">report_skip</span></code></a></li>
+<li>target <a class="reference internal" href="09-api.html#tcfl.tc.target_c" title="tcfl.tc.target_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a>:
+<a class="reference internal" href="09-api.html#tcfl.tc.target_c.report_info" title="tcfl.tc.target_c.report_info"><code class="xref py py-meth docutils literal notranslate"><span class="pre">report_info</span></code></a>,
+<a class="reference internal" href="09-api.html#tcfl.tc.target_c.report_pass" title="tcfl.tc.target_c.report_pass"><code class="xref py py-meth docutils literal notranslate"><span class="pre">report_pass</span></code></a>,
+<a class="reference internal" href="09-api.html#tcfl.tc.target_c.report_fail" title="tcfl.tc.target_c.report_fail"><code class="xref py py-meth docutils literal notranslate"><span class="pre">report_fail</span></code></a>,
+<a class="reference internal" href="09-api.html#tcfl.tc.target_c.report_blck" title="tcfl.tc.target_c.report_blck"><code class="xref py py-meth docutils literal notranslate"><span class="pre">report_blck</span></code></a>,
+<a class="reference internal" href="09-api.html#tcfl.tc.target_c.report_skip" title="tcfl.tc.target_c.report_skip"><code class="xref py py-meth docutils literal notranslate"><span class="pre">report_skip</span></code></a></li>
+<li>testcase <a class="reference internal" href="09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a>:
+<a class="reference internal" href="09-api.html#tcfl.tc.tc_c.report_info" title="tcfl.tc.tc_c.report_info"><code class="xref py py-meth docutils literal notranslate"><span class="pre">report_info</span></code></a>,
+<a class="reference internal" href="09-api.html#tcfl.tc.tc_c.report_pass" title="tcfl.tc.tc_c.report_pass"><code class="xref py py-meth docutils literal notranslate"><span class="pre">report_pass</span></code></a>,
+<a class="reference internal" href="09-api.html#tcfl.tc.tc_c.report_fail" title="tcfl.tc.tc_c.report_fail"><code class="xref py py-meth docutils literal notranslate"><span class="pre">report_fail</span></code></a>,
+<a class="reference internal" href="09-api.html#tcfl.tc.tc_c.report_blck" title="tcfl.tc.tc_c.report_blck"><code class="xref py py-meth docutils literal notranslate"><span class="pre">report_blck</span></code></a>,
+<a class="reference internal" href="09-api.html#tcfl.tc.tc_c.report_skip" title="tcfl.tc.tc_c.report_skip"><code class="xref py py-meth docutils literal notranslate"><span class="pre">report_skip</span></code></a></li>
 </ul>
 <p>The system provides default drivers that report to the console and a
 log file, as well as create report files with results of failures.</p>
 <p>To create a new driver, one can override
-<a class="reference internal" href="09-api.html#tcfl.report.report_c" title="tcfl.report.report_c"><code class="xref py py-class docutils literal"><span class="pre">tcfl.report.report_c</span></code></a>:</p>
-<div class="highlight-python"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/env python</span>
+<a class="reference internal" href="09-api.html#tcfl.report.report_c" title="tcfl.report.report_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">tcfl.report.report_c</span></code></a>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/env python</span>
 <span class="kn">import</span> <span class="nn">tcfl.report</span>
 
 <span class="k">class</span> <span class="nc">report_ex_c</span><span class="p">(</span><span class="n">tcfl</span><span class="o">.</span><span class="n">report</span><span class="o">.</span><span class="n">report_c</span><span class="p">):</span>
@@ -2545,7 +2529,7 @@ they shall not be subject to normal verbosity control.</li>
 <li><em>alevel</em> is the verbosity level at which the attachments are
 reported</li>
 <li><em>ulevel</em> is deprecated</li>
-<li><em>_tc</em> is the <a class="reference internal" href="09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal"><span class="pre">tcfl.tc.tc_c</span></code></a> or <a class="reference internal" href="09-api.html#tcfl.tc.target_c" title="tcfl.tc.target_c"><code class="xref py py-class docutils literal"><span class="pre">tcfl.tc.target_c</span></code></a>
+<li><em>_tc</em> is the <a class="reference internal" href="09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">tcfl.tc.tc_c</span></code></a> or <a class="reference internal" href="09-api.html#tcfl.tc.target_c" title="tcfl.tc.target_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">tcfl.tc.target_c</span></code></a>
 object that is reporting</li>
 <li><em>tag</em> is a string <em>PASS</em>, <em>FAIL</em>, <em>BLCK</em>, <em>SKIP</em> or <em>INFO</em>,
 indicating what condition is being reported.</li>
@@ -2577,8 +2561,8 @@ messages)</li>
 <div class="section" id="example-1-reporting-completion-of-testcase-execution">
 <h3>2.5.1. Example 1: reporting completion of testcase execution<a class="headerlink" href="#example-1-reporting-completion-of-testcase-execution" title="Permalink to this headline">¶</a></h3>
 <p>For example, to report all the testcases that finalize to a file
-called <em>results.log</em>, consider <a class="reference download internal" href="../_downloads/conf_report_ex.py" download=""><code class="xref download docutils literal"><span class="pre">this</span> <span class="pre">example</span></code></a>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/env python</span>
+called <em>results.log</em>, consider <a class="reference download internal" href="../_downloads/conf_report_ex.py" download=""><code class="xref download docutils literal notranslate"><span class="pre">this</span> <span class="pre">example</span></code></a>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/env python</span>
 <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">Example report driver</span>
 <span class="sd">&quot;&quot;&quot;</span>
@@ -2648,12 +2632,12 @@ corruption.</li>
 </div>
 <div class="section" id="example-2-reporting-failures">
 <h3>2.5.2. Example 2: reporting failures<a class="headerlink" href="#example-2-reporting-failures" title="Permalink to this headline">¶</a></h3>
-<p>The builtin <a class="reference download internal" href="../_downloads/report.py" download=""><code class="xref download docutils literal"><span class="pre">report</span> <span class="pre">failure</span> <span class="pre">driver</span></code></a>
+<p>The builtin <a class="reference download internal" href="../_downloads/report.py" download=""><code class="xref download docutils literal notranslate"><span class="pre">report</span> <span class="pre">failure</span> <span class="pre">driver</span></code></a>
 works similarly, but collecting information as we go to differerent
 files for each testcase instantiation. When the testcase completes, it
 writes a single report with all the information using the same method
 as we described in the first example.</p>
-<p>See <a class="reference internal" href="09-api.html#tcfl.report.file_c" title="tcfl.report.file_c"><code class="xref py py-class docutils literal"><span class="pre">tcfl.report.file_c</span></code></a>.</p>
+<p>See <a class="reference internal" href="09-api.html#tcfl.report.file_c" title="tcfl.report.file_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">tcfl.report.file_c</span></code></a>.</p>
 </div>
 </div>
 <div class="section" id="app-builders">
@@ -2662,36 +2646,36 @@ as we described in the first example.</p>
 <div class="section" id="overriding-actions">
 <span id="tcf-guide-app-builder-override"></span><h3>2.6.1. Overriding actions<a class="headerlink" href="#overriding-actions" title="Permalink to this headline">¶</a></h3>
 <p>Any defined application builder will insert in the testcase, for each
-named target (<em>targetX</em>) declared with <a class="reference internal" href="09-api.html#tcfl.tc.target" title="tcfl.tc.target"><code class="xref py py-func docutils literal"><span class="pre">tcfl.tc.target()</span></code></a> (or
-<a class="reference internal" href="09-api.html#tcfl.tc.interconnect" title="tcfl.tc.interconnect"><code class="xref py py-func docutils literal"><span class="pre">tcfl.tc.interconnect()</span></code></a>) the following methods:</p>
+named target (<em>targetX</em>) declared with <a class="reference internal" href="09-api.html#tcfl.tc.target" title="tcfl.tc.target"><code class="xref py py-func docutils literal notranslate"><span class="pre">tcfl.tc.target()</span></code></a> (or
+<a class="reference internal" href="09-api.html#tcfl.tc.interconnect" title="tcfl.tc.interconnect"><code class="xref py py-func docutils literal notranslate"><span class="pre">tcfl.tc.interconnect()</span></code></a>) the following methods:</p>
 <ul class="simple">
-<li><code class="docutils literal"><span class="pre">configure_50_targetX(self,</span> <span class="pre">targetX)</span></code></li>
-<li><code class="docutils literal"><span class="pre">build_50_targetX(self,</span> <span class="pre">targetX)</span></code></li>
-<li><code class="docutils literal"><span class="pre">deploy_50_targetX(self,</span> <span class="pre">targetX)</span></code></li>
-<li><code class="docutils literal"><span class="pre">setup_50_targetX(self,</span> <span class="pre">targetX)</span></code></li>
-<li><code class="docutils literal"><span class="pre">start_50_targetX(self,</span> <span class="pre">targetX)</span></code></li>
-<li><code class="docutils literal"><span class="pre">teardown_50_targetX(self,</span> <span class="pre">targetX)</span></code></li>
-<li><code class="docutils literal"><span class="pre">clean_50_targetX(self,</span> <span class="pre">targetX)</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">configure_50_targetX(self,</span> <span class="pre">targetX)</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">build_50_targetX(self,</span> <span class="pre">targetX)</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">deploy_50_targetX(self,</span> <span class="pre">targetX)</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">setup_50_targetX(self,</span> <span class="pre">targetX)</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">start_50_targetX(self,</span> <span class="pre">targetX)</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">teardown_50_targetX(self,</span> <span class="pre">targetX)</span></code></li>
+<li><code class="docutils literal notranslate"><span class="pre">clean_50_targetX(self,</span> <span class="pre">targetX)</span></code></li>
 </ul>
 <p>however, you can override any by defining it yourself in your test
 class:</p>
-<div class="highlight-python"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">build_50_targetX</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">targetX</span><span class="p">):</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">build_50_targetX</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">targetX</span><span class="p">):</span>
     <span class="n">targetX</span><span class="o">.</span><span class="n">report_info</span><span class="p">(</span><span class="s2">&quot;Doing something else for building&quot;</span><span class="p">)</span>
     <span class="o">...</span>
 </pre></div>
 </div>
 <p>while you can still call the overriden function by its new name,
-<code class="docutils literal"><span class="pre">overriden_build_50_target()</span></code>.</p>
-<div class="highlight-python"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">build_50_targetX</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">targetX</span><span class="p">):</span>
+<code class="docutils literal notranslate"><span class="pre">overriden_build_50_target()</span></code>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">build_50_targetX</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">targetX</span><span class="p">):</span>
     <span class="n">targetX</span><span class="o">.</span><span class="n">report_info</span><span class="p">(</span><span class="s2">&quot;Doing something else before building&quot;</span><span class="p">)</span>
     <span class="o">...</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">overriden_build_50_target</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">targetX</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>so the functionality is quite quick to reuse.</p>
-<p>See <code class="docutils literal"><span class="pre">test_zephyr_override.py</span></code>, where that is done to build Zephyr’s
+<p>See <code class="docutils literal notranslate"><span class="pre">test_zephyr_override.py</span></code>, where that is done to build Zephyr’s
 <em>Hello World!</em>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="ch">#! /usr/bin/python2</span>
 <span class="c1">#</span>
 <span class="c1"># Copyright (c) 2017 Intel Corporation</span>
 <span class="c1">#</span>
@@ -2729,7 +2713,7 @@ class:</p>
 <div class="section" id="contributing">
 <span id="tcf-contributing"></span><h2>2.7. Contributing<a class="headerlink" href="#contributing" title="Permalink to this headline">¶</a></h2>
 <p>Checkout your code in (eg) <cite>~/tcf.git</cite></p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ git clone https://github.com/intel/tcf.git tcf.git
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git clone https://github.com/intel/tcf.git tcf.git
 </pre></div>
 </div>
 <div class="admonition note">
@@ -2748,22 +2732,22 @@ clone <em>master</em>).</p>
 the local, checked out copy of the code rather than having to install
 system wide.</p>
 <p>For that, you can set the configuration:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ mkdir ~/.tcf
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ mkdir ~/.tcf
 $ cd ~/.tcf
 $ ln -s ~/tcf.git/zephyr/conf_zephyr.py
 </pre></div>
 </div>
 <p>If you have installed TCF systemwide, you might have to remove
-<cite>/etc/tcf/conf_zephyr.py</cite> or alternatively, pass <code class="docutils literal"><span class="pre">--config-path</span>
+<cite>/etc/tcf/conf_zephyr.py</cite> or alternatively, pass <code class="docutils literal notranslate"><span class="pre">--config-path</span>
 <span class="pre">:~/tcf.git/zephyr</span></code>, but it can be repetitive (the initial <cite>:</cite> removes
 the predefined path <cite>/etc/tcf</cite>).</p>
 <p>And now you can run:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ cd anywhere
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cd anywhere
 $ ~/tcf.git/tcf command...
 </pre></div>
 </div>
 <p>Add servers as needed in your toplevel <cite>~/.tcf</cite> or <cite>/etc/tcf/</cite>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ echo &quot;tcfl.config.url_add(&#39;https://SERVER:5000&#39;, ssl_ignore = True)&quot; &gt;&gt; conf_servers.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ echo &quot;tcfl.config.url_add(&#39;https://SERVER:5000&#39;, ssl_ignore = True)&quot; &gt;&gt; conf_servers.py
 </pre></div>
 </div>
 <p>A useful trick to be able to quickly switch servers (when only
@@ -2772,13 +2756,13 @@ S2):</p>
 <ul>
 <li><p class="first">Create directory <cite>~/s/S1</cite>, add a conf_server.py there pointing to
 the servers in said set; when running tcf, use:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ ~/tcf.git/tcf --config-path ~/s/S1 COMMAND
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ ~/tcf.git/tcf --config-path ~/s/S1 COMMAND
 </pre></div>
 </div>
 </li>
 <li><p class="first">Maybe easier, is to call the directory <cite>~/s/S1/.tcf</cite>, cd into
 <cite>~/s/S1</cite> and run tcf from there:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ cd ~/s/S1
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cd ~/s/S1
 $ ~/tcf.git/tcf command...
 </pre></div>
 </div>
@@ -2789,19 +2773,19 @@ production servers, another <cite>staging/.tcf</cite>, with all the test servers
 </ul>
 </div>
 <div class="section" id="running-the-tcf-server-ttbd-from-the-source-tree">
-<h3>2.7.3. Running the TCF server (ttbd) from the source tree<a class="headerlink" href="#running-the-tcf-server-ttbd-from-the-source-tree" title="Permalink to this headline">¶</a></h3>
+<span id="running-server-source"></span><h3>2.7.3. Running the TCF server (ttbd) from the source tree<a class="headerlink" href="#running-the-tcf-server-ttbd-from-the-source-tree" title="Permalink to this headline">¶</a></h3>
 <p>If you are developing TCF server code, running said code without
 installing system wide (and potentially conflicting versions),
 requires some setup. This is usually called the <em>staging</em> server,
 running locally on your machine:</p>
 <ol class="arabic">
 <li><p class="first">Disable SELinux:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># setenforce 0</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># setenforce 0</span>
 </pre></div>
 </div>
 </li>
 <li><p class="first">Build what’s needed (<em>ttblc.so</em>):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ cd ~/z/tcf.git/ttbd
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cd ~/z/tcf.git/ttbd
 $ python setup.py build
 $ ln -s build/lib.linux-x86_64-2.7/ttblc.so
 </pre></div>
@@ -2809,19 +2793,19 @@ $ ln -s build/lib.linux-x86_64-2.7/ttblc.so
 </li>
 <li><p class="first">Ensure your home directory and such are readable by users members
 of your group:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ chmod g+rX ~
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ chmod g+rX ~
 $ chmod -R g+rX ~/tcf.git
 </pre></div>
 </div>
 </li>
 <li><p class="first">Create a staging configuration directory <cite>/etc/ttbd-staging</cite>, make it
 owned by your user, so you don’t have to work as root:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ sudo install -d -o $LOGNAME -g $LOGNAME /etc/ttbd-staging
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ sudo install -d -o $LOGNAME -g $LOGNAME /etc/ttbd-staging
 </pre></div>
 </div>
 </li>
 <li><p class="first">link the following config files from your source tree:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ cd /etc/ttbd-staging
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cd /etc/ttbd-staging
 $ ln -s ~/tcf.git/ttbd/conf_00_lib.py
 $ ln -s ~/tcf.git/ttbd/conf_06_default.py
 $ ln -s ~/tcf.git/ttbd/zephyr/conf_06_zephyr.py
@@ -2831,7 +2815,7 @@ $ ln -s ~/tcf.git/ttbd/zephyr/conf_06_zephyr.py
 <li><p class="first">Create a local configuration, so you can login without a password
 from the local machine to port 5001 (port 5000 we leave it for
 production instances):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ cat &gt; /etc/ttbd-staging/conf_local.py &lt;&lt;EOF
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cat &gt; /etc/ttbd-staging/conf_local.py &lt;&lt;EOF
 local_auth.append(“127.0.0.1”)
 host = “0.0.0.0”
 port = 5001
@@ -2839,7 +2823,7 @@ EOF
 </pre></div>
 </div>
 <p>To have TCF use this daemon, add a configuration line:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">tcfl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">url_add</span><span class="p">(</span><span class="s1">&#39;https://SERVER:5001&#39;</span><span class="p">,</span> <span class="n">ssl_ignore</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">tcfl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">url_add</span><span class="p">(</span><span class="s1">&#39;https://SERVER:5001&#39;</span><span class="p">,</span> <span class="n">ssl_ignore</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>to any TCF config file which your client will read.</p>
@@ -2852,7 +2836,7 @@ configuration has only virtual machines.</p>
 following this FIXME: procedure.</p>
 </li>
 <li><p class="first">Create a configuration for systemd to start the daemon:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># cp ~user/tcf.git/ttbd/ttbd@.service /etc/systemd/systemctl/ttbd@staging.service</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># cp ~user/tcf.git/ttbd/ttbd@.service /etc/systemd/systemctl/ttbd@staging.service</span>
 </pre></div>
 </div>
 <p>Edit said file and:</p>
@@ -2877,11 +2861,11 @@ every single system call…for those hard debug cases :)</p>
 </li>
 </ol>
 <p>Start the daemon with:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># systemctl restart ttbd@staging</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># systemctl restart ttbd@staging</span>
 </pre></div>
 </div>
 <p>Make it always start automatically with:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># systemctl enable ttbd@staging</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># systemctl enable ttbd@staging</span>
 </pre></div>
 </div>
 </div>
@@ -2915,11 +2899,11 @@ time and provide a consistent review platform for all.</p>
 GitHub)</p>
 </li>
 <li><p class="first">On your development computer, clone the fork you just made:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ git clone https://github.com/&lt;your github id&gt;/tcf.git
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git clone https://github.com/&lt;your github id&gt;/tcf.git
 </pre></div>
 </div>
 <p>Configure <em>git</em> to know about the upstream repo:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ git remote add upstream https://github.com/intel/tcf
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git remote add upstream https://github.com/intel/tcf
 $ git remote -v
 </pre></div>
 </div>
@@ -2927,42 +2911,42 @@ $ git remote -v
 <li><p class="first">Create a topic branch (off of master or anyother branch) for your
 work (if you’re addressing an issue, we suggest including the issue
 number in the branch name):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ git checkout master
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git checkout master
 $ git checkout -b fix_comment_typo
 </pre></div>
 </div>
 <p>Make changes, test locally, change, test, test again; some base
 testcases we will run are at least:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ cd ~/tcf.git
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cd ~/tcf.git
 $ ./lint-all.py
 $ ./tcf run ~/tcf.git/tests
 </pre></div>
 </div>
 </li>
 <li><p class="first">Start the pull request process by adding your changed files:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ git add [file(s) that changed, add -p if you want to be more specific]
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git add [file(s) that changed, add -p if you want to be more specific]
 </pre></div>
 </div>
 <p>You can see files that are not yet staged using:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ git status
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git status
 </pre></div>
 </div>
 <p>Verify changes to be committed look as you expected:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ git diff --cached
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git diff --cached
 </pre></div>
 </div>
 </li>
 <li><p class="first">Commit your changes to your local repo:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ git commit -vs
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git commit -vs
 </pre></div>
 </div>
-<p><code class="docutils literal"><span class="pre">-s</span></code> option automatically adds your <cite>Signed-off-by:</cite> to your
+<p><code class="docutils literal notranslate"><span class="pre">-s</span></code> option automatically adds your <cite>Signed-off-by:</cite> to your
 commit message. Your commit will be rejected without this line that
 indicates your agreement with the DCO (Developer Certificate of
 Origin).</p>
 <p>Commits messages shall be explanatory and concise, properly spelled
 and in the form:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">AREA</span><span class="p">:</span> <span class="n">SHORT</span> <span class="n">SUMMARY</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">AREA</span><span class="p">:</span> <span class="n">SHORT</span> <span class="n">SUMMARY</span>
 
 <span class="n">Longer</span> <span class="n">description</span> <span class="n">that</span> <span class="n">can</span> <span class="n">be</span> <span class="n">obviated</span> <span class="k">if</span> <span class="n">the</span> <span class="n">commit</span> <span class="ow">is</span> <span class="n">quite</span>
 <span class="n">obvious</span> <span class="ow">and</span><span class="o">/</span><span class="ow">or</span> <span class="n">the</span> <span class="n">summary</span> <span class="n">already</span> <span class="n">says</span> <span class="n">it</span> <span class="nb">all</span><span class="o">.</span> <span class="n">Note</span>
@@ -2976,7 +2960,7 @@ and in the form:</p>
 </li>
 <li><p class="first">Push your topic branch with your changes to your fork in your
 personal GitHub account:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ git push origin fix_comment_typo
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git push origin fix_comment_typo
 </pre></div>
 </div>
 <ol class="loweralpha">
@@ -3001,7 +2985,7 @@ you can check on your pull request at
 merged, you can create another branch to work on another issue (be
 sure to make your new branch off of master and not the previous
 branch):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ git checkout master
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git checkout master
 $ git checkout -b fix_another_issue
 </pre></div>
 </div>
@@ -3015,9 +2999,7 @@ branch.</p>
 
 
            </div>
-           <div class="articleComments">
-            
-           </div>
+           
           </div>
           <footer>
   
@@ -3035,11 +3017,11 @@ branch.</p>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2015, Author.
+        &copy; Copyright 2015, Author
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -3054,35 +3036,33 @@ branch.</p>
 
   
 
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'../',
-            VERSION:'0.11',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="../_static/jquery.js"></script>
-      <script type="text/javascript" src="../_static/underscore.js"></script>
-      <script type="text/javascript" src="../_static/doctools.js"></script>
+    
+    
+      <script type="text/javascript">
+          var DOCUMENTATION_OPTIONS = {
+              URL_ROOT:'../',
+              VERSION:'0.11',
+              LANGUAGE:'None',
+              COLLAPSE_INDEX:false,
+              FILE_SUFFIX:'.html',
+              HAS_SOURCE:  true,
+              SOURCELINK_SUFFIX: '.txt'
+          };
+      </script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+    
 
   
 
-  
-  
-    <script type="text/javascript" src="../_static/js/theme.js"></script>
-  
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
 
-  
-  
   <script type="text/javascript">
       jQuery(function () {
-          SphinxRtdTheme.StickyNav.enable();
+          SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-   
+  </script> 
 
 </body>
 </html>

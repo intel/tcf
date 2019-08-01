@@ -35,4 +35,4 @@ class _test(tcfl.tc.tc_c):
 
     @staticmethod
     def eval(target):
-        target.expect("***** BOOTING ZEPHYR OS")
+        target.expect("***** Booting Zephyr OS")

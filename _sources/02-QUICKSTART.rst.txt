@@ -6,6 +6,8 @@
 
 .. _install_tcf_client:
 
+.. include:: doc/02-client-setup-LL-00.rst
+
 1. Install the client software from source::
 
      $ git clone http://github.com/intel/tcf tcf.git
@@ -15,6 +17,19 @@
      $ cd zephyr
      $ python2 setup.py install --user
 
+   (see :ref:`installation
+   troubleshooting<tcf_client_install_troubleshooting>` for things
+   that can go wrong)
+
+   .. note:: Ensure your PATH includes *$HOME/.local/bin*, where *install
+             --user* puts things, by adding to *~/.bashrc*::
+     
+               $ echo 'test -z "${PATH##*$HOME/.local/bin*}" || export PATH=$PATH:$HOME/.local/bin' >> ~/.bashrc
+
+             source bashrc to ensure the setting is there::
+
+               $ source ~/.bashrc
+               
    You can also run *tcf* from the :ref:`source directory
    <tcf_run_from_source_tree>`.
      
@@ -31,6 +46,11 @@
 3.
 
    .. include:: doc/02-client-setup-LL-04-login.rst
+
+   For login in with the same *username* and *password* to all servers
+   at the same time::
+
+     $ TCF_USER=<USERNAME> TCF_PASSWORD=<PASSWORD> tcf login -q
 
 4. If you want to run Zephyr testcases you will also need to follow
    the `Zephyr Development Environment Setup on Linux
@@ -87,7 +107,7 @@ build the Zephyr OS you can run one of its test cases on it::
   $ git clone http://github.com/zephyrproject-rtos/zephyr
   $ export ZEPHYR_BASE=$HOME/zephyr
   $ export ZEPHYR_TOOLCHAIN_VARIANT=zephyr
-  $ export ZEPHYR_SDK_INSTALL_DIR=/opt/zephyr-sdk-0.9.3
+  $ export ZEPHYR_SDK_INSTALL_DIR=/opt/zephyr-sdk-0.9.5
 
   $ cd $ZEPHYR_BASE/samples/hello_world
   $ make BOARD=qemu_x86

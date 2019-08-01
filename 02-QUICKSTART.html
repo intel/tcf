@@ -24,27 +24,19 @@
 
   
 
-  
-  
-    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  
-
-  
-
-  
-        <link rel="index" title="Index"
-              href="genindex.html"/>
-        <link rel="search" title="Search" href="search.html"/>
-    <link rel="top" title="Test Case Framework 0.11 documentation" href="index.html"/>
-        <link rel="next" title="2. Guides" href="doc/02-guides.html"/>
-        <link rel="prev" title="TCF" href="index.html"/> 
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="2. Guides" href="doc/02-guides.html" />
+    <link rel="prev" title="TCF" href="index.html" /> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
 
 </head>
 
-<body class="wy-body-for-nav" role="document">
+<body class="wy-body-for-nav">
 
    
   <div class="wy-grid-for-nav">
@@ -103,7 +95,7 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="doc/02-guides.html">2. Guides</a></li>
 <li class="toctree-l1"><a class="reference internal" href="doc/03-server-setup.html">3. Server deployment guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="doc/04-HOWTOs.html">4. HOWTOs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="doc/04-HOWTOs.html">4. Examples and HOWTOs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="doc/05-RFAQs.html">5. Rationales and Frequently Asked Questions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="doc/06-troubleshooting.html">6. Support &amp; Troubleshooting</a></li>
 <li class="toctree-l1"><a class="reference internal" href="doc/07-Architecture.html">7. Architecture</a></li>
@@ -122,7 +114,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
 
       
-      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+      <nav class="wy-nav-top" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">Test Case Framework</a>
@@ -130,9 +122,10 @@
       </nav>
 
 
-      
       <div class="wy-nav-content">
+        
         <div class="rst-content">
+        
           
 
 
@@ -178,7 +171,7 @@
 <span id="id1"></span><h1>1. Quickstart<a class="headerlink" href="#quickstart" title="Permalink to this headline">¶</a></h1>
 <ol class="arabic" id="install-tcf-client">
 <li><p class="first">Install the client software from source:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ git clone http://github.com/intel/tcf tcf.git
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git clone http://github.com/intel/tcf tcf.git
 $ cd tcf.git
 $ pip2 install --user -r requirements.txt  # dependencies
 $ python2 setup.py install --user
@@ -186,11 +179,26 @@ $ cd zephyr
 $ python2 setup.py install --user
 </pre></div>
 </div>
+<p>(see <a class="reference internal" href="doc/06-troubleshooting.html#tcf-client-install-troubleshooting"><span class="std std-ref">installation
+troubleshooting</span></a> for things
+that can go wrong)</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p>Ensure your PATH includes <em>$HOME/.local/bin</em>, where <em>install
+–user</em> puts things, by adding to <em>~/.bashrc</em>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ echo &#39;test -z &quot;${PATH##*$HOME/.local/bin*}&quot; || export PATH=$PATH:$HOME/.local/bin&#39; &gt;&gt; ~/.bashrc
+</pre></div>
+</div>
+<p>source bashrc to ensure the setting is there:</p>
+<div class="last highlight-default notranslate"><div class="highlight"><pre><span></span>$ source ~/.bashrc
+</pre></div>
+</div>
+</div>
 <p>You can also run <em>tcf</em> from the <a class="reference internal" href="doc/02-guides.html#tcf-run-from-source-tree"><span class="std std-ref">source directory</span></a>.</p>
 </li>
 <li><p class="first"><a class="reference internal" href="doc/02-guides.html#tcf-guide-configuration"><span class="std std-ref">Configure it</span></a>, adding to
 <cite>~/.tcf/conf_servers.py</cite> or <cite>/etc/tcf/conf_servers.py</cite></p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">tcfl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">url_add</span><span class="p">(</span><span class="s1">&#39;https://SERVER1:5000&#39;</span><span class="p">,</span> <span class="n">ssl_ignore</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">tcfl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">url_add</span><span class="p">(</span><span class="s1">&#39;https://SERVER1:5000&#39;</span><span class="p">,</span> <span class="n">ssl_ignore</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
 <span class="n">tcfl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">url_add</span><span class="p">(</span><span class="s1">&#39;https://SERVER2:5000&#39;</span><span class="p">,</span> <span class="n">ssl_ignore</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
 <span class="n">tcfl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">url_add</span><span class="p">(</span><span class="s1">&#39;https://SERVER3:5000&#39;</span><span class="p">,</span> <span class="n">ssl_ignore</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
 <span class="n">tcfl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">url_add</span><span class="p">(</span><span class="s1">&#39;https://SERVER3:5000&#39;</span><span class="p">,</span> <span class="n">ssl_ignore</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
@@ -204,7 +212,7 @@ to them using <cite>tcf login LOGIN</cite>.</p>
 your machine or another one.</p>
 </li>
 <li><p class="first">Now, login with the provided <em>login</em> and <em>password</em>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf login LOGIN
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf login LOGIN
 Login to https://SERVER1:5000 as LOGIN
 Password: &lt;your password&gt;
 Login to https://SERVER2:5000 as LOGIN
@@ -213,11 +221,16 @@ Login to https://SERVER3:5000 as LOGIN
 Password: &lt;your password&gt;
 </pre></div>
 </div>
+<p>For login in with the same <em>username</em> and <em>password</em> to all servers
+at the same time:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ TCF_USER=&lt;USERNAME&gt; TCF_PASSWORD=&lt;PASSWORD&gt; tcf login -q
+</pre></div>
+</div>
 </li>
 <li><p class="first">If you want to run Zephyr testcases you will also need to follow
 the <a class="reference external" href="https://docs.zephyrproject.org/latest/getting_started/installation_linux.html">Zephyr Development Environment Setup on Linux</a>
 and run:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ git clone https://github.com/zephyrproject-rtos/zephyr.git zephyr.git
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git clone https://github.com/zephyrproject-rtos/zephyr.git zephyr.git
 $ source zephyr.git/zephyr-env.sh
 </pre></div>
 </div>
@@ -231,7 +244,7 @@ $ source zephyr.git/zephyr-env.sh
 targets it gives you acces to (this list is for the targets a default
 <a class="reference internal" href="doc/03-server-setup.html#ttbd-guide-install-default-config"><span class="std std-ref">server install provides</span></a>,
 <em>qz</em>* for Zephyr OS QEMU targets, <em>qlf</em>* for Fedora Linux targets):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf list
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf list
 local/nwa
 ...
 local/qz30a-x86
@@ -259,10 +272,10 @@ or after the *list</em> command (to increase the amount of information for
 each target).</p>
 <p>As installing <cite>tcf-zephyr</cite> has brought the dependencies needed to
 build the Zephyr OS you can run one of its test cases on it:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ git clone http://github.com/zephyrproject-rtos/zephyr
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ git clone http://github.com/zephyrproject-rtos/zephyr
 $ export ZEPHYR_BASE=$HOME/zephyr
 $ export ZEPHYR_TOOLCHAIN_VARIANT=zephyr
-$ export ZEPHYR_SDK_INSTALL_DIR=/opt/zephyr-sdk-0.9.3
+$ export ZEPHYR_SDK_INSTALL_DIR=/opt/zephyr-sdk-0.9.5
 
 $ cd $ZEPHYR_BASE/samples/hello_world
 $ make BOARD=qemu_x86
@@ -289,8 +302,8 @@ $ tcf power-off qz30a-x86
 </div></blockquote>
 <p>these are available if the targets supports the interfaces for it,
 which you can find by listing it
-with <code class="docutils literal"><span class="pre">-vv</span></code>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf list -vv arduino101-15 | grep interfaces:
+with <code class="docutils literal notranslate"><span class="pre">-vv</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf list -vv arduino101-15 | grep interfaces:
 interfaces: test_target_console_mixin test_target_images_mixin tt_debug_mixin tt_power_control_mixin
 </pre></div>
 </div>
@@ -305,11 +318,11 @@ only and as <em>x86+arc</em>.</p>
 </div>
 <div class="section" id="running-zephyr-os-testcases">
 <h2>1.2. Running Zephyr OS testcases<a class="headerlink" href="#running-zephyr-os-testcases" title="Permalink to this headline">¶</a></h2>
-<p>Zephyr OS testcases can be run directly thanks to a <a class="reference internal" href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c" title="tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c"><code class="xref py py-class docutils literal"><span class="pre">driver</span></code></a> (loaded by the TCF
-configuration file <a class="reference download internal" href="_downloads/conf_zephyr.py" download=""><code class="xref download docutils literal"><span class="pre">/etc/tcf/conf_zephyr.py</span></code></a>), with <em>tcf run</em> doing the building,
+<p>Zephyr OS testcases can be run directly thanks to a <a class="reference internal" href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c" title="tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">driver</span></code></a> (loaded by the TCF
+configuration file <a class="reference download internal" href="_downloads/conf_zephyr.py" download=""><code class="xref download docutils literal notranslate"><span class="pre">/etc/tcf/conf_zephyr.py</span></code></a>), with <em>tcf run</em> doing the building,
 flashing, power cycling, reading and checking for you (including
 choosing one or more suitable targets):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ cd $ZEPHYR_BASE
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cd $ZEPHYR_BASE
 $ tcf run -vvy tests/kernel/common
 INFO2/        toplevel @local: scanning for test cases
 INFO1/oqep    tests/kernel/common/testcase.yaml#kernel.common @locals/qz30b-x86:x86: will run on target group &#39;target=locals/qz30b-x86:x86&#39;
@@ -342,20 +355,20 @@ recognize.</p>
 read from the console until it found a few things the Zephyr driver
 told it to look for:</p>
 <ul>
-<li><p class="first"><code class="docutils literal"><span class="pre">RunID:</span> <span class="pre">:gn0v</span></code>: during the compilation, this was passed as
-<code class="docutils literal"><span class="pre">-DTC_RUNID=:gn0v</span></code>, serves to ensure the right image got flashed
+<li><p class="first"><code class="docutils literal notranslate"><span class="pre">RunID:</span> <span class="pre">:gn0v</span></code>: during the compilation, this was passed as
+<code class="docutils literal notranslate"><span class="pre">-DTC_RUNID=:gn0v</span></code>, serves to ensure the right image got flashed
 and ran.</p>
 <p>Note this ID is unique to the testcase path, the target is run
 into and a bunch of other things, so it can be guaranteed that if
 the image that boots does not have that, it is likely the wrong
 image and shall be a failure.</p>
 </li>
-<li><p class="first"><code class="docutils literal"><span class="pre">PROJECT</span> <span class="pre">EXECUTION</span> <span class="pre">SUCCESFUL</span></code>: every Zephyr OS testcase prints
-this on success. If we got <code class="docutils literal"><span class="pre">...FAILED</span></code>, then the testcase
+<li><p class="first"><code class="docutils literal notranslate"><span class="pre">PROJECT</span> <span class="pre">EXECUTION</span> <span class="pre">SUCCESFUL</span></code>: every Zephyr OS testcase prints
+this on success. If we got <code class="docutils literal notranslate"><span class="pre">...FAILED</span></code>, then the testcase
 execution would be marked as failed.</p>
 </li>
-<li><p class="first">The driver also keeps an eye for telltales of issues, like <code class="docutils literal"><span class="pre">USAGE</span>
-<span class="pre">FAULT</span></code>, <code class="docutils literal"><span class="pre">fatal</span> <span class="pre">fault</span></code> and will report failure if those are seen.</p>
+<li><p class="first">The driver also keeps an eye for telltales of issues, like <code class="docutils literal notranslate"><span class="pre">USAGE</span>
+<span class="pre">FAULT</span></code>, <code class="docutils literal notranslate"><span class="pre">fatal</span> <span class="pre">fault</span></code> and will report failure if those are seen.</p>
 </li>
 </ul>
 </li>
@@ -364,7 +377,7 @@ execution would be marked as failed.</p>
 <h3>1.2.1. Running in multiple targets<a class="headerlink" href="#running-in-multiple-targets" title="Permalink to this headline">¶</a></h3>
 <p>Now if you ran (note there is no <em>-y</em> and only one <em>-v</em> to reduce
 verbosity):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ cd $ZEPHYR_BASE
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ cd $ZEPHYR_BASE
 $ tcf run -v tests/kernel/common
 INFO1/ep8q    zephyr.git/tests/kernel/common/testcase.yaml#kernel.common @locals/qz39a-xtensa:xtensa: will run on target group &#39;target=locals/qz39a-xtensa:xtensa&#39;
 INFO1/foav    zephyr.git/tests/kernel/common/testcase.yaml#kernel.common @locals/qz36b-riscv32:riscv32: will run on target group &#39;target=locals/qz36b-riscv32:riscv32&#39;
@@ -404,7 +417,7 @@ server.</p>
 the same time; note <em>tcf run</em> will spread around multiple targets in
 parallel–because it’d get very verbose, we removed the <em>-v</em> and <em>tcf
 run</em> will only report about things that don’t pass:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run tests/kernel/common/ tests/kernel/mem_slab/
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run tests/kernel/common/ tests/kernel/mem_slab/
 BLCK0/kijl    tests/kernel/common/testcase.yaml#kernel.common @locals/qz37a-riscv32:riscv32: evaluation blocked
 BLCK0/8thb    tests/kernel/mem_slab/mslab_threadsafe/testcase.yaml#kernel.memory_slabs @locals/qz37b-riscv32:riscv32: evaluation blocked
 BLCK0/605h    tests/kernel/mem_slab/mslab/testcase.yaml#kernel.memory_slabs @locals/qz37a-riscv32:riscv32: evaluation blocked
@@ -423,7 +436,7 @@ twenty passed, five blocked and it took about three minutes.</p>
 <p>Automation can be done in any language, provided there is a driver for
 it; however, the default automation script is Python.</p>
 <p>Create a file called <cite>test_hello_world.py</cite> with the following:</p>
-<div class="highlight-python"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre> 1
+<div class="highlight-python notranslate"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre> 1
  2
  3
  4
@@ -479,7 +492,7 @@ it; however, the default automation script is Python.</p>
 <p>this tells <em>tcf</em>’s test runner:</p>
 <blockquote>
 <div><ul>
-<li><p class="first">With the <a class="reference internal" href="doc/09-api.html#tcfl.tc.target" title="tcfl.tc.target"><code class="xref py py-func docutils literal"><span class="pre">tcfl.tc.target()</span></code></a> class decorator, we declare this
+<li><p class="first">With the <a class="reference internal" href="doc/09-api.html#tcfl.tc.target" title="tcfl.tc.target"><code class="xref py py-func docutils literal notranslate"><span class="pre">tcfl.tc.target()</span></code></a> class decorator, we declare this
 test needs a single target on which we are going to deploy a Zephyr
 application.</p>
 <ul>
@@ -499,22 +512,22 @@ provided in the form of Python functions added to the test object
 </li>
 </ul>
 </li>
-<li><p class="first">we create a <cite>_test</cite> class, deriving from <a class="reference internal" href="doc/09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal"><span class="pre">tcfl.tc.tc_c</span></code></a>, so
+<li><p class="first">we create a <cite>_test</cite> class, deriving from <a class="reference internal" href="doc/09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">tcfl.tc.tc_c</span></code></a>, so
 the testcase can be located and integrated</p>
 </li>
 <li><p class="first">there is an evaluation function, <cite>_test.eval(target)</cite> which is used
 to tell if the test case succeeded or failed.</p>
 <p>The testcase runner will call it with a target object, which
 represents a remote target with which you can interact via the
-<a class="reference internal" href="doc/09-api.html#tcfl.tc.target_c" title="tcfl.tc.target_c"><code class="xref py py-class docutils literal"><span class="pre">API</span></code></a> it provides.</p>
+<a class="reference internal" href="doc/09-api.html#tcfl.tc.target_c" title="tcfl.tc.target_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">API</span></code></a> it provides.</p>
 <p>If it returns, it is a <em>pass</em>. A failure can be indicated by
-raising <a class="reference internal" href="doc/09-api.html#tcfl.tc.failed_e" title="tcfl.tc.failed_e"><code class="xref py py-exc docutils literal"><span class="pre">tcfl.tc.failed_e</span></code></a>; any other exception raised is
-captured and converted to a <a class="reference internal" href="doc/09-api.html#tcfl.tc.blocked_e" title="tcfl.tc.blocked_e"><code class="xref py py-exc docutils literal"><span class="pre">blockage</span></code></a>,
+raising <a class="reference internal" href="doc/09-api.html#tcfl.tc.failed_e" title="tcfl.tc.failed_e"><code class="xref py py-exc docutils literal notranslate"><span class="pre">tcfl.tc.failed_e</span></code></a>; any other exception raised is
+captured and converted to a <a class="reference internal" href="doc/09-api.html#tcfl.tc.blocked_e" title="tcfl.tc.blocked_e"><code class="xref py py-exc docutils literal notranslate"><span class="pre">blockage</span></code></a>,
 which is a situation considered to impede the evaluation of the
 testcase.</p>
 <p>Multiple evaluation functions can be provided (named <cite>eval*()</cite>,
 each taking none or different targets, as many as declared by the
-testcase (see <a class="reference internal" href="doc/09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal"><span class="pre">test</span> <span class="pre">class</span> <span class="pre">overview</span></code></a>). For the
+testcase (see <a class="reference internal" href="doc/09-api.html#tcfl.tc.tc_c" title="tcfl.tc.tc_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">test</span> <span class="pre">class</span> <span class="pre">overview</span></code></a>). For the
 testcase to pass, all the evaluation functions have to pass.</p>
 <p>FIXME: ensure the tc_c and target_c class descriptions are adequate
 from this context</p>
@@ -523,12 +536,12 @@ from this context</p>
 </div></blockquote>
 <p><em>tcf run</em> finds the <cite>.py</cite> file, queries which targets available and
 selects the ones that match the conditions imposed with
-<a class="reference internal" href="doc/09-api.html#tcfl.tc.target" title="tcfl.tc.target"><code class="xref py py-func docutils literal"><span class="pre">tcfl.tc.target()</span></code></a>; it then builds the <em>Hello World!</em> app for each
+<a class="reference internal" href="doc/09-api.html#tcfl.tc.target" title="tcfl.tc.target"><code class="xref py py-func docutils literal notranslate"><span class="pre">tcfl.tc.target()</span></code></a>; it then builds the <em>Hello World!</em> app for each
 of them, pulling configuration from the target’s description tags
 (that you can see with <cite>tcf list -vvv TARGETNAME</cite>) and then evaluates
 the output for success.</p>
 <p>Let’s ask it to run against an specific target, <em>local/qz39c-arm</em>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run -vv -t local/qz39c-arm test_zephyr_hello_world.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run -vv -t local/qz39c-arm test_zephyr_hello_world.py
 INFO2/        toplevel @local: scanning for test cases
 INFO2/n9gc    test_zephyr_hello_world.py#_test @local/qz39c-arm:arm: will run on target group &#39;xqkw (target=local/qz39c-arm:arm)&#39;
 PASS1/n9gc    test_zephyr_hello_world.py#_test @local/qz39c-arm:arm: configure passed
@@ -552,7 +565,7 @@ where it runs and information on what happened (<a class="reference internal" hr
 <p>At this point, you can ask it to run anywhere it can; <em>tcf run</em> will
 try to run on all targets it can find, running by default only one
 target of each type:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run test_zephyr_hello_world.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run test_zephyr_hello_world.py
 PASS0/  toplevel @local: 3 tests (3 passed, 0 failed, 0 blocked, 0 skipped) - passed
 </pre></div>
 </div>
@@ -562,15 +575,13 @@ testst that passed.</p>
 fail or error (and generates individual <cite>report-*.txt</cite> files about
 it. For more information, throw in <em>-v</em>s</p>
 <p><em>tcf</em> can be taught about other testcase formats using <a class="reference internal" href="doc/glossary.html#term-test-case-driver"><span class="xref std std-term">test
-case driver</span></a>s; (like <a class="reference internal" href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c" title="tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c"><code class="xref py py-class docutils literal"><span class="pre">Zephyr's</span> <span class="pre">Sanity</span> <span class="pre">Checks</span></code></a>)</p>
+case driver</span></a>s; (like <a class="reference internal" href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c" title="tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c"><code class="xref py py-class docutils literal notranslate"><span class="pre">Zephyr's</span> <span class="pre">Sanity</span> <span class="pre">Checks</span></code></a>)</p>
 </div>
 </div>
 
 
            </div>
-           <div class="articleComments">
-            
-           </div>
+           
           </div>
           <footer>
   
@@ -588,11 +599,11 @@ case driver</span></a>s; (like <a class="reference internal" href="doc/09-api.ht
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2015, Author.
+        &copy; Copyright 2015, Author
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -607,35 +618,33 @@ case driver</span></a>s; (like <a class="reference internal" href="doc/09-api.ht
 
   
 
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'./',
-            VERSION:'0.11',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="_static/jquery.js"></script>
-      <script type="text/javascript" src="_static/underscore.js"></script>
-      <script type="text/javascript" src="_static/doctools.js"></script>
+    
+    
+      <script type="text/javascript">
+          var DOCUMENTATION_OPTIONS = {
+              URL_ROOT:'./',
+              VERSION:'0.11',
+              LANGUAGE:'None',
+              COLLAPSE_INDEX:false,
+              FILE_SUFFIX:'.html',
+              HAS_SOURCE:  true,
+              SOURCELINK_SUFFIX: '.txt'
+          };
+      </script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+    
 
   
 
-  
-  
-    <script type="text/javascript" src="_static/js/theme.js"></script>
-  
+  <script type="text/javascript" src="_static/js/theme.js"></script>
 
-  
-  
   <script type="text/javascript">
       jQuery(function () {
-          SphinxRtdTheme.StickyNav.enable();
+          SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-   
+  </script> 
 
 </body>
 </html>

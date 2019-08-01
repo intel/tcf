@@ -9,10 +9,41 @@ For support, see the :ref:`contributing section
 TCF client
 ==========
 
+.. _tcf_client_install_troubleshooting:
+
+*tcf* dependencies installation failures
+----------------------------------------
+
+.. _tcf_client_missing_redhat_hardened_cc1:
+
+Missing *redhat-hardened-cc1*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+During installation with pip2::
+
+  $ pip2 install --user -r requirements.txt
+  ...
+  creating build/temp.linux-x86_64-2.7
+  creating build/temp.linux-x86_64-2.7/Levenshtein
+  gcc -pthread -fno-strict-aliasing -O2 -g -pipe -Wall -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector-strong --param=ssp-buffer-size=4 -grecord-gcc-switches -specs=/usr/lib/rpm/redhat/redhat-hardened-cc1 -m64 -mtune=generic -D_GNU_SOURCE -fPIC -fwrapv -DNDEBUG -O2 -g -pipe -Wall -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector-strong --param=ssp-buffer-size=4 -grecord-gcc-switches -specs=/usr/lib/rpm/redhat/redhat-hardened-cc1 -m64 -mtune=generic -D_GNU_SOURCE -fPIC -fwrapv -fPIC -I/usr/include/python2.7 -c Levenshtein/_levenshtein.c -o build/temp.linux-x86_64-2.7/Levenshtein/_levenshtein.o
+  gcc: error: /usr/lib/rpm/redhat/redhat-hardened-cc1: No such file or directory
+  error: command 'gcc' failed with exit status 1
+
+this usually happens in Fedora based distros; fix by installing
+missing package::
+
+  # dnf install -y redhat-rpm-config
+
+  
 *tcf* just hangs there, nothing happens
 ---------------------------------------
 
-Add ``-v``\s, check your proxy settings are ok
+Add ``-v``\s right after *tcf* (e.g.: ``tcf -vvv ...``; usually this
+means TCF is trying to contact a host that is either:
+
+- nonresponsive (the server might be up, the port open but the daemon
+  is not responding or the server has crashed)
+- blocked by a firewall (check your proxy settings are ok)
 
 Client operations report *EOF occurred in violation of protocol*
 ----------------------------------------------------------------
@@ -51,6 +82,124 @@ if your servers are locally accesible.
 --------------------------------------
 
 FIXME: update
+
+target power on fails with *timed out waiting for udev to set permissions*
+--------------------------------------------------------------------------
+
+Targets implemented with QEMU virtual machines do networking using
+Linux's TAP interfaces, which need proper permissions being set.
+
+*ttbd* relies on file :file:`ttbd/80-udev.rules` being installed in
+``/usr/lib/udev/rules.d`` to perform this function. When a power on
+fails with a message looking like::
+
+  qlf04a: /dev/tapNNN: timed out waiting for udev to set permissions in /usr/lib/udev/rules.d/80-ttbd.rules
+
+this usually means said file is not installed; RPM installation should
+have put it in ``/usr/lib/udev/rules.d``; if running from source, make
+sure to install it manually and ask *udev* to reload::
+
+  # install tcf.git/ttbd/80-udev.rules /usr/lib/udev/rules.d
+  # udevadm control --reload-rules
+
+Sometimes instead this might be SELinux issue::
+
+  $ tcf power-on ql06a
+  Traceback (most recent call last):
+    File "/usr/bin/tcf", line 517, in <module>
+      retval = args.func(args)
+    File "/usr/lib/python2.7/site-packages/tcfl/ttb_client.py", line 799, in rest_target_power_on
+      rtb.rest_tb_target_power_on(rt)
+    File "/usr/lib/python2.7/site-packages/tcfl/ttb_client.py", line 319, in rest_tb_target_power_on
+      data = { 'ticket': ticket })
+    File "/usr/lib/python2.7/site-packages/tcfl/ttb_client.py", line 196, in send_request
+      commonl.request_response_maybe_raise(r)
+    File "/usr/lib/python2.7/site-packages/commonl/__init__.py", line 468, in request_response_maybe_raise
+      raise e
+  requests.exceptions.HTTPError: 400: ql06a: [Errno 13] Permission denied: '/dev/tap1023'
+
+is usually caused by a SELinux check disallowing the daemon access to
+the ``/dev/tapNUMBER`` device.
+
+The system's journal might show::
+
+  audit[11345]: AVC avc:  denied  { open } for  pid=11345 comm="ttbd" path="/dev/tap1023" dev="devtmpfs" ino=35798295 scontext=system_u:system_r:init_t:s0 tcontext=system_u:object_r:tun_tap_device_t:s0 tclass=chr_file permissive=0
+
+there is no current proper fix, other than disabling SELinux::
+
+  # setenforce 0
+
+however, this seems to only happen when running the daemon from a
+*$HOME* directory, instead of from a system installation.
+
+PXE POS provisioning target fails to PXE boot: Unable to locate configuration file
+----------------------------------------------------------------------------------
+
+When a system is configured to boot targets to Provisioning OS over
+PXE, a target fails to boot with a message on the BIOS console such
+as::
+
+  >>Start PXE over IPv4.
+  Station IP address is 192.168.97.101
+  Server IP address is 192.168.97.1
+  NBP filename is ttbd-production/efi-x86_64/syslinux.efi
+  NBP filesize is 176328 Bytes
+  Downloading NBP file...
+  NBP file downloaded successfully.
+  Getting cached packet
+  My IP is 192.168.97.101
+  Unable to locate configuration file
+
+There might be multiple causes for this, but here are the most common:
+
+- there is a typo in the target's MAC address
+
+  The target is given, via TFTP, the *syslinux PXE bootloader*, who
+  will look for configuration files with multiple names (see
+  https://www.syslinux.org/wiki/index.php?title=PXELINUX#Configuration_filename)
+  on the TFTP server, but relies in one named after the target's MAC
+  address.
+
+  The TTBD server's :ref:`POS <pos_setup>` environment generates the
+  configuration file when the network to which the target is attached
+  is powered up.
+
+  Thus, the target's MAC address listed in the configuration has to
+  match the one the target actually uses on the network:
+
+  >>> ttbl.config.targets['TARGETNAME'].add_to_interconnect(
+  >>>   NETWORKNAME, dict(
+  >>>       mac_addr = "00:07:32:4b:36:87",
+  >>>       ipv4_addr = '192.168.98.160', ipv4_prefix_len = 24,
+  >>>       ipv6_addr = 'fc00::62:a0', ipv6_prefix_len = 112)
+  >>>   )
+
+  ensure the *mac_addr* value is the MAC address of the network
+  interface the target is using to PXE boot from (*_addr* fields will
+  vary from the example to your configuration).
+
+- mismatch in IP addresses
+
+  It is frequent to create typos in the network configuration and
+  target configuration so that the target's IP address won't be in the
+  network's address range. Ensure this is correct.
+
+PXE POS provisioning target fails to boot: NFS: an incorrect mount option was specified
+---------------------------------------------------------------------------------------
+
+When the Provisoning OS kernel tries to NFS mount the root, it fails
+with invalid mount option specified:
+
+Check the MAC address is correct and the system is given the right IP
+address (vs any from the pool).
+
+This usually happens when the system doesn't recognize the MAC address
+as matching the right host. It is very common when changing
+names. Also, before reinitializing the server, clean up the cache::
+
+  $ rm -rf /var/lib/tftpbootlib/ttbd-production/pxelinux.cfg/*
+
+to ensure there are no left-over configuration files with old addresses
 
 *ttbd* server
 =============
@@ -146,6 +295,29 @@ Tips for diagnosing systemd startup
   this is most likely a permissons issue; verify your Unix permissions
   and ACLs are right. SELinux might be in the way too (check your
   system output with *journalctl -xe* and look for ttbd.
+
+- systemctl fails with *service not found*
+
+  Besides the unit not existing, this might happen when you run the
+  daemon from a :ref:`source directory <running_server_source>` and
+  SELinux is not allowing access::
+
+    $ sudo systemctl restart ttbd@afapli.service
+    Failed to restart ttbd@afapli.service: Unit ttbd@afapli.service not found.
+
+  Look in the *journalctl* for lines like::
+
+    $ sudo systemctl restart ttbd@production.service
+    Failed to restart ttbd@production.service: Unit ttbd@production.service not found.
+    $ journalctl -S -2min | grep -B4
+
+    ...audit[1]: AVC avc:  denied  { read } for  pid=1 comm="systemd" name="ttbd@.service" dev="dm-2" ino=48627844 scontext=system_u:system_r:init_t:s0 tcontext=unconfined_u:object_r:user_home_t:s0 tclass=file permissive=0
+    ...systemd[1]: Cannot access "(null)": Permission denied
+    ...systemd[1]: ttbd@production.service: Failed to load configuration: No such file or directory
+
+  A quick way to fix this is to disable SELinux with::
+
+    # setenforce
 
 .. _systemd_tips_configuring:
 
@@ -357,40 +529,6 @@ that is not installed in the system; for remediation::
 
   # semanage fcontext -a -t var_run_t /var/cache/ttbd-staging
   # restorecon -v /var/cache/ttbd-staging
-
-Network QEMU target fails to power up with *Permission denied: '/dev/tapNUMBER'*
---------------------------------------------------------------------------------
-
-Trying to power up a QEMU VM that uses *macvtap* devices for
-networking::
-
-  $ tcf power-on ql06a
-  Traceback (most recent call last):
-    File "/usr/bin/tcf", line 517, in <module>
-      retval = args.func(args)
-    File "/usr/lib/python2.7/site-packages/tcfl/ttb_client.py", line 799, in rest_target_power_on
-      rtb.rest_tb_target_power_on(rt)
-    File "/usr/lib/python2.7/site-packages/tcfl/ttb_client.py", line 319, in rest_tb_target_power_on
-      data = { 'ticket': ticket })
-    File "/usr/lib/python2.7/site-packages/tcfl/ttb_client.py", line 196, in send_request
-      commonl.request_response_maybe_raise(r)
-    File "/usr/lib/python2.7/site-packages/commonl/__init__.py", line 468, in request_response_maybe_raise
-      raise e
-  requests.exceptions.HTTPError: 400: ql06a: [Errno 13] Permission denied: '/dev/tap1023'
-
-is usually caused by a SELinux check disallowing the daemon access to
-the ``/dev/tapNUMBER`` device.
-
-The system's journal might show::
-
-  audit[11345]: AVC avc:  denied  { open } for  pid=11345 comm="ttbd" path="/dev/tap1023" dev="devtmpfs" ino=35798295 scontext=system_u:system_r:init_t:s0 tcontext=system_u:object_r:tun_tap_device_t:s0 tclass=chr_file permissive=0
-
-there is no current proper fix, other than disabling SELinux::
-
-  # setenforce 0
-
-however, this seems to only happen when running the daemon from a
-*$HOME* directory, instead of from a system installation.
 
 .. _ttbd_auth_ldap_invalid_creds:
 

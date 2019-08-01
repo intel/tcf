@@ -24,27 +24,19 @@
 
   
 
-  
-  
-    <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
-  
-
-  
-
-  
-        <link rel="index" title="Index"
-              href="../genindex.html"/>
-        <link rel="search" title="Search" href="../search.html"/>
-    <link rel="top" title="Test Case Framework 0.11 documentation" href="../index.html"/>
-        <link rel="next" title="7. Architecture" href="07-Architecture.html"/>
-        <link rel="prev" title="5. Rationales and Frequently Asked Questions" href="05-RFAQs.html"/> 
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="7. Architecture" href="07-Architecture.html" />
+    <link rel="prev" title="5. Rationales and Frequently Asked Questions" href="05-RFAQs.html" /> 
 
   
   <script src="../_static/js/modernizr.min.js"></script>
 
 </head>
 
-<body class="wy-body-for-nav" role="document">
+<body class="wy-body-for-nav">
 
    
   <div class="wy-grid-for-nav">
@@ -94,13 +86,20 @@
 <li class="toctree-l1"><a class="reference internal" href="../02-QUICKSTART.html">1. Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="02-guides.html">2. Guides</a></li>
 <li class="toctree-l1"><a class="reference internal" href="03-server-setup.html">3. Server deployment guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="04-HOWTOs.html">4. HOWTOs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="04-HOWTOs.html">4. Examples and HOWTOs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="05-RFAQs.html">5. Rationales and Frequently Asked Questions</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">6. Support &amp; Troubleshooting</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#tcf-client">6.1. TCF client</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#tcf-just-hangs-there-nothing-happens">6.1.1. <em>tcf</em> just hangs there, nothing happens</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#client-operations-report-eof-occurred-in-violation-of-protocol">6.1.2. Client operations report <em>EOF occurred in violation of protocol</em></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#tcf-run-fails-compiling-in-zephyr">6.1.3. <em>tcf run</em> fails compiling in Zephyr…</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tcf-dependencies-installation-failures">6.1.1. <em>tcf</em> dependencies installation failures</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#missing-redhat-hardened-cc1">6.1.1.1. Missing <em>redhat-hardened-cc1</em></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#tcf-just-hangs-there-nothing-happens">6.1.2. <em>tcf</em> just hangs there, nothing happens</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#client-operations-report-eof-occurred-in-violation-of-protocol">6.1.3. Client operations report <em>EOF occurred in violation of protocol</em></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#tcf-run-fails-compiling-in-zephyr">6.1.4. <em>tcf run</em> fails compiling in Zephyr…</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#target-power-on-fails-with-timed-out-waiting-for-udev-to-set-permissions">6.1.5. target power on fails with <em>timed out waiting for udev to set permissions</em></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pxe-pos-provisioning-target-fails-to-pxe-boot-unable-to-locate-configuration-file">6.1.6. PXE POS provisioning target fails to PXE boot: Unable to locate configuration file</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pxe-pos-provisioning-target-fails-to-boot-nfs-an-incorrect-mount-option-was-specified">6.1.7. PXE POS provisioning target fails to boot: NFS: an incorrect mount option was specified</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#ttbd-server">6.2. <em>ttbd</em> server</a><ul>
@@ -113,19 +112,18 @@
 <li class="toctree-l3"><a class="reference internal" href="#multiple-failures-caused-by-selinux">6.2.7. Multiple failures caused by <em>SELinux</em></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#different-operations-fail-daemon-log-reports-connection-reset-by-peer">6.2.8. Different operations fail, daemon log reports <em>Connection reset by peer</em></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#uploading-files-to-the-daemon-fails-with-var-cache-ttbd-production-username-cannot-create-path">6.2.9. Uploading files to the daemon fails with <em>/var/cache/ttbd-production/USERNAME: cannot create path</em></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#network-qemu-target-fails-to-power-up-with-permission-denied-dev-tapnumber">6.2.10. Network QEMU target fails to power up with <em>Permission denied: ‘/dev/tapNUMBER’</em></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#ldap-login-fails-with-invalid-credentials-but-the-password-is-right-i-know">6.2.11. LDAP login fails with invalid credentials, but the password is right, I know</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#freedom-board-k64f">6.2.12. Freedom Board k64f</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#freedom-board-k64f-openocd-fails-to-power-up-unable-to-open-cmsis-dap-device-0xd28-0x204">6.2.12.1. Freedom Board k64f, openocd fails to power up (unable to open CMSIS-DAP device 0xd28:0x204)</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#frdm-k64f-boards-fail-to-power-up-openocd-prints-message-about-reset-wdog-loop">6.2.12.2. FRDM k64f boards fail to power up, OpenOCD prints message about RESET/WDOG loop</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#set-the-up-the-target-in-debug-mode">6.2.12.3. Set the up the target in debug mode</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#issue-openocd-commands-to-stop-the-loop">6.2.12.4. Issue OpenOCD commands to stop the loop</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#copy-a-known-firmware-image-to-its-flash-drive">6.2.12.5. Copy a known firmware image to its flash drive</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#reset-the-board-to-normal-configuration">6.2.12.6. Reset the board to normal configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#ldap-login-fails-with-invalid-credentials-but-the-password-is-right-i-know">6.2.10. LDAP login fails with invalid credentials, but the password is right, I know</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#freedom-board-k64f">6.2.11. Freedom Board k64f</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#freedom-board-k64f-openocd-fails-to-power-up-unable-to-open-cmsis-dap-device-0xd28-0x204">6.2.11.1. Freedom Board k64f, openocd fails to power up (unable to open CMSIS-DAP device 0xd28:0x204)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#frdm-k64f-boards-fail-to-power-up-openocd-prints-message-about-reset-wdog-loop">6.2.11.2. FRDM k64f boards fail to power up, OpenOCD prints message about RESET/WDOG loop</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#set-the-up-the-target-in-debug-mode">6.2.11.3. Set the up the target in debug mode</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#issue-openocd-commands-to-stop-the-loop">6.2.11.4. Issue OpenOCD commands to stop the loop</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#copy-a-known-firmware-image-to-its-flash-drive">6.2.11.5. Copy a known firmware image to its flash drive</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#reset-the-board-to-normal-configuration">6.2.11.6. Reset the board to normal configuration</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="#arduino101">6.2.13. Arduino101</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#arduino101-openocd-fails-to-power-up-targets-report-tap-disabled">6.2.13.1. Arduino101: openocd fails to power up (targets report tap-disabled)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#arduino101">6.2.12. Arduino101</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#arduino101-openocd-fails-to-power-up-targets-report-tap-disabled">6.2.12.1. Arduino101: openocd fails to power up (targets report tap-disabled)</a></li>
 </ul>
 </li>
 </ul>
@@ -148,7 +146,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
 
       
-      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+      <nav class="wy-nav-top" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="../index.html">Test Case Framework</a>
@@ -156,9 +154,10 @@
       </nav>
 
 
-      
       <div class="wy-nav-content">
+        
         <div class="rst-content">
+        
           
 
 
@@ -205,14 +204,41 @@
 <p>For support, see the <a class="reference internal" href="02-guides.html#support-and-reporting-issues"><span class="std std-ref">contributing section</span></a>.</p>
 <div class="section" id="tcf-client">
 <h2>6.1. TCF client<a class="headerlink" href="#tcf-client" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="tcf-dependencies-installation-failures">
+<span id="tcf-client-install-troubleshooting"></span><h3>6.1.1. <em>tcf</em> dependencies installation failures<a class="headerlink" href="#tcf-dependencies-installation-failures" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="missing-redhat-hardened-cc1">
+<span id="tcf-client-missing-redhat-hardened-cc1"></span><h4>6.1.1.1. Missing <em>redhat-hardened-cc1</em><a class="headerlink" href="#missing-redhat-hardened-cc1" title="Permalink to this headline">¶</a></h4>
+<p>During installation with pip2:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ pip2 install --user -r requirements.txt
+...
+creating build/temp.linux-x86_64-2.7
+creating build/temp.linux-x86_64-2.7/Levenshtein
+gcc -pthread -fno-strict-aliasing -O2 -g -pipe -Wall -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector-strong --param=ssp-buffer-size=4 -grecord-gcc-switches -specs=/usr/lib/rpm/redhat/redhat-hardened-cc1 -m64 -mtune=generic -D_GNU_SOURCE -fPIC -fwrapv -DNDEBUG -O2 -g -pipe -Wall -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector-strong --param=ssp-buffer-size=4 -grecord-gcc-switches -specs=/usr/lib/rpm/redhat/redhat-hardened-cc1 -m64 -mtune=generic -D_GNU_SOURCE -fPIC -fwrapv -fPIC -I/usr/include/python2.7 -c Levenshtein/_levenshtein.c -o build/temp.linux-x86_64-2.7/Levenshtein/_levenshtein.o
+gcc: error: /usr/lib/rpm/redhat/redhat-hardened-cc1: No such file or directory
+error: command &#39;gcc&#39; failed with exit status 1
+</pre></div>
+</div>
+<p>this usually happens in Fedora based distros; fix by installing
+missing package:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># dnf install -y redhat-rpm-config</span>
+</pre></div>
+</div>
+</div>
+</div>
 <div class="section" id="tcf-just-hangs-there-nothing-happens">
-<h3>6.1.1. <em>tcf</em> just hangs there, nothing happens<a class="headerlink" href="#tcf-just-hangs-there-nothing-happens" title="Permalink to this headline">¶</a></h3>
-<p>Add <code class="docutils literal"><span class="pre">-v</span></code>s, check your proxy settings are ok</p>
+<h3>6.1.2. <em>tcf</em> just hangs there, nothing happens<a class="headerlink" href="#tcf-just-hangs-there-nothing-happens" title="Permalink to this headline">¶</a></h3>
+<p>Add <code class="docutils literal notranslate"><span class="pre">-v</span></code>s right after <em>tcf</em> (e.g.: <code class="docutils literal notranslate"><span class="pre">tcf</span> <span class="pre">-vvv</span> <span class="pre">...</span></code>; usually this
+means TCF is trying to contact a host that is either:</p>
+<ul class="simple">
+<li>nonresponsive (the server might be up, the port open but the daemon
+is not responding or the server has crashed)</li>
+<li>blocked by a firewall (check your proxy settings are ok)</li>
+</ul>
 </div>
 <div class="section" id="client-operations-report-eof-occurred-in-violation-of-protocol">
-<h3>6.1.2. Client operations report <em>EOF occurred in violation of protocol</em><a class="headerlink" href="#client-operations-report-eof-occurred-in-violation-of-protocol" title="Permalink to this headline">¶</a></h3>
+<h3>6.1.3. Client operations report <em>EOF occurred in violation of protocol</em><a class="headerlink" href="#client-operations-report-eof-occurred-in-violation-of-protocol" title="Permalink to this headline">¶</a></h3>
 <p>Any client operation (such as <em>tcf list</em>):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ ~/z/tcf.git/tcf list
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ ~/z/tcf.git/tcf list
 Traceback (most recent call last):
   File &quot;~/z/tcf.git/tcf&quot;, line 350, in &lt;module&gt;
     retval = args.func(args)
@@ -234,14 +260,123 @@ protocol</em>, the proxy may be cutting you off; ensure your
 proxies are properly setup as per <a class="reference external" href="setup_proxies">these instructions</a>).</p>
 <p>In a pinch, you can unset your <em>proxy</em> environment
 variables are unset:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ unset https_proxy http_proxy HTTPS_PROXY HTTP_PROXY
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ unset https_proxy http_proxy HTTPS_PROXY HTTP_PROXY
 </pre></div>
 </div>
 <p>if your servers are locally accesible.</p>
 </div>
 <div class="section" id="tcf-run-fails-compiling-in-zephyr">
-<h3>6.1.3. <em>tcf run</em> fails compiling in Zephyr…<a class="headerlink" href="#tcf-run-fails-compiling-in-zephyr" title="Permalink to this headline">¶</a></h3>
+<h3>6.1.4. <em>tcf run</em> fails compiling in Zephyr…<a class="headerlink" href="#tcf-run-fails-compiling-in-zephyr" title="Permalink to this headline">¶</a></h3>
 <p>FIXME: update</p>
+</div>
+<div class="section" id="target-power-on-fails-with-timed-out-waiting-for-udev-to-set-permissions">
+<h3>6.1.5. target power on fails with <em>timed out waiting for udev to set permissions</em><a class="headerlink" href="#target-power-on-fails-with-timed-out-waiting-for-udev-to-set-permissions" title="Permalink to this headline">¶</a></h3>
+<p>Targets implemented with QEMU virtual machines do networking using
+Linux’s TAP interfaces, which need proper permissions being set.</p>
+<p><em>ttbd</em> relies on file <code class="file docutils literal notranslate"><span class="pre">ttbd/80-udev.rules</span></code> being installed in
+<code class="docutils literal notranslate"><span class="pre">/usr/lib/udev/rules.d</span></code> to perform this function. When a power on
+fails with a message looking like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">qlf04a</span><span class="p">:</span> <span class="o">/</span><span class="n">dev</span><span class="o">/</span><span class="n">tapNNN</span><span class="p">:</span> <span class="n">timed</span> <span class="n">out</span> <span class="n">waiting</span> <span class="k">for</span> <span class="n">udev</span> <span class="n">to</span> <span class="nb">set</span> <span class="n">permissions</span> <span class="ow">in</span> <span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">udev</span><span class="o">/</span><span class="n">rules</span><span class="o">.</span><span class="n">d</span><span class="o">/</span><span class="mi">80</span><span class="o">-</span><span class="n">ttbd</span><span class="o">.</span><span class="n">rules</span>
+</pre></div>
+</div>
+<p>this usually means said file is not installed; RPM installation should
+have put it in <code class="docutils literal notranslate"><span class="pre">/usr/lib/udev/rules.d</span></code>; if running from source, make
+sure to install it manually and ask <em>udev</em> to reload:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># install tcf.git/ttbd/80-udev.rules /usr/lib/udev/rules.d</span>
+<span class="c1"># udevadm control --reload-rules</span>
+</pre></div>
+</div>
+<p>Sometimes instead this might be SELinux issue:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf power-on ql06a
+Traceback (most recent call last):
+  File &quot;/usr/bin/tcf&quot;, line 517, in &lt;module&gt;
+    retval = args.func(args)
+  File &quot;/usr/lib/python2.7/site-packages/tcfl/ttb_client.py&quot;, line 799, in rest_target_power_on
+    rtb.rest_tb_target_power_on(rt)
+  File &quot;/usr/lib/python2.7/site-packages/tcfl/ttb_client.py&quot;, line 319, in rest_tb_target_power_on
+    data = { &#39;ticket&#39;: ticket })
+  File &quot;/usr/lib/python2.7/site-packages/tcfl/ttb_client.py&quot;, line 196, in send_request
+    commonl.request_response_maybe_raise(r)
+  File &quot;/usr/lib/python2.7/site-packages/commonl/__init__.py&quot;, line 468, in request_response_maybe_raise
+    raise e
+requests.exceptions.HTTPError: 400: ql06a: [Errno 13] Permission denied: &#39;/dev/tap1023&#39;
+</pre></div>
+</div>
+<p>is usually caused by a SELinux check disallowing the daemon access to
+the <code class="docutils literal notranslate"><span class="pre">/dev/tapNUMBER</span></code> device.</p>
+<p>The system’s journal might show:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">audit</span><span class="p">[</span><span class="mi">11345</span><span class="p">]:</span> <span class="n">AVC</span> <span class="n">avc</span><span class="p">:</span>  <span class="n">denied</span>  <span class="p">{</span> <span class="nb">open</span> <span class="p">}</span> <span class="k">for</span>  <span class="n">pid</span><span class="o">=</span><span class="mi">11345</span> <span class="n">comm</span><span class="o">=</span><span class="s2">&quot;ttbd&quot;</span> <span class="n">path</span><span class="o">=</span><span class="s2">&quot;/dev/tap1023&quot;</span> <span class="n">dev</span><span class="o">=</span><span class="s2">&quot;devtmpfs&quot;</span> <span class="n">ino</span><span class="o">=</span><span class="mi">35798295</span> <span class="n">scontext</span><span class="o">=</span><span class="n">system_u</span><span class="p">:</span><span class="n">system_r</span><span class="p">:</span><span class="n">init_t</span><span class="p">:</span><span class="n">s0</span> <span class="n">tcontext</span><span class="o">=</span><span class="n">system_u</span><span class="p">:</span><span class="n">object_r</span><span class="p">:</span><span class="n">tun_tap_device_t</span><span class="p">:</span><span class="n">s0</span> <span class="n">tclass</span><span class="o">=</span><span class="n">chr_file</span> <span class="n">permissive</span><span class="o">=</span><span class="mi">0</span>
+</pre></div>
+</div>
+<p>there is no current proper fix, other than disabling SELinux:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># setenforce 0</span>
+</pre></div>
+</div>
+<p>however, this seems to only happen when running the daemon from a
+<em>$HOME</em> directory, instead of from a system installation.</p>
+</div>
+<div class="section" id="pxe-pos-provisioning-target-fails-to-pxe-boot-unable-to-locate-configuration-file">
+<h3>6.1.6. PXE POS provisioning target fails to PXE boot: Unable to locate configuration file<a class="headerlink" href="#pxe-pos-provisioning-target-fails-to-pxe-boot-unable-to-locate-configuration-file" title="Permalink to this headline">¶</a></h3>
+<p>When a system is configured to boot targets to Provisioning OS over
+PXE, a target fails to boot with a message on the BIOS console such
+as:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">&gt;&gt;</span><span class="n">Start</span> <span class="n">PXE</span> <span class="n">over</span> <span class="n">IPv4</span><span class="o">.</span>
+<span class="n">Station</span> <span class="n">IP</span> <span class="n">address</span> <span class="ow">is</span> <span class="mf">192.168</span><span class="o">.</span><span class="mf">97.101</span>
+<span class="n">Server</span> <span class="n">IP</span> <span class="n">address</span> <span class="ow">is</span> <span class="mf">192.168</span><span class="o">.</span><span class="mf">97.1</span>
+<span class="n">NBP</span> <span class="n">filename</span> <span class="ow">is</span> <span class="n">ttbd</span><span class="o">-</span><span class="n">production</span><span class="o">/</span><span class="n">efi</span><span class="o">-</span><span class="n">x86_64</span><span class="o">/</span><span class="n">syslinux</span><span class="o">.</span><span class="n">efi</span>
+<span class="n">NBP</span> <span class="n">filesize</span> <span class="ow">is</span> <span class="mi">176328</span> <span class="n">Bytes</span>
+<span class="n">Downloading</span> <span class="n">NBP</span> <span class="n">file</span><span class="o">...</span>
+<span class="n">NBP</span> <span class="n">file</span> <span class="n">downloaded</span> <span class="n">successfully</span><span class="o">.</span>
+<span class="n">Getting</span> <span class="n">cached</span> <span class="n">packet</span>
+<span class="n">My</span> <span class="n">IP</span> <span class="ow">is</span> <span class="mf">192.168</span><span class="o">.</span><span class="mf">97.101</span>
+<span class="n">Unable</span> <span class="n">to</span> <span class="n">locate</span> <span class="n">configuration</span> <span class="n">file</span>
+</pre></div>
+</div>
+<p>There might be multiple causes for this, but here are the most common:</p>
+<ul>
+<li><p class="first">there is a typo in the target’s MAC address</p>
+<p>The target is given, via TFTP, the <em>syslinux PXE bootloader</em>, who
+will look for configuration files with multiple names (see
+<a class="reference external" href="https://www.syslinux.org/wiki/index.php?title=PXELINUX#Configuration_filename">https://www.syslinux.org/wiki/index.php?title=PXELINUX#Configuration_filename</a>)
+on the TFTP server, but relies in one named after the target’s MAC
+address.</p>
+<p>The TTBD server’s <a class="reference internal" href="03-server-setup.html#pos-setup"><span class="std std-ref">POS</span></a> environment generates the
+configuration file when the network to which the target is attached
+is powered up.</p>
+<p>Thus, the target’s MAC address listed in the configuration has to
+match the one the target actually uses on the network:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ttbl</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">targets</span><span class="p">[</span><span class="s1">&#39;TARGETNAME&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">add_to_interconnect</span><span class="p">(</span>
+<span class="gp">&gt;&gt;&gt; </span>  <span class="n">NETWORKNAME</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span>
+<span class="gp">&gt;&gt;&gt; </span>      <span class="n">mac_addr</span> <span class="o">=</span> <span class="s2">&quot;00:07:32:4b:36:87&quot;</span><span class="p">,</span>
+<span class="gp">&gt;&gt;&gt; </span>      <span class="n">ipv4_addr</span> <span class="o">=</span> <span class="s1">&#39;192.168.98.160&#39;</span><span class="p">,</span> <span class="n">ipv4_prefix_len</span> <span class="o">=</span> <span class="mi">24</span><span class="p">,</span>
+<span class="gp">&gt;&gt;&gt; </span>      <span class="n">ipv6_addr</span> <span class="o">=</span> <span class="s1">&#39;fc00::62:a0&#39;</span><span class="p">,</span> <span class="n">ipv6_prefix_len</span> <span class="o">=</span> <span class="mi">112</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span>  <span class="p">)</span>
+</pre></div>
+</div>
+<p>ensure the <em>mac_addr</em> value is the MAC address of the network
+interface the target is using to PXE boot from (<em>_addr</em> fields will
+vary from the example to your configuration).</p>
+</li>
+<li><p class="first">mismatch in IP addresses</p>
+<p>It is frequent to create typos in the network configuration and
+target configuration so that the target’s IP address won’t be in the
+network’s address range. Ensure this is correct.</p>
+</li>
+</ul>
+</div>
+<div class="section" id="pxe-pos-provisioning-target-fails-to-boot-nfs-an-incorrect-mount-option-was-specified">
+<h3>6.1.7. PXE POS provisioning target fails to boot: NFS: an incorrect mount option was specified<a class="headerlink" href="#pxe-pos-provisioning-target-fails-to-boot-nfs-an-incorrect-mount-option-was-specified" title="Permalink to this headline">¶</a></h3>
+<p>When the Provisoning OS kernel tries to NFS mount the root, it fails
+with invalid mount option specified:</p>
+<p>Check the MAC address is correct and the system is given the right IP
+address (vs any from the pool).</p>
+<p>This usually happens when the system doesn’t recognize the MAC address
+as matching the right host. It is very common when changing
+names. Also, before reinitializing the server, clean up the cache:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ rm -rf /var/lib/tftpbootlib/ttbd-production/pxelinux.cfg/*
+</pre></div>
+</div>
+<p>to ensure there are no left-over configuration files with old addresses</p>
 </div>
 </div>
 <div class="section" id="ttbd-server">
@@ -249,7 +384,7 @@ variables are unset:</p>
 <div class="section" id="restart-ttbd-watch-the-output-for-errors">
 <h3>6.2.1. Restart <em>ttbd</em>, watch the output for errors<a class="headerlink" href="#restart-ttbd-watch-the-output-for-errors" title="Permalink to this headline">¶</a></h3>
 <p>Run:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ journalctl -feu ttbd@NAME
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ journalctl -feu ttbd@NAME
 </pre></div>
 </div>
 <p><cite>-f</cite> follows the output, <cite>-e</cite> goes to the end of the file as of now,
@@ -259,7 +394,7 @@ variables are unset:</p>
 <div class="section" id="log-shows-can-t-find-hub-retrying">
 <h3>6.2.2. Log shows <em>can’t find hub, retrying</em><a class="headerlink" href="#log-shows-can-t-find-hub-retrying" title="Permalink to this headline">¶</a></h3>
 <p>This message:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">...</span> <span class="n">pc_ykush</span><span class="o">.</span><span class="n">_command</span><span class="p">():</span><span class="mi">139</span> <span class="n">target</span><span class="o">-</span><span class="n">TARGET</span><span class="p">:</span> <span class="n">YKXXXXX</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span> <span class="n">can</span><span class="s1">&#39;t find hub, retrying</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">...</span> <span class="n">pc_ykush</span><span class="o">.</span><span class="n">_command</span><span class="p">():</span><span class="mi">139</span> <span class="n">target</span><span class="o">-</span><span class="n">TARGET</span><span class="p">:</span> <span class="n">YKXXXXX</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span> <span class="n">can</span><span class="s1">&#39;t find hub, retrying</span>
 </pre></div>
 </div>
 <p>this means that for whichever reason, when the YKUSH is powered on,
@@ -287,7 +422,7 @@ enumerates, verify with <cite>lsusb.py -iu | grep YKXXXX</cite></p>
 happens when you plug the hub.</p>
 </li>
 <li><p class="first">if <cite>dmesg</cite> shows messages like:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">kernel</span><span class="p">:</span> <span class="n">usb</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1.2</span><span class="o">.</span><span class="mi">5</span><span class="p">:</span> <span class="n">device</span> <span class="n">descriptor</span> <span class="n">read</span><span class="o">/</span><span class="mi">64</span><span class="p">,</span> <span class="n">error</span> <span class="o">-</span><span class="mi">32</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">kernel</span><span class="p">:</span> <span class="n">usb</span> <span class="mi">1</span><span class="o">-</span><span class="mf">1.2</span><span class="o">.</span><span class="mi">5</span><span class="p">:</span> <span class="n">device</span> <span class="n">descriptor</span> <span class="n">read</span><span class="o">/</span><span class="mi">64</span><span class="p">,</span> <span class="n">error</span> <span class="o">-</span><span class="mi">32</span>
 </pre></div>
 </div>
 <p>the micro USB cable for upstream connectivity might be bad;
@@ -304,7 +439,7 @@ and is time to replace it</p>
 <div class="section" id="log-shows-errors-cannot-find-ykush-serial-yknnnnn">
 <span id="ttbd-cannot-find-ykush-serial"></span><h3>6.2.3. log shows errors <em>Cannot find YKUSH serial ‘YKNNNNN’</em><a class="headerlink" href="#log-shows-errors-cannot-find-ykush-serial-yknnnnn" title="Permalink to this headline">¶</a></h3>
 <p>Plenty of operations randomly fail with messages such as:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">...</span> <span class="nd">@SERVER</span><span class="o">/</span><span class="n">TARGET</span><span class="p">:</span><span class="n">BSP</span><span class="p">:</span> <span class="n">error</span> <span class="n">resetting</span><span class="p">:</span> <span class="mi">400</span><span class="p">:</span> <span class="n">TARGET</span><span class="p">:</span> <span class="n">Cannot</span> <span class="n">find</span> <span class="n">YKUSH</span> <span class="n">serial</span> <span class="s1">&#39;YKNNNNN&#39;</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">...</span> <span class="nd">@SERVER</span><span class="o">/</span><span class="n">TARGET</span><span class="p">:</span><span class="n">BSP</span><span class="p">:</span> <span class="n">error</span> <span class="n">resetting</span><span class="p">:</span> <span class="mi">400</span><span class="p">:</span> <span class="n">TARGET</span><span class="p">:</span> <span class="n">Cannot</span> <span class="n">find</span> <span class="n">YKUSH</span> <span class="n">serial</span> <span class="s1">&#39;YKNNNNN&#39;</span>
 </pre></div>
 </div>
 <p>this is usually caused by overloaded USB buses (also <a class="reference internal" href="#troubleshooting-usb-bandwidth"><span class="std std-ref">other
@@ -330,6 +465,29 @@ instance</p>
 and ACLs are right. SELinux might be in the way too (check your
 system output with <em>journalctl -xe</em> and look for ttbd.</p>
 </li>
+<li><p class="first">systemctl fails with <em>service not found</em></p>
+<p>Besides the unit not existing, this might happen when you run the
+daemon from a <a class="reference internal" href="02-guides.html#running-server-source"><span class="std std-ref">source directory</span></a> and
+SELinux is not allowing access:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ sudo systemctl restart ttbd@afapli.service
+Failed to restart ttbd@afapli.service: Unit ttbd@afapli.service not found.
+</pre></div>
+</div>
+<p>Look in the <em>journalctl</em> for lines like:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ sudo systemctl restart ttbd@production.service
+Failed to restart ttbd@production.service: Unit ttbd@production.service not found.
+$ journalctl -S -2min | grep -B4
+
+...audit[1]: AVC avc:  denied  { read } for  pid=1 comm=&quot;systemd&quot; name=&quot;ttbd@.service&quot; dev=&quot;dm-2&quot; ino=48627844 scontext=system_u:system_r:init_t:s0 tcontext=unconfined_u:object_r:user_home_t:s0 tclass=file permissive=0
+...systemd[1]: Cannot access &quot;(null)&quot;: Permission denied
+...systemd[1]: ttbd@production.service: Failed to load configuration: No such file or directory
+</pre></div>
+</div>
+<p>A quick way to fix this is to disable SELinux with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># setenforce</span>
+</pre></div>
+</div>
+</li>
 </ul>
 </div>
 <div class="section" id="tips-for-configuring-systemd-startup">
@@ -346,7 +504,7 @@ for example:</p>
 </li>
 <li><p class="first">add dependencies to the <cite>[Unit]</cite> section, for example, if there
 is another daemon that should be started first, like:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Requires</span> <span class="o">=</span> <span class="n">ttbd</span><span class="nd">@NAME0</span><span class="o">.</span><span class="n">service</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Requires</span> <span class="o">=</span> <span class="n">ttbd</span><span class="nd">@NAME0</span><span class="o">.</span><span class="n">service</span>
 </pre></div>
 </div>
 <p>this would make the <cite>NAME0</cite> daemon start before the <cite>NAME</cite>
@@ -355,7 +513,7 @@ daemon.</p>
 </ul>
 </li>
 <li><p class="first">tell systemd to reload configuration:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># systemctl daemon-reload</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># systemctl daemon-reload</span>
 </pre></div>
 </div>
 </li>
@@ -377,7 +535,7 @@ instance; add <em>-l</em> to get longer messages (without ellipsis)</li>
 <div class="section" id="usb-device-powers-up-but-serial-port-does-not-come-up">
 <h3>6.2.6. USB device powers up, but serial port does not come up<a class="headerlink" href="#usb-device-powers-up-but-serial-port-does-not-come-up" title="Permalink to this headline">¶</a></h3>
 <p>Messages such as this pop from the server log:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">I</span><span class="p">[</span><span class="mi">7742</span><span class="p">]</span> <span class="n">pc</span><span class="o">.</span><span class="n">power_on_do</span><span class="p">():</span><span class="mi">284</span><span class="p">:</span> <span class="n">target</span><span class="o">-</span><span class="n">TARGETNAME</span><span class="p">[</span><span class="n">local</span><span class="p">:</span><span class="mi">5</span><span class="n">fng</span><span class="p">]:</span>\
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">I</span><span class="p">[</span><span class="mi">7742</span><span class="p">]</span> <span class="n">pc</span><span class="o">.</span><span class="n">power_on_do</span><span class="p">():</span><span class="mi">284</span><span class="p">:</span> <span class="n">target</span><span class="o">-</span><span class="n">TARGETNAME</span><span class="p">[</span><span class="n">local</span><span class="p">:</span><span class="mi">5</span><span class="n">fng</span><span class="p">]:</span>\
   <span class="o">&lt;</span><span class="n">ttbl</span><span class="o">.</span><span class="n">pc</span><span class="o">.</span><span class="n">delay_til_usb_device</span> <span class="nb">object</span> <span class="n">at</span> <span class="mh">0x7fce3611edd0</span><span class="o">&gt;</span><span class="p">:</span> \
   <span class="n">delaying</span> <span class="n">power</span><span class="o">-</span><span class="n">on</span> <span class="mf">5.00</span><span class="n">s</span> <span class="n">until</span> <span class="n">USB</span> <span class="n">device</span> <span class="k">with</span> <span class="n">serial</span> <span class="n">SOMESERIALNUMBER</span> <span class="n">appears</span>
 <span class="o">...</span>
@@ -387,7 +545,7 @@ instance; add <em>-l</em> to get longer messages (without ellipsis)</li>
 </pre></div>
 </div>
 <p>And <em>tcf run</em> and others report things such as:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">HTTPError</span><span class="p">:</span> <span class="mi">400</span><span class="p">:</span> <span class="n">TARGETNAME</span><span class="p">:</span> <span class="n">timeout</span> <span class="p">(</span><span class="mf">39.67</span><span class="n">s</span><span class="p">)</span> <span class="n">on</span> <span class="n">power</span><span class="o">-</span><span class="n">on</span> <span class="n">delay</span> <span class="n">waiting</span> \
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">HTTPError</span><span class="p">:</span> <span class="mi">400</span><span class="p">:</span> <span class="n">TARGETNAME</span><span class="p">:</span> <span class="n">timeout</span> <span class="p">(</span><span class="mf">39.67</span><span class="n">s</span><span class="p">)</span> <span class="n">on</span> <span class="n">power</span><span class="o">-</span><span class="n">on</span> <span class="n">delay</span> <span class="n">waiting</span> \
 <span class="k">for</span> <span class="n">USB</span> <span class="n">device</span> <span class="k">with</span> <span class="n">serial</span> <span class="n">SOMESERIALNUMBER</span> <span class="n">to</span> <span class="n">appear</span>
 </pre></div>
 </div>
@@ -403,7 +561,7 @@ exposes the serial port hasn’t been connected.</p>
 functionality. Inspect the kernel log with <cite>dmesg</cite> and verify the
 kernel is able to recognize the device and report it is powering up
 properly (for example, for an FRDM k64f):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">new</span> <span class="n">full</span><span class="o">-</span><span class="n">speed</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">number</span> <span class="mi">127</span> <span class="n">using</span> <span class="n">xhci_hcd</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">new</span> <span class="n">full</span><span class="o">-</span><span class="n">speed</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">number</span> <span class="mi">127</span> <span class="n">using</span> <span class="n">xhci_hcd</span>
 <span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">New</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">found</span><span class="p">,</span> <span class="n">idVendor</span><span class="o">=</span><span class="mi">0</span><span class="n">d28</span><span class="p">,</span> <span class="n">idProduct</span><span class="o">=</span><span class="mi">0204</span>
 <span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">New</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">strings</span><span class="p">:</span> <span class="n">Mfr</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">Product</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">SerialNumber</span><span class="o">=</span><span class="mi">3</span>
 <span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.3</span><span class="o">.</span><span class="mi">1</span><span class="p">:</span> <span class="n">Product</span><span class="p">:</span> <span class="n">MBED</span> <span class="n">CMSIS</span><span class="o">-</span><span class="n">DAP</span>
@@ -421,7 +579,7 @@ properly (for example, for an FRDM k64f):</p>
 device in the USB configuration that provides the serial
 device. When trying to power up the target, look out for messages in
 the kernel log similar to (with <cite>dmesg</cite>):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">4.2</span><span class="p">:</span> <span class="n">new</span> <span class="n">full</span><span class="o">-</span><span class="n">speed</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">number</span> <span class="mi">27</span> <span class="n">using</span> <span class="n">xhci_hcd</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">4.2</span><span class="p">:</span> <span class="n">new</span> <span class="n">full</span><span class="o">-</span><span class="n">speed</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">number</span> <span class="mi">27</span> <span class="n">using</span> <span class="n">xhci_hcd</span>
 <span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">4.2</span><span class="p">:</span> <span class="n">New</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">found</span><span class="p">,</span> <span class="n">idVendor</span><span class="o">=</span><span class="mi">0</span><span class="n">d28</span><span class="p">,</span> <span class="n">idProduct</span><span class="o">=</span><span class="mi">0204</span>
 <span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">4.2</span><span class="p">:</span> <span class="n">New</span> <span class="n">USB</span> <span class="n">device</span> <span class="n">strings</span><span class="p">:</span> <span class="n">Mfr</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">Product</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">SerialNumber</span><span class="o">=</span><span class="mi">3</span>
 <span class="n">usb</span> <span class="mi">2</span><span class="o">-</span><span class="mf">2.1</span><span class="o">.</span><span class="mf">4.1</span><span class="p">:</span> <span class="n">Product</span><span class="p">:</span> <span class="n">MBED</span> <span class="n">CMSIS</span><span class="o">-</span><span class="n">DAP</span>
@@ -450,7 +608,7 @@ create (see <a class="reference internal" href="04-HOWTOs.html#usb-tty"><span cl
 <p>Double check the configuration, use <cite>journalctl -au systemd-udevd</cite>
 to inspect the <em>udev</em> ouput. You can also increase its log level
 with:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># udevadm control -l debug</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># udevadm control -l debug</span>
 </pre></div>
 </div>
 <p>power cycle the device and inspect the output from <em>udev</em> to see why
@@ -469,7 +627,7 @@ testing development versions that run from the git tree.</p>
 interventions. In this case, sometimes the best thing is to disable
 <em>SELinux</em> for the development work–however, it is important to later
 test in a system wide deployment:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># setenforce 0</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># setenforce 0</span>
 </pre></div>
 </div>
 <p>will disable <em>SELinux</em>.</p>
@@ -479,7 +637,7 @@ test in a system wide deployment:</p>
 <p>This is caused in most cases by <em>OpenOCD</em> crashing, making all kinds
 of operations fail. Mostly seen during retrying, where it retries and
 retries but it keeps failing, with logs in the daemon such as:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">W</span><span class="p">[</span><span class="mi">15024</span><span class="p">]</span> <span class="n">flasher</span><span class="o">.</span><span class="n">_expect_mgr</span><span class="p">():</span><span class="mi">522</span><span class="p">:</span> <span class="n">target</span><span class="o">-</span><span class="n">emsk</span><span class="o">-</span><span class="mi">27</span><span class="p">[</span><span class="n">USER</span><span class="p">:</span><span class="n">lak2</span><span class="p">]:</span> <span class="n">OpenOCD</span><span class="o">/</span><span class="n">snps_em_sk</span><span class="p">[</span><span class="mi">251634500808</span><span class="p">]:</span> <span class="n">target</span> <span class="n">reset</span><span class="o">/</span><span class="n">halt</span> <span class="k">for</span> <span class="n">image</span> <span class="n">flashing</span><span class="p">:</span> <span class="n">Error</span> <span class="n">shutting</span> <span class="n">down</span> <span class="n">socket</span><span class="p">:</span> <span class="p">[</span><span class="n">Errno</span> <span class="mi">107</span><span class="p">]</span> <span class="n">Transport</span> <span class="n">endpoint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">connected</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">W</span><span class="p">[</span><span class="mi">15024</span><span class="p">]</span> <span class="n">flasher</span><span class="o">.</span><span class="n">_expect_mgr</span><span class="p">():</span><span class="mi">522</span><span class="p">:</span> <span class="n">target</span><span class="o">-</span><span class="n">emsk</span><span class="o">-</span><span class="mi">27</span><span class="p">[</span><span class="n">USER</span><span class="p">:</span><span class="n">lak2</span><span class="p">]:</span> <span class="n">OpenOCD</span><span class="o">/</span><span class="n">snps_em_sk</span><span class="p">[</span><span class="mi">251634500808</span><span class="p">]:</span> <span class="n">target</span> <span class="n">reset</span><span class="o">/</span><span class="n">halt</span> <span class="k">for</span> <span class="n">image</span> <span class="n">flashing</span><span class="p">:</span> <span class="n">Error</span> <span class="n">shutting</span> <span class="n">down</span> <span class="n">socket</span><span class="p">:</span> <span class="p">[</span><span class="n">Errno</span> <span class="mi">107</span><span class="p">]</span> <span class="n">Transport</span> <span class="n">endpoint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">connected</span>
 </pre></div>
 </div>
 <p>there is no easy solution for this: <em>OpenOCD</em> is crashing, it is a
@@ -496,14 +654,14 @@ to tell those cases apart.</p>
 <div class="section" id="uploading-files-to-the-daemon-fails-with-var-cache-ttbd-production-username-cannot-create-path">
 <h3>6.2.9. Uploading files to the daemon fails with <em>/var/cache/ttbd-production/USERNAME: cannot create path</em><a class="headerlink" href="#uploading-files-to-the-daemon-fails-with-var-cache-ttbd-production-username-cannot-create-path" title="Permalink to this headline">¶</a></h3>
 <p>A client operation (normally uploading files to the server), ends with:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">requests</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">HTTPError</span><span class="p">:</span> <span class="mi">400</span><span class="p">:</span> <span class="o">/</span><span class="n">var</span><span class="o">/</span><span class="n">cache</span><span class="o">/</span><span class="n">ttbd</span><span class="o">-</span><span class="n">production</span><span class="o">/</span><span class="n">USERNAME</span><span class="p">:</span> <span class="n">cannot</span> <span class="n">create</span> <span class="n">path</span><span class="p">:</span> <span class="p">[</span><span class="n">Errno</span> <span class="mi">13</span><span class="p">]</span> <span class="n">Permission</span> <span class="n">denied</span><span class="p">:</span> <span class="s1">&#39;/var/cache/ttbd-production/USERNAME&#39;</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">requests</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">HTTPError</span><span class="p">:</span> <span class="mi">400</span><span class="p">:</span> <span class="o">/</span><span class="n">var</span><span class="o">/</span><span class="n">cache</span><span class="o">/</span><span class="n">ttbd</span><span class="o">-</span><span class="n">production</span><span class="o">/</span><span class="n">USERNAME</span><span class="p">:</span> <span class="n">cannot</span> <span class="n">create</span> <span class="n">path</span><span class="p">:</span> <span class="p">[</span><span class="n">Errno</span> <span class="mi">13</span><span class="p">]</span> <span class="n">Permission</span> <span class="n">denied</span><span class="p">:</span> <span class="s1">&#39;/var/cache/ttbd-production/USERNAME&#39;</span>
 </pre></div>
 </div>
-<p>if the path <code class="docutils literal"><span class="pre">/var/cache/ttbd-production</span></code> exists, it is owned by user
+<p>if the path <code class="docutils literal notranslate"><span class="pre">/var/cache/ttbd-production</span></code> exists, it is owned by user
 <em>ttbd:ttbd</em> and the user has permissions to write, create, this might
 be a SELinux issue.</p>
 <p>If in the system’s journal, it can be found:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ journal -x
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ journal -x
 ...
 
 python3[23087]: SELinux is preventing ttbd from create access on the directory USERNAME.
@@ -533,49 +691,17 @@ python3[23087]: SELinux is preventing ttbd from create access on the directory U
 <p>where <em>USERNAME</em> is any user with access to <em>ttbd</em>.</p>
 <p>This usually happens when the daemon is being ran from an installation
 that is not installed in the system; for remediation:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># semanage fcontext -a -t var_run_t /var/cache/ttbd-staging</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># semanage fcontext -a -t var_run_t /var/cache/ttbd-staging</span>
 <span class="c1"># restorecon -v /var/cache/ttbd-staging</span>
 </pre></div>
 </div>
 </div>
-<div class="section" id="network-qemu-target-fails-to-power-up-with-permission-denied-dev-tapnumber">
-<h3>6.2.10. Network QEMU target fails to power up with <em>Permission denied: ‘/dev/tapNUMBER’</em><a class="headerlink" href="#network-qemu-target-fails-to-power-up-with-permission-denied-dev-tapnumber" title="Permalink to this headline">¶</a></h3>
-<p>Trying to power up a QEMU VM that uses <em>macvtap</em> devices for
-networking:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf power-on ql06a
-Traceback (most recent call last):
-  File &quot;/usr/bin/tcf&quot;, line 517, in &lt;module&gt;
-    retval = args.func(args)
-  File &quot;/usr/lib/python2.7/site-packages/tcfl/ttb_client.py&quot;, line 799, in rest_target_power_on
-    rtb.rest_tb_target_power_on(rt)
-  File &quot;/usr/lib/python2.7/site-packages/tcfl/ttb_client.py&quot;, line 319, in rest_tb_target_power_on
-    data = { &#39;ticket&#39;: ticket })
-  File &quot;/usr/lib/python2.7/site-packages/tcfl/ttb_client.py&quot;, line 196, in send_request
-    commonl.request_response_maybe_raise(r)
-  File &quot;/usr/lib/python2.7/site-packages/commonl/__init__.py&quot;, line 468, in request_response_maybe_raise
-    raise e
-requests.exceptions.HTTPError: 400: ql06a: [Errno 13] Permission denied: &#39;/dev/tap1023&#39;
-</pre></div>
-</div>
-<p>is usually caused by a SELinux check disallowing the daemon access to
-the <code class="docutils literal"><span class="pre">/dev/tapNUMBER</span></code> device.</p>
-<p>The system’s journal might show:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">audit</span><span class="p">[</span><span class="mi">11345</span><span class="p">]:</span> <span class="n">AVC</span> <span class="n">avc</span><span class="p">:</span>  <span class="n">denied</span>  <span class="p">{</span> <span class="nb">open</span> <span class="p">}</span> <span class="k">for</span>  <span class="n">pid</span><span class="o">=</span><span class="mi">11345</span> <span class="n">comm</span><span class="o">=</span><span class="s2">&quot;ttbd&quot;</span> <span class="n">path</span><span class="o">=</span><span class="s2">&quot;/dev/tap1023&quot;</span> <span class="n">dev</span><span class="o">=</span><span class="s2">&quot;devtmpfs&quot;</span> <span class="n">ino</span><span class="o">=</span><span class="mi">35798295</span> <span class="n">scontext</span><span class="o">=</span><span class="n">system_u</span><span class="p">:</span><span class="n">system_r</span><span class="p">:</span><span class="n">init_t</span><span class="p">:</span><span class="n">s0</span> <span class="n">tcontext</span><span class="o">=</span><span class="n">system_u</span><span class="p">:</span><span class="n">object_r</span><span class="p">:</span><span class="n">tun_tap_device_t</span><span class="p">:</span><span class="n">s0</span> <span class="n">tclass</span><span class="o">=</span><span class="n">chr_file</span> <span class="n">permissive</span><span class="o">=</span><span class="mi">0</span>
-</pre></div>
-</div>
-<p>there is no current proper fix, other than disabling SELinux:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># setenforce 0</span>
-</pre></div>
-</div>
-<p>however, this seems to only happen when running the daemon from a
-<em>$HOME</em> directory, instead of from a system installation.</p>
-</div>
 <div class="section" id="ldap-login-fails-with-invalid-credentials-but-the-password-is-right-i-know">
-<span id="ttbd-auth-ldap-invalid-creds"></span><h3>6.2.11. LDAP login fails with invalid credentials, but the password is right, I know<a class="headerlink" href="#ldap-login-fails-with-invalid-credentials-but-the-password-is-right-i-know" title="Permalink to this headline">¶</a></h3>
+<span id="ttbd-auth-ldap-invalid-creds"></span><h3>6.2.10. LDAP login fails with invalid credentials, but the password is right, I know<a class="headerlink" href="#ldap-login-fails-with-invalid-credentials-but-the-password-is-right-i-know" title="Permalink to this headline">¶</a></h3>
 <p>It’s been seeing that sometimes LDAP fails when the password is well
-known; seen when <code class="docutils literal"><span class="pre">journalctl</span> <span class="pre">-eu</span> <span class="pre">ttbd&#64;production</span> <span class="pre">|</span> <span class="pre">grep</span> <span class="pre">-i</span> <span class="pre">ldap</span></code>
+known; seen when <code class="docutils literal notranslate"><span class="pre">journalctl</span> <span class="pre">-eu</span> <span class="pre">ttbd&#64;production</span> <span class="pre">|</span> <span class="pre">grep</span> <span class="pre">-i</span> <span class="pre">ldap</span></code>
 reports:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Mar</span> <span class="mi">21</span> <span class="mi">02</span><span class="p">:</span><span class="mi">08</span><span class="p">:</span><span class="mi">30</span> <span class="n">HOSTNAME</span> <span class="n">ttbd</span><span class="p">[</span><span class="mi">10041</span><span class="p">]:</span> <span class="n">I</span><span class="p">[</span><span class="mi">10217</span><span class="p">]</span> <span class="n">ttbd</span><span class="o">.</span><span class="n">login</span><span class="p">():</span><span class="mi">249</span><span class="p">:</span> \
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Mar</span> <span class="mi">21</span> <span class="mi">02</span><span class="p">:</span><span class="mi">08</span><span class="p">:</span><span class="mi">30</span> <span class="n">HOSTNAME</span> <span class="n">ttbd</span><span class="p">[</span><span class="mi">10041</span><span class="p">]:</span> <span class="n">I</span><span class="p">[</span><span class="mi">10217</span><span class="p">]</span> <span class="n">ttbd</span><span class="o">.</span><span class="n">login</span><span class="p">():</span><span class="mi">249</span><span class="p">:</span> \
   <span class="n">user</span> <span class="n">USERNAME</span><span class="p">:</span> <span class="n">invalid</span> <span class="n">credentials</span> <span class="kn">from</span> <span class="nn">ldap</span><span class="p">:</span><span class="o">//</span><span class="n">LDAPSERVER</span><span class="p">:</span><span class="n">PORT</span><span class="p">:</span> \
   <span class="n">USERNAME</span><span class="p">:</span> <span class="n">invalid</span> <span class="n">credentials</span> <span class="k">for</span> <span class="n">LDAP</span> <span class="n">ldap</span><span class="p">:</span><span class="o">//</span><span class="n">LDAPSERVER</span><span class="p">:</span><span class="n">PORT</span><span class="p">:</span> \
   <span class="p">{</span><span class="s1">&#39;info&#39;</span><span class="p">:</span> <span class="s1">&#39;80090308: LdapErr: DSID-0C0903D9, </span><span class="se">\</span>
@@ -585,17 +711,17 @@ reports:</p>
 </div>
 <p>Root causing help welcome, as it’s still unknown.</p>
 <p>Restarting the daemon usually fixes it:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># systemctl restart ttbd@production</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># systemctl restart ttbd@production</span>
 </pre></div>
 </div>
 </div>
 <div class="section" id="freedom-board-k64f">
-<h3>6.2.12. Freedom Board k64f<a class="headerlink" href="#freedom-board-k64f" title="Permalink to this headline">¶</a></h3>
+<h3>6.2.11. Freedom Board k64f<a class="headerlink" href="#freedom-board-k64f" title="Permalink to this headline">¶</a></h3>
 <div class="section" id="freedom-board-k64f-openocd-fails-to-power-up-unable-to-open-cmsis-dap-device-0xd28-0x204">
-<h4>6.2.12.1. Freedom Board k64f, openocd fails to power up (unable to open CMSIS-DAP device 0xd28:0x204)<a class="headerlink" href="#freedom-board-k64f-openocd-fails-to-power-up-unable-to-open-cmsis-dap-device-0xd28-0x204" title="Permalink to this headline">¶</a></h4>
+<h4>6.2.11.1. Freedom Board k64f, openocd fails to power up (unable to open CMSIS-DAP device 0xd28:0x204)<a class="headerlink" href="#freedom-board-k64f-openocd-fails-to-power-up-unable-to-open-cmsis-dap-device-0xd28-0x204" title="Permalink to this headline">¶</a></h4>
 <p>When an <em>frdm</em> target fails to power up and <em>ttbd</em> logs in
 <em>journalctl -eu ttbd&#64;production</em> show:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Info</span> <span class="p">:</span> <span class="n">auto</span><span class="o">-</span><span class="n">selecting</span> <span class="n">first</span> <span class="n">available</span> <span class="n">session</span> <span class="n">transport</span> <span class="s2">&quot;swd&quot;</span><span class="o">.</span> <span class="n">To</span> <span class="n">override</span> <span class="n">use</span> <span class="s1">&#39;transport select &lt;transport&gt;&#39;</span><span class="o">.</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Info</span> <span class="p">:</span> <span class="n">auto</span><span class="o">-</span><span class="n">selecting</span> <span class="n">first</span> <span class="n">available</span> <span class="n">session</span> <span class="n">transport</span> <span class="s2">&quot;swd&quot;</span><span class="o">.</span> <span class="n">To</span> <span class="n">override</span> <span class="n">use</span> <span class="s1">&#39;transport select &lt;transport&gt;&#39;</span><span class="o">.</span>
 <span class="n">Info</span> <span class="p">:</span> <span class="n">add</span> <span class="n">flash_bank</span> <span class="n">kinetis</span> <span class="n">k60</span><span class="o">.</span><span class="n">flash</span>
 <span class="n">adapter</span> <span class="n">speed</span><span class="p">:</span> <span class="mi">1000</span> <span class="n">kHz</span>
 <span class="n">none</span> <span class="n">separate</span>
@@ -606,7 +732,7 @@ reports:</p>
 <p>this usually means <em>openocd</em> is trying to open the <cite>/dev/hidrawN</cite> file
 that represents this device, but it can’t. Usually it happens because
 the way <em>udev</em> has configured it with <em>uaccess</em>, and it looks like:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># getfacl /dev/hidraw0</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># getfacl /dev/hidraw0</span>
 <span class="n">getfacl</span><span class="p">:</span> <span class="n">Removing</span> <span class="n">leading</span> <span class="s1">&#39;/&#39;</span> <span class="kn">from</span> <span class="nn">absolute</span> <span class="n">path</span> <span class="n">names</span>
 <span class="c1"># file: dev/hidraw0</span>
 <span class="c1"># owner: root</span>
@@ -624,22 +750,22 @@ with <em>udev</em> rule that forces any CMSIS devices to be owned by group
 <em>ttbd</em>.</p>
 <p>Make sure your <em>ttbd-zephyr</em> version is at least &gt;= <em>0.10_6_N-M</em>
 with:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># rpm -qa | grep ttbd</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># rpm -qa | grep ttbd</span>
 <span class="n">ttbd</span><span class="o">-</span><span class="mf">0.10</span><span class="n">_8_g69bcfa3</span><span class="o">-</span><span class="mf">1.</span><span class="n">noarch</span>
 <span class="n">ttbd</span><span class="o">-</span><span class="n">zephyr</span><span class="o">-</span><span class="mf">0.10</span><span class="n">_8_g69bcfa3</span><span class="o">-</span><span class="mf">1.</span><span class="n">noarch</span>
 </pre></div>
 </div>
 <p>which can be quickly updated with:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># dnf update --best --allowerasing ttbd ttbd-zephyr</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># dnf update --best --allowerasing ttbd ttbd-zephyr</span>
 </pre></div>
 </div>
 <p>(<a class="reference internal" href="04-HOWTOs.html#tcf-update"><span class="std std-ref">update instructions</span></a>).</p>
 </div>
 <div class="section" id="frdm-k64f-boards-fail-to-power-up-openocd-prints-message-about-reset-wdog-loop">
-<h4>6.2.12.2. FRDM k64f boards fail to power up, OpenOCD prints message about RESET/WDOG loop<a class="headerlink" href="#frdm-k64f-boards-fail-to-power-up-openocd-prints-message-about-reset-wdog-loop" title="Permalink to this headline">¶</a></h4>
+<h4>6.2.11.2. FRDM k64f boards fail to power up, OpenOCD prints message about RESET/WDOG loop<a class="headerlink" href="#frdm-k64f-boards-fail-to-power-up-openocd-prints-message-about-reset-wdog-loop" title="Permalink to this headline">¶</a></h4>
 <p>An FRDM board fails to power up because OpenOCD cannot initialize,
 printing in the journal a message similar to:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">log</span><span class="p">:</span> <span class="n">Info</span> <span class="p">:</span> <span class="n">SWD</span> <span class="n">DPIDR</span> <span class="mh">0x2ba01477</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">log</span><span class="p">:</span> <span class="n">Info</span> <span class="p">:</span> <span class="n">SWD</span> <span class="n">DPIDR</span> <span class="mh">0x2ba01477</span>
 <span class="n">log</span><span class="p">:</span> <span class="n">Warn</span> <span class="p">:</span> <span class="o">****</span> <span class="n">Your</span> <span class="n">Kinetis</span> <span class="n">MCU</span> <span class="ow">is</span> <span class="n">probably</span> <span class="n">locked</span><span class="o">-</span><span class="n">up</span> <span class="ow">in</span> <span class="n">RESET</span><span class="o">/</span><span class="n">WDOG</span> <span class="n">loop</span><span class="o">.</span> <span class="o">****</span>
 <span class="n">log</span><span class="p">:</span> <span class="n">Warn</span> <span class="p">:</span> <span class="o">****</span> <span class="n">Common</span> <span class="n">reason</span> <span class="ow">is</span> <span class="n">a</span> <span class="n">blank</span> <span class="n">flash</span> <span class="p">(</span><span class="n">at</span> <span class="n">least</span> <span class="n">a</span> <span class="n">reset</span> <span class="n">vector</span><span class="p">)</span><span class="o">.</span>  <span class="o">****</span>
 <span class="n">log</span><span class="p">:</span> <span class="n">Warn</span> <span class="p">:</span> <span class="o">****</span> <span class="n">Issue</span> <span class="s1">&#39;kinetis mdm halt&#39;</span> <span class="n">command</span> <span class="ow">or</span> <span class="k">if</span> <span class="n">SRST</span> <span class="ow">is</span> <span class="n">connected</span>   <span class="o">****</span>
@@ -651,7 +777,7 @@ printing in the journal a message similar to:</p>
 <span class="n">log</span><span class="p">:</span> <span class="n">Info</span> <span class="p">:</span> <span class="n">accepting</span> <span class="s1">&#39;tcl&#39;</span> <span class="n">connection</span> <span class="n">on</span> <span class="n">tcp</span><span class="o">/</span><span class="mi">38743</span>
 </pre></div>
 </div>
-<p>(which can be found with <code class="docutils literal"><span class="pre">journalctl</span> <span class="pre">-au</span> <span class="pre">ttbd&#64;production</span> <span class="pre">|</span> <span class="pre">grep</span> <span class="pre">BOARDNAME</span> <span class="pre">|</span> <span class="pre">less</span> <span class="pre">-S</span></code>)</p>
+<p>(which can be found with <code class="docutils literal notranslate"><span class="pre">journalctl</span> <span class="pre">-au</span> <span class="pre">ttbd&#64;production</span> <span class="pre">|</span> <span class="pre">grep</span> <span class="pre">BOARDNAME</span> <span class="pre">|</span> <span class="pre">less</span> <span class="pre">-S</span></code>)</p>
 <p>this means that the board cannot boot properly because it is stuck in
 a Reset/Watchdog loop. The watchdog resets the board before it can
 load the firmware. OpenOCD is not able to get in there. The green led
@@ -664,17 +790,17 @@ next to the <em>SDAUSB</em> is on and next to it, the <em>RST</em> red light bli
 <li>reset the board to normal configuration</li>
 </ul>
 <p>this is accomplished by as script in the examples directory:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf run -vvt frdm-NN /usr/share/tcf/examples/test_frdm_recover.py
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf run -vvt frdm-NN /usr/share/tcf/examples/test_frdm_recover.py
 </pre></div>
 </div>
 <div class="section" id="manual-execution-of-the-procedure">
-<h5>6.2.12.2.1. Manual execution of the procedure<a class="headerlink" href="#manual-execution-of-the-procedure" title="Permalink to this headline">¶</a></h5>
+<h5>6.2.11.2.1. Manual execution of the procedure<a class="headerlink" href="#manual-execution-of-the-procedure" title="Permalink to this headline">¶</a></h5>
 </div>
 </div>
 <div class="section" id="set-the-up-the-target-in-debug-mode">
-<h4>6.2.12.3. Set the up the target in debug mode<a class="headerlink" href="#set-the-up-the-target-in-debug-mode" title="Permalink to this headline">¶</a></h4>
+<h4>6.2.11.3. Set the up the target in debug mode<a class="headerlink" href="#set-the-up-the-target-in-debug-mode" title="Permalink to this headline">¶</a></h4>
 <p>Disable the board so none tries to use it:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf disable frdm-NN; tcf release -f frdm-NN; tcf acquire frdm-NN
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf disable frdm-NN; tcf release -f frdm-NN; tcf acquire frdm-NN
 </pre></div>
 </div>
 <div class="admonition note">
@@ -685,27 +811,27 @@ single line.</p>
 </div>
 <p>Set OpenOCD to operate in relaxed mode, so it doesn’t require the
 target to be in standing order to succesfully start:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf power-off frdm-NN
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf power-off frdm-NN
 $ tcf property-set frdm-NN openocd-relaxed True
 </pre></div>
 </div>
 <p>Power cycle the target (will take a while as it will retry):</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf power-cycle frdm-NN
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf power-cycle frdm-NN
 </pre></div>
 </div>
 <p>it might take a while as OpenOCD tries to start. The green red light next to
 green power light is on, blinking</p>
 </div>
 <div class="section" id="issue-openocd-commands-to-stop-the-loop">
-<h4>6.2.12.4. Issue OpenOCD commands to stop the loop<a class="headerlink" href="#issue-openocd-commands-to-stop-the-loop" title="Permalink to this headline">¶</a></h4>
-<p>Issue the OpenOCD command <code class="docutils literal"><span class="pre">kinetis</span> <span class="pre">mdm</span> <span class="pre">halt</span></code>:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf debug-openocd frdm-NN &quot;kinetis mdm halt&quot;
+<h4>6.2.11.4. Issue OpenOCD commands to stop the loop<a class="headerlink" href="#issue-openocd-commands-to-stop-the-loop" title="Permalink to this headline">¶</a></h4>
+<p>Issue the OpenOCD command <code class="docutils literal notranslate"><span class="pre">kinetis</span> <span class="pre">mdm</span> <span class="pre">halt</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf debug-openocd frdm-NN &quot;kinetis mdm halt&quot;
 </pre></div>
 </div>
 <p>Repeat this command until any the following things happen:</p>
 <ul>
 <li><p class="first">the following output is printed:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">Halt</span> <span class="n">timed</span> <span class="n">out</span><span class="p">,</span> <span class="n">wake</span> <span class="n">up</span> <span class="n">GDB</span><span class="o">.</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Halt</span> <span class="n">timed</span> <span class="n">out</span><span class="p">,</span> <span class="n">wake</span> <span class="n">up</span> <span class="n">GDB</span><span class="o">.</span>
 <span class="n">Polling</span> <span class="n">target</span> <span class="n">k60</span><span class="o">.</span><span class="n">cpu</span> <span class="n">failed</span><span class="p">,</span> <span class="n">trying</span> <span class="n">to</span> <span class="n">reexamine</span>
 <span class="n">MDM</span><span class="p">:</span> <span class="n">Chip</span> <span class="ow">is</span> <span class="n">unsecured</span><span class="o">.</span> <span class="n">Continuing</span><span class="o">.</span>
 <span class="n">k60</span><span class="o">.</span><span class="n">cpu</span><span class="p">:</span> <span class="n">hardware</span> <span class="n">has</span> <span class="mi">6</span> <span class="n">breakpoints</span><span class="p">,</span> <span class="mi">4</span> <span class="n">watchpoints</span>
@@ -721,14 +847,14 @@ green power light is on, blinking</p>
 </li>
 </ul>
 <p>Verify with the following command reporting the CPU is halted:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf debug-openocd frdm-28y &quot;targets&quot;
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf debug-openocd frdm-28y &quot;targets&quot;
 TargetName         Type       Endian TapName            State
 --  ------------------ ---------- ------ ------------------ ------------
 0* k60.cpu            cortex_m   little k60.cpu            halted
 </pre></div>
 </div>
 <p>Retry otherwise, with any of:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf debug-openocd frdm-NN &quot;kinetis mdm halt&quot;
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf debug-openocd frdm-NN &quot;kinetis mdm halt&quot;
 $ tcf debug-openocd frdm-NN &quot;reset halt&quot;
 </pre></div>
 </div>
@@ -736,9 +862,9 @@ $ tcf debug-openocd frdm-NN &quot;reset halt&quot;
 and press the <em>RESET</em> button on the board. Follow the messages.</p>
 </div>
 <div class="section" id="copy-a-known-firmware-image-to-its-flash-drive">
-<h4>6.2.12.5. Copy a known firmware image to its flash drive<a class="headerlink" href="#copy-a-known-firmware-image-to-its-flash-drive" title="Permalink to this headline">¶</a></h4>
+<h4>6.2.11.5. Copy a known firmware image to its flash drive<a class="headerlink" href="#copy-a-known-firmware-image-to-its-flash-drive" title="Permalink to this headline">¶</a></h4>
 <p>Flash using openocd commands:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf debug-openocd frdm-NN &quot;flash write_image erase /var/lib/ttbd/frdm_k64f_recovery.bin 0&quot;
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf debug-openocd frdm-NN &quot;flash write_image erase /var/lib/ttbd/frdm_k64f_recovery.bin 0&quot;
 auto erase enabled
 Flash Configuration Field written.
 Reset or power off the device to make settings effective.
@@ -749,27 +875,27 @@ might need to retry a couple times.
 </div>
 </div>
 <div class="section" id="reset-the-board-to-normal-configuration">
-<h4>6.2.12.6. Reset the board to normal configuration<a class="headerlink" href="#reset-the-board-to-normal-configuration" title="Permalink to this headline">¶</a></h4>
+<h4>6.2.11.6. Reset the board to normal configuration<a class="headerlink" href="#reset-the-board-to-normal-configuration" title="Permalink to this headline">¶</a></h4>
 <ul>
 <li><p class="first">Remove the relaxed setting for openocd:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf property-set frdm-NN openocd-relaxed
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf property-set frdm-NN openocd-relaxed
 </pre></div>
 </div>
 </li>
 <li><p class="first">power off the target:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf power-off frdm-NN
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf power-off frdm-NN
 </pre></div>
 </div>
 </li>
 <li><p class="first">run a healtcheck on it:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf healthcheck frdm-NN
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf healthcheck frdm-NN
 ...
 frdm-NN: healthcheck completed
 </pre></div>
 </div>
 </li>
 <li><p class="first">finally, enable the target for normal operation:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span>$ tcf enable frdm-NN
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ tcf enable frdm-NN
 </pre></div>
 </div>
 </li>
@@ -777,12 +903,12 @@ frdm-NN: healthcheck completed
 </div>
 </div>
 <div class="section" id="arduino101">
-<h3>6.2.13. Arduino101<a class="headerlink" href="#arduino101" title="Permalink to this headline">¶</a></h3>
+<h3>6.2.12. Arduino101<a class="headerlink" href="#arduino101" title="Permalink to this headline">¶</a></h3>
 <div class="section" id="arduino101-openocd-fails-to-power-up-targets-report-tap-disabled">
-<h4>6.2.13.1. Arduino101: openocd fails to power up (targets report tap-disabled)<a class="headerlink" href="#arduino101-openocd-fails-to-power-up-targets-report-tap-disabled" title="Permalink to this headline">¶</a></h4>
+<h4>6.2.12.1. Arduino101: openocd fails to power up (targets report tap-disabled)<a class="headerlink" href="#arduino101-openocd-fails-to-power-up-targets-report-tap-disabled" title="Permalink to this headline">¶</a></h4>
 <p>When the target fails to power up and in the daemon log,
 <em>journalctl -eu ttbd&#64;production</em> shows something like:</p>
-<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">init</span> <span class="n">verification</span> <span class="n">JTAG</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mi">8</span><span class="p">):</span> <span class="n">Error</span> <span class="n">condition</span><span class="p">:</span> <span class="n">n</span><span class="o">/</span><span class="n">a</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">init</span> <span class="n">verification</span> <span class="n">JTAG</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mi">8</span><span class="p">):</span> <span class="n">Error</span> <span class="n">condition</span><span class="p">:</span> <span class="n">n</span><span class="o">/</span><span class="n">a</span>
 <span class="n">init</span> <span class="n">verification</span> <span class="n">JTAG</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mi">8</span><span class="p">):</span> <span class="n">output</span><span class="p">[</span><span class="n">before</span><span class="p">]:</span> <span class="n">TargetName</span>         <span class="n">Type</span>       <span class="n">Endian</span> <span class="n">TapName</span>            <span class="n">State</span>
 <span class="n">init</span> <span class="n">verification</span> <span class="n">JTAG</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mi">8</span><span class="p">):</span> <span class="n">output</span><span class="p">[</span><span class="n">before</span><span class="p">]:</span> <span class="o">--</span>  <span class="o">------------------</span> <span class="o">----------</span> <span class="o">------</span> <span class="o">------------------</span> <span class="o">------------</span>
 <span class="n">init</span> <span class="n">verification</span> <span class="n">JTAG</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="mi">8</span><span class="p">):</span> <span class="n">output</span><span class="p">[</span><span class="n">before</span><span class="p">]:</span> <span class="mi">0</span>  <span class="n">quark_se</span><span class="o">.</span><span class="n">quark</span>     <span class="n">quark_se</span>   <span class="n">little</span> <span class="n">quark_se</span><span class="o">.</span><span class="n">quark</span>     <span class="n">tap</span><span class="o">-</span><span class="n">disabled</span>
@@ -797,7 +923,7 @@ following reasons for it:</p>
 <li>the JTAG cable is not properly connected; ensure the cable is the
 right one and it is properly connected, paying close attention to
 the pinout (for example, as described in the fixture documented in
-<a class="reference internal" href="09-api.html#conf_00_lib.arduino101_add" title="conf_00_lib.arduino101_add"><code class="xref py py-func docutils literal"><span class="pre">conf_00_lib.arduino101_add()</span></code></a>).</li>
+<a class="reference internal" href="09-api.html#conf_00_lib.arduino101_add" title="conf_00_lib.arduino101_add"><code class="xref py py-func docutils literal notranslate"><span class="pre">conf_00_lib.arduino101_add()</span></code></a>).</li>
 <li>the hardware itself might have a hardware block against
 JTAGs. Disable it (if possible).</li>
 </ul>
@@ -808,9 +934,7 @@ JTAGs. Disable it (if possible).</li>
 
 
            </div>
-           <div class="articleComments">
-            
-           </div>
+           
           </div>
           <footer>
   
@@ -828,11 +952,11 @@ JTAGs. Disable it (if possible).</li>
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2015, Author.
+        &copy; Copyright 2015, Author
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -847,35 +971,33 @@ JTAGs. Disable it (if possible).</li>
 
   
 
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'../',
-            VERSION:'0.11',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="../_static/jquery.js"></script>
-      <script type="text/javascript" src="../_static/underscore.js"></script>
-      <script type="text/javascript" src="../_static/doctools.js"></script>
+    
+    
+      <script type="text/javascript">
+          var DOCUMENTATION_OPTIONS = {
+              URL_ROOT:'../',
+              VERSION:'0.11',
+              LANGUAGE:'None',
+              COLLAPSE_INDEX:false,
+              FILE_SUFFIX:'.html',
+              HAS_SOURCE:  true,
+              SOURCELINK_SUFFIX: '.txt'
+          };
+      </script>
+        <script type="text/javascript" src="../_static/jquery.js"></script>
+        <script type="text/javascript" src="../_static/underscore.js"></script>
+        <script type="text/javascript" src="../_static/doctools.js"></script>
+    
 
   
 
-  
-  
-    <script type="text/javascript" src="../_static/js/theme.js"></script>
-  
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
 
-  
-  
   <script type="text/javascript">
       jQuery(function () {
-          SphinxRtdTheme.StickyNav.enable();
+          SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-   
+  </script> 
 
 </body>
 </html>

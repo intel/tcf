@@ -130,3 +130,65 @@ savings in human time (and their burn rate) and increased efficiency.
 
 .. note:: time spent looking around for cables is wasted money; order
   in bulk and have spares.
+
+Zephyr
+======
+
+``tcf run -s`` will not filter a Zephyr subcase
+-----------------------------------------------
+
+When trying to filter with ``-s`` a :class:`Zephyr SanityCheck
+<tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c>` style
+:class:`subcase <tcfl.tc_zephyr_sanity.tc_zephyr_subsanity_c>`
+nothing gets executed; trying to filter
+``zephyr.git/tests/libc/c_lib/testcase.yaml#libraries.libc.strcmp``::
+
+  $ tcf run -vvv -t 'jfsotc05/esp32-42' -s 'name:".*zephyr.git/tests/lib/c_lib/testcase.yaml#libraries.libc.strcmp$"' zephyr.git/tests/lib/c_lib/testcase.yaml
+  INFO3/	toplevel @local: version 0.11-75-g5ebea2f
+  INFO2/	toplevel @local: scanning for test cases
+  E tc.testcases_discover():5890: All testcases skipped or filtered out by command line -s options
+  SKIP0/	toplevel @local: 1 tests (0 passed, 0 error, 0 failed, 0 blocked, 1 skipped, in 0:00:00.104572) - skipped
+
+yields nothing, while if we remove the trailing ``.strcmp`` and filter
+for it ``zephyr.git/tests/libc/c_lib/testcase.yaml#libraries.libc``::
+
+  $ tcf run -vvv -t 'jfsotc05/esp32-42' -s 'name:".*zephyr.git/tests/lib/c_lib/testcase.yaml#libraries.libc$"' zephyr.git/tests/lib/c_lib/testcase.yaml
+  ...
+
+it runs all the testcases under ``zephyr.git/tests/libc/c_lib/testcase.yaml#libraries.libc``
+
+So it is effectively not possible to filter for a Zephyr subcase. This
+is because it is part of a bundle of testcases that can only be run as
+a bundle.
+
+**Technical details**
+
+1. Zephyr sanity checks are a container of multiple subcases.
+
+2. When they run, they always run all the subcases
+   tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.eval_50() and capture the
+   output.
+
+3. They then parse the subcases on the teardown path
+   func:`tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.teardown_subtestcases`.
+
+   This is done by looking out the captured output and *fake* subcases
+   are created and executed when the container is done in sequence by
+   the function ``tcfl.tc.tc_c._run()`` which just say the testcase
+   passed/failed (no actual physical running is done)
+
+4. Then we extract KPIs
+   :func:`tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.teardown`.
+
+So, ``...testcase.yaml#libraries.libc.strcmp`` is a subcase of
+``...testcase.yaml#libraries.libc``, which means it is *fake*, it is not
+really running, so it can't really be filtered out as it is a
+subproduct of the output. Hence why ``-s`` is not filtering it, as it
+only filters against the testcases when loading them.
+
+Now the ``libraries.libc`` part works because it becomes part of the
+testcase name when loading
+(``zephyr.git/tests/lib/c_lib/testcase.yaml#libraries.libc``); this is
+done by :func:`tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.is_testcase`
+(with ``_testcasesample_yaml_mktcs()`` function) when discovering the
+``testcase.yaml`` file.

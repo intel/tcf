@@ -25,25 +25,17 @@
 
   
 
-  
-  
-    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  
-
-  
-
-  
-        <link rel="index" title="Index"
-              href="#"/>
-        <link rel="search" title="Search" href="search.html"/>
-    <link rel="top" title="Test Case Framework 0.11 documentation" href="index.html"/> 
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="#" />
+    <link rel="search" title="Search" href="search.html" /> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
 
 </head>
 
-<body class="wy-body-for-nav" role="document">
+<body class="wy-body-for-nav">
 
    
   <div class="wy-grid-for-nav">
@@ -93,7 +85,7 @@
 <li class="toctree-l1"><a class="reference internal" href="02-QUICKSTART.html">1. Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="doc/02-guides.html">2. Guides</a></li>
 <li class="toctree-l1"><a class="reference internal" href="doc/03-server-setup.html">3. Server deployment guide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="doc/04-HOWTOs.html">4. HOWTOs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="doc/04-HOWTOs.html">4. Examples and HOWTOs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="doc/05-RFAQs.html">5. Rationales and Frequently Asked Questions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="doc/06-troubleshooting.html">6. Support &amp; Troubleshooting</a></li>
 <li class="toctree-l1"><a class="reference internal" href="doc/07-Architecture.html">7. Architecture</a></li>
@@ -112,7 +104,7 @@
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
 
       
-      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+      <nav class="wy-nav-top" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">Test Case Framework</a>
@@ -120,9 +112,10 @@
       </nav>
 
 
-      
       <div class="wy-nav-content">
+        
         <div class="rst-content">
+        
           
 
 
@@ -222,6 +215,8 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.target_c.addr_get">addr_get() (tcfl.tc.target_c method)</a>
 </li>
+      <li><a href="doc/09-api.html#ttbl.ioc_flash_server_app.interface.allowed_modes">allowed_modes (ttbl.ioc_flash_server_app.interface attribute)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.ttb_client.rest_target_broker.API_PREFIX">API_PREFIX (tcfl.ttb_client.rest_target_broker attribute)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.ttb_client.rest_target_broker.API_VERSION">API_VERSION (tcfl.ttb_client.rest_target_broker attribute)</a>
@@ -232,10 +227,10 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.app_manual.app_manual">app_manual (class in tcfl.app_manual)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#tcfl.app_sketch.app_sketch">app_sketch (class in tcfl.app_sketch)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#tcfl.app_zephyr.app_zephyr">app_zephyr (class in tcfl.app_zephyr)</a>
 </li>
       <li><a href="doc/09-api.html#conf_00_lib.arduino101_add">arduino101_add() (in module conf_00_lib)</a>
@@ -250,11 +245,15 @@
       </ul></li>
       <li><a href="doc/09-api.html#tcfl.app.args_app_src_check">args_app_src_check() (in module tcfl.app)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.tc.tc_c.assign_timeout">assign_timeout (tcfl.tc.tc_c attribute)</a>
+</li>
       <li><a href="doc/09-api.html#commonl.expr_parser.ast_expr">ast_expr() (in module commonl.expr_parser)</a>
 </li>
       <li><a href="doc/09-api.html#commonl.expr_parser.ast_sym">ast_sym() (in module commonl.expr_parser)</a>
 </li>
       <li><a href="doc/09-api.html#commonl.expr_parser.ast_sym_int">ast_sym_int() (in module commonl.expr_parser)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc.exception.attachments_get">attachments_get() (tcfl.tc.exception method)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.authenticator_c">authenticator_c (class in ttbl)</a>
 </li>
@@ -288,7 +287,17 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.blocked_e">blocked_e</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.pos_uefi.boot_config_fix">boot_config_fix() (in module tcfl.pos_uefi)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos_uefi.boot_config_multiroot">boot_config_multiroot() (in module tcfl.pos_uefi)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.app_zephyr.boot_delay">boot_delay (in module tcfl.app_zephyr)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.boot_mgr_disable">boot_mgr_disable (tcfl.tc_clear_bbt.tc_clear_bbt_c attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.extension.boot_normal">boot_normal() (tcfl.pos.extension method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.extension.boot_to_pos">boot_to_pos() (tcfl.pos.extension method)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.tt.tt_arduino2.bossac_cmd">bossac_cmd (ttbl.tt.tt_arduino2 attribute)</a>
 </li>
@@ -342,6 +351,14 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.build_unit_test">build_unit_test() (tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c method)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.bundle_run_pre_sh">bundle_run_pre_sh (in module tcfl.tc_clear_bbt)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.bundle_t_map">bundle_t_map (in module tcfl.tc_clear_bbt)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.usbrly08b.button">button (class in ttbl.usbrly08b)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_buttons.buttons">buttons (class in tcfl.target_ext_buttons)</a>
+</li>
   </ul></td>
 </tr></table>
 
@@ -350,15 +367,33 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#tcfl.target_ext_ssh.ssh.call">call() (tcfl.target_ext_ssh.ssh method)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.pos.extension.cap_fn_get">cap_fn_get() (tcfl.pos.extension method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.capability_fns">capability_fns (in module tcfl.pos)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.capability_register">capability_register() (in module tcfl.pos)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.capture_boot_video_source">capture_boot_video_source (tcfl.tc_clear_bbt.tc_clear_bbt_c attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#conf_00_lib.capture_screenshot_vnc">capture_screenshot_vnc (in module conf_00_lib)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.target_ext_ssh.ssh.check_call">check_call() (tcfl.target_ext_ssh.ssh method)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.app_zephyr.zephyr.check_filter">check_filter() (tcfl.app_zephyr.zephyr method)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.target_ext_ssh.ssh.check_output">check_output() (tcfl.target_ext_ssh.ssh method)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.tc.tc_c.class_result">class_result (tcfl.tc.tc_c attribute)</a>
+      <li><a href="doc/09-api.html#tcfl.pos.tc_pos0_base.class_result">class_result (tcfl.pos.tc_pos0_base attribute)</a>
 
       <ul>
+        <li><a href="doc/09-api.html#tcfl.pos.tc_pos_base.class_result">(tcfl.pos.tc_pos_base attribute)</a>
+</li>
+        <li><a href="doc/09-api.html#tcfl.tc.tc_c.class_result">(tcfl.tc.tc_c attribute)</a>
+</li>
+        <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.class_result">(tcfl.tc_clear_bbt.tc_clear_bbt_c attribute)</a>
+</li>
+        <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_taps_subcase_c_base.class_result">(tcfl.tc_clear_bbt.tc_taps_subcase_c_base attribute)</a>
+</li>
         <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.class_result">(tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c attribute)</a>
 </li>
         <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_subsanity_c.class_result">(tcfl.tc_zephyr_sanity.tc_zephyr_subsanity_c attribute)</a>
@@ -373,6 +408,10 @@
 </li>
         <li><a href="doc/09-api.html#tcfl.app_zephyr.app_zephyr.clean">(tcfl.app_zephyr.app_zephyr static method)</a>
 </li>
+        <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.clean">(tcfl.tc_clear_bbt.tc_clear_bbt_c static method)</a>
+</li>
+        <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_taps_subcase_c_base.clean">(tcfl.tc_clear_bbt.tc_taps_subcase_c_base static method)</a>
+</li>
         <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.clean">(tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c method)</a>
 </li>
         <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_subsanity_c.clean">(tcfl.tc_zephyr_sanity.tc_zephyr_subsanity_c static method)</a>
@@ -382,14 +421,52 @@
 </li>
       <li><a href="doc/09-api.html#ttbl.config.cleanup_files_period">cleanup_files_period (in module ttbl.config)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_buttons.buttons.click">click() (tcfl.target_ext_buttons.buttons method)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.msgid_c.cls_init">cls_init() (tcfl.msgid_c class method)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.cm_loopback.cm_loopback">cm_loopback (class in ttbl.cm_loopback)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.cm_serial.cm_serial">cm_serial (class in ttbl.cm_serial)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.target_ext_tunnel.cmdline_setup">cmdline_setup() (in module tcfl.target_ext_tunnel)</a>
+      <li><a href="doc/09-api.html#tcfl.target_ext_buttons.cmdline_button_click">cmdline_button_click() (in module tcfl.target_ext_buttons)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_buttons.cmdline_button_list">cmdline_button_list() (in module tcfl.target_ext_buttons)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_buttons.cmdline_button_press">cmdline_button_press() (in module tcfl.target_ext_buttons)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_buttons.cmdline_button_release">cmdline_button_release() (in module tcfl.target_ext_buttons)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_capture.cmdline_capture_list">cmdline_capture_list() (in module tcfl.target_ext_capture)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_capture.cmdline_capture_start">cmdline_capture_start() (in module tcfl.target_ext_capture)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_capture.cmdline_capture_stop">cmdline_capture_stop() (in module tcfl.target_ext_capture)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_capture.cmdline_capture_stop_and_get">cmdline_capture_stop_and_get() (in module tcfl.target_ext_capture)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_fastboot.cmdline_fastboot">cmdline_fastboot() (in module tcfl.target_ext_fastboot)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_fastboot.cmdline_fastboot_list">cmdline_fastboot_list() (in module tcfl.target_ext_fastboot)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_ioc_flash_server_app.cmdline_ioc_flash_server_app">cmdline_ioc_flash_server_app() (in module tcfl.target_ext_ioc_flash_server_app)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.cmdline_pos_capability_list">cmdline_pos_capability_list() (in module tcfl.pos)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.cmdline_setup">cmdline_setup() (in module tcfl.pos)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#tcfl.target_ext_buttons.cmdline_setup">(in module tcfl.target_ext_buttons)</a>
+</li>
+        <li><a href="doc/09-api.html#tcfl.target_ext_capture.cmdline_setup">(in module tcfl.target_ext_capture)</a>
+</li>
+        <li><a href="doc/09-api.html#tcfl.target_ext_fastboot.cmdline_setup">(in module tcfl.target_ext_fastboot)</a>
+</li>
+        <li><a href="doc/09-api.html#tcfl.target_ext_ioc_flash_server_app.cmdline_setup">(in module tcfl.target_ext_ioc_flash_server_app)</a>
+</li>
+        <li><a href="doc/09-api.html#tcfl.target_ext_tunnel.cmdline_setup">(in module tcfl.target_ext_tunnel)</a>
+</li>
+      </ul></li>
       <li><a href="doc/09-api.html#tcfl.target_ext_tunnel.cmdline_tunnel_add">cmdline_tunnel_add() (in module tcfl.target_ext_tunnel)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.target_ext_tunnel.cmdline_tunnel_list">cmdline_tunnel_list() (in module tcfl.target_ext_tunnel)</a>
@@ -399,12 +476,18 @@
       <li><a href="doc/09-api.html#tcfl.report_mongodb.report_mongodb_c.collection_name">collection_name (tcfl.report_mongodb.report_mongodb_c attribute)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.tt_qemu.qmp_c.command">command() (ttbl.tt_qemu.qmp_c method)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.qmp_c.command">(ttbl.tt_qemu2.qmp_c method)</a>
 </li>
+      </ul></li>
       <li><a href="doc/09-api.html#module-commonl.expr_parser">commonl.expr_parser (module)</a>
 </li>
       <li><a href="doc/09-api.html#module-commonl.tcob">commonl.tcob (module)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.report_mongodb.report_mongodb_c.complete_hooks">complete_hooks (tcfl.report_mongodb.report_mongodb_c attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc.concurrently">concurrently() (in module tcfl.tc)</a>
 </li>
       <li><a href="doc/09-api.html#module-conf_00_lib">conf_00_lib (module)</a>
 </li>
@@ -414,6 +497,8 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.ConfigurationError">ConfigurationError</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#tcfl.app.configure">configure() (in module tcfl.app)</a>
 
       <ul>
@@ -426,8 +511,16 @@
       </ul></li>
       <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.configure_00">configure_00() (tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c method)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_subsanity_c.configure_50">configure_50() (tcfl.tc_zephyr_sanity.tc_zephyr_subsanity_c method)</a>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.configure_00_set_relpath_set">configure_00_set_relpath_set() (tcfl.tc_clear_bbt.tc_clear_bbt_c method)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.configure_10">configure_10() (tcfl.tc_clear_bbt.tc_clear_bbt_c method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_taps_subcase_c_base.configure_50">configure_50() (tcfl.tc_clear_bbt.tc_taps_subcase_c_base method)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_subsanity_c.configure_50">(tcfl.tc_zephyr_sanity.tc_zephyr_subsanity_c method)</a>
+</li>
+      </ul></li>
       <li><a href="doc/09-api.html#tcfl.target_ext_console.console">console (class in tcfl.target_ext_console)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.cm_loopback.cm_loopback.console_do_list">console_do_list() (ttbl.cm_loopback.cm_loopback method)</a>
@@ -441,9 +534,9 @@
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_qemu.tt_qemu.console_do_list">(ttbl.tt_qemu.tt_qemu method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.tt_qemu.console_do_list">(ttbl.tt_qemu2.tt_qemu method)</a>
+</li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#ttbl.cm_loopback.cm_loopback.console_do_read">console_do_read() (ttbl.cm_loopback.cm_loopback method)</a>
 
       <ul>
@@ -455,9 +548,21 @@
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_qemu.tt_qemu.console_do_read">(ttbl.tt_qemu.tt_qemu method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.tt_qemu.console_do_read">(ttbl.tt_qemu2.tt_qemu method)</a>
+</li>
       </ul></li>
       <li><a href="doc/09-api.html#ttbl.test_target_console_mixin.console_do_setup">console_do_setup() (ttbl.test_target_console_mixin method)</a>, <a href="doc/09-api.html#ttbl.test_target_console_mixin.console_do_setup">[1]</a>
 </li>
+      <li><a href="doc/09-api.html#ttbl.cm_serial.cm_serial.console_do_size">console_do_size() (ttbl.cm_serial.cm_serial method)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#ttbl.test_target_console_mixin.console_do_size">(ttbl.test_target_console_mixin method)</a>, <a href="doc/09-api.html#ttbl.test_target_console_mixin.console_do_size">[1]</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu.tt_qemu.console_do_size">(ttbl.tt_qemu.tt_qemu method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.tt_qemu.console_do_size">(ttbl.tt_qemu2.tt_qemu method)</a>
+</li>
+      </ul></li>
       <li><a href="doc/09-api.html#ttbl.cm_loopback.cm_loopback.console_do_write">console_do_write() (ttbl.cm_loopback.cm_loopback method)</a>
 
       <ul>
@@ -468,6 +573,8 @@
         <li><a href="doc/09-api.html#ttbl.tt.simics.console_do_write">(ttbl.tt.simics method)</a>
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_qemu.tt_qemu.console_do_write">(ttbl.tt_qemu.tt_qemu method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.tt_qemu.console_do_write">(ttbl.tt_qemu2.tt_qemu method)</a>
 </li>
       </ul></li>
       <li><a href="doc/09-api.html#tcfl.tl.console_dump_on_failure">console_dump_on_failure() (in module tcfl.tl)</a>
@@ -490,7 +597,11 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.target_c.console_rx_read">console_rx_read() (tcfl.tc.target_c method)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.tc.target_c.console_rx_size">console_rx_size() (tcfl.tc.target_c method)</a>
+</li>
       <li><a href="doc/09-api.html#ttbl.test_target_console_mixin.console_setup">console_setup() (ttbl.test_target_console_mixin method)</a>, <a href="doc/09-api.html#ttbl.test_target_console_mixin.console_setup">[1]</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.test_target_console_mixin.console_size">console_size() (ttbl.test_target_console_mixin method)</a>, <a href="doc/09-api.html#ttbl.test_target_console_mixin.console_size">[1]</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.cm_loopback.cm_loopback.console_takeover">console_takeover() (ttbl.cm_loopback.cm_loopback method)</a>
 
@@ -565,6 +676,8 @@
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_qemu.tt_qemu.debug_do_info">(ttbl.tt_qemu.tt_qemu method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.tt_qemu.debug_do_info">(ttbl.tt_qemu2.tt_qemu method)</a>
+</li>
       </ul></li>
       <li><a href="doc/09-api.html#ttbl.tt.tt_flasher.debug_do_openocd">debug_do_openocd() (ttbl.tt.tt_flasher method)</a>
 
@@ -597,6 +710,8 @@
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_qemu.tt_qemu.debug_do_start">(ttbl.tt_qemu.tt_qemu method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.tt_qemu.debug_do_start">(ttbl.tt_qemu2.tt_qemu method)</a>
+</li>
       </ul></li>
       <li><a href="doc/09-api.html#ttbl.tt.tt_flasher.debug_do_stop">debug_do_stop() (ttbl.tt.tt_flasher method)</a>
 
@@ -605,13 +720,13 @@
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_qemu.tt_qemu.debug_do_stop">(ttbl.tt_qemu.tt_qemu method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.tt_qemu.debug_do_stop">(ttbl.tt_qemu2.tt_qemu method)</a>
+</li>
       </ul></li>
       <li><a href="doc/09-api.html#ttbl.tt_debug_mixin.debug_halt">debug_halt() (ttbl.tt_debug_mixin method)</a>, <a href="doc/09-api.html#ttbl.tt_debug_mixin.debug_halt">[1]</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.tt_debug_mixin.debug_info">debug_info() (ttbl.tt_debug_mixin method)</a>, <a href="doc/09-api.html#ttbl.tt_debug_mixin.debug_info">[1]</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#ttbl.tt_debug_mixin.debug_openocd">debug_openocd() (ttbl.tt_debug_mixin method)</a>, <a href="doc/09-api.html#ttbl.tt_debug_mixin.debug_openocd">[1]</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.tt_debug_mixin.debug_reset">debug_reset() (ttbl.tt_debug_mixin method)</a>, <a href="doc/09-api.html#ttbl.tt_debug_mixin.debug_reset">[1]</a>
@@ -620,6 +735,8 @@
 </li>
       <li><a href="doc/09-api.html#ttbl.tt_debug_mixin.debug_resume">debug_resume() (ttbl.tt_debug_mixin method)</a>, <a href="doc/09-api.html#ttbl.tt_debug_mixin.debug_resume">[1]</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#ttbl.tt_debug_mixin.debug_start">debug_start() (ttbl.tt_debug_mixin method)</a>, <a href="doc/09-api.html#ttbl.tt_debug_mixin.debug_start">[1]</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.tt_debug_mixin.debug_stop">debug_stop() (ttbl.tt_debug_mixin method)</a>, <a href="doc/09-api.html#ttbl.tt_debug_mixin.debug_stop">[1]</a>
@@ -627,6 +744,8 @@
       <li><a href="doc/09-api.html#ttbl.config.defaults_enabled">defaults_enabled (in module ttbl.config)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.pc.delay">delay (class in ttbl.pc)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.tc_pos0_base.delay_login">delay_login (tcfl.pos.tc_pos0_base attribute)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.pc.delay_til_file_appears">delay_til_file_appears (class in ttbl.pc)</a>
 </li>
@@ -647,8 +766,26 @@
 </li>
         <li><a href="doc/09-api.html#tcfl.app_zephyr.app_zephyr.deploy">(tcfl.app_zephyr.app_zephyr static method)</a>
 </li>
+        <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.deploy">(tcfl.tc_clear_bbt.tc_clear_bbt_c method)</a>
+</li>
       </ul></li>
+      <li><a href="doc/09-api.html#tcfl.pos.tc_pos0_base.deploy_50">deploy_50() (tcfl.pos.tc_pos0_base method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.extension.deploy_image">deploy_image() (tcfl.pos.extension method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.tc_pos0_base.deploy_image_args">deploy_image_args (tcfl.pos.tc_pos0_base attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.deploy_linux_kernel">deploy_linux_kernel() (in module tcfl.pos)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tl.deploy_linux_ssh_root_nopwd">deploy_linux_ssh_root_nopwd() (in module tcfl.tl)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.deploy_path">deploy_path() (in module tcfl.pos)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.deploy_tree">deploy_tree() (in module tcfl.pos)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.msgid_c.depth">depth() (tcfl.msgid_c class method)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.dhcp.pci.dhcpd_path">dhcpd_path (ttbl.dhcp.pci attribute)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_c.dir_ignore_add_regex">dir_ignore_add_regex() (tcfl.tc.tc_c class method)</a>
 </li>
@@ -659,6 +796,8 @@
       <li><a href="doc/09-api.html#conf_00_lib.dlwps7_add">dlwps7_add() (in module conf_00_lib)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.target_ext_broker_files.broker_files.dnload">dnload() (tcfl.target_ext_broker_files.broker_files method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_buttons.buttons.double_click">double_click() (tcfl.target_ext_buttons.buttons method)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.app.driver_add">driver_add() (in module tcfl.app)</a>
 
@@ -690,9 +829,13 @@
 </li>
       <li><a href="doc/09-api.html#ttbl.tt.tt_esp32.esptool_path">esptool_path (ttbl.tt.tt_esp32 attribute)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.eval_50">eval_50() (tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c method)</a>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.eval">eval() (tcfl.tc_clear_bbt.tc_clear_bbt_c method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_taps_subcase_c_base.eval_50">eval_50() (tcfl.tc_clear_bbt.tc_taps_subcase_c_base method)</a>
 
       <ul>
+        <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.eval_50">(tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c method)</a>
+</li>
         <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_subsanity_c.eval_50">(tcfl.tc_zephyr_sanity.tc_zephyr_subsanity_c method)</a>
 </li>
       </ul></li>
@@ -702,8 +845,34 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.harness_c.evaluate">evaluate() (tcfl.tc_zephyr_sanity.harness_c method)</a>
 </li>
+      <li><a href="doc/04-HOWTOs.html#module-examples.test_audio_capture">examples.test_audio_capture (module)</a>
+</li>
+      <li><a href="doc/04-HOWTOs.html#module-examples.test_deploy_files">examples.test_deploy_files (module)</a>
+</li>
+      <li><a href="doc/04-HOWTOs.html#module-examples.test_dump_kws">examples.test_dump_kws (module)</a>
+</li>
+      <li><a href="doc/04-HOWTOs.html#module-examples.test_dump_kws_one_target">examples.test_dump_kws_one_target (module)</a>
+</li>
+      <li><a href="doc/04-HOWTOs.html#module-examples.test_dump_kws_two_targets">examples.test_dump_kws_two_targets (module)</a>
+</li>
+      <li><a href="doc/04-HOWTOs.html#module-examples.test_pos0_base">examples.test_pos0_base (module)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="doc/04-HOWTOs.html#module-examples.test_pos_base">examples.test_pos_base (module)</a>
+</li>
+      <li><a href="doc/04-HOWTOs.html#module-examples.test_pos_boot">examples.test_pos_boot (module)</a>
+</li>
+      <li><a href="doc/04-HOWTOs.html#module-examples.test_pos_deploy">examples.test_pos_deploy (module)</a>
+</li>
+      <li><a href="doc/04-HOWTOs.html#module-examples.test_pos_deploy_2">examples.test_pos_deploy_2 (module)</a>
+</li>
+      <li><a href="doc/04-HOWTOs.html#module-examples.test_ssh_in">examples.test_ssh_in (module)</a>
+</li>
+      <li><a href="doc/04-HOWTOs.html#module-examples.test_tagging">examples.test_tagging (module)</a>
+</li>
+      <li><a href="doc/04-HOWTOs.html#module-examples.test_yielding_results">examples.test_yielding_results (module)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.tc.exception">exception</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_c.exception_to_result">exception_to_result (tcfl.tc.tc_c attribute)</a>
@@ -714,16 +883,20 @@
         <li><a href="doc/09-api.html#ttbl.test_target_console_mixin.expect">(ttbl.test_target_console_mixin method)</a>, <a href="doc/09-api.html#ttbl.test_target_console_mixin.expect">[1]</a>
 </li>
       </ul></li>
-      <li><a href="doc/09-api.html#ttbl.target.expect_send_sequence">expect_send_sequence() (in module ttbl.target)</a>
-</li>
       <li><a href="doc/09-api.html#ttbl.test_target_console_mixin.expect_sequence">expect_sequence() (ttbl.test_target_console_mixin method)</a>, <a href="doc/09-api.html#ttbl.test_target_console_mixin.expect_sequence">[1]</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.test_target_console_mixin.EXPECT_TIMEOUT">EXPECT_TIMEOUT (ttbl.test_target_console_mixin attribute)</a>, <a href="doc/09-api.html#ttbl.test_target_console_mixin.EXPECT_TIMEOUT">[1]</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.tc.tc_c.expecter">expecter (tcfl.tc.tc_c attribute)</a>
-</li>
       <li><a href="doc/09-api.html#tcfl.expecter.expecter_c">expecter_c (class in tcfl.expecter)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.pos.extension">extension (class in tcfl.pos)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#tcfl.target_ext_capture.extension">(class in tcfl.target_ext_capture)</a>
+</li>
+        <li><a href="doc/09-api.html#tcfl.target_ext_ioc_flash_server_app.extension">(class in tcfl.target_ext_ioc_flash_server_app)</a>
+</li>
+      </ul></li>
       <li><a href="doc/09-api.html#tcfl.tc.target_c.extension_register">extension_register() (tcfl.tc.target_c class method)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.target_c.extension_unregister">extension_unregister() (tcfl.tc.target_c class method)</a>
@@ -738,9 +911,15 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#tcfl.tc.failed_e">failed_e</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_fastboot.fastboot">fastboot (class in tcfl.target_ext_fastboot)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.capture.ffmpeg">ffmpeg (class in ttbl.capture)</a>
+</li>
       <li><a href="doc/09-api.html#ttbl.user_control.User.file_access_lock">file_access_lock (ttbl.user_control.User attribute)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.report.file_c">file_c (class in tcfl.report)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_shell.shell.file_copy_from">file_copy_from() (tcfl.target_ext_shell.shell method)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.target_ext_shell.shell.file_copy_to">file_copy_to() (tcfl.target_ext_shell.shell method)</a>
 </li>
@@ -750,17 +929,27 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.target_ext_shell.shell.file_remove">file_remove() (tcfl.target_ext_shell.shell method)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.filename_regex">filename_regex (tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c attribute)</a>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.filename_regex">filename_regex (tcfl.tc_clear_bbt.tc_clear_bbt_c attribute)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.filename_regex">(tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c attribute)</a>
 </li>
+      </ul></li>
       <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.filename_yaml_regex">filename_yaml_regex (tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c attribute)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.test_target.files_path">files_path (ttbl.test_target attribute)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.tc.find">find() (in module tcfl.tc)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="doc/09-api.html#tcfl.target_ext_shell.shell.files_remove">files_remove() (tcfl.target_ext_shell.shell method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc.tc_c.finalize">finalize() (tcfl.tc.tc_c method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc.find">find() (in module tcfl.tc)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_c.find_in_path">find_in_path() (tcfl.tc.tc_c class method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.fix_time">fix_time (tcfl.tc_clear_bbt.tc_clear_bbt_c attribute)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.flasher.flasher_c">flasher_c (class in ttbl.flasher)</a>
 </li>
@@ -782,8 +971,6 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.target_c.fullid">fullid (tcfl.tc.target_c attribute)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.expecter.expecter_c.functors">functors (tcfl.expecter.expecter_c attribute)</a>
-</li>
   </ul></td>
 </tr></table>
 
@@ -792,20 +979,32 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#tcfl.msgid_c.generate">generate() (tcfl.msgid_c class method)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.target_ext_power.power.get">get() (tcfl.target_ext_power.power method)</a>
+      <li><a href="doc/09-api.html#ttbl.capture.generic_snapshot">generic_snapshot (class in ttbl.capture)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.capture.generic_stream">generic_stream (class in ttbl.capture)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_capture.extension.get">get() (tcfl.target_ext_capture.extension method)</a>
 
       <ul>
+        <li><a href="doc/09-api.html#tcfl.target_ext_power.power.get">(tcfl.target_ext_power.power method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.buttons.impl.get">(ttbl.buttons.impl method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.buttons.interface.get">(ttbl.buttons.interface method)</a>
+</li>
         <li><a href="doc/09-api.html#ttbl.fsdb.fsdb.get">(ttbl.fsdb.fsdb method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.usbrly08b.button.get">(ttbl.usbrly08b.button method)</a>
+</li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#ttbl.test_target.get_id">get_id() (ttbl.test_target method)</a>
 
       <ul>
         <li><a href="doc/09-api.html#ttbl.user_control.User.get_id">(ttbl.user_control.User method)</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#tcfl.app.get_real_srcdir">get_real_srcdir() (in module tcfl.app)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.SanityConfigParser.get_section">get_section() (tcfl.tc_zephyr_sanity.SanityConfigParser method)</a>
@@ -820,6 +1019,10 @@
 <h2 id="H">H</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="doc/09-api.html#ttbl.flasher.openocd_c.hack_reset_after_init">hack_reset_after_init (ttbl.flasher.openocd_c attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.flasher.openocd_c.hack_reset_halt_after_init">hack_reset_halt_after_init (ttbl.flasher.openocd_c attribute)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.target_ext_debug.debug.halt">halt() (tcfl.target_ext_debug.debug method)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.harness">harness (tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c attribute)</a>
@@ -828,17 +1031,21 @@
 </li>
       <li><a href="doc/09-api.html#ttbl.user_control.User.has_role">has_role() (ttbl.user_control.User method)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.expecter.expecter_c.have_to_pass">have_to_pass (tcfl.expecter.expecter_c attribute)</a>
+      <li><a href="doc/glossary.html#term-hash"><strong>hash</strong></a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="doc/09-api.html#tcfl.expecter.expecter_c.have_to_pass">have_to_pass (tcfl.expecter.expecter_c attribute)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.util.healthcheck">healthcheck() (in module tcfl.util)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.util.healthcheck_power">healthcheck_power() (in module tcfl.util)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.helpurl">helpurl (tcfl.report.file_c attribute)</a>
+      <li><a href="doc/glossary.html#term-herd"><strong>herd</strong></a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_c.hook_pre">hook_pre (tcfl.tc.tc_c attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.report.file_c.hooks">hooks (tcfl.report.file_c attribute)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.target_ext_ssh.ssh.host">host (tcfl.target_ext_ssh.ssh attribute)</a>
 </li>
@@ -862,6 +1069,16 @@
       </ul></li>
       <li><a href="doc/09-api.html#tcfl.msgid_c.ident">ident() (tcfl.msgid_c class method)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.ignore_stress">ignore_stress (tcfl.tc_clear_bbt.tc_clear_bbt_c attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.ignore_ts">ignore_ts (in module tcfl.tc_clear_bbt)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.tc_pos0_base.image">image (tcfl.pos.tc_pos0_base attribute)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.image">(tcfl.tc_clear_bbt.tc_clear_bbt_c attribute)</a>
+</li>
+      </ul></li>
       <li><a href="doc/09-api.html#ttbl.test_target_images_mixin.image_do_set">image_do_set() (ttbl.test_target_images_mixin method)</a>
 
       <ul>
@@ -881,12 +1098,26 @@
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_qemu.tt_qemu.image_do_set">(ttbl.tt_qemu.tt_qemu method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.tt_qemu.image_do_set">(ttbl.tt_qemu2.tt_qemu method)</a>
+</li>
       </ul></li>
       <li><a href="doc/09-api.html#ttbl.flasher.flasher_c.image_erase">image_erase() (ttbl.flasher.flasher_c method)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.test_target_images_mixin.image_get">image_get() (ttbl.test_target_images_mixin method)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.flasher.flasher_c.image_hash">image_hash() (ttbl.flasher.flasher_c method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.image_list_from_rsync_output">image_list_from_rsync_output() (in module tcfl.pos)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.tc_pos0_base.image_requested">image_requested (tcfl.pos.tc_pos0_base attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.image_seed_match">image_seed_match() (in module tcfl.pos)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.image_select_best">image_select_best() (in module tcfl.pos)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.image_spec_to_tuple">image_spec_to_tuple() (in module tcfl.pos)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.image_tree">image_tree (tcfl.tc_clear_bbt.tc_clear_bbt_c attribute)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.test_target_images_mixin.image_type_check">image_type_check() (ttbl.test_target_images_mixin method)</a>
 </li>
@@ -919,10 +1150,16 @@
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_qemu.tt_qemu.images_do_set">(ttbl.tt_qemu.tt_qemu method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.tt_qemu.images_do_set">(ttbl.tt_qemu2.tt_qemu method)</a>
+</li>
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#ttbl.test_target_images_mixin.images_set">images_set() (ttbl.test_target_images_mixin method)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.buttons.impl">impl (class in ttbl.buttons)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.capture.impl_c">impl_c (class in ttbl.capture)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.app.import_mp_pathos">import_mp_pathos() (in module tcfl.app)</a>
 
@@ -944,6 +1181,10 @@
 </li>
       <li><a href="doc/09-api.html#ttbl.tt.tt_max10.input_sof">input_sof (ttbl.tt.tt_max10 attribute)</a>
 </li>
+      <li><a href="doc/09-api.html#ttbl.config.instance">instance (in module ttbl.config)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.config.instance_suffix">instance_suffix (in module ttbl.config)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.tc.interconnect">interconnect() (in module tcfl.tc)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.config.interconnect_add">interconnect_add() (in module ttbl.config)</a>
@@ -951,6 +1192,20 @@
       <li><a href="doc/09-api.html#ttbl.interconnect_c">interconnect_c (class in ttbl)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.interconnect_impl_c">interconnect_impl_c (class in ttbl)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.buttons.interface">interface (class in ttbl.buttons)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#ttbl.capture.interface">(class in ttbl.capture)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.fastboot.interface">(class in ttbl.fastboot)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.ioc_flash_server_app.interface">(class in ttbl.ioc_flash_server_app)</a>
+</li>
+      </ul></li>
+      <li><a href="doc/09-api.html#ttbl.test_target.interface_add">interface_add() (ttbl.test_target method)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.test_target.interface_origin">interface_origin (ttbl.test_target attribute)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.test_target.ip_tunnel_add">ip_tunnel_add() (ttbl.test_target method)</a>
 </li>
@@ -987,6 +1242,8 @@
       <li><a href="doc/09-api.html#tcfl.tc.tc_c.is_testcase">is_testcase() (tcfl.tc.tc_c class method)</a>
 
       <ul>
+        <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.is_testcase">(tcfl.tc_clear_bbt.tc_clear_bbt_c class method)</a>
+</li>
         <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.is_testcase">(tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c class method)</a>
 </li>
       </ul></li>
@@ -996,31 +1253,11 @@
 <h2 id="J">J</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="doc/09-api.html#tcfl.tc.tc_c.jobs">jobs (tcfl.tc.tc_c attribute)</a>
-</li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.junit">junit (tcfl.report.file_c attribute)</a>
-</li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.junit_classname">junit_classname (tcfl.report.file_c attribute)</a>
-</li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.junit_domain">junit_domain (tcfl.report.file_c attribute)</a>
-</li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.junit_hooks">junit_hooks (tcfl.report.file_c attribute)</a>
-</li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.junit_name">junit_name (tcfl.report.file_c attribute)</a>
+      <li><a href="doc/09-api.html#tcfl.report.jinja2_xml_escape">jinja2_xml_escape() (in module tcfl.report)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.junit_report_pass">junit_report_pass (tcfl.report.file_c attribute)</a>
-</li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.junit_report_skip">junit_report_skip (tcfl.report.file_c attribute)</a>
-</li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.junit_reproduction">junit_reproduction (tcfl.report.file_c attribute)</a>
-</li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.junit_suite_name">junit_suite_name (tcfl.report.file_c attribute)</a>
-</li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.junit_suite_package">junit_suite_package (tcfl.report.file_c attribute)</a>
-</li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.junit_suite_properties">junit_suite_properties (tcfl.report.file_c attribute)</a>
+      <li><a href="doc/09-api.html#tcfl.tc.tc_c.jobs">jobs (tcfl.tc.tc_c attribute)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -1036,6 +1273,12 @@
 
       <ul>
         <li><a href="doc/09-api.html#tcfl.tc.tc_c.kw_set">(tcfl.tc.tc_c method)</a>
+</li>
+      </ul></li>
+      <li><a href="doc/09-api.html#tcfl.tc.target_c.kw_unset">kw_unset() (tcfl.tc.target_c method)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#tcfl.tc.tc_c.kw_unset">(tcfl.tc.tc_c method)</a>
 </li>
       </ul></li>
       <li><a href="doc/09-api.html#tcfl.tc.target_c.kws">kws (tcfl.tc.target_c attribute)</a>
@@ -1070,22 +1313,40 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#tcfl.tc.target_group_c.len">len() (tcfl.tc.target_group_c method)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.tl.linux_ipv4_addr_get_from_console">linux_ipv4_addr_get_from_console() (in module tcfl.tl)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tl.linux_os_release_get">linux_os_release_get() (in module tcfl.tl)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_shell.shell.linux_shell_prompt_regex">linux_shell_prompt_regex (tcfl.target_ext_shell.shell attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tl.linux_ssh_root_nopwd">linux_ssh_root_nopwd() (in module tcfl.tl)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tl.linux_wait_online">linux_wait_online() (in module tcfl.tl)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.target_ext_broker_files.broker_files.list">list() (tcfl.target_ext_broker_files.broker_files method)</a>
 
       <ul>
+        <li><a href="doc/09-api.html#tcfl.target_ext_buttons.buttons.list">(tcfl.target_ext_buttons.buttons method)</a>
+</li>
+        <li><a href="doc/09-api.html#tcfl.target_ext_capture.extension.list">(tcfl.target_ext_capture.extension method)</a>
+</li>
         <li><a href="doc/09-api.html#tcfl.target_ext_console.console.list">(tcfl.target_ext_console.console method)</a>
+</li>
+        <li><a href="doc/09-api.html#tcfl.target_ext_fastboot.fastboot.list">(tcfl.target_ext_fastboot.fastboot method)</a>
 </li>
         <li><a href="doc/09-api.html#tcfl.target_ext_tunnel.tunnel.list">(tcfl.target_ext_tunnel.tunnel method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.capture.interface.list">(ttbl.capture.interface method)</a>
+</li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#tcfl.config.load">load() (in module tcfl.config)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.user_control.User.load_user">load_user() (ttbl.user_control.User static method)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.user_control.local_user">local_user (class in ttbl.user_control)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#tcfl.expecter.expecter_c.log">log() (tcfl.expecter.expecter_c method)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.target_ext_ssh.ssh.login">login (tcfl.target_ext_ssh.ssh attribute)</a>
@@ -1102,6 +1363,8 @@
         <li><a href="doc/09-api.html#ttbl.authenticator_c.login">(ttbl.authenticator_c static method)</a>
 </li>
       </ul></li>
+      <li><a href="doc/09-api.html#tcfl.pos.tc_pos0_base.login_user">login_user (tcfl.pos.tc_pos0_base attribute)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.ttb_client.rest_target_broker.logout">logout() (tcfl.ttb_client.rest_target_broker method)</a>
 </li>
   </ul></td>
@@ -1116,14 +1379,24 @@
 </li>
       <li><a href="doc/09-api.html#ttbl.pc.manual">manual (class in ttbl.pc)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.mapping">mapping (tcfl.tc_clear_bbt.tc_clear_bbt_c attribute)</a>
+</li>
       <li><a href="doc/09-api.html#conf_00_lib.minnowboard_add">minnowboard_add() (in module conf_00_lib)</a>
+</li>
+      <li><a href="doc/09-api.html#conf_00_lib.minnowboard_EFI_boot_grub_pc">minnowboard_EFI_boot_grub_pc (class in conf_00_lib)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="doc/09-api.html#conf_00_lib.minnowboard_EFI_boot_grub_pc">minnowboard_EFI_boot_grub_pc (class in conf_00_lib)</a>
+      <li><a href="doc/09-api.html#tcfl.pos.mk_persistent_tcf_d">mk_persistent_tcf_d() (in module tcfl.pos)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_c.mkticket">mkticket() (tcfl.tc.tc_c method)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.pos_multiroot.mount_fs">mount_fs() (in module tcfl.pos_multiroot)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#tcfl.pos.extension.mount_fs">(tcfl.pos.extension method)</a>
+</li>
+      </ul></li>
       <li><a href="doc/09-api.html#tcfl.msgid_c">msgid_c (class in tcfl)</a>
 </li>
       <li><a href="doc/09-api.html#conf_00_lib.mv_add">mv_add() (in module conf_00_lib)</a>
@@ -1149,6 +1422,8 @@
       <li><a href="doc/09-api.html#conf_00_lib.nrf5x_add">nrf5x_add() (in module conf_00_lib)</a>
 </li>
       <li><a href="doc/09-api.html#conf_00_lib.nucleo_add">nucleo_add() (in module conf_00_lib)</a>
+</li>
+      <li><a href="doc/glossary.html#term-nut"><strong>NUT</strong></a>
 </li>
       <li><a href="doc/09-api.html#conf_00_lib.nw_default_targets_add">nw_default_targets_add() (in module conf_00_lib)</a>
 </li>
@@ -1236,18 +1511,46 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.patch_hw_requires">patch_hw_requires (tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c attribute)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.target_ext_tags.patch_tags">patch_tags (class in tcfl.target_ext_tags)</a>
+      <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.patch_tags">patch_tags (tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.config.path">path (in module tcfl.config)</a>
 
       <ul>
-        <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.patch_tags">(tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c attribute)</a>
+        <li><a href="doc/09-api.html#ttbl.fastboot.interface.path">(ttbl.fastboot.interface attribute)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.ioc_flash_server_app.interface.path">(ttbl.ioc_flash_server_app.interface attribute)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.rsync.pci.path">(ttbl.rsync.pci attribute)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.socat.pci.path">(ttbl.socat.pci attribute)</a>
 </li>
       </ul></li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.paths">paths (tcfl.tc_clear_bbt.tc_clear_bbt_c attribute)</a>
+</li>
       <li><a href="doc/09-api.html#ttbl.cm_serial.pc">pc (class in ttbl.cm_serial)</a>
 
       <ul>
         <li><a href="doc/09-api.html#ttbl.usbrly08b.pc">(class in ttbl.usbrly08b)</a>
 </li>
       </ul></li>
+      <li><a href="doc/09-api.html#ttbl.dhcp.pci">pci (class in ttbl.dhcp)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#ttbl.rsync.pci">(class in ttbl.rsync)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.socat.pci">(class in ttbl.socat)</a>
+</li>
+      </ul></li>
+      <li><a href="doc/09-api.html#ttbl.dhcp.pci.error_e">pci.error_e</a>, <a href="doc/09-api.html#ttbl.rsync.pci.error_e">[1]</a>, <a href="doc/09-api.html#ttbl.socat.pci.error_e">[2]</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.dhcp.pci.start_e">pci.start_e</a>, <a href="doc/09-api.html#ttbl.rsync.pci.start_e">[1]</a>, <a href="doc/09-api.html#ttbl.socat.pci.start_e">[2]</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.buttons.pci_button_click">pci_button_click (class in ttbl.buttons)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.buttons.pci_button_sequences">pci_button_sequences (class in ttbl.buttons)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.buttons.pci_buttons_released">pci_buttons_released (class in ttbl.buttons)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.msgid_c.phase">phase() (tcfl.msgid_c class method)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.pc_ykush.plugger.plug">plug() (ttbl.pc_ykush.plugger method)</a>
@@ -1257,6 +1560,8 @@
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_qemu.plugger.plug">(ttbl.tt_qemu.plugger method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.plugger.plug">(ttbl.tt_qemu2.plugger method)</a>
+</li>
         <li><a href="doc/09-api.html#ttbl.usbrly08b.plugger.plug">(ttbl.usbrly08b.plugger method)</a>
 </li>
       </ul></li>
@@ -1265,6 +1570,8 @@
       <ul>
         <li><a href="doc/09-api.html#ttbl.tt_qemu.plugger">(class in ttbl.tt_qemu)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.plugger">(class in ttbl.tt_qemu2)</a>
+</li>
         <li><a href="doc/09-api.html#ttbl.usbrly08b.plugger">(class in ttbl.usbrly08b)</a>
 </li>
       </ul></li>
@@ -1272,7 +1579,9 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.target_ext_ssh.ssh.port">port (tcfl.target_ext_ssh.ssh attribute)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.target_ext_tcob.tcob.port">port() (tcfl.target_ext_tcob.tcob method)</a>
+      <li><a href="doc/glossary.html#term-pos"><strong>POS</strong></a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.dhcp.pos_cmdline_opts">pos_cmdline_opts (in module ttbl.dhcp)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_c.post_tc_append">post_tc_append() (tcfl.tc.tc_c method)</a>
 </li>
@@ -1291,7 +1600,15 @@
       <ul>
         <li><a href="doc/09-api.html#conf_00_lib.vlan_pci.power_get_do">(conf_00_lib.vlan_pci method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.buttons.pci_button_click.power_get_do">(ttbl.buttons.pci_button_click method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.buttons.pci_button_sequences.power_get_do">(ttbl.buttons.pci_button_sequences method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.buttons.pci_buttons_released.power_get_do">(ttbl.buttons.pci_buttons_released method)</a>
+</li>
         <li><a href="doc/09-api.html#ttbl.cm_serial.pc.power_get_do">(ttbl.cm_serial.pc method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.dhcp.pci.power_get_do">(ttbl.dhcp.pci method)</a>
 </li>
         <li><a href="doc/09-api.html#ttbl.flasher.openocd_c.power_get_do">(ttbl.flasher.openocd_c method)</a>
 </li>
@@ -1311,11 +1628,17 @@
 </li>
         <li><a href="doc/09-api.html#ttbl.pc_ykush.ykush.power_get_do">(ttbl.pc_ykush.ykush method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.rsync.pci.power_get_do">(ttbl.rsync.pci method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.socat.pci.power_get_do">(ttbl.socat.pci method)</a>
+</li>
         <li><a href="doc/09-api.html#ttbl.tt.simics.power_get_do">(ttbl.tt.simics method)</a>
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_power_control_impl.power_get_do">(ttbl.tt_power_control_impl method)</a>
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_qemu.tt_qemu.power_get_do">(ttbl.tt_qemu.tt_qemu method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.tt_qemu.power_get_do">(ttbl.tt_qemu2.tt_qemu method)</a>
 </li>
         <li><a href="doc/09-api.html#ttbl.usbrly08b.pc.power_get_do">(ttbl.usbrly08b.pc method)</a>
 </li>
@@ -1331,7 +1654,15 @@
       <ul>
         <li><a href="doc/09-api.html#conf_00_lib.vlan_pci.power_off_do">(conf_00_lib.vlan_pci method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.buttons.pci_button_click.power_off_do">(ttbl.buttons.pci_button_click method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.buttons.pci_button_sequences.power_off_do">(ttbl.buttons.pci_button_sequences method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.buttons.pci_buttons_released.power_off_do">(ttbl.buttons.pci_buttons_released method)</a>
+</li>
         <li><a href="doc/09-api.html#ttbl.cm_serial.pc.power_off_do">(ttbl.cm_serial.pc method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.dhcp.pci.power_off_do">(ttbl.dhcp.pci method)</a>
 </li>
         <li><a href="doc/09-api.html#ttbl.flasher.openocd_c.power_off_do">(ttbl.flasher.openocd_c method)</a>
 </li>
@@ -1351,11 +1682,17 @@
 </li>
         <li><a href="doc/09-api.html#ttbl.pc_ykush.ykush.power_off_do">(ttbl.pc_ykush.ykush method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.rsync.pci.power_off_do">(ttbl.rsync.pci method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.socat.pci.power_off_do">(ttbl.socat.pci method)</a>
+</li>
         <li><a href="doc/09-api.html#ttbl.tt.simics.power_off_do">(ttbl.tt.simics method)</a>
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_power_control_impl.power_off_do">(ttbl.tt_power_control_impl method)</a>
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_qemu.tt_qemu.power_off_do">(ttbl.tt_qemu.tt_qemu method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.tt_qemu.power_off_do">(ttbl.tt_qemu2.tt_qemu method)</a>
 </li>
         <li><a href="doc/09-api.html#ttbl.usbrly08b.pc.power_off_do">(ttbl.usbrly08b.pc method)</a>
 </li>
@@ -1371,7 +1708,15 @@
       <ul>
         <li><a href="doc/09-api.html#conf_00_lib.vlan_pci.power_on_do">(conf_00_lib.vlan_pci method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.buttons.pci_button_click.power_on_do">(ttbl.buttons.pci_button_click method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.buttons.pci_button_sequences.power_on_do">(ttbl.buttons.pci_button_sequences method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.buttons.pci_buttons_released.power_on_do">(ttbl.buttons.pci_buttons_released method)</a>
+</li>
         <li><a href="doc/09-api.html#ttbl.cm_serial.pc.power_on_do">(ttbl.cm_serial.pc method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.dhcp.pci.power_on_do">(ttbl.dhcp.pci method)</a>
 </li>
         <li><a href="doc/09-api.html#ttbl.flasher.openocd_c.power_on_do">(ttbl.flasher.openocd_c method)</a>
 </li>
@@ -1391,11 +1736,17 @@
 </li>
         <li><a href="doc/09-api.html#ttbl.pc_ykush.ykush.power_on_do">(ttbl.pc_ykush.ykush method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.rsync.pci.power_on_do">(ttbl.rsync.pci method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.socat.pci.power_on_do">(ttbl.socat.pci method)</a>
+</li>
         <li><a href="doc/09-api.html#ttbl.tt.simics.power_on_do">(ttbl.tt.simics method)</a>
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_power_control_impl.power_on_do">(ttbl.tt_power_control_impl method)</a>
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_qemu.tt_qemu.power_on_do">(ttbl.tt_qemu.tt_qemu method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.tt_qemu.power_on_do">(ttbl.tt_qemu2.tt_qemu method)</a>
 </li>
         <li><a href="doc/09-api.html#ttbl.usbrly08b.pc.power_on_do">(ttbl.usbrly08b.pc method)</a>
 </li>
@@ -1404,10 +1755,28 @@
       </ul></li>
       <li><a href="doc/09-api.html#ttbl.tt.tt_flasher.power_on_do_post">power_on_do_post() (ttbl.tt.tt_flasher method)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.expecter.expecter_c.power_on_post">power_on_post() (tcfl.expecter.expecter_c method)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.dhcp.power_on_pre_pos_setup">power_on_pre_pos_setup() (in module ttbl.dhcp)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.tt_power_control_mixin.power_rail_get">power_rail_get() (ttbl.tt_power_control_mixin method)</a>, <a href="doc/09-api.html#ttbl.tt_power_control_mixin.power_rail_get">[1]</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.tt_power_control_mixin.power_rail_get_any">power_rail_get_any() (ttbl.tt_power_control_mixin method)</a>, <a href="doc/09-api.html#ttbl.tt_power_control_mixin.power_rail_get_any">[1]</a>
+</li>
       <li><a href="doc/09-api.html#ttbl.tt_power_control_mixin.power_state">power_state (ttbl.tt_power_control_mixin attribute)</a>, <a href="doc/09-api.html#ttbl.tt_power_control_mixin.power_state">[1]</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_logadapter_c.prefix">prefix (tcfl.tc.tc_logadapter_c attribute)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_buttons.buttons.press">press() (tcfl.target_ext_buttons.buttons method)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#ttbl.buttons.impl.press">(ttbl.buttons.impl method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.buttons.interface.press">(ttbl.buttons.interface method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.usbrly08b.button.press">(ttbl.usbrly08b.button method)</a>
+</li>
+      </ul></li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_logadapter_c.process">process() (tcfl.tc.tc_logadapter_c method)</a>
 
       <ul>
@@ -1418,6 +1787,10 @@
       </ul></li>
       <li><a href="doc/09-api.html#ttbl.config.processes">processes (in module ttbl.config)</a>
 </li>
+      <li><a href="doc/09-api.html#ttbl.test_target.properties_keep_on_release">properties_keep_on_release (ttbl.test_target attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.test_target.properties_user">properties_user (ttbl.test_target attribute)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.tc.target_c.property_get">property_get() (tcfl.tc.target_c method)</a>
 
       <ul>
@@ -1425,6 +1798,10 @@
 </li>
       </ul></li>
       <li><a href="doc/09-api.html#ttbl.test_target.property_get_locked">property_get_locked() (ttbl.test_target method)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.test_target.property_is_user">property_is_user() (ttbl.test_target method)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.test_target.property_keep_value">property_keep_value() (ttbl.test_target method)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.target_c.property_set">property_set() (tcfl.tc.target_c method)</a>
 
@@ -1434,18 +1811,28 @@
       </ul></li>
       <li><a href="doc/09-api.html#ttbl.test_target.property_set_locked">property_set_locked() (ttbl.test_target method)</a>
 </li>
+      <li><a href="doc/09-api.html#ttbl.dhcp.pxe_architectures">pxe_architectures (in module ttbl.dhcp)</a>
+</li>
   </ul></td>
 </tr></table>
 
 <h2 id="Q">Q</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="doc/09-api.html#ttbl.tt_qemu2.tt_qemu.qemu_cmdline">qemu_cmdline (ttbl.tt_qemu2.tt_qemu attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.tt_qemu2.tt_qemu.qemu_cmdline_append">qemu_cmdline_append (ttbl.tt_qemu2.tt_qemu attribute)</a>
+</li>
       <li><a href="doc/09-api.html#ttbl.tt_qemu.tt_qemu.qemu_cmdlines">qemu_cmdlines (ttbl.tt_qemu.tt_qemu attribute)</a>
 </li>
-      <li><a href="doc/09-api.html#conf_00_lib.tt_qemu_linux.qemu_preexec_fn">qemu_preexec_fn() (conf_00_lib.tt_qemu_linux method)</a>
+      <li><a href="doc/09-api.html#conf_00_lib.qemu_pos_add">qemu_pos_add() (in module conf_00_lib)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.tt_qemu.qmp_c">qmp_c (class in ttbl.tt_qemu)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.qmp_c">(class in ttbl.tt_qemu2)</a>
 </li>
+      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#conf_00_lib.quark_c1000_add">quark_c1000_add() (in module conf_00_lib)</a>
@@ -1466,10 +1853,18 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_c.release">release (tcfl.tc.tc_c attribute)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.tc.target_c.release">release() (tcfl.tc.target_c method)</a>
+      <li><a href="doc/09-api.html#tcfl.target_ext_buttons.buttons.release">release() (tcfl.target_ext_buttons.buttons method)</a>
 
       <ul>
+        <li><a href="doc/09-api.html#tcfl.tc.target_c.release">(tcfl.tc.target_c method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.buttons.impl.release">(ttbl.buttons.impl method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.buttons.interface.release">(ttbl.buttons.interface method)</a>
+</li>
         <li><a href="doc/09-api.html#ttbl.test_target.release">(ttbl.test_target method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.usbrly08b.button.release">(ttbl.usbrly08b.button method)</a>
 </li>
       </ul></li>
       <li><a href="doc/09-api.html#ttbl.test_target.release_hooks">release_hooks (ttbl.test_target attribute)</a>
@@ -1481,7 +1876,11 @@
 </li>
       </ul></li>
       <li><a href="doc/09-api.html#tcfl.report.report_c.report">report() (tcfl.report.report_c class method)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#tcfl.tc.result_c.report">(tcfl.tc.result_c method)</a>
 </li>
+      </ul></li>
       <li><a href="doc/09-api.html#tcfl.tc.target_c.report_blck">report_blck() (tcfl.tc.target_c method)</a>
 
       <ul>
@@ -1498,8 +1897,6 @@
         <li><a href="doc/09-api.html#tcfl.tc.tc_c.report_data">(tcfl.tc.tc_c method)</a>
 </li>
       </ul></li>
-      <li><a href="doc/09-api.html#tcfl.config.report_driver_add">report_driver_add() (in module tcfl.config)</a>
-</li>
       <li><a href="doc/09-api.html#tcfl.tc.target_c.report_error">report_error() (tcfl.tc.target_c method)</a>
 
       <ul>
@@ -1512,9 +1909,9 @@
         <li><a href="doc/09-api.html#tcfl.tc.tc_c.report_fail">(tcfl.tc.tc_c method)</a>
 </li>
       </ul></li>
-      <li><a href="doc/09-api.html#tcfl.tc.result_c.report_from_exception">report_from_exception() (tcfl.tc.result_c static method)</a>
+      <li><a href="doc/09-api.html#tcfl.tc.tc_c.report_file_prefix">report_file_prefix (tcfl.tc.tc_c attribute)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.report_header">report_header (tcfl.report.file_c attribute)</a>
+      <li><a href="doc/09-api.html#tcfl.tc.result_c.report_from_exception">report_from_exception() (tcfl.tc.result_c static method)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.target_c.report_info">report_info() (tcfl.tc.target_c method)</a>
 
@@ -1548,8 +1945,18 @@
         <li><a href="doc/09-api.html#tcfl.tc.tc_c.report_tweet">(tcfl.tc.tc_c method)</a>
 </li>
       </ul></li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.reproduction">reproduction (tcfl.report.file_c attribute)</a>
+      <li><a href="doc/09-api.html#ttbl.buttons.interface.request_process">request_process() (ttbl.buttons.interface method)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#ttbl.capture.interface.request_process">(ttbl.capture.interface method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.fastboot.interface.request_process">(ttbl.fastboot.interface method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.ioc_flash_server_app.interface.request_process">(ttbl.ioc_flash_server_app.interface method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.tt_interface.request_process">(ttbl.tt_interface method)</a>
+</li>
+      </ul></li>
       <li><a href="doc/09-api.html#tcfl.target_ext_debug.debug.reset">reset() (tcfl.target_ext_debug.debug method)</a>
 
       <ul>
@@ -1622,10 +2029,10 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.ttb_client.rest_target_list">rest_target_list() (in module tcfl.ttb_client)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#tcfl.ttb_client.rest_target_list_table">rest_target_list_table() (in module tcfl.ttb_client)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#tcfl.ttb_client.rest_target_power_cycle">rest_target_power_cycle() (in module tcfl.ttb_client)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.ttb_client.rest_target_power_get">rest_target_power_get() (in module tcfl.ttb_client)</a>
@@ -1671,6 +2078,8 @@
       <li><a href="doc/09-api.html#tcfl.ttb_client.rest_target_broker.rest_tb_target_console_read">rest_tb_target_console_read() (tcfl.ttb_client.rest_target_broker method)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.ttb_client.rest_target_broker.rest_tb_target_console_read_to_fd">rest_tb_target_console_read_to_fd() (tcfl.ttb_client.rest_target_broker method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.ttb_client.rest_target_broker.rest_tb_target_console_size">rest_tb_target_console_size() (tcfl.ttb_client.rest_target_broker method)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.ttb_client.rest_target_broker.rest_tb_target_console_write">rest_tb_target_console_write() (tcfl.ttb_client.rest_target_broker method)</a>
 </li>
@@ -1742,6 +2151,14 @@
 </li>
       <li><a href="doc/09-api.html#ttbl.usbrly08b.rly08b.not_found_e">rly08b.not_found_e</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.pos.extension.rsync">rsync() (tcfl.pos.extension method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.extension.rsync_np">rsync_np() (tcfl.pos.extension method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.extension.rsyncd_start">rsyncd_start() (tcfl.pos.extension method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.extension.rsyncd_stop">rsyncd_stop() (tcfl.pos.extension method)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.tc.target_c.rt">rt (tcfl.tc.target_c attribute)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_c.rt_all">rt_all (tcfl.tc.tc_c attribute)</a>
@@ -1753,9 +2170,19 @@
       <li><a href="doc/09-api.html#tcfl.expecter.expecter_c.run">run() (tcfl.expecter.expecter_c method)</a>
 
       <ul>
+        <li><a href="doc/09-api.html#tcfl.target_ext_fastboot.fastboot.run">(tcfl.target_ext_fastboot.fastboot method)</a>
+</li>
+        <li><a href="doc/09-api.html#tcfl.target_ext_ioc_flash_server_app.extension.run">(tcfl.target_ext_ioc_flash_server_app.extension method)</a>
+</li>
         <li><a href="doc/09-api.html#tcfl.target_ext_shell.shell.run">(tcfl.target_ext_shell.shell method)</a>
 </li>
+        <li><a href="doc/09-api.html#tcfl.target_ext_ssh.ssh.run">(tcfl.target_ext_ssh.ssh method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.ioc_flash_server_app.interface.run">(ttbl.ioc_flash_server_app.interface method)</a>
+</li>
       </ul></li>
+      <li><a href="doc/glossary.html#term-runid"><strong>RunID</strong></a>
+</li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_c.runid">runid (tcfl.tc.tc_c attribute)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_c.runid_visible">runid_visible (tcfl.tc.tc_c attribute)</a>
@@ -1790,6 +2217,12 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.ttb_client.rest_target_broker.send_request">send_request() (tcfl.ttb_client.rest_target_broker method)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_buttons.buttons.sequence">sequence() (tcfl.target_ext_buttons.buttons method)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#ttbl.buttons.interface.sequence">(ttbl.buttons.interface method)</a>
+</li>
+      </ul></li>
       <li><a href="doc/09-api.html#tcfl.tc.serially">serially() (in module tcfl.tc)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.fsdb.fsdb.set">set() (ttbl.fsdb.fsdb method)</a>
@@ -1810,6 +2243,10 @@
       </ul></li>
       <li><a href="doc/09-api.html#tcfl.tl.setup_verify_slip_feature">setup_verify_slip_feature() (in module tcfl.tl)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.tl.sh_export_proxy">sh_export_proxy() (in module tcfl.tl)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.config.share_path">share_path (in module tcfl.config)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.tc.target_c.shcmd_local">shcmd_local() (tcfl.tc.target_c method)</a>
 
       <ul>
@@ -1818,10 +2255,12 @@
       </ul></li>
       <li><a href="doc/09-api.html#tcfl.target_ext_shell.shell">shell (class in tcfl.target_ext_shell)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_shell.shell.shell_prompt_regex">shell_prompt_regex (tcfl.target_ext_shell.shell attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_shell.shell_prompts">shell_prompts (in module tcfl.target_ext_shell)</a>
+</li>
       <li><a href="doc/09-api.html#ttbl.tt.simics">simics (class in ttbl.tt)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#ttbl.tt.simics.error_e">simics.error_e</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.tt.simics.simics_start_e">simics.simics_start_e</a>
@@ -1832,10 +2271,16 @@
 </li>
       <li><a href="doc/09-api.html#conf_00_lib.simics_zephyr_cmds">simics_zephyr_cmds (in module conf_00_lib)</a>
 </li>
+      <li><a href="doc/glossary.html#term-site"><strong>site</strong></a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_console.console.size">size() (tcfl.target_ext_console.console method)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.tc.skip_e">skip_e</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.cm_logger.spec_add">spec_add() (in module ttbl.cm_logger)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#ttbl.cm_logger.spec_reset">spec_reset() (in module ttbl.cm_logger)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.cm_logger.spec_rm">spec_rm() (in module ttbl.cm_logger)</a>
@@ -1849,21 +2294,61 @@
       <ul>
         <li><a href="doc/09-api.html#tcfl.app.app_c.start">(tcfl.app.app_c static method)</a>
 </li>
+        <li><a href="doc/09-api.html#tcfl.target_ext_capture.extension.start">(tcfl.target_ext_capture.extension method)</a>
+</li>
         <li><a href="doc/09-api.html#tcfl.target_ext_debug.debug.start">(tcfl.target_ext_debug.debug method)</a>
+</li>
+        <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.start">(tcfl.tc_clear_bbt.tc_clear_bbt_c method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.capture.ffmpeg.start">(ttbl.capture.ffmpeg method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.capture.generic_snapshot.start">(ttbl.capture.generic_snapshot method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.capture.generic_stream.start">(ttbl.capture.generic_stream method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.capture.impl_c.start">(ttbl.capture.impl_c method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.capture.interface.start">(ttbl.capture.interface method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.capture.vnc.start">(ttbl.capture.vnc method)</a>
 </li>
         <li><a href="doc/09-api.html#ttbl.flasher.flasher_c.start">(ttbl.flasher.flasher_c method)</a>
 </li>
       </ul></li>
+      <li><a href="doc/09-api.html#tcfl.pos.tc_pos0_base.start_50">start_50() (tcfl.pos.tc_pos0_base method)</a>
+</li>
       <li><a href="doc/09-api.html#ttbl.user_control.User.state_dir">state_dir (ttbl.user_control.User attribute)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.test_target.state_path">state_path (ttbl.test_target attribute)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.pc.dlwps7.state_regex">state_regex (ttbl.pc.dlwps7 attribute)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.target_ext_debug.debug.stop">stop() (tcfl.target_ext_debug.debug method)</a>
+      <li><a href="doc/glossary.html#term-static-testcase"><strong>static testcase</strong></a>
+</li>
+      <li><a href="doc/09-api.html#conf_00_lib.stm32_add">stm32_add() (in module conf_00_lib)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_capture.extension.stop">stop() (tcfl.target_ext_capture.extension method)</a>
 
       <ul>
+        <li><a href="doc/09-api.html#tcfl.target_ext_debug.debug.stop">(tcfl.target_ext_debug.debug method)</a>
+</li>
         <li><a href="doc/09-api.html#ttbl.flasher.flasher_c.stop">(ttbl.flasher.flasher_c method)</a>
+</li>
+      </ul></li>
+      <li><a href="doc/09-api.html#tcfl.target_ext_capture.extension.stop_and_get">stop_and_get() (tcfl.target_ext_capture.extension method)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#ttbl.capture.ffmpeg.stop_and_get">(ttbl.capture.ffmpeg method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.capture.generic_snapshot.stop_and_get">(ttbl.capture.generic_snapshot method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.capture.generic_stream.stop_and_get">(ttbl.capture.generic_stream method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.capture.impl_c.stop_and_get">(ttbl.capture.impl_c method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.capture.interface.stop_and_get">(ttbl.capture.interface method)</a>
+</li>
+        <li><a href="doc/09-api.html#ttbl.capture.vnc.stop_and_get">(ttbl.capture.vnc method)</a>
 </li>
       </ul></li>
       <li><a href="doc/09-api.html#tcfl.tc.target_c.stub_app_add">stub_app_add() (tcfl.tc.target_c method)</a>
@@ -1875,6 +2360,12 @@
       <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.subtestcases">subtestcases (tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c attribute)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.result_c.summary">summary() (tcfl.tc.result_c method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.swupd_debug">swupd_debug (tcfl.tc_clear_bbt.tc_clear_bbt_c attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.swupd_url">swupd_url (tcfl.tc_clear_bbt.tc_clear_bbt_c attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.dhcp.syslinux_path">syslinux_path (in module ttbl.dhcp)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -1896,13 +2387,13 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_c.tag_set">tag_set() (tcfl.tc.tc_c method)</a>
 </li>
-      <li><a href="doc/09-api.html#ttbl.test_target.tags">tags (ttbl.test_target attribute)</a>
-</li>
       <li><a href="doc/09-api.html#tcfl.tc.tags">tags() (in module tcfl.tc)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_c.tags_set">tags_set() (tcfl.tc.tc_c method)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.test_target.tags_update">tags_update() (ttbl.test_target method)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tap_parse_output">tap_parse_output() (in module tcfl.tc_clear_bbt)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.target_extension_c.target">target (tcfl.tc.target_extension_c attribute)</a>
 </li>
@@ -1946,6 +2437,10 @@
 </li>
       <li><a href="doc/09-api.html#ttbl.config.target_owned_max_idle">target_owned_max_idle (in module ttbl.config)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.pos.target_power_cycle_to_normal_pxe">target_power_cycle_to_normal_pxe() (in module tcfl.pos)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.target_power_cycle_to_pos_pxe">target_power_cycle_to_pos_pxe() (in module tcfl.pos)</a>
+</li>
       <li><a href="doc/09-api.html#ttbl.flasher.flasher_c.target_reset">target_reset() (ttbl.flasher.flasher_c method)</a>
 
       <ul>
@@ -1968,13 +2463,21 @@
         <li><a href="doc/09-api.html#tcfl.tc.tc_c.targets">(tcfl.tc.tc_c attribute)</a>
 </li>
       </ul></li>
+      <li><a href="doc/09-api.html#tcfl.tc.tc_c.targets_active">targets_active() (tcfl.tc.tc_c method)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.ttb_client.rest_target_broker.tb_state_save">tb_state_save() (tcfl.ttb_client.rest_target_broker method)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_c">tc_c (class in tcfl.tc)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.config.tc_driver_add">tc_driver_add() (in module tcfl.config)</a>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c">tc_clear_bbt_c (class in tcfl.tc_clear_bbt)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.tc_logadapter_c">tc_logadapter_c (class in tcfl.tc)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.tc_pos0_base">tc_pos0_base (class in tcfl.pos)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.pos.tc_pos_base">tc_pos_base (class in tcfl.pos)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_taps_subcase_c_base">tc_taps_subcase_c_base (class in tcfl.tc_clear_bbt)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c">tc_zephyr_sanity_c (class in tcfl.tc_zephyr_sanity)</a>
 </li>
@@ -1994,17 +2497,31 @@
 </li>
       <li><a href="doc/09-api.html#module-tcfl.expecter">tcfl.expecter (module)</a>
 </li>
+      <li><a href="doc/09-api.html#module-tcfl.pos">tcfl.pos (module)</a>
+</li>
+      <li><a href="doc/09-api.html#module-tcfl.pos_multiroot">tcfl.pos_multiroot (module)</a>
+</li>
+      <li><a href="doc/09-api.html#module-tcfl.pos_uefi">tcfl.pos_uefi (module)</a>
+</li>
       <li><a href="doc/09-api.html#module-tcfl.report">tcfl.report (module)</a>
 </li>
       <li><a href="doc/09-api.html#module-tcfl.report_mongodb">tcfl.report_mongodb (module)</a>
 </li>
       <li><a href="doc/09-api.html#module-tcfl.target_ext_broker_files">tcfl.target_ext_broker_files (module)</a>
 </li>
+      <li><a href="doc/09-api.html#module-tcfl.target_ext_buttons">tcfl.target_ext_buttons (module)</a>
+</li>
+      <li><a href="doc/09-api.html#module-tcfl.target_ext_capture">tcfl.target_ext_capture (module)</a>
+</li>
       <li><a href="doc/09-api.html#module-tcfl.target_ext_console">tcfl.target_ext_console (module)</a>
 </li>
       <li><a href="doc/09-api.html#module-tcfl.target_ext_debug">tcfl.target_ext_debug (module)</a>
 </li>
+      <li><a href="doc/09-api.html#module-tcfl.target_ext_fastboot">tcfl.target_ext_fastboot (module)</a>
+</li>
       <li><a href="doc/09-api.html#module-tcfl.target_ext_images">tcfl.target_ext_images (module)</a>
+</li>
+      <li><a href="doc/09-api.html#module-tcfl.target_ext_ioc_flash_server_app">tcfl.target_ext_ioc_flash_server_app (module)</a>
 </li>
       <li><a href="doc/09-api.html#module-tcfl.target_ext_power">tcfl.target_ext_power (module)</a>
 </li>
@@ -2012,13 +2529,11 @@
 </li>
       <li><a href="doc/09-api.html#module-tcfl.target_ext_ssh">tcfl.target_ext_ssh (module)</a>
 </li>
-      <li><a href="doc/09-api.html#module-tcfl.target_ext_tags">tcfl.target_ext_tags (module)</a>
-</li>
-      <li><a href="doc/09-api.html#module-tcfl.target_ext_tcob">tcfl.target_ext_tcob (module)</a>
-</li>
       <li><a href="doc/09-api.html#module-tcfl.target_ext_tunnel">tcfl.target_ext_tunnel (module)</a>
 </li>
       <li><a href="doc/09-api.html#module-tcfl.tc">tcfl.tc (module)</a>
+</li>
+      <li><a href="doc/09-api.html#module-tcfl.tc_clear_bbt">tcfl.tc_clear_bbt (module)</a>
 </li>
       <li><a href="doc/09-api.html#module-tcfl.tc_zephyr_sanity">tcfl.tc_zephyr_sanity (module)</a>
 </li>
@@ -2028,7 +2543,7 @@
 </li>
       <li><a href="doc/09-api.html#module-tcfl.util">tcfl.util (module)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.target_ext_tcob.tcob">tcob (class in tcfl.target_ext_tcob)</a>
+      <li><a href="doc/09-api.html#ttbl.config.tcp_port_range">tcp_port_range (in module ttbl.config)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tl.tcpdump_collect">tcpdump_collect() (in module tcfl.tl)</a>
 </li>
@@ -2042,14 +2557,26 @@
         <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.teardown">(tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c method)</a>
 </li>
       </ul></li>
+      <li><a href="doc/09-api.html#tcfl.pos.tc_pos0_base.teardown_50">teardown_50() (tcfl.pos.tc_pos0_base method)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_clear_bbt_c.teardown_50">(tcfl.tc_clear_bbt.tc_clear_bbt_c method)</a>
+</li>
+      </ul></li>
       <li><a href="doc/09-api.html#tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.teardown_subtestcases">teardown_subtestcases() (tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c method)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.tl.teardown_targets_power_off">teardown_targets_power_off() (in module tcfl.tl)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.dhcp.template_rexpand">template_rexpand() (in module ttbl.dhcp)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.report.file_c.templates">templates (tcfl.report.file_c attribute)</a>
 </li>
       <li><a href="doc/glossary.html#term-test-case"><strong>test case</strong></a>
 </li>
       <li><a href="doc/glossary.html#term-test-case-driver"><strong>test case driver</strong></a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/glossary.html#term-test-case-finder"><strong>test case finder</strong></a>
 </li>
       <li><a href="doc/glossary.html#term-test-finder"><strong>test finder</strong></a>
@@ -2060,8 +2587,6 @@
 </li>
       <li><a href="doc/glossary.html#term-test-target-broker"><strong>test target broker</strong></a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#ttbl.test_target">test_target (class in ttbl)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.test_target_busy_e">test_target_busy_e</a>
@@ -2100,13 +2625,7 @@
 </li>
       <li><a href="doc/09-api.html#tcfl.tc.testcases_discover">testcases_discover() (in module tcfl.tc)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.text">text (tcfl.report.file_c attribute)</a>
-</li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.text_report_pass">text_report_pass (tcfl.report.file_c attribute)</a>
-</li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.text_report_skip">text_report_skip (tcfl.report.file_c attribute)</a>
-</li>
-      <li><a href="doc/09-api.html#tcfl.report.file_c.text_reproduction">text_reproduction (tcfl.report.file_c attribute)</a>
+      <li><a href="doc/09-api.html#ttbl.dhcp.tftp_dir">tftp_dir (in module ttbl.dhcp)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.test_target.thing_add">thing_add() (ttbl.test_target method)</a>
 </li>
@@ -2174,6 +2693,8 @@
 </li>
       <li><a href="doc/09-api.html#ttbl.tt.tt_flasher.error">tt_flasher.error</a>
 </li>
+      <li><a href="doc/09-api.html#ttbl.tt_interface">tt_interface (class in ttbl)</a>
+</li>
       <li><a href="doc/09-api.html#ttbl.tt.tt_max10">tt_max10 (class in ttbl.tt)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.tt.tt_power">tt_power (class in ttbl.tt)</a>
@@ -2187,9 +2708,11 @@
       <li><a href="doc/09-api.html#ttbl.tt.tt_power_lc">tt_power_lc (class in ttbl.tt)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.tt_qemu.tt_qemu">tt_qemu (class in ttbl.tt_qemu)</a>
+
+      <ul>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.tt_qemu">(class in ttbl.tt_qemu2)</a>
 </li>
-      <li><a href="doc/09-api.html#conf_00_lib.tt_qemu_linux">tt_qemu_linux (class in conf_00_lib)</a>
-</li>
+      </ul></li>
       <li><a href="doc/09-api.html#conf_00_lib.tt_qemu_zephyr">tt_qemu_zephyr (class in conf_00_lib)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.tt.tt_serial">tt_serial (class in ttbl.tt)</a>
@@ -2204,6 +2727,10 @@
 </li>
       <li><a href="doc/09-api.html#module-ttbl.auth_party">ttbl.auth_party (module)</a>
 </li>
+      <li><a href="doc/09-api.html#module-ttbl.buttons">ttbl.buttons (module)</a>
+</li>
+      <li><a href="doc/09-api.html#module-ttbl.capture">ttbl.capture (module)</a>
+</li>
       <li><a href="doc/09-api.html#module-ttbl.cm_logger">ttbl.cm_logger (module)</a>
 </li>
       <li><a href="doc/09-api.html#module-ttbl.cm_loopback">ttbl.cm_loopback (module)</a>
@@ -2212,19 +2739,29 @@
 </li>
       <li><a href="doc/09-api.html#module-ttbl.config">ttbl.config (module)</a>
 </li>
+      <li><a href="doc/09-api.html#module-ttbl.dhcp">ttbl.dhcp (module)</a>
+</li>
+      <li><a href="doc/09-api.html#module-ttbl.fastboot">ttbl.fastboot (module)</a>
+</li>
       <li><a href="doc/09-api.html#module-ttbl.flasher">ttbl.flasher (module)</a>
 </li>
       <li><a href="doc/09-api.html#module-ttbl.fsdb">ttbl.fsdb (module)</a>
+</li>
+      <li><a href="doc/09-api.html#module-ttbl.ioc_flash_server_app">ttbl.ioc_flash_server_app (module)</a>
 </li>
       <li><a href="doc/09-api.html#module-ttbl.pc">ttbl.pc (module)</a>
 </li>
       <li><a href="doc/09-api.html#module-ttbl.pc_ykush">ttbl.pc_ykush (module)</a>
 </li>
-      <li><a href="doc/09-api.html#module-ttbl.target">ttbl.target (module)</a>
+      <li><a href="doc/09-api.html#module-ttbl.rsync">ttbl.rsync (module)</a>
+</li>
+      <li><a href="doc/09-api.html#module-ttbl.socat">ttbl.socat (module)</a>
 </li>
       <li><a href="doc/09-api.html#module-ttbl.tt">ttbl.tt (module)</a>
 </li>
       <li><a href="doc/09-api.html#module-ttbl.tt_qemu">ttbl.tt_qemu (module)</a>
+</li>
+      <li><a href="doc/09-api.html#module-ttbl.tt_qemu2">ttbl.tt_qemu2 (module)</a>
 </li>
       <li><a href="doc/09-api.html#module-ttbl.usbrly08b">ttbl.usbrly08b (module)</a>
 </li>
@@ -2255,20 +2792,26 @@
 </li>
         <li><a href="doc/09-api.html#ttbl.tt_qemu.plugger.unplug">(ttbl.tt_qemu.plugger method)</a>
 </li>
+        <li><a href="doc/09-api.html#ttbl.tt_qemu2.plugger.unplug">(ttbl.tt_qemu2.plugger method)</a>
+</li>
         <li><a href="doc/09-api.html#ttbl.usbrly08b.plugger.unplug">(ttbl.usbrly08b.plugger method)</a>
 </li>
       </ul></li>
       <li><a href="doc/09-api.html#tcfl.target_ext_shell.shell.up">up() (tcfl.target_ext_shell.shell method)</a>
 </li>
+      <li><a href="doc/09-api.html#tcfl.tc_clear_bbt.tc_taps_subcase_c_base.update">update() (tcfl.tc_clear_bbt.tc_taps_subcase_c_base method)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.target_ext_broker_files.broker_files.upload">upload() (tcfl.target_ext_broker_files.broker_files method)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.target_ext_images.images.upload_set">upload_set() (tcfl.target_ext_images.images method)</a>
 </li>
-      <li><a href="doc/09-api.html#tcfl.report_mongodb.report_mongodb_c.url">url (tcfl.report_mongodb.report_mongodb_c attribute)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="doc/09-api.html#tcfl.report_mongodb.report_mongodb_c.url">url (tcfl.report_mongodb.report_mongodb_c attribute)</a>
+</li>
       <li><a href="doc/09-api.html#tcfl.config.url_add">url_add() (in module tcfl.config)</a>
+</li>
+      <li><a href="doc/09-api.html#tcfl.config.urls">urls (in module tcfl.config)</a>
 </li>
       <li><a href="doc/09-api.html#ttbl.usb_find_by_bus_address">usb_find_by_bus_address() (in module ttbl)</a>
 </li>
@@ -2282,8 +2825,6 @@
 </li>
       <li><a href="doc/09-api.html#ttbl.user_control.User.user_not_existant_e">User.user_not_existant_e</a>
 </li>
-      <li><a href="doc/09-api.html#ttbl.test_target.user_properties">user_properties (ttbl.test_target attribute)</a>
-</li>
       <li><a href="doc/09-api.html#ttbl.fsdb.fsdb.uuid_ns">uuid_ns (ttbl.fsdb.fsdb attribute)</a>
 </li>
   </ul></td>
@@ -2292,19 +2833,19 @@
 <h2 id="V">V</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="doc/09-api.html#tcfl.tc.tc_c.valid_results">valid_results (tcfl.tc.tc_c attribute)</a>
-</li>
       <li><a href="doc/09-api.html#commonl.tcob.validate_connections">validate_connections() (in module commonl.tcob)</a>
 </li>
       <li><a href="doc/09-api.html#commonl.tcob.validate_pin_map">validate_pin_map() (in module commonl.tcob)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#tcfl.ttb_client.rest_target_broker.validate_session">validate_session() (tcfl.ttb_client.rest_target_broker method)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#tcfl.report.report_c.verbosity_set">verbosity_set() (tcfl.report.report_c method)</a>
 </li>
       <li><a href="doc/09-api.html#conf_00_lib.vlan_pci">vlan_pci (class in conf_00_lib)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.capture.vnc">vnc (class in ttbl.capture)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -2319,6 +2860,8 @@
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="doc/09-api.html#tcfl.tc.target_c.want_name">want_name (tcfl.tc.target_c attribute)</a>
+</li>
+      <li><a href="doc/09-api.html#ttbl.who_split">who_split() (in module ttbl)</a>
 </li>
       <li><a href="doc/09-api.html#tcfl.target_ext_console.console.write">write() (tcfl.target_ext_console.console method)</a>
 </li>
@@ -2354,9 +2897,7 @@
 
 
            </div>
-           <div class="articleComments">
-            
-           </div>
+           
           </div>
           <footer>
   
@@ -2365,11 +2906,11 @@
 
   <div role="contentinfo">
     <p>
-        &copy; Copyright 2015, Author.
+        &copy; Copyright 2015, Author
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
 
 </footer>
 
@@ -2384,35 +2925,33 @@
 
   
 
-    <script type="text/javascript">
-        var DOCUMENTATION_OPTIONS = {
-            URL_ROOT:'./',
-            VERSION:'0.11',
-            COLLAPSE_INDEX:false,
-            FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true,
-            SOURCELINK_SUFFIX: '.txt'
-        };
-    </script>
-      <script type="text/javascript" src="_static/jquery.js"></script>
-      <script type="text/javascript" src="_static/underscore.js"></script>
-      <script type="text/javascript" src="_static/doctools.js"></script>
+    
+    
+      <script type="text/javascript">
+          var DOCUMENTATION_OPTIONS = {
+              URL_ROOT:'./',
+              VERSION:'0.11',
+              LANGUAGE:'None',
+              COLLAPSE_INDEX:false,
+              FILE_SUFFIX:'.html',
+              HAS_SOURCE:  true,
+              SOURCELINK_SUFFIX: '.txt'
+          };
+      </script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+    
 
   
 
-  
-  
-    <script type="text/javascript" src="_static/js/theme.js"></script>
-  
+  <script type="text/javascript" src="_static/js/theme.js"></script>
 
-  
-  
   <script type="text/javascript">
       jQuery(function () {
-          SphinxRtdTheme.StickyNav.enable();
+          SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-   
+  </script> 
 
 </body>
 </html>
