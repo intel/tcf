@@ -64,12 +64,12 @@ class _test(tcfl.tc.tc_c):
         #
         # Run commands over SSH
         #
-        # https://zerobot2.ostc.intel.com/job/TCF-master/lastSuccessfulBuild/artifact/html/doc/09-api.html?highlight=ssh#tcfl.target_ext_ssh.ssh.check_output
+        # https://intel.github.io/tcf/doc/09-api.html?highlight=ssh#tcfl.target_ext_ssh.ssh.check_output
         #target.ssh._ssh_cmdline_options.append("-v")	# DEBUG login problems
         output = target.ssh.check_output("echo hello")
         assert 'hello' in output
 
-        # Alternative way to do it https://zerobot2.ostc.intel.com/job/TCF-master/lastSuccessfulBuild/artifact/html/doc/04-HOWTOs.html?highlight=ssh#linux-targets-ssh-login-from-a-testcase-client
+        # Alternative way to do it https://intel.github.io/tcf/doc/04-HOWTOs.html?highlight=ssh#linux-targets-ssh-login-from-a-testcase-client
         # by hand
 
         # create a tunnel from server_name:server_port -> to target:22
