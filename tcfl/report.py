@@ -804,6 +804,11 @@ class file_c(report_c):
                 # filter to automatically escape anything that might
                 # not be *ML kosher...but 0x00. So as we only need
                 # this for reporting, we'll make an ugly exception.
+                if not isinstance(message, unicode):
+                    # ugly hack until we move to Pyv3 so we have no
+                    # conversion error if the message contains non
+                    # ASCII chars
+                    message = message.decode('utf-8', errors = 'replace')
                 yield ident, tgname, message.replace("\x00", "<NULL>")
 
     def _mkreport(self, msg_tag, code, _tc, message):
