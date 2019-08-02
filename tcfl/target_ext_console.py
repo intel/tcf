@@ -650,17 +650,6 @@ class entension(tc.target_extension_c):
         self.target.report_info("%s: wrote %dB (%s) to console"
                                 % (console, len(data), data_report))
 
-
-    def _power_on_post(self):
-        #
-        # This hook is called by the power interface when we
-        # power-on/cycle
-        #
-        # Reset the default console
-        self._default = None
-        self.default_property = None
-        self.target.property_set("console-default", None)
-
     def list(self):
         return self.target.rt.get('consoles', [])
 

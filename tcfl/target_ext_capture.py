@@ -356,12 +356,12 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
         target = self.target
         if not buffers_poll.get('screenshot_count', 0):
             target.report_info('%s/%s: not detecting, no screenshots yet'
-                               % (run_name, self.name))
+                               % (run_name, self.name), dlevel = 3)
             return None
         most_recent = buffers_poll['screenshots'][-1]
         target.report_info('%s/%s: detecting in %s'
                            % (run_name, self.name, most_recent),
-                           dlevel = 1)
+                           dlevel = 2)
         buffers['current'] = most_recent
         screenshot_img = cv2.imread(most_recent)
         r = _template_find(
@@ -464,7 +464,7 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
                 if not screenshots:
                     self.target.report_info(
                         "%s/%s: no screenshot collateral, "
-                        "nice no captures where done"
+                        "since no captures where done"
                         % (run_name, self.name))
                     return
                 last_screenshot = screenshots[-1]
@@ -604,7 +604,7 @@ class extension(tc.target_extension_c):
             self, template_image_filename, capturer = 'screen',
             in_area = None, merge_similar = 0.7,
             min_width = 30, min_height = 30,
-            poll_period = 3, timeout = 30,
+            poll_period = 3, timeout = 130,
             raise_on_timeout = tc.error_e, raise_on_found = None):
         """
         Returns an object that finds an image/template in an
