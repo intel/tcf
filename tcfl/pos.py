@@ -562,7 +562,7 @@ class extension(tc.target_extension_c):
             # None specified, let's take from the target config
             boot_to_pos_fn = self.cap_fn_get('boot_to_pos', 'pxe')
 
-        bios_boot_time = int(target.kws.get("bios_boot_time", 0))
+        bios_boot_time = int(target.kws.get("bios_boot_time", 30))
 
         for tries in range(3):
             target.report_info("POS: rebooting into Provisioning OS [%d/3]"
@@ -572,8 +572,9 @@ class extension(tc.target_extension_c):
             # Sequence for TCF-live based on Fedora
             try:
                 # POS prints this when it boots before login
-                target.expect("TCF test node")
-                target.shell.up(timeout = bios_boot_time + timeout)
+                target.expect("TCF test node", timeout =
+                              bios_boot_time + timeout)
+                target.shell.up(timeout = timeout)
             except tc.error_e as e:
                 outputf = e.attachments_get().get('console output', None)
                 if outputf:
@@ -1064,6 +1065,16 @@ EOF""")
             try:
                 # ensure we use the POS prompt
                 target.shell.shell_prompt_regex = _pos_prompt
+                # FIXME: this is a hack because now the expecter has a
+                # maximum timeout set that can't be overriden--the
+                # re-design of the expect sequences will fix this, but
+                # for now we have to make sure the maximum is also set
+                # here, so in case the bios_boot_time setting in
+                # boot_to_pos is higher, it still can go.
+                # bios_boot_time has to be all encapsulated in
+                # boot_to_pos(), as it can be called from other areas
+                bios_boot_time = int(target.kws.get("bios_boot_time", 30))
+                testcase.tls.expecter.timeout = bios_boot_time + timeout
 
                 self.boot_to_pos(pos_prompt = _pos_prompt, timeout = timeout,
                                  boot_to_pos_fn = target_power_cycle_to_pos)
