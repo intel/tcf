@@ -806,7 +806,7 @@ def _target_interface(target_id, interface, call):
         try:
             fd = open(filepath, "rb")
         except Exception as e:
-            flask_logi_abort(400, "%s: can't stream file: %s" % (filepath, e))
+            flask_logi_abort(400, "%s: can't stream file: %s" % (filepath, e), exc_info = True)
         return flask.Response(fd, direct_passthrough = True)
     else:
         return flask.jsonify(result)
