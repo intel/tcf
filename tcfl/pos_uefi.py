@@ -371,6 +371,9 @@ def _linux_boot_guess(target, image):
 
 
 pos_boot_names = [
+    # UEFI Network
+    # UEFI Network N
+    re.compile(r"^UEFI Network(\s+[0-9]+)?$"),
     # UEFI: PXE IP[46].*
     # UEFI PXEv[46].*
     re.compile(r"^UEFI:?\s+PXE[v ](IP)?[46].*$"),
