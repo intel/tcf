@@ -564,36 +564,49 @@ class extension(tc.target_extension_c):
 
         bios_boot_time = int(target.kws.get("bios_boot_time", 30))
 
-        for tries in range(3):
-            target.report_info("POS: rebooting into Provisioning OS [%d/3]"
-                               % tries)
-            boot_to_pos_fn(target)
+        # FIXME: this is a hack because now the expecter has a
+        # maximum timeout set that can't be overriden--the
+        # re-design of the expect sequences will fix this, but
+        # for now we have to make sure the maximum is also set
+        # here, so in case the bios_boot_time setting in
+        # boot_to_pos is higher, it still can go.
+        # bios_boot_time has to be all encapsulated in
+        # boot_to_pos(), as it can be called from other areas
+        testcase = target.testcase
+        timeout_original = testcase.tls.expecter.timeout
+        try:
+            testcase.tls.expecter.timeout = bios_boot_time + timeout
+            for tries in range(3):
+                target.report_info("POS: rebooting into Provisioning OS [%d/3]"
+                                   % tries)
+                boot_to_pos_fn(target)
 
-            # Sequence for TCF-live based on Fedora
-            try:
-                # POS prints this when it boots before login
-                target.expect("TCF test node", timeout =
-                              bios_boot_time + timeout)
-                target.shell.up(timeout = timeout)
-            except tc.error_e as e:
-                outputf = e.attachments_get().get('console output', None)
-                if outputf:
-                    output = open(outputf.name).read()
-                if output == None or output == "" or output == "\x00":
-                    target.report_error("POS: no console output, retrying")
+                # Sequence for TCF-live based on Fedora
+                try:
+                    # POS prints this when it boots before login
+                    target.expect("TCF test node", timeout =
+                                  bios_boot_time + timeout)
+                    target.shell.up(timeout = timeout)
+                except tc.error_e as e:
+                    outputf = e.attachments_get().get('console output', None)
+                    if outputf:
+                        output = open(outputf.name).read()
+                    if output == None or output == "" or output == "\x00":
+                        target.report_error("POS: no console output, retrying")
+                        continue
+                    # sometimes the BIOS has been set to boot local directly,
+                    # so we might as well retry
+                    target.report_error("POS: unexpected console output, retrying")
+                    self._unexpected_console_output_try_fix(output, target)
                     continue
-                # sometimes the BIOS has been set to boot local directly,
-                # so we might as well retry
-                target.report_error("POS: unexpected console output, retrying")
-                self._unexpected_console_output_try_fix(output, target)
-                continue
-            target.report_info("POS: got Provisioning OS shell")
-            break
-        else:
-            raise tc.blocked_e(
-                "POS: tried too many times to boot, without signs of life",
-                { "console output": target.console.read(), 'target': target })
-
+                target.report_info("POS: got Provisioning OS shell")
+                break
+            else:
+                raise tc.blocked_e(
+                    "POS: tried too many times to boot, without signs of life",
+                    { "console output": target.console.read(), 'target': target })
+        finally:
+            testcase.tls.expecter.timeout = timeout_original
 
     def boot_normal(self, boot_to_normal_fn = None):
         """
