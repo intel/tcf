@@ -99,6 +99,15 @@ provides access to functions to set TCF's configuration.
 You can add new paths to parse with ``--config-path`` and force
 specific files to be read with ``--config-file``. See *tcf --help*.
 
+How do I list which targets I own?
+----------------------------------
+
+Run::
+
+  $ tcf list -v 'owner:"MYNAME"'
+
+*MYNAME* is whatever identifier you used to login.
+
 .. _howto_release_target:
 
 How do I release a target I don't own?
@@ -121,6 +130,17 @@ As a user, you can always force release any of your own locks with
 `-f` or with `-t TICKETSTRING`::
 
   $ tcf -t TICKETSTRING release TARGETNAME
+
+How do I release all the targets I own?
+---------------------------------------
+
+Run::
+
+  $ tcf release -f $(tcf list 'owner:"MYNAME"')
+
+- *MYNAME* is whatever identifier you used to login
+- *tcf list 'owner:"MYNAME"'* lists which targets you currently own
+
 
 How do I keep a target(s) reserved and powered-on while I fuzz with them?
 -------------------------------------------------------------------------
