@@ -301,8 +301,8 @@ Driver / targe type specific metadata
 Provisioning OS specific metadata
 ---------------------------------
 
-- *linux_serial_console_default*: which device is the system's serial
-  console connected to TCF's first console.
+- *linux_serial_console_default*: which device **the target** sees as
+  the system's serial console connected to TCF's first console.
 
   If *DEVICE* (eg: ttyS0) is given, Linux will be booted with the
   argument *console=DEVICE,115200*.
@@ -381,6 +381,9 @@ Provisioning OS specific metadata
 .. automodule:: conf_00_lib
    :members:
    :undoc-members:
+.. automodule:: conf_00_lib_pdu
+   :members:
+   :undoc-members:
 
 *ttbd* Configuration API
 ========================
@@ -429,6 +432,7 @@ Power Control Interface
 .. autoclass:: ttbl.tt_power_control_mixin
 .. automodule:: ttbl.dhcp
 .. automodule:: ttbl.pc
+.. automodule:: ttbl.raritan_emx
 .. automodule:: ttbl.pc_ykush
 .. automodule:: ttbl.rsync
 .. automodule:: ttbl.socat

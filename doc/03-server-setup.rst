@@ -389,7 +389,9 @@ Create a configuration file
 configuration statements as described in the links below:
 
 - :py:func:`Digital Loggers Web Power Switch 7
-  <conf_00_lib.dlwps7_add>` wall-power switch.
+  <conf_00_lib.dlwps7_add>` PDUs / wall-power switches
+- :py:func:`Raritan EMX
+  <conf_00_lib_pdu.raritan_emx_add>` based PDUs  / wall-power switches
 - :py:func:`YKUSH USB power switches <conf_00_lib.ykush_targets_add>`
   USB data/power switchable hub
 - :py:func:`Devantech USB-RLY08B USB controlled relays
