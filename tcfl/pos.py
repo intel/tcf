@@ -596,7 +596,8 @@ class extension(tc.target_extension_c):
                         continue
                     # sometimes the BIOS has been set to boot local directly,
                     # so we might as well retry
-                    target.report_error("POS: unexpected console output, retrying")
+                    target.report_error("POS: unexpected console output, retrying",
+                                        attachments = dict(output = output))
                     self._unexpected_console_output_try_fix(output, target)
                     continue
                 target.report_info("POS: got Provisioning OS shell")
