@@ -1286,6 +1286,15 @@ def deploy_path(ic, target, _kws, cache = True):
                            dlevel = 2)
         return
 
+    if isinstance(source_path, basestring):
+        source_path = [ source_path ]
+    elif isinstance(source_path, collections.Iterable):
+        pass
+    else:
+        raise AssertionError(
+            "argument source_path needs to be a string or a "
+            "list of such, got a %s" % type(source_path).__name__)
+
     # try to sync first from the server cache
     for src in source_path:
         cache_name = os.path.basename(src)
@@ -1302,14 +1311,18 @@ def deploy_path(ic, target, _kws, cache = True):
                          " -cHaAX %s %s/misc/%s /mnt/persistent.tcf.d/"
                          " || true # ignore failures, might not be cached"
                          % (rsync_extra, rsync_server,
-                            cache_name))
+                            cache_name),
+                         # FIXME: hardcoded
+                         timeout = 300)
         target.report_info("POS: rsynced %s from %s "
                            "to /mnt/persistent.tcf.d/%s"
                            % (cache_name, rsync_server, cache_name))
 
     def _rsync_path(_source_path, dst_path):
-        target.report_info("rsyncing file %s -> target:%s"
-                           % (_source_path, dst_path), dlevel = 1)
+        # this might take some time, so be slightl more verbose when
+        # we start, so we know what it this waiting for
+        target.report_info("POS: rsyncing %s -> target:%s"
+                           % (_source_path, dst_path), dlevel = -1)
         target.testcase._targets_active()
         if cache:
             # FIXME: do we need option_delete here too? option_delete = True
@@ -1319,18 +1332,11 @@ def deploy_path(ic, target, _kws, cache = True):
             target.pos.rsync_np(_source_path, dst_path, option_delete = True,
                                 path_append = "", rsync_extra = rsync_extra)
         target.testcase._targets_active()
-        target.report_pass("rsynced file %s -> target:%s"
+        target.report_pass("POS: rsynced %s -> target:%s"
                            % (_source_path, dst_path))
 
-    if isinstance(source_path, basestring):
-        _rsync_path(source_path, dst_path)
-    elif isinstance(source_path, collections.Iterable):
-        for _source_path in source_path:
-            _rsync_path(_source_path, dst_path)
-    else:
-        raise AssertionError(
-            "argument source_path needs to be a string or a "
-            "list of such, got a %s" % type(source_path).__name__)
+    for _source_path in source_path:
+        _rsync_path(_source_path, dst_path)
 
 # FIXME: when tc.py's import hell is fixed, this shall move to tl.py?
 
