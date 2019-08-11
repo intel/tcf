@@ -333,7 +333,9 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
           >>>     (
           >>>         1.0,
           >>>         ( 0.949, 0.005, 0.968, 0.0312 ),
+          >>>         # relative (X0, Y0) to (X1, Y1)
           >>>         ( 972, 4, 992, 24)
+          >>>         # absolute (X0, Y0) to (X1, Y1)
           >>>     ),
           >>>     (
           >>>         0.957,
@@ -629,7 +631,9 @@ class extension(tc.target_extension_c):
         >>>         (
         >>>             1.0,
         >>>             ( 0.949, 0.005, 0.968, 0.0312 ),
+        >>>             # relative (X0, Y0) to (X1, Y1)
         >>>             ( 972, 4, 992, 24)
+        >>>             # absolute (X0, Y0) to (X1, Y1)
         >>>         ),
         >>>         (
         >>>             0.957,
