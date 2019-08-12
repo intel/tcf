@@ -838,14 +838,27 @@ def boot_config_fix(target):
         target.shell.shell_prompt_regex = target_ext_shell._shell_prompt_regex
         target.shell.up(user = 'root')
 
+        # Some drivers disable efibootmgr to avoid the boot order
+        # being changed without control--in said case, hack to use the
+        # disabled version so we can actually fix things.
+        # note alias is a POSIX
+        # https://pubs.opengroup.org/onlinepubs/9699919799/utilities/alias.html
+        # utility, so shall be available in most shells
+        target.shell.run(
+            "test -x /usr/bin/efibootmgr.disabled"
+            " && alias efibootmgr=/usr/bin/efibootmgr.disabled || true")
         # Clean house
         output = target.shell.run("efibootmgr", output = True)
         _boot_order, boot_entries = \
             _efibootmgr_output_parse(target, output)
         removed = []
         kept = []
-        target.report_info("boot order: %s" %  ",".join(_boot_order))
-        for entry, name, _category, _index in boot_entries:
+        target.report_info("boot order: %s" %  ",".join(_boot_order),
+                           attachments = dict(
+                               boot_entries =
+                               pprint.pformat(boot_entries)
+                           ))
+        for entry, name, category, _index in boot_entries:
             if name in efi_entries_to_remove:
                 target.shell.run("efibootmgr -b %s -B" % entry)
                 if entry in _boot_order:
@@ -856,8 +869,9 @@ def boot_config_fix(target):
                     _boot_order.remove(entry)
                 else:
                     kept.append("%s:%s" % (entry, name))
-            target.report_info("boot order after %s %s remove: %s"
-                               % (entry, name,  _boot_order))
+            target.report_info("boot order after checking %s/%s %s: %s"
+                               % (entry, category, name,
+                                  ",".join(_boot_order)))
         output = target.shell.run("efibootmgr -o %s" % ",".join(_boot_order),
                                   output = True, trim = True)
         target.report_info(
