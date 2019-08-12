@@ -353,7 +353,7 @@ bundle_path_map = [
 #: :data:`bundle_path_map`) to rename the directory to match the entry
 #: of this one.
 #:
-#: .. example::
+#: .. admonition:: Example
 #:
 #:    In the hardcoded example, *bat-dev-tooling.t* is just doing
 #:    something to prep and then exec'ing bats to run
