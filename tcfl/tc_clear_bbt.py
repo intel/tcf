@@ -283,8 +283,8 @@ ignore_ts_mutex = threading.Lock()
 ignore_ts_regex = None
 
 # This is now a hack because we don't have a good way to tell which
-# bundles take longer or not from the bundle itself, so for no we'll
-# hardcode it FIXME
+# bundles take longer or not from the bundle itself, so for now we'll
+# hardcode it.  FIXME
 bundle_run_timeouts = {
     'kvm-host': 480,
     # size
