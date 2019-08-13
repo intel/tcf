@@ -323,7 +323,6 @@ bundle_add_timeouts = {
     'desktop': 480,
     'desktop-autostart': 480,
     'LyX': 500,
-    'machine-learning-basic': 800,
     'machine-learning-tensorflow': 800,
     'texlive': 800,
     'education': 800,
@@ -334,6 +333,22 @@ bundle_add_timeouts = {
     'os-testsuite-phoronix': 1000,
     'os-testsuite-phoronix-server': 1000,
     'os-testsuite-phoronix-desktop': 1000,
+    # The timeout below are not done through experimentation
+    # but it is hope that as we find bundles that consistently download
+    # fine we can use the MB values to fine-tune the downloads
+    # All download size from Clear LTS 30070
+    'container-virt': 800, #197.31MB
+    'computer-vision-basic': 800, #1001MB
+    'devpkg-nautilus': 800, #144MB
+    'devpkg-clutter-gst': 800, #251MB
+    'education-primary' : 800, #266MB
+    'machine-learning-basic': 800, #1280MB
+    'network-basic-dev': 800, #958MB
+    'python-basic-dev': 800, #466MB
+    'os-util-gui': 800, #218MB
+    'service-os-dev': 800, #652MB
+    'storage-cluster': 800, #211MB
+
 }
 
 # ugly case here, as this is a hack made for a subdirectory that
