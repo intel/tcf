@@ -2611,7 +2611,7 @@ class tc_c(object):
     """
 
     #
-    # Public testcase interface
+    # Public testcase API/interface
     #
 
     #: List of places where we declared this testcase is build only
@@ -2976,6 +2976,26 @@ class tc_c(object):
                                attachments)
         return r
 
+    def relpath_to_abs(self, path):
+        """
+        Given a path relative to the test script's source, make it absolute.
+
+        .. admonition: example
+
+           If the testscript calling this API (as given by
+           ``testcase.kws['srcdir_abs']`` is
+           ``/some/path/test_file.py`` and this is given as
+           ``subdir/somefile``, then the source will be considered to
+           be ``/some/path/subdir/somefile``
+
+        @returns string with the absolutized path if relative, the
+          same if already absolute
+
+        """
+
+        if os.path.isabs(path):
+            return path
+        return os.path.join(self.kws['srcdir_abs'], path)
 
     def shcmd_local(self, cmd, origin = None, reporter = None,
                     logfile = None):

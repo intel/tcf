@@ -190,12 +190,13 @@ class ssh(tc.target_extension_c):
             ql = [ '-q' ]
         else:
             ql = []
-        cmdline = [ "/usr/bin/ssh", "-p", "%s" % self._ssh_port ] \
+        cmdline = [ "/usr/bin/ssh", "-p", str(self._ssh_port) ] \
             + self._ssh_cmdline_options + ql \
             + [ self.login + "@" + self._ssh_host, "-t", _cmd ]
         self.target.report_info("running SSH command: %s"
                                 % " ".join(cmdline), dlevel = 2)
         returncode = subprocess.call(cmdline, stdin = None,
+                                     shell = False,
                                      stdout = log_stdout,
                                      stderr = log_stderr)
         log_stdout.seek(0, 0)
@@ -256,10 +257,14 @@ class ssh(tc.target_extension_c):
 
     def copy_to(self, src, dst = "", recursive = False,
                 nonzero_e = tc.error_e):
-        """
-        Copy a file or tree with *SCP* to the target from the client
+        """Copy a file or tree with *SCP* to the target from the client
 
         :param str src: local file or directory to copy
+
+          Note a relative path will be made relative to the location
+          of the testscript, see :func:`testcase.relpath_to_abs
+          <tcfl.tc.tc_c.relpath_to_abs>`.
+
         :param str dst: (optional) destination file or directoy
           (defaults to root's home directory)
         :param bool recursive: (optional) copy recursively (needed for
@@ -271,10 +276,12 @@ class ssh(tc.target_extension_c):
           :class:`tcfl.tc.skip_e`, :class:`tcfl.tc.blocked_e`) or
           *None* (default) to not raise anything and just return the
           exit code.
+
         """
         self._tunnel()
         self.target.report_info("running SCP local:%s -> target:%s"
                                 % (src, dst), dlevel = 1)
+        src = self.target.testcase.relpath_to_abs(src)
         options = "-vB"
         if recursive:
             options += "r"
@@ -285,7 +292,8 @@ class ssh(tc.target_extension_c):
                 + [ src, self.login + "@" + self._ssh_host + ":" + dst ]
             self.target.report_info("running SCP command: %s"
                                     % " ".join(cmdline), dlevel = 2)
-            s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT)
+            s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT,
+                                        shell = False)
         except subprocess.CalledProcessError as e:
             self._returncode_eval(e.returncode)
             commonl.raise_from(nonzero_e(
@@ -332,7 +340,8 @@ class ssh(tc.target_extension_c):
                 + [self.login + "@" + self._ssh_host + ":" + src, dst ]
             self.target.report_info("running SCP command: %s"
                                     % " ".join(cmdline), dlevel = 2)
-            s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT)
+            s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT,
+                                        shell = False)
         except subprocess.CalledProcessError as e:
             self._returncode_eval(e.returncode)
             commonl.raise_from(nonzero_e(
