@@ -45,6 +45,7 @@ Capturing data, doing SSH
 
 .. automodule:: examples.test_audio_capture
 .. automodule:: examples.test_ssh_in
+.. automodule:: examples.test_linux_ssh
 
 .. _finding_testcase_metadata:
 

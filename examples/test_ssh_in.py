@@ -84,7 +84,6 @@ class _test(tcfl.pos.tc_pos0_base):
         tcfl.tl.linux_ssh_root_nopwd(target)
         target.shell.run("systemctl restart sshd")
         
-        output = target.shell.run("echo hello",
-                                  output = True, trim = True).strip()
+        output = target.ssh.check_output("echo hello").strip()
         if output != "hello":
             raise tcfl.tc.failed_e("didn't get hello but '%s'" % output)
