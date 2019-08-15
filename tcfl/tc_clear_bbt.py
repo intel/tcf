@@ -301,7 +301,7 @@ bundle_run_timeouts = {
     # Needs way more time, more if the machine is slow ... way, about
     # 16 min, 4k subcases this FIXME has to be split so it can be
     # parallelized
-    'bat-perl-extras-perl-use.t': 5000,
+    'perl-extras': 8000,
     'bat-os-testsuite-phoronix.t': 600,
     'bat-mixer.t': 3000,
 }
