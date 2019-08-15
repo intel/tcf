@@ -529,6 +529,11 @@ Tunnels can also be created with the command line::
 Note you might need first the steps in the next section to allow SSH
 to login with a passwordless root.
 
+Linux targets: restarting the SSH daemon
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+See the examples in :func:`tcfl.tl.linux_ssh_root_nopwd`.
+
 .. _target_pos_manually:
 
 How do I boot a target to PXE boot mode manually?

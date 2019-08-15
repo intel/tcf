@@ -224,6 +224,41 @@ def linux_os_release_get(target, prefix = ""):
 def linux_ssh_root_nopwd(target, prefix = ""):
     """
     Configure a SSH deamon to allow login as root with no passwords
+
+    .. _howto_restart_sshd:
+
+    In a script:
+
+    >>> tcfl.tl.linux_ssh_root_nopwd(target)
+    >>> target.shell.run("systemctl restart sshd")
+
+    wait for *sshd* to be fully ready; it is a hack
+
+    >>> target.shell.run(           # wait for sshd to fully restart
+    >>>     "while ! curl -s http://localhost:22 | /usr/bin/fgrep SSH-2.0; do"
+    >>>     " sleep 1s; done", timeout = 10)
+
+    - why *curl*? most distros have it installed; if SSH is replying
+      with the SSH-2.0 string, then likely the daemon is ready
+
+    - why not netcat *nc*? note default installed in most distros
+
+    - why not plain *ssh*? because that might fail by many other
+      reasons, but you can check the debug in *ssh -v* messages for a
+      *debug1: Remote protocol version* string; output is harder to
+      keep under control and *curl* is kinda faster, but::
+
+        $ ssh -v localhost 2>&1 -t echo | fgrep -q 'debug1: Remote protocol version'
+
+      is a valid test
+
+    - why not *netstat*? for example::
+
+        $  while ! netstat -antp | grep -q '^tcp.*:22.*LISTEN.*sshd'; do sleep 1s; done
+
+      *netstat* is not always available, when available, that is also
+       a valid test
+
     """
     target.shell.run("""\
 mkdir -p %s/etc/ssh
