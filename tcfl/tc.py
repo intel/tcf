@@ -5513,6 +5513,9 @@ class tc_c(object):
         c._prefix_update()
         c.tls = threading.local()
         c._cleanup_files = set()
+        c.tls.expecter = expecter.expecter_c(
+            c._expecter_log, c, poll_period = poll_period,
+            timeout = self.tls.expecter.timeout)
         return c
 
     @result_c.from_exception

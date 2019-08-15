@@ -257,8 +257,8 @@ class shell(tc.target_extension_c):
             self.target.on_console_rx("ERROR-IN-SHELL", result = 'errr',
                                       timeout = False)
 
-        # Now commands should timeout fast
-        self.target.testcase.tls.expecter.timeout = 30
+        # don't set a timeout here, leave it to whatever it was defaulted
+
 
     def _run(self, cmd = None, expect = None, prompt_regex = None,
              output = False, output_filter_crlf = True, trim = False):
