@@ -13,7 +13,7 @@ def lint_py_check_per_line_filter(_repo, cf):
     if not cf or cf.binary or cf.deleted:
         return False
 
-    with open(cf.name, 'r') as f:
+    with open(cf.name, 'r', encoding = 'utf-8', errors = 'ignore') as f:
         firstline = f.readline()
     if not cf.name.endswith(".py") and not 'python' in firstline:
         _repo.log.info("%s: skipping, not a Python file", cf.name)
@@ -24,7 +24,7 @@ def lint_py_check_per_line(_repo, cf):
     """
     Run multiple line-by-line checks
     """
-    with open(cf.name, "r") as f:
+    with open(cf.name, "r", encoding = 'utf-8', errors = 'replace') as f:
         line_cnt = 0
         regex_import = re.compile(r"\s*from\s+.*\s+import\s+.*")
         warnings = 0

@@ -11,7 +11,7 @@ def lint_pylint_filter(repo, cf):	# pylint: disable = too-many-branches
     if not cf or cf.binary or cf.deleted:
         return False
 
-    with open(cf.name, 'r') as f:
+    with open(cf.name, 'r', encoding = 'utf-8', errors = 'replace') as f:
         firstline = f.readline()
     if not cf.name.endswith(".py") and not 'python' in firstline:
         repo.log.info("%s: skipping, not a Python file", cf.name)
@@ -20,7 +20,7 @@ def lint_pylint_filter(repo, cf):	# pylint: disable = too-many-branches
 
 def lint_pylint(repo, cf):	# pylint: disable = too-many-branches
     cmdline = [ 'pylint' ]
-    with open(cf.name, 'r') as f:
+    with open(cf.name, 'r', encoding = 'utf-8', errors = 'replace') as f:
         firstline = f.readline()
         if 'python3' in firstline:
             if shutil.which('python3-pylint'):
@@ -40,7 +40,8 @@ def lint_pylint(repo, cf):	# pylint: disable = too-many-branches
             elif shutil.which('pylint2'):
                 cmdline = [ 'pylint2' ]
         else:
-            cmdline = [ 'pylint' ]
+            # default to pylint-2
+            cmdline = [ 'pylint-2' ]
     rcfile = os.path.join(repo.working_tree_dir, '.pylintrc')
     if os.path.exists(rcfile):
         cmdline.append('--rcfile=' + rcfile)

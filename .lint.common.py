@@ -70,7 +70,7 @@ def lint_ws_at_eol_filter(_repo, cf):
     return True
 
 def lint_ws_at_eol(_repo, cf):
-    with open(cf.name, "r") as f:
+    with open(cf.name, "r", encoding = 'utf-8', errors = 'replace') as f:
         # Heaven's sake, indexes start at zero ZERO ZERO
         # https://i.imgur.com/zAjk1xs.jpg ... but most
         # tools report line numbers as index 1, so we do it like them

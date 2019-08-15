@@ -12,6 +12,7 @@ be the work in progress code or HEAD).
 Steps are implemented by scriptlets called .lint.NAME.py in the
 current directory or any path given with -p.
 """
+
 import tempfile
 import argparse
 import imp
@@ -21,10 +22,12 @@ import re
 import subprocess
 import sys
 import traceback
+import typing
 import urllib.parse
 
 import git
 import github
+import gitlab
 
 help_epilog = """
 To use with git commit hook:
@@ -221,8 +224,16 @@ def generic_line_linter(
         assert isinstance(log, logging.Logger)
     else:
         log = _repo.log
-    assert isinstance(regex_error, re._pattern_type)
-    assert isinstance(regex_warning, re._pattern_type)
+    # we'd use 'typing.Pattern' instead of type(workaround), but there
+    # is a bug in early Python3 that makes that complain with:
+    #
+    # >>> TypeError: Type aliases cannot be used with isinstance().
+    #
+    # So, that.
+    # https://stackoverflow.com/questions/50495099/typeerror-type-aliases-cannot-be-used-with-isinstance
+    workaround = re.compile("")
+    assert isinstance(regex_error, type(workaround))
+    assert isinstance(regex_warning, type(workaround))
 
     try:
         if os.path.isabs(_repo.relpath):
@@ -361,6 +372,8 @@ class changedfile_c(object):	# pylint: disable = too-few-public-methods
     Describes a file that changed
     """
     gitrev_blame = None
+    gl_mr = None
+
     def __init__(self, repo, filename):
 
         self.repo = repo
@@ -403,13 +416,73 @@ class changedfile_c(object):	# pylint: disable = too-few-public-methods
                        self.binary, self.deleted,
                        ",".join([ str(i) for i in self.lines ]))
 
-    def message(self, message, line_number = None):
+    def __review_line_report_gitlab(self, category, line_number, message):
+        # notes allow a discussion thread that has to be
+        # reolved/closed to be created -- better that commit
+        # comments, as it allows us to track it
+        # Can't get the position thing to work, the gitlab Python
+        # API is not passing it and not allowing me to create a
+        # discussion object either, like the documentation says.
+        color = ""
+        if category == 'warning':
+            color = "#FFDA02"
+        elif category == 'error':
+            color = "#FF0000"
+        elif category == 'blockage':
+            color = "#800080"
+        # Can't figure out how not to have the colour code show up
+        # according to the markdown spec
+        # https://gitlab.devtools.intel.com/help/user/markdown#colors
+        print("DEBUG discussions gl_mr id %08x" % id(self.gl_mr))
+        self.gl_mr.discussions.create(dict(
+            # start a discussion, body of the discussion is whatever
+            # this checker said
+            body = r"""
+**`%s %s`** `%s`
+```
+%s
+```
+""" % (context.shortname, category, color, message),
+            position = dict(
+                line_code = int(line_number),
+                base_sha = self.gl_mr.diff_refs['base_sha'],
+                start_sha = self.gl_mr.diff_refs['start_sha'],
+                head_sha = self.gl_mr.diff_refs['head_sha'],
+                new_path = self.name_rel_repo,
+                old_path = self.name_rel_repo,
+                new_line = int(line_number),
+                position_type = 'text',
+            ),
+            resolvable = True,
+        ))
+
+    def _review_line_report_gitlab(self, category, line_number, message):
+        try:            
+            self.__review_line_report_gitlab(category, line_number, message)
+        except gitlab.exceptions.GitlabCreateError as e:
+            if '400 (Bad request) "Note {:line_code=>["can\'t be blank",' \
+               ' "must be a valid line code"]}" not given' in str(e):
+                # problem with no solution so far
+                # https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=2&ved=2ahUKEwiTvLOj4sbiAhXnCTQIHdtqCdwQFjABegQIBBAB&url=https%3A%2F%2Fgitlab.com%2Fgitlab-org%2Fgitlab-ce%2Fissues%2F24542&usg=AOvVaw18yIXYaGWmCli9QEGYkRWs
+                
+                self.log.error("ignoring submission error %s" % e)
+                pass
+
+        
+    def _review_line_report(self, category, line_number, message):
+        if self.gl_mr:
+            # There is a gitlab merge request to report to
+            self._review_line_report_gitlab(category, line_number, message)
+        # FIXME: github must do this too
+
+    def message(self, category, message, line_number = None):
         """
         Report a message
 
         :param str message: line with the message
         """
         self.repo.message(message, line_number)
+        self._review_line_report(category, line_number, message)
 
     def warning(self, message, line_number = None):
         """
@@ -427,7 +500,7 @@ class changedfile_c(object):	# pylint: disable = too-few-public-methods
         """
         if line_number in self.lines or args.wide:
             context.warnings += 1
-            self.message(message, line_number)
+            self.message('warning', message, line_number)
 
     def error(self, message, line_number = None):
         """
@@ -445,7 +518,7 @@ class changedfile_c(object):	# pylint: disable = too-few-public-methods
         """
         if line_number in self.lines or args.wide:
             context.errors += 1
-            self.message(message, line_number)
+            self.message('error', message, line_number)
 
     def blockage(self, message, line_number = None):
         """
@@ -463,7 +536,7 @@ class changedfile_c(object):	# pylint: disable = too-few-public-methods
         """
         if line_number in self.lines or args.wide:
             context.blockage += 1
-            self.message(message, line_number)
+            self.message('blockage', message, line_number)
 
 class _action_increase_level(argparse.Action):	# pylint: disable = too-few-public-methods
     def __init__(self, option_strings, dest, default = None, required = False,
@@ -575,6 +648,25 @@ ap.add_argument(
     action = "store_true", default = False,
     help = "Get github values repo and commit from Jenkins environment "
     "(from the pull request builder plugin exporting env vars "
+    "ghprbActualCommit and ghprbAuthorRepoGitUrl); token still has "
+    "to be passed in the command line")
+ap.add_argument(
+    "--gitlab-repo",
+    action = "store", default = None,
+    help = "Gitlab repository for the commit we are checking")
+ap.add_argument(
+    "--gitlab-mergerequest",
+    action = "store", default = None,
+    help = "Gitlab merge request in --gitlab-repo to update status")
+ap.add_argument(
+    "--gitlab-token",
+    action = "store", default = None,
+    help = "Gitlab token to access the API")
+ap.add_argument(
+    "--gitlab-from-jenkins",
+    action = "store_true", default = False,
+    help = "Get gitlab values repo and commit from Jenkins environment "
+    "FIXME (from the pull request builder plugin exporting env vars "
     "ghprbActualCommit and ghprbAuthorRepoGitUrl); token still has "
     "to be passed in the command line")
 ap.add_argument(
@@ -798,6 +890,8 @@ class context_c(object):	# pylint: disable = too-few-public-methods
     inventory = {}
 
     gh_commit = None
+    gl_commit = None
+    gl_mr = None
 
     def __init__(self, name, shortname = None):
         self.name = name
@@ -878,12 +972,35 @@ class context_c(object):	# pylint: disable = too-few-public-methods
             url = github.GithubObject.NotSet
         cls.gh_commit.create_status(status, url, description, self.name)
 
+    def _gitlab_status_set(self, git_repo, status, description, url):
+        status_map = dict(
+            # only statuses known by gitlab API
+            pending = 'pending',
+            failure = 'failed',
+            error = 'failed',
+            success = 'success',
+        )
+        try:
+            self.gl_commit.statuses.create({
+                'state': status_map[status],
+                'name': self.name,
+                'target_url': url,
+                'description': description
+            })
+        except gitlab.exceptions.GitlabCreateError as e:
+            git_repo.log.error("gitlabCreateError %s", e)
+
+
     def status_set(self, git_repo, status, description, url):
         if url:
             git_repo.log.info("status %s: %s [%s]", status, description, url)
         else:
             git_repo.log.info("status %s: %s", status, description)
-        self.github_status_set(git_repo, status, description, url)
+
+        if self.gl_commit:
+            self._gitlab_status_set(git_repo, status, description, url)
+        else:	# FIXME: this needs polishing
+            self.github_status_set(git_repo, status, description, url)
 
     def status_final_set(self, git_repo, url, cfs_n, cf_tree):
         if self.name.startswith("__"):
@@ -935,11 +1052,32 @@ def _lint_run(function, repo, _cf):
         context_global.warnings += context.warnings
         context_global.blockage += context.blockage
 
+# Are we working with gitlab?
+if args.gitlab_repo:
+    assert args.use == "HEAD", \
+        "Gitlab can be only used with --use-head"
+    gl_url = urllib.parse.urlparse(args.gitlab_repo)
+    gitlab_baseurl = "https://" + gl_url.hostname
+    gl = gitlab.Gitlab(gitlab_baseurl, private_token = args.gitlab_token)
+    gl.auth()
+    gl_project = gl.projects.get(gl_url.path[1:])
+    context_c.gl_commit = gl_project.commits.get(changedfile_c.gitrev_blame)
+    changedfile_c.gl_commit = context_c.gl_commit
+    context_c.gl_mr = gl_project.mergerequests.get(args.gitlab_mergerequest)
+    changedfile_c.gl_mr = context_c.gl_mr
+    print("DEBUG discussions gl_mr id %08x" % id(context_c.gl_mr))
+
+else:
+    gl = None
+    gl_commit = None
+    gl_mr = None
+    gl_project = None
+
 
 cfs_all = {}
 for _filename in git_repo.filenames:
     cfs_all[_filename] = changedfile_c(git_repo, _filename)
-        
+
 for _name, (lint_function, lint_filter, _shortname, _config) \
     in lint_functions_sorted:
     try:
