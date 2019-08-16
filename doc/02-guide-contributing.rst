@@ -144,6 +144,7 @@ running locally on your machine:
      every single system call...for those hard debug cases :)
 
    - Reload the systemd configuration::
+
        # systemctl daemon-reload
 
 Start the daemon with::
