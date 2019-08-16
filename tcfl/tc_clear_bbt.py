@@ -471,6 +471,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         self.subtc_list = []
         self.subtcs = {}
         self.test_bundle_name = os.path.basename(path)
+        self.bats_parallel = False
 
     #: Shall we capture a boot video if possible?
     capture_boot_video_source = "screen_stream"
@@ -693,8 +694,25 @@ EOF
                 target.capture.get(self.capture_boot_video_source,
                                    self.report_file_prefix + "boot.avi")
             raise
-        target.report_pass("Booted %s" % self.image)
+        target.report_pass("booted %s" % self.image)
 
+        # allow remote access while running the testcase, in case we
+        # need to poke around to monitor
+        tcfl.tl.linux_ssh_root_nopwd(target)
+        target.shell.run("systemctl restart sshd")
+        target.shell.run(		# wait for sshd to fully restart
+            "while ! curl -s http://localhost:22 | /usr/bin/fgrep SSH-2.0; do"
+            " sleep 1s; done", timeout = 15)
+
+        output = target.shell.run(
+            "bats --help | fgrep -q -- '  -j' || echo N''O # supports -j?",
+            output = True, trim = True)
+        if 'NO' not in output:
+            self.bats_parallel = True
+            # Yeah, we could use `getconf _NPROCESSORS_ONLN`, but this
+            # works, since we want to know how many processing units we
+            # can give bats.
+            target.shell.run("CPUS=$(grep -c ^processor /proc/cpuinfo)")
         # Why this? because a lot of the test output can be confused
         # with a prompt and the prompt regex then trips on it and
         # everything gets out of sync
@@ -851,10 +869,15 @@ EOF
             # Run the t_file
             # remember we cd'ed into the directory, the way these
             # BBTs are written, it is expected
+            if self.bats_parallel and 'use_parallel' in t_file:
+                # note we set CUPS in the target in start()
+                parallel = "-j $CPUS"
+            else:
+                parallel = ""
             run_timeout = _bundle_run_timeout(self, self.test_bundle_name, t_file)
             output = target.shell.run(
-                "bats --tap %s || echo FAILED''-%s"
-                % (t_file, self.kws['tc_hash']),
+                "bats --tap %s %s || echo FAILED''-%s"
+                % (t_file, parallel, self.kws['tc_hash']),
                 output = True, timeout = run_timeout)
             # top level result
             if 'bats: command not found' in output:
