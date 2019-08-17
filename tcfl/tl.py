@@ -376,3 +376,112 @@ def linux_wait_online(ic, target, loops = 10, wait_s = 0.5):
         "# block until the expected IP is assigned, we are online"
         % (loops, target.addr_get(ic, "ipv4"), wait_s, wait_s),
         timeout = (loops + 1) * wait_s)
+
+
+def linux_rsync_cache_lru_cleanup(target, path, max_kbytes):
+    """Cleanup an LRU rsync cache in a path in the target
+
+    An LRU rsync cache is a file tree which is used as an accelerator
+    to rsync trees in to the target for the POS deployment system;
+
+    When it grows too big, we need to purge the files/dirs that were
+    uploaded longest ago (as this indicates when it was the last time
+    they were used). For that we use the mtime and we sort by it.
+
+    Note this is quite naive, since we can't really calculate well the
+    space occupied by directories, which adds to the total...
+
+    So it sorts by reverse mtime (newest first) and iterates over the
+    list until the accumulated size is more than max_kbytes; then it
+    starts removing files.
+
+    """
+    assert isinstance(target, tcfl.tc.target_c)
+    assert isinstance(path, basestring)
+    assert max_kbytes > 0
+
+    target.report_info(
+        "rsync cache: reducing %s to %dMiB" % (path, max_kbytes / 1024.0))
+
+    prompt_original = target.shell.shell_prompt_regex
+    with target.on_console_rx_cm(
+            re.compile("^(.*Error|Exception):.*^>>> ", re.MULTILINE | re.DOTALL),
+            timeout = False, result = 'errr'):
+        try:
+            target.send("TTY=dumb python || python2 || python3")	 # launch python!
+            # This lists all the files in the path recursively, sorting
+            # them by oldest modification time first.
+            #
+            # In Python? Why? because it is much faster than doing it in
+            # shell when there are very large trees with many
+            # files. Make sure it is 2 and 3 compat.
+            #
+            # Note we are feeding lines straight to the python
+            # interpreter, so we need an extra newline for each
+            # indented block to close them.
+            #
+            # The list includes the mtime, the size and the name  (not using
+            # bisect.insort() because it doesn't support an insertion key
+            # easily).
+            #
+            # Then start iterating newest first until the total
+            # accumulated size exceeds what we have been 
+            # asked to free and from there on, wipe all files.
+            #
+            # Note we list directories after the files; since
+            # sorted(), when sorted by mtime is most likely they will
+            # show after their contained files, so we shall be able to
+            # remove empty dirs. Also, sorted() is stable. If they
+            # were actually needed, they'll be brought back by rsync
+            # at low cost.
+            #
+            # We use statvfs() to get the filesystem's block size to
+            # approximate the actual space used in the disk
+            # better. Still kinda naive.
+            #
+            # why not use scandir()? this needs to be able to run in
+            # python2 for older installations.
+            #
+            # walk: walk depth first, so if we rm all the files in a dir,
+            # the dir is empty and we will wipe it too after wiping
+            # the files; if stat fails with FileNotFoundError, that's
+            # usually a dangling symlink; ignore it. OSError will
+            # likely be something we can't find, so we ignore it too.
+            #
+            # And don't print anything...takes too long for large trees
+            target.shell.run("""
+import os, errno, stat
+fsbsize = os.statvfs('%(path)s').f_bsize
+l = []
+dirs = []
+for r, dl, fl in os.walk('%(path)s', topdown = False):
+    for fn in fl + dl:
+        fp = os.path.join(r, fn)
+        try:
+            s = os.stat(fp)
+            sd = fsbsize * ((s.st_size + fsbsize - 1) / fsbsize)
+            l.append((s.st_mtime, sd, fp, stat.S_ISDIR(s.st_mode)))
+        except (OSError, FileNotFoundError) as x:
+            pass
+
+
+acc = 0
+sc = %(max_bytes)d
+for e in sorted(l, key = lambda e: e[0], reverse = True):
+    acc += e[1]
+    if acc > sc:
+        if e[3]:
+            try:
+                os.rmdir(e[2])
+            except OSError as x:
+                if x.errno == errno.ENOTEMPTY:
+                    pass
+        else:
+            os.unlink(e[2])
+
+
+exit()
+""" % dict(path = path, max_bytes = max_kbytes * 1024))
+        finally:
+            target.shell.shell_prompt_regex = prompt_original
+

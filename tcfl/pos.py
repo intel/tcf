@@ -710,6 +710,11 @@ EOF""")
         overriden when flashing images. Then it will rsync it from there
         to the final location.
 
+        Note this cache directory can accumulate and grow too big;
+        :func:`target.pos.deploy_image
+        <tcfl.pos.extension.deploy_image>` will cap it to a top size
+        by removing the oldest files.
+
         This allows the content to be cached in between testcase execution
         that reimages the target. Thus, the first run, the whole source
         tree is transferred to the persistent area, but subsequent runs
@@ -995,6 +1000,37 @@ EOF""")
         ## }
         self.fsinfo = json.loads(output)
 
+    def _rootfs_cache_manage(self, target, root_part_dev):
+        # Figure out how much space is being consumed by the
+        # TCF persistent cache, we might have to clean up
+        du_regex = re.compile(r"^(?P<megs>[0-9]+)M\s+total$",
+                              re.MULTILINE)
+        # we don't care if the dir doesn't exist; -c makes it 0
+        du_output = target.shell.run(
+            "du -BM -sc /mnt/persistent.tcf.d 2> /dev/null || true"
+            "  # how much cached space; cleanup?", output = True)
+        match = du_regex.search(du_output)
+        if not match:
+            # if it doesn't exist, we still shall be able to parse
+            # that it is 0M and that's it -- so this might be a sign
+            # of something really wrong
+            raise tc.error_e("can't parse cache space measurement",
+                             dict(output = du_output))
+        megs = int(match.groupdict()['megs'])
+        # report it for general info
+        target.report_data(
+            "TCF persistant cache usage",
+            "%s:%s" % (target.fullid, root_part_dev), megs)
+        # FIXME: initial hardcoding for deployment testing, 3GiB
+        megs_top = 3 * 1024
+        if megs < megs_top:
+            target.report_skip("POS: cache uses %d/%dM: skipping cleanup" %
+                               (megs, megs_top))
+        else:
+            tl.linux_rsync_cache_lru_cleanup(target, "/mnt/persistent.tcf.d",
+                                             megs_top * 1024)
+
+
     def deploy_image(self, ic, image,
                      boot_dev = None, root_part_dev = None,
                      partitioning_fn = None,
@@ -1129,6 +1165,7 @@ EOF""")
                 root_part_dev = self.mount_fs(image_final, boot_dev)
                 kws['root_part_dev'] = root_part_dev
 
+                self._rootfs_cache_manage(target, root_part_dev)
                 target.report_info("POS: rsyncing %(image)s from "
                                    "%(rsync_server)s to %(root_part_dev)s"
                                    % kws,
