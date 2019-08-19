@@ -622,9 +622,9 @@ class extension(tc.target_extension_c):
         # bios_boot_time has to be all encapsulated in
         # boot_to_pos(), as it can be called from other areas
         testcase = target.testcase
-        timeout_original = testcase.tls.expecter.timeout
+        timeout_original = testcase.tls.expect_timeout
         try:
-            testcase.tls.expecter.timeout = bios_boot_time + timeout
+            testcase.tls.expect_timeout = bios_boot_time + timeout
             for tries in range(3):
                 target.report_info("POS: rebooting into Provisioning OS [%d/3]"
                                    % tries)
@@ -656,7 +656,7 @@ class extension(tc.target_extension_c):
                     "POS: tried too many times to boot, without signs of life",
                     { "console output": target.console.read(), 'target': target })
         finally:
-            testcase.tls.expecter.timeout = timeout_original
+            testcase.tls.expect_timeout = timeout_original
 
     def boot_normal(self, boot_to_normal_fn = None):
         """
@@ -1387,7 +1387,7 @@ EOF""")
                 # bios_boot_time has to be all encapsulated in
                 # boot_to_pos(), as it can be called from other areas
                 bios_boot_time = int(target.kws.get("bios_boot_time", 30))
-                testcase.tls.expecter.timeout = bios_boot_time + timeout
+                testcase.tls.expect_timeout = bios_boot_time + timeout
 
                 self.boot_to_pos(pos_prompt = _pos_prompt, timeout = timeout,
                                  boot_to_pos_fn = target_power_cycle_to_pos)

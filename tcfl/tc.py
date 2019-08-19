@@ -1353,7 +1353,7 @@ class target_c(object):
         if timeout == False:
             timeout = 0
         elif timeout == None:
-            timeout = self.testcase.tls.expecter.timeout
+            timeout = self.testcase.tls.expect_timeout
 
         if result == "pass":
             raise_on_found = None
