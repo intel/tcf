@@ -342,13 +342,26 @@ bundle_add_timeouts = {
     'devpkg-nautilus': 800, #144MB
     'devpkg-clutter-gst': 800, #251MB
     'education-primary' : 800, #266MB
-    'machine-learning-basic': 800, #1280MB
+    'machine-learning-basic': 1200, #1280MB
     'network-basic-dev': 800, #958MB
     'python-basic-dev': 800, #466MB
     'os-util-gui': 800, #218MB
     'service-os-dev': 800, #652MB
     'storage-cluster': 800, #211MB
-
+    'game-dev': 4800, # 3984
+    'database-basic-dev': 800, # 938
+    'devpkg-gnome-panel': 800, #183
+    'games': 800, # 761MB
+    'devpkg-gnome-online-accounts': 800, # 171MB
+    'desktop-kde-apps': 800, # 555 MB
+    'java9-basic': 800, # 347MB
+    'big-data-basic': 800, # (1049MB)
+    'maker-gis': 800, # (401MB)
+    'maker-cnc': 800, # (352MB)
+    'machine-learning-web-ui': 1200, # (1310MB)
+    'storage-util-dev': 800, # (920MB)
+    'openstack-common': 800, # (360MB)
+    'supertuxkart': 800 # (545 MB)
 }
 
 # ugly case here, as this is a hack made for a subdirectory that
@@ -584,7 +597,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
     #: if environ SWUPD_FIX_TIME is defined, set the target's time to
     #: the client's time
     fix_time = os.environ.get("SWUPD_FIX_TIME", None)
-    
+
     def _deploy_bbt(self, _ic, target, _kws):
         # note self.bbt_tree and self.rel_path_in_target are set by
         # configure_00_set_relpath_set(); this way if we call withtout
@@ -725,7 +738,7 @@ EOF
             target.shell.run(
                 "date -us '%s' && hwclock -wu"
                 % str(datetime.datetime.utcnow()))
-        
+
         target.shell.run(
             "test -f /etc/ca-certs/trusted/regenerate"
             " && rm -rf /run/lock/clrtrust.lock"
