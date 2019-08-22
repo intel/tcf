@@ -324,11 +324,11 @@ bundle_add_timeouts = {
     'desktop-autostart': 480,
     'LyX': 500,
     'machine-learning-tensorflow': 800,
-    'texlive': 800,
+    'texlive': 1000, #1061
     'education': 800,
     'os-core-dev': 800,
     # these are seriously big and need plenty of room not to fail randomly
-    'os-clr-on-clr': 1500,
+    'os-clr-on-clr': 8000,
     'os-testsuite': 1000,
     'os-testsuite-phoronix': 1000,
     'os-testsuite-phoronix-server': 1000,
@@ -343,12 +343,12 @@ bundle_add_timeouts = {
     'devpkg-clutter-gst': 800, #251MB
     'education-primary' : 800, #266MB
     'machine-learning-basic': 1200, #1280MB
-    'network-basic-dev': 800, #958MB
+    'network-basic-dev': 1200, #758MB
     'python-basic-dev': 800, #466MB
     'os-util-gui': 800, #218MB
     'service-os-dev': 800, #652MB
     'storage-cluster': 800, #211MB
-    'game-dev': 4800, # 3984
+    'game-dev': 6000, # 3984
     'database-basic-dev': 800, # 938
     'devpkg-gnome-panel': 800, #183
     'games': 800, # 761MB
@@ -361,7 +361,14 @@ bundle_add_timeouts = {
     'machine-learning-web-ui': 1200, # (1310MB)
     'storage-util-dev': 800, # (920MB)
     'openstack-common': 800, # (360MB)
-    'supertuxkart': 800 # (545 MB)
+    'supertuxkart': 800, # (545 MB)
+    'qt-basic-dev': 2400, # (1971MB)
+    'os-utils-gui-dev': 6000, #(3784MB)
+    'mail-utils-dev ': 1000, #(670MB)
+    'containers-basic-dev': 1200, #921MB
+    'R-rstudio': 1200, # 1041MB
+    'devpkg-opencv': 800, # 492MB
+    'storage-utils-dev': 1000, # 920 MB
 }
 
 # ugly case here, as this is a hack made for a subdirectory that
