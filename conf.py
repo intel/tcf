@@ -40,6 +40,7 @@ extensions = [
 autodoc_default_flags = [ 'members', 'undoc-members' ]
 autoclass_content = 'both'
 autodoc_member_order = 'bysource'
+autodoc_mock_imports = [ "raritan" ]
 
 # Bring in documentation from other packages
 intersphinx_mapping = {
@@ -50,6 +51,16 @@ intersphinx_mapping = {
     'requests': ( 'http://docs.python-requests.org/en/master/', None ),
     'serial': ('http://pythonhosted.org/pyserial/', None ),
 }
+
+# workaround:
+#
+## SOMEFILE.py:docstring of CLASS:: WARNING: py:class reference target not found: list
+#
+# Apaprently a backport bug to Python 2.7
+#
+# description: https://bugs.python.org/issue31117
+# workaround: https://stackoverflow.com/questions/11417221/sphinx-autodoc-gives-warning-pyclass-reference-target-not-found-type-warning
+nitpick_ignore = [('py:class', 'list')]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

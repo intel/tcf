@@ -371,11 +371,19 @@ bundle_add_timeouts = {
     'storage-utils-dev': 1000, # 920 MB
 }
 
-# ugly case here, as this is a hack made for a subdirectory that
-# contains .ts that we call from another .t looking sh.
-# it is a bad hack which calls for another bad hack
-# So do not try to run this subdir
-
+#: Map bundle path names
+#:
+#: Ugly case here; this is a bad hack to work around another one.
+#:
+#: In some testcases, the *.t* file is an actuall shell script that
+#: does some setup and then executes a real *.t* file, which has been
+#: detected with different name while we scanned for subcases.
+#:
+#: So this allows us to map what we detect (the regex) to what bats is
+#: then reported when running that hack (the replacement).
+#:
+#: Confusing.
+#:
 bundle_path_map = [
     # each entry is a regex that is matched and what is replaced with
     # re.sub()

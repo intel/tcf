@@ -281,7 +281,7 @@ class skip_e(exception):
 #:
 #: - *skip*: the testcase has detected a condition that deems it not
 #:   applicable and thus shall be skipped (raise
-#    :py:exc:`tcfl.tc.skipped_e`)
+#:   :py:exc:`tcfl.tc.skip_e`)
 valid_results = dict(
     PASS = ( 'pass', 'passed' ),
     ERRR = ( 'error', 'errored' ),
@@ -4373,8 +4373,7 @@ class tc_c(object):
     #: or even in the testcase itself, before it assigns (in build or
     #: config methods)
     #:
-    #: >>> self.assign_timeout = 15 * 60 * 60
-    
+    #: >>> self.assign_timeout = 15 * 60 * 60    
     assign_timeout = 1000
 
     # FIXME: add phase "assign"
