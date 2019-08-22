@@ -40,7 +40,13 @@ extensions = [
 autodoc_default_flags = [ 'members', 'undoc-members' ]
 autoclass_content = 'both'
 autodoc_member_order = 'bysource'
-autodoc_mock_imports = [ "raritan" ]
+# some imports can't be put in the build slaves without major effort
+# and in any case, they are unneeed to build docs.
+autodoc_mock_imports = [
+    "prctl",
+    "raritan",
+    "requests_ntlm",
+]
 
 # Bring in documentation from other packages
 intersphinx_mapping = {
