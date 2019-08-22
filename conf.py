@@ -108,6 +108,7 @@ exclude_patterns = [
     # which happens when including these files inside a bigger
     # one. Seems a bug in Sphinx that might have be fixed in newer
     # releases.
+    # Individual files we have included 
     "doc/02-guide-contributing.rst",
     "doc/02-guide-tcf.rst",
     "doc/02-guide-tests.rst",
@@ -115,6 +116,9 @@ exclude_patterns = [
     "doc/02-guide-report-drivers.rst",
     "doc/02-guide-tcf-run.rst",
     "doc/02-guide-app-builder.rst",
+    # these are the files we always include, so let's have them
+    # excluded from being autoadded to avoid duplicates
+    "doc/*-LL-*.rst",
 ]
 
 # The reST default role (used for this markup: `text`) to use for all
