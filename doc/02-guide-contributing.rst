@@ -91,6 +91,10 @@ running locally on your machine:
      $ chmod g+rX ~
      $ chmod -R g+rX ~/tcf.git
 
+4. Create a user and group *ttbd*::
+
+     # useradd -U ttbd
+     
 4. Create a staging configuration directory `/etc/ttbd-staging`, make it
    owned by your user, so you don’t have to work as root::
 
