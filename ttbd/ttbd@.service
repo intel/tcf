@@ -85,7 +85,7 @@ Group = ttbd
 SupplementaryGroups = dialout root kvm video audio
 # Clean compiled Python to avoid old files (from removed .py)
 ExecStartPre = /bin/rm -f /etc/ttbd-%i/*.pyc
-ExecStartPre = /usr/bin/install -vv -d --mode 2770 --owner ttbd --group ttbd /var/run/ttbd-%i /var/cache/ttbd-%i
+ExecStartPre =  /usr/bin/install -vv -d --mode 2770 --owner ttbd --group ttbd /var/lib/ttbd /var/run/ttbd-%i /var/cache/ttbd-%i
 ExecStart = /usr/bin/ttbd -vv -w %i
 TimeoutSec = 300
 NotifyAccess = all
