@@ -14,6 +14,7 @@ Infrastructure for reporting test case results and progress in a modular way.
 """
 import codecs
 import contextlib
+import datetime
 import inspect
 import logging
 import os
@@ -73,7 +74,9 @@ class report_c(object):
     def verbosity_set(self, verbosity):
         self.verbosity = verbosity
 
-    def _report(self, level, alevel, ulevel, _tc, tag, message, attachments):
+    def _report(self, level, alevel, ulevel, 
+                _tc, tag, message, attachments,
+                options):
         """
         Low level reporting
 
@@ -86,9 +89,12 @@ class report_c(object):
         :param dict: dictionary of attachments; either an open file,
             to report the contents of the file or list of strings or
             strings or whatever
+        :param options: dictionary of options. Can be anything.
         """
         for rd in self._drivers:
-            rd._report(level, alevel, ulevel, _tc, tag, message, attachments)
+            rd._report(level, alevel, ulevel, 
+                       _tc, tag, message, attachments,
+                       {})
         raise NotImplementedError
 
     _drivers = []
@@ -188,9 +194,14 @@ class report_c(object):
             ulevel = 0
         if attachments != None:
             assert isinstance(attachments, dict)
+
+        utctime = datetime.datetime.utcnow()
+        options = { 'timestamp'   : utctime, 
+                    'timestamp_h' : "%sZ" % (utctime.isoformat()) }
         for rd in cls._drivers:
             rd._report(level, alevel, ulevel, _tc,
-                       tag, message, attachments)
+                       tag, message, attachments,
+                       options)
 
 
 class report_console_c(report_c):
@@ -310,11 +321,17 @@ class report_console_c(report_c):
                                 % (prefix, key, e, traceback.format_exc()))
 
 
-    def _report(self, level, alevel, ulevel, _tc, tag, message, attachments):
-        _prefix = "%s%d/%s\t" % (tag, level,
-                                 tcfl.msgid_c.ident()) + _tc.report_mk_prefix()
-        _aprefix = "%s%d/%s\t" % (
-            tag, alevel, tcfl.msgid_c.ident()) + _tc.report_mk_prefix()
+    def _report(self, level, alevel, ulevel, 
+                _tc, tag, message, attachments,
+                options):
+        utctime = options['timestamp_h'] if 'timestamp_h' in options else ''
+
+        _prefix = "%s%d/%s\t%s\t"  % (tag, level, 
+                                      tcfl.msgid_c.ident(), utctime) \
+                  + _tc.report_mk_prefix()
+        _aprefix = "%s%d/%s\t%s\t" % (tag, alevel, 
+                                      tcfl.msgid_c.ident(), utctime) \
+                  + _tc.report_mk_prefix()
         with self.lock:
             self._report_writer(level, "%s: %s\n" % (_prefix, message))
             if attachments != None:
@@ -596,7 +613,9 @@ class file_c(report_c):
         i = i[:4]
         return "%s%s" % (runid, i)
 
-    def _report(self, level, alevel, ulevel, _tc, tag, message, attachments):
+    def _report(self, level, alevel, ulevel,
+                _tc, tag, message, attachments,
+                options):
         """
         Report data to log files for a possible failure report later
 
@@ -645,7 +664,10 @@ class file_c(report_c):
                 # If empty, give it a to snip token that we'll replace
                 # later in mkreport
                 ident = "<snip>"
-            _prefix = "%s %d %s%s\t" % (tag, level, ident, tgname)
+            utctime = options['timestamp_h'] \
+                      if 'timestamp_h' in options else ''
+            _prefix = "%s %d %s%s\t%s\t" \
+                      % (tag, level, ident, tgname, utctime)
             self._write(f, u"%s %s\n" % (_prefix, message))
             if attachments != None:
                 assert isinstance(attachments, dict)
@@ -835,7 +857,9 @@ class file_c(report_c):
             # the template might specify a new directory path that
             # still does not exist
             commonl.makedirs_p(os.path.dirname(file_name), 0o750)
+
             with codecs.open(file_name, "w", encoding = 'utf-8',
                              errors = 'ignore') as fo:
                 for text in template.generate(**kws):
                     fo.write(text)
+

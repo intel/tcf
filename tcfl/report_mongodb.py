@@ -144,7 +144,9 @@ class report_mongodb_c(tcfl.report.report_c):
         self.db = None
         self.results = None
 
-    def _report(self, level, alevel, ulevel, _tc, tag, message, attachments):
+    def _report(self, level, alevel, ulevel, 
+                _tc, tag, message, attachments,
+                options):
         """
         Report data to documents in mongodb; we accumulate all the
         data until the completion message and at that point we
