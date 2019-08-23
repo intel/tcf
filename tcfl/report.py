@@ -857,7 +857,9 @@ class file_c(report_c):
             # the template might specify a new directory path that
             # still does not exist
             commonl.makedirs_p(os.path.dirname(file_name), 0o750)
-
+            utctime=datetime.datetime.utcnow().replace(microsecond=0)
+            kws['report_timestamp'] = utctime
+            kws['report_timestamp_h'] = "%sZ" % (utctime.isoformat())
             with codecs.open(file_name, "w", encoding = 'utf-8',
                              errors = 'ignore') as fo:
                 for text in template.generate(**kws):
