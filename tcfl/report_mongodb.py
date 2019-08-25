@@ -8,7 +8,9 @@
 # TCF report driver for MongoDB
 import codecs
 import datetime
+import os
 import pymongo
+
 import tcfl.tc
 import tcfl.report
 
@@ -143,6 +145,22 @@ class report_mongodb_c(tcfl.report.report_c):
         self.mongo_client = None
         self.db = None
         self.results = None
+        # It might happen dep on the version of pymongo that we get
+        # this if we pass the data structure over forks and then it
+        # doesn't work:
+        #
+        #   /usr/lib64/python2.7/site-packages/pymongo/topology.py:149:
+        #     UserWarning: MongoClient opened before fork. Create
+        #     MongoClient only after forking. See PyMongo's documentation
+        #     for details:
+        #     http://api.mongodb.org/python/current/faq.html#is-pymongo-fork-safe
+        #
+        #   "MongoClient opened before fork. Create MongoClient only "
+        #
+        # So we record on _mongo_setup() what was the PID we used to
+        # create it and when we recheck if we have to call
+        # _mongo_setup() again, we also do it if we are in a different PID.
+        self.made_in_pid = None
 
     def _report(self, level, alevel, ulevel, _tc, tag, message, attachments):
         """
@@ -281,6 +299,7 @@ class report_mongodb_c(tcfl.report.report_c):
         self.mongo_client = pymongo.MongoClient(self.url, **self.extra_params)
         self.db = self.mongo_client[self.db_name]
         self.results = self.db[self.collection_name]
+        self.made_in_pid = os.getpid()
 
     def _complete(self, _tc, runid, hashid, tc_name, doc):
         """
@@ -333,7 +352,7 @@ class report_mongodb_c(tcfl.report.report_c):
 
         retry_count = 1
         while retry_count <= 3:
-            if not self.results:
+            if not self.results or self.made_in_pid != os.getpid():
                 self._mongo_setup()
             try:
                 # We replace any existing reports for this _id -- if that
