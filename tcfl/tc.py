@@ -5566,6 +5566,173 @@ class tc_c(object):
         return c
 
     @result_c.from_exception
+    def _permutations_make(self, rt_all, rt_selected, ic_selected):
+        # FIXME: maybe move this to __init__
+        self._methods_prepare()	# setup phase running methods
+        self.rt_all = rt_all
+        if self.is_static():
+            if self._dry_run:
+                self.report_info("will run")
+            rt_selected = { 'local': rt_all['local']['bsp_models'].keys() }
+            ic_selected = { }
+
+        # This will be now testcase-specific, so make a deep copy
+        # so it can be modified by the testcase -- note we might alter
+        # FIXME: note we might not need this deep coy --
+        # verify once the reorg is done
+        self.rt_selected = copy.deepcopy(rt_selected)
+        self.ic_selected = copy.deepcopy(ic_selected)
+
+        # list candidates to interconnects
+        #
+        # We requested R interconnects [len(self._interconnects)] and we
+        # have ic_selected as candidates for those interconnects. Each
+        # interconnect requested might put restrictons to which
+        # interconnects can be used. So in ic_candidates, return which of
+        # ic_selected can be used for each interconnect.
+        self.report_info("interconnect groups: finding remote ic targets",
+                         dlevel = 6)
+        ic_candidates = self._target_wants_find_candidates(
+            self._interconnects, ic_selected)
+        self.report_info("interconnect groups: available remote ic "
+                         "targets: %s" % self._selected_str(ic_selected),
+                         dlevel = 5)
+        # The list of candidates to interconnects could be arranged in
+        # different ways. Permutations will make it grow quick. If IC0 =
+        # {AB}, IC1={ABC} and IC2={ABC}, there is an upper ceiling of
+        # N!/(N-R)!, where R is the number of interconnects and N is the
+        # max number of available candidates (len(ic_selected) (the real
+        # ceiling will be lower as this is not a pure permutation
+        # problem--some of the sets of candidates don't include all the
+        # available N candidates in ic_selected and I don't really know if
+        # there is a math way to compute it -- internet got too dense for
+        # my limited set theory knowledge quite quick).
+        #
+        # So we are just going to generate a few at random; if we only have
+        # one interconnect, we'll try to get one for each type of
+        # interconnect. Otherwise we use the command line to limit the
+        # amount of IC groups we create.
+        if len(self._interconnects) == 1:
+            ic_want_name = list(self._interconnects)[0]
+            max_permutations = \
+                len(self._rt_types(ic_candidates[ic_want_name]))
+        else:
+            # FIXME: get from command line and defaults
+            max_permutations = 10
+        self.report_info("interconnect groups: generating %d by "
+                         "permuting remote ic targets" %
+                         max_permutations, dlevel = 6)
+        ic_permutations = self._target_wants_list_permutations(
+            ic_candidates, max_permutations, tag = "interconnect")
+        if len(self._interconnects):
+            if len(ic_permutations) == 0:
+                type(self).class_result += result_c(0, 0, 0, 0, 1)
+                raise skip_e("WARNING! No interconnects available")
+        elif len(self._interconnects) == 0:
+            # Cheat, when we don't use interconnects, just define an empty
+            # one so we enter into the loop below
+            ic_permutations = { "all": { } }
+        for icgid, icg in ic_permutations.iteritems():
+            self.report_info("interconnect group %s: %s"
+                             % (icgid, self._tg_str(icg)), dlevel = 5)
+
+
+        # FIXME: now filter them
+
+        # Now that we have a set of interconnect permutations, we need
+        # to select, for each, which targets fit in the permutation
+        # Basically, this is a simple OR, if the target is in any of
+        # the interconnects, it's good to go.
+        self.report_info("interconnect groups: finding remote "
+                         "targets available for each",
+                         dlevel = 6)
+        icg_selected = collections.defaultdict(dict)
+        for icgid, icg in ic_permutations.iteritems():
+            for icwn, (rtic, _) in icg.iteritems():
+                rtic_id = self.rt_all[rtic]['id']
+                for rt_full_id, bsp_models in rt_selected.iteritems():
+                    rt = self.rt_all[rt_full_id]
+                    if rtic_id in rt.get('interconnects', {}):
+                        icg_selected[icgid][rt_full_id] = bsp_models
+            if icgid == "all":	# No interconnects, take'em all
+                icg_selected[icgid] = dict(rt_selected)
+
+            if not icg_selected[icgid]:
+                type(self).class_result += result_c(0, 0, 0, 0, 1)
+                self.report_skip(
+                    "interconnect group %s (%s): no targets can be used!!"
+                    % (icgid, self._tg_str(icg)), dlevel = 3)
+            else:
+                self.report_info(
+                    "interconnect group %s (%s): candidate targets "
+                    "available: %s" %
+                    (icgid, self._tg_str(icg),
+                     self._selected_str(icg_selected[icgid])),
+                    dlevel = 4)
+
+        # So now icg_selected is a dict, keyed by interconnet
+        # group name, which contains the remote targets that are
+        # valid candidates to be used for that interconnect group
+        # (so they satisfy the condition of being in any of the
+        # interconnects that are required for the group).
+        #
+        # So now, for each of those interconnect groups we need to
+        # generate a list of target groups.
+        self.report_info("interconnect groups: generating target "
+                         "groups for each", dlevel = 6)
+        rt_candidates = {}
+        rt_permutations = {}
+        target_want_list = set(self._targets.keys()) - self._interconnects
+        for icgid, rt_selected in icg_selected.iteritems():
+            # Generate keywords that describe the current
+            # interconnects
+            kws_ics = dict()
+            for icwn, ic in ic_permutations[icgid].iteritems():
+                commonl.kws_update_from_rt(kws_ics, self.rt_all[ic[0]],
+                                           prefix = icwn + ".")
+            # list candidates to targets in this interconnect group
+            self.report_info("interconnect group %s: "
+                             "finding remote target candidates" %
+                             icgid, dlevel = 8)
+            rt_candidates = self._target_wants_find_candidates(
+                target_want_list, rt_selected, kws_ics)
+            self.report_info("interconnect group %s: "
+                             "remote target candidates: %s"
+                             % (icgid, pprint.pformat(rt_candidates)),
+                             dlevel = 7)
+
+            # Generate permutations of targets wants vs available
+            # targets for this interconnect group
+            if len(target_want_list) == 1:
+                twn = list(target_want_list)[0]
+                max_permutations = len(self._rt_types(rt_candidates[twn]))
+            else:
+                max_permutations = tc_c.max_permutations
+
+            self.report_info("interconnect group %s: generating "
+                             "target groups" % icgid, dlevel = 6)
+            tgs = self._target_wants_list_permutations(
+                rt_candidates, max_permutations, name_prefix = icgid)
+            if tgs:
+                for tgid, tg in tgs.iteritems():
+                    rt_permutations[(icgid, tgid)] = tg
+            elif len(self._targets) == 0: # static TC
+                ic_permutations["localic"] = {}
+                rt_permutations = { ("localic", "localtg") : {} }
+            elif len(target_want_list) == 0: # only ICs?
+                self.report_info("interconnect group %s: "
+                                 "no targets needed" % (icgid),
+                                 dlevel = 4)
+                # FIXME: fix so if tgid == None, nothjing is printed
+                rt_permutations[(icgid, None)] = {}
+            else:
+                self.report_info("interconnect group %s: "
+                                 "not enough targets" % (icgid),
+                                 dlevel = 4)
+        return ic_permutations, rt_permutations
+
+
+    @result_c.from_exception
     def _run_on_targets(self, tp, rt_all, rt_selected, ic_selected):
         """
         Launch the test case execution, in one or more background
@@ -5597,168 +5764,8 @@ class tc_c(object):
         try:
             threads = []
 
-            # FIXME: maybe move this to __init__
-            self._methods_prepare()	# setup phase running methods
-            self.rt_all = rt_all
-            if self.is_static():
-                if self._dry_run:
-                    self.report_info("will run")
-                rt_selected = { 'local': rt_all['local']['bsp_models'].keys() }
-                ic_selected = { }
-
-            # This will be now testcase-specific, so make a deep copy
-            # so it can be modified by the testcase -- note we might alter
-            # FIXME: note we might not need this deep coy --
-            # verify once the reorg is done
-            self.rt_selected = copy.deepcopy(rt_selected)
-            self.ic_selected = copy.deepcopy(ic_selected)
-
-            # list candidates to interconnects
-            #
-            # We requested R interconnects [len(self._interconnects)] and we
-            # have ic_selected as candidates for those interconnects. Each
-            # interconnect requested might put restrictons to which
-            # interconnects can be used. So in ic_candidates, return which of
-            # ic_selected can be used for each interconnect.
-            self.report_info("interconnect groups: finding remote ic targets",
-                             dlevel = 6)
-            ic_candidates = self._target_wants_find_candidates(
-                self._interconnects, ic_selected)
-            self.report_info("interconnect groups: available remote ic "
-                             "targets: %s" % self._selected_str(ic_selected),
-                             dlevel = 5)
-            # The list of candidates to interconnects could be arranged in
-            # different ways. Permutations will make it grow quick. If IC0 =
-            # {AB}, IC1={ABC} and IC2={ABC}, there is an upper ceiling of
-            # N!/(N-R)!, where R is the number of interconnects and N is the
-            # max number of available candidates (len(ic_selected) (the real
-            # ceiling will be lower as this is not a pure permutation
-            # problem--some of the sets of candidates don't include all the
-            # available N candidates in ic_selected and I don't really know if
-            # there is a math way to compute it -- internet got too dense for
-            # my limited set theory knowledge quite quick).
-            #
-            # So we are just going to generate a few at random; if we only have
-            # one interconnect, we'll try to get one for each type of
-            # interconnect. Otherwise we use the command line to limit the
-            # amount of IC groups we create.
-            if len(self._interconnects) == 1:
-                ic_want_name = list(self._interconnects)[0]
-                max_permutations = \
-                    len(self._rt_types(ic_candidates[ic_want_name]))
-            else:
-                # FIXME: get from command line and defaults
-                max_permutations = 10
-            self.report_info("interconnect groups: generating %d by "
-                             "permuting remote ic targets" %
-                             max_permutations, dlevel = 6)
-            ic_permutations = self._target_wants_list_permutations(
-                ic_candidates, max_permutations, tag = "interconnect")
-            if len(self._interconnects):
-                if len(ic_permutations) == 0:
-                    type(self).class_result += result_c(0, 0, 0, 0, 1)
-                    raise skip_e("WARNING! No interconnects available")
-            elif len(self._interconnects) == 0:
-                # Cheat, when we don't use interconnects, just define an empty
-                # one so we enter into the loop below
-                ic_permutations = { "all": { } }
-            for icgid, icg in ic_permutations.iteritems():
-                self.report_info("interconnect group %s: %s"
-                                 % (icgid, self._tg_str(icg)), dlevel = 5)
-
-
-            # FIXME: now filter them
-
-            # Now that we have a set of interconnect permutations, we need
-            # to select, for each, which targets fit in the permutation
-            # Basically, this is a simple OR, if the target is in any of
-            # the interconnects, it's good to go.
-            self.report_info("interconnect groups: finding remote "
-                             "targets available for each",
-                             dlevel = 6)
-            icg_selected = collections.defaultdict(dict)
-            for icgid, icg in ic_permutations.iteritems():
-                for icwn, (rtic, _) in icg.iteritems():
-                    rtic_id = self.rt_all[rtic]['id']
-                    for rt_full_id, bsp_models in rt_selected.iteritems():
-                        rt = self.rt_all[rt_full_id]
-                        if rtic_id in rt.get('interconnects', {}):
-                            icg_selected[icgid][rt_full_id] = bsp_models
-                if icgid == "all":	# No interconnects, take'em all
-                    icg_selected[icgid] = dict(rt_selected)
-
-                if not icg_selected[icgid]:
-                    type(self).class_result += result_c(0, 0, 0, 0, 1)
-                    self.report_skip(
-                        "interconnect group %s (%s): no targets can be used!!"
-                        % (icgid, self._tg_str(icg)), dlevel = 3)
-                else:
-                    self.report_info(
-                        "interconnect group %s (%s): candidate targets "
-                        "available: %s" %
-                        (icgid, self._tg_str(icg),
-                         self._selected_str(icg_selected[icgid])),
-                        dlevel = 4)
-
-            # So now icg_selected is a dict, keyed by interconnet
-            # group name, which contains the remote targets that are
-            # valid candidates to be used for that interconnect group
-            # (so they satisfy the condition of being in any of the
-            # interconnects that are required for the group).
-            #
-            # So now, for each of those interconnect groups we need to
-            # generate a list of target groups.
-            self.report_info("interconnect groups: generating target "
-                             "groups for each", dlevel = 6)
-            rt_candidates = {}
-            rt_permutations = {}
-            target_want_list = set(self._targets.keys()) - self._interconnects
-            for icgid, rt_selected in icg_selected.iteritems():
-                # Generate keywords that describe the current
-                # interconnects
-                kws_ics = dict()
-                for icwn, ic in ic_permutations[icgid].iteritems():
-                    commonl.kws_update_from_rt(kws_ics, self.rt_all[ic[0]],
-                                               prefix = icwn + ".")
-                # list candidates to targets in this interconnect group
-                self.report_info("interconnect group %s: "
-                                 "finding remote target candidates" %
-                                 icgid, dlevel = 8)
-                rt_candidates = self._target_wants_find_candidates(
-                    target_want_list, rt_selected, kws_ics)
-                self.report_info("interconnect group %s: "
-                                 "remote target candidates: %s"
-                                 % (icgid, pprint.pformat(rt_candidates)),
-                                 dlevel = 7)
-
-                # Generate permutations of targets wants vs available
-                # targets for this interconnect group
-                if len(target_want_list) == 1:
-                    twn = list(target_want_list)[0]
-                    max_permutations = len(self._rt_types(rt_candidates[twn]))
-                else:
-                    max_permutations = tc_c.max_permutations
-
-                self.report_info("interconnect group %s: generating "
-                                 "target groups" % icgid, dlevel = 6)
-                tgs = self._target_wants_list_permutations(
-                    rt_candidates, max_permutations, name_prefix = icgid)
-                if tgs:
-                    for tgid, tg in tgs.iteritems():
-                        rt_permutations[(icgid, tgid)] = tg
-                elif len(self._targets) == 0: # static TC
-                    ic_permutations["localic"] = {}
-                    rt_permutations = { ("localic", "localtg") : {} }
-                elif len(target_want_list) == 0: # only ICs?
-                    self.report_info("interconnect group %s: "
-                                     "no targets needed" % (icgid),
-                                     dlevel = 4)
-                    # FIXME: fix so if tgid == None, nothjing is printed
-                    rt_permutations[(icgid, None)] = {}
-                else:
-                    self.report_info("interconnect group %s: "
-                                     "not enough targets" % (icgid),
-                                     dlevel = 4)
+            ic_permutations, rt_permutations = self._permutations_make(
+                rt_all, rt_selected, ic_selected)
 
             # So now we are going to iterate over all the groups
             for (icgid, tgid), tg in rt_permutations.iteritems():
@@ -5770,6 +5777,11 @@ class tc_c(object):
                         tg_name = tgid
                     else:
                         tg_name = "%s-%s" % (icgid, tgid)
+                # create a representation of the name that indicates
+                # the twn/role, such as
+                #
+                # ic=SERVER1/nwa target=SERVER2/target2 target2=SERVER1/target3
+                icg = ic_permutations[icgid]
                 strs = []
                 icg_str = self._tg_str(icg)
                 if len(icg_str):
@@ -5782,12 +5794,12 @@ class tc_c(object):
                 group_str = " ".join(strs)
                 del strs
 
-                icg = ic_permutations[icgid]
                 tc_for_tg = self._clone()
                 if self._dry_run:
                     self.report_info("will run on target group '%s'"
                                      % group_str, dlevel = 1)
                     continue
+
                 # FIXME: this order could be better
                 target_group = target_group_c(group_str)
                 # Ids of the interconnect targets we'll be using
