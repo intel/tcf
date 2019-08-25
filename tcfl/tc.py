@@ -82,6 +82,8 @@ target lock--note this does not conflict with other users, as the
 tickets are namespaced per-user. This allows the server log to be used
 to crossreference what was being ran, to sort out issues.
 
+The *hash* length (number of characters used) is controlled by
+:data:`tcfl.tc.tc_c.hashid_len`.
 """
 import ast
 import atexit
@@ -2849,6 +2851,29 @@ class tc_c(object):
         return not self._targets
 
 
+    #: Number of characters in the testcase's :term:`hash`
+    #:
+    #: The testcase's *HASHID* is a unique identifier to identify a
+    #: testcase the group of test targets where it ran.
+    #:
+    #: This defines the lenght of such hash; before it used 4 to be
+    #: four but once over 40k testcases are being run, conflicts start
+    #: to pop up, where more than one testcase/target combo maps to
+    #: the same hash.
+    #:
+    #:  32 ^ 4 = 1048576 unique combinations
+    #:
+    #:  32 ^ 6 = 1073741824 unique combinations
+    #:
+    #: 6 chars offers a keyspace 1024 times larger with base32 than
+    #: 4 chars. Base64 increases the amount, but not that much
+    #: compared to the ease of confusion between caps and non caps.
+    #:
+    #: So it has been raised to 6.
+    #:
+    #: FIXME: add a registry to warn of used ids
+    hashid_len = 6
+
     # Reporting interface FIXME: document
     def report_pass(self, message, attachments = None,
                     level = None, dlevel = 0, alevel = 2, ulevel = 5):
@@ -5362,7 +5387,8 @@ class tc_c(object):
                             if self.target_group else 'n/a'
         if ticket == None:
             self.ticket = msgid_c.encode(
-                self._hash_salt + self.name + target_group_name, 4)
+                self._hash_salt + self.name + target_group_name,
+                self.hashid_len)
         else:
             self.ticket = self._ident
 
@@ -5391,7 +5417,7 @@ class tc_c(object):
             global log_dir
             self.report_file_prefix = os.path.join(
                 log_dir, "report-%(runid)s:%(tc_hash)s." % self.kws)
-            with msgid_c(self.ticket, depth = 1, l = 4) as msgid:
+            with msgid_c(self.ticket, depth = 1, l = self.hashid_len) as msgid:
                 self._ident = msgid_c.ident()
                 try:
                     self.report_info("will run on target group '%s'"
@@ -5427,7 +5453,7 @@ class tc_c(object):
         except Exception as e:
             # This msgid_c context is a hack so that this exception
             # report has a proper RUNID and HASH prefix
-            with msgid_c(self.ticket, depth = 0, l = 4) as msgid:
+            with msgid_c(self.ticket, depth = 0, l = self.hashid_len) as msgid:
                 self.report_blck(
                     "BUG exception: %s %s" % (type(e).__name__, e),
                     { 'exception info': traceback.format_exc() },
@@ -5942,7 +5968,8 @@ class tc_c(object):
             except Exception as e:
                 tc_fake = tc_c(file_name, file_name, "builtin")
                 tc_fake.mkticket()
-                with msgid_c(tc_fake.ticket, depth = 1, l = 4) as _msgid:
+                with msgid_c(tc_fake.ticket, depth = 1, l = cls.hashid_len) \
+                     as _msgid:
                     tc_fake._ident = msgid_c.ident()
                     retval = result_c.report_from_exception(tc_fake, e)
                     tc_fake.finalize(retval)
@@ -6156,7 +6183,7 @@ def testcases_discover(tcs_filtered, args):
             tcs_filtered[tc_path] = tc
         except exception as e:
             tc.mkticket()
-            with msgid_c(tc.ticket, l = 4) as _msgid:
+            with msgid_c(tc.ticket, l = tc_c.hashid_len) as _msgid:
                 tc._ident = msgid_c.ident()
                 result += result_c.report_from_exception(tc, e)
 
@@ -6479,7 +6506,7 @@ def _run(args):
         tc_c.jobs = len(tcs_filtered)
         for tc in tcs_filtered.values():
             tc.mkticket()
-            with msgid_c(tc.ticket, l = 4) as _msgid:
+            with msgid_c(tc.ticket, l = tc_c.hashid_len) as _msgid:
                 tc._ident = msgid_c.ident()
                 _threads = tc._run_on_targets(tp, rt_all,
                                               rt_selected, ic_selected)
@@ -6509,7 +6536,7 @@ def _run(args):
                 continue
             else:
                 seen_classes.add(cls)
-                with msgid_c(tc.ticket, l = 4, depth = 0,
+                with msgid_c(tc.ticket, l = tc_c.hashid_len, depth = 0,
                              phase = "class_teardown") as _msgid:
                     result += tc._class_teardowns_run()
         # If something failed or blocked, report totals verbosely

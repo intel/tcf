@@ -18,8 +18,9 @@ Glossary
 
    hash
 
-     In the context of *tcf run*, a hash is a four character code that
-     uniquely identifies the test case name and the target where it ran.
+     In the context of *tcf run*, a hash is a six character code that
+     uniquely identifies the test case name and the target/s where it
+     ran.
 
    herd
 
