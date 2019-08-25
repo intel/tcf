@@ -2505,6 +2505,28 @@ class tc_c(object):
               code which will be instantiated in another class without
               it being confused with a testcase.
 
+    :param str name: the name of the testcase
+    :param str tc_file_path: the path to the file where the testcase
+      was found
+    :param str origin: the origin of the testcase (in most cases this
+      is a string *FILENAME:LINE*)
+
+    Note that in the most cases, the three arguments will be the same,
+    as the name of the testcase will be the same as the path where the
+    test case is found and if there is only one testcase per file, the
+    origin is either line 1 or no line.
+
+    When a file contains specifies multiple testcases, then they can
+    be created such as:
+
+     - name TCFILEPATH#TCCASENAME
+     - tc_file_path TCFILEPATH
+     - origin TCFILEPATH:LINENUMBER (matching the line number where
+       the subcase is specified)
+
+    this allows a well defined namespace in which cases from multiple
+    files that are run at the same time don't conflict in name.
+
     The runner will call the testcase methods to evaluate the test;
     any failure/blockage causes the evaluation to stop and move on to
     the next testcase:
