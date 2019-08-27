@@ -1962,6 +1962,17 @@ class result_c():
         return result
 
     @staticmethod
+    def from_exception_cpe(tc, e, result_e = error_e):
+        return result_c.report_from_exception(
+            tc, e, attachments = {
+                "output": e.output,
+                "return": e.returncode,
+                "cmd": e.cmd
+            },
+            force_result = result_e
+        )
+
+    @staticmethod
     def from_exception(fn):
         """
         Call a phase function to translate exceptions into
@@ -1987,13 +1998,7 @@ class result_c():
             # Some exceptions that are common and we know about, so we
             # can print some more info that will be helpful
             except subprocess.CalledProcessError as e:
-                return result_c.report_from_exception(
-                    _tc, e, attachments = {
-                        "output": e.output,
-                        "return": e.returncode,
-                        "cmd": e.cmd
-                    }, force_result = error_e
-                )
+                return result_c.from_exception_cpe(_tc, e)
             except OSError as e:
                 attachments = dict(
                     errno = e.errno,
@@ -5966,27 +5971,50 @@ class tc_c(object):
                 raise AssertionError(
                     "%s: unknown # of arguments %d to is_testcase()"
                     % (_tc_driver, len(argspec.args)))
-            
+
+        def _is_testcase_call(tc_driver, file_name, from_path):
+            style = _style_get(tc_driver)
+            # hack to support multiple versions of the interface
+            if style == 2:
+                return tc_driver.is_testcase(file_name)
+            elif style == 3:
+                return tc_driver.is_testcase(file_name, from_path)
+            raise AssertionError("bad style %d" % style)
+
         for _tc_driver in cls._tc_drivers:
             tc_instances = []
-            try:
-                style = _style_get(_tc_driver)
-                # hack to support multiple versions of the interface
-                if style == 2:
-                    tc_instances += _tc_driver.is_testcase(file_name)
-                elif style == 3:
-                    tc_instances += _tc_driver.is_testcase(file_name,
-                                                           from_path)
-            except Exception as e:
-                tc_fake = tc_c(file_name, file_name, "builtin")
-                tc_fake.mkticket()
-                with msgid_c(tc_fake.ticket, depth = 1, l = cls.hashid_len) \
-                     as _msgid:
-                    tc_fake._ident = msgid_c.ident()
+            # new one all the time, in case we use it and close it
+            tc_fake = tc_c(file_name, file_name, "builtin")
+            tc_fake.mkticket()
+            tc_fake._ident = msgid_c.ident()
+            with msgid_c(tc_fake.ticket, depth = 1, l = cls.hashid_len) \
+                 as _msgid:
+                try:
+                    tc_instances += _is_testcase_call(_tc_driver,
+                                                      file_name, from_path)
+                # this is so ugly, need to merge better with result_c's handling
+                except subprocess.CalledProcessError as e:
+                    retval = result_c.from_exception_cpe(tc_fake, e)
+                    tc_fake.finalize(retval)
+                    result += retval
+                    continue
+                except OSError as e:
+                    attachments = dict(
+                        errno = e.errno,
+                        strerror = e.strerror
+                    )
+                    if e.filename:
+                        attachments['filename'] = e.filename
+                    retval = result_c.report_from_exception(tc_fake, e,
+                                                            attachments)
+                    tc_fake.finalize(retval)
+                    result += retval
+                    continue
+                except Exception as e:
                     retval = result_c.report_from_exception(tc_fake, e)
                     tc_fake.finalize(retval)
                     result += retval
-                continue
+                    continue
 
             if not tc_instances:
                 continue
