@@ -274,26 +274,62 @@ EOF""")
 
 def deploy_linux_kernel(ic, target, _kws):
     """Deploy a linux kernel tree in the local machine to the target's
-    root filesystem
+    root filesystem (:ref:`example <example_linux_kernel>`).
 
-    This is normally given to :func:`target.pos.deploy_image
-    <tcfl.pos.extension.deploy_image>` as:
+    A Linux kernel can be built and installed in a separate root
+    directory in the following form::
 
-    >>> target.kw_set("pos_deploy_linux_kernel", SOMELOCALLOCATION)
+      - ROOTDIR/boot/*
+      - ROOTDIR/lib/modules/*
+
+    all those will be rsync'ed to the target's */boot* and
+    */lib/modules* (caching on the target's persistent rootfs area for
+    performance) after flashing the OS image. Thus, it will overwrite
+    whatever kernels where in there.
+
+    The target's */boot/EFI* directories will be kept, so that the
+    bootloader configuration can pull the information to configure the
+    new kernel using the existing options.
+
+    Build the Linux kernel from a *linux* source directory to a
+    *build* directory::
+
+      $ mkdir -p build
+      $ cp CONFIGFILE build/.config
+      $ make -C PATH/TO/SRC/linux O=build oldconfig
+      $ make -C build all
+
+    (or your favourite configuration and build mechanism), now it can
+    be installed into the root directory::
+
+      $ mkdir -p root
+      $ make -C build INSTALLKERNEL=ignoreme \
+          INSTALL_PATH=root/boot INSTALL_MOD_PATH=root \
+          install modules_install
+
+    The *root* directory can now be given to
+    :func:`target.pos.deploy_image <tcfl.pos.extension.deploy_image>`
+    as:
+
+    >>> target.deploy_linux_kernel_tree = ROOTDIR
     >>> target.pos.deploy_image(ic, IMAGENAME,
     >>>                         extra_deploy_fns = [ tcfl.pos.deploy_linux_kernel ])
 
-    as it expects ``kws['pos_deploy_linux_kernel']`` which points to a
-    local directory in the form::
+    or if using the :class:`tcfl.pos.tc_pos_base` test class template,
+    it can be done such as:
 
-      - boot/*
-      - lib/modules/KVER/*
+    >>> class _test(tcfl.pos.tc_pos_base):
+    >>>     ...
+    >>>
+    >>>     def deploy_00(self, ic, target):
+    >>>         rootdir = ROOTDIR
+    >>>         target.deploy_linux_kernel_tree = rootdir
+    >>>         self.deploy_image_args = dict(extra_deploy_fns = [
+    >>>             tcfl.pos.deploy_linux_kernel ])
 
-    all those will be rsynced to the target's persistent root area
-    (for speed) and from there to the root filesystem's /boot and
-    /lib/modules. Anything else in the ``/boot/`` and
-    ``/lib/modules/`` directories will be replaced with what comes
-    from the *kernel tree*.
+    *ROOTDIR* can be hardcoded, but remember if given relative, it is
+    relative to the directory where *tcf run* was executed from, not
+    where the testcase source is.
 
     **Low level details**
 
@@ -304,21 +340,22 @@ def deploy_linux_kernel(ic, target, _kws):
     The client will rsync the tree from the local machine to the
     persistent space using :meth:`target.pos.rsync <extension.rsync>`,
     which also caches it in a persistent area to speed up multiple
-    transfers.
+    transfers. From there it will be rsynced to its final
+    location.
 
     """
-    if not '' in _kws:
+    kernel_tree = getattr(target, "deploy_linux_kernel_tree", None)
+    if kernel_tree == None:
         target.report_info("not deploying linux kernel because "
-                           "*pos_deploy_linux_kernel_tree* keyword "
+                           "*pos_deploy_linux_kernel_tree* attribute "
                            "has not been set for the target", dlevel = 2)
         return
     target.report_info("rsyncing boot image to target")
-    target.pos.rsync("%(pos_deploy_linux_kernel_tree)s/boot" % target.kws,
-                     "/boot")
+    target.pos.rsync("%s/boot" % kernel_tree, "/", path_append = "",
+                     rsync_extra = "--exclude '*efi/'")
+    target.testcase._targets_active()
     target.report_info("rsyncing lib/modules to target")
-    target.pos.rsync("%(pos_deploy_linux_kernel_tree)s/lib/modules"
-                     % target.kws,
-                     "/lib/modules")
+    target.pos.rsync("%s/lib/modules" % kernel_tree, "/lib", path_append = "")
     target.testcase._targets_active()
     target.report_pass("linux kernel transferred")
 
@@ -1136,7 +1173,7 @@ EOF""")
                     target.shell.shell_prompt_regex = \
                         _pos_prompt = re.compile(r'TCF-%s: [0-9]+ \$ '
                                                  % testcase.kws['tc_hash'])
-                    
+
                 testcase.targets_active()
                 kws = dict(
                     rsync_server = ic.kws['pos_rsync_server'],
@@ -1411,7 +1448,7 @@ class tc_pos0_base(tc.tc_c):
     #: Once the image was deployed, this will be set with the name of
     #: the image that was selected.
     image = "image-not-deployed"
-    
+
     #: extra parameters to the image deployment function
     #: :func:`target.pos.deploy_image
     #: <tcfl.pos.extension.deploy_image>`
@@ -1435,7 +1472,7 @@ class tc_pos0_base(tc.tc_c):
     #: How many seconds to delay before login in once the login prompt
     #: is detected
     delay_login = 0
-    
+
     def deploy_50(self, ic, target):
         # ensure network, DHCP, TFTP, etc are up and deploy
         ic.power.on()

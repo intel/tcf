@@ -39,6 +39,7 @@ evertything:
 .. automodule:: examples.test_pos_deploy_2
 .. automodule:: examples.test_pos_boot
 .. automodule:: examples.test_deploy_files
+.. automodule:: examples.test_linux_kernel
 
 Capturing data, doing SSH
 -------------------------
@@ -142,9 +143,59 @@ Run::
 - *MYNAME* is whatever identifier you used to login
 - *tcf list 'owner:"MYNAME"'* lists which targets you currently own
 
+.. _howto_target_keep_acquired:
 
-How do I keep a target(s) reserved and powered-on while I fuzz with them?
--------------------------------------------------------------------------
+How do I keep a target acquired/reserved after *tcf run* is done?
+-----------------------------------------------------------------
+
+Giving *--no-release* to *tcf run* will keep the target acquired after
+the scrip execution concludes. Note however that it will be acquired
+by *USERNAME\::term:`HASHID`* (:term:`what's a hashid? <hash>`).
+
+For example, if we were using targets *nwa* and *qu04a* to :ref:`boot
+in provisioning mode <example_pos_boot>`, the hashid could be
+*ormorh*::
+
+  $ tcf run --no-release -vvt 'nwa or qu04a' /usr/share/examples/test_pos_boot.py
+  ...
+  INFO1/ormorh	  ..../test_pos_boot.py#_test @3hyt-uo3g: will run on target group 'ic=localhost/nwa target=localhost/qu04a:x86_64'
+  ...
+
+note how the hashid is *ormorh* in this case and thus, upon completion::
+
+  $ tcf list -v owner
+  localhost/nwa [USERNAME:ormorh] ON
+  localhost/qu04a [USERNAME:ormorh] ON
+
+to maintain the target acquired and powered while potentially
+debugging or testing other things, use a *while loop* which keeps
+acquiring with the same hashid. This tells the daemon we are actively
+using the target and won't release for us. In a separate console, run::
+
+  $ while tcf -t ormorh acquire nwa or qu04a; do sleep 10s; done
+
+.. warning: remember to cancel the job when done with the target so
+            other users can acquire it and use it.
+
+now you can access the console, do captures or interact with the
+target in any other way, remembering to specify the ticket::
+
+  $ tcf -t ormorh console-write -i qu04a
+  $ tcf -t ormorh capture-get qu04a screen screencap.png
+  ...
+
+Some details:
+
+ - use *while tcf acquire* vs *while true; do tcf acquire* because
+   that way, if the server fails, connection drops (eg: you close your
+   laptop), then the process tops and won't restart unless you do it
+   manually.
+
+ - if you depend on the network, do not forget to also acquire the
+   network, otherwise it will be powered off and routing won't work.
+
+Alternative method without hashids
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 First make sure you are not blocking anyone::
 
@@ -180,16 +231,6 @@ Do not forget to kill the *while* process and release the targets when
 done, otherwise others won't be able to use them. If someone has left
 a target taken, it can be released following :ref:`these instructions
 <howto_release_target>`
-
-Some details:
-
- - use *while tcf acquire* vs *while true; do tcf acquire* because
-   that way, if the server fails, connection drops (eg: you close your
-   laptop), then the process tops and won't restart unless you do it
-   manually.
-
- - if you depend on the network, do not forget to also acquire the
-   network, otherwise it will be powered off and routing won't work.
   
 How can I debug a target?
 -------------------------
