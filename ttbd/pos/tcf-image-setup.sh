@@ -444,15 +444,15 @@ for shadow_file in \
     fi
 done
 
-file=etc/pam.d/common-auth
-if [ -r $destdir/$file ]; then
-    # SuSE SLES seems to be configuring PAM so a passwordless root
-    # acount doesn't work; tweak it
-    if ! grep -q "pam_unix.so.*nullok" $destdir/$file; then
-        info "$file: allowing login to accounts with no password (adding 'nullok')"
-        sudo sed -i 's/pam_unix.so/pam_unix.so\tnullok /' $destdir/$file
-    fi
-fi
+for file in etc/pam.d/common-auth usr/share/pam.d/su; do
+    [ -r $destdir/$file ] || continue
+    grep -q "pam_unix.so.*nullok" $destdir/$file || continue
+    # Some distros configure PAM to disallow passwordless root; we
+    # change that so automation doesn't have to work through so many
+    # hoops
+    info "$file: allowing login to accounts with no password (adding 'nullok')"
+    sudo sed -i 's/pam_unix.so/pam_unix.so\tnullok /' $destdir/$file
+done
 
 #
 # Fixup / harcode serial login consoles
