@@ -556,6 +556,7 @@ class file_c(report_c):
             for line in attachment.splitlines(False):
                 if line == '':
                     continue
+                line = line.decode('utf-8', errors = 'replace')
                 self._write(f, u"%s %s: %s\n" % (prefix, key, line.rstrip()))
         elif hasattr(attachment, "name"):
             # Is it a file? reopen it to read so we don't modify the
