@@ -244,7 +244,8 @@ class tc_taps_subcase_c_base(tcfl.tc.tc_c):
 #: Ignore t files
 #:
 #: List of individual .t files to ignore, since we can't filter
-#: those on the command line; this can be done  in a config file:
+#: those on the command line; this can be done  in a :ref:`config file
+#: <tcf_client_configuration>`:
 #:
 #: >>> tcfl.tc_clear_bbt.ignore_ts = [
 #: >>>     'bundles/XYZ/somefile.t',
@@ -282,9 +283,21 @@ ignore_ts = os.environ.get("BBT_IGNORE_TS", "").split()
 ignore_ts_mutex = threading.Lock()
 ignore_ts_regex = None
 
-# This is now a hack because we don't have a good way to tell which
-# bundles take longer or not from the bundle itself, so for now we'll
-# hardcode it.  FIXME
+#: How long to wait for the BBT run to take?
+#:
+#: Each test case might take longer or shorter to run, but there is no
+#: good way to tell. Thus we hardcode some by bundle name or by .t
+#: name.
+#:
+#: More settings can be added from configuration by adding to any
+#: :ref:`TCF configuration file <tcf_client_configuration>` entries
+#: such as:
+#:
+#: >>> tcfl.tc_clear_bbt.bundle_run_timeouts['NAME'] = 456
+#: >>> tcfl.tc_clear_bbt.bundle_run_timeouts['NAME2'] = 3000
+#: >>> tcfl.tc_clear_bbt.bundle_run_timeouts['NAME3'] = 12
+#: >>> ...
+#:
 bundle_run_timeouts = {
     'kvm-host': 480,
     # size
