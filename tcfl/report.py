@@ -372,7 +372,7 @@ class file_c(report_c):
     #:
     #: >>> tcfl.report.file_c.templates['MYTEMPLATE'] = dict(
     #: >>>    #:  name = 'report.j2.txt',
-    #: >>>    #:  output_file_name = 'report-%(runid)s:%(tc_hash)s.txt',
+    #: >>>    #:  output_file_name = 'report-%(runid)s_%(tc_hash)s.txt',
     #: >>>    #:  report_pass = False,
     #: >>>    #:  report_skip = False,
     #: >>>    #:  report_error = True,
@@ -492,7 +492,7 @@ class file_c(report_c):
     templates = {
         "text" : dict(
             name = 'report.j2.txt',
-            output_file_name = 'report-%(runid)s:%(tc_hash)s.txt',
+            output_file_name = 'report-%(runid)s_%(tc_hash)s.txt',
             report_pass = False,
             report_skip = False,
             report_error = True,
@@ -501,7 +501,7 @@ class file_c(report_c):
         ),
         "junit" : dict(
             name = 'junit.j2.xml',
-            output_file_name = 'junit-%(runid)s:%(tc_hash)s.xml',
+            output_file_name = 'junit-%(runid)s_%(tc_hash)s.xml',
             report_pass = False,
             report_skip = False,
             report_error = False,
