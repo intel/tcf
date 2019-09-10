@@ -2835,6 +2835,10 @@ class tc_c(object):
         for hook in self.hook_pre:
             hook(self)
 
+        #: list of subcases this testcase contains
+        self.subtc = {}
+        #: parent of this testcase (normally used for subcases)
+        self.parent = None
         #: do we have to actually acquire any targets?
         #:
         #: in general (default), the testcases need to acquire the
@@ -5270,6 +5274,14 @@ class tc_c(object):
                 hook(self)
             # specific, we can take it out to the TC level
             if not self._phase_skip("configure"):
+                if self.subtc:
+                    self.report_info(
+                        "NOTE: this testcase will unfold subcases: %s" %
+                        " ".join(self.subtc.keys()), dlevel = 1)
+                else:
+                    self.report_info(
+                        "NOTE: this testcase does not unfold subcases",
+                        dlevel = 1)
                 with msgid_c("C", phase = 'config'):
                     retval = self._methods_call("configure")
                 result += retval
@@ -5475,7 +5487,8 @@ class tc_c(object):
         self.result = result
         results = [ (type(self), result.summary()) ]
 
-        for tc in self._tcs_post:
+        # run the list of sub testcases and the post tcs added
+        for tc in self.subtc.values() + self._tcs_post:
             # Well, this is quite a hack -- for reporting to work ok,
             # rebind each's target's testcase pointer to this
             # subtestcase.
@@ -5575,6 +5588,12 @@ class tc_c(object):
         c.tls.expecter = expecter.expecter_c(
             c._expecter_log, c, poll_period = poll_period,
             timeout = self.tls.expecter.timeout)
+        c.subtc = {}
+        c.parent = self.parent
+        for subtc_name, subtc in self.subtc.iteritems():
+            subtc_copy = subtc._clone()
+            subtc_copy.parent = c
+            c.subtc[subtc_name] = subtc_copy
         return c
 
     @result_c.from_exception
@@ -6105,6 +6124,76 @@ class tc_c(object):
         return self._methods_call("class_teardown")
 
 tc_c.driver_add(tc_c)
+
+class subtc_c(tc_c):
+    """Helper for reporting sub testcases
+
+    This is used to implement a pattern where a testcase reports, when
+    executed, multiple subcases that are always executed. Then the
+    output is parsed and reported as individual testcases.
+
+    As well as the parameters in :class:`tcfl.tc.tc_c`, the
+    following parameter is needed:
+
+    :param tcfl.tc.tc_c parent: testcase which is the parent of this
+      testcase.
+
+    Refer to this :ref:`simplified example <example_subcases>` for a
+    usage example.
+
+    Note these subcases are just an artifact to report the subcases
+    results individually, so they do not actually need to acquire or
+    physically use the targets.
+
+    """
+    def __init__(self, name, tc_file_path, origin, parent):
+        assert isinstance(name, basestring)
+        assert isinstance(tc_file_path, basestring)
+        assert isinstance(origin, basestring)
+        assert isinstance(parent, tcfl.tc.tc_c)
+
+        self.parent = parent
+        tcfl.tc.tc_c.__init__(self, name, tc_file_path, origin)
+        self.result = None	# FIXME: already there?
+        self.summary = None
+        self.output = None
+        # we don't need to acquire our targets, won't use them
+        self.targets_assign = False
+
+    def update(self, result, summary, output):
+        """
+        Update the results this subcase will report
+
+        :param tcfl.tc.result_c result: result to be reported
+        :param str summary: one liner summary of the execution report
+        """
+        assert isinstance(result, tcfl.tc.result_c)
+        assert isinstance(summary, basestring)
+        assert isinstance(output, basestring)
+        self.result = result
+        self.summary = summary
+        self.output = output
+
+    def eval_50(self):		# pylint: disable = missing-docstring
+        self.report_pass("NOTE: This is a subtestcase of %(tc_name)s "
+                         "(%(runid)s:%(tc_hash)s); refer to it for full "
+                         "information" % self.parent.kws, dlevel = 1)
+        if self.result == None:
+            self.result = self.parent.result
+            self.result.report(
+                self, "subcase didn't run; parent didn't complete execution?",
+                dlevel = 2, attachments = dict(output = self.output))
+        else:
+            self.result.report(
+                self, "subcase run summary: %s" % self.summary,
+                dlevel = 2, attachments = dict(output = self.output))
+        return self.result
+
+    @staticmethod
+    def clean():		# pylint: disable = missing-docstring
+        # Nothing to do, but do it anyway so the accounting doesn't
+        # complain that nothing was found to run
+        pass
 
 
 def find(args):

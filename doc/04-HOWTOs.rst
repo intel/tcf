@@ -41,6 +41,12 @@ evertything:
 .. automodule:: examples.test_deploy_files
 .. automodule:: examples.test_linux_kernel
 
+Common patterns
+---------------
+
+.. automodule:: examples.test_subcases
+
+
 Capturing data, doing SSH
 -------------------------
 
