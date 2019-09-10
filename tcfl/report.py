@@ -296,10 +296,15 @@ class report_console_c(report_c):
                             prefix, key, cnt, maxlines,
                             line, alevel, ulevel, maxlines_hit)
             else:
+                # all this needs a serious cleanup, what a mess -- if
+                # we get attachments that are not lines or files it
+                # fails badly.
                 try:
-                    for line in attachment:
+                    for item in attachment:
+                        if isinstance(item, basestring):
+                            item = item.rstrip()
                         self._report_line(prefix, key, cnt, maxlines,
-                                          line.rstrip(), alevel, ulevel,
+                                          item, alevel, ulevel,
                                           maxlines_hit)
                 except TypeError as e:
                     self._report_line(prefix, key, 0, maxlines,
