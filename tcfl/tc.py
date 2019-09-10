@@ -2835,6 +2835,13 @@ class tc_c(object):
         for hook in self.hook_pre:
             hook(self)
 
+        #: do we have to actually acquire any targets?
+        #:
+        #: in general (default), the testcases need to acquire the
+        #: targets where they are going to be executed, but in some
+        #: cases, they do not.
+        self.targets_acquire = True
+
     def __thread_init__(self, expecter_parent):
         """
         When we run some methods of this object in a different thread,
@@ -4434,7 +4441,7 @@ class tc_c(object):
         timeout = self.assign_timeout
         period = assign_period
 
-        if self.is_static():
+        if not self.targets_acquire or self.is_static():
             yield
             return
 
