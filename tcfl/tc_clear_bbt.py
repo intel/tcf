@@ -5,6 +5,13 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 #
+# test with
+#
+# Not yet working ok with bundles/os-clr-on-clr, but the thing is not even printing anything, can't tell?
+#
+# BBT_IGNORE_TS=bbt.git/bundles/os-core-update/bat-clr-boot-manager.t bundles/os-core-update/bat-clr-boot-manager.t
+#
+# 
 """
 Driver to run Clear Linux BBT test suite
 
@@ -182,64 +189,6 @@ def tap_parse_output(output):
                     dict(output = output, line = linecnt))
             continue
     return tcs
-
-class tc_taps_subcase_c_base(tcfl.tc.tc_c):
-    """
-    Report each subcase result of running a list of TAP testcases
-
-    Given an entry of data from the output of
-    :func:`tap_parse_output`, create a fake testcase that is just used
-    to report results of the subcase.
-
-    This is used by :class:`tc_clear_bbt_c` to report each TAP subcase
-    individually for reporting control.
-    """
-    def __init__(self, name, tc_file_path, origin, parent):
-        assert isinstance(name, basestring)
-        assert isinstance(tc_file_path, basestring)
-        assert isinstance(origin, basestring)
-        assert isinstance(parent, tcfl.tc.tc_c)
-
-        tcfl.tc.tc_c.__init__(self, name, tc_file_path, origin)
-        self.tc_file_path = tc_file_path
-        self.parent = parent
-        self.kw_set('tc_name_short', name)
-        self.result = None
-        self.data = dict()
-
-    def update(self, result, data):
-        assert isinstance(data, dict)
-        # create a result object with the data we parsed from the output
-        self.result = result
-        self.data = data
-
-    def configure_50(self):	# pylint: disable = missing-docstring
-	# we don't need to manipulate the targets, so don't assign;
-        # will be faster -- do it like this so we can use the same
-        # class testcases that require a target and those that don't.
-        for target in self.targets.values():
-            target.acquire = False
-        self.report_pass("NOTE: This is a subtestcase of %(tc_name)s "
-                         "(%(runid)s:%(tc_hash)s); refer to it for full "
-                         "information" % self.parent.kws, dlevel = 1)
-
-    def eval_50(self):		# pylint: disable = missing-docstring
-        if self.result == None:
-            self.result = self.parent.result
-            self.result.report(
-                self, "subcase didn't run; parent didn't complete execution?",
-                dlevel = 2, attachments = self.data)
-        else:
-            self.result.report(
-                self, "subcase reported '%s'" % self.data['result'],
-                dlevel = 2, attachments = self.data)
-        return self.result
-
-    @staticmethod
-    def clean():		# pylint: disable = missing-docstring
-        # Nothing to do, but do it anyway so the accounting doesn't
-        # complain that nothing was found to run
-        pass
 
 #: Ignore t files
 #:
@@ -420,7 +369,7 @@ bundle_path_map = [
 #:    scanning the output to what is expected from scanning the
 #:    testcases in disk.
 bundle_t_map = {
-    'bat-dev-tooling.t.autospec_nano': 'build-package.t.autospec_nano',
+    'bat-dev-tooling.t.autospec_nano': 'build-package.autospec_nano',
 }
 
 def _bundle_add_timeout(tc, bundle_name, test_name):
@@ -509,8 +458,6 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         self.rel_path_in_target = None
         self.t_files = [ os.path.basename(t_file_path) ]
         self.deploy_done = False
-        self.subtc_list = []
-        self.subtcs = {}
         self.test_bundle_name = os.path.basename(path)
         self.bats_parallel = False
 
@@ -542,30 +489,6 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         if self.capture_boot_video_source + ":" \
            not in target.kws.get('capture', ""):
             self.capture_boot_video_source = False
-
-    # Because of unfortunate implementation decissions that have to be
-    # revisited, we need to initialize the list of
-    # sub-testcases here.
-    #
-    # Why? because once we create an instance of this testcase,
-    # instead of creating a new one for each target it has to run on
-    # in tcfl.tc.tc_c._run_on_targets(), we deepcopy() it in
-    # _clone(). So the constructor is never called again -- yeah, that
-    # has to change.
-    def configure_10(self):	# pylint: disable = missing-docstring
-        for key, name, tc_file_path, origin in self.subtc_list:
-            # note how we parent it to self, not subtcs's
-            # parent--because that'll be someone else. @self is the
-            # current running TC that this parents these guys
-            self.subtcs[key] = tc_taps_subcase_c_base(name, tc_file_path,
-                                                      origin, self)
-            self.post_tc_append(self.subtcs[key])
-        if self.subtcs:
-            self.report_pass("NOTE: this testcase will unfold subcases: %s" %
-                             " ".join(self.subtcs.keys()), dlevel = 1)
-        else:
-            self.report_pass("NOTE: this testcase does not provide subcases",
-                             dlevel = 1)
 
     #: Specification of image to install
     #:
@@ -883,10 +806,16 @@ EOF
                 "%s: skipped due to configuration "
                 "(tcfl.tc_clear_bbt.ignore_ts or BBT_IGNORE_TS environment)"
                 % rel_file_path)
-            for name, subtc in self.subtcs.iteritems():
+            for name, subtc in self.subtc.iteritems():
                 if name.startswith(t_file):
                     subtc.result = tcfl.tc.result_c(0, 0, 0, 0, 1)
                     subtc.data = dict(result = "skipped")
+                    subtc.update(
+                        tcfl.tc.result_c(0, 0, 0, 0, 1),
+                        "skipped due to configuration"
+                        " (tcfl.tc_clear_bbt.ignore_ts or"
+                        " BBT_IGNORE_TS environment)",
+                        "")
             result.skipped += 1
         else:
             self.report_info("running %s%s" % (prefix, t_file))
@@ -955,16 +884,19 @@ EOF
                                      % (tc_name, _tc_name))
                 else:
                     _tc_name = tc_name
-                subtc = self.subtcs[_tc_name]
+                subtc = self.subtc[_tc_name]
                 if self._ts_ignore(subtc.name):
-                    data['result'] += \
-                        "result skipped due to configuration " \
+                    _result = tcfl.tc.result_c(0, 0, 0, 0, 1)
+                    summary = "result skipped due to configuration " \
                         "(tcfl.tc_clear_bbt.ignore_ts or " \
                         "BBT_IGNORE_TS environment)"
-                    subtc.update(tcfl.tc.result_c(0, 0, 0, 0, 1), data)
+                    log = data['output']
                 else:
                     # translate the taps result to a TCF result, record it
-                    subtc.update(self.mapping[data['result']], data)
+                    _result = self.mapping[data['result']]
+                    log = data['output']
+                    summary = log.split('\n', 1)[0]
+                subtc.update(_result, summary, log, )
                 result += subtc.result
         return result
 
@@ -1044,19 +976,17 @@ EOF
             _name = commonl.name_make_safe(name.strip())
             logging.debug("%s contains subcase %s", path, _name)
             t_file_name = os.path.basename(path)
-            self.subtc_list.append((
-                # note we'll key on the .t file basename and the subtest name
-                # inside the .t file, otherwise if two different .t files
-                # in the dir have same subtest names, they'd override.
-                # In _eval_one() we'll refer to this dict
-                # We keep this, even if is basically the same because
-                # it will easily make configure_10 later print a
-                # shorter list for reference in reports...
-                t_file_name + "." + _name,
+            # note we'll key on the .t file basename and the subtest name
+            # inside the .t file, otherwise if two different .t files
+            # in the dir have same subtest names, they'd override.
+            # In _eval_one() we'll refer to this dict
+            subcase_name = t_file_name + "." + _name
+            self.subtc[subcase_name] = tcfl.tc.subtc_c(
                 # testcase full name / unique ID
                 prefix + t_file_name.replace(".t", "") + "." + _name,
-                self.kws['thisfile'], self.origin
-            ))
+                self.kws['thisfile'], self.origin,
+                # parent
+                self)
 
     @classmethod
     def is_testcase(cls, path, _from_path):
