@@ -5281,7 +5281,7 @@ class tc_c(object):
                 else:
                     self.report_info(
                         "NOTE: this testcase does not unfold subcases",
-                        dlevel = 1)
+                        dlevel = 2)
                 with msgid_c("C", phase = 'config'):
                     retval = self._methods_call("configure")
                 result += retval
@@ -5445,7 +5445,10 @@ class tc_c(object):
                 self._ident = msgid_c.ident()
                 try:
                     self.report_info("will run on target group '%s'"
-                                     % (self.target_group.descr))
+                                     % (self.target_group.descr),
+                                     # be less verbose for subcases,
+                                     # since we know this info already
+                                     dlevel = 2 if self.parent else 0 )
                     for _target in self.target_group.targets.values():
                         # We need to update all the target's KWS, as we
                         # have added KWS to the tescase (tc_hash and
@@ -6175,7 +6178,7 @@ class subtc_c(tc_c):
         self.output = output
 
     def eval_50(self):		# pylint: disable = missing-docstring
-        self.report_pass("NOTE: This is a subtestcase of %(tc_name)s "
+        self.report_pass("NOTE: this is a subtestcase of %(tc_name)s "
                          "(%(runid)s:%(tc_hash)s); refer to it for full "
                          "information" % self.parent.kws, dlevel = 1)
         if self.result == None:
