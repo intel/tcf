@@ -5940,8 +5940,14 @@ class tc_c(object):
         tcs = []
         for _cls in l:
             path = inspect.getsourcefile(_cls)
-            tc = _cls(path + "#" + _cls.__name__,	# Name
-                      path,				# File, origin
+            name = path
+            if _cls.__name__ != "_test":
+                # if the test class name is just "_test", we don't
+                # even list it as as test, we assume per convention it
+                # is the only test in the file
+                name += "#" + _cls.__name__
+            # testcase name, file where it came from, origin
+            tc = _cls(name, path,
                       path + ":" + "%d" % inspect.getsourcelines(_cls)[1])
             tcs.append(tc)
         return tcs
