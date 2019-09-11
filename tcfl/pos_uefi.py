@@ -286,6 +286,16 @@ def _linux_boot_guess_from_grub_cfg(target, _image):
         return None, None, None
     entry = target._grub_entries.values()[0]
     del target._grub_entries			# need no more
+    # note we assume the grub.cfg entries are in [/mnt]/boot because
+    # grub.cfg is in /boot and there is usually a filesystem just for
+    # /boot, thus the entries are relative.
+    if entry.linux:
+        entry.linux = "/boot/" + entry.linux
+    if initrd:
+        entry.initrd = "/boot/" + entry.initrd
+    target.report_info(
+        "POS/EFI: %s: scanning found kernel %s initrd %s args %s"
+        % (grub_cfg_path, entry.linux, entry.initrd, entry.linux_args))
     return entry.linux, entry.initrd, entry.linux_args
 
 
