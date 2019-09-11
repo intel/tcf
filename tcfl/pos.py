@@ -1353,7 +1353,7 @@ def deploy_path(ic, target, _kws, cache = True):
     """
     source_path = getattr(target, "deploy_path_src", None)
     dst_path = getattr(target, "deploy_path_dest", "/")
-    rsync_extra = getattr(target, "deploy_rsync_extra", None)
+    rsync_extra = getattr(target, "deploy_rsync_extra", "")
     if source_path == None:
         target.report_info("not deploying local path because "
                            "*target.deploy_path_src is missing or None ",
