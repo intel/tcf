@@ -5281,7 +5281,7 @@ class tc_c(object):
                 else:
                     self.report_info(
                         "NOTE: this testcase does not unfold subcases",
-                        dlevel = 2)
+                        dlevel = 3)
                 with msgid_c("C", phase = 'config'):
                     retval = self._methods_call("configure")
                 result += retval
@@ -6161,7 +6161,7 @@ class subtc_c(tc_c):
         self.summary = None
         self.output = None
         # we don't need to acquire our targets, won't use them
-        self.targets_assign = False
+        self.targets_acquire = False
 
     def update(self, result, summary, output):
         """
