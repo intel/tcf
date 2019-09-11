@@ -1037,6 +1037,78 @@ EOF""")
         ## }
         self.fsinfo = json.loads(output)
 
+    #:
+    #: List of directories to clean up when trying to make up space in
+    #: the root filesystem.
+    #:
+    #: Before an image can be flashed, we need some space so rsync can
+    #: do its job. If there is not enough, we start cleaning
+    #: directories from files that can be easily ignored or we know
+    #: are going ot be wiped.
+    #:
+    #: This list can be manipulated to fit the specific use case, for
+    #: example, from the deploy methods before calling
+    #: meth:`deploy_image`:
+    #:
+    #: >>> self.pos.rootfs_make_room_candidates.insert(0, "/mnt/opt")
+    #:
+    rootfs_make_room_candidates =  [
+        "/mnt/tmp/",
+        "/mnt/var/tmp/",
+        "/mnt/var/log/",
+        "/mnt/var/cache/",
+        "/mnt/var/lib/swupd",
+        "/mnt/var/lib/rpm",
+        "/mnt/var/lib/systemd",
+        "/mnt/var/lib/",
+        # do this last, the cache is important...
+        "/mnt/persistent.tcf.d/"
+    ]
+
+    def _rootfs_make_room(self, target, minimum_megs):
+        # rsync needs have *some* space to work, otherwise it will
+        # fail
+        #
+        # ensure we have at least megs available in the root partition
+        # before trying to rsyncing in a new image; start wiping
+        # things that are not so critical and most likely will be
+        # deleted or brough it clean by the new image; for each
+        # candidate to wipe we check if there is enough space,
+        # otherwise wipe that candidate; check again, wipe next
+        # candidate, etc..
+
+        dlevel = 2	# initially don't care too much
+        for candidate in self.rootfs_make_room_candidates:
+            output = target.shell.run(
+                "df -BM --output=avail /mnt   # got enough free space?",
+                output = True, trim = True)
+            avail_regex = re.compile("(?P<avail>[0-9]+)M", re.MULTILINE)
+            m = avail_regex.search(output)
+            if not m:
+                target.report_error(
+                    "POS: rootfs: unable to verify available space, can't"
+                    "parse df output", dict(output = output))
+                return
+            available_megs = int(m.groupdict()['avail'])
+            if available_megs >= minimum_megs:
+                target.report_info(
+                    "POS: rootfs: %dM free (vs minimum %dM)"
+                    % (available_megs, minimum_megs), dlevel = dlevel)
+                return
+
+            dlevel = 0		# we wiped, now I need to know
+            target.report_info(
+                "POS: rootfs: only %dM free vs minimum %dM, wiping %s"
+                % (available_megs, minimum_megs, candidate))
+            # wipe like this because the dir structure won't really
+            # cost that much in terms of size; as well, this is way
+            # fast for large trees vs 'rm -rf' [now, perl is really
+            # fast, but we can't be sure is installed]
+            target.shell.run("find %s -type f -delete" % candidate)
+
+        # fall through means we couldn't wipe enough stuff
+
+
     def _rootfs_cache_manage(self, target, root_part_dev):
         # Figure out how much space is being consumed by the
         # TCF persistent cache, we might have to clean up
@@ -1203,6 +1275,7 @@ EOF""")
                 kws['root_part_dev'] = root_part_dev
 
                 self._rootfs_cache_manage(target, root_part_dev)
+                self._rootfs_make_room(target, 150)
                 target.report_info("POS: rsyncing %(image)s from "
                                    "%(rsync_server)s to %(root_part_dev)s"
                                    % kws,
