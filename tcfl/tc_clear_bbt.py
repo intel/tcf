@@ -254,8 +254,9 @@ bundle_run_timeouts = {
     'perl-basic': 480,
     'telemetrics': 480,
     # time?
-    'xfce4-desktop': 480,
-    'bat-xfce4-desktop-gui.t': 480,
+    'xfce4-desktop': 800,
+    'bat-xfce4-desktop-bin-help.t': 800,
+    'bat-xfce4-desktop-gui.t': 800,
     'bat-desktop-kde-gui.t': 800,
     'bat-desktop-kde-apps-gui.t': 800,
     # when this catches a lot of files, it can take a while
@@ -331,6 +332,7 @@ bundle_add_timeouts = {
     'R-rstudio': 1200, # 1041MB
     'devpkg-opencv': 800, # 492MB
     'storage-utils-dev': 1000, # 920 MB
+    'sysadmin-basic-dev': 1000, # 944 MB
 }
 
 #: Map bundle path names
