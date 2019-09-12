@@ -248,25 +248,20 @@ ignore_ts_regex = None
 #: >>> ...
 #:
 bundle_run_timeouts = {
-    'kvm-host': 480,
-    # size
-    'os-clr-on-clr': 640,
-    'perl-basic': 480,
-    'telemetrics': 480,
-    # time?
-    'xfce4-desktop': 800,
+    # Keep this list alphabetically sorted!
+    'bat-desktop-kde-apps-gui.t': 800,
+    'bat-desktop-kde-gui.t': 800,
+    'bat-mixer.t': 3000,
+    'bat-os-testsuite-phoronix.t': 600,
     'bat-xfce4-desktop-bin-help.t': 800,
     'bat-xfce4-desktop-gui.t': 800,
-    'bat-desktop-kde-gui.t': 800,
-    'bat-desktop-kde-apps-gui.t': 800,
-    # when this catches a lot of files, it can take a while
+    'kvm-host': 480,
+    'os-clr-on-clr': 640,
+    'perl-basic': 480,
+    'perl-extras': 8000,    # 4k subcases, needs to be split to parallelize
     'quick-perms.t': 3000,
-    # Needs way more time, more if the machine is slow ... way, about
-    # 16 min, 4k subcases this FIXME has to be split so it can be
-    # parallelized
-    'perl-extras': 8000,
-    'bat-os-testsuite-phoronix.t': 600,
-    'bat-mixer.t': 3000,
+    'telemetrics': 480,
+    'xfce4-desktop': 800,
 }
 
 #: Commands to execute before running bats on each .t file (key by .t
@@ -283,56 +278,52 @@ bundle_run_pre_sh = {
 # FIXME: This has to be put in the tl.swupd_bundle_add helper too and
 # be configurable
 bundle_add_timeouts = {
+    # Keep this list alphabetically sorted!
+    'LyX': 500,
+    'R-rstudio': 1200, # 1041MB
+    'big-data-basic': 800, # (1049MB)
+    'computer-vision-basic': 800, #1001MB
+    'container-virt': 800, #197.31MB
+    'containers-basic-dev': 1200, #921MB
+    'database-basic-dev': 800, # 938
     'desktop': 480,
     'desktop-autostart': 480,
-    'LyX': 500,
-    'machine-learning-tensorflow': 800,
-    'texlive': 1000, #1061
+    'desktop-kde-apps': 800, # 555 MB
+    'devpkg-clutter-gst': 800, #251MB
+    'devpkg-gnome-online-accounts': 800, # 171MB
+    'devpkg-gnome-panel': 800, #183
+    'devpkg-nautilus': 800, #144MB
+    'devpkg-opencv': 800, # 492MB
     'education': 800,
-    'os-core-dev': 800,
-    # these are seriously big and need plenty of room not to fail randomly
+    'education-primary' : 800, #266MB
+    'game-dev': 6000, # 3984
+    'games': 800, # 761MB
+    'java9-basic': 800, # 347MB
+    'machine-learning-basic': 1200, #1280MB
+    'machine-learning-tensorflow': 800,
+    'machine-learning-web-ui': 1200, # (1310MB)
+    'mail-utils-dev ': 1000, #(670MB)
+    'maker-cnc': 800, # (352MB)
+    'maker-gis': 800, # (401MB)
+    'network-basic-dev': 1200, #758MB
+    'openstack-common': 800, # (360MB)
     'os-clr-on-clr': 8000,
+    'os-core-dev': 800,
     'os-testsuite': 1000,
     'os-testsuite-phoronix': 1000,
-    'os-testsuite-phoronix-server': 1000,
     'os-testsuite-phoronix-desktop': 1000,
-    # The timeout below are not done through experimentation
-    # but it is hope that as we find bundles that consistently download
-    # fine we can use the MB values to fine-tune the downloads
-    # All download size from Clear LTS 30070
-    'container-virt': 800, #197.31MB
-    'computer-vision-basic': 800, #1001MB
-    'devpkg-nautilus': 800, #144MB
-    'devpkg-clutter-gst': 800, #251MB
-    'education-primary' : 800, #266MB
-    'machine-learning-basic': 1200, #1280MB
-    'network-basic-dev': 1200, #758MB
-    'python-basic-dev': 800, #466MB
+    'os-testsuite-phoronix-server': 1000,
     'os-util-gui': 800, #218MB
+    'os-utils-gui-dev': 6000, #(3784MB)
+    'python-basic-dev': 800, #466MB
+    'qt-basic-dev': 2400, # (1971MB)
     'service-os-dev': 800, #652MB
     'storage-cluster': 800, #211MB
-    'game-dev': 6000, # 3984
-    'database-basic-dev': 800, # 938
-    'devpkg-gnome-panel': 800, #183
-    'games': 800, # 761MB
-    'devpkg-gnome-online-accounts': 800, # 171MB
-    'desktop-kde-apps': 800, # 555 MB
-    'java9-basic': 800, # 347MB
-    'big-data-basic': 800, # (1049MB)
-    'maker-gis': 800, # (401MB)
-    'maker-cnc': 800, # (352MB)
-    'machine-learning-web-ui': 1200, # (1310MB)
     'storage-util-dev': 800, # (920MB)
-    'openstack-common': 800, # (360MB)
-    'supertuxkart': 800, # (545 MB)
-    'qt-basic-dev': 2400, # (1971MB)
-    'os-utils-gui-dev': 6000, #(3784MB)
-    'mail-utils-dev ': 1000, #(670MB)
-    'containers-basic-dev': 1200, #921MB
-    'R-rstudio': 1200, # 1041MB
-    'devpkg-opencv': 800, # 492MB
     'storage-utils-dev': 1000, # 920 MB
+    'supertuxkart': 800, # (545 MB)
     'sysadmin-basic-dev': 1000, # 944 MB
+    'texlive': 1000, #1061
 }
 
 #: Map bundle path names
