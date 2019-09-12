@@ -58,6 +58,7 @@ import os
 import random
 import re
 import traceback
+import subprocess
 
 import distutils.version
 import Levenshtein
@@ -1445,9 +1446,28 @@ def deploy_path(ic, target, _kws, cache = True):
     # try to sync first from the server cache
     for src in source_path:
         cache_name = os.path.basename(src)
-        target.shell.run("mkdir -p /mnt/persistent.tcf.d/%s\n"
-                         "# trying to seed %s from the server's cache"
-                         % (cache_name, cache_name))
+
+        # Get local file type - regular file / directory
+        local_type = subprocess.check_output([
+            "/usr/bin/stat", "-c%F", src]).strip()
+
+        # Get remote file type - regular file / directory / doesn't exist
+        remote_type = target.shell.run(
+                    "/usr/bin/stat -c%%F /mnt/persistent.tcf.d/%s 2> "
+                    "/dev/null || echo missing" % cache_name,
+                    output = True, trim = True).strip()
+
+        # Remove cache if file exists and the types are different
+        # A 'regular file' could be a 'directory' in prev life
+        if remote_type != 'missing' and local_type != remote_type:
+            target.shell.run("rm -rf /mnt/persistent.tcf.d/%s\n"
+                              % cache_name)
+
+        # Seed from server's cache if it is a directory
+        if local_type == "directory":
+            target.shell.run("mkdir -p /mnt/persistent.tcf.d/%s\n"
+                    "# trying to seed %s from the server's cache"
+                    % (cache_name, cache_name))
 
         rsync_server = ic.kws['pos_rsync_server']
         target.report_info("POS: rsyncing %s from %s "
