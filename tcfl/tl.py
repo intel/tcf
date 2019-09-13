@@ -9,8 +9,11 @@
 Common utilities for test cases
 """
 
+import collections
+import datetime
 import os
 import re
+import time
 
 import tcfl.tc
 import target_ext_shell
@@ -485,3 +488,285 @@ exit()
         finally:
             target.shell.shell_prompt_regex = prompt_original
 
+#:
+#: Timeouts for adding different, big size bundles
+#:
+#: To add to this configuration, specify in a client configuration
+#: file or on a test script:
+#:
+#: >>> tcfl.tl.swupd_bundle_add_timeouts['BUNDLENAME'] = TIMEOUT
+#:
+#: note timeout for adding a bundle defaults to 240 seconds.
+#
+# Well, so this is a hack anyway; we probably shall replace this with
+# a combination of:
+#
+# - seeing if the progress counter is updating
+# - a total timeout dependent on the size of the package
+#
+swupd_bundle_add_timeouts = {
+    # Keep this list alphabetically sorted!
+    'LyX': 500,
+    'R-rstudio': 1200, # 1041MB
+    'big-data-basic': 800, # (1049MB)
+    'computer-vision-basic': 800, #1001MB
+    'container-virt': 800, #197.31MB
+    'containers-basic-dev': 1200, #921MB
+    'database-basic-dev': 800, # 938
+    'desktop': 480,
+    'desktop-autostart': 480,
+    'desktop-kde-apps': 800, # 555 MB
+    'devpkg-clutter-gst': 800, #251MB
+    'devpkg-gnome-online-accounts': 800, # 171MB
+    'devpkg-gnome-panel': 800, #183
+    'devpkg-nautilus': 800, #144MB
+    'devpkg-opencv': 800, # 492MB
+    'education': 800,
+    'education-primary' : 800, #266MB
+    'game-dev': 6000, # 3984
+    'games': 800, # 761MB
+    'java9-basic': 800, # 347MB
+    'machine-learning-basic': 1200, #1280MB
+    'machine-learning-tensorflow': 800,
+    'machine-learning-web-ui': 1200, # (1310MB)
+    'mail-utils-dev ': 1000, #(670MB)
+    'maker-cnc': 800, # (352MB)
+    'maker-gis': 800, # (401MB)
+    'network-basic-dev': 1200, #758MB
+    'openstack-common': 800, # (360MB)
+    'os-clr-on-clr': 8000,
+    'os-core-dev': 800,
+    'os-testsuite': 1000,
+    'os-testsuite-phoronix': 1000,
+    'os-testsuite-phoronix-desktop': 1000,
+    'os-testsuite-phoronix-server': 1000,
+    'os-util-gui': 800, #218MB
+    'os-utils-gui-dev': 6000, #(3784MB)
+    'python-basic-dev': 800, #466MB
+    'qt-basic-dev': 2400, # (1971MB)
+    'service-os-dev': 800, #652MB
+    'storage-cluster': 800, #211MB
+    'storage-util-dev': 800, # (920MB)
+    'storage-utils-dev': 1000, # 920 MB
+    'supertuxkart': 800, # (545 MB)
+    'sysadmin-basic-dev': 1000, # 944 MB
+    'texlive': 1000, #1061
+}
+
+def swupd_bundle_add(ic, target, bundle_list,
+                     debug = None, url = None,
+                     wait_online = True, set_proxy = True,
+                     fix_time = None, add_timeout = None,
+                     become_root = False):
+    """Install bundles into a Clear distribution
+
+    This is a helper that install a list of bundles into a Clear
+    distribution taking care of a lot of the hard work.
+
+    While it is preferrable to have an open call to *swupd bundle-add*
+    and it should be as simple as that, we have found we had to
+    repeatedly take manual care of many issues and thus this helper
+    was born. It will take take care of:
+
+    - wait for network connectivity [convenience]
+    - setup proxy variables [convenience]
+    - set swupd URL from where to download [convenience]
+    - fix system's time for SSL certification (in *broken* HW)
+    - retry bundle-add calls when they fail due:
+      - random network issues
+      - issues such as::
+
+          Error: cannot acquire lock file. Another swupd process is \
+          already running  (possibly auto-update)
+
+      all retryable after a back-off wait.
+
+    :param tcfl.tc.target_c ic: interconnect the target uses for
+      network connectivity
+
+    :param tcfl.tc.target_c target: target on which to operate
+
+    :param bundle_list: name of the bundle to add or list of them;
+      note they will be added each in a separate *bundle-add* command
+
+    :param bool debug: (optional) run *bundle-add* with ``--debug--``;
+      if *None*, defaults to environment *SWUPD_DEBUG* being defined
+      to any value.
+
+    :param str url: (optional) set the given *url* for the swupd's
+      repository with *swupd mirror*; if *None*, defaults to
+      environment *SWUPD_URL* if defined, otherwise leaves the
+      system's default setting.
+
+    :param bool wait_online: (optional) waits for the system to have
+      network connectivity (with :func:`tcfl.tl.linux_wait_online`);
+      defaults to *True*.
+
+    :param bool set_proxy: (optional) sets the proxy environment with
+      :func:`tcfl.tl.sh_export_proxy` if the interconnect exports proxy
+      information; defaults to *True*.
+
+    :param bool fix_time: (optional) fixes the system's time if *True*
+      to the client's time.; if *None*, defaults to environment
+      *SWUPD_FIX_TIME* if defined, otherwise *False*.
+
+    :param int add_timeout: (optional) timeout to set to wait for the
+      *bundle-add* to complete; defaults to whatever is configured in
+      the :data:`tcfl.tl.swupd_bundle_add_timeouts` or the the default
+      of 240 seconds.
+
+    :param bool become_root: (optional) if *True* run the command as super
+      user using *su* (defaults to *False*). To be used when the script has the
+      console logged in as non-root.
+
+      This uses *su* vs *sudo* as some installations will not install
+      *sudo* for security reasons.
+
+      Note this function assumes *su* is configured to work without
+      asking any passwords. For that, PAM module *pam_unix.so* has to
+      be configured to include the option *nullok* in target's files
+      such as:
+
+      - */etc/pam.d/common-auth*
+      - */usr/share/pam.d/su*
+
+      ``tcf-image-setup.sh`` will do this for you if using it to set
+      images.
+    """
+
+    testcase = target.testcase
+
+    # gather parameters / defaults & verify
+    assert isinstance(ic, tcfl.tc.target_c)
+    assert isinstance(target, tcfl.tc.target_c)
+    if isinstance(bundle_list, basestring):
+        bundle_list = [ bundle_list ]
+    else:
+        assert isinstance(bundle_list, collections.Iterable) \
+            and all(isinstance(item, basestring) for item in bundle_list), \
+            "bundle_list must be a string (bundle name) or list " \
+            "of bundle names, got a %s" % type(bundle_list).__name__
+
+    if debug == None:
+        debug = 'SWUPD_DEBUG' in os.environ
+    else:
+        assert isinstance(debug, bool)
+
+    if url == None:
+        url = os.environ.get('SWUPD_URL', None)
+    else:
+        assert isinstance(url, basestring)
+
+    if fix_time == None:
+        fix_time = os.environ.get("SWUPD_FIX_TIME", None)
+    else:
+        assert isinstance(fix_time, bool)
+
+    # note add_timeout might be bundle-specific, so we can't really
+    # set it here
+    if add_timeout != None:
+        assert add_timeout > 0
+    assert isinstance(become_root, bool)
+
+    # the system's time is untrusted; we need it to be correct so the
+    # certificate verification works--set it from the client's time
+    # (assumed to be correct). Use -u for UTC settings to avoid TZ
+    # issues
+    if fix_time:
+        target.shell.run("date -us '%s' && hwclock -wu"
+                         % str(datetime.datetime.utcnow()))
+
+    if wait_online:		        # wait for connectivity to be up
+        tcfl.tl.linux_wait_online(ic, target)
+
+    kws = dict(
+        debug = "--debug" if debug else "",
+        hashid = testcase.kws['tc_hash']
+    )
+    if become_root:
+        kws['su_prefix'] = "su -mc '"
+        kws['su_postfix'] = "'"
+    else:
+        kws['su_prefix'] = ""
+        kws['su_postfix'] = ""
+    target.shell.run(			# fix clear certificates if needed
+        "%(su_prefix)s"			# no space here, for su -mc 'COMMAND'
+        "test -f /etc/ca-certs/trusted/regenerate"
+        " && rm -rf /run/lock/clrtrust.lock"
+        " && clrtrust -v generate"
+        " && rm -f /etc/ca-certs/trusted/regenerate"
+        "%(su_postfix)s"		# no space here, for su -mc 'COMMAND'
+        % kws)
+
+    if set_proxy:			# set proxies if needed
+        tcfl.tl.sh_export_proxy(ic, target)
+
+    if url:				# set swupd URL if needed
+        target.shell.run("%(su_prefix)sswupd mirror -s %(url)s%(su_postfix)s"
+                         % kws)
+
+
+    # Install them bundles
+    #
+    # installing can take too much time, so we do one bundle at a
+    # time so the system knows we are using the target.
+    #
+    # As well, swupd doesn't seem to be able to recover well from
+    # network glitches--so we do a loop where we retry a few times;
+    # we record how many tries we did and the time it took as KPIs
+    for bundle in bundle_list:
+        kws['bundle'] = bundle
+        # adjust bundle add timeout
+        # FIXME: add patch to bundle-add to recognize --dry-run --sizes so
+        # that it lists all the bundles it has to download and their sizes
+        # so we can dynamically adjust this
+        if add_timeout == None:
+            if bundle in swupd_bundle_add_timeouts:
+                add_timeout = swupd_bundle_add_timeouts[bundle]
+                target.report_info(
+                    "bundle-add: adjusting timeout to %d per configuration "
+                    "tcfl.tl.swupd_bundle_add_timeouts" % add_timeout)
+            else:
+                add_timeout = 240
+
+        count = 0
+        top = 10
+        for count in range(1, top + 1):
+            # We use -p so the format is the POSIX standard as
+            # defined in
+            # https://pubs.opengroup.org/onlinepubs/009695399/utilities
+            # /time.html
+            # STDERR section
+            output = target.shell.run(
+                "time -p"
+                " %(su_prefix)sswupd bundle-add %(debug)s %(bundle)s%(su_postfix)s"
+                " || echo FAILED''-%(hashid)s"
+                % kws,
+                output = True, timeout = add_timeout)
+            if not 'FAILED-%(tc_hash)s' % testcase.kws in output:
+                # We assume it worked
+                break
+
+            target.report_info("bundle-add: failed %d/%d? Retrying in 5s"
+                               % (count, top))
+            time.sleep(5)
+        else:
+            # match below's
+            target.report_data("swupd bundle-add retries",
+                               bundle, count)
+            raise tcfl.tc.error_e("bundle-add failed too many times")
+
+        # see above on time -p
+        kpi_regex = re.compile(r"^real[ \t]+(?P<seconds>[\.0-9]+)$",
+                               re.MULTILINE)
+        m = kpi_regex.search(output)
+        if not m:
+            raise tcfl.tc.error_e(
+                "Can't find regex %s in output" % kpi_regex.pattern,
+                dict(output = output))
+        # maybe domain shall include the top level image type
+        # (clear:lts, clear:desktop...)
+        target.report_data("swupd bundle-add retries",
+                           bundle, int(count))
+        target.report_data("swupd bundle-add duration (seconds)",
+                           bundle, float(m.groupdict()['seconds']))
