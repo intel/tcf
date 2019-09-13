@@ -678,17 +678,6 @@ EOF
             'export PS1="BBT-PS1-PROMPT% " # do a very simple prompt, ' \
             'difficult to confuse with test output')
 
-        if self.fix_time:
-            target.shell.run(
-                "date -us '%s' && hwclock -wu"
-                % str(datetime.datetime.utcnow()))
-
-        target.shell.run(
-            "test -f /etc/ca-certs/trusted/regenerate"
-            " && rm -rf /run/lock/clrtrust.lock"
-            " && clrtrust -v generate"
-            " && rm -f /etc/ca-certs/trusted/regenerate")
-
         # Install bundles we need
         #
         # If there is a  'requirements' file alongside our .t file,
@@ -702,73 +691,7 @@ EOF
             bundles += open(requirements_fname).read().split()
         self.report_info("Bundle requirements: %s" % " ".join(bundles),
                          dlevel = 1)
-
-        # if there is no distro mirror, use proxies -- HACK
-        tcfl.tl.sh_export_proxy(ic, target)
-
-        distro_mirror = ic.kws.get('distro_mirror', None)
-        if self.swupd_url:
-            swupd_url = self.swupd_url % ic.kws
-            target.shell.run("swupd mirror -s %s" % swupd_url)
-        elif distro_mirror:
-            # If the network exposes a distro mirror, use it -- this is
-            # kind of a hack for now, because we assume that if there is a
-            # mirror, we don't have to use a proxy (if any) for getting to
-            # it.
-            # FIXME
-            target.shell.run(
-                "swupd mirror -s %s/pub/mirrors/clearlinux/update/"
-                % distro_mirror)
-
-        # Install them bundles
-        #
-        # installing can take too much time, so we do one bundle at a
-        # time so the system knows we are using the target.
-        #
-        # As well, swupd doesn't seem to be able to recover well from
-        # network glitches--so we do a loop where we retry a few times;
-        # we record how many tries we did and the time it took as KPIs
-        for bundle in bundles:
-            if self.swupd_debug:
-                debug = "--debug"
-            else:
-                debug = ""
-            count = 0
-            top = 10
-            add_timeout = _bundle_add_timeout(self, self.test_bundle_name, bundle)
-            for count in range(1, top + 1):
-                # We use -p so the format is the POSIX standard as
-                # defined in
-                # https://pubs.opengroup.org/onlinepubs/009695399/utilities/time.html
-                # STDERR section
-                output = target.shell.run(
-                    "time -p swupd bundle-add %s %s || echo FAILED''-%s"
-                    % (debug, bundle, self.kws['tc_hash']),
-                    output = True, timeout = add_timeout)
-                if not 'FAILED-%(tc_hash)s' % self.kws in output:
-                    # we assume it worked
-                    break
-                target.shell.run("sleep 5s # failed %d/%d? retrying in 5s"
-                                 % (count, top))
-            else:
-                target.report_data("BBT bundle-add retries",
-                                   bundle, count)
-                raise tcfl.tc.error_e("bundle-add failed too many times")
-            # see above on time -p
-            kpi_regex = re.compile(r"^real[ \t]+(?P<seconds>[\.0-9]+)$",
-                                   re.MULTILINE)
-            m = kpi_regex.search(output)
-            if not m:
-                raise tcfl.tc.error_e(
-                    "Can't find regex %s in output" % kpi_regex.pattern,
-                    dict(output = output))
-            # maybe domain shall include the top level image type
-            # (clear:lts, clear:desktop...)
-            target.report_data("BBT bundle-add retries",
-                               bundle, int(count))
-            target.report_data("BBT bundle-add duration (seconds)",
-                               bundle, float(m.groupdict()['seconds']))
-            self.targets_active(target)
+        tcfl.tl.swupd_bundle_add(ic, target, bundles)
 
     def _ts_ignore(self, subtcname):
         global ignore_ts_regex
