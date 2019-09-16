@@ -702,9 +702,9 @@ def swupd_bundle_add(ic, target, bundle_list,
         tcfl.tl.sh_export_proxy(ic, target)
 
     if url:				# set swupd URL if needed
+        kws['url'] = url
         target.shell.run("%(su_prefix)sswupd mirror -s %(url)s%(su_postfix)s"
                          % kws)
-
 
     # Install them bundles
     #
