@@ -433,7 +433,7 @@ class shell(tc.target_extension_c):
         # it from base64 to bin
         self.run(
             'python3 -c "import sys, binascii; '
-            'sys.stdout.buffer.write(binascii.a2b_base64(sys.stdin.read()))"'
+            'sys.stdout.buffer.write(binascii.a2b_base64(sys.stdin.buffer.read()))"'
             ' < /tmp/file.b64 > %s' % remote_filename)
         # FIXME: checksum and verify :/
 
@@ -465,8 +465,8 @@ class shell(tc.target_extension_c):
         # b64 and read it from the console
         output = self.run(
             'python3 -c "import sys, binascii; '
-            'sys.stdout.buffer.write(binascii.b2a_base64(sys.stdin.read()))"'
-            ' < %s' % remote_filename, output = True, trim = True)
+            'sys.stdout.buffer.write(binascii.b2a_base64(sys.stdin.buffer.read()))"'
+            ' < %s' % remote_filename, output = True)
         # output comes as
         ## python3 -c...
         ## B64DATA
