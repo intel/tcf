@@ -34,7 +34,7 @@ and execute all the ``.t`` files in the directory followed by all the
 
 The output of each ``.t`` execution is parsed with
 :func:`tap_parse_output` to generate for each a subcase (an instance
-of :class:`subcases <tc_taps_subcase_c_base>`) which will report the
+of :class:`subcases <tcfl.tc.subtc_c>`) which will report the
 individual result of that subcase execution.
 
 **Setup steps**
@@ -438,7 +438,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
 
       2. :func:`parse the output <tap_parse_output>` into subcases to
          report their results individually using
-         :class:`tc_taps_subcase_c_base`
+         :class:`tcfl.tc.subtc_c`
 
     """
 
