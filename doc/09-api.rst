@@ -381,6 +381,9 @@ Provisioning OS specific metadata
 .. automodule:: conf_00_lib
    :members:
    :undoc-members:
+.. automodule:: conf_00_lib_capture
+   :members:
+   :undoc-members:
 .. automodule:: conf_00_lib_mcu
    :members:
    :undoc-members:
