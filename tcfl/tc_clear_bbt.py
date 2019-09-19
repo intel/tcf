@@ -658,7 +658,7 @@ EOF
         tcfl.tl.linux_ssh_root_nopwd(target)
         target.shell.run("systemctl restart sshd")
         target.shell.run(		# wait for sshd to fully restart
-            "while ! curl -s http://localhost:22 | /usr/bin/fgrep SSH-2.0; do"
+            "while ! nc localhost 22 < /dev/null | /usr/bin/fgrep SSH-2.0; do"
             " sleep 1s; done", timeout = 15)
 
         output = target.shell.run(
