@@ -1019,8 +1019,8 @@ General catchas
 
 Some common issues that make it automating hard
 
-Hidden characters in console output
------------------------------------
+Hidden characters in console output, ANSI menus
+-----------------------------------------------
 
 This happens very commonly when console prompts or text produce ANSI
 escape sequences to colorize output; as a human on the console, we see
@@ -1040,6 +1040,49 @@ Parsing ANSI escape sequences is quite tricky and if this is a command
 prompt, a more simple sollution is to remove them from the prompt
 configuration.
 
+An option to see them is::
+
+  tcf console-read --follow TARGET | cat -A
+
+``-A`` in cat will escape the ANSI characters for you.
+
+When trying to automate an application that implements an ANSI TUI
+(Text User Interface) with menus and such, it becomes quite
+complicated. For example, BIOS over serials.
+
+The application might be sending strings such as:
+
+    - *^[[X;YHSTRING* put *STRING* in X,Y
+    - *^[[0m* normal letters
+    - *^[[1m* bold letters
+    - *^[[37m* white FG
+    - *^[[40m* black BG
+
+sometimes text is intersped in ANSI escape sequences (especially with
+very awkward software) that print **STRING** like this::
+
+  ^[[1mS^[[1mT^[[1mR^[[1mI^[[1mN^[[1mSG
+
+to match this against a regular expression, you need to do::
+
+  re.compile("\x1b\[1mS\x1b\[1mT\x1b\[1mR\x1b\[1mI\x1b\[1mN\x1b\[1mSG")
+
+for example
+
+Another problem is the sequence of characters you will see on the
+screen menu but how they come out in the serial port might be
+different; it usually helps to open two terminals, side by side and in
+one open the TUI via the TCF console::
+
+  $ tcf console-write -i TARGET
+
+and on another, just the byte stream::
+
+  $ tcf console-read --follow TARGET | cat -A
+
+interacting with it on the first console will give you an idea of what
+is actually printed that can be used to latch on.
+  
 Newlines when reading output of a command
 -----------------------------------------
 
