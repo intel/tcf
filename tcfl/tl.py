@@ -238,13 +238,16 @@ def linux_ssh_root_nopwd(target, prefix = ""):
     wait for *sshd* to be fully ready; it is a hack
 
     >>> target.shell.run(           # wait for sshd to fully restart
-    >>>     "while ! curl -s http://localhost:22 | /usr/bin/fgrep SSH-2.0; do"
+    >>>     "while ! nc localhost 22 < /dev/null | /usr/bin/fgrep SSH-2.0; do"
     >>>     " sleep 1s; done", timeout = 10)
 
-    - why *curl*? most distros have it installed; if SSH is replying
+    - why *nc*? easy and simple; note default installed in most distros
+
+    - why not *curl*? most distros have it installed; if SSH is replying
       with the SSH-2.0 string, then likely the daemon is ready
 
-    - why not netcat *nc*? note default installed in most distros
+      Recent versions of curl now check for HTTP headers, so can't be
+      really used for this
 
     - why not plain *ssh*? because that might fail by many other
       reasons, but you can check the debug in *ssh -v* messages for a
