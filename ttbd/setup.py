@@ -113,6 +113,7 @@ targets over HTTP to be controlled by the TCF client.
         ]),
         ('etc/ttbd-production', [
             'conf_00_lib.py',
+            'conf_00_lib_pdu.py',
             'conf_06_default.py',
             'conf_05_auth_local.py',
             'example_conf_05_auth_localdb.py',

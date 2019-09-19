@@ -381,21 +381,23 @@ Everything in *ttbd* is a test target; they need to be added by
 creating Python objects that represent them in the configuration
 files. Helper functions have been created to simplify the process.
 
-Power switches are used to build power rails to power on or off the
+Power switches (PDUs) are used to build power rails to power on or off the
 different test targets and other infrastructure components
 
 Create a configuration file
 ``/etc/ttbd-production/conf_10_targets.py`` and start adding
 configuration statements as described in the links below:
 
-- :py:func:`Digital Loggers Web Power Switch 7
-  <conf_00_lib.dlwps7_add>` PDUs / wall-power switches
-- :py:func:`Raritan EMX
-  <conf_00_lib_pdu.raritan_emx_add>` based PDUs  / wall-power switches
-- :py:func:`YKUSH USB power switches <conf_00_lib.ykush_targets_add>`
-  USB data/power switchable hub
-- :py:func:`Devantech USB-RLY08B USB controlled relays
-  <conf_00_lib.usbrly08b_targets_add>`
+- :ref:`PDUs / power switches <config_api_pdu>`:
+  - :py:func:`Digital Loggers Web Power Switch 7
+    <conf_00_lib_pdu.dlwps7_add>` PDUs / wall-power switches
+  - :py:func:`Raritan EMX
+    <conf_00_lib_pdu.raritan_emx_add>` based PDUs  / wall-power switches
+  - :py:func:`YKUSH USB power switches <conf_00_lib_pdu.ykush_targets_add>`
+    USB data/power switchable hub
+  - :py:func:`Devantech USB-RLY08B USB controlled relays
+    <conf_00_lib_pdu.usbrly08b_targets_add>`
+
 - to add targets for just controlling power to something, see
   :ref:`these instructions<tt_power>`
 - :ref:`physical Linux servers <ttbd_config_phys_linux>` boards

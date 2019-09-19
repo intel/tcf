@@ -1820,7 +1820,7 @@ can make it be things like::
 
 This would make *TARGETNAME*'s power be controlled by plug #5 of the
 *Digital Logger Web Power Switch 7* named *sp3* (:py:func:`setup
-instructions <conf_00_lib.dlwps7_add>`). Because this is a normal,
+instructions <conf_00_lib_pdu.dlwps7_add>`). Because this is a normal,
 120V plug, if a light bulb were connected to it::
 
     ttbl.config.target_add(
@@ -1842,7 +1842,7 @@ It could also be::
 which means that power to *TARGETNAME* would be implemented by
 powering on or off port #3 of the YKush power-switching hub with
 serial number *YK21080* (:py:func:`setup instructions
-<conf_00_lib.ykush_targets_add>`).
+<conf_00_lib_pdu.ykush_targets_add>`).
 
 Other power controller implementations are possible, of course, by
 subclassing :py:class:`ttbl.tt_power_control_impl`.
@@ -1868,7 +1868,7 @@ provides serial console access, then this will work:
   <https://www.serialgear.com/Serial-Adapters-USBG-NULL-30.html>`_ or
   two USB serial dongles with a NULL modem adapter will do.
 - one available port on a power switch, to turn the physical machine
-  on/off (eg, a :func:`DLWPS7 <conf_00_lib.dlwps7_add>`)
+  on/off (eg, a :func:`DLWPS7 <conf_00_lib_pdu.dlwps7_add>`)
 
 **Connecting the test target fixture**
 
@@ -1951,7 +1951,7 @@ This builds on the :ref:`previous section <tt_linux_simple>`.
   <https://www.serialgear.com/Serial-Adapters-USBG-NULL-30.html>`_ or
   two USB serial dongles with a NULL modem adapter will do.
 - one available port on a power switch, to turn the physical machine
-  on/off (eg, a :func:`DLWPS7 <conf_00_lib.dlwps7_add>`)
+  on/off (eg, a :func:`DLWPS7 <conf_00_lib_pdu.dlwps7_add>`)
 
 **Connecting the test target fixture**
 
