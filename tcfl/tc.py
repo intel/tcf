@@ -6155,8 +6155,8 @@ class subtc_c(tc_c):
         assert isinstance(origin, basestring)
         assert isinstance(parent, tcfl.tc.tc_c)
 
-        self.parent = parent
         tcfl.tc.tc_c.__init__(self, name, tc_file_path, origin)
+        self.parent = parent
         self.result = None	# FIXME: already there?
         self.summary = None
         self.output = None
