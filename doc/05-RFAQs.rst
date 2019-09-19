@@ -37,7 +37,7 @@ but it is out of the scope of this document.
 MCU test fixture for highest reliabiltiy
 ========================================
 
-The fixture described in :func:`conf_00_lib.arduino101_add` can be
+The fixture described in :func:`conf_00_lib_mcu.arduino101_add` can be
 considered complicated, but it is designed for maximum reliability
 when running thousands of test cases. These same points apply to other
 (most) MCUs under test.

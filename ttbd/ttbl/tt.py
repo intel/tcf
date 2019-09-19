@@ -1215,7 +1215,7 @@ class grub2elf(tt_serial, ttbl.test_target_images_mixin):
     necessary, a boot coercer can be implemented in the form of a
     power control implementation that in its `power_on_do()` method
     talks to the serial port to do whatever is needed. See for example
-    :class:`conf_00_lib.minnowboard_EFI_boot_grub_pc` which does so
+    :class:`conf_00_lib_mcu.minnowboard_EFI_boot_grub_pc` which does so
     for Minnowboards.
 
     **Setup**
@@ -1258,7 +1258,7 @@ class grub2elf(tt_serial, ttbl.test_target_images_mixin):
 
     - Setup the target's BIOS to boot by default off the USB drive
 
-    See :func:`conf_00_lib.minnowboard_add` for an example instantiation.
+    See :func:`conf_00_lib_mcu.minnowboard_add` for an example instantiation.
 
     """
     def __init__(self, _id,

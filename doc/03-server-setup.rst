@@ -98,7 +98,7 @@ to execute a *comand* as super-user (loging in as root or using
 Links will come in different flavours:
 
 - example link to a :ref:`section <conventions>`
-- example link to another :py:func:`section <conf_00_lib.dlwps7_add>`
+- example link to another :py:func:`section <conf_00_lib_pdu.dlwps7_add>`
 
 .. _system_install:
 
@@ -388,13 +388,18 @@ Create a configuration file
 ``/etc/ttbd-production/conf_10_targets.py`` and start adding
 configuration statements as described in the links below:
 
-- :ref:`PDUs / power switches <config_api_pdu>`:
+- :ref:`PDUs / power switches <conf_00_lib_pdu>`:
+  
   - :py:func:`Digital Loggers Web Power Switch 7
     <conf_00_lib_pdu.dlwps7_add>` PDUs / wall-power switches
+    
   - :py:func:`Raritan EMX
-    <conf_00_lib_pdu.raritan_emx_add>` based PDUs  / wall-power switches
+    <conf_00_lib_pdu.raritan_emx_add>` based PDUs  / wall-power
+    switches
+    
   - :py:func:`YKUSH USB power switches <conf_00_lib_pdu.ykush_targets_add>`
     USB data/power switchable hub
+    
   - :py:func:`Devantech USB-RLY08B USB controlled relays
     <conf_00_lib_pdu.usbrly08b_targets_add>`
 
@@ -404,18 +409,18 @@ configuration statements as described in the links below:
 
 .. _ttbd_config_mcus:
 
-MCU boards supported by default require different fixtures which are
-described below:
+MCU boards supported by default require :ref:`different fixtures
+<conf_00_lib_mcu>`, for example:
 
-- :py:func:`Arduino 101 <conf_00_lib.arduino101_add>` boards
-- :py:func:`Arduino Due <conf_00_lib.arduino2_add>` boards
-- :py:func:`Atmel SAM e70 <conf_00_lib.sam_xplained_add>` boards
-- :py:func:`FRDM k64f <conf_00_lib.frdm_add>` boards
-- :py:func:`STM32 / Nucleo <conf_00_lib.stm32_add>` boards
-- :py:func:`Quark C1000 <conf_00_lib.quark_c1000_add>` boards
-- :py:func:`Quark D2000 <conf_00_lib.mv_add>` boards
-- :py:func:`Synopsis EMSK <conf_00_lib.emsk_add>` boards
-- :py:func:`TinyTILEs <conf_00_lib.tinytile_add>` boards
+- :py:func:`Arduino 101 <conf_00_lib_mcu.arduino101_add>` boards
+- :py:func:`Arduino Due <conf_00_lib_mcu.arduino2_add>` boards
+- :py:func:`Atmel SAM e70 <conf_00_lib_mcu.sam_xplained_add>` boards
+- :py:func:`FRDM k64f <conf_00_lib_mcu.frdm_add>` boards
+- :py:func:`STM32 / Nucleo <conf_00_lib_mcu.stm32_add>` boards
+- :py:func:`Quark C1000 <conf_00_lib_mcu.quark_c1000_add>` boards
+- :py:func:`Quark D2000 <conf_00_lib_mcu.mv_add>` boards
+- :py:func:`Synopsis EMSK <conf_00_lib_mcu.emsk_add>` boards
+- :py:func:`TinyTILEs <conf_00_lib_mcu.tinytile_add>` boards
 
 .. include:: 03-server-setup-LL-boards.rst
 
@@ -652,12 +657,12 @@ As well, setup the proper hardware connections:
 
 - *sp1* connected to the wall and it's network cable to the server,
   name *sp1* defined in ``/etc/hosts`` to the right IP address (see
-  :py:func:`here <conf_00_lib.dlwps7_add>` for details)
+  :py:func:`here <conf_00_lib_pdu.dlwps7_add>` for details)
 - *YK20954*\'s power connected to the power switch *sp1*\'s socket #3
 - *YK20956*\'s power connected to the power switch *sp1*\'s socket #2
 - *frdm-06* USB cable connected to *YK20946*\'s port #3
 - *arduino101-2* connected as described :py:func:`here
-  <conf_00_lib.arduino101_add>`
+  <conf_00_lib_mcu.arduino101_add>`
 
 Restart the server and a listing should show::
 
@@ -1132,7 +1137,7 @@ c. If we want to control the power to the network switch, we would add a
    to socket #5 of a :class:`Digital Weblogger Switch
    7<ttbl.pc.dlwps7>` which the server can reach through the
    infrastructure network as hostname *sp5* (see :py:func:`configuring
-   Digital Loggers Web Power Switch 7 <conf_00_lib.dlwps7_add>`) --
+   Digital Loggers Web Power Switch 7 <conf_00_lib_pdu.dlwps7_add>`) --
    note other power switches can be used too as long as a driver class
    is available for them.
 

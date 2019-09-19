@@ -763,7 +763,7 @@ following reasons for it:
 - the JTAG cable is not properly connected; ensure the cable is the
   right one and it is properly connected, paying close attention to
   the pinout (for example, as described in the fixture documented in
-  :func:`conf_00_lib.arduino101_add`).
+  :func:`conf_00_lib_mcu.arduino101_add`).
 
 - the hardware itself might have a hardware block against
   JTAGs. Disable it (if possible).

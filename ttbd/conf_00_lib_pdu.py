@@ -6,7 +6,7 @@
 #
 # Add functions more or less alphabetically
 """
-.. _config_api_pdu:
+.. _conf_00_lib_pdu:
 
 Configuration API for PDUs and other power switching equipment
 --------------------------------------------------------------
