@@ -491,6 +491,14 @@ exit()
         finally:
             target.shell.shell_prompt_regex = prompt_original
 
+#
+# Well, so this is a hack anyway; we probably shall replace this with
+# a combination of:
+#
+# - seeing if the progress counter is updating
+# - a total timeout dependent on the size of the package
+#
+
 #:
 #: Timeouts for adding different, big size bundles
 #:
@@ -500,13 +508,6 @@ exit()
 #: >>> tcfl.tl.swupd_bundle_add_timeouts['BUNDLENAME'] = TIMEOUT
 #:
 #: note timeout for adding a bundle defaults to 240 seconds.
-#
-# Well, so this is a hack anyway; we probably shall replace this with
-# a combination of:
-#
-# - seeing if the progress counter is updating
-# - a total timeout dependent on the size of the package
-#
 swupd_bundle_add_timeouts = {
     # Keep this list alphabetically sorted!
     'LyX': 500,
