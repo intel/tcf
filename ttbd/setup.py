@@ -116,6 +116,7 @@ targets over HTTP to be controlled by the TCF client.
             'conf_00_lib_capture.py',
             'conf_00_lib_mcu.py',
             'conf_00_lib_mcu_stm32.py',
+            'conf_00_lib_pos.py',
             'conf_00_lib_pdu.py',
             'conf_06_default.py',
             'conf_05_auth_local.py',
