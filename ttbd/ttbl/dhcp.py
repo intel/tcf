@@ -577,6 +577,7 @@ def power_on_pre_pos_setup(target):
         return
     # We only care if mode is set to pxe or local -- local makes us
     # tell the thing to go boot local disk
+    # FIXME: assume no pos_mode means local
     if pos_mode != "pxe" and pos_mode != "local":
         target.log.info("POS boot: ignoring, pos_mode set to %s "
                         "(vs PXE or local)" % pos_mode)

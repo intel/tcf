@@ -4,6 +4,14 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+"""
+Controlling targets via IPMI
+----------------------------
+
+This module implements multiple objects that can be used to control a
+target's power or serial console via IPMI.
+
+"""
 
 import logging
 import os
