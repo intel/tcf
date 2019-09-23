@@ -258,7 +258,8 @@ bundle_run_timeouts = {
     'kvm-host': 480,
     'os-clr-on-clr': 640,
     'perl-basic': 480,
-    'perl-extras': 8000,    # 4k subcases, needs to be split to parallelize
+    'perl-extras': 12000,    # 4k subcases, needs to be split to parallelize
+    'bat-perl-extras-perl-use_parallel.t': 20000,	# wth...
     'quick-perms.t': 3000,
     'telemetrics': 480,
     'xfce4-desktop': 800,
@@ -275,56 +276,7 @@ bundle_run_pre_sh = {
     ]
 }
 
-# FIXME: This has to be put in the tl.swupd_bundle_add helper too and
-# be configurable
-bundle_add_timeouts = {
-    # Keep this list alphabetically sorted!
-    'LyX': 500,
-    'R-rstudio': 1200, # 1041MB
-    'big-data-basic': 800, # (1049MB)
-    'computer-vision-basic': 800, #1001MB
-    'container-virt': 800, #197.31MB
-    'containers-basic-dev': 1200, #921MB
-    'database-basic-dev': 800, # 938
-    'desktop': 480,
-    'desktop-autostart': 480,
-    'desktop-kde-apps': 800, # 555 MB
-    'devpkg-clutter-gst': 800, #251MB
-    'devpkg-gnome-online-accounts': 800, # 171MB
-    'devpkg-gnome-panel': 800, #183
-    'devpkg-nautilus': 800, #144MB
-    'devpkg-opencv': 800, # 492MB
-    'education': 800,
-    'education-primary' : 800, #266MB
-    'game-dev': 6000, # 3984
-    'games': 800, # 761MB
-    'java9-basic': 800, # 347MB
-    'machine-learning-basic': 1200, #1280MB
-    'machine-learning-tensorflow': 800,
-    'machine-learning-web-ui': 1200, # (1310MB)
-    'mail-utils-dev ': 1000, #(670MB)
-    'maker-cnc': 800, # (352MB)
-    'maker-gis': 800, # (401MB)
-    'network-basic-dev': 1200, #758MB
-    'openstack-common': 800, # (360MB)
-    'os-clr-on-clr': 8000,
-    'os-core-dev': 800,
-    'os-testsuite': 1000,
-    'os-testsuite-phoronix': 1000,
-    'os-testsuite-phoronix-desktop': 1000,
-    'os-testsuite-phoronix-server': 1000,
-    'os-util-gui': 800, #218MB
-    'os-utils-gui-dev': 6000, #(3784MB)
-    'python-basic-dev': 800, #466MB
-    'qt-basic-dev': 2400, # (1971MB)
-    'service-os-dev': 800, #652MB
-    'storage-cluster': 800, #211MB
-    'storage-util-dev': 800, # (920MB)
-    'storage-utils-dev': 1000, # 920 MB
-    'supertuxkart': 800, # (545 MB)
-    'sysadmin-basic-dev': 1000, # 944 MB
-    'texlive': 1000, #1061
-}
+# bundle_add_timeouts -> moved to tcfl.tl.py
 
 #: Map bundle path names
 #:
@@ -364,20 +316,6 @@ bundle_path_map = [
 bundle_t_map = {
     'bat-dev-tooling.t.autospec_nano': 'build-package.autospec_nano',
 }
-
-def _bundle_add_timeout(tc, bundle_name, test_name):
-    timeout = 240
-    if bundle_name in bundle_add_timeouts:
-        timeout = bundle_add_timeouts[bundle_name]
-        tc.report_info("adjusting timeout to %d per "
-                       "configuration tcfl.tc_clear_bbt.bundle_add_timeouts"
-                       % timeout)
-    if test_name in bundle_add_timeouts:
-        timeout = bundle_add_timeouts[test_name]
-        tc.report_info("adjusting timeout to %d per "
-                       "configuration tcfl.tc_clear_bbt.bundle_add_timeouts"
-                       % timeout)
-    return timeout
 
 def _bundle_run_timeout(tc, bundle_name, test_name):
     timeout = 240
@@ -662,7 +600,7 @@ EOF
             " sleep 1s; done", timeout = 15)
 
         output = target.shell.run(
-            "bats --help | fgrep -q -- '  -j' || echo N''O # supports -j?",
+            "bats --help | fgrep -q -- '--jobs' || echo N''O # supports -j?",
             output = True, trim = True)
         if 'NO' not in output:
             self.bats_parallel = True
