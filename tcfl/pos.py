@@ -469,11 +469,11 @@ class extension(tc.target_extension_c):
             raise self.unneeded
         tc.target_extension_c.__init__(self, target)
 
-        pos_capable = target.kws['pos_capable']
-        if isinstance(pos_capable, bool):
-            if pos_capable == False:
-                raise tc.blocked_e("target is not POS capable",
-                                   dict(target = target))
+        pos_capable = target.kws.get('pos_capable', None)
+        if pos_capable == None or pos_capable == False:
+            raise self.unneeded("target is not POS capable",
+                                dict(target = target))
+        elif pos_capable == True:
             target.report_info("WARNING! target's pos_capable is still old "
                                "style, update your config--taking "
                                "defaults")
