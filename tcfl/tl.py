@@ -750,7 +750,12 @@ def swupd_bundle_add(ic, target, bundle_list,
             if not 'FAILED-%(tc_hash)s' % testcase.kws in output:
                 # We assume it worked
                 break
-
+            if 'Error: Bundle too large by' in output:
+                df = target.shell.run("df -h", output = True, trim = True)
+                raise tcfl.tc.blocked_e(
+                    "swupd reports rootfs out of space to"
+                    " install bundle %(bundle)s" % kws,
+                    dict(output = output, df = df))
             target.report_info("bundle-add: failed %d/%d? Retrying in 5s"
                                % (count, top))
             time.sleep(5)
