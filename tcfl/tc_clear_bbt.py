@@ -253,13 +253,14 @@ bundle_run_timeouts = {
     'bat-desktop-kde-gui.t': 800,
     'bat-mixer.t': 3000,
     'bat-os-testsuite-phoronix.t': 600,
+    'bat-os-utils-gui-dev-pkgconfig-compile.t': 400,
+    'bat-perl-extras-perl-use_parallel.t': 20000,	# wth...
     'bat-xfce4-desktop-bin-help.t': 800,
     'bat-xfce4-desktop-gui.t': 800,
     'kvm-host': 480,
     'os-clr-on-clr': 640,
     'perl-basic': 480,
     'perl-extras': 12000,    # 4k subcases, needs to be split to parallelize
-    'bat-perl-extras-perl-use_parallel.t': 20000,	# wth...
     'quick-perms.t': 3000,
     'telemetrics': 480,
     'xfce4-desktop': 800,
