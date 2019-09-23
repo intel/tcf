@@ -91,6 +91,9 @@ if __name__ == "__main__":
         "-u", "--url", action = "append", default = [],
         help = "URL to the test broker (multiple may be specified)")
     arg_parser.add_argument(
+        "-d", "--debug", action = "store_true", default = False,
+        help = "Enable internal debug prints and checks")
+    arg_parser.add_argument(
         "-x", "--traces", action='store_true', default = False,
         help = "Print exception traces")
     arg_parser.add_argument(
@@ -477,6 +480,15 @@ if __name__ == "__main__":
     log_format = commonl.log_format_compose(log_format, False, False)
     logging.basicConfig(format = log_format, level = args.level)
 
+    if args.debug:
+        import httplib
+        # Debug logging
+        httplib.HTTPConnection.debuglevel = 1
+        logging.getLogger().setLevel(logging.DEBUG)
+        req_log = logging.getLogger('requests.packages.urllib3')
+        req_log.setLevel(logging.DEBUG)
+        req_log.propagate = True
+    
     if args.chdir:
         os.chdir(args.chdir)
 
