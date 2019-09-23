@@ -238,10 +238,11 @@ def linux_ssh_root_nopwd(target, prefix = ""):
     wait for *sshd* to be fully ready; it is a hack
 
     >>> target.shell.run(           # wait for sshd to fully restart
-    >>>     "while ! nc localhost 22 < /dev/null | /usr/bin/fgrep SSH-2.0; do"
+    >>>     # this assumes BASH
+    >>>     "while ! exec 3<>/dev/tcp/localhost/22; do"
     >>>     " sleep 1s; done", timeout = 10)
 
-    - why *nc*? easy and simple; note default installed in most distros
+    - why not *nc*? easy and simple; not default installed in most distros
 
     - why not *curl*? most distros have it installed; if SSH is replying
       with the SSH-2.0 string, then likely the daemon is ready
