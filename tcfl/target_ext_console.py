@@ -8,12 +8,27 @@
 Raw access to the target's serial consoles
 ------------------------------------------
 
+This exposes APIs to interface with the target's serial consoles and
+the hookups for accessing them form the command line.
 """
 
+import contextlib
 import curses.ascii
-import tc
+import errno
+import fcntl
+import getpass
+import logging
+import os
+import sys
+import termios
+import threading
+import time
+import tty
 
-class console(tc.target_extension_c):
+import tc
+from . import msgid_c
+
+class extension(tc.target_extension_c):
     """
     Extension to :py:class:`tcfl.tc.target_c` to run methods from the console
     management interface to TTBD targets.
@@ -25,85 +40,631 @@ class console(tc.target_extension_c):
     >>> target.console.setup()
     >>> target.console.list()
 
+    Consoles might be disabled (because for example, the targer has to
+    be on some network for them to be enabled:
+
+    >>> target.console.enable()
+    >>> target.console.disable()
+
+    You can setup some parameters with:
+
+    >>> target.console.setup()
+    >>> target.console.setup_get()
+
     """
 
     def __init__(self, target):
-        if not 'test_target_console_mixin' in target.rt.get('interfaces', []):
+        self._default = None
+        interfaces = target.rt.get('interfaces', [])
+        if 'console' in target.rt.get('interfaces', []):
+            self.compat = False
+        elif 'test_target_console_mixin' in target.rt.get('interfaces', []):
+            self.compat = True
+        else:
             raise self.unneeded
+        self.target = target
+        # this won't change runtime, so it is ok to cache it
+        self.console_list = self.list()
+        # this becomes a ALIAS: REAL-NAME
+        if not self.compat:
+            r = self.target.ttbd_iface_call("console", "list", method = "GET")
+            self.aliases = r['aliases']
+        else:
+            self.aliases = {}	# COMPAT
+        # Which is the default console that was set in runtime?
+        # call it only once from here, otherwise everytime we try to
+        # get the console to use by default we do a call
+        self.default_property = self.target.property_get("console-default",
+                                                         None)
+        self._default = self.default_property
 
-    def read(self, console_id = None, offset = 0, fd = None):
+
+    def _console_get(self, console):
+        #
+        # Given a console name or None, return which console to use;
+        # if None, take the default, which is 'default' if it exists,
+        # otherwise the first one on the list.
+        #
+        assert console == None or isinstance(console, basestring)
+        if console:
+            assert console in self.console_list, \
+                "%s: console not supported by target" % console
+            return console
+        if self._default:
+            return self._default
+        if 'default' in self.console_list:
+            return 'default'
+        elif self.console_list:
+            return self.console_list[0]
+        else:
+            raise RuntimeError("target lists no consoles")
+
+    @property
+    def default(self):
+        """
+        Return the default console
+        """
+        return self._default
+
+    @default.setter
+    def default(self, new_console = None):
+        """
+        Set or reset the default console
+
+        :param str new_console: (optional) the new console to set as
+          default; must be an existing console. If *None*, the default
+          console is reset to one called *default* or the first
+          console.
+        :returns: current default console
+        """
+        console_list = self.list()
+        assert new_console == None or new_console in console_list, \
+            "new default console %s is not an existing console (%s)" \
+            % (new_console, " ".join(console_list))
+        self.target.report_info("default console changed from %s to %s"
+                                % (self._default, new_console))
+        self._default = new_console
+        return new_console
+
+
+    def enable(self, console = None):
+        """
+        Enable a console
+
+        :param str console: (optional) console to enable; if missing,
+          the default one.
+        """
+        console = self._console_get(console)
+        self.target.ttbd_iface_call("console", "enable", method = "PUT",
+                                    component = console)
+
+    def disable(self, console = None):
+        """
+        Disable a console
+
+        :param str console: (optional) console to disable; if missing,
+          the default one.
+        """
+        console = self._console_get(console)
+        self.target.ttbd_iface_call("console", "disable", method = "PUT",
+                                    component = console)
+
+    def state(self, console = None):
+        """
+        Return the given console's state
+
+        :param str console: (optional) console to enable; if missing,
+          the default one
+        :returns: *True* if enabled, *False* otherwise
+        """
+        console = self._console_get(console)
+        r = self.target.ttbd_iface_call("console", "state", method = "GET",
+                                        component = console)
+        return r['result']
+
+
+    def setup(self, console, **parameters):
+        """
+        Setup console's parameters
+
+        If no parameters are given, reset to defaults.
+
+        List of current parameters can be obtained with :meth:`setup_get`.
+        """
+        if self.compat:
+            raise RuntimeError("target does not support new console interface")
+        console = self._console_get(console)
+        return self.target.ttbd_iface_call("console", "setup",
+                                           component = console,
+                                           **parameters)
+
+    def setup_get(self, console):
+        """
+        Return a dictionary with current parameters.
+        """
+        if self.compat:
+            raise RuntimeError("target does not support new console interface")
+        console = self._console_get(console)
+        r = self.target.ttbd_iface_call("console", "setup", method = "GET",
+                                        component = console)
+        return r['result']
+
+    def list(self):
+        if self.compat:
+            r = self.target.rt.get('consoles', [])
+            return r
+        else:
+            r = self.target.ttbd_iface_call("console", "list", method = "GET")
+            return r['result']
+
+    def read(self, console = None, offset = 0, max_size = 0, fd = None):
         """
         Read data received on the target's console
 
-        :param str console_id: (optional) console to read from
+        :param str console: (optional) console to read from
         :param int offset: (optional) offset to read from (defaults to zero)
         :param int fd: (optional) file descriptor to which to write
           the output (in which case, it returns the bytes read).
+        :param int max_size: (optional) if *fd* is given, maximum
+          amount of data to read
         :returns: data read (or if written to a file descriptor,
           amount of bytes read)
         """
-        if console_id == None or console_id == "":
-            console_id_name = "<default>"
-        else:
-            console_id_name = console_id
-        self.target.report_info(
-            "reading console '%s:%s' @%d" % (self.target.fullid,
-                                             console_id_name, offset),
-            dlevel = 1)
+        assert console == None or isinstance(console, basestring)
+        assert offset >= 0
+        assert max_size >= 0
+        #assert fd == None or fd >= 0
+        assert fd == None or isinstance(fd, file)
+
+        target = self.target
+        if self.compat:
+            #
+            # COMPAT: ttbl.test_target_console_mixin
+            #
+            if console == None or console == "":
+                console_name = "<default>"
+            else:
+                console_name = console
+            target.report_info("%s: reading from @%d"
+                               % (console_name, offset), dlevel = 4)
+            if fd:
+                r = self.target.rtb.rest_tb_target_console_read_to_fd(
+                    fd.fileno(),
+                    self.target.rt, console, offset,
+                    ticket = self.target.ticket)
+                ret = r
+                l = r
+            else:
+                r = self.target.rtb.rest_tb_target_console_read(
+                    self.target.rt, console, offset,
+                    ticket = self.target.ticket)
+                ret = r.text
+                l = len(ret)
+            target.report_info("%s: read %dB from console @%d"
+                               % (console_name, l, offset), dlevel = 3)
+            return ret
+
+        console = self._console_get(console)
         if fd:
-            r = self.target.rtb.rest_tb_target_console_read_to_fd(
-                fd,
-                self.target.rt, console_id, offset,
-                ticket = self.target.ticket)
-            ret = r
-            l = r
+            target.report_info("%s: reading from @%d"
+                               % (console, offset), dlevel = 4)
+            # read from the stream, write to a file
+            with contextlib.closing(
+                    target.ttbd_iface_call(
+                        "console", "read", method = "GET",
+                        component = console, offset = offset,
+                        stream = True, raw = True)) as r:
+                # http://docs.python-requests.org/en/master/user/quickstart/#response-content
+                chunk_size = 1024
+                total = 0
+                for chunk in r.iter_content(chunk_size):
+                    while True:
+                        try:
+                            fd.write(chunk)
+                            break
+                        except IOError as e:
+                            # for those files opened in O_NONBLOCK
+                            # mode -- yep, prolly a bad idea -- as
+                            # non elegant as you can find it. But
+                            # otherwise 'tcf console-write -i' with a
+                            # large amount of data loose stuff--need
+                            # to properly root cause FIXME
+                            if e.errno == errno.EAGAIN:
+                                time.sleep(0.5)
+                                continue
+                            raise
+
+                    # don't use chunk_size, as it might be less
+                    total += len(chunk)
+                    if max_size > 0 and total >= max_size:
+                        break
+                fd.flush()
+                ret = total
+                l = total
         else:
-            r = self.target.rtb.rest_tb_target_console_read(
-                self.target.rt, console_id, offset,
-                ticket = self.target.ticket)
+            # read from the stream, to a stream, return it
+            r = target.ttbd_iface_call("console", "read", method = "GET",
+                                       component = console, offset = offset,
+                                       raw = True)
             ret = r.text
             l = len(ret)
-        self.target.report_info("read console '%s:%s' @%d %dB"
-                                % (self.target.fullid, console_id_name,
-                                   offset, l))
+        target.report_info("%s: read %dB from console @%d"
+                           % (console, l, offset), dlevel = 3)
         return ret
 
-    def size(self, console_id = None):
+    def size(self, console = None):
         """
         Return the amount of bytes so far read from the console
 
-        :param str console_id: (optional) console to read from
+        :param str console: (optional) console to read from
         """
-        return int(self.target.rtb.rest_tb_target_console_size(
-            self.target.rt, console_id, ticket = self.target.ticket))
+        if self.compat:
+            return int(self.target.rtb.rest_tb_target_console_size(
+                self.target.rt, console, ticket = self.target.ticket))
 
-    def write(self, data, console_id = None):
-        """
-        Write data received to a console
+        console = self._console_get(console)
+        r = self.target.ttbd_iface_call("console", "size", method = "GET",
+                                        component = console)
+        if r['result'] == None:
+            return None
+        return int(r['result'])
 
-        :param data: data to write
-        :param str console_id: (optional) console to read from
+    def write(self, data, console = None):
         """
-        if console_id == None or console_id == "":
-            console_id_name = "<default>"
-        else:
-            console_id_name = console_id
-        if len(data) > 30:
-            data_report = data[:30] + "..."
+        Write data to a console
+
+        :param data: data to write (string or bytes)
+        :param str console: (optional) console to write to
+        """
+        if len(data) > 50:
+            data_report = data[:50] + "..."
         else:
             data_report = data
-        data_report = filter(curses.ascii.isprint, data_report)
-        self.target.report_info("writing to console '%s:%s'"
-                                % (self.target.fullid, console_id_name),
-                                dlevel = 1)
-        self.target.rtb.rest_tb_target_console_write(
-            self.target.rt, console_id, data, ticket = self.target.ticket)
-        self.target.report_info("wrote '%s' to console '%s:%s'"
-                                % (data_report, self.target.fullid,
-                                   console_id_name))
+        # escape unprintable chars
+        data_report = data_report.encode('unicode-escape', errors = 'replace')
+        if self.compat:
+            if console == None or console == "":
+                console_name = "<default>"
+            else:
+                console_name = console
+            self.target.report_info("%s: writing %dB to console"
+                                    % (console_name, len(data)),
+                                    dlevel = 3)
+            self.target.rtb.rest_tb_target_console_write(
+                self.target.rt, console, data, ticket = self.target.ticket)
+            self.target.report_info("%s: wrote %dB (%s) to console"
+                                    % (console_name, len(data), data_report))
+            return
 
-    def setup(self, console_id = None, **kwargs):
-        raise NotImplementedError
+        console = self._console_get(console)
+        self.target.report_info("%s: writing %dB to console"
+                                % (console, len(data)), dlevel = 3)
+        self.target.ttbd_iface_call("console", "write",
+                                    component = console, data = data)
+        self.target.report_info("%s: wrote %dB (%s) to console"
+                                % (console, len(data), data_report))
 
-    def list(self):
-        return self.target.rt.get('consoles', [])
+def f_write_retry_eagain(fd, data):
+    while True:
+        try:
+            fd.write(data)
+            return
+        except IOError as e:
+            # for those files opened in O_NONBLOCK
+            # mode -- yep, prolly a bad idea -- as
+            # non elegant as you can find it. But
+            # otherwise 'tcf console-write -i' with a
+            # large amount of data loose stuff--need
+            # to properly root cause FIXME
+            if e.errno == errno.EAGAIN:
+                time.sleep(0.5)
+                continue
+            raise
+
+
+def _console_read_thread_fn(target, console, fd, offset):
+    # read in the background the target's console output and print it
+    # to stdout
+    with msgid_c("cmdline"):
+        if offset == -1:
+            offset = target.console.size(console)
+            if offset == None:	# disabled console? fine
+                offset = 0
+        else:
+            offset = 0
+        while True:
+            try:
+                # Instead of reading and sending directy to the
+                # stdout, we need to break it up in chunks; the
+                # console is in non-blocking mode (for reading
+                # keystrokes) and also in raw mode, so it doesn't do
+                # \n to \r\n xlation for us.
+                # So we chunk it and add the \r ourselves; there might
+                # be a better method to do this.
+                data = target.console.read(console, offset = offset,
+                                           max_size = 4096)
+                if data:
+                    # add CR, because the console is in raw mode
+                    for line in data.splitlines(True):
+                        f_write_retry_eagain(fd, line)
+                        if '\n' in line:
+                            f_write_retry_eagain(fd, "\r")
+                    time.sleep(0.1)
+                    fd.flush()
+                else:
+                    time.sleep(0.5)	# Give the port some time
+
+                offset += len(data)
+                # FIXME: hack, shall be able to get current size from
+                # read call, even when streaming
+                size = target.console.size(console)
+                if size != None and size < offset:	# target power cycled?
+                    sys.stderr.write(
+                        "\n\r\r\nWARNING: target power cycled\r\r\n\n")
+                    offset = 0
+            except Exception as e:	# pylint: disable = broad-except
+                logging.exception(e)
+                raise
+
+def _cmdline_console_write_interactive(target, console, crlf, offset):
+    #
+    # Poor mans interactive console
+    #
+    # spawn a background reader thread to print the console output,
+    # capture user's keyboard input and send it to the target.
+    print """\
+WARNING: This is a very limited interactive console
+         Escape character twice ^[^[ to exit
+"""
+    time.sleep(1)
+    fd = os.fdopen(sys.stdout.fileno(), "w+")
+    console_read_thread = threading.Thread(
+        target = _console_read_thread_fn,
+        args = (target, console, fd, offset))
+    console_read_thread.daemon = True
+    console_read_thread.start()
+
+    class _done_c(Exception):
+        pass
+
+    try:
+        one_escape = False
+        old_flags = termios.tcgetattr(sys.stdin.fileno())
+        tty.setraw(sys.stdin.fileno())
+        flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFD)
+        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        while True and console_read_thread.is_alive():
+            try:
+                chars = sys.stdin.read()
+                if not chars:
+                    continue
+                for char in chars:
+                    # if the terminal sends a \r (user hit enter),
+                    # translate to crlf
+                    if crlf and char == "\r":
+                        target.console.write(crlf, console = console)
+                    if char == '\x1b':
+                        if one_escape:
+                            raise _done_c()
+                        one_escape = True
+                    else:
+                        one_escape = False
+                target.console.write(chars, console = console)
+            except _done_c:
+                break
+            except IOError as e:
+                if e.errno != errno.EAGAIN:
+                    raise
+                # If no data ready, wait a wee, try again
+                time.sleep(0.25)
+    finally:
+        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_flags)
+
+
+def _cmdline_console_write(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args)
+        if args.interactive:
+            _cmdline_console_write_interactive(target, args.console,
+                                               args.crlf, args.offset)
+        elif args.data == []:	# no data given, so get from stdin
+            while True:
+                line = getpass.getpass("")
+                if line:
+                    target.console.write(line.strip() + args.crlf,
+                                         console = args.console)
+        else:
+            for line in args.data:
+                target.console.write(line + args.crlf,
+                                     console = args.console)
+
+
+def _cmdline_console_read(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args)
+        console = args.console
+        offset = int(args.offset)
+        max_size = int(args.max_size)
+        if args.output == None:
+            fd = sys.stdout
+        else:
+            fd = open(args.output, "wb")
+        try:
+            while True:
+                offset += target.console.read(console, offset,
+                                              max_size, fd)
+                if not args.follow:
+                    break
+                size = target.console.size(console)
+                if size < offset:	# target power cycled?
+                    offset = 0
+                time.sleep(0.25)	# no need to bombard the server..
+        finally:
+            if fd != sys.stdout:
+                fd.close()
+
+
+def _cmdline_console_list(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args)
+        for console in target.console.list():
+            size = target.console.size(console)
+            if size != None:
+                print "%s: %d" % (console, size)
+            else:
+                print "%s: disabled" % console
+
+
+def _cmdline_console_setup(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args)
+        if args.reset:
+            r = target.console.setup(args.console)
+        elif args.parameters == []:
+            r = target.console.setup_get(args.console)
+        else:
+            parameters = {}
+            for parameter in args.parameters:
+                if ':' in parameter:
+                    key, value = parameter.split(":", 1)
+                    # try to convert to int/float or keep as string
+                    while True:
+                        try:
+                            value = int(value)
+                            break
+                        except ValueError:
+                            pass
+                        try:
+                            value = float(value)
+                            break
+                        except ValueError:
+                            pass
+                        break	# just a string or whatever it reps as                        
+                else:
+                    key = parameter
+                    value = True
+                parameters[key] = value
+            r = target.console.setup(args.console, **parameters)
+        result = r.get('result', {})
+        for key, value in result.iteritems():
+            print "%s: %s" % (key, value)
+
+def _cmdline_console_enable(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args)
+        target.console.enable(args.console)
+
+
+def _cmdline_console_disable(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args)
+        target.console.disable(args.console)
+
+
+def _cmdline_setup(arg_subparser):
+    ap = arg_subparser.add_parser(
+        "console-read",
+        help = "Read from a target's console (pipe to `cat -A` to"
+        " remove control chars")
+    ap.add_argument("-s", "--offset", action = "store",
+                    dest = "offset", type = int,
+                    help = "Read the console output starting from "
+                    "offset (some targets might or not support this)")
+    ap.add_argument("-m", "--max-size", action = "store",
+                    dest = "max_size", default = 0,
+                    help = "Read as much bytes (approx) [only available with "
+                    "-o]")
+    ap.add_argument("-o", "--output", action = "store", default = None,
+                    metavar = "FILENAME",
+                    help = "Write output to FILENAME")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target's name")
+    ap.add_argument("--console", "-c", metavar = "CONSOLE",
+                    action = "store", default = None,
+                    help = "Console to read from")
+    ap.add_argument("--follow",
+                    action = "store_true", default = False,
+                    help = "Continue reading in a loop until Ctrl-C is "
+                    "pressed")
+    ap.set_defaults(func = _cmdline_console_read, offset = 0)
+
+    ap = arg_subparser.add_parser(
+        "console-list",
+        help = "List consoles")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target name")
+    ap.set_defaults(func = _cmdline_console_list)
+
+    ap = arg_subparser.add_parser(
+        "console-write",
+        help = "Write to a target's console")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target's name or URL")
+    ap.add_argument("--console", "-c", metavar = "CONSOLE",
+                    action = "store", default = None,
+                    help = "Console to write to")
+    ap.add_argument("--interactive", "-i",
+                    action = "store_true", default = False,
+                    help = "Print back responses")
+    ap.add_argument("--local-echo", "-e",
+                    action = "store_true", default = True,
+                    help = "Do local echo (%(default)s)")
+    ap.add_argument("--no-local-echo", "-E",
+                    action = "store_false", default = True,
+                    help = "Do not local echo (%(default)s)")
+    ap.add_argument("-r", dest = "crlf",
+                    action = "store_const", const = "\r",
+                    help = "CRLF lines with \\r")
+    ap.add_argument("-n", dest = "crlf",
+                    action = "store_const", const = "\n",
+                    help = "CRLF lines with \\n")
+    ap.add_argument("-R", dest = "crlf",
+                    action = "store_const", const = "\r\n",
+                    help = "CRLF lines with \\r\\n")
+    ap.add_argument("-N", dest = "crlf",
+                    action = "store_const", const = "",
+                    help = "Don't add any CRLF to lines (default)")
+    ap.add_argument("data", metavar = "DATA",
+                    action = "store", default = None, nargs = '*',
+                    help = "Data to write; if none given, "
+                    "read from stdin")
+    ap.add_argument("-s", "--offset", action = "store",
+                    dest = "offset", type = int, default = 0,
+                    help = "(for interfactive) read the console "
+                    "output starting from (-1 for last)")
+    ap.set_defaults(func = _cmdline_console_write, crlf = "")
+
+
+    ap = arg_subparser.add_parser("console-setup",
+                                  help = "Setup a console")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target name")
+    ap.add_argument("--console", "-c", metavar = "CONSOLE",
+                    action = "store", default = None,
+                    help = "name of console to setup, or default")
+    ap.add_argument("--reset", "-r",
+                    action = "store_true", default = False,
+                    help = "reset to default values")
+    ap.add_argument("parameters", metavar = "KEY:VALUE", #action = "append",
+                    nargs = "*",
+                    help = "Parameters to set (KEY:VALUE)")
+    ap.set_defaults(func = _cmdline_console_setup)
+
+
+    ap = arg_subparser.add_parser("console-disable",
+                                  help = "Disable a console")
+    ap.add_argument("--console", "-c", metavar = "CONSOLE",
+                    action = "store", default = None,
+                    help = "name of console to disable")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target name")
+    ap.set_defaults(func = _cmdline_console_disable)
+
+    ap = arg_subparser.add_parser("console-enable",
+                                  help = "Enable a console")
+    ap.add_argument("--console", "-c", metavar = "CONSOLE",
+                    action = "store", default = None,
+                    help = "name of console to enable")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target name")
+    ap.set_defaults(func = _cmdline_console_enable)

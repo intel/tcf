@@ -21,11 +21,12 @@ import time
 
 import commonl
 import commonl.requirements
-import ttbl
+import ttbl.power
+import ttbl.console
 
 import pyghmi.ipmi.command
 
-class pci(ttbl.tt_power_control_impl):
+class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):
 
     """
     Power controller to turn on/off a server via IPMI
@@ -71,6 +72,7 @@ class pci(ttbl.tt_power_control_impl):
     """
     def __init__(self, bmc_hostname, user = None, password = None):
         ttbl.tt_power_control_impl.__init__(self)
+        ttbl.power.impl_c.__init__(self)
         self.bmc_hostname = bmc_hostname
         self.user = user
         self.password = password
@@ -84,23 +86,23 @@ class pci(ttbl.tt_power_control_impl):
         self.bmc = pyghmi.ipmi.command.Command(self.bmc_hostname,
                                                self.user, self.password)
 
-    def power_on_do(self, target):
+    def on(self, target, component):
         self._setup()
         result = self.bmc.set_power('on', wait = True)
-        target.log.info("ipmi %s@%s on returned %s"
-                        % (self.user, self.bmc_hostname, result))
+        target.log.info("%s: ipmi %s@%s on returned %s"
+                        % (component, self.user, self.bmc_hostname, result))
 
-    def power_off_do(self, target):
+    def off(self, target, component):
         self._setup()
         result = self.bmc.set_power('off', wait = True)
-        target.log.info("ipmi %s@%s off returned %s"
-                        % (self.user, self.bmc_hostname, result))
+        target.log.info("%s: ipmi %s@%s off returned %s"
+                        % (component, self.user, self.bmc_hostname, result))
 
-    def power_get_do(self, target):
+    def get(self, target, component):
         self._setup()
         data = self.bmc.get_power()
-        target.log.info("ipmi %s@%s get_power returned %s"
-                        % (self.user, self.bmc_hostname,
+        target.log.info("%s: ipmi %s@%s get_power returned %s"
+                        % (component, self.user, self.bmc_hostname,
                            pprint.pformat(data)))
         state = data.get('powerstate', None)
         if state == 'on':
@@ -108,12 +110,24 @@ class pci(ttbl.tt_power_control_impl):
         elif state == 'off':
             return False
         else:
-            target.log.info("ipmi %s@%s get_power returned no state: %s"
-                            % (self.user, self.bmc_hostname,
+            target.log.info("%s: ipmi %s@%s get_power returned no state: %s"
+                            % (component, self.user, self.bmc_hostname,
                                pprint.pformat(data)))
             return None
 
-class pci_ipmitool(ttbl.tt_power_control_impl):
+    # COMPAT: old interface, ttbl.tt_power_control_impl
+    def power_on_do(self, target):
+        return self.on(target, "n/a")
+
+    def power_off_do(self, target):
+        return self.off(target, "n/a")
+
+    def power_get_do(self, target):
+        # this reports None because this is is just a delay loop
+        return None
+
+        
+class pci_ipmitool(ttbl.power.impl_c, ttbl.tt_power_control_impl):
     """
     Power controller to turn on/off a server via IPMI
 
@@ -123,6 +137,7 @@ class pci_ipmitool(ttbl.tt_power_control_impl):
     """
     def __init__(self, bmc_hostname, user = None, password = None):
         ttbl.tt_power_control_impl.__init__(self)
+        ttbl.power.impl_c.__init__(self)
         self.bmc_hostname = bmc_hostname
         self.bmc = None
         self.env = dict()
@@ -149,23 +164,34 @@ class pci_ipmitool(ttbl.tt_power_control_impl):
             raise
         return result
 
-    def power_on_do(self, target):
+    def on(self, target, component):
         result = self._run(target, [ "chassis", "power", "on" ])
-        target.log.info("on returned %s" % result)
+        target.log.info("%s: on returned %s" % (component, result))
 
-    def power_off_do(self, target):
+    def off(self, target, component):
         result = self._run(target, [ "chassis", "power", "off" ])
-        target.log.info("off returned %s" % result)
+        target.log.info("%s: off returned %s" % (component, result))
 
-    def power_get_do(self, target):
+    def get(self, target, component):
         result = self._run(target, [ "chassis", "power", "status" ])
-        target.log.info("status returned %s" % result)
+        target.log.info("%s: status returned %s" % (component, result))
         if 'Chassis Power is on' in result:
             return True
         elif 'Chassis Power is off' in result:
             return False
-        target.log.error("ipmtool state returned unknown message: %s"
-                         % result)
+        target.log.error("%s: ipmtool state returned unknown message: %s"
+                         % (component, result))
+        return None
+
+    # COMPAT: old interface, ttbl.tt_power_control_impl
+    def power_on_do(self, target):
+        return self.on(target, "n/a")
+
+    def power_off_do(self, target):
+        return self.off(target, "n/a")
+
+    def power_get_do(self, target):
+        # this reports None because this is is just a delay loop
         return None
 
 
@@ -266,6 +292,10 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
             env = env,
         )
         ttbl.power.socat_pc.on(self, target, component)
+
+    # console interface
+    def state(self, target, component):
+        return self.get(target, component)
 
     def enable(self, target, component):
         return self.on(target, component)

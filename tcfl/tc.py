@@ -1181,6 +1181,7 @@ class target_c(object):
         data received after calling this function.
 
         """
+        console = self.console._console_get(console)
         # Why does this work? Because next expect runs a new
         # console_rx_eval function that will get it's offset
         # to be zero and thus it'll initialize to the offset from the
@@ -1251,6 +1252,7 @@ class target_c(object):
            from which to read. If negative, it is offset from the last
            data received.
         """
+        console = self.console._console_get(console)
         _, console_code = expecter.console_mk_code(self, console)
         of = self.testcase.tls.expecter.buffers.get(console_code, None)
         if of == None:
@@ -1269,6 +1271,7 @@ class target_c(object):
         :param str console: (optional) name of console on which the
            the data was received (otherwie use the default one).
         """
+        console = self.console._console_get(console)
         _, console_code = expecter.console_mk_code(self, console)
         of = self.testcase.tls.expecter.buffers.get(console_code, None)
         if of == None:
@@ -1332,6 +1335,7 @@ class target_c(object):
 
         """
         # Won't be re-added if already there
+        console = self.console._console_get(console)
         added = self.testcase.tls.expecter.add(
             False, expecter.console_rx_poller, (self, console),)
         has_to_pass = True if result == "pass" else False
@@ -1361,8 +1365,7 @@ class target_c(object):
         """
         if timeout:
             assert isinstance(timeout, int)
-        if console:
-            assert isinstance(console, basestring)
+        console = self.console._console_get(console)
 
         try:
             with self.on_console_rx_cm(regex_or_str, timeout = timeout,
@@ -1398,8 +1401,6 @@ class target_c(object):
         """
         if timeout:
             assert isinstance(timeout, int)
-        if console:
-            assert isinstance(console, basestring)
 
         try:
             uid = "just_me" # There is only one target.expect()
@@ -1444,6 +1445,7 @@ class target_c(object):
 
         :returns: Nothing
         """
+        console = self.console._console_get(console)
         has_to_pass = True if result == "pass" else False
         _tc = self.testcase
         if isinstance(timeout, numbers.Number) \
@@ -1573,14 +1575,10 @@ class target_c(object):
         assert isinstance(raw, bool)
         assert method.upper() in ( "PUT", "GET", "DELETE", "POST" )
 
-        if kwargs == None:
-            kwargs = {}
         if component:
             kwargs['component'] = component
         if self.ticket:
             kwargs['ticket'] = self.ticket
-        if kwargs == {}:
-            kwargs = {}
         return self.rtb.send_request(
             method,
             "targets/%s/%s/%s" % (self.id, interface, call),
@@ -7143,7 +7141,7 @@ tcfl.app.driver_add(app_manual.app_manual)
 import target_ext_broker_files
 target_c.extension_register(target_ext_broker_files.broker_files)
 import target_ext_console
-target_c.extension_register(target_ext_console.console)
+target_c.extension_register(target_ext_console.extension, "console")
 import target_ext_power
 target_c.extension_register(target_ext_power.extension, "power")
 import target_ext_images
