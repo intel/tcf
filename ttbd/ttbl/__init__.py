@@ -771,6 +771,20 @@ class test_target(object):
         #: FIXME
         self._acquirer = None
 
+        #:
+        #: Pre/post power on/off hooks
+        #:
+        #: For historical reasons, these lists are here instead of on
+        #: the new power interface extension--at some point they will
+        #: be moved
+        #:
+        #: FIXME: move to target.power.
+        self.power_on_pre_fns = []
+        self.power_on_post_fns = []
+        self.power_off_pre_fns = []
+        self.power_off_post_fns = []
+
+
     @property
     def type(self):
         return self.tags['type']

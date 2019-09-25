@@ -171,8 +171,10 @@ def _target_id_to_dict(target_id):
         r[prop] = target.fsdb.get(prop)
     # Override a few standard properties
     r['disabled'] = target.fsdb.get('disabled') == "True"
-    if isinstance(target, ttbl.tt_power_control_mixin):
-        # Use the cached version, otherwise it takes too long
+    # Use the cached version, otherwise it takes too long
+    # this is "On" if powered, Off otherwise
+    if hasattr(target, 'power') \
+       or isinstance(target, ttbl.tt_power_control_mixin):	# COMPAT
         r['powered'] = target.fsdb.get('powered') != None
     r.update(target.tags)
     # Make the interfaces list a space separated string
