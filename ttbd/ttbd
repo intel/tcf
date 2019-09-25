@@ -816,17 +816,18 @@ def _target_interface(target_id, interface, call):
             target.log.error("BUG: %s: request_process() added a "
                              "'diagnostics' field that will be overriden"
                              % interface)
-        target.log.debug("%s.request_process() returned %s"
-                         % (interface, pprint.pformat(result)))
         result['diagnostics'] = iostr.getvalue()
     except ttbl.test_target_e as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
     except Exception as e:
         flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
     if 'stream_file' in result:
+        offset = result.get('stream_offset', 0)
         filepath = result['stream_file']
         try:
             fd = open(filepath, "rb")
+            if offset > 0:
+                fd.seek(offset)
         except Exception as e:
             flask_logi_abort(400, "%s: can't stream file: %s" % (filepath, e), exc_info = True)
         return flask.Response(fd, direct_passthrough = True)
