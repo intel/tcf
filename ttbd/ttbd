@@ -774,7 +774,7 @@ def _target_ip_tunnel(target_id):
 
 @app.route(API_PREFIX + 'targets/<string:target_id>/' \
            + '<string:interface>/<string:call>',
-           methods = [ 'POST', 'DELETE', 'GET' ])
+           methods = [ 'PUT', 'POST', 'DELETE', 'GET' ])
 @flask_login.login_required
 def _target_interface(target_id, interface, call):
     with ttbl.config.targets_lock:
