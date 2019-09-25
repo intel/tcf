@@ -333,8 +333,253 @@ class symlink_acquirer_c(acquirer_c):
 
 
 class tt_interface(object):
+    """
+    A target specific interface
+
+    This class can be subclassed and then instanced to create a target
+    specific interface for implementing any kind of functionality. For
+    example, the :class:`console <ttbl.console.interface>`, in a
+    configuration file when the target is added:
+
+    >>> target = test_target("TARGETNAME")
+    >>> ttbl.config.target_add(target)
+    >>>
+    >>> target.interface_add(
+    >>>     "console",
+    >>>     ttbl.console.interface(
+    >>>         serial0 = ttbl.console.serial_pc("/dev/ttyS0")
+    >>>         serial1 = ttbl.console.serial_pc("/dev/ttyS1")
+    >>>         default = "serial0",
+    >>>     )
+    >>> )
+
+    creates an instance of the *console* interface with access to two
+    console. The interface is then available over HTTP
+    ``https://SERVER/ttb-vN/target/TARGETNAME/console/*``
+
+    A common pattern for interfaces is to be composed of multiple
+    components, with a different implementation driver for each. For
+    that, a class named *impl_c* is created to define the base
+    interface that all the implementation drivers need to support.
+
+    To create methods that are served over the
+    ``https://SERVER/ttb-vN/target/TARGETNAME/INTERFACENAME/*`` url,
+    create methods in the subclass called *METHOD_NAME* with the
+    signature:
+
+    >>>     def METHOD_NAME(self, target, who, args, user_path):
+    >>>         impl, component = self.arg_impl_get(args, "component")
+    >>>         arg1 = args.get('arg1', None)
+    >>>         arg2 = args.get('arg2', None)
+    >>>         ...
+
+    where:
+
+    - *METHOD* is *put*, *get*, *post* or *delete* (HTTP methods)
+
+    - *NAME* is the method name (eg: *set_state*)
+
+    - *target* is the target object this call is happening onto
+
+    - *who* is the (logged in) user making this call
+
+    - *args* is a dictionary of arguments passed by the client for the
+      HTTP call keyed by name (a string)
+
+    - *user_path* is a string describing the space in the filesystem
+      where files for this user are stored
+
+    When multiple components are used (such as in
+    :class:`ttbl.power.interface` or :class:`ttbl.console.interface`.
+    """
+
     def __init__(self):
-        pass
+        #: List of components that implement this interface
+        #:
+        #: (for interfaces that support multiple components only)
+        #:
+        #: This has to be an ordered dict because the user might care about
+        #: order (eg: power rails need to be executed in the given order)
+        self.impls = collections.OrderedDict()
+        #: Map of names in :data:`impls` that are actually an alias
+        #: and which entry they are aliasing.
+        self.aliases = dict()
+
+    def _target_setup(self, target):
+        # FIXME: move to public interface
+        """
+        Called when the interface is added to a target to initialize
+        the needed target aspect (such as adding tags/metadata)
+        """
+        raise NotImplementedError
+
+
+    def _release_hook(self, target, force):
+        # FIXME: move to public interface
+        """
+        Called when the target is released
+        """
+        raise NotImplementedError
+
+
+    def impls_set(self, impls, kwimpls, cls):
+        """
+        Record in *self.impls* a given set of implementations
+
+        This is only used for interfaces that support multiple components.
+
+        :param list impls: list of objects of type *cls* or of tuples
+          *(NAME, IMPL)* to serve as implementations for the
+          interface; when non named, they will be called *componentN*
+        :param dict impls: dictionary keyed by name of objects of type
+          *cls* to serve as implementatons for the itnerface.
+        :param type cls: base class for the implementations (eg:
+        :class:`ttbl.console.impl_c`)
+
+        """
+        assert isinstance(impls, collections.Iterable)
+        assert isinstance(kwimpls, dict), \
+            "impls must be a dictionary keyed by console name; got %s" \
+            % type(impls).__name__
+        assert issubclass(cls, object)
+
+        aliases = {}
+
+        def _init_by_name(name, impl):
+            if isinstance(impl, cls):
+                if name in self.impls:
+                    raise AssertionError("component '%s' already exists "
+                                         % name)
+                self.impls[name] = impl
+            elif isinstance(impl, basestring):		# alias...
+                aliases[name] = impl			# ...process later
+            else:
+                raise AssertionError(
+                    "'%s' implementation is type %s, " \
+                    "expected %s or str" % (
+                        name, type(impl).__name__,
+                        cls.__name__
+                    ))
+
+        count = 0
+        for impl in impls:
+            if isinstance(impl, tuple):
+                assert len(impl) == 2, \
+                    "tuple of implementations has to have two elements; " \
+                    "got %d" % len(impl)
+                name, pc = impl
+                assert isinstance(name, basestring), \
+                    "tuple[0] has to be a string, got %s" % type(name)
+                assert isinstance(pc, cls), \
+                    "tuple[1] has to be a %s, got %s" % (cls, type(pc))
+                _init_by_name(name, pc)
+            elif isinstance(impl, cls):
+                _init_by_name("component%d" % count, impl)
+            else:
+                raise RuntimeError("list of implementations have to be "
+                                   "either instances of subclasses of %s "
+                                   " or tuples of (NAME, INSTANCE);"
+                                   " %s is a %s"
+                                   % (cls, impl, type(impl)))
+            count += 1
+
+        for name, impl in kwimpls.items():
+            _init_by_name(name, impl)
+
+        for alias, component in aliases.iteritems():
+            if component not in self.impls:
+                raise AssertionError(
+                    "alias '%s' refers to an component "
+                    "'%s' that does not exist (%s)"
+                    % (alias, component, " ".join(self.impls.keys())))
+            self.aliases[alias] = component
+
+    @staticmethod
+    def _arg_get(args, name):
+        if name not in args:
+            raise RuntimeError("missing '%s' argument" % name)
+        return args[name]
+
+    def impl_get_by_name(self, arg, arg_name = "component"):
+        """
+        Return an interface's component implementation by name
+        """
+        if arg in self.aliases:		# translate?
+            arg = self.aliases[arg]
+        if arg in self.impls:
+            return self.impls[arg], arg
+        raise IndexError("%s: unknown %s" % (arg, arg_name))
+
+
+    def arg_impl_get(self, args, arg_name, allow_missing = False):
+        """
+        Return an interface's component implementation by name
+
+        Given the arguments passed with an HTTP request
+        check if one called ARG_NAME is present, we want to get
+        args[ARG_NAME] and self.impl[ARG_NAME].
+
+        :returns: the implementation in *self.impls* for the component
+          specified in the args
+        """
+        if not arg_name in args:
+            if allow_missing:
+                return None, None
+            raise RuntimeError("missing '%s' argument" % arg_name)
+        arg = args[arg_name]
+        if not isinstance(arg, basestring):
+            raise RuntimeError("%s: argument must be a string; got '%s'"
+                               % (arg_name, type(arg).__name__))
+        return self.impl_get_by_name(arg, arg_name)
+
+
+    def args_impls_get(self, args):
+        """
+        Return a list of components by name or all if none given
+
+        If no *component* argument is given, return the whole list of
+        component implementations, otherwise only the selected one.
+
+        (internal interface)
+
+        :params dict args: dictionary of arguments keyed by argument
+          name
+        :returns: a list of *(NAME, IMPL)* based on if we got an
+          instance to run on (only execute that one) or on all the
+          components
+        """
+        impl, component = self.arg_impl_get(args, 'component',
+                                            allow_missing = True)
+        if impl == None:
+            # no component was specified, so we operate over all the components
+            # KEEP THE ORDER
+            impls = self.impls.items()
+            _all = True
+        else:
+            impls = [ ( component, impl ) ]
+            _all = False
+        return impls, _all
+
+
+    @staticmethod
+    def assert_return_type(val, expected_type, target, component, call,
+                           none_ok = False):
+        """
+        Assert a value generated from a target interface call driver
+        is of the right type and complain otherwise
+        """
+        assert isinstance(expected_type, type)
+        assert isinstance(target, ttbl.test_target)
+        assert component == None or isinstance(component, basestring)
+        assert isinstance(call, basestring)
+        assert isinstance(none_ok, bool)
+        if none_ok == True and val == None:
+            return
+        assert isinstance(val, expected_type), \
+            "%s::%s[%s](): driver returned %s, expected %s" \
+            % (target.id, call, component,
+               type(val).__name__, expected_type.__name__)
+
 
     def request_process(self, target, who, method, call, args, user_path):
         """
@@ -359,6 +604,7 @@ class tt_interface(object):
           e.g.:
 
           >>> dict(
+          >>>    result = "SOMETHING",	# convention for unified result
           >>>    output = "something",
           >>>    value = 43
           >>> )
@@ -372,22 +618,16 @@ class tt_interface(object):
         assert isinstance(call, basestring)
         assert isinstance(args, dict)
         assert user_path != None and isinstance(user_path, basestring)
-        raise NotImplementedError
+        raise NotImplementedError("%s|%s: unsuported" % (method, call))
         # Note that upon return, the calling layer will add a field
         # 'diagnostics', so don't use that
-        #return {}
+        #
+        #return dict(result = "SOMETHING")
+        #
+        # to streaming a file
+        #
+        #return dict(stream_file = CAPTURE_FILE, stream_offset = OFFSET)
 
-    def _release_hook(self, target, force):
-        """
-        Called when the target is released
-        """
-        raise NotImplementedError
-
-    def _target_setup(self, target):
-        """
-        Called when the interface is added to a target to initialize
-        the needed target aspect (such as adding tags/metadata)
-        """
 
 # FIXME: yeah, ugly, but import dependency hell
 import ttbl.config
@@ -462,6 +702,7 @@ class test_target(object):
             self._type = _type
         else:
             self._type = type(self).__name__
+        self.tags['id'] =  __id
         self.tags['type'] = self._type
         self.log = test_target_logadapter_c(logging.getLogger(), None)
         self.log.target = self
@@ -825,7 +1066,7 @@ class test_target(object):
                 "user property %s: not a string or regex, but %s" \
                 % (prop, type(prop).__name__)
         return False
-            
+
     def property_keep_value(self, name):
         """
         Return *True* if a user property's value needs to be kept.
@@ -843,7 +1084,7 @@ class test_target(object):
                 "user property %s: not a string or regex, but %s" \
                 % (prop, type(prop).__name__)
         return False
-            
+
     def thing_add(self, name, plugger):
         """
         Define a thing that can be un/plugged to this target
@@ -1189,7 +1430,9 @@ class test_target(object):
           :meth:`ttbl.tt_interface.request_process` to handle calls
           from proxy/brokerage layers.
         """
-        assert isinstance(obj, tt_interface)
+        assert isinstance(obj, tt_interface), \
+            "obj: expected ttbl.tt_interface; got %s" \
+            % type(obj).__name__
         if name in self.tags['interfaces']:
             raise RuntimeError(
                 "An interface of type %s has been already "

@@ -290,6 +290,9 @@ class interface(ttbl.tt_interface):
         else:
             raise RuntimeError("%s|%s: unsuported" % (method, call))
 
+    def _target_setup(self, _):
+        pass
+        
     def _release_hook(self, target, _force):
         # nothing needed here
         pass

@@ -111,6 +111,9 @@ class interface(ttbl.tt_interface):
         # save it
         self.impls = impls
 
+    def _target_setup(self, _):
+        pass
+        
     def press(self, who, target, button):
         assert button in self.impls.keys(), "button %s unknown" % button
         with self.target_owned_and_locked(who):
