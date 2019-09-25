@@ -1512,11 +1512,89 @@ class target_c(object):
            or self.bsps_stub[bsp][0] == None:
             self.bsps_stub[bsp] = (_app, app_src, app_src_options)
 
+
+    @staticmethod
+    def create_from_cmdline_args(args, target_name = None, iface = None):
+        """
+        Create a :class:`tcfl.tc.target_c` object from command line
+          arguments
+
+        :param argparse.Namespace args: arguments from argparse
+        :param str target_name: (optional) name of the target, by
+          default is taken from *args.target*.
+        :param str iface: (optional) target must support the given
+          interface, otherwise an exception is raised.
+        :returns: instance of :class:`tcfl.tc.target_c` representing
+          said target, if it is available.
+        """
+        if target_name == None:
+            if not hasattr(args, 'target'):
+                raise RuntimeError("missing 'target' argument")
+            target_name = getattr(args, 'target', None)
+        _rtb, rt = ttb_client._rest_target_find_by_id(target_name)
+        target = target_c(rt, tc_global, None, "cmdline")
+        if iface != None and not iface in target.rt.get('interfaces', []):
+            raise RuntimeError("%s: target does not support the %s interface"
+                               % (target_name, iface))
+        if args.ticket:
+            target.ticket = args.ticket
+        return target
+
+    def ttbd_iface_call(self, interface, call, method = "PUT",
+                        component = None, stream = False, raw = False,
+                        **kwargs):
+        """
+        Execute a general interface call to TTBD, the TCF remoting server
+
+        This allows to call any interface on the server that provides
+        this target. It is used to implement higher level calls.
+
+        :param str interface: interface name (eg: "power", "console",
+          etc); normally any new style interface listed in the
+          target's *interfaces* tag.
+        :param str call: name of the call implemented by such
+          interface (eg: for power, "on", "off"); these are described
+          on the interface's implementation.
+        :param str method: (optional, defaults to *PUT*); HTTP method
+          to use to call; one of *PUT*, *GET*, *DELETE*,
+          *POST*. The interface dictates the method.
+        :param str component: (optional, default *None*) for
+          interfaces that implement multiple components (a common
+          pattern), specify which component the call applies to.
+
+        Rest of the arguments are a dictionary keyed by string with
+        values that will be serialized as JSON to pass the remote call
+        as arguments, and thus are interface specific.
+        """
+        assert isinstance(interface, basestring)
+        assert isinstance(call, basestring)
+        assert component == None or isinstance(component, basestring)
+        assert isinstance(stream, bool)
+        assert isinstance(raw, bool)
+        assert method.upper() in ( "PUT", "GET", "DELETE", "POST" )
+
+        if kwargs == None:
+            kwargs = {}
+        if component:
+            kwargs['component'] = component
+        if self.ticket:
+            kwargs['ticket'] = self.ticket
+        if kwargs == {}:
+            kwargs = {}
+        return self.rtb.send_request(
+            method,
+            "targets/%s/%s/%s" % (self.id, interface, call),
+            stream = stream, raw = raw,
+            data = kwargs)
+
+
     #
     # Private API
     #
 
     __extensions = {}
+
+
 
     def _kws_update(self, bsp = None):
         self.kws.clear()
@@ -4469,7 +4547,7 @@ class tc_c(object):
     #: or even in the testcase itself, before it assigns (in build or
     #: config methods)
     #:
-    #: >>> self.assign_timeout = 15 * 60 * 60    
+    #: >>> self.assign_timeout = 15 * 60 * 60
     assign_timeout = 1000
 
     # FIXME: add phase "assign"
