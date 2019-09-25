@@ -769,12 +769,15 @@ class socat_pc(daemon_c):
     Specifying addresses is very specific to the usage that it is to
     be done of it, but for example:
 
-    - ``PTY,link=console-%(component)s.write!!CREATE:console-%(component)s.read``
+    - ``PTY,link=console-%(component)s.write,rawer!!CREATE:console-%(component)s.read``
 
       creates a PTY which will pass whatever is written to
       ``console-COMPONENT.write`` to the second address and whatever
       is read from it to ``console-COMPONENT.read`` (!! serves like a
       bifurcator).
+
+      Note you need to use *rawer* to ensure a clean pipe, otherwise
+      the PTY later might add \\rs.
 
     - ``/dev/ttyS0,creat=0,rawer,b115200,parenb=0,cs8,bs1
 
@@ -788,11 +791,14 @@ class socat_pc(daemon_c):
       written to *console-COMPONENT.write* and whatever comes out of
       *stdout* is written to *console-COMPONENT.read*.
 
+    Be wary of adding options such *crnl* to remove extra CRs (\\r)
+    before the newline (\\n) when using to implement consoles. The
+    console channels are meant to be completely transparent.
 
     For examples, look at :class:`ttbl.console.serial_pc` and
     :class:`ttbl.console.ipmi_sol_pc`.
 
-    ** Tricks for debugging **
+    ** Catchas and Tricks for debugging **
     
     Sometimes it just dies and we are left wondering
 
@@ -801,10 +807,9 @@ class socat_pc(daemon_c):
         EXEC:'strace -fo /tmp/strace.log COMMANDTHATDIES'
 
       find information in server's ``/tmp/strace.log`` when power
-      cycling
+      cycling or enable top level calling under strace; it gets
+      helpful.
 
-    - check the socat options *nl*, *crnl* to strip trailing CRs, for
-      example
     """
 
     def __init__(self, address1, address2, env_add = None,
@@ -819,7 +824,8 @@ class socat_pc(daemon_c):
                 "-lf", "%(path)s/%(component)s-%(name)s.log",
                 # more than three -d's is a lot of verbosity, will
                 # fill up the drive soon
-                # FIXME: allow individual control
+                # FIXME: allow individual control/configure strace debug
+                #  "-v", "-x", prints the data as it goes back and forth
                 "-d", "-d",
                 address1,		# will be formatted against kws
                 address2,		# will be formatted against kws

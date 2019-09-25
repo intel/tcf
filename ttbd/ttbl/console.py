@@ -1,0 +1,494 @@
+#! /usr/bin/python2
+#
+# Copyright (c) 2019 Intel Corporation
+#
+# SPDX-License-Identifier: Apache-2.0
+"""
+Access target's serial consoles / bidirectional channels
+--------------------------------------------------------
+
+Implemented by :class:`ttbl.console.interface`.
+"""
+
+import errno
+import os
+import time
+
+import ttbl
+
+class impl_c(object):
+    """
+    Implementation interface for a console driver
+
+    The target will list the available consoles in the targets'
+    *consoles* tag
+
+    """
+    def __init__(self):
+        self.parameters = {}
+
+    def enable(self, target, component):
+        """
+        Enable a console
+
+        :param str component: console to enable
+        """
+        raise NotImplementedError("%s/%s: enabling console not implemented"
+                                  % (target.id, component))
+
+    def disable(self, target, component):
+        """
+        Disable a console
+
+        :param str console: (optional) console to disable; if missing,
+          the default one.
+        """
+        raise NotImplementedError("%s/%s: disabling console not implemented"
+                                  % (target.id, component))
+
+    def state(self, target, component):
+        """
+        Return the given console's state
+
+        :param str console: (optional) console to enable; if missing,
+          the default one
+        :returns: *True* if enabled, *False* otherwise
+        """
+        raise NotImplementedError("%s/%s: console state not implemented"
+                                  % (target.id, component))
+        #return False
+
+    def setup(self, target, component, parameters):
+        """
+        Setup console parameters (implementation specific)
+
+        Check :meth:`interface.read` for common parameters
+
+        :param dict parameters: dictionary of implementation specific
+          parameters
+        :returns: nothing
+        """
+        raise NotImplementedError("%s/%s: console control not implemented"
+                                  % (target.id, component))
+
+    def read(self, target, component, offset):
+        """
+        Return data read from the console since it started recording
+        from a given byte offset.
+
+        Check :meth:`interface.read` for common parameters
+
+        :params int offset: offset from which to read
+
+        :returns: data dictionary of values to pass to the client; the
+          data is expected to be in a file which will be streamed to
+          the client.
+
+          >>> return dict(stream_file = CAPTURE_FILE, stream_offset = OFFSET)
+
+          this allows to support large amounts of data automatically
+        """
+        raise NotImplementedError("%s/%s: console control not implemented"
+                                  % (target.id, component))
+        #return dict(stream_file = CAPTURE_FILE, stream_offset = OFFSET)
+
+    def size(self, target, component):
+        """
+        Return the amount of data currently read from the console.
+
+        Check :meth:`interface.read` for common parameters
+
+        :returns: number of bytes read from the console since the last
+          power up.
+        """
+        raise NotImplementedError("%s/%s: console control not implemented"
+                                  % (target.id, component))
+
+    def write(self, target, component, data):
+        """
+        Write bytes the the console
+
+        Check :meth:`interface.read` for common parameters
+
+        :param data: string of bytes or data to write to the console
+        """
+        raise NotImplementedError("%s/%s: console control not implemented"
+                                  % (target.id, component))
+
+
+class interface(ttbl.tt_interface):
+    """Interface to access the target's consoles
+
+    An instance of this gets added as an object to the target object
+    with:
+
+    >>> ttbl.config.targets['qu05a'].interface_add(
+    >>>     "console",
+    >>>     ttbl.console.interface(
+    >>>         ttyS0 = ttbl.console.serial_device("/dev/ttyS5")
+    >>>         ttyS1 = ttbl.capture.generic("ipmi-sol")
+    >>>         default = "ttyS0",
+    >>>     )
+    >>> )
+
+    Note how *default* has been made an alias of *ttyS0*
+
+    :param dict impls: dictionary keyed by console name and which
+      values are instantiation of console drivers inheriting from
+      :class:`ttbl.console.impl_c` or names of other consoles (to
+      sever as aliases).
+
+      Names have to be valid python symbol names.
+
+    This interface:
+
+    - supports N > 1 channels per target, of any type (serial,
+      network, etc)
+
+    - allows raw traffic (not just pure ASCII), for example for serial
+      console escape sequences, etc
+
+    - the client shall not need to be constantly reading to avoid
+      loosing data; the read path shall be (can be) implemented to
+      buffer everything since power on (by creating a power control
+      driver :class:`ttbl.power.impl_c` that records everything; see
+      :class:`ttbl.console.serial_pc` for an example
+
+    - allows setting general channel parameters
+
+    """
+    def __init__(self, *impls, **kwimpls):
+        ttbl.tt_interface.__init__(self)
+        # the implementations for the console need to be of type impl_c
+        self.impls_set(impls, kwimpls, impl_c)
+
+
+    def _target_setup(self, target):
+        # Called when the interface is added to a target to initialize
+        # the needed target aspect (such as adding tags/metadata)
+        target.tags_update(dict(consoles = self.impls.keys()))
+
+
+    def _release_hook(self, target, _force):
+        # nothing to do on target release
+        pass
+
+    # called by the daemon when a METHOD request comes to the HTTP path
+    # /ttb-vVERSION/targets/TARGET/interface/console/CALL
+
+    def get_setup(self, _target, _who, args, _user_path):
+        impl, _component = self.arg_impl_get(args, "component")
+        return dict(result = impl.parameters)
+
+    def put_setup(self, target, who, args, _user_path):
+        impl, component = self.arg_impl_get(args, "component")
+        parameters = dict()
+        for k, v in args.iteritems():
+            parameters[k] = v
+        if 'ticket' in parameters:
+            del parameters['ticket']
+        del parameters['component']
+        assert all(isinstance(i, basestring) for i in parameters.values()), \
+            'console.setup#parameters should be a dictionary keyed ' \
+            'by string, values being strings'
+        with target.target_owned_and_locked(who):
+            target.timestamp()
+            return impl.setup(target, component, parameters)
+
+    def get_list(self, target, who, args, _user_path):
+        return dict(result = self.aliases.keys() + self.impls.keys())
+
+    def put_enable(self, target, who, args, _user_path):
+        impl, component = self.arg_impl_get(args, "component")
+        with target.target_owned_and_locked(who):
+            target.timestamp()
+            impl.enable(target, component)
+            return dict()
+
+    def put_disable(self, target, who, args, _user_path):
+        impl, component = self.arg_impl_get(args, "component")
+        with target.target_owned_and_locked(who):
+            target.timestamp()
+            impl.disable(target, component)
+            return dict()
+    
+    def get_state(self, target, who, args, _user_path):
+        impl, component = self.arg_impl_get(args, "component")
+        state = impl.state(target, component)
+        self.assert_return_type(state, bool, target,
+                                component, "console.state")
+        return dict(result = state)
+
+    def get_read(self, target, who, args, _user_path):
+        impl, component = self.arg_impl_get(args, "component")
+        offset = int(args.get('offset', 0))
+        if target.target_is_owned_and_locked(who):
+            target.timestamp()	# only if the reader owns it
+        r =  impl.read(target, component, offset)
+        stream_file = r.get('stream_file', None)
+        if stream_file and not os.path.exists(stream_file):
+            # no file yet, no console output
+            return { 'stream_file': '/dev/null', 'offset': 0 }
+        return r
+
+    def get_size(self, target, who, args, _user_path):
+        impl, component = self.arg_impl_get(args, "component")
+        size = impl.size(target, component)
+        self.assert_return_type(size, int, target,
+                                component, "console.size", none_ok = True)
+        return dict(result = size)
+
+    def put_write(self, target, who, args, _user_path):
+        impl, component = self.arg_impl_get(args, "component")
+        with target.target_owned_and_locked(who):
+            target.timestamp()
+            impl.write(target, component,
+                       self._arg_get(args, 'data'))
+            return {}    
+
+
+
+class generic_c(impl_c):
+    """General base console implementation
+
+    This object will implement a base console driver that reads from a
+    file in the (the read file) and writes to a file (the write file)
+    in the local filesystem.
+
+    The read / write files are named
+    ``console-CONSOLENAME.{read,write}`` and are located in the
+    target's state directory. Thus there is no need for state, since
+    the parameters are available in the call.
+
+    The idea is that another piece (normally a power control unit that
+    starts a background daemon) will be reading from the console in
+    the target system and dumping data to the read file. For writing,
+    the same piece takes whatever data is being provided and passes it
+    on, or it can be written directly.
+
+    See :class:`ttbl.console.serial_pc` for an example of this model
+    implemented in a serial port and :class:`ttbl.console.sol_pc` for
+    implementing an IPMI Serial-Over-Lan console.
+
+    :param int chunk_size: (optional) when writing, break the writing
+      in chunks of this size and wait *interchunk_wait* in between
+      sending each chunk. By default is 0, which is disabled.
+
+    :param float interchunk_wait: (optional) if *chunk_size* is
+      enabled, time to wait in seconds in between each chunk.
+
+    """
+    def __init__(self, chunk_size = 0, interchunk_wait = 0.2):
+        assert chunk_size >= 0
+        assert interchunk_wait > 0
+        self.chunk_size = chunk_size
+        self.interchunk_wait = interchunk_wait
+        impl_c.__init__(self)
+
+    def state(self, target, component):
+        # if the write file is gone, most times this means the thing
+        # is disabled
+        # we conifigure socat -- or whatever -- to kill this file when
+        # stopped
+        return os.path.exists(os.path.join(target.state_dir,
+                                           "console-%s.write" % component))
+
+    def read(self, target, component, offset):
+        return dict(
+            stream_file = os.path.join(target.state_dir,
+                                       "console-%s.read" % component),
+            stream_offset = offset
+        )
+
+
+    def size(self, target, component):
+        state = self.state(target, component)
+        if not self.state(target, component):
+            return None
+        try:
+            file_name = os.path.join(target.state_dir,
+                                     "console-%s.read" % component)
+            return os.stat(file_name).st_size
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            # not even existing, so empty
+            return 0
+
+
+    def write(self, target, component, data):
+        file_name = os.path.join(target.state_dir,
+                                 "console-%s.write" % component)
+        target.log.debug("%s: writing %dB to console (%s)",
+                         component, len(data), data.encode('unicode-escape'))
+        fd = os.open(file_name, os.O_RDWR, 0)
+        try:
+            if self.chunk_size:
+                # somethings have no flow control and you need to make
+                # it happen like...this
+                # yeh, I know an iterator in python..yadah--this is
+                # quite clear
+                left = len(data)
+                itr = 0
+                while left > 0:
+                    _chunk_size = min(left, self.chunk_size)
+                    os.write(fd, data[itr : itr + _chunk_size])
+                    time.sleep(self.interchunk_wait)
+                    itr += _chunk_size
+                    left -= _chunk_size
+            else:
+                os.write(fd, data)
+        finally:
+            os.close(fd)
+
+
+class serial_pc(ttbl.power.socat_pc, generic_c):
+    """
+    Implement a serial port console and data recorder
+
+    This class implements two interfaces:
+
+    - power interface: to start a serial port recorder in the
+      background as soon as the target is powered on. Anything read
+      form the serial port is written to the *console-NAME.read* file
+      and anything written to it is written to *console-NAME.write*
+      file, which is sent to the serial port.
+
+      The power interface is implemented by subclassing
+      :class:`ttbl.power.socat_pc`, which starts *socat* as daemon to
+      serve as a data recorder and to pass data to the serial port
+      from the read file.
+
+    - console interface: interacts with the console interface by
+      exposing the data recorded in *console-NAME.read* file and
+      writing to the *console-NAME.write* file.
+
+    :params str serial_file_name: (optional) name of the serial port
+      file, which can be templated with *%(FIELD)s* as per
+      class:`ttbl.power.socat_pc` (the low level implementation).
+
+      By default, it uses */dev/tty-TARGETNAME*, which makes it easier
+      to configure. The tty name linked to the target can be set with
+      :ref:`udev <usb_tty>`.
+
+    For example, create a serial port recoder power control / console
+    driver and insert it into the power rail and the console of a
+    target:
+
+    >>> serial0_pc = ttbl.console.serial_pc(console_file_name)
+    >>>
+    >>> ttbl.config.targets[name].interface_add(
+    >>>     "power",
+    >>>     ttbl.power.interface(
+    >>>         ...
+    >>>         serial0_pc,
+    >>>         ...
+    >>>     )
+    >>> ttbl.config.targets[name].interface_add(
+    >>>     "console",
+    >>>     ttbl.console.interface(
+    >>>         serial0 = serial0_pc,
+    >>>         default = "serial0",
+    >>>     )
+    >>> )
+
+    """
+    def __init__(self, serial_file_name = None):
+        generic_c.__init__(self)
+        if serial_file_name == None:
+            serial_file_name = "/dev/tty-%(id)s"
+        else:
+            serial_file_name = serial_file_name
+        ttbl.power.socat_pc.__init__(
+            self,
+            # note it is important to do the rawer first thing, then
+            # do the settings; rawer resets to raw state
+            "PTY,link=console-%(component)s.write,rawer"
+            "!!CREATE:console-%(component)s.read",
+            "%s,creat=0,rawer,b115200,parenb=0,cs8,bs1" % serial_file_name)
+
+    # console interface
+    def enable(self, target, component):
+        return self.on(target, component)
+
+    def disable(self, target, component):
+        return self.off(target, component)
+
+
+class ipmi_sol_pc(ttbl.power.socat_pc, generic_c):
+    """
+    Implement a serial port over IPMI's Serial-Over-Lan protocol
+
+    This class implements two interfaces:
+
+    - power interface: to start an IPMI SoL recorder in the
+      background as soon as the target is powered on.
+
+      The power interface is implemented by subclassing
+      :class:`ttbl.power.socat_pc`, which starts *socat* as daemon to
+      serve as a data recorder and to pass data to the serial port
+      from the read file. It is configured to to start *ipmitool* with
+      the *sol activate* arguments which leaves it fowarding traffic
+      back and forth.
+
+      Anything read form the serial port is written to the
+      *console-NAME.read* file and anything written to it is written
+      to *console-NAME.write* file, which is sent to the serial port.
+
+    - console interface: interacts with the console interface by
+      exposing the data recorded in *console-NAME.read* file and
+      writing to the *console-NAME.write* file.
+
+    :params str hostname: name of the host where the IPMI BMC is
+      located
+    :params str username: username to login into the BMC
+    :params str password: password to login into the BMC
+
+    Look at :class:`ttbl.console.generic_c` for a description of
+    *chunk_size* and *interchunk_wait*. This is in general needed when
+    whatever is behind SSH is not doing flow control and we want the
+    server to slow down sending things.
+
+    For example, create an IPMI recoder console driver and insert it 
+    into the power rail (its interface as power control makes it be 
+    called to start/stop recording when the target powers on/off) and
+    then it is also registered as the target's console:
+
+    >>> sol0_pc = ttbl.console.serial_pc(console_file_name)
+    >>>
+    >>> ttbl.config.targets[name].interface_add(
+    >>>     "power",
+    >>>     ttbl.power.interface(
+    >>>         ...
+    >>>         sol0_pc,
+    >>>         ...
+    >>>     )
+    >>> ttbl.config.targets[name].interface_add(
+    >>>     "console",
+    >>>     ttbl.console.interface(
+    >>>         sol0 = sol0_pc,
+    >>>         default = "sol0",
+    >>>     )
+    >>> )
+
+    """
+    def __init__(self, hostname, username, password,
+                 chunk_size = 0, interchunk_wait = 0.1):
+        assert isinstance(hostname, basestring)
+        assert isinstance(username, basestring)
+        assert isinstance(password, basestring)
+        generic_c.__init__(self,
+                           chunk_size = chunk_size,
+                           interchunk_wait = interchunk_wait)
+        ttbl.power.socat_pc.__init__(
+            self,
+            "PTY,link=console-%(component)s.write,rawer"
+            "!!CREATE:console-%(component)s.read",
+            "EXEC:'/usr/bin/ipmitool -H %(hostname)s -U %(username)s -E"
+            " -I lanplus sol activate',sighup,sigint,sigquit"
+        )
+        # pass those fields to the socat_pc templating engine
+        self.kws['hostname'] = hostname
+        self.kws['username'] = username
+        self.kws['password'] = password
+        self.env_add['IPMITOOL_PASSWORD'] = password

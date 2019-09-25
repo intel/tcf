@@ -19,6 +19,7 @@ import time
 
 import commonl
 import ttbl
+import ttbl.console
 
 class qmp_c(object):
     """
@@ -117,6 +118,7 @@ class qmp_c(object):
 
 class tt_qemu(
         ttbl.test_target,
+        ttbl.console.impl_c,
         ttbl.tt_power_control_mixin,
         ttbl.tt_power_control_impl,
         ttbl.test_target_images_mixin,
@@ -516,7 +518,7 @@ class tt_qemu(
 
     def console_do_write(self, data, console_id = None):
         if console_id != None and not console_id in self.bsps:
-            raise ValueError
+            raise ValueError("unknown console_id %s" % console_id)
         if console_id == None:
             console_id = self.bsps[0]
         # Reading is easy -- QEMU is designed to create a named socket
@@ -553,6 +555,23 @@ class tt_qemu(
             raise RuntimeError("target is off")
         else:
             raise RuntimeError("This QEMU does not support writing to console")
+
+    def read(self, target, component, offset):
+        if component != None and not component in self.bsps:
+            raise RuntimeError("console ID '%s' not found" % component)
+        if component == None:
+            component = self.bsps[0]
+        consolefname = os.path.join(self.state_dir,
+                                    "%s-console.read" % component)
+        return dict(stream_file = consolefname,
+                    stream_offset = offset)
+
+    def size(self, _target, component):
+        return self.console_do_size(console_id = component)
+
+    def write(self, target, component, data):
+        self.console_do_write(data, component)
+        return {}
 
 
 class plugger(ttbl.thing_plugger_mixin):

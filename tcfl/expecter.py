@@ -354,8 +354,8 @@ def console_rx_poller(expecter, target, console = None):
         # system, so because read_to_fd() is bypassing caching, flush
         # first and sync after the read.
         of.flush()
-        total_bytes = target.rtb.rest_tb_target_console_read_to_fd(
-            ofd, target.rt, console, offset, max_size, target.ticket)
+        total_bytes = target.console.read(console = console, offset = offset,
+                                          max_size = max_size, fd = of)
         of.flush()
         os.fsync(ofd)
         ts_end = time.time()
@@ -479,7 +479,7 @@ def console_rx_eval(expecter, target,
                     "found expected `%s` in console `%s:%s` at %.2fs @%d"
                     % (what, target.fullid, console_id_name,
                        ts - expecter.ts0, offset + m.start()),
-                    { "console output": of }, dlevel = 1, alevel = 2)
+                    { "console output": of }, dlevel = 4, alevel = 2)
                 of.seek(offset_tip)
                 raise tc.pass_e(
                     "found expected `%s` in console `%s:%s` at %.2fs"
