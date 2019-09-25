@@ -284,7 +284,7 @@ class skip_e(exception):
 #:
 #: - *blck*: the testcase has blocked due to an infrastructure issue
 #:   which forbids from telling if it passed, failed or errored (raise
-#:   :py:exc:`tcfl.tc.blocked_e`) 
+#:   :py:exc:`tcfl.tc.blocked_e`)
 #:
 #: - *skip*: the testcase has detected a condition that deems it not
 #:   applicable and thus shall be skipped (raise
@@ -849,7 +849,7 @@ class target_c(object):
         :param str instance: (optional) when this target has multiple
           connections to the same interconnect (via multiple physical
           or virtual network interfaces), you can select which
-          instance of those it is wanted. 
+          instance of those it is wanted.
 
           By default this will return the default instance (eg, the
           one corresponding to the interconnect ``ICNAME``), but if an
@@ -7145,7 +7145,7 @@ target_c.extension_register(target_ext_broker_files.broker_files)
 import target_ext_console
 target_c.extension_register(target_ext_console.console)
 import target_ext_power
-target_c.extension_register(target_ext_power.power)
+target_c.extension_register(target_ext_power.extension, "power")
 import target_ext_images
 target_c.extension_register(target_ext_images.images)
 import target_ext_debug

@@ -244,24 +244,6 @@ if __name__ == "__main__":
         nargs = "+", help = "Target's name or URL")
     arg_parser_target_release.set_defaults(func = ttb_client.rest_target_release)
 
-    ap = arg_subparsers.add_parser(
-        "power-on", help = "Power target on")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_power_on)
-
-    ap = arg_subparsers.add_parser("power-off",
-                                   help = "Power target off")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_power_off)
-
-    ap = arg_subparsers.add_parser("reset",
-                                   help = "Reset target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_reset)
-
     ap = arg_subparsers.add_parser("debug-halt",
                                    help = "Halt target's CPUs")
     ap.add_argument("target", metavar = "TARGET", action = "store",
@@ -293,21 +275,6 @@ if __name__ == "__main__":
     ap.add_argument("command", metavar = "COMMAND", action = "store",
                     default = None, help = "OpenOCD command")
     ap.set_defaults(func = ttb_client.rest_target_debug_openocd)
-
-    ap = arg_subparsers.add_parser("power-cycle",
-                                   help = "Power target cycle")
-    ap.add_argument(
-        "-w", "--wait", metavar = "SECONDS", action = "store",
-        default = None, help = "How long to wait between power "
-        "off and power on")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_power_cycle)
-
-    ap = arg_subparsers.add_parser("power-get", help = "Power target get")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_power_get)
 
     ap = arg_subparsers.add_parser("broker-file-upload",
                                    help = "Upload a local file to a broker")
@@ -479,6 +446,7 @@ if __name__ == "__main__":
     tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_ioc_flash_server_app.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_fastboot.cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_power._cmdline_setup(arg_subparsers)
 
 
     global args
@@ -495,7 +463,7 @@ if __name__ == "__main__":
         req_log = logging.getLogger('requests.packages.urllib3')
         req_log.setLevel(logging.DEBUG)
         req_log.propagate = True
-    
+
     if args.chdir:
         os.chdir(args.chdir)
 

@@ -1030,36 +1030,6 @@ def rest_target_release(args):
         rtb.rest_tb_target_release(rt, force = args.force,
                                    ticket = args.ticket)
 
-def rest_target_power_on(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_power_on(rt, ticket = args.ticket)
-
-def rest_target_power_off(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_power_off(rt, ticket = args.ticket)
-
-def rest_target_reset(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_reset(rt, ticket = args.ticket)
-
 def rest_target_debug_halt(args):
     """
     :param argparse.Namespace args: object containing the processed
@@ -1110,20 +1080,6 @@ def rest_target_debug_openocd(args):
     res = rtb.rest_tb_target_debug_openocd(rt, args.command,
                                            ticket = args.ticket)
     print res
-
-def rest_target_power_cycle(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    if args.wait != None:
-        wait = float(args.wait)
-    else:
-        wait = None
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_power_cycle(rt, wait = wait, ticket = args.ticket)
 
 def rest_target_images_set(args):
     """
@@ -1206,19 +1162,6 @@ def rest_target_images_upload_set(args):
     """
     rtb, rt = _rest_target_find_by_id(args.target)
     return rest_tb_target_images_upload_set(rtb, rt, args.images)
-
-def rest_target_power_get(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    rtb, rt = _rest_target_find_by_id(args.target)
-    powered =  rtb.rest_tb_target_power_get(rt)
-    if powered:
-        print "%s: on" % args.target
-    else:
-        print "%s: off" % args.target
 
 def rest_broker_file_upload(args):
     """
