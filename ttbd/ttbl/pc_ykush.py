@@ -13,13 +13,13 @@ import usb.core
 import usb.util
 
 import commonl
-import commonl.requirements
 import ttbl
+import ttbl.power
 
-# Verify that we can run TTBD
-commonl.requirements.verify_pyusb_version()
-
-class ykush(ttbl.tt_power_control_impl):
+# FIXME: ename to _pc
+# FIXME: move this file to ykush.py, since it provides other
+#        components, not just a power controller
+class ykush(ttbl.power.impl_c, ttbl.tt_power_control_impl):
 
     class notfound_e(ValueError):
         pass
@@ -77,6 +77,8 @@ class ykush(ttbl.tt_power_control_impl):
         """
         if not isinstance(port, int) or port < 1 or port > 3:
             raise ValueError("ykush ports are 1, 2 and 3, gave %s" % port)
+        ttbl.power.impl_c.__init__(self)
+        ttbl.tt_power_control_impl.__init__(self)
         self.port = port
         self.ykush_serial = ykush_serial
         self.retries = 10
@@ -276,13 +278,13 @@ class ykush(ttbl.tt_power_control_impl):
                 time.sleep(0.25)
                 had_to_retry = True
 
-    def power_on_do(self, target):
+    def on(self, target, component):
         cmd = 0x10 | self.port
         r = self._command(target, cmd)
         target.log.log(8, "ykush power on %s[%d] / 0x%02x = 0x%02x %02x"
                        % (self.ykush_serial, self.port, cmd, r[0], r[1]))
 
-    def power_off_do(self, target):
+    def off(self, target, component):
         # Okie, this is quite a hack -- when we try to power it off,
         # if the serial is not found, we just assume the device is not
         # there and thus it is off -- so we ignore it. Why? Becuase
@@ -300,7 +302,7 @@ class ykush(ttbl.tt_power_control_impl):
                            % (self.ykush_serial, self.port, cmd))
             pass
 
-    def power_get_do(self, target):
+    def get(self, target, component):
         cmd = 0x20 | self.port
         try:
             r = self._command(target, cmd)
@@ -313,6 +315,18 @@ class ykush(ttbl.tt_power_control_impl):
         except self.notfound_e:
             # If it is not connected, it is off
             return False
+
+    # COMPAT: old interface, ttbl.tt_power_control_impl
+    def power_on_do(self, target):
+        return self.on(target, "n/a")
+
+    def power_off_do(self, target):
+        return self.off(target, "n/a")
+
+    def power_get_do(self, target):
+        # this reports None because this is is just a delay loop
+        return None
+
 
 class plugger(ykush,		 # pylint: disable = abstract-method
               ttbl.thing_plugger_mixin):

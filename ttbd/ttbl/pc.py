@@ -8,7 +8,6 @@
 """
 
 """
-
 import errno
 import logging
 import os
@@ -23,12 +22,13 @@ import usb.core
 import usb.util
 
 import commonl
-import commonl.requirements
 import ttbl
+import ttbl.power
 
-# Verify that we can run TTBD
-commonl.requirements.verify_pyusb_version()
-
+# FIXME: move all these to ttbl.power once the old implementation is
+#        all removed
+# FIXME: replace with ttbl.power.fake()
+# COMPAT: old interface, ttbl.tt_power_control_impl
 class nil(ttbl.tt_power_control_impl):
     """
     """
@@ -45,6 +45,8 @@ class nil(ttbl.tt_power_control_impl):
     def power_get_do(self, target):
         return target.fsdb.get('pc-nil-%s' % self.id) != None
 
+# COMPAT: old interface, ttbl.tt_power_control_impl
+# FIXME: remove, unused, impractical
 class manual(ttbl.tt_power_control_impl):
     """
     Implement a manual power control interface that prompts the user
@@ -76,7 +78,7 @@ class manual(ttbl.tt_power_control_impl):
         return target.fsdb.get('powered-manual-%s' % self.id) != None
 
 
-class delay(ttbl.tt_power_control_impl):
+class delay(ttbl.tt_power_control_impl, ttbl.power.impl_c):
     """
     Introduce artificial delays when calling on/off/get to allow
     targets to settle.
@@ -85,23 +87,37 @@ class delay(ttbl.tt_power_control_impl):
     implementations given to a power control interface.
     """
     def __init__(self, on = 0, off = 0):
+        ttbl.power.impl_c.__init__(self)
+        ttbl.tt_power_control_impl.__init__(self)
         self.on_delay = float(on)
         self.off_delay = float(off)
 
-    def power_on_do(self, target):
-        logging.debug("%s: on delay %f", self, self.on_delay)
+    def on(self, target, component):
+        target.log.debug("%s: on delay %f", component, self.on_delay)
         time.sleep(self.on_delay)
 
-    def power_off_do(self, target):
-        logging.debug("%s: off delay %f", self, self.off_delay)
+    def off(self, target, component):
+        target.log.debug("%s: off delay %f", component, self.off_delay)
         time.sleep(self.off_delay)
+
+    def get(self, target, component):
+        # this reports None because this is is just a delay loop
+        return None
+
+    # COMPAT: old interface, ttbl.tt_power_control_impl
+    def power_on_do(self, target):
+        return self.on(target, "n/a")
+
+    def power_off_do(self, target):
+        return self.off(target, "n/a")
 
     def power_get_do(self, target):
         # this reports None because this is is just a delay loop
         return None
 
 
-class delay_til_file_gone(ttbl.tt_power_control_impl):
+
+class delay_til_file_gone(ttbl.power.impl_c, ttbl.tt_power_control_impl):
     """
     Delay until a file dissapears.
 
@@ -110,51 +126,67 @@ class delay_til_file_gone(ttbl.tt_power_control_impl):
     """
     def __init__(self, poll_period = 0.25, timeout = 25,
                  on = None, off = None, get = None):
+        ttbl.power.impl_c.__init__(self)
+        ttbl.tt_power_control_impl.__init__(self)
         self.on_file = on
         self.off_file = off
         self.get_file = get
         self.poll_period = poll_period
         self.timeout = timeout
 
+    def on(self, target, component):
+        if self.on_file == None:
+            return
+        t0 = time.time()
+        while os.path.exists(self.on_file):
+            t = time.time()
+            if t - t0 > self.timeout:
+                raise RuntimeError("%s: timeout (%.2fs) on power-on delay "
+                                   "waiting for file %s to disappear"
+                                   % (component, t - t0, self.on_file))
+            target.log.debug("%s: delaying power-on %.2fs until "
+                             "file %s dissapears",
+                             component, self.poll_period, self.on_file)
+            time.sleep(self.poll_period)
+        target.log.debug("%s: delayed power-on %.2fs until file %s "
+                         "dissapeared",
+                         component, time.time() - t0, self.on_file)
+
+    def off(self, target, component):
+        if self.off_file == None:
+            return
+        t0 = time.time()
+        while os.path.exists(self.off_file):
+            t = time.time()
+            if t - t0 > self.timeout:
+                raise RuntimeError("%s: timeout (%.2fs) on power-off delay "
+                                   "waiting for file %s to disappear"
+                                   % (component, t - t0, self.off_file))
+            target.log.debug("%s: delaying power-on %.2fs until file %s "
+                             "dissapears",
+                             component, self.poll_period, self.off_file)
+            time.sleep(self.poll_period)
+        target.log.debug("%s: delayed power-off %.2fs until file %s "
+                         "dissapeared",
+                         component, time.time() - t0, self.off_file)
+
+    def get(self, target, component):
+        # this reports None because this is is just a delay loop
+        return None
+
+    # COMPAT: old interface, ttbl.tt_power_control_impl
     def power_on_do(self, target):
-        if self.on_file != None:
-            t0 = time.time()
-            while os.path.exists(self.on_file):
-                t = time.time()
-                if t - t0 > self.timeout:
-                    raise Exception("timeout (%.2fs) on power-on delay "
-                                    "waiting for file %s to disappear"
-                                    % (t - t0, self.on_file))
-                logging.debug("%s: delaying power-on %.2fs until "
-                              "file %s dissapears",
-                              self, self.poll_period, self.on_file)
-                time.sleep(self.poll_period)
-            logging.debug("%s: delayed power-on %.2fs until file %s "
-                          "dissapeared",
-                          self, time.time() - t0, self.on_file)
+        return self.on(target, "n/a")
 
     def power_off_do(self, target):
-        if self.off_file != None:
-            t0 = time.time()
-            while os.path.exists(self.off_file):
-                t = time.time()
-                if t - t0 > self.timeout:
-                    raise Exception("timeout (%.2fs) on power-off delay "
-                                    "waiting for file %s to disappear"
-                                    % (t - t0, self.off_file))
-                logging.debug("%s: delaying power-on %.2fs until file %s "
-                              "dissapears",
-                              self, self.poll_period, self.off_file)
-                time.sleep(self.poll_period)
-            logging.debug("%s: delayed power-off %.2fs until file %s "
-                          "dissapeared",
-                          self, time.time() - t0, self.off_file)
+        return self.off(target, "n/a")
 
     def power_get_do(self, target):
         # this reports None because this is is just a delay loop
         return None
 
-class delay_til_file_appears(ttbl.tt_power_control_impl):
+
+class delay_til_file_appears(ttbl.power.impl_c, ttbl.tt_power_control_impl):
     """
     Delay until a file appears.
 
@@ -164,47 +196,69 @@ class delay_til_file_appears(ttbl.tt_power_control_impl):
     def __init__(self, filename,
                  poll_period = 0.25, timeout = 25,
                  action = None, action_args = None):
+        ttbl.power.impl_c.__init__(self)
+        ttbl.tt_power_control_impl.__init__(self)
         self.filename = filename
         self.poll_period = poll_period
         self.timeout = timeout
+        assert action == None \
+            or isinstance(action, Exception) \
+            or callable(action), \
+            "action '%s' has to be an exception type or callable" % action
         self.action = action
         self.action_args = action_args
 
-    def power_on_do(self, target):
+    def on(self, target, component):
         if self.filename == None:
             return
         t0 = time.time()
         while not os.path.exists(self.filename):
             t = time.time()
             if t - t0 > self.timeout:
-                raise Exception("timeout (%.2fs) on power-on delay "
-                                "waiting for file %s to appear"
-                                % (t - t0, self.filename))
+                raise RuntimeError("%s: timeout (%.2fs) on power-on delay "
+                                   "waiting for file %s to appear"
+                                   % (component, t - t0, self.filename))
             if self.action:
                 target.log.debug("%s: executing action %s"
-                                 % (self, self.action))
-                try:
-                    self.action(target, *self.action_args)
-                except Exception as e:
-                    target.log.error("%s: error executing action %s: %s",
-                                     self, self.action, e)
-                    raise
+                                 % (component, self.action))
+                if isinstance(self.action, Exception):
+                    raise self.action(*self.action_args)
+                else:
+                    try:
+                        self.action(target, *self.action_args)
+                    except Exception as e:
+                        target.log.error("%s: error executing action %s: %s",
+                                         component, self.action, e)
+                        raise
             target.log.debug("%s: delaying power-on %.2fs until file %s "
                              "appears"
-                             % (self, self.poll_period, self.filename))
+                             % (component, self.poll_period, self.filename))
             time.sleep(self.poll_period)
         target.log.debug("%s: delayed power-on %.2fs until file %s appeared"
-                         % (self, time.time() - t0, self.filename))
+                         % (component, time.time() - t0, self.filename))
+
+    def off(self, target, component):
+        # hmm, missing no file
+        pass
+
+    def get(self, target, component):
+        # this reports None because this is is just a delay loop
+        return None
+
+    # COMPAT: old interface, ttbl.tt_power_control_impl
+    def power_on_do(self, target):
+        return self.on(target, "n/a")
 
     def power_off_do(self, target):
-        pass
+        return self.off(target, "n/a")
 
     def power_get_do(self, target):
         # this reports None because this is is just a delay loop
         return None
 
 
-class delay_til_usb_device(ttbl.tt_power_control_impl):
+
+class delay_til_usb_device(ttbl.power.impl_c, ttbl.tt_power_control_impl):
     """
     Delay power-on until a USB device dis/appears.
 
@@ -230,6 +284,7 @@ class delay_til_usb_device(ttbl.tt_power_control_impl):
                  poll_period = 0.25, timeout = 25,
                  action = None, action_args = None):
         ttbl.tt_power_control_impl.__init__(self)
+        ttbl.power.impl_c.__init__(self)
         self.serial = serial
         self.when_powering_on = when_powering_on
         self.want_connected = want_connected
@@ -237,8 +292,10 @@ class delay_til_usb_device(ttbl.tt_power_control_impl):
         self.timeout = timeout
         self.action = action
         self.action_args = action_args
+        self.component = None		# filled in by _on/_off/_get
         if action != None:
             assert hasattr(action, "__call__")
+        self.log = None			# filled out in _on/_off/_get
 
     class not_found_e(Exception):
         "Exception raised when a USB device is not found"
@@ -263,27 +320,31 @@ class delay_til_usb_device(ttbl.tt_power_control_impl):
                 # Some devices get us here, unknown why--probably
                 # permissions issue
                 if e.message == "The device has no langid":
-                    self.log.debug("DEBUG: USB %04x:%04x @%d/%03d: "
+                    self.log.debug("%s: USB %04x:%04x @%d/%03d: "
                                    "langid error: %s",
+                                   self.component,
                                    d.idVendor, d.idProduct,
                                    d.bus, d.address, d.langids)
                     serial_number = None
                 else:
                     raise
-            self.log.log(7, "USB %04x:%04x @%d/%03d [%s]: considering",
+            self.log.log(7, "%s: USB %04x:%04x @%d/%03d [%s]: considering",
+                         self.component,
                          d.idVendor, d.idProduct,
                          d.bus, d.address, serial_number)
             return serial_number == self.serial
         except usb.core.USBError as e:
             # Ignore errors, normally means we have no permission to
             # read the device
-            self.log.log(7, "USB %04x:%04x @%d/%03d: can't access: %s",
-                         d.idVendor, d.idProduct, d.bus, d.address, e)
+            self.log.log(
+                7, "%s: USB %04x:%04x @%d/%03d: can't access: %s",
+                self.component, d.idVendor, d.idProduct, d.bus, d.address, e)
             return False
         except Exception as e:
-            self.log.error("BUG: %04x:%04x @%d/%03d: exception %s\n%s",
-                           d.idVendor, d.idProduct, d.bus, d.address, e,
-                           traceback.format_exc())
+            self.log.error(
+                "BUG: %s: %04x:%04x @%d/%03d: exception %s\n%s",
+                self.component, d.idVendor, d.idProduct, d.bus, d.address, e,
+                traceback.format_exc())
 
     def _find_device(self):
         # We do not cache the backend [commented out code], as
@@ -311,21 +372,22 @@ class delay_til_usb_device(ttbl.tt_power_control_impl):
                 t = time.time()
                 if t - t0 > timeout:
                     raise self.not_found_e(
-                        "timeout (%.2fs) on %s waiting for USB device with "
-                        "serial %s to %s"
-                        % (t - t0, action, self.serial, text))
+                        "%s: timeout (%.2fs) on %s waiting for "
+                        "USB device with serial %s to %s"
+                        % (self.component, t - t0, action, self.serial, text))
                 # We do not cache the backend [commented out code], as
                 # it (somehow) makes it miss the device we are looking
                 # for; talk about butterfly effect at a local level --
                 # might be a USB library version issue?
                 dev = self._find_device()
                 if dev == None:
-                    self.log.log(8, "USB [%s]: NOT FOUND", self.serial)
+                    self.log.log(8, "%s: USB [%s]: NOT FOUND",
+                                 self.component, self.serial)
                     if not self.want_connected:
                         break
                 else:
-                    self.log.log(8, "USB %04x:%04x @%d/%03d [%s]: found",
-                                 dev.idVendor, dev.idProduct,
+                    self.log.log(8, "%s: USB %04x:%04x @%d/%03d [%s]: found",
+                                 self.component, dev.idVendor, dev.idProduct,
                                  dev.bus, dev.address, dev.serial_number)
 #                    if type(self).backend == None:
 #                        type(self).backend = dev._ctx.backend
@@ -336,57 +398,74 @@ class delay_til_usb_device(ttbl.tt_power_control_impl):
             except usb.core.USBError as e:
                 self.log.info("%s/%s: delaying %.2fs for USB device "
                               "for serial %s to %s: exception %s"
-                              % (self, action, self.poll_period, self.serial,
-                                 text, e))
+                              % (self.component, action, self.poll_period,
+                                 self.serial, text, e))
                 if e.errno != errno.EACCES:
                     raise
             if self.action:
-                self.log.debug("%s/%s: executing action %s" % (self, action,
-                                                               self.action))
+                self.log.debug("%s/%s: executing action %s"
+                               % (self.component, action, self.action))
                 try:
                     self.action(target, *self.action_args)
                 except Exception as e:
                     self.log.error("%s/%s: error executing action %s: %s",
-                                   self, action, self.action, e)
+                                   self.component, action, self.action, e)
                     raise
             self.log.info("%s/%s: delaying %.2fs for USB device with "
-                          "serial %s to %s" % (self, action, self.poll_period,
-                                            self.serial, text))
+                          "serial %s to %s"
+                          % (self.component, action, self.poll_period,
+                             self.serial, text))
             time.sleep(self.poll_period)
-        target.log.debug("%s/%s: delayed %.2fs for USB device with "
-                         "serial %s to %s"
-                         % (self, action, t - t0, self.serial, text_past))
+        target.log.debug(
+            "%s/%s: delayed %.2fs for USB device with serial %s to %s"
+            % (self.component, action, t - t0, self.serial, text_past))
         return dev
 
-    def power_on_do(self, target):
-        self.log = target.log	# for _usb_match_on_serial
+    def on(self, target, component):
+        self.log = target.log		# for _usb_match_on_serial
+        self.component = component	# for _usb_match_on_serial
         if self.when_powering_on:
             self._is_device_present(target, "power-on")
 
-    def power_off_do(self, target):
-        self.log = target.log	# for _usb_match_on_serial
+    def off(self, target, component):
+        self.log = target.log		# for _usb_match_on_serial
+        self.component = component	# for _usb_match_on_serial
         if not self.when_powering_on:
             self._is_device_present(target, "power-off")
 
-    def power_get_do(self, target):
+    def get(self, target, component):
         # Return if the USB device is connected
         #
         # Why? because for some targets, we can only tell if they are
         # connected by seeing a USB device plugged to the system. For
         # example, a USB connected Android target which we power
         # on/off by tweaking the buttons so there is no PDU to act upon.
-        self.log = target.log	# for _usb_match_on_serial
+        self.log = target.log		# for _usb_match_on_serial
+        self.component = component	# for _usb_match_on_serial
         try:
             dev = self._find_device()
             # if we find a device, it is connected, we are On
             return dev != None
         except usb.core.USBError as e:
-            target.log.warning("can't tell if USB device `%s` is connected: %s"
-                               % (self.serial, e))
+            target.log.warning(
+                "%s: can't tell if USB device `%s` is connected: %s"
+                % (component, self.serial, e))
             return False
 
+    # COMPAT: old interface, ttbl.tt_power_control_impl
+    def power_on_do(self, target):
+        return self.on(target, "n/a")
 
-class dlwps7(ttbl.tt_power_control_impl):
+    def power_off_do(self, target):
+        return self.off(target, "n/a")
+
+    def power_get_do(self, target):
+        # this reports None because this is is just a delay loop
+        return None
+
+
+
+class dlwps7(ttbl.power.impl_c, ttbl.tt_power_control_impl):
     """
     Implement a power control interface to the Digital Logger's Web
     Power Switch 7
@@ -415,6 +494,8 @@ class dlwps7(ttbl.tt_power_control_impl):
     driver fail.
     """
     def __init__(self, _url, reboot_wait_s = 0.5):
+        ttbl.tt_power_control_impl.__init__(self)
+        ttbl.power.impl_c.__init__(self)
         assert isinstance(_url, basestring)
         assert isinstance(reboot_wait_s, (int, float))
         url = urlparse.urlparse(_url)
@@ -433,34 +514,17 @@ class dlwps7(ttbl.tt_power_control_impl):
             raise Exception("%s: outlet number '%d' has to be 1 >= outlet >= 8"
                             % (_url, self.outlet))
         self.url = self.url
-        # The target argument is not used anyway...
-        self.power_get_do(None)
 
-    def power_on_do(self, target):
+    def on(self, target, component):
         r = requests.get(self.url + "/outlet?%d=ON" % self.outlet)
         commonl.request_response_maybe_raise(r)
-        self.power_get_do(target)
-        time.sleep(self.reboot_wait_s)
 
-    def power_off_do(self, target):
+    def off(self, target, _component):
         r = requests.get(self.url + "/outlet?%d=OFF" % self.outlet)
         commonl.request_response_maybe_raise(r)
-        self.power_get_do(target)
-
-    def power_cycle_do(self, target, wait = 0):
-        if self.power_get_do(target):
-            r = requests.get(self.url + "/outlet?%d=OFF" % self.outlet)
-            commonl.request_response_maybe_raise(r)
-            if self.reboot_wait_s > 0 or wait > 0:
-                time.sleep(max(self.reboot_wait_s, wait))
-        r = requests.get(self.url + "/outlet?%d=ON" % self.outlet)
-        commonl.request_response_maybe_raise(r)
-        # Give it time to settle
-        time.sleep(self.reboot_wait_s)
-        self.power_get_do(target)
 
     state_regex = re.compile("<!-- state=(?P<state>[0-9a-z][0-9a-z]) lock=[0-9a-z][0-9a-z] -->")
-    def power_get_do(self, target):
+    def get(self, target, component):
         """Get the power status for the outlet
 
         The unit returns the power state when querying the
@@ -488,3 +552,26 @@ class dlwps7(ttbl.tt_power_control_impl):
             return False
         else:
             return True
+
+    # COMPAT: old interface, ttbl.tt_power_control_impl
+    def power_on_do(self, target):
+        return self.on(target, "n/a")
+
+    def power_off_do(self, target):
+        return self.off(target, "n/a")
+
+    def power_get_do(self, target):
+        # this reports None because this is is just a delay loop
+        return None
+
+    def power_cycle_do(self, target, wait = 0):
+        if self.power_get_do(target):
+            r = requests.get(self.url + "/outlet?%d=OFF" % self.outlet)
+            commonl.request_response_maybe_raise(r)
+            if self.reboot_wait_s > 0 or wait > 0:
+                time.sleep(max(self.reboot_wait_s, wait))
+        r = requests.get(self.url + "/outlet?%d=ON" % self.outlet)
+        commonl.request_response_maybe_raise(r)
+        # Give it time to settle
+        time.sleep(self.reboot_wait_s)
+        self.power_get_do(target)
