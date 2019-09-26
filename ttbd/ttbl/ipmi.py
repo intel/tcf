@@ -293,12 +293,45 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
         )
         ttbl.power.socat_pc.on(self, target, component)
 
-    # console interface
-    def state(self, target, component):
-        return self.get(target, component)
-
+    # console interface; state() implemented by generic_c
     def enable(self, target, component):
         return self.on(target, component)
 
     def disable(self, target, component):
         return self.off(target, component)
+
+
+class sol_ssh_console_pc(ttbl.console.ssh_pc):
+    """
+    IPMI SoL over SSH console
+
+    This augments :class:`ttbl.console.ssh_pc` in that it will first
+    disable the SOL connection to avoid conflicts with other users.
+
+    This forces the input into the SSH channel to the BMC to be
+    chunked each five bytes with a 0.1 second delay in between. This
+    seems to gives most BMCs a breather re flow control.
+    """
+    def __init__(self, hostname, username, password, ssh_port = 22,
+                 chunk_size = 5, interchunk_wait = 0.1):
+        ttbl.console.ssh_pc.__init__(self, hostname, username, password,
+                                     port = ssh_port, chunk_size = chunk_size,
+                                     interchunk_wait = interchunk_wait)
+        self.env_add['IPMITOOL_PASSWORD'] = password
+
+
+    def on(self, target, component):
+        # if there is someone leftover reading, kick them out, there can
+        # be only one
+        env = dict(os.environ)
+        env.update(self.env_add)
+        subprocess.call(	# don't check, we don't really care
+            [
+                "/usr/bin/ipmitool", "-H", self.kws['hostname'],
+                "-U", self.kws['username'], "-E",
+                "-I", "lanplus", "sol", "deactivate",
+            ],
+            stderr = subprocess.STDOUT,
+            env = env,
+        )
+        ttbl.console.ssh_pc.on(self, target, component)

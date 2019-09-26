@@ -14,6 +14,7 @@ import errno
 import os
 import time
 
+import commonl
 import ttbl
 
 class impl_c(object):
@@ -407,13 +408,147 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
             "!!CREATE:console-%(component)s.read",
             "%s,creat=0,rawer,b115200,parenb=0,cs8,bs1" % serial_file_name)
 
-    # console interface
-    def state(self, target, component):
-        return self.get(target, component)
-
+    # console interface; state() is implemented by generic_c
     def enable(self, target, component):
         return self.on(target, component)
 
     def disable(self, target, component):
         return self.off(target, component)
 
+
+class ssh_pc(ttbl.power.socat_pc, generic_c):
+    """Implement a serial port over an SSH connection
+
+    This class implements two interfaces:
+
+    - power interface: to start an SSH connection recorder in the
+      background as soon as the target is powered on.
+
+      The power interface is implemented by subclassing
+      :class:`ttbl.power.socat_pc`, which starts *socat* as daemon to
+      serve as a data recorder and to pass data to the connection
+      from the read file.
+
+      Anything read form the SSH connection is written to the
+      *console-NAME.read* file and anything written to it is written
+      to *console-NAME.write* file, which is sent to the serial port.
+
+    - console interface: interacts with the console interface by
+      exposing the data recorded in *console-NAME.read* file and
+      writing to the *console-NAME.write* file.
+
+    :params str hostname: *USER[:PASSWORD]@HOSTNAME* for the SSH server
+
+    For example:
+
+    >>> ssh0_pc = ttbl.console.ssh_pc('HOSTNAME', 'USERNAME', "PASSWORD")
+    >>>
+    >>> ttbl.config.targets[name].interface_add(
+    >>>     "power",
+    >>>     ttbl.power.interface(
+    >>>         ...
+    >>>         ssh0_pc,
+    >>>         ...
+    >>>     )
+    >>> ttbl.config.targets[name].interface_add(
+    >>>     "console",
+    >>>     ttbl.console.interface(
+    >>>         ssh0 = ssh0_pc,
+    >>>     )
+    >>> )
+
+    FIXME:
+     - pass password via agent? file descriptor?
+     - pass connection parameters (-o stuff)
+
+    """
+    def __init__(self, hostname, port = 22,
+                 chunk_size = 0, interchunk_wait = 0.1):
+        assert isinstance(hostname, basestring)
+        assert port > 0
+
+        generic_c.__init__(self,
+                           chunk_size = chunk_size,
+                           interchunk_wait = interchunk_wait)
+        ttbl.power.socat_pc.__init__(
+            self,
+            "PTY,link=console-%(component)s.write,rawer"
+            "!!CREATE:console-%(component)s.read",
+            # Configuf file is generated during on().
+            # -tt: (yeah, double) force TTY allocation even w/o
+            # controlly TTY
+            "EXEC:'sshpass -e ssh -v -F %(component)s-ssh-config -tt"
+            # don't use ssh://USER@HOST:PORT, some versions do not grok it
+            "  -p %(port)s %(username)s@%(hostname)s'"
+            ",sighup,sigint,sigquit"
+        )
+        user, password, hostname = commonl.split_user_pwd_hostname(hostname)
+        self.parameters_default = {
+            'user': user,
+        }
+        self.parameters.update(self.parameters_default)
+        # pass those fields to the socat_pc templating engine
+        self.kws['hostname'] = hostname
+        self.kws['username'] = user
+        self.kws['port'] = port
+        # this is used for sshpass to send the password; we dont' keep
+        # the password in the default parameters because then it'd
+        # leak easily to anyone
+        self.password = password
+        # SSHPASS always has to be defined
+        self.env_add['SSHPASS'] = password if password else ""
+
+
+    def on(self, target, component):
+        # generate configuration file from parameters
+        with open(os.path.join(target.state_dir, component + "-ssh-config"),
+                  "w+") as cf:
+            cf.write("""\
+UserKnownHostsFile = %s/%s-ssh-known_hosts
+StrictHostKeyChecking = no
+ServerAliveCountMax = 6
+ServerAliveInterval = 10
+TCPKeepAlive = yes
+ForwardX11 = no
+ForwardAgent = no
+EscapeChar = none
+""" % (target.state_dir, component))
+        return ttbl.power.socat_pc.on(self, target, component)
+
+    # console interface; state() is implemented by generic_c
+    def setup(self, target, component, parameters):
+        if parameters == {}:		# reset
+            self.parameters = dict(self.parameters_default)
+                # SSHPASS always has to be defined
+            self.env_add['SSHPASS'] = self.password if self.password else ""
+            self.kws['username'] = self.parameters['user']
+            return dict(result = self.parameters)
+
+        # things we allow
+        allowed_keys = [ 'user', 'password' ]
+        for key in parameters.keys():
+            if key not in allowed_keys:
+                raise RuntimeError("field '%s' cannot be set" % key)
+
+        # some lame security checks
+        for key, value in parameters.iteritems():
+            if '\n' in value:		# could be used to enter other fields
+                raise RuntimeError(
+                    "field '%s': value contains invalid newline" % key)
+
+        # ok, all verify, let's set it
+        for key, value in parameters.iteritems():
+            if key == 'user':
+                self.kws['username'] = value
+            elif key == 'password':
+                # SSHPASS always has to be defined
+                self.env_add['SSHPASS'] = value if value else ""
+            else:
+                self.parameters[key] = value
+        return dict(result = self.parameters)
+
+    def enable(self, target, component):
+        return self.on(target, component)
+
+    def disable(self, target, component):
+        return self.off(target, component)
