@@ -53,7 +53,7 @@ Execution log
 {% block REPRODUCTION_STEPS -%}
 Reproduce it [*]:
 
-  tcf run -vvv{{ t_option }} -s 'name:".*{{ tc_name }}$"' {{ thisfile }}
+  tcf run -vvv{{ t_option }} {{ thisfile }}
 
 {% if targets -%}
 Find more information about targets:
