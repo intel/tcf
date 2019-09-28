@@ -2836,7 +2836,10 @@ class tc_c(object):
             hook(self)
 
         #: list of subcases this testcase contains
-        self.subtc = {}
+        #:
+        #: It is ordered by addition time, so things sub-execute in
+        #: addition order.
+        self.subtc = collections.OrderedDict()
         #: parent of this testcase (normally used for subcases)
         self.parent = None
         #: do we have to actually acquire any targets?
@@ -5591,7 +5594,7 @@ class tc_c(object):
         c.tls.expecter = expecter.expecter_c(
             c._expecter_log, c, poll_period = poll_period,
             timeout = self.tls.expecter.timeout)
-        c.subtc = {}
+        c.subtc = collections.OrderedDict()
         c.parent = self.parent
         for subtc_name, subtc in self.subtc.iteritems():
             subtc_copy = subtc._clone()
