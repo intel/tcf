@@ -6191,7 +6191,8 @@ class subtc_c(tc_c):
                 dlevel = 2, attachments = dict(output = self.output))
         else:
             self.result.report(
-                self, "subcase run summary: %s" % self.summary,
+                self, "subcase run summary: %s"
+                % (self.summary if self.summary else "<not provided>"),
                 dlevel = 2, attachments = dict(output = self.output))
         return self.result
 
