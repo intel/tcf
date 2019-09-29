@@ -6388,10 +6388,11 @@ def testcases_discover(tcs_filtered, args):
     ignore_r = re.compile(r"^(\s*#.*|\s*)$")
     for manifest_file in args.manifest:
         try:
-            with open(manifest_file) as manifest_fp:
+            with open(os.path.expanduser(manifest_file)) as manifest_fp:
                 for tc_path_line in manifest_fp:
                     if not ignore_r.match(tc_path_line):
-                        args.testcase.append(tc_path_line.strip())
+                        args.testcase.append(
+                            os.path.expanduser(tc_path_line.strip()))
         except OSError:
             file_error = sys.exc_info()[1]
             logger.error("Error reading file: " + str(file_error))
