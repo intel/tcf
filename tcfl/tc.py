@@ -5978,6 +5978,8 @@ class tc_c(object):
 
         - :meth:`tcfl.tc_clear_bbt.tc_clear_bbt.is_testcase`
         - :meth:`tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.is_testcase`
+        - :meth:`examples.test_ptest_runner._driver` (:term:`impromptu
+          testcase driver)
 
         note drivers need to be registered with
         :meth:`tcfl.tc.tc_c.driver_add`; on the other hand, a Python

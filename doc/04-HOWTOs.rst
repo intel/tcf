@@ -80,7 +80,12 @@ such as `%(tc_name)s` and in report templates.
 .. automodule:: examples.test_dump_kws_one_target
 .. automodule:: examples.test_dump_kws_two_targets
 
+Testcase drivers
+----------------
 
+Testcase drivers load and execute existing testcases.
+
+.. automodule:: examples.test_ptest_runner
 
 TCF client tricks
 =================
