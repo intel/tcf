@@ -439,6 +439,9 @@ class tc_zephyr_subsanity_c(tc.tc_c):
         # errored/failed/skip/block to configure, build, deploy etc,
         # all the subTCs are errored/failed/skipped/blocked
         self._result = None
+        # need to set this because we are a subcase of it and we can't
+        # execute independently
+        self.kw_set('tc_name_toplevel', parent.kws['tc_name_toplevel'])
         self.kw_set('tc_name_short', zephyr_name)
 
     def configure_50(self):	# pylint: disable = # missing-docstring
@@ -1637,7 +1640,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         return d
     
     @classmethod
-    def _testcasesample_yaml_mktcs(cls, path):
+    def _testcasesample_yaml_mktcs(cls, path, _tc_name, subcases_cmdline):
         #
         #
         # ASSUMPTIONS:
@@ -1645,11 +1648,11 @@ class tc_zephyr_sanity_c(tc.tc_c):
         #
         # 1 - each subtestcase listed in testcase|sample.yaml or in the
         #     output of 'sanitycheck --list-tests' is in the form
-        #     something.other.whatever.final
+        #     something.other.whatever.final.
         #
         # 2 - if the testcase provides subcases inside the source,
         #     something.other.whatever has to match as a subcase in the
-        #     testcase|sample.yaml
+        #     testcase|sample.yaml; those are subsubcases.
         #
         # so anyhoo, there are multiple testcases declared in the
         # yaml, which allow us to build multiple testcases from the
@@ -1659,7 +1662,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         #
         # So it is kinda hard to identify what is the top_subcase
         # subtestcase (off the YAML file) or scanned from the source
-        # (src_subcase)
+        # (src_subsubcase)
         #
         # For example, when listing zephyr/samples/philosophers
         #
@@ -1709,7 +1712,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
             # pass
             raise tc.skip_e(
                 "no `tests` section declared in %s" % path)
-            return
+            return [ ]
         else:
             assert isinstance(data, dict), \
                 "tests data is not a dict but a %s" % type(data).__name__
@@ -1719,35 +1722,46 @@ class tc_zephyr_sanity_c(tc.tc_c):
         # testcase|sample.yaml, where we are getting config options,
         # excludes, etc... try to guess who comes fro the YAML level,
         # who is a subtest in the source.
-        src_subcases = set()
-        yaml_subcases = mapping.keys()
+        src_subsubcases = set()
+        yaml_subsubcases = mapping.keys()
         for subcase in subcases:
-            if subcase not in yaml_subcases:
+            if subcase not in yaml_subsubcases:
                 top_subcase, src_subcase = os.path.splitext(subcase)
-                if top_subcase not in yaml_subcases:
+                if top_subcase not in yaml_subsubcases:
                     raise tcfl.tc.error_e(
                         "testcase declares subcase %s (top %s src %s) whose "
                         "top not listed in YAML's subcases (%s)"
                         % (subcase, top_subcase, src_subcase,
-                           " ".join(yaml_subcases)))
-                src_subcases.add(src_subcase[1:])
+                           " ".join(yaml_subsubcases)))
+                src_subsubcases.add(src_subcase[1:])
 
-        for tc_name, _tc_vals in mapping.iteritems():
-            tc_vals = cls._get_test(tc_name, _tc_vals, common, testcase_valid_keys)
-            origin = path + "#" + tc_name
-            _tc = cls(origin, path, origin, tc_name, src_subcases)
+        # Now we create a top level test for each subtestcase we
+        # found in the YAML file; if we were given test names in the
+        # command line, we only create for those.
+        for subtc_name, _tc_vals in mapping.iteritems():
+            tc_vals = cls._get_test(subtc_name, _tc_vals, common,
+                                    testcase_valid_keys)
+            origin = path + "#" + subtc_name
+            if subcases_cmdline and subtc_name not in subcases_cmdline:
+                logging.info(
+                    "%s#%s: ignoring subcase, not in command line list",
+                    path, subtc_name)
+                continue
+            _tc = cls(path + "#" + subtc_name, path, origin,
+                      subtc_name, src_subsubcases)
             _tc.log.debug("Original %s data for test '%s'\n%s"
-                          % (os.path.basename(path), tc_name,
+                          % (os.path.basename(path), subtc_name,
                              pprint.pformat(tc_vals)))
-            _tc._dict_init(tc_vals, path, tc_name)
+            _tc._dict_init(tc_vals, path, subtc_name)
             tcs.append(_tc)
         return tcs
 
     @classmethod
-    def is_testcase(cls, path, _from_path):
+    def is_testcase(cls, path, _from_path, tc_name, subcases_cmdline):
         if cls.filename_regex.match(os.path.basename(path)):
             return cls._testcase_ini_mktcs(path)
         if cls.filename_yaml_regex.match(os.path.basename(path)):
-            return cls._testcasesample_yaml_mktcs(path)
+            return cls._testcasesample_yaml_mktcs(path, tc_name,
+                                                  subcases_cmdline)
         else:
             return []

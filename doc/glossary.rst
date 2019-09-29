@@ -27,6 +27,17 @@ Glossary
      Group of TCF servers that are meant to be used together, they all
      provide redundancy for targets of the same style.
 
+   impromptu testcase driver
+
+     A Python test file implementing :term:`testcase driver` that:
+
+     - contains a single class called *_driver*
+
+     - allows executing one or more test cases that have no
+       file representation in the client's filesystem
+
+     :ref:`More details <testcase_driver_impromptu>` available.
+
    RunID
 
      A unique identifier for a run of testcases that groups the output
@@ -61,6 +72,17 @@ Glossary
      or functionality.
 
      A test case can be a program or a script
+
+   testcase driver
+
+     A testcase driver is a script that when pointed to a file of any
+     type in the client's filesystem (not in the target's), can
+     determine if it can recognize it as something it can execute as a
+     flow for evaluating a test case.
+
+     This allows test content written in anything than Python to be
+     exectured by the automation process without modifying it. See
+     :meth:`tcfl.tc.tc_c.is_testacase`.
 
    test target
 

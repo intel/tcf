@@ -100,6 +100,62 @@ The *tcf run* testcase (`tcfl.tc._run()`) will:
   <tcfl.expecter>`), a loop which ensures what is expected to
   happen happens.
 
+.. _testcase_driver_impromptu:
+
+Testcases that have no representation in the client's filesystem
+----------------------------------------------------------------
+
+A very common execution flow involves that the client has a file in
+their filesystem that represents the testcase to run in the target,
+eg::
+
+  $ tcf run some/file/test_this.py
+  $ tcf run jdk8u.git/test/path/test1.java jdk8u.git/test/path/test2.java
+
+different drivers can pick up the testcase and execute the testcase,
+in most case involving the sending of the test content (script, data,
+etc) to the target and then executing it there.
+
+However the case of a test suite whose content is already installed in
+the target makes this model not possible. If for example, in the
+remote system the test suite is executed by running::
+
+  $ run-test /usr/lib/something/test_1
+  $ run-test /usr/lib/something/test_2
+  $ run-test /usr/lib/something/test_3
+
+we can create a script that executes each of those commands, but it
+becomes repetitive.
+
+A different sollution is a :term:`impromptu test driver`; this is a
+Python test class instance called *_driver* by it's own in a file, eg:
+*test_something.py* which can get subcase parameter execution from
+TCF's command line::
+
+  $ tcf run test_something.py#test_1#test_2#test_3
+
+like this, the invocation of *test_something.py* is passed a list of
+subcases (*test_1*, *test_2*, *test_3*) to run. However, the following::
+
+  $ tcf run test_something.py#test_1#test_2 test_something.py#test_3
+
+would execute two testcases, one which runs subcases *test_1* and
+*test_2*, another who runs *test_3* only.
+
+Note this is basically a way for the command line to tell a script
+which subcases to execute. However, the key things here are that:
+
+- this makes the testname be SCRIPT#SUBCASE1#SUBCASE#SUBCASE3
+
+  this is important because altering the execution order might alter
+  the test results, and hence they shall be considered different
+  tests.
+
+  If for a given test environment the order is not important or shall
+  not affect the result, this becomes then another measurement point
+  (eg: that running the testcases in multiple orders shall not matter).
+
+
 
 The Test Target Broker
 ======================

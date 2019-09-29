@@ -105,6 +105,9 @@ import shutil
 import string
 import subprocess
 import sys
+reload(sys)
+# change the default string encoding to ASCII to remove the mess of encodings
+sys.setdefaultencoding('utf-8')
 import tempfile
 import threading
 import time
@@ -2696,6 +2699,15 @@ class tc_c(object):
         self.buffers_lock = threading.Lock()
         self.name = name
         self.kw_set('tc_name', self.name)
+        # top level testcase name is that of the toplevel testcase,
+        # with any subcases removed (anything after ##), so
+        #
+        # some/test/path/name#param1#param2##subcase/path/subcase
+        #
+        # becomes
+        #
+        # some/test/path/name#param1#param2
+        self.kw_set('tc_name_toplevel', self.name.split("##", 1)[0])
         self.kw_set('cwd', os.getcwd())
         # This one is left for drivers to do their thing in here
         self.kw_set('tc_name_short', self.name)
@@ -2835,7 +2847,19 @@ class tc_c(object):
         for hook in self.hook_pre:
             hook(self)
 
+        #: list of subcases this test is asked to execute by the test
+        #: case runner (see :data:`subtc`)
+        #:
+        #: Subcases follow the format
+        #: *NAME/SUBNAME/SUBSUBNAME/SUBSUBSUBNAME...*
+        self.subcases = []
+
         #: list of subcases this testcase contains
+        #:
+        #: Note this is different to :data:`subcases` in that this is
+        #: the final list the testcase has collected after doing
+        #: discovery in the machine and (possibly) examining the
+        #: execution logs.
         #:
         #: It is ordered by addition time, so things sub-execute in
         #: addition order.
@@ -5594,6 +5618,7 @@ class tc_c(object):
         c.tls.expecter = expecter.expecter_c(
             c._expecter_log, c, poll_period = poll_period,
             timeout = self.tls.expecter.timeout)
+        c.subcases = list(self.subcases)
         c.subtc = collections.OrderedDict()
         c.parent = self.parent
         for subtc_name, subtc in self.subtc.iteritems():
@@ -5929,7 +5954,66 @@ class tc_c(object):
     # Default driver loader; most test case drivers would over load
     # this to determine if a file is a testcase or not.
     @classmethod
-    def is_testcase(cls, path, _from_path):
+    def is_testcase(cls, path, from_path, tc_name, subcases_cmdline):
+        """Determine if a given file describes one or more testcases and
+        crete them
+
+        TCF's test case discovery engine calls this method for each
+        file that could describe one or more testcases. It will
+        iterate over all the files and paths passed on the command
+        line files and directories, find files and call this function
+        to enquire on each.
+
+        This function's responsibility is then to look at the contents
+        of the file and create one or more objects of type
+        :class:`tcfl.tc.tc_c` which represent the testcases to be
+        executed, returning them in a list.
+
+        When creating :term:`testcase driver`, the driver has to
+        create its own version of this function. The default
+        implementation recognizes python files called *test_*.py* that
+        contain one or more classes that subclass :class:`tcfl.tc.tc_c`.
+
+        See examples of drivers in:
+
+        - :meth:`tcfl.tc_clear_bbt.tc_clear_bbt.is_testcase`
+        - :meth:`tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.is_testcase`
+
+        note drivers need to be registered with
+        :meth:`tcfl.tc.tc_c.driver_add`; on the other hand, a Python
+        :term:`impromptu testcase driver` needs no registration, but
+        the test class has to be called *_driver*.
+
+        :param str path: path and filename of the file that has to be
+          examined; this is always a regular file (or symlink to it).
+
+        :param str from_path: source command line argument this file
+          was found on; e.g.: if *path* is *dir1/subdir/file*, and the
+          user ran::
+
+            $ tcf run somefile dir1/ dir2/
+
+          *tcf run* found this under the second argument and thus:
+
+          >>> from_path = "dir1"
+
+        :param str tc_name: testcase name the core has determine based
+          on the path and subcases specified on the command line; the
+          driver can override it, but it is recommended it is kept.
+
+        :param list(str) subcases_cmdline: list of subcases the user
+          has specified in the command line; e.g.: for::
+
+            $ tcf run test_something.py#sub1#sub2
+
+          this would be:
+
+          >>> subcases_cmdline = [ 'sub1', 'sub2']
+
+        :returns: list of testcases found in *path*, empty if none
+          found or file not recognized / supported.
+
+        """
         if not cls.file_regex.search(os.path.basename(path)):
             return []
         try:
@@ -5965,20 +6049,33 @@ class tc_c(object):
         tcs = []
         for _cls in l:
             path = inspect.getsourcefile(_cls)
-            name = path
-            if _cls.__name__ != "_test":
+            subcase_name = _cls.__name__
+            if subcase_name != "_driver" \
+               and subcases_cmdline and subcase_name not in subcases_cmdline:
+                logging.info("%s: subcase ignored since it wasn't "
+                             "given in the command line list: %s",
+                             subcase_name, " ".join(subcases_cmdline))
+                continue
+            if subcase_name not in ( "_test", "_driver" ):
                 # if the test class name is just "_test", we don't
                 # even list it as as test, we assume per convention it
                 # is the only test in the file
-                name += "#" + _cls.__name__
+                name = tc_name + "#" + subcase_name
+            else:
+                name = tc_name
             # testcase name, file where it came from, origin
-            tc = _cls(name, path,
-                      path + ":" + "%d" % inspect.getsourcelines(_cls)[1])
+            tc = _cls(
+                name, path,
+                path + ":" + "%d" % inspect.getsourcelines(_cls)[1])
+            if subcase_name == "_driver":
+                # make a copy, as we might modify during execution
+                tc.subcases = list(subcases_cmdline)
             tcs.append(tc)
         return tcs
 
     @classmethod
-    def _create_from_file_name(cls, tcis, file_name, from_path):
+    def _create_from_file_name(cls, tcis, file_name, from_path,
+                               subcases_cmdline):
         """
         Given a filename that contains a possible test case, create one or
         more TC structures from it and return them in a list
@@ -5987,6 +6084,8 @@ class tc_c(object):
         :param str file_name: path to file to consider
         :param str from_path: original path from which this file was
           scanned (this will be a parent path of this file)
+        :param list subcases: list of subcase names the testcase should
+          consider
         :returns: result_c with counts of tests passed/failed (zero,
           as at this stage we cannot know), blocked (due to error
           importing) or skipped(due to whichever condition).
@@ -6003,33 +6102,46 @@ class tc_c(object):
             argspec = inspect.getargspec(_tc_driver.is_testcase)
             if len(argspec.args) == 2:
                 return 2
+            # v2: added from_path
             elif len(argspec.args) == 3:
                 return 3
+            # v3; added tc_name, subcases
+            elif len(argspec.args) == 5:
+                return 4
             else:
                 raise AssertionError(
                     "%s: unknown # of arguments %d to is_testcase()"
                     % (_tc_driver, len(argspec.args)))
 
-        def _is_testcase_call(tc_driver, file_name, from_path):
+        def _is_testcase_call(tc_driver, tc_name, file_name,
+                              from_path, subcases_cmdline):
             style = _style_get(tc_driver)
             # hack to support multiple versions of the interface
             if style == 2:
                 return tc_driver.is_testcase(file_name)
             elif style == 3:
                 return tc_driver.is_testcase(file_name, from_path)
+            elif style == 4:
+                return tc_driver.is_testcase(file_name, from_path,
+                                             tc_name, subcases_cmdline)
             raise AssertionError("bad style %d" % style)
 
+        if subcases_cmdline:
+            tc_name = file_name + "#" + "#".join(subcases_cmdline)
+        else:
+            tc_name = file_name
         for _tc_driver in cls._tc_drivers:
             tc_instances = []
             # new one all the time, in case we use it and close it
-            tc_fake = tc_c(file_name, file_name, "builtin")
+            tc_fake = tc_c(tc_name, file_name, "builtin")
             tc_fake.mkticket()
             tc_fake._ident = msgid_c.ident()
             with msgid_c(tc_fake.ticket, depth = 1, l = cls.hashid_len) \
                  as _msgid:
                 try:
-                    tc_instances += _is_testcase_call(_tc_driver,
-                                                      file_name, from_path)
+                    tc_instances += _is_testcase_call(_tc_driver, tc_name,
+                                                      file_name, from_path,
+                                                      subcases_cmdline)
                 # this is so ugly, need to merge better with result_c's handling
                 except subprocess.CalledProcessError as e:
                     retval = result_c.from_exception_cpe(tc_fake, e)
@@ -6070,7 +6182,7 @@ class tc_c(object):
         return result
 
     @classmethod
-    def find_in_path(cls, tcs, path):
+    def find_in_path(cls, tcs, path, subcases_cmdline):
         """
         Given a path, scan for test cases and put them in the
         dictionary @tcs based on filename where found.
@@ -6079,6 +6191,9 @@ class tc_c(object):
         :param dict tcs: dictionary where to add the test cases found
 
         :param str path: path where to scan for test cases
+
+        :param list subcases: list of subcase names the testcase should
+          consider
 
         :returns: result_c with counts of tests passed/failed (zero,
           as at this stage we cannot know), blocked (due to error
@@ -6111,14 +6226,14 @@ class tc_c(object):
                 for filename in sorted(_filenames):
                     tc_instances = []
                     file_name = os.path.join(tc_path, filename)
-                    result += cls._create_from_file_name(tc_instances,
-                                                         file_name, path)
+                    result += cls._create_from_file_name(
+                        tc_instances, file_name, path, subcases_cmdline)
                     for _tc in tc_instances:
                         tcs[_tc.name] = _tc
         elif os.path.isfile(path):
             tc_instances = []
-            result += cls._create_from_file_name(tc_instances, path,
-                                                 os.path.dirname(path))
+            result += cls._create_from_file_name(
+                tc_instances, path, os.path.dirname(path), subcases_cmdline)
             for _tc in tc_instances:
                 tcs[_tc.name] = _tc
         return result
@@ -6281,10 +6396,16 @@ def testcases_discover(tcs_filtered, args):
             result.blocked += 1
 
     for tc_path in args.testcase:
+        if '#' in tc_path:
+            parts = tc_path.split("#")
+            tc_path = parts[0]
+            subcases_cmdline = parts[1:]
+        else:
+            subcases_cmdline = []
         if not os.path.exists(tc_path):
             logger.error("%s: does not exist; ignoring", tc_path)
             continue
-        result += tc_c.find_in_path(tcs, tc_path)
+        result += tc_c.find_in_path(tcs, tc_path, subcases_cmdline)
         for tcd in tc_c._tc_drivers:
             # If a driver has a different find function, use it to
             # find more
@@ -6292,7 +6413,7 @@ def testcases_discover(tcs_filtered, args):
             if tcd_find_in_path is not None and\
                id(getattr(tcd_find_in_path, "im_func", tcd_find_in_path)) \
                != id(tc_c.find_in_path.im_func):
-                result += tcd.find_in_path(tcs, tc_path)
+                result += tcd.find_in_path(tcs, tc_path, subcases_cmdline)
     if len(tcs) == 0:
         logger.error("WARNING! No testcases found")
         return result
