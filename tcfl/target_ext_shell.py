@@ -259,6 +259,7 @@ class shell(tc.target_extension_c):
 
         # don't set a timeout here, leave it to whatever it was defaulted
 
+    crnl_regex = re.compile("\r+\n")
 
     def _run(self, cmd = None, expect = None, prompt_regex = None,
              output = False, output_filter_crlf = True, trim = False):
@@ -292,10 +293,17 @@ class shell(tc.target_extension_c):
         if output:
             output = self.target.console.read(offset = offset)
             if output_filter_crlf:
-                output = output.replace("\r\n", self.target.crlf)
+                # replace \r\n, \r\r\n, \r\r\r\r\n... it happens
+                output = re.sub(self.crnl_regex, self.target.crlf, output)
             if trim:
-                # FIXME: not good enough, if the output didn't include
-                # a nl, it will mess it up -- use regex finding
+                # When we can run(), it usually prints in the console:
+                ## <command-echo from our typing>
+                ## <command output>
+                ## <prompt>
+                #
+                # So to trim we just remove the first and last
+                # lines--won't work well without output_filter_crlf
+                # and it is quite a hack.
                 first_nl = output.find(self.target.crlf)
                 last_nl = output.rfind(self.target.crlf)
                 output = output[first_nl+1:last_nl+1]
