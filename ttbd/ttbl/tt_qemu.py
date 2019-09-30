@@ -288,10 +288,10 @@ class tt_qemu(
         r = commonl.process_alive(self.pidfile[bsp], cmdline)
         return r
 
-    def _qmp_start(self):
+    def _qmp_start(self, _target):
         if self.fsdb.get("debug") != None:
             # Don't start yet, let a debugger command do it
-            return
+            return False
         for bsp in self.bsps:
             try:
                 with qmp_c(self.pidfile[bsp] + ".qmp") as qmp:

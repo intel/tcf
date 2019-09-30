@@ -2815,7 +2815,7 @@ class tt_qemu_zephyr(ttbl.tt_qemu.tt_qemu):
                 return None
             raise
 
-    def _slip_power_on_pre(self):
+    def _slip_power_on_pre(self, _target):
         kws = dict(self.kws)
         # Get fresh values for these keys
         for key in self.fsdb.keys():
@@ -2859,7 +2859,7 @@ class tt_qemu_zephyr(ttbl.tt_qemu.tt_qemu):
                     "-serial chardev:slip-pty-%s " %  (ic_name, ic_name)
             count += 1
 
-    def _slip_power_on_post(self):
+    def _slip_power_on_post(self, _target):
         kws = dict(self.kws)
         # Get fresh values for these keys
         for key in self.fsdb.keys():
@@ -2932,7 +2932,7 @@ class tt_qemu_zephyr(ttbl.tt_qemu.tt_qemu):
 
             count += 1
 
-    def _slip_power_off_pre(self):
+    def _slip_power_off_pre(self, _target):
         # Before powering off the VM, kill the tun daemon if we
         # started it
         count = 0

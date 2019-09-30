@@ -645,10 +645,10 @@ class tt_flasher(
     # access the JTAG
 
 
-    def power_on_do_post(self):
+    def power_on_do_post(self, _target):
         self.flasher.start()
 
-    def power_off_do_pre(self):
+    def power_off_do_pre(self, _target):
         self.flasher.stop()
 
     def reset_do(self, _):

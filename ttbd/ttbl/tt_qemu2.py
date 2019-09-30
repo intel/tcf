@@ -332,14 +332,14 @@ class tt_qemu(
         r = commonl.process_alive(self.pidfile, cmdline)
         return r
 
-    def _power_on_pre_clear(self):
+    def _power_on_pre_clear(self, _target):
         # we always start with no command line additions, we determine
         # these as we are powering on
         self.qemu_cmdline_append = ""
 
     _r_ident = re.compile('[^a-z0-9A-Z]+')
 
-    def _power_on_pre_consoles(self):
+    def _power_on_pre_consoles(self, _target):
         # Configure serial consoles
         for console in self.consoles:
             self.qemu_cmdline_append += \
@@ -350,7 +350,7 @@ class tt_qemu(
                 (console, console, console, console)
 
     # hooks for starting/stopping networking
-    def _power_on_pre_nw(self):
+    def _power_on_pre_nw(self, _target):
         # We need the __init__ part doing it earlier because remember,
         # these might be running different processes, and the basic
         # self.qemu_cmdline array has to be initialized so we can
@@ -428,15 +428,15 @@ class tt_qemu(
             self.qemu_cmdline_append += "-net none "
 
 
-    def _power_off_post_nw(self):
+    def _power_off_post_nw(self, _target):
         # Tear down network stuff
         for ic_name, _ in self.tags.get('interconnects', {}).iteritems():
             commonl.if_remove_maybe("t%s%s" % (ic_name, self.id))
 
-    def _qmp_start(self):
+    def _qmp_start(self, _target):
         if self.fsdb.get("debug") != None:
             # Don't start yet, let a debugger command do it
-            return
+            return False
         try:
             with qmp_c(self.pidfile + ".qmp") as qmp:
                 r = qmp.command("cont")
