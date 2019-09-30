@@ -617,10 +617,10 @@ class extension(tc.target_extension_c):
             for tries in range(3):
                 target.report_info("POS: rebooting into Provisioning OS [%d/3]"
                                    % tries)
-                boot_to_pos_fn(target)
 
                 # Sequence for TCF-live based on Fedora
                 try:
+                    boot_to_pos_fn(target)
                     # POS prints this when it boots before login
                     target.expect("TCF test node", timeout =
                                   bios_boot_time + timeout)
@@ -1036,7 +1036,12 @@ EOF""")
         ##    }
         ##  ]
         ## }
-        self.fsinfo = json.loads(output)
+        try:
+            self.fsinfo = json.loads(output)
+        except Exception as e:
+            raise tc.blocked_e("can't parse JSON: %s" % e,
+                               dict(output = output,
+                                    trace = traceback.format_exc()))
 
     #:
     #: List of directories to clean up when trying to make up space in
