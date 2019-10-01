@@ -31,6 +31,10 @@ import getpass
 import requests
 import shutil
 import sys
+reload(sys)
+# change the default string encoding to ASCII to remove the mess of encodings
+# this is currently a controversial hack and with Py3 it will dissapear
+sys.setdefaultencoding('utf-8')
 
 # I bet there is a better way to do this...but we need the symbol to
 # be in the logging module so that it is not included in the "function

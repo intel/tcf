@@ -58,6 +58,25 @@ def jinja2_xml_escape(data):
     return new
 
 
+def _mkutf8(s):
+    #
+    # We need a generic 'just write this and heck with encodings', but
+    # we don't know how the data is coming to us.
+    #
+    # If already unicode, pass it through; if str, assume is UTF-8 and
+    # try to safely decode it it to UTF-8. If anything else, rep() it into unicode.
+    #
+    # I am still so confused by Python's string / unicode / encoding /
+    # decoding rules
+    #
+    if isinstance(s, unicode):
+        return s
+    elif isinstance(s, str):
+        return s.decode('utf-8', errors = 'replace')
+    else:
+        # represent it in unicode, however the object says
+        return unicode(s)
+
 class report_c(object):
     """
     Report driver to write to stdout (for human consumption) and to a
@@ -221,17 +240,14 @@ class report_console_c(report_c):
         report_c.__init__(self, verbosity)
         if self.log_file != None:
             self.logf = codecs.open(log_file, "w+", encoding = 'utf-8',
-                                    errors = 'ignore')
+                                    errors = 'replace')
         else:
             self.logf = None
         self.verbosity_logf = verbosity_logf
 
     def _report_writer(self, l, s):
         if l <= self.verbosity:
-            # FIXME: hack -- avoid issues with different encoding
-            # environments--I dislike this, but I don't have a better
-            # solution
-            sys.stdout.write(s.encode('utf-8', errors = 'replace'))
+            sys.stdout.write(_mkutf8(s))
         # note we always want to log messages with verbosity greater
         # or equal to 1000, as those are used for control.
         if self.logf and (l >= 1000 or l <= self.verbosity_logf):
@@ -245,10 +261,7 @@ class report_console_c(report_c):
                 self._report_writer(alevel, s)
         else:	# Over the limit? if maybe log to console
             if ulevel <= self.verbosity:
-                # FIXME: hack -- avoid issues with different encoding
-                # environments--I dislike this, but I don't have a better
-                # solution
-                sys.stdout.write(s.encode('utf-8', errors = 'replace'))
+                sys.stdout.write(_mkutf8(s))
             elif maxlines_hit == False:
                 if alevel <= self.verbosity:
                     msg = "%s: %s: SS <more output abridged>\n" % (prefix, key)
@@ -286,7 +299,7 @@ class report_console_c(report_c):
                 # Is it a file? reopen it to read so we don't modify the
                 # original pointer
                 with codecs.open(attachment.name, "r",
-                                 encoding = 'utf-8', errors = 'ignore') as f:
+                                 encoding = 'utf-8', errors = 'replace') as f:
                     # We don't want to report all the file, just since
                     # the last change
                     if not attachment.closed:
@@ -534,10 +547,7 @@ class file_c(report_c):
 
     @staticmethod
     def _write(f, s):
-        if isinstance(s, unicode):
-            f.write(s)
-        else:
-            f.write(unicode(s).encode('utf-8', errors = 'ignore'))
+        f.write(_mkutf8(s))
 
     def __init__(self, log_dir):
         assert isinstance(log_dir, basestring)
@@ -559,15 +569,15 @@ class file_c(report_c):
         if isinstance(attachment, basestring):
             # String
             for line in attachment.splitlines(False):
+                line = _mkutf8(line)
                 if line == '':
                     continue
-                line = line.encode('utf-8', errors = 'replace')
                 self._write(f, u"%s %s: %s\n" % (prefix, key, line.rstrip()))
         elif hasattr(attachment, "name"):
             # Is it a file? reopen it to read so we don't modify the
             # original pointer
             with codecs.open(attachment.name, "r",
-                             encoding = 'utf-8', errors = 'ignore') as fa:
+                             encoding = 'utf-8', errors = 'replace') as fa:
                 # We don't want to report all the file, just since the
                 # last change
                 if not attachment.closed:
@@ -629,11 +639,11 @@ class file_c(report_c):
         if not code in self.fs:
             f = codecs.open(
                 os.path.join(_tc.tmpdir, "report-" + code + ".txt"),
-                "w", encoding = 'utf-8', errors = 'ignore')
+                "w", encoding = 'utf-8', errors = 'replace')
             self.fs[code] = f.name
         else:
             f = codecs.open(self.fs[code], "a+b",
-                            encoding = 'utf-8', errors = 'ignore')
+                            encoding = 'utf-8', errors = 'replace')
 
         # Extract the target name where this message came from (if the
         # reporter is a target)
@@ -673,7 +683,7 @@ class file_c(report_c):
         everything)
         """
         with codecs.open(self.fs[code], "a+b",
-                         encoding = 'utf-8', errors = 'ignore') as fi:
+                         encoding = 'utf-8', errors = 'replace') as fi:
             # FIXME: can't we just pickle this?
             for line in fi:
                 if line == "":
@@ -842,6 +852,6 @@ class file_c(report_c):
             # still does not exist
             commonl.makedirs_p(os.path.dirname(file_name), 0o750)
             with codecs.open(file_name, "w", encoding = 'utf-8',
-                             errors = 'ignore') as fo:
+                             errors = 'replace') as fo:
                 for text in template.generate(**kws):
                     fo.write(text)
