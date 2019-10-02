@@ -702,10 +702,11 @@ def swupd_bundle_add(ic, target, bundle_list,
         kws['su_postfix'] = ""
     target.shell.run(			# fix clear certificates if needed
         "%(su_prefix)s"			# no space here, for su -mc 'COMMAND'
-        "test -f /etc/ca-certs/trusted/regenerate"
-        " && rm -rf /run/lock/clrtrust.lock"
-        " && clrtrust -v generate"
-        " && rm -f /etc/ca-certs/trusted/regenerate"
+        "certs_path=/etc/ca-certs/trusted;"
+        "if [ -f $certs_path/regenerate ]; then"
+        " rm -f $certs_path/regenerate $certs_path/lock;"
+        " clrtrust -v generate;"
+        "fi"
         "%(su_postfix)s"		# no space here, for su -mc 'COMMAND'
         % kws)
 
