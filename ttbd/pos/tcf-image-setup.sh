@@ -446,7 +446,7 @@ done
 
 for file in etc/pam.d/common-auth usr/share/pam.d/su; do
     [ -r $destdir/$file ] || continue
-    grep -q "pam_unix.so.*nullok" $destdir/$file || continue
+    grep -q "pam_unix.so.*nullok" $destdir/$file && continue
     # Some distros configure PAM to disallow passwordless root; we
     # change that so automation doesn't have to work through so many
     # hoops
