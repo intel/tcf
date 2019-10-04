@@ -195,6 +195,23 @@ target in any other way, remembering to specify the ticket::
   $ tcf -t ormorh capture-get qu04a screen screencap.png
   ...
 
+or via SSH, first we have to ask the server to create a tunnel for us
+from to the target's SSH port::
+
+  $ tcf list -vv qu04a | grep ipv4_addr
+  interconnects.nwa.ipv4_addr: 192.168.97.4
+  $ tcf tunnel-add qu04a 22 tcp 192.168.97.4
+  SERVERNAME:19893
+  $ ssh -p 19893 root@SERVERNAME
+
+.. note:: make sure you specify the user to login as; it likely won't
+          be the same as in your client machine.
+  
+Release the target so it can be used by someone else::
+
+  $ kill -9 %1               # kill the while loop that keeps it acquired
+  $ tcf release -f $(tcf list 'owner:"YOURNAME"')
+
 Some details:
 
  - use *while tcf acquire* vs *while true; do tcf acquire* because
@@ -242,7 +259,7 @@ Do not forget to kill the *while* process and release the targets when
 done, otherwise others won't be able to use them. If someone has left
 a target taken, it can be released following :ref:`these instructions
 <howto_release_target>`
-  
+
 How can I debug a target?
 -------------------------
 
@@ -571,7 +588,7 @@ Tunnels can also be created with the command line::
 
   $ tcf tunnel-add TARGETNAME 22 tcp TARGETADDR
   SERVERNAME:19893
-  $ ssh -p 19893 SERVERNAME cat /etc/passwd
+  $ ssh -p 19893 root@SERVERNAME cat /etc/passwd
   root:x:0:0:root:/root:/bin/bash
   bin:x:1:1:bin:/bin:/sbin/nologin
   daemon:x:2:2:daemon:/sbin:/sbin/nologin
