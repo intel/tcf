@@ -681,7 +681,7 @@ class tt_qemu(
             console_id = self.consoles[0]
         elif not console_id in self.consoles:
             raise ValueError("unknown console %s (target has %s)"
-                             % console_id, "m ".join(self.consoles))
+                             % (console_id, "m ".join(self.consoles)))
         return console_id
 
     def console_do_read(self, console_id = None, offset = 0):
