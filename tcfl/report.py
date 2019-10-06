@@ -17,6 +17,7 @@ import contextlib
 import inspect
 import logging
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -239,11 +240,40 @@ class report_console_c(report_c):
         self.lock = threading.Lock()
         report_c.__init__(self, verbosity)
         if self.log_file != None:
-            self.logf = codecs.open(log_file, "w+", encoding = 'utf-8',
-                                    errors = 'replace')
+            _basename, ext = os.path.splitext(self.log_file)
+            if ext in self.compress:
+                # use shell + exec to try to game possible buffering
+                # issues w/ Python and blocks
+                command = self.compress[ext]
+                pipe = subprocess.Popen(
+                    "exec " + command + " > %s" % self.log_file,
+                    shell = True, stdin = subprocess.PIPE)
+                self.logf = pipe.stdin
+            else:
+                self.logf = codecs.open(log_file, "w+", encoding = 'utf-8',
+                                        errors = 'replace')
         else:
             self.logf = None
         self.verbosity_logf = verbosity_logf
+
+    #: Map log file extension to compression program
+    #:
+    #: Log files in big runs can be huge but we don't want to loose
+    #: them or we don't need the whole thing...until we need them.
+    #:
+    #: Compressing them after the fact is often a pain, so we can
+    #: compress them on the run. Each program here takes stdin raw
+    #: data and writes compressed data to stdout. It shall stop when
+    #: receiving EOF and close it out gracefully, which will also work
+    #: if TCF is killed mercilessly.
+    #:
+    #: New programs can be added with:
+    #:
+    #: >>> tcfl.report.report_console_c.compress[".EXT"] = "program -options"
+    compress = {
+        ".bz2": "bzip2 -9qzc",
+        ".xz": "xz -T0 -6qzc",
+    }
 
     def _report_writer(self, l, s):
         if l <= self.verbosity:
