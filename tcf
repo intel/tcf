@@ -368,7 +368,7 @@ if __name__ == "__main__":
     tcfl.target_ext_tunnel.cmdline_setup(arg_subparsers)
     # imported by tcfl.tc
     tcfl.tc.pos.cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_buttons.cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_console._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_ioc_flash_server_app.cmdline_setup(arg_subparsers)

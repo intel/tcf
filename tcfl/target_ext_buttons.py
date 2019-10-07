@@ -12,19 +12,9 @@ Press and release buttons in the target
 import json
 
 import tc
-import ttb_client
-import logging
+from . import msgid_c
 
-def _rest_tb_target_button_sequence(rtb, rt, sequence, ticket = ''):
-    _sequence = json.dumps(sequence)
-    rtb.send_request("POST", "targets/%s/buttons/sequence" % rt['id'],
-                     data = { 'sequence': _sequence, 'ticket': ticket })
-
-def _rest_tb_target_buttons_get(rtb, rt, ticket = ''):
-    return rtb.send_request("GET", "targets/%s/buttons/get" % rt['id'],
-                            data = { 'ticket': ticket })
-
-class buttons(tc.target_extension_c):
+class extension(tc.target_extension_c):
     """
     Extension to :py:class:`tcfl.tc.target_c` to manipulate buttons
     connected to the target.
@@ -60,124 +50,134 @@ class buttons(tc.target_extension_c):
         if not 'buttons' in target.rt.get('interfaces', []):
             raise self.unneeded
 
+    def _sequence(self, sequence):
+        self.target.ttbd_iface_call("buttons", "sequence", method = "PUT",
+                                    sequence = json.dumps(sequence))
+
     def press(self, button_name):
         self.target.report_info("%s: pressing" % button_name, dlevel = 1)
-        _rest_tb_target_button_sequence(self.target.rtb, self.target.rt,
-                                        [ [ button_name, 'press' ] ],
-                                        ticket = self.target.ticket)
+        self._sequence([ [ 'press', button_name ] ])
         self.target.report_info("%s: pressed" % button_name)
 
     def release(self, button_name):
         self.target.report_info("%s: releasing" % button_name, dlevel = 1)
-        _rest_tb_target_button_sequence(self.target.rtb, self.target.rt,
-                                        [ [ button_name, 'release' ] ],
-                                        ticket = self.target.ticket)
+        self._sequence([ [ 'release', button_name ] ])
         self.target.report_info("%s: released" % button_name)
 
     def sequence(self, sequence):
         self.target.report_info("running sequence: %s" % sequence, dlevel = 1)
-        _rest_tb_target_button_sequence(self.target.rtb, self.target.rt,
-                                        sequence, ticket = self.target.ticket)
+        self._sequence(sequence)
         self.target.report_info("ran sequence: %s" % sequence)
 
-    def click(self, button_name, duration = 1):
+    def click(self, button_name, duration = 0.25):
         self.target.report_info("clicking: %s for %.02f"
                                 % (button_name, duration), dlevel = 1)
-        _rest_tb_target_button_sequence(self.target.rtb, self.target.rt,
-                                        [
-                                            ( button_name, 'press' ),
-                                            ( button_name, duration ),
-                                            ( button_name, 'release' ),
-                                        ],
-                                        ticket = self.target.ticket)
+        self._sequence([
+            [ 'press', button_name ],
+            [ 'wait', duration ],
+            [ 'release', button_name ]
+        ])
         self.target.report_info("clicked: %s for %.02f"
                                 % (button_name, duration))
 
     def double_click(self, button_name,
                      duration_click = 0.25, duration_release = 0.25):
-        self.target.report_info("clicking: %s for %.02f"
-                                % (button_name, duration), dlevel = 1)
-        _rest_tb_target_button_sequence(self.target.rtb, self.target.rt,
-                                        [
-                                            ( button_name, 'press' ),
-                                            ( button_name, duration_click ),
-                                            ( button_name, 'release' )
-                                        ( button_name, duration_release ),
-                                            ( button_name, 'press' )
-                                            ( button_name, duration_click ),
-                                            ( button_name, 'release' )
-                                        ],
-                                        ticket = self.target.ticket)
-        self.target.report_info("clicked: %s for %.02f"
-                                % (button_name, duration))
+        self.target.report_info("double-clicking: %s for %.02f/%.2fs"
+                                % (button_name, duration_click,
+                                   duration_release),
+                                dlevel = 1)
+        self._sequence([
+            [ 'press', button_name ],
+            [ 'wait', duration_click ],
+            [ 'release', button_name ],
+            [ 'wait', duration_release ],
+            [ 'press', button_name ],
+            [ 'wait', duration_click ],
+            [ 'release', button_name ],
+        ])
+        self.target.report_info("double-clicked: %s for %.02f/%.2fs"
+                                % (button_name, duration_click,
+                                   duration_release))
 
     def list(self):
         self.target.report_info("listing", dlevel = 1)
-        data = _rest_tb_target_buttons_get(self.target.rtb, self.target.rt,
-                                              ticket = self.target.ticket)
-        self.target.report_info("listed: %s" % buttons)
-        return data['buttons']
+        r = self.target.ttbd_iface_call("buttons", "list", method = "GET")
+        self.target.report_info("listed: %s" % r['result'])
+        return r['result']
 
         
-def cmdline_button_press(args):
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    _rest_tb_target_button_sequence(rtb, rt,
-                                    [ [ args.button_name, 'press' ] ],
-                                    ticket = args.ticket)
+def _cmdline_button_press(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args, iface = "buttons")
+        target.button.press(args.button_name)
 
-def cmdline_button_release(args):
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    _rest_tb_target_button_sequence(rtb, rt,
-                                    [ [ args.button_name, 'release' ] ],
-                                    ticket = args.ticket)
+def _cmdline_button_release(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args, iface = "buttons")
+        target.button.release(args.button_name)
 
-def cmdline_button_click(args):
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    _rest_tb_target_button_sequence(rtb, rt,
-                                    [
-                                        ( args.button_name, 'press' ),
-                                        ( args.button_name, args.click_time ),
-                                        ( args.button_name, 'release' ),
-                                    ],
-                                    ticket = args.ticket)
+def _cmdline_button_click(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args, iface = "buttons")
+        target.button.click(args.button_name, args.click_time)
 
-def cmdline_button_list(args):
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    data = _rest_tb_target_buttons_get(rtb, rt, ticket = args.ticket)
-    for name, state in data['buttons'].iteritems():
-        if state:
-            _state = 'pressed'
-        else:
-            _state = 'released'
-        print "%s:%s" % (name, _state)
+def _cmdline_button_double_click(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args, iface = "buttons")
+        target.button.double_click(args.button_name,
+                                   args.click_time, args.wait_time)
 
+def _cmdline_button_list(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args, iface = "buttons")
+        data = target.button.list()
+        for name, state in data.iteritems():
+            if state:
+                _state = 'pressed'
+            else:
+                _state = 'released'
+            print name + ": " + _state
 
-def cmdline_setup(argsp):
+def _cmdline_setup(argsp):
     ap = argsp.add_parser("button-press", help = "press a button")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
     ap.add_argument("button_name", metavar = "BUTTON-NAME", action = "store",
-                    type = str, help = "Name of the button to press")
-    ap.set_defaults(func = cmdline_button_press)
+                    type = str, help = "Name of the button")
+    ap.set_defaults(func = _cmdline_button_press)
 
     ap = argsp.add_parser("button-release", help = "release a button")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
     ap.add_argument("button_name", metavar = "BUTTON-NAME", action = "store",
-                    type = str, help = "Name of the button to release")
-    ap.set_defaults(func = cmdline_button_release)
+                    type = str, help = "Name of the button")
+    ap.set_defaults(func = _cmdline_button_release)
 
     ap = argsp.add_parser("button-click", help = "click a button")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
     ap.add_argument("button_name", metavar = "BUTTON-NAME", action = "store",
-                    type = str, help = "Name of the button to release")
-    ap.add_argument("click_time", metavar = "CLICK-TIME", action = "store",
-                    type = float, default = 0.25, nargs = "?",
-                    help = "Seconds to click for")
-    ap.set_defaults(func = cmdline_button_click)
+                    type = str, help = "Name of the button")
+    ap.add_argument("-c", "--click-time", metavar = "CLICK-TIME",
+                    action = "store", type = float, default = 0.25,
+                    help = "Seconds to click for (%(default).2fs)")
+    ap.set_defaults(func = _cmdline_button_click)
+
+    ap = argsp.add_parser("button-double-click",
+                          help = "double-click a button")
+    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
+                    default = None, help = "Target's name or URL")
+    ap.add_argument("button_name", metavar = "BUTTON-NAME", action = "store",
+                    type = str, help = "Name of the button")
+    ap.add_argument("-c", "--click-time", metavar = "CLICK-TIME",
+                    action = "store", type = float, default = 0.25,
+                    help = "Seconds to click for (%(default).2fs)")
+    ap.add_argument("-w", "--wait-time", metavar = "WAIT-TIME",
+                    action = "store", type = float, default = 0.25,
+                    help = "Seconds to wait between clicks (%(default).2fs)")
+    ap.set_defaults(func = _cmdline_button_double_click)
 
     ap = argsp.add_parser("button-list", help = "List available buttons")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
-    ap.set_defaults(func = cmdline_button_list)
+    ap.set_defaults(func = _cmdline_button_list)

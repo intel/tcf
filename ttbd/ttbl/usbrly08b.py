@@ -131,14 +131,18 @@ class rly08b(object):
             return response
 
 
-class pc(rly08b, ttbl.tt_power_control_impl):
-
+class pc(rly08b, ttbl.power.impl_c, ttbl.tt_power_control_impl):
+    """
+    Power control implementation that uses a relay to close/open a
+    circuit on on/off
+    """
     def __init__(self, serial_number, relay):
         self.relay = relay
         rly08b.__init__(self, serial_number)
-        ttbl.tt_power_control_impl.__init__(self)
+        ttbl.tt_power_control_impl.__init__(self)	# COMPAT
+        ttbl.power.impl_c.__init__(self)
 
-    def power_on_do(self, target):
+    def on(self, target, _component):
         cmd = 0x64 + self.relay
         rs = self._command(cmd, get_state = True)[-1]
         rl = struct.unpack('<' + 'B' *len(rs), rs)
@@ -148,7 +152,7 @@ class pc(rly08b, ttbl.tt_power_control_impl):
                                " (returned 0x%02x)"
                                % (self.serial_number, self.relay, r))
 
-    def power_off_do(self, target):
+    def off(self, target, _component):
         # Okie, this is quite a hack -- when we try to power it off,
         # if the serial is not found, we just assume the device is not
         # there and thus it is off -- so we ignore it. Why? Becuase
@@ -170,7 +174,7 @@ class pc(rly08b, ttbl.tt_power_control_impl):
                            "#%d powered off"
                            % (self.serial_number, self.relay))
 
-    def power_get_do(self, target):
+    def get(self, target, _component):
         cmd = 0x5b
         try:
             rs = self._command(cmd)[-1]
@@ -189,21 +193,32 @@ class pc(rly08b, ttbl.tt_power_control_impl):
                            % (self.serial_number, self.relay))
             return False
 
+    # COMPAT: old interface, ttbl.tt_power_control_impl
+    def power_on_do(self, target):
+        return self.on(target, "n/a")
 
-class button(pc, ttbl.buttons.impl):
+    def power_off_do(self, target):
+        return self.off(target, "n/a")
 
+    def power_get_do(self, target):
+        return self.get(target, "n/a")
+
+
+class button_c(pc, ttbl.buttons.impl_c):
+    """
+    Implement a button press by closing/opening a relay circuit
+    """
     def __init__(self, serial_number, relay):
-        ttbl.buttons.impl.__init__(self)
+        ttbl.buttons.impl_c.__init__(self)
         pc.__init__(self, serial_number, relay)
 
-    def press(self, target, _button):
-        self.power_on_do(target)
+    def press(self, target, button):
+        self.on(target, button)
 
-    def release(self, target, _button):
-        self.power_off_do(target)
+    def release(self, target, button):
+        self.off(target, button)
 
-    def get(self, target, _button):
-        return self.power_get_do(target)
+    # get implemented by pc.get()
 
 
 class plugger(rly08b,		 # pylint: disable = abstract-method
