@@ -1110,7 +1110,8 @@ EOF""")
             # cost that much in terms of size; as well, this is way
             # fast for large trees vs 'rm -rf' [now, perl is really
             # fast, but we can't be sure is installed]
-            target.shell.run("find %s -type f -delete" % candidate)
+            # || true -> we don't really care if the directory exists or not
+            target.shell.run("find %s -type f -delete || true" % candidate)
 
         # fall through means we couldn't wipe enough stuff
 
