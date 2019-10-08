@@ -605,15 +605,6 @@ EOF
             "while ! exec 3<>/dev/tcp/localhost/22; do"
             " sleep 1s; done", timeout = 15)
 
-        output = target.shell.run(
-            "bats --help | fgrep -q -- '--jobs' || echo N''O # supports -j?",
-            output = True, trim = True)
-        if 'NO' not in output:
-            self.bats_parallel = True
-            # Yeah, we could use `getconf _NPROCESSORS_ONLN`, but this
-            # works, since we want to know how many processing units we
-            # can give bats.
-            target.shell.run("CPUS=$(grep -c ^processor /proc/cpuinfo)")
         # Why this? because a lot of the test output can be confused
         # with a prompt and the prompt regex then trips on it and
         # everything gets out of sync
@@ -636,6 +627,18 @@ EOF
         self.report_info("Bundle requirements: %s" % " ".join(bundles),
                          dlevel = 1)
         tcfl.tl.swupd_bundle_add(ic, target, bundles)
+
+        # once the os-test-suite thing has been installed, then we can
+        # test if bats supports parallelism
+        output = target.shell.run(
+            "bats --help | fgrep -q -- '--jobs' || echo N''O # supports -j?",
+            output = True, trim = True)
+        if 'NO' not in output:
+            self.bats_parallel = True
+            # Yeah, we could use `getconf _NPROCESSORS_ONLN`, but this
+            # works, since we want to know how many processing units we
+            # can give bats.
+            target.shell.run("CPUS=$(grep -c ^processor /proc/cpuinfo)")
 
     def _ts_ignore(self, subtcname):
         global ignore_ts_regex
