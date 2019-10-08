@@ -530,7 +530,11 @@ swupd_bundle_add_timeouts = {
     'education-primary' : 800, #266MB
     'game-dev': 6000, # 3984
     'games': 800, # 761MB
+    'java-basic': 800, # 347MB
     'java9-basic': 800, # 347MB
+    'java11-basic': 800,
+    'java12-basic': 800,
+    'java13-basic': 800,
     'machine-learning-basic': 1200, #1280MB
     'machine-learning-tensorflow': 800,
     'machine-learning-web-ui': 1200, # (1310MB)
