@@ -534,46 +534,6 @@ def _property_get(target_id):
         'diagnostics': iostr.getvalue()
     })
 
-@app.route(API_PREFIX + 'targets/<string:target_id>/thing',
-           methods = ['PUT', 'GET', 'DELETE'])
-@flask_login.login_required
-def _thing(target_id):
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    ticket = flask.request.form.get('ticket', "")
-    # See FIXME at file reader about diagnostics
-    iostr = StringIO.StringIO()
-    iostr_wrapper = codecs.StreamReaderWriter(
-        iostr, codec_utf8.streamreader, codec_utf8.streamwriter, errors = 'replace')
-    try:
-        r = {}
-        with log_to_str_too(target.log, iostr_wrapper):
-            if flask.request.method == "PUT":
-                if not 'thing' in flask.request.form:
-                    return flask.abort(404, "missing 'thing' paramter")
-                thing = flask.request.form['thing']
-                target.thing_plug(who_make(ticket), thing)
-                target.timestamp()	# If this works, it is acquired and locked
-            elif flask.request.method == "DELETE":
-                if not 'thing' in flask.request.form:
-                    return flask.abort(404, "missing 'thing' paramter")
-                thing = flask.request.form['thing']
-                target.thing_unplug(who_make(ticket), thing)
-                target.timestamp()	# If this works, it is acquired and locked
-            elif flask.request.method == "GET":
-                r['result'] = target.thing_list(who_make(ticket))
-                target.timestamp()	# If this works, it is acquired and locked
-            else:
-                flask_logi_abort(400, "Unupported request %s" % method)
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    finally:
-        r['diagnostics'] = iostr.getvalue()
-    return flask.jsonify(r)
-
-
 # FIXME: this is a pattern, use a decorator?
 @app.route(API_PREFIX + 'targets/<string:target_id>/power_on', methods = ['PUT'])
 @flask_login.login_required

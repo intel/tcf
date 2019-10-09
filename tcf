@@ -211,29 +211,6 @@ if __name__ == "__main__":
     ap.set_defaults(func = ttb_client.rest_target_property_get)
 
 
-    ap = arg_subparsers.add_parser("thing-plug",
-                                   help = "Plug a thing to the target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("thing", metavar = "THING", action = "store",
-                    default = None, help = "Thing to plug")
-    ap.set_defaults(func = ttb_client.rest_target_thing_plug)
-
-    ap = arg_subparsers.add_parser("thing-unplug",
-                                   help = "Unplug a thing from the target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("thing", metavar = "THING", action = "store",
-                    default = None, help = "Thing to unplug")
-    ap.set_defaults(func = ttb_client.rest_target_thing_unplug)
-
-    ap = arg_subparsers.add_parser("thing-list",
-                                   help = "List plugged things")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_thing_list)
-
-
     arg_parser_target_release = arg_subparsers.add_parser(
         "release", help = "Release ownership of a target")
     arg_parser_target_release.add_argument(
@@ -374,6 +351,7 @@ if __name__ == "__main__":
     tcfl.tc.target_ext_ioc_flash_server_app.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_fastboot._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_power._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_things._cmdline_setup(arg_subparsers)
 
 
     global args

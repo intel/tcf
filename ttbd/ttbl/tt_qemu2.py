@@ -37,6 +37,7 @@ import time
 
 import commonl
 import ttbl
+import ttbl.things
 
 class qmp_c(object):
     """
@@ -136,9 +137,8 @@ class qmp_c(object):
 
 
 
-class plugger(ttbl.thing_plugger_mixin):
-    """
-    Plugger class to plug external devices to QEMU VMs
+class plugger(ttbl.things.impl_c):
+    """Plugger class to plug external devices to QEMU VMs
 
     :param dict kwargs: parameters for :meth:`qmp_c.command`'s
       `device_add` method, which for example, could be:
@@ -146,11 +146,33 @@ class plugger(ttbl.thing_plugger_mixin):
       - driver = "usb-host"
       - hostbus = BUSNUMBER
       - hostaddr = USBADDRESS
+
+    Sadly, there is no way to tell  QEMU to hotplug a device by serial
+    number, so according to docs, the  only way to do it is hardcoding
+    the device and bus number.
+
+    eg:
+
+    >>> ttbl.config.target_add(
+    >>>     ttbl.test_target("drive_34"), 
+    >>>     tags = { },
+    >>>     target_type = "usb_disk")
+    >>> 
+    >>> ttbl.config.targets['qu04a'].interface_add(
+    >>>     "things",
+    >>>     ttbl.things.interface(
+    >>>         drive_34 = ttbl.tt_qemu2.plugger(
+    >>>             "drive_34", driver = "usb-host", hostbus = 1, hostaddr = 67),
+    >>>         usb_disk = "drive_34",	# alias for a101_04
+    >>>     )
+    >>> )
+
+
     """
     def __init__(self, name, **kwargs):
         self.kwargs = kwargs
         self.name = name
-        ttbl.thing_plugger_mixin.__init__(self)
+        ttbl.things.impl_c.__init__(self)
 
     def plug(self, target, thing):
         assert isinstance(target, tt_qemu)
@@ -175,6 +197,12 @@ class plugger(ttbl.thing_plugger_mixin):
                 return
             raise RuntimeError("%s: cannot plug '%s': %s"
                                % (self.name, thing.id, r))
+
+    def get(self, target, thing):
+        # FIXME: this should query QEMU for the devices plugged, but
+        # need to do more research on how
+        return target.fsdb.get("thing-" + thing.id) ==  'True'
+
 
 class tt_qemu(
         ttbl.test_target,

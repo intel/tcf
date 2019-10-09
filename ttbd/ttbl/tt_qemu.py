@@ -19,6 +19,7 @@ import time
 
 import commonl
 import ttbl
+import ttbl.things
 import ttbl.console
 
 class qmp_c(object):
@@ -574,7 +575,7 @@ class tt_qemu(
         return {}
 
 
-class plugger(ttbl.thing_plugger_mixin):
+class plugger(ttbl.things.impl_c):
     """
     Plugger class to plug external devices to QEMU VMs
 
@@ -588,7 +589,7 @@ class plugger(ttbl.thing_plugger_mixin):
     def __init__(self, name, **kwargs):
         self.kwargs = kwargs
         self.name = name
-        ttbl.thing_plugger_mixin.__init__(self)
+        ttbl.things.impl_c.__init__(self)
 
     def plug(self, target, thing):
         assert isinstance(target, tt_qemu)
@@ -619,3 +620,8 @@ class plugger(ttbl.thing_plugger_mixin):
                 return
             raise RuntimeError("%s: cannot plug '%s': %s"
                                % (self.name, thing.id, r))
+
+    def get(self, target, thing):
+        # FIXME: this should query QEMU for the devices plugged, but
+        # need to do more research on how
+        return target.fsdb.get("thing-" + thing.id) ==  'True'

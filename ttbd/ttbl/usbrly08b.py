@@ -12,6 +12,7 @@ import serial
 import serial.tools.list_ports
 
 import ttbl
+import ttbl.things
 import ttbl.buttons
 
 class rly08b(object):
@@ -222,8 +223,8 @@ class button_c(pc, ttbl.buttons.impl_c):
 
 
 class plugger(rly08b,		 # pylint: disable = abstract-method
-              ttbl.thing_plugger_mixin,
-              ttbl.tt_power_control_impl):
+              ttbl.things.impl_c,
+              ttbl.power.impl_c):
     """
     Implement a USB multiplexor/plugger that allows a DUT to be
     plugged to Host B and to Host A when unplugged. It follows it can
@@ -420,7 +421,8 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
                                "(only 0 or 1 available)" % bank)
         # 0 is ignored, we don't use an specific relay in this mode
         rly08b.__init__(self, serial_number)
-        ttbl.thing_plugger_mixin.__init__(self)
+        ttbl.things.impl_c.__init__(self)
+        ttbl.power.impl_c.__init__(self)
 
     def plug(self, target, _thing):	# pylint: disable = missing-docstring
         # Connect terminals C and NC (Host B), disconnecting NO (Host A)
@@ -463,16 +465,16 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
                                   self.vcc, self.dp, self.dm, self.gnd,
                                   state & self.mask))
 
-    def power_on_do(self, target):
+    def on(self, target, _component):
         # Why reverse? Because we'd rather have default power off to
         # be disconnected from the target that requires it on until we
         # turn the target on
         self.unplug(target, None)
 
-    def power_off_do(self, target):
+    def off(self, target, _component):
         self.plug(target, None)
 
-    def power_get_do(self, target):
+    def get(self, target, _thing = None):
         cmd = 0x5b
         try:
             rs = self._command(cmd)[-1]

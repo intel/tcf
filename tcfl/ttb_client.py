@@ -404,19 +404,6 @@ class rest_target_broker(object):
         data = { 'ticket': ticket }
         return self.send_request("PUT", "targets/%s/disable" % rt['id'], data)
 
-    def rest_tb_thing_plug(self, rt, thing, ticket = ''):
-        return self.send_request("PUT", "targets/%s/thing" % rt['id'],
-                                 data = { 'thing': thing, 'ticket': ticket })
-
-    def rest_tb_thing_list(self, rt, ticket = ''):
-        r =  self.send_request("GET", "targets/%s/thing" % rt['id'],
-                               data = { 'ticket': ticket })
-        return r['result']
-
-    def rest_tb_thing_unplug(self, rt, thing, ticket = ''):
-        self.send_request("DELETE", "targets/%s/thing" % rt['id'],
-                          data = { 'thing': thing, 'ticket': ticket })
-
     def rest_tb_target_release(self, rt, ticket = '', force = False):
         self.send_request(
             "PUT", "targets/%s/release" % rt['id'],
@@ -1222,17 +1209,3 @@ def rest_target_debug_stop(args):
     for target in args.target:
         rtb, rt = _rest_target_find_by_id(target)
         rtb.rest_tb_target_debug_stop(rt, ticket = args.ticket)
-
-def rest_target_thing_plug(args):
-    rtb, rt = _rest_target_find_by_id(args.target)
-    rtb.rest_tb_thing_plug(rt, args.thing, ticket = args.ticket)
-
-def rest_target_thing_unplug(args):
-    rtb, rt = _rest_target_find_by_id(args.target)
-    rtb.rest_tb_thing_unplug(rt, args.thing, ticket = args.ticket)
-
-def rest_target_thing_list(args):
-    rtb, rt = _rest_target_find_by_id(args.target)
-    r = rtb.rest_tb_thing_list(rt, ticket = args.ticket)
-    for thing_name, status in sorted(r.iteritems()):
-        print thing_name + (": plugged" if status is True else ": unplugged")

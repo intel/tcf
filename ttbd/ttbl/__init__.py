@@ -114,37 +114,6 @@ def who_create(user_id, ticket = None):
     else:
         return user_id
 
-class thing_plugger_mixin(object):
-    """
-    Define how to plug things (targets) into other targets
-
-    A thing is a target that can be, in any form, connected to another
-    target. For example, a USB device to a host, where both the US
-    device and host are targets. This is so that we can make sure
-    they are owned by someone before plugging, as it can alter state.
-    """
-    def plug(self, target, thing):
-        """
-        Plug *thing* into *target*
-
-        Caller must own both *target* and *thing*
-
-        :param ttbl.test_target target: target where to plug
-        :param ttbl.test_target thing: thing to plug into *target*
-        """
-        raise NotImplementedError
-
-    def unplug(self, target, thing):
-        """
-        Unplug *thing* from *target*
-
-        Caller must own *target* (not *thing* necessarily)
-
-        :param ttbl.test_target target: target where to unplug from
-        :param ttbl.test_target thing: thing to unplug
-        """
-        raise NotImplementedError
-
 
 class acquirer_c(object):
     """
@@ -671,31 +640,14 @@ class test_target(object):
         #:
         #: FIXME document more
         #:
-        #: - *things*: dictionary with information about things
-        #:   (devices, etc) that can be hotplugged to this target;
-        #:   the target's driver is the one in charge of implementing
-        #:   said hotplugging:
-        #:
-        #:    >>> { "THINGNAME": ("TYPE"[, ARG1, [ARG2 [...]]) }
-        #:
-        #:    *TYPE* is driver specific, but as of now, the following
-        #:    types are known:
-        #:
-        #:    - *usb:sibling_of_serial, SERIAL, NUMBER*: connect
-        #:      whichever USB device is in USB port number *NUMBER* of
-        #:      the hub to which another USB device with serial number
-        #:      *SERIAL* is connected.
-        #:
-
         self.tags = {
-            'things' : [],
             'interconnects': {},
         }
-        #: references to the targets that implement things that can be
-        #: plugged to this target.
-        self.things = {}
-        #: List of targets this target is a thing to
-        self.thing_to = {}
+        #: List of targets this target is a thing to; see
+        #: class:`ttbl.things.interface`
+        #:
+        #: FIXME: this needs to be moved to that interface
+        self.thing_to = set()
         if _tags:
             self.tags.update(_tags)
         if _type != None:
@@ -757,14 +709,6 @@ class test_target(object):
         #: Each interface will add as needed, so it gets executed upon
         #: :meth:`release`, under the owned lock.
         self.release_hooks = set()
-
-        #: Methods used to plug/unplug things to/from targets, keyed
-        #: by method name and value being a tuple with two functions
-        #: (the plug function and the unplug function).
-        #:
-        #: Said functions take as arguments the thing name and the
-        #: thing desciptor from the target's tags.
-        self.thing_methods = {}
 
         #: Keep places where interfaces were registered from
         self.interface_origin = {}
@@ -1099,105 +1043,6 @@ class test_target(object):
                 % (prop, type(prop).__name__)
         return False
 
-    def thing_add(self, name, plugger):
-        """
-        Define a thing that can be un/plugged to this target
-
-        :param str name: name of an existing target in this server
-          that is considered to be a thing to this target
-        :param ttbl.thing_plugger_mixin plugger: object that has
-          methods to do the physical action of plugging/unplugging the
-          thing to the target.
-
-          For example, this can be an instance of
-          :class:`ttbl.usbrly08b.plugger`.
-        """
-        assert isinstance(name, basestring)
-        assert isinstance(plugger, thing_plugger_mixin)
-        assert name in ttbl.config.targets, \
-            "thing '%s' has to be a defined target" % name
-
-        thing = ttbl.config.targets[name]
-        self.things[name] = (thing, plugger)
-        thing.thing_to[self.id] = (self, plugger)
-        if not name in self.tags['things']:
-            # can't use a set, JSON can't serialize it :/
-            self.tags['things'].append(name)
-
-    def _thing_plug(self, thing_target, plugger):
-        plugger.plug(self, thing_target)
-        self.fsdb.set("thing-" + thing_target.id, 'True')
-
-    def _thing_unplug(self, thing_target, plugger):
-        self.fsdb.set("thing-" + thing_target.id, None)
-        plugger.unplug(self, thing_target)
-
-    def thing_plug(self, who, thing_name):
-        """
-        Connect a thing to the target
-
-        :param str who: user that owns the target
-        :param str thing_name: name of the thing we want to plug; note
-          the current user has to own the thing (which is also a
-          target)
-
-        The user who is plugging must own this target *and* the thing.
-        """
-        assert isinstance(who, basestring)
-        assert isinstance(thing_name, basestring)
-        if not thing_name in self.things:
-            raise IndexError("%s: unknown thing, can't plug" % thing_name)
-        thing_target, plugger = self.things[thing_name]
-        with self.target_owned_and_locked(who), \
-              thing_target.target_owned_and_locked(who):
-            # Always do it -- if done already, the operation might
-            # fail or not, but the state we keep might not reflect
-            # reality as change might come external to the daemon
-            self._thing_plug(thing_target, plugger)
-
-    def thing_unplug(self, who, thing_name):
-        """
-        Disconnect a thing from the target.
-
-        :param str who: user that owns the target
-        :param str thing_name: thing to disconnect; note the current
-          user has to own the thing (which is also a target)
-
-        The user who is unplugging must own this target, but don't
-        necessary need to own the thing.
-
-        Note that when you release the target, all the things
-        connected to it are released, even if you don't own the
-        things.
-
-        """
-        assert isinstance(who, basestring)
-        assert isinstance(thing_name, basestring)
-        if not thing_name in self.things:
-            raise IndexError("%s: unknown thing, can't unplug" % thing)
-        thing_target, plugger = self.things[thing_name]
-        with self.target_owned_and_locked(who):
-            self._thing_unplug(thing_target, plugger)
-
-    def thing_list(self, who):
-        """
-        List the things available for connection and their current
-        connection state
-        """
-        assert isinstance(who, basestring)
-        things = {}
-        with self.target_owned_and_locked(who):
-            for thing_name in self.things:
-                state = self.fsdb.get("thing-" + thing_name)
-                # We do it like this to ensure the right value only is
-                # considered
-                if state == 'True':	# pylint: disable = simplifiable-if-statement
-                    state = True
-                else:
-                    state = False
-                things[thing_name] = state
-            return things
-
     def ip_tunnel_list(self, who):
         """
         List existing IP tunnels
@@ -1360,13 +1205,6 @@ class test_target(object):
         """
         for tunnel_id in self.fsdb.keys("tunnel-id-*"):
             self._ip_tunnel_remove(tunnel_id)
-        # unplug all the things this target has
-        for _, (thing_target, plugger) in self.things.iteritems():
-            self._thing_unplug(thing_target, plugger)
-        # if this target is a thing to other targets, unplug
-        # itself from them
-        for _, (target, plugger) in self.thing_to.iteritems():
-            target._thing_unplug(self, plugger)
         for release_hook in self.release_hooks:
             release_hook(self, force)
         # Any property set in target.properties_user gets cleared when
