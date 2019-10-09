@@ -7161,6 +7161,6 @@ target_c.extension_register(target_ext_buttons.extension, "button")
 import target_ext_capture
 target_c.extension_register(target_ext_capture.extension, "capture")
 import target_ext_fastboot
-target_c.extension_register(target_ext_fastboot.fastboot)
+target_c.extension_register(target_ext_fastboot.extension, "fastboot")
 import pos
 target_c.extension_register(pos.extension, "pos")

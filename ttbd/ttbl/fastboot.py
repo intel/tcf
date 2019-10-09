@@ -150,7 +150,14 @@ class interface(ttbl.tt_interface):
         ttbl.tt_interface.__init__(self)
         self.allowed_commands = allowed_commands
         self.usb_serial_number = usb_serial_number
-        self.user_path = None	# we'll fill this on the request_process
+
+
+    def _target_setup(self, _):
+        pass
+
+    def _release_hook(self, target, _force):
+        # nothing needed here
+        pass
 
     #: path to the fastboot binary
     #:
@@ -173,7 +180,7 @@ class interface(ttbl.tt_interface):
         raise ValueError("Bad type given (%s); str or re.compile() expected"
                          % type(arg).__name__)
 
-    def _allowed(self, target, given_arg, allowed_arg):
+    def _allowed(self, target, given_arg, allowed_arg, user_path):
         # allowed_arg can be
         #
         # - str
@@ -197,7 +204,7 @@ class interface(ttbl.tt_interface):
                 return None
             # expand some values to replace
             for key, value in [
-                    ("%USERPATH%", self.user_path)
+                    ("%USERPATH%", user_path)
             ]:
                 replacement_with = replacement_with.replace(key, value)
             return re.sub(allowed_regex, replacement_with, given_arg)
@@ -208,13 +215,29 @@ class interface(ttbl.tt_interface):
                 return None
             return given_arg
 
+    # called by the daemon when a METHOD request comes to the HTTP path
+    # /ttb-vVERSION/targets/TARGET/interface/console/CALL
 
-    def _run(self, who, target, all_args):
+    def put_run(self, target, who, args, user_path):
+        """
+        Run a fastboot command
+
+        Note we don't allow any command execution, only what is
+        allowed by :data:`allowed_commands`, which might also filter
+        the arguments based on the configuration.
+        """
+        if not 'parameters' in args:
+            raise RuntimeError("missing argument: parameters")
+
+        # FIXME: :100 is a hard limit on args, configurable?
+        all_args = json.loads(args['parameters'])[:100]
         translated_args = []
         command = all_args[0]
         if command not in self.allowed_commands:
             raise RuntimeError("fastboot %s: disallowed by configuration"
                                % command)
+
+        # The command is allowed, so now filter it if the config says so
         allowed_args = self.allowed_commands[command]
         count = 0
         target.log.warning("filtering args %s with %s",
@@ -224,14 +247,16 @@ class interface(ttbl.tt_interface):
                 raise RuntimeError(
                     "fastboot %s: argument #%d disallowed by "
                     "configuration (not enough count)" % (command, count))
-            translated_arg = self._allowed(target,
-                                           given_arg, allowed_args[count])
+            translated_arg = self._allowed(target, given_arg,
+                                           allowed_args[count], user_path)
             if translated_arg == None:
                 raise RuntimeError(
                     "fastboot %s: argument #%d disallowed by "
                     "configuration (no match)" % (command, count))
             translated_args.append(translated_arg)
             count += 1
+
+        # we have a filtered command ready to run
         cmdline = [ self.path, "-s", self.usb_serial_number ] \
             + translated_args
         with target.target_owned_and_locked(who):
@@ -253,7 +278,8 @@ class interface(ttbl.tt_interface):
                     target.log.warning("error output: " + line)
                     raise RuntimeError(msg)
 
-    def _list(self, _who, _target):
+
+    def get_list(self, _target, _who, _args, _user_path):
         data = dict()
         for command, param_list in self.allowed_commands.iteritems():
             _param_list = []
@@ -277,22 +303,3 @@ class interface(ttbl.tt_interface):
             data[command] = params
         return { 'commands': data }
 
-    def request_process(self, target, who, method, call, args, _user_path):
-        self.user_path = _user_path
-        if method == "POST" and call == "run":
-            if not 'parameters' in args:
-                raise RuntimeError("missing argument: parameters")
-            parameters = json.loads(args['parameters'])
-            # FIXME: :100 is a hard limit on args, configurable?
-            return self._run(who, target, parameters[:100])
-        elif method == "GET" and call == "list":
-            return self._list(who, target)
-        else:
-            raise RuntimeError("%s|%s: unsuported" % (method, call))
-
-    def _target_setup(self, _):
-        pass
-        
-    def _release_hook(self, target, _force):
-        # nothing needed here
-        pass
