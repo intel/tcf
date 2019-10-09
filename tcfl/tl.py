@@ -359,7 +359,7 @@ def sh_export_proxy(ic, target):
             "%(ipv6_addr)s/%(ipv6_prefix_len)d,localhost"
         target.shell.run("export " + proxy_cmd % ic.kws)
 
-def linux_wait_online(ic, target, loops = 10, wait_s = 0.5):
+def linux_wait_online(ic, target, loops = 20, wait_s = 0.5):
     """
     Wait on the serial console until the system is assigned an IP
 
