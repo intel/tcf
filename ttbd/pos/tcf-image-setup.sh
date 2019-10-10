@@ -9,6 +9,13 @@ function help() {
     cat <<EOF
 $progname DIRECTORY IMAGEFILE [IMAGETYPE]
 
+DIRECTORY: where to expand the image to
+
+  NAME:SPIN:VERSION:[SUBVERSION]:ARCHITECTURE
+
+  if .tar.xz is appended to the name, the image tree will be packed in
+  a tar.xz file and the directory removed.
+
 Clear Linux:
 
   $ wget https://download.clearlinux.org/releases/29390/clear/clear-29390-live.img.xz
@@ -108,6 +115,10 @@ if [ $# -lt 2 -o $# -gt 3 ]; then
 fi
 
 destdir=$1
+if echo $destdir | grep -q ".tar.xz"; then
+    tarname=$destdir
+    destdir=${destdir%%.tar.xz}
+fi
 image_file=$2
 image_type=${3:-}
 tmpdir=${TMPDIR:-`mktemp -d $progname-XXXXXX`}
@@ -586,7 +597,7 @@ post_flash_script: |
   cd \$ROOT
 EOF
 
-if [ $root_fstype == btrfs ]; then
+if [ "$root_fstype" == btrfs ]; then
     # if there are volumes in a btrfs filesystem, re-create them
     volumes=""
     rename_commands=""
@@ -625,3 +636,17 @@ EOF
 EOF
 fi
 sudo mv $tmpdir/.tcf.metadata.yaml $destdir
+
+# If we said we wanted it in a tar file, pack it up and remove the directory
+if ! [ -z "$tarname" ]; then
+    cd $(dirname $destdir)
+    basename=$(basename $destdir)
+    # --numeric-owner: so when we extract we keep exactly what we
+    #                  packed in stead of trying to map to destination
+    #                  system
+    # --force-local: if name has :, it is still local
+    # --selinux --acls --xattrs: keep all those attributes identical
+    sudo XZ_OPT="--threads=0 -9e" \
+         tar cJf $tarname --numeric-owner --force-local --selinux --acls --xattrs $basename
+    sudo rm -rf $destdir
+fi
