@@ -1,7 +1,9 @@
-duplicity
-Flask
+flask
+flask-login
+flask-principal
 pexpect
 ply
+prctl
 pyghmi
 pyserial
 python_ldap
@@ -9,4 +11,4 @@ pyusb
 requests
 setuptools
 systemd
-testing
+tornado
