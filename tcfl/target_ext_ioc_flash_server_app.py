@@ -11,25 +11,10 @@ Flash the target with *ioc_flash_server_app*
 """
 
 import tc
-import ttb_client
-
-def _rest_tb_target_ioc_flash_server_app(
-        rtb, rt,
-        mode, filename, generic_id, baudrate,
-        ticket = ''):
-    return rtb.send_request("POST",
-                            "targets/%s/ioc_flash_server_app/run" % rt['id'],
-                            data = {
-                                'baudrate': baudrate,
-                                'mode': mode,
-                                'filename': filename,
-                                'generic_id': generic_id,
-                                'ticket': ticket
-                            })
+from . import msgid_c
 
 class extension(tc.target_extension_c):
     """
-
     Extension to :py:class:`tcfl.tc.target_c` to the
     *ioc_flash_server_app* command to a target on the server in a safe
     way.
@@ -57,27 +42,27 @@ class extension(tc.target_extension_c):
         :param str baudrate: (optional)
         """
         self.target.report_info("running", dlevel = 1)
-        r = _rest_tb_target_ioc_flash_server_app(
-            self.target.rtb, self.target.rt,
-            mode, filename, generic_id, baudrate,
-            ticket = self.target.ticket)
+        r = self.target.ttbd_iface_call(
+            "ioc_flash_server_app", "run", method = "PUT",
+            mode = mode, filename = filename, generic_id = generic_id,
+            baudrate = baudrate)
         self.target.report_info("ran",
                                 { 'diagnostics': r['diagnostics'] },
                                 dlevel = 2)
 
 
-def cmdline_ioc_flash_server_app(args):
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    _rest_tb_target_ioc_flash_server_app(
-        rtb, rt,
-        args.mode, args.filename, args.id, args.baudrate,
-        ticket = args.ticket)
+def _cmdline_ioc_flash_server_app(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(
+            args, iface = "ioc_flash_server_app")
+        target.ioc_flash_server_app.run(args.mode, args.filename,
+                                        args.id, args.baudrate)
 
-def cmdline_setup(argsp):
+def _cmdline_setup(argsp):
     ap = argsp.add_parser("ioc_flash_server_app",
                           help = "Run ioc_flash_server_app command")
-    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
-                    default = None, help = "Target's name or URL")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target's name")
     ap.add_argument("mode", action = "store",
                     type = str, help = "Execution mode (maps to -MODE "
                     "in the command line tool)",
@@ -93,4 +78,4 @@ def cmdline_setup(argsp):
     ap.add_argument("id", action = "store", nargs = "?",
                     type = str, help = "Generic ID for -w command",
                     default = None)
-    ap.set_defaults(func = cmdline_ioc_flash_server_app)
+    ap.set_defaults(func = _cmdline_ioc_flash_server_app)

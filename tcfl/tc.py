@@ -7156,7 +7156,8 @@ target_c.extension_register(target_ext_shell.shell)
 import target_ext_ssh
 target_c.extension_register(target_ext_ssh.ssh)
 import target_ext_ioc_flash_server_app
-target_c.extension_register(target_ext_ioc_flash_server_app.extension)
+target_c.extension_register(target_ext_ioc_flash_server_app.extension,
+                            "ioc_flash_server_app")
 import target_ext_buttons
 target_c.extension_register(target_ext_buttons.extension, "button")
 import target_ext_capture
