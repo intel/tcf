@@ -153,7 +153,7 @@ class shell(tc.target_extension_c):
     def up(self, tempt = None,
            user = None, login_regex = re.compile('login:'), delay_login = 0,
            password = None, password_regex = re.compile('[Pp]assword:'),
-           shell_setup = True, timeout = 120):
+           shell_setup = True, timeout = None):
         """Wait for the shell in a console to be ready
 
         Giving it ample time to boot, wait for a :data:`shell prompt
@@ -190,7 +190,8 @@ class shell(tc.target_extension_c):
           exception if a shell command fails.
 
         :param int timeout: [optional] seconds to wait for the login
-          prompt to appear
+          prompt to appear; defaults to 60s plus whatever the target
+          specifies in metadata *bios_boot_time*.
 
         """
         assert tempt == None or isinstance(tempt, basestring)
@@ -200,9 +201,11 @@ class shell(tc.target_extension_c):
         assert password == None or isinstance(password, basestring)
         assert isinstance(password_regex, ( basestring, re._pattern_type ))
         assert isinstance(shell_setup, bool)
-        assert timeout > 0
+        assert timeout == None or timeout > 0
 
         target = self.target
+        if timeout == None:
+            timeout = 60 + int(target.kws.get("bios_boot_time", 0))
 
         def _login(target):
             # If we have login info, login to get a shell prompt
