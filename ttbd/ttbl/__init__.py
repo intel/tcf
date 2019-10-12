@@ -1685,7 +1685,6 @@ class test_target_console_mixin(object):
         Return list of available *console_id*\s
         """
         consoles = self.console_do_list()
-        self.tags['consoles'] = consoles
         return consoles
 
     class expect_e(Exception):		# pylint: disable = missing-docstring

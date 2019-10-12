@@ -133,6 +133,8 @@ class cm_serial(ttbl.test_target_console_mixin):
                 self.consoles[console_name] = spec
             else:
                 raise TypeError("Do not know how to handle '%s'" % spec)
+        self.tags.setdefault('consoles', [])
+        self.tags['consoles'] += self.consoles.keys()
         if do_open:
             self.consoles_open()
 

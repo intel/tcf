@@ -670,12 +670,7 @@ class tt_qemu(
     # Console mixin
     # Any file SOMETHING-console.read describes a console that is available.
     def console_do_list(self):
-        consoles = []
-        for filename in os.listdir(self.state_dir):
-            if filename.endswith("-console.read"):
-                console_name = filename[:-len("-console.read")]
-                consoles.append(console_name)
-        return consoles
+        return self.consoles
 
     def _console_id_get(self, console_id):
         if console_id == None:

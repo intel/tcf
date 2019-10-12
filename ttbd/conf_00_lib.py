@@ -141,6 +141,7 @@ def qemu_pos_add(target_name,
             bsps = dict(
                 x86_64 = dict(console = 'x86_64', linux = True),
             ),
+            consoles = list(consoles),
             ssh_client = True,
             pos_capable = dict(
                 boot_to_pos = 'pxe',
