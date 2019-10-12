@@ -37,9 +37,7 @@ import requests
 import usb.core
 
 import commonl
-import ttbl.config
 import fsdb
-import mutex
 import user_control
 
 logger = logging.root.getChild("ttb")
@@ -102,6 +100,19 @@ def who_split(who):
         return who.split(":", 2)
     return who, None
 
+def who_create(user_id, ticket = None):
+    """
+    Create a TTBD user descriptor from a user id name and a ticket
+
+    :params str user_id: user's name / ID
+    :params str ticket: (optional) ticket for the reservation
+
+    :returns: (str) user id descriptor
+    """
+    if ticket != None and ticket != "":
+        return user_id + ":" + ticket
+    else:
+        return user_id
 
 class thing_plugger_mixin(object):
     """
@@ -131,6 +142,92 @@ class thing_plugger_mixin(object):
 
         :param ttbl.test_target target: target where to unplug from
         :param ttbl.test_target thing: thing to unplug
+        """
+        raise NotImplementedError
+
+
+class acquirer_c(object):
+    """
+    Interface to resource acquisition managers/schedulers
+
+    A subclass of this is instantiated to manage the access to
+    resources that can be contended; when using the TCF remoting
+    mechanism that deals with targets connected to the current host,
+    for example, this is :class:`ttbl.mutex.mutex_symlink`.
+
+    This can however, use any other resource manager.
+
+    The operations in here can raise any exception, but mostly the
+    ones derived from :class:`ttbl.acquirer_c.exception`: 
+
+    - :class:`ttbl.acquirer_c.timeout_e`
+    - :class:`ttbl.acquirer_c.busy_e`
+    - :class:`ttbl.acquirer_c.no_rights_e`
+    - :class:`ttbl.acquirer_c.cant_release_not_owner_e`
+    - :class:`ttbl.acquirer_c.cant_release_not_acquired_e`
+
+    """
+    def __init__(self, target):
+        assert isinstance(target, ttbl.test_target)
+        self.target = target
+
+    class exception(Exception):
+        "General exception for acquisition system errors"
+        pass
+
+    class timeout_e(exception):
+        "Timeout acquiring"
+        pass
+
+    class busy_e(exception):
+        "The resource is busy, can't acquire"
+        pass
+
+    class no_rights_e(exception):
+        "Not enought rights to perform the operation"
+        pass
+
+    class cant_release_not_owner_e(exception):
+        "Cannot release since the resource is acquired by someone else"
+        pass
+
+    class cant_release_not_acquired_e(exception):
+        "Cannot release since the resource is not acquired"
+        pass
+
+    def acquire(self, who, force):
+        """
+        Acquire the resource for the given user
+
+        The implementation is allowed to spin for a little while to
+        get it done, but in general this shall be a non-blocking
+        operation, return busy if not available.
+
+        :param str who: user name
+        :param boot force: force the acquisition (overriding current
+          user); this assumes the user *who* has permissions to do so;
+          if not, raise an exception child of :class:`exception`.
+
+        :raises busy_e: if the target is busy and could not be acquired
+        :raises timeout_e: some sort of timeout happened
+        :raises no_rights_e: not enough privileges for the operation
+        """
+        raise NotImplementedError
+
+    def release(self, who, force):
+        """
+        Release the resource from the given user
+
+        :param str who: user name
+        :param boot force: force the release (overriding current
+          user); this assumes the user *who* has permissions to do so;
+          if not, raise an exception child of :class:`exception`.
+        """
+        raise NotImplementedError
+
+    def get(self):
+        """
+        Return the current resource owner
         """
         raise NotImplementedError
 
@@ -191,7 +288,9 @@ class tt_interface(object):
         Called when the interface is added to a target to initialize
         the needed target aspect (such as adding tags/metadata)
         """
-        
+
+# FIXME: yeah, ugly, but import dependency hell
+import ttbl.config
 
 # FIXME: generate a unique ID; has to be stable across reboots, so it
 #        needs to be generated from whichever path we are connecting
@@ -286,7 +385,7 @@ class test_target(object):
         #: processes use this to store information that reflect's the
         #: target's state.
         self.fsdb = fsdb.fsdb(self.state_dir)
-        self.mutex_location = os.path.join(self.state_dir, "mutex")
+
         # Much as I HATE reentrant locks, there is no way around it
         # without major rearchitecting that is not going to happen.
         #
@@ -328,6 +427,8 @@ class test_target(object):
 
         #: Keep places where interfaces were registered from
         self.interface_origin = {}
+        #: FIXME
+        self._acquirer = None
 
     @property
     def type(self):
@@ -338,6 +439,16 @@ class test_target(object):
         assert isinstance(new_type, basestring)
         self.tags['type'] = new_type
         return self.tags['type']
+
+    @property
+    def acquirer(self):
+        return self._acquirer
+
+    @acquirer.setter
+    def acquirer(self, new):
+        assert isinstance(new, acquirer_c)
+        self._acquirer = new
+        return new
 
     def get_id(self):
         return self.id
@@ -487,15 +598,6 @@ class test_target(object):
         self._tags_verify()
         commonl.kws_update_from_rt(self.kws, self.tags)
 
-    def owner_get(self):
-        """
-        Return who the current owner of this target is
-
-        :returns: object describing the owner
-        """
-        _mutex = mutex.mutex_symlink(self.mutex_location, None)
-        return _mutex.owner_get()
-
     def timestamp_get(self):
         return os.path.getmtime(os.path.join(self.state_dir, "timestamp"))
 
@@ -509,7 +611,15 @@ class test_target(object):
             f.write(time.strftime("%c\n"))
             pass
 
-    def acquire(self, who):
+    def owner_get(self):
+        """
+        Return who the current owner of this target is
+
+        :returns: object describing the owner
+        """
+        return self._acquirer.get()
+
+    def acquire(self, who, force):
         """
         Assign the test target to user *who* unless it is already
         taken by someone else.
@@ -518,11 +628,10 @@ class test_target(object):
         :raises: :class:`test_target_busy_e` if already taken
         """
         assert isinstance(who, basestring)
-        _mutex = mutex.mutex_symlink(self.mutex_location, who)
         try:
-            if _mutex.acquire():
+            if self._acquirer.acquire(who, force):
                 self._state_cleanup(True)
-        except _mutex.mutex_busy_e:
+        except acquirer_c.busy_e:
             raise test_target_busy_e(self)
         # different operations in the system might require the user
         # storage area to exist, so ensure it is there when the user
@@ -911,7 +1020,7 @@ class test_target(object):
             if self.property_is_user(prop) and not self.property_keep_value(prop):
                 self.fsdb.set(prop, None)
 
-    def release(self, who, force = False):
+    def release(self, who, force):
         """
         Release the ownership of this target.
 
@@ -923,14 +1032,13 @@ class test_target(object):
         :raises: :class:`test_target_not_acquired_e` if not taken
         """
         assert isinstance(who, basestring)
-        _mutex = mutex.mutex_symlink(self.mutex_location, who)
         try:
             if self.target_is_owned_and_locked(who):
                 self._state_cleanup(force)
-            _mutex.release(force)
-        except _mutex.not_owner_e:
+            self._acquirer.release(who, force)
+        except acquirer_c.cant_release_not_owner_e:
             raise test_target_release_denied_e(self)
-        except _mutex.not_acquired_e:
+        except acquirer_c.cant_release_not_acquired_e:
             raise test_target_not_acquired_e(self)
 
     @contextlib.contextmanager

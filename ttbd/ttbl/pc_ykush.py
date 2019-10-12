@@ -203,7 +203,7 @@ class ykush(ttbl.tt_power_control_impl):
             timeout = 10
             while True:
                 try:
-                    ykush_target.acquire(owner)
+                    ykush_target.acquire(owner, True)
                     break
                 except ttbl.test_target_busy_e as e:
                     t = time.time()

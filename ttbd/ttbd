@@ -205,11 +205,7 @@ def who_make(ticket = None, user = None):
         user = flask_login.current_user
     else:
         assert isinstance(user, ttbl.user_control.User)
-    user_id = user.get_id()
-    if ticket != None and ticket != "":
-        return user_id + ":" + ticket
-    else:
-        return user_id
+    return ttbl.who_create(user.get_id(), ticket)
 
 def current_user_is_admin():
     """
@@ -341,12 +337,19 @@ def _target_acquire(target_id):
     # would succeed if already acquired.
     # FIXME: some security checks on this ticket?
     ticket = flask.request.form.get('ticket', "")
+    if flask.request.form.get('force', 'false').lower() == 'true':
+        force = True
+        if not current_user_is_admin():
+            flask_logd_abort(400, "forced acquisition requires admin rights")
+    else:
+        force = False
+
     if target_id not in ttbl.config.targets.keys():
         return flask.abort(404, "%s: can't find target" % target_id)
     with ttbl.config.targets_lock:
         target = ttbl.config.targets[target_id]
     try:
-        target.acquire(who_make(ticket))
+        target.acquire(who_make(ticket), force)
         target.timestamp()
     except ttbl.test_target_busy_e as e:
         flask_log_abort(3, 400, "%s" % e, exc_info = False)
@@ -1143,12 +1146,13 @@ def _files_list():
 @contextlib.contextmanager
 def target_acquired(target, who):
     try:
-        target.acquire(who)
+        target.acquire(who, False)
         yield
     except:
-        target.release(who)
+        # do not force releasing it if we don't own it
+        target.release(who, False)
         raise
-    target.release(who)
+    target.release(who, False)
 
 def _do_cleanup_released(target, who):
     if not hasattr(target, "power_off"):	# Only with power control

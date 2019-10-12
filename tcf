@@ -173,6 +173,9 @@ if __name__ == "__main__":
         "target", metavar = "TARGET", action = "store",
         nargs = "+", default = None,
         help = "Target's name or URL")
+    ap.add_argument("-f", "--force", action = "store_true", default = False,
+                    help = "Force the acquisition, removing the target "
+                    "from its current owner (requires admin rights)")
     arg_parser_target_acquire.set_defaults(func = ttb_client.rest_target_acquire)
 
     ap = arg_subparsers.add_parser("enable",

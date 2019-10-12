@@ -12,6 +12,7 @@ import threading
 import collections
 import re
 import ttbl
+import mutex
 
 urls = []
 targets = {}
@@ -72,7 +73,8 @@ def _nested_list_flatten(l):
         else:
             yield e
 
-def target_add(target, _id = None, tags = None, target_type = None):
+def target_add(target, _id = None, tags = None, target_type = None,
+               acquirer = None):
     """
     Add a target to the list of managed targets
 
@@ -117,6 +119,9 @@ def target_add(target, _id = None, tags = None, target_type = None):
         raise ValueError("target ID %s: invalid characters (valid: %s)" \
                          % (_id, regex.pattern))
 
+    if acquirer == None:
+        acquirer = mutex.mutex_symlink(target)
+    target.acquirer = acquirer
     with targets_lock:
         if id in targets.keys():
             raise ValueError("target ID %s already exists" % _id)
@@ -127,7 +132,8 @@ def target_add(target, _id = None, tags = None, target_type = None):
     target.tags_update(dict(id = target.id, path = target.state_dir))
     assert isinstance(target.tags['interconnects'], dict)
 
-def interconnect_add(ic, _id = None, tags = None, ic_type = None):
+def interconnect_add(ic, _id = None, tags = None, ic_type = None,
+                     acquirer = None):
     """
     Add a target interconnect
 
@@ -146,7 +152,8 @@ def interconnect_add(ic, _id = None, tags = None, ic_type = None):
       default it's taken from the object's type.
 
     """
-    target_add(ic, _id, tags = tags, target_type = ic_type)
+    target_add(ic, _id, tags = tags, target_type = ic_type,
+               acquirer = acquirer)
     ttbl.config.targets[ic.id].tags['interfaces'].append('interconnect_c')
 
 _authenticators = []

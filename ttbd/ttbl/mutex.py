@@ -10,7 +10,9 @@ import os
 import errno
 import time
 
-class mutex_symlink(object):
+import ttbl
+
+class mutex_symlink(ttbl.acquirer_c):
     """
     The lamest file-system based mutex ever
 
@@ -44,48 +46,18 @@ class mutex_symlink(object):
       So use a different owner for each thread of execution.
 
     """
-    class exception(Exception):
-        pass
 
-    class timeout_e(exception):
-        def __init__(self, mutex):
-            mutex_symlink.exception.__init__(
-                self,
-                "%s: timeout acquiring mutex (for %s)"
-                % (mutex.location, mutex.owner))
-
-    class mutex_busy_e(exception):
-        def __init__(self, mutex):
-            mutex_symlink.exception.__init__(
-                self,
-                "%s: %s tried to acquire owned mutex (owned by %s)"
-                % (mutex.location, mutex.owner, mutex.owner_get()))
-        pass
-
-    class not_owner_e(exception):
-        def __init__(self, mutex):
-            mutex_symlink.exception.__init__(
-                self,
-                "%s: %s tried to release not-owned mutex (owned by %s)"
-                % (mutex.location, mutex.owner, mutex.owner_get()))
-        pass
-
-    class not_acquired_e(exception):
-        def __init__(self, mutex):
-            mutex_symlink.exception.__init__(
-                self,
-                "%s: %s tried to release non-acquired mutex"
-                % (mutex.location, mutex.owner))
-        pass
-
-    def __init__(self, location, owner, timeout = None, wait_period = 0.5):
-        self.location = location
-        self.owner = owner
+    def __init__(self, target, timeout = 3, wait_period = 0.5):
+        assert timeout > 0
+        assert wait_period > 0
+        ttbl.acquirer_c.__init__(self, target)
+        self.target = target
+        self.location = os.path.join(target.state_dir, "mutex")
         self.timeout = timeout
         self.wait_period = wait_period
-        # FIXME: check the location is usable
 
-    def acquire(self, timeout = None, wait_period = None):
+
+    def acquire(self, who, force):
         """
         Acquire the mutex, blocking until acquired
 
@@ -96,60 +68,54 @@ class mutex_symlink(object):
         # FIXME: make the symlink target so that it can be opened as a
         # file exclusive while manipulation happens?
         # How to tell it is the same?
-        if timeout == None:
-            timeout = self.timeout
-        if wait_period == None:
-            wait_period = self.wait_period
         # Check if we have it already -- see the warning in the class
         # header about this.
-        current_owner = self.owner_get()
-        if current_owner != None and current_owner == self.owner:
+        current_owner = self.get()
+        if current_owner != None and current_owner == who:
             return False
         t0 = time.time()
         while True:
             try:
                 t = time.time()
-                os.symlink(self.owner, self.location)
+                os.symlink(who, self.location)
                 return True
             except OSError as e:
                 if e.errno == errno.EEXIST:
-                    if timeout == None:
-                        raise self.mutex_busy_e(self)
+                    if self.timeout == None:
+                        raise self.busy_e(self)
                     if t - t0 > timeout:
                         raise self.timeout_e(self)
-                    time.sleep(wait_period)
+                    time.sleep(self.wait_period)
                 else:
                     raise
 
-    def release(self, force = False):
+    def release(self, who, force):
         if force:
             try:
                 os.unlink(self.location)
             except OSError as e:
-                pass
+                if e.errno == errno.ENOENT:
+                    pass
+                raise
             return
         try:
             link_dest = os.readlink(self.location)
         except OSError as e:
             if e.errno == errno.ENOENT:
-                raise self.not_acquired_e(self)
+                raise self.cant_release_not_acquired_e(self)
         # Here is the thinking: if you have a right to release this
         # mutex is because you own it; thus, it won't change since the
         # time we read its target until you get to unlock it by
-        # removing the file.
+        # removing the file. Yeah, some other process could have come
+        # in the middle and removed it and then we are done. Window
+        # for race condition
         # I'd rather have an atomic 'unlink if target matches...'
-        if link_dest == self.owner:
-            os.unlink(self.location)
-        else:
-            raise self.not_owner_e(self)
+        if link_dest != who:
+            raise self.cant_release_not_owner_e(self)
+        os.unlink(self.location)
 
-    def __enter__(self):
-        return self.acquire()
 
-    def __exit__(self, type, value, traceback):
-        return self.release()
-
-    def owner_get(self):
+    def get(self):
         try:
             return os.readlink(self.location)
         except OSError as e:
@@ -194,14 +160,14 @@ if __name__ == "__main__":
         def test_2(self):
             cls = type(self)
             cls.mutex11.acquire()
-            with self.assertRaises(mutex_symlink.mutex_busy_e):
+            with self.assertRaises(mutex_symlink.busy_e):
                 cls.mutex12.acquire()
             cls.mutex11.release()
 
         def test_3(self):
             cls = type(self)
             cls.mutex11.acquire()
-            with self.assertRaises(mutex_symlink.not_owner_e):
+            with self.assertRaises(mutex_symlink.cant_release_not_owner_e):
                 cls.mutex12.release()
             cls.mutex11.release()
 
@@ -218,7 +184,7 @@ if __name__ == "__main__":
         def test_5(self):
             cls = type(self)
             with cls.mutex11:
-                with self.assertRaises(mutex_symlink.mutex_busy_e):
+                with self.assertRaises(mutex_symlink.busy_e):
                     cls.mutex12.acquire()
 
         def test_6(self):
@@ -228,7 +194,7 @@ if __name__ == "__main__":
             cls.mutex11b.acquire()	# Should just work
             cls.mutex11.release()
             cls.mutex12.acquire()
-            with self.assertRaises(mutex_symlink.mutex_busy_e):
+            with self.assertRaises(mutex_symlink.busy_e):
                 cls.mutex11b.acquire()
             cls.mutex12.release()
 
