@@ -258,6 +258,7 @@ class tt_qemu(
         # might generate new ones or refresh them.
         self.power_on_pre_fns.append(self._power_on_pre_clear)
         self.consoles = consoles
+        self.tags['consoles'] = consoles
 
     def _qmp_running(self):
         """
