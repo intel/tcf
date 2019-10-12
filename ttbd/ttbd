@@ -1,4 +1,5 @@
 #! /usr/bin/python2
+# coding:utf-8
 #
 # Copyright (c) 2017 Intel Corporation
 #
@@ -68,6 +69,10 @@ import ttbl.config
 import requests
 import shutil
 import sys
+reload(sys)
+# change the default string encoding to ASCII to remove the mess of encodings
+# this is currently a controversial hack and with Py3 it will dissapear
+sys.setdefaultencoding('utf-8')
 import urlparse
 import glob
 
