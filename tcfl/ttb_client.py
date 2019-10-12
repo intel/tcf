@@ -388,9 +388,9 @@ class rest_target_broker(object):
         else:
             raise ValueError("%s/%s: unknown target" % (self.aka, target_id))
 
-    def rest_tb_target_acquire(self, rt, ticket = ''):
+    def rest_tb_target_acquire(self, rt, ticket = '', force = False):
         return self.send_request("PUT", "targets/%s/acquire" % rt['id'],
-                                 data = { 'ticket': ticket })
+                                 data = { 'ticket': ticket, 'force': force })
 
     def rest_tb_target_active(self, rt, ticket = ''):
         self.send_request("PUT", "targets/%s/active" % rt['id'],
@@ -969,7 +969,8 @@ def rest_target_acquire(args):
     """
     for target in args.target:
         rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_acquire(rt, ticket = args.ticket)
+        rtb.rest_tb_target_acquire(
+            rt, ticket = args.ticket, force = args.force)
 
 def rest_target_enable(args):
     """

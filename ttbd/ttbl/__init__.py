@@ -153,7 +153,7 @@ class acquirer_c(object):
     A subclass of this is instantiated to manage the access to
     resources that can be contended; when using the TCF remoting
     mechanism that deals with targets connected to the current host,
-    for example, this is :class:`ttbl.mutex.mutex_symlink`.
+    for example, this is :class:`ttbl.symlink_acquirer_c`.
 
     This can however, use any other resource manager.
 
@@ -173,7 +173,11 @@ class acquirer_c(object):
 
     class exception(Exception):
         "General exception for acquisition system errors"
-        pass
+        def __init__(self):
+            Exception.__init__(self, self.__doc__)
+
+        def __repr__(self):
+            return self.__doc__
 
     class timeout_e(exception):
         "Timeout acquiring"
@@ -230,6 +234,102 @@ class acquirer_c(object):
         Return the current resource owner
         """
         raise NotImplementedError
+
+
+class symlink_acquirer_c(acquirer_c):
+    """
+    The lamest file-system based mutex ever
+
+    This is a rentrant mutex implemented using symlinks (an atomic
+    operation under POSIX).
+
+    To create it, declare the location where it will be and a string
+    the *owner*. Then you can acquire() or release() it. If it is
+    already acquired, it can spin busy wait on it (if given a timeout)
+    or just fail. You can only release if you own it.
+
+    Why like this? We'll have multiple processes doing this on behalf
+    of remote clients (so it makes no sense to track owner by PID. The
+    caller decides who gets to override and all APIs agree to use it
+    (as it is advisory).
+
+    .. warning:: The reentrancy of the lock assumes that the owner
+      will use a single thread of execution to operate under it.
+
+      Thus, the following scenario would fail and cause a race
+      condition:
+
+        - Thread A: acquires as owner-A
+        - Thread B: starts to acquire as owner-A
+        - Thread A: releases as owner-A (now released)
+        - Thread B: verifies it was acquired by owner-A so passes as
+          acquired
+        - Thread B: MISTAKENLY assumes it owns the mutex when it is
+          released in reality
+
+      So use a different owner for each thread of execution.
+
+    """
+
+    def __init__(self, target, wait_period = 0.5):
+        assert wait_period > 0
+        ttbl.acquirer_c.__init__(self, target)
+        self.target = target
+        self.location = os.path.join(target.state_dir, "mutex")
+        self.wait_period = wait_period
+
+
+    def acquire(self, who, force):
+        """
+        Acquire the mutex, blocking until acquired
+        """
+        if force:
+            commonl.rm_f(self.location)
+        else:
+            current_owner = self.get()
+            if current_owner != None and current_owner == who:
+                return	# we already own it
+        try:
+            os.symlink(who, self.location)
+        except OSError as e:
+            if e.errno == errno.EEXIST:
+                raise self.busy_e()
+            raise
+
+
+    def release(self, who, force):
+        if force:
+            try:
+                os.unlink(self.location)
+            except OSError as e:
+                if e.errno == errno.ENOENT:
+                    pass
+                raise
+            return
+        try:
+            link_dest = os.readlink(self.location)
+        except OSError as e:
+            if e.errno == errno.ENOENT:
+                raise self.cant_release_not_acquired_e()
+        # Here is the thinking: if you have a right to release this
+        # mutex is because you own it; thus, it won't change since the
+        # time we read its target until you get to unlock it by
+        # removing the file. Yeah, some other process could have come
+        # in the middle and removed it and then we are done. Window
+        # for race condition
+        # I'd rather have an atomic 'unlink if target matches...'
+        if link_dest != who:
+            raise self.cant_release_not_owner_e()
+        os.unlink(self.location)
+
+
+    def get(self):
+        try:
+            return os.readlink(self.location)
+        except OSError as e:
+            if e.errno == errno.ENOENT:
+                return None
+            raise
 
 
 class tt_interface(object):

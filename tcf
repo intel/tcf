@@ -167,16 +167,16 @@ if __name__ == "__main__":
         "'zephyr_board and not type:\"^qemu.*\"'")
     arg_parser_target_list.set_defaults(func = ttb_client.rest_target_list)
 
-    arg_parser_target_acquire = arg_subparsers.add_parser(
+    ap = arg_subparsers.add_parser(
         "acquire", help = "Acquire ownership of a target")
-    arg_parser_target_acquire.add_argument(
+    ap.add_argument(
         "target", metavar = "TARGET", action = "store",
         nargs = "+", default = None,
         help = "Target's name or URL")
     ap.add_argument("-f", "--force", action = "store_true", default = False,
                     help = "Force the acquisition, removing the target "
                     "from its current owner (requires admin rights)")
-    arg_parser_target_acquire.set_defaults(func = ttb_client.rest_target_acquire)
+    ap.set_defaults(func = ttb_client.rest_target_acquire)
 
     ap = arg_subparsers.add_parser("enable",
                                    help = "Enable a disabled target")

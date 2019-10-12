@@ -12,7 +12,6 @@ import threading
 import collections
 import re
 import ttbl
-import mutex
 
 urls = []
 targets = {}
@@ -120,7 +119,7 @@ def target_add(target, _id = None, tags = None, target_type = None,
                          % (_id, regex.pattern))
 
     if acquirer == None:
-        acquirer = mutex.mutex_symlink(target)
+        acquirer = ttbl.symlink_acquirer_c(target)
     target.acquirer = acquirer
     with targets_lock:
         if id in targets.keys():
