@@ -1211,3 +1211,24 @@ class dict_missing_c(dict):
 def ipv4_len_to_netmask_ascii(length):
     return socket.inet_ntoa(struct.pack('>I', 0xffffffff ^ ((1 << (32 - length) ) - 1)))
     
+def split_user_pwd_hostname(s):
+    """
+    Return a tuple decomponsing ``[USER[:PASSWORD]@HOSTNAME``
+
+    :returns: tuple *( USER, PASSWORD, HOSTNAME )*, *None* in missing fields.
+    """
+    assert isinstance(s, basestring)
+    user = None
+    password = None
+    hostname = None
+    if '@' in s:
+        user_password, hostname = s.split('@', 1)
+    else:
+        user_password = ""
+        hostname = s
+    if ':' in user_password:
+        user, password = user_password.split(':', 1)
+    else:
+        user = user_password
+        password = None
+    return user, password, hostname
