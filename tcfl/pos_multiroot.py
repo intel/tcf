@@ -266,6 +266,7 @@ def mount_fs(target, image, boot_dev):
             if tag.startswith("pos_root_"):
                 target.property_set(tag, None)
         _disk_partition(target)
+        target.pos._fsinfo_load()
         target.property_set('pos_reinitialize', None)
 
     root_part_dev = _rootfs_guess(target, image, boot_dev)
@@ -341,6 +342,7 @@ def mount_fs(target, image, boot_dev):
             if 'special device ' + root_part_dev \
                + ' does not exist.' in output:
                 _disk_partition(target)
+                target.pos._fsinfo_load()
             else:
                 # ok, this probably means probably the partitions are not
                 # formatted; so let's just reformat and retry 
