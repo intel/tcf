@@ -473,14 +473,12 @@ def console_rx_eval(expecter, target,
             if result == None or result == "pass":
                 # raising pass gets stopped at expecter.run(), so we
                 # print instead, so we can see the console
-                offset_tip = of.tell()	# we report console from where searched
                 of.seek(offset)	# so we report console from where searched
                 target.report_pass(
                     "found expected `%s` in console `%s:%s` at %.2fs @%d"
                     % (what, target.fullid, console_id_name,
                        ts - expecter.ts0, offset + m.start()),
                     { "console output": of }, dlevel = 4, alevel = 2)
-                of.seek(offset_tip)
                 raise tc.pass_e(
                     "found expected `%s` in console `%s:%s` at %.2fs"
                     % (what, target.fullid, console_id_name,
