@@ -383,12 +383,23 @@ class report_console_c(report_c):
 
 
     def _report(self, level, alevel, ulevel, _tc, tag, message, attachments):
+        if isinstance(_tc, tcfl.tc.tc_c):
+            tc = _tc
+        elif isinstance(_tc, tcfl.tc.target_c):
+            tc = _tc.testcase
+        else:
+            raise AssertionError("dunno what _tc is %s" % type(_tc).__name__)
+
+        if not hasattr(tc, "ts0"):
+            tc.ts0 = time.time()
+        delta = time.time() - tc.ts0
+
         _prefix = "%s%d/%s\t" % (tag, level,
                                  tcfl.msgid_c.ident()) + _tc.report_mk_prefix()
         _aprefix = "%s%d/%s\t" % (
             tag, alevel, tcfl.msgid_c.ident()) + _tc.report_mk_prefix()
         with self.lock:
-            self._report_writer(level, "%s: %s\n" % (_prefix, message))
+            self._report_writer(level, "%s: [+%.1fs] %s\n" % (_prefix, delta, message))
             if attachments != None:
                 assert isinstance(attachments, dict)
                 for key, attachment in attachments.iteritems():
