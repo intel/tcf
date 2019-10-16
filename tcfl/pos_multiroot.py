@@ -180,7 +180,7 @@ def _rootfs_guess_by_image(target, image, boot_dev):
     # This prolly can be made more efficient, like collect least-used
     # partition data? to avoid the situation where two clients keep
     # imaging over each other when they could have two separate images
-    root_part_dev, score, seed = pos.image_seed_match(partl, image)
+    root_part_dev, score, check_empties, seed = pos.image_seed_match(partl, image)
     if score == 0:
         # none is a good match, find an empty one...if there are
         # non empty, just any
@@ -194,6 +194,14 @@ def _rootfs_guess_by_image(target, image, boot_dev):
                 "POS: picked up random partition %s, because none of the "
                 "existing installed ones was a good match and there "
                 "are no empty ones" % root_part_dev, dlevel = 2)
+    elif check_empties and empties:
+        # This is for the case where image and seed have the same distro
+        # but different spin. We want to check our luck if there is an empty
+        # partition. If there isn't, we will just take the given one from
+        # pos.image_seed_match.
+        root_part_dev = random.choice(empties)
+        target.report_info("POS: picked up empty root partition %s"
+                            % root_part_dev, dlevel = 2)
     else:
         target.report_info("POS: picked up root partition %s for %s "
                            "due to a %.02f similarity with %s"
