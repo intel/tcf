@@ -546,7 +546,7 @@ swupd_bundle_add_timeouts = {
     'os-clr-on-clr': 8000,
     'os-core-dev': 800,
     'os-testsuite': 1000,
-    'os-testsuite-phoronix': 1000,
+    'os-testsuite-phoronix': 2000,	# 4000MiB
     'os-testsuite-phoronix-desktop': 1000,
     'os-testsuite-phoronix-server': 1000,
     'os-util-gui': 800, #218MB
