@@ -150,6 +150,27 @@ class shell(tc.target_extension_c):
     #: Deprecated, use :data:`shell_prompt_regex`
     linux_shell_prompt_regex = shell_prompt_regex
 
+    def setup(self):
+        """
+        Setup the shell for scripting operation
+
+        In the case of a bash shell, this:
+        - sets the prompt to something easer to latch on to
+        - disables command line editing
+        - traps errors in shell execution
+        """
+        self.run('export PS1="TCF-%s:$PS1"' % self.target.kws['tc_hash'])
+        # disable line editing for proper recording of command line
+        # when running bash; otherwise the scrolling readline does
+        # messes up the output
+        self.run('test ! -z "$BASH" && set +o vi +o emacs')
+        # Trap the shell to complain loud if a command fails, and catch it
+        # See that '' in the middle, is so the catcher later doesn't
+        # get tripped by the command we sent to set it up
+        self.run("trap 'echo ERROR''-IN-SHELL' ERR")
+        self.target.on_console_rx("ERROR-IN-SHELL", result = 'errr',
+                                  timeout = False)
+
     def up(self, tempt = None,
            user = None, login_regex = re.compile('login:'), delay_login = 0,
            password = None, password_regex = re.compile('[Pp]assword:'),
@@ -184,10 +205,14 @@ class shell(tc.target_extension_c):
         :param int delay_login: (optional) wait this many seconds
           before sending the user name after finding the login prompt.
 
-        :param bool shell_setup: (optional, default) setup the shell
+        :param shell_setup: (optional, default) setup the shell
           up by disabling command line editing (makes it easier for
           the automation) and set up hooks that will raise an
           exception if a shell command fails.
+
+          By default calls target.shell.setup(); if *False*, nothing
+          will be called. No arguments are passed, the function needs
+          to operate on the default console.
 
         :param int timeout: [optional] seconds to wait for the login
           prompt to appear; defaults to 60s plus whatever the target
@@ -200,7 +225,7 @@ class shell(tc.target_extension_c):
         assert delay_login >= 0
         assert password == None or isinstance(password, basestring)
         assert isinstance(password_regex, ( basestring, re._pattern_type ))
-        assert isinstance(shell_setup, bool)
+        assert isinstance(shell_setup, bool) or callable(shell_setup)
         assert timeout == None or timeout > 0
 
         target = self.target
@@ -246,19 +271,12 @@ class shell(tc.target_extension_c):
         finally:
             self.target.testcase.tls.expecter.timeout = original_timeout
 
-        if shell_setup:
-            # 
-            self.run('export PS1="TCF-%s:$PS1"' % target.kws['tc_hash'])
-            # disable line editing for proper recording of command line
-            # when running bash; otherwise the scrolling readline does
-            # messes up the output
-            self.run('test ! -z "$BASH" && set +o vi +o emacs')
-            # Trap the shell to complain loud if a command fails, and catch it
-            # See that '' in the middle, is so the catcher later doesn't
-            # get tripped by the command we sent to set it up
-            self.run("trap 'echo ERROR''-IN-SHELL' ERR")
-            self.target.on_console_rx("ERROR-IN-SHELL", result = 'errr',
-                                      timeout = False)
+        # same as target.console.select_preferred()
+        if shell_setup == True:    	# passed as a parameter
+            target.shell.setup()
+        elif callable(shell_setup):
+            shell_setup()
+        # False, so we don't call shell setup
 
         # don't set a timeout here, leave it to whatever it was defaulted
 

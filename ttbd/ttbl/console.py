@@ -139,7 +139,15 @@ class interface(ttbl.tt_interface):
       :class:`ttbl.console.impl_c` or names of other consoles (to
       sever as aliases).
 
-      Names have to be valid python symbol names.
+      Names have to be valid python symbol names following the
+      following convention:
+
+      - *serial\**  RS-232C compatible physical Serial port
+      - *sol\**     IPMI Serial-Over-Lan
+      - *ssh\**     SSH session (may require setup before enabling)
+
+    A *default* console is set by declaring an alias as in the example
+    above; however, a preferred console
 
     This interface:
 
@@ -156,6 +164,7 @@ class interface(ttbl.tt_interface):
       :class:`ttbl.console.serial_pc` for an example
 
     - allows setting general channel parameters
+
 
     """
     def __init__(self, *impls, **kwimpls):
@@ -178,8 +187,10 @@ class interface(ttbl.tt_interface):
     # /ttb-vVERSION/targets/TARGET/interface/console/CALL
 
     def get_setup(self, _target, _who, args, _user_path):
-        impl, _component = self.arg_impl_get(args, "component")
-        return dict(result = impl.parameters)
+        impl, component = self.arg_impl_get(args, "component")
+        parameters = dict(impl.parameters)
+        parameters['real_name'] = component
+        return dict(result = parameters)
 
     def put_setup(self, target, who, args, _user_path):
         impl, component = self.arg_impl_get(args, "component")
@@ -197,7 +208,9 @@ class interface(ttbl.tt_interface):
             return impl.setup(target, component, parameters)
 
     def get_list(self, target, who, args, _user_path):
-        return dict(result = self.aliases.keys() + self.impls.keys())
+        return dict(
+            aliases = self.aliases,
+            result = self.aliases.keys() + self.impls.keys())
 
     def put_enable(self, target, who, args, _user_path):
         impl, component = self.arg_impl_get(args, "component")

@@ -606,6 +606,7 @@ EOF
             # this assumes BASH
             "while ! exec 3<>/dev/tcp/localhost/22; do"
             " sleep 1s; done", timeout = 15)
+        target.console.select_preferred()
 
         # Why this? because a lot of the test output can be confused
         # with a prompt and the prompt regex then trips on it and

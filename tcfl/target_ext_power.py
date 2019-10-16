@@ -110,7 +110,9 @@ class extension(tc.target_extension_c):
                 self.target.rt, ticket = self.target.ticket)
         else:
             self.target.ttbd_iface_call("power", "on", component = component)
-        self.target.testcase.tls.expecter.power_on_post(self.target)
+        if component == None and hasattr(self.target, 'console'):
+            self.target.console._power_on_post()
+            self.target.testcase.tls.expecter.power_on_post(self.target)
         self.target.report_info("powered on")
 
     def cycle(self, wait = None, component = None):
@@ -130,7 +132,9 @@ class extension(tc.target_extension_c):
         else:
             self.target.ttbd_iface_call("power", "cycle",
                                         component = component, wait = wait)
-        self.target.testcase.tls.expecter.power_on_post(self.target)
+        if component == None and hasattr(self.target, 'console'):
+            self.target.console._power_on_post()
+            self.target.testcase.tls.expecter.power_on_post(self.target)
         self.target.report_info("power cycled")
 
     def reset(self):

@@ -1335,7 +1335,6 @@ class target_c(object):
 
         """
         # Won't be re-added if already there
-        console = self.console._console_get(console)
         added = self.testcase.tls.expecter.add(
             False, expecter.console_rx_poller, (self, console),)
         has_to_pass = True if result == "pass" else False
@@ -1445,7 +1444,6 @@ class target_c(object):
 
         :returns: Nothing
         """
-        console = self.console._console_get(console)
         has_to_pass = True if result == "pass" else False
         _tc = self.testcase
         if isinstance(timeout, numbers.Number) \

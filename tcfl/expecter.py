@@ -304,9 +304,9 @@ class expecter_c(object):
 
 def console_mk_code(target, console):
     # This mimics console_rx_eval
-    console_id_name = "default" if console in (None, "") else console
-    return console_id_name, "console-rx-" + \
-        commonl.file_name_make_safe(target.fullid) + "-" + console_id_name
+    _console = target.console._console_get(console)
+    return _console, "console-rx-" + \
+        commonl.file_name_make_safe(target.fullid) + "-" + _console
 
 def console_mk_uid(target, what, console, _timeout, result):
     # Create a unique identifier for this evaluator, we'll use it to
@@ -412,10 +412,10 @@ def console_rx_eval(expecter, target,
         what = regex
         regex = re.compile(re.escape(regex))
 
-    if not uid:
-        uid = console_mk_uid(target, what, console, _timeout, result)
-
     console_id_name, console_code = console_mk_code(target, console)
+    if not uid:
+        uid = console_mk_uid(target, what, console_id_name, _timeout, result)
+
     # These were set by the poller
     of = expecter.buffers.get(console_code, None)
     if of == None:

@@ -266,6 +266,13 @@ def linux_ssh_root_nopwd(target, prefix = ""):
       *netstat* is not always available, when available, that is also
        a valid test
 
+    Things you can do after this:
+
+    1. switch over to an SSH console if configured (they are faster
+       and depending on the HW, more reliable):
+
+       >>> target.console.setup_preferred()
+
     """
     target.shell.run("""\
 mkdir -p %s/etc/ssh

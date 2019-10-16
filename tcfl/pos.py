@@ -1228,6 +1228,7 @@ EOF""")
 
             original_timeout = testcase.tls.expecter.timeout
             original_prompt = target.shell.shell_prompt_regex
+            original_console_default = target.console.default
             try:
                 # ensure we use the POS prompt
                 target.shell.shell_prompt_regex = _pos_prompt
@@ -1244,6 +1245,7 @@ EOF""")
 
                 self.boot_to_pos(pos_prompt = _pos_prompt, timeout = timeout,
                                  boot_to_pos_fn = target_power_cycle_to_pos)
+                target.console.select_preferred(user = 'root')
                 if not pos_prompt:
                     # Adopt a harder to false positive prompt regex;
                     # the TCF-HASHID is set by target.shell.up() after
@@ -1352,6 +1354,7 @@ EOF""")
                     "for device in %s; do umount -l $device || true; done"
                     % " ".join(reversed(target.pos.umount_list)))
             finally:
+                target.console.default = original_console_default
                 target.shell.shell_prompt_regex = original_prompt
                 testcase.tls.expecter.timeout = original_timeout
 

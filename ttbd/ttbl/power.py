@@ -378,6 +378,10 @@ class interface(ttbl.tt_interface):
             return
         target.log.info("powering on%s" % why)
         if whole_rail:
+            # since we are powering on, let's have whoever does this
+            # select the right default console, but we wipe whatver
+            # was set before
+            target.property_set('console-default', None)
             target.log.debug(
                 "power pre-on%s; fns %s"
                 % (why, " ".join(str(f) for f in target.power_on_pre_fns)))
