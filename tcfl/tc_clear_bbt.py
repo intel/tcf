@@ -259,6 +259,7 @@ bundle_run_timeouts = {
     'bat-os-testsuite-phoronix.t': 600,
     'bat-os-utils-gui-dev-pkgconfig-compile.t': 400,
     'bat-perl-extras-perl-use_parallel.t': 20000,	# wth...
+    'bat-R-extras-R-library_parallel.t': 480,
     'bat-xfce4-desktop-bin-help.t': 800,
     'bat-xfce4-desktop-gui.t': 800,
     'kvm-host': 480,
