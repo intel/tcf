@@ -1378,18 +1378,26 @@ def image_seed_match(lp, goal):
     scores = {}
     for part_name, seed in lp.iteritems():
         score = 0
+        check_empties[part_name] = None
         seedl = image_spec_to_tuple(str(seed))
 
         if seedl[0] == goall[0]:
             # At least we want a distribution match for it to be
             # considered
             scores[part_name] = Levenshtein.seqratio(goall, seedl)
+
+            # Here, we are checking if spin for image and seed are equal.
+            # If the spin are not equal, we should check if there is
+            # an empty one to reduce time; therefore, we enable a 
+            # flag to check empties.
+            if seedl[1] != goall[1]:
+                check_empties[part_name] = True
         else:
             scores[part_name] = 0
     if scores:
         selected, score = max(scores.iteritems(), key = operator.itemgetter(1))
-        return selected, score, lp[selected]
-    return None, 0, None
+        return selected, score, check_empties[selected], lp[selected]
+    return None, 0, None, None
 
 
 def deploy_tree(_ic, target, _kws):
