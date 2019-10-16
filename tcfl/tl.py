@@ -519,6 +519,7 @@ swupd_bundle_add_timeouts = {
     'containers-basic-dev': 1200, #921MB
     'database-basic-dev': 800, # 938
     'desktop': 480,
+    'desktop-dev': 2500,	# 4500 MiB
     'desktop-autostart': 480,
     'desktop-kde-apps': 800, # 555 MB
     'devpkg-clutter-gst': 800, #251MB
