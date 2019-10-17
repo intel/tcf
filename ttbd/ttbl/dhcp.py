@@ -558,15 +558,28 @@ pos_cmdline_opts = {
         # and can syslog/nfsmount, etc Note we know the fields from the
         # target's configuration, as they are pre-assigned
         "ip=dhcp",        
-        "root=/dev/nfs",		# we are NFS rooted
+        "root=/dev/nfs",        # we are NFS rooted
         # no exotic storage options
         "rd.luks=0", "rd.lvm=0", "rd.md=0", "rd.dm=0", "rd.multipath=0",
-        "ro",				# we are read only
-        "plymouth.enable=0 ",		# No installer to run
-        "loglevel=2",			# kernel, be quiet to avoid
-        				# your messages polluting the
-                                        # serial terminal
-    ]
+        "ro",                   # we are read only
+        "plymouth.enable=0 ",   # No installer to run
+        "loglevel=2",           # kernel, be quiet to avoid
+                                # your messages polluting the
+                                # serial terminal
+    ],
+    'tcf-live-clr':  [
+       "kernel",
+       "linux",
+       "root=/dev/nfs",
+       "initrd=%(pos_http_url_prefix)sinitramfs-%(pos_image)s ", 
+       "init=/usr/lib/systemd/systemd-bootchart",
+       "initcall_debug",
+       "tsc=reliable",
+       "no_timer_check",
+       "noreplace-smp",
+       "rw",
+    ],
+
 }
 
 def power_on_pre_pos_setup(target):
