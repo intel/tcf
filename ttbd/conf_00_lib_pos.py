@@ -256,18 +256,197 @@ def pos_target_name_split(name):
     return gd['type'], int(gd['index']), gd['network']
 
 
+def target_pos_setup(target,
+                     nw_name,
+                     pos_boot_dev,
+                     linux_serial_console_default,
+                     pos_nfs_server = None,
+                     pos_nfs_path = None,
+                     pos_rsync_server = None,
+                     boot_config = None,
+                     boot_config_fix = None,
+                     boot_to_normal = None,
+                     boot_to_pos = None,
+                     mount_fs = None,
+                     pos_http_url_prefix = None,
+                     pos_image = None,
+                     pos_partsizes = None):
+    """Given an existing target, add to it metadata used by the
+    Provisioning OS mechanism.
+
+    :param str nw_name: name of the network target that provides
+      POS services to this target
+
+    :param str pos_boot_dev: which is the boot device to use,
+      where the boot loader needs to be installed in a boot
+      partition. e.g.: ``sda`` for */dev/sda* or ``mmcblk01`` for
+      */dev/mmcblk01*.
+
+    :param str linux_serial_console_default: which device **the
+      target** sees as the system's serial console connected to TCF's
+      boot console.
+
+      If *DEVICE* (eg: ttyS0) is given, Linux will be booted with the
+      argument *console=DEVICE,115200*.
+
+    :param str pos_nfs_server: (optional) IPv4 address of the NFS
+      server that provides the Provisioning OS root filesystem
+
+      e.g.: *192.168.0.6*
+
+      Default is *None*, and thus taking from what the boot
+      interconnect declares in the same metadata.
+
+    :param str pos_nfs_path: path in the NFS server for the
+      Provisioning OS root filesystem.
+
+      Normally this is set from the information exported by the
+      network *nw_name*.
+
+      e.g.: */home/ttbd/images/tcf-live/x86_64/*.
+
+      Default is *None*, and thus taking from what the boot
+      interconnect declares in the same metadata.
+
+    :param str pos_rsync_server: (optional) RSYNC URL where the
+      Provisioning OS images are available.
+
+      eg: *192.168.0.6::images*
+
+      Default is *None*, and thus taking from what the boot
+      interconnect declares in the same metadata.
+
+    :param str boot_config: (optional) :data:`capability
+      tcfl.pos.capability_fns` to configure the boot
+      loader.
+
+      e.g.: :ref:`*uefi* <tcfl.pos_uefi.boot_config_multiroot>` (default)
+
+    :param str boot_config_fix: (optional) :data:`capability
+      tcfl.pos.capability_fns` to fix the boot
+      loader configuration.
+
+      e.g.: :ref:`*uefi* <tcfl.pos_uefi.boot_config_fix>` (default)
+
+    :param str boot_to_normal: (optional) :data:`capability
+      tcfl.pos.capability_fns` to boot the system in normal (non
+      provisioning) mode
+
+      e.g.: :ref:`*pxe* <tcfl.pos.target_power_cycle_to_normal_pxe>` (default)
+
+    :param str boot_to_pos: (optional) :data:`capability
+      tcfl.pos.capability_fns` to boot the system in provisioning
+      mode.
+
+      e.g.: :ref:`*pxe* <tcfl.pos.target_power_cycle_to_pos_pxe>` (default)
+
+    :param str mount_fs: (optional) :data:`capability
+      tcfl.pos.capability_fns` to partition, select and mount the root
+      filesystem during provisioning mode
+
+      e.g.: :ref:`*multiroot* <tcfl.pos_multiroot>` (default)
+
+    :param str pos_http_url_prefix: (optional) prefix to give to the
+      kernel/initrd for booting over TFTP or HTTP. Note: you want a
+      trailing slash:
+
+      e.g.: *http://192.168.0.6/ttbd-pos/x86_64/* for HTTP boot
+
+      e.g.: *subdir* for TFTP boot from the *subdir* subdirectory
+
+      Default is *None*, and thus taking from what the boot
+      interconnect declares in the same metadata.
+
+    :param str pos_image: (optional) name of the Provisioning image to
+      use, which will be used for the kernel name, initrd name and NFS
+      root path:
+
+      - kernel: vmlinuz-POS-IMAGE
+      - initrd: initrd-POS-IMAGE
+      - root-path: POS-IMAGE/ARCHITECTURE
+
+      e.g.: *tcf-live* (default)
+
+    :part str pos_partsizes: (optional) when using the *multiroot*
+      *mount_fs* capability, this tells it how to partition the disk
+      by giving the sizes (in GiB) of the partitions:
+
+      - boot
+      - swap
+      - scratch (available for any use)
+      - root filesystem (multiple are created until the disk is
+      - exhausted)
+
+      Filesystem images are flashed to each root filesystem and
+      recycled for speed.
+
+      e.g.: *"1:10:30:20"* (default)
+
+    """
+    if not boot_config:
+        boot_config = 'uefi'
+    if not boot_config_fix:
+        boot_config_fix = 'uefi'
+    if not boot_to_normal:
+        boot_to_normal = 'pxe'
+    if not boot_to_pos:
+        boot_to_pos = 'pxe'
+    if not mount_fs:
+        mount_fs = 'multiroot'
+    if not pos_image:
+        pos_image = 'tcf-live'
+    if not pos_partsizes:
+        pos_partsizes = "1:10:30:20"
+
+    tags = dict(
+        linux_serial_console_default = linux_serial_console_default,
+        pos_boot_interconnect = nw_name,
+        pos_boot_dev = pos_boot_dev,
+        pos_capable = dict(
+            boot_config = boot_config,
+            boot_config_fix = boot_config_fix,
+            boot_to_normal = boot_to_normal,
+            boot_to_pos = boot_to_pos,
+            mount_fs = mount_fs,
+        ),
+        pos_image = pos_image,
+        pos_partsizes = pos_partsizes,
+    )
+    if pos_nfs_server:
+        tags['pos_nfs_server'] = pos_nfs_server
+    if pos_nfs_path:
+        tags['pos_nfs_path'] = pos_nfs_path
+    if pos_rsync_server:
+        tags['pos_rsync_server'] = pos_rsync_server
+    if pos_http_url_prefix:
+        tags['pos_http_url_prefix'] = pos_http_url_prefix
+    target.tags_update(tags)
+
+
+
 def pos_target_add(
         name,			# TTYPE-INDEX
         mac_addr,		# HH:HH:HH:HH:HH:HH
         power_rail,	 	# spX/N
         boot_disk,		# "sda",
-        partsizes,		# "1:20:50:35",
+        pos_partsizes,		# "1:20:50:35",
         linux_serial_console,	# 'ttyUSB0'
         target_type = None,	# eg "NUC5i",
         target_type_long = None,# eg "Intel NUC5i5425OU",
         index = None,		# 3, 4, ... formatted as %02
         network = None,		# 'a', "AB", etc...
-        extra_tags = None):
+        power_on_pre_hook = None,
+        extra_tags = None,
+        pos_nfs_server = None,
+        pos_nfs_path = None,
+        pos_rsync_server = None,
+        boot_config = None,
+        boot_config_fix = None,
+        boot_to_normal = None,
+        boot_to_pos = None,
+        mount_fs = None,
+        pos_http_url_prefix = None,
+        pos_image = None):
     """Add a PC-class target that can be provisioned using Provisioning
     OS.
 
@@ -334,13 +513,13 @@ def pos_target_add(
 
       Note */dev/* is not needed.
 
-    :param str partsizes: sizes of the partitions to create; this is a
+    :param str pos_partsizes: sizes of the partitions to create; this is a
       list of four numbers with sizes in gigabytes for the boot, swap,
       scratch and root partitions.
 
       eg:
 
-      >>> pos_target_add("nuc5-2a", ..., partsizes = "1:4:10:5")
+      >>> pos_target_add("nuc5-2a", ..., pos_partsizes = "1:4:10:5")
 
       will create in this target a boot partition 1 GiB in size, then
       a swap partition 4 GiB, a scratch partition 10 GiB and then
@@ -410,6 +589,23 @@ def pos_target_add(
       >>>    fixture_usb_disk = "4289273ADF334"
       >>> ))
 
+    :param func power_on_pre_hook: (optional) function the server
+      calls before powering on the target so so it boots Provisioning
+      OS mode or normal mode.
+
+      This might be configuring the DHCP server to offer a TFTP file
+      or configuring the TFTP configuration file a bootloader will
+      pick, etc; for examples, look at:
+
+      - :func:`ttbl.dhcp.power_on_pre_pos_setup`
+      - :meth:`ttbl.ipmi.pci.pre_power_pos_setup`
+      - :meth:`ttbl.ipmi.pci_ipmiutil.pre_power_pos_setup`
+
+      Default is :func:`ttbl.dhcp.power_on_pre_pos_setup`.
+
+    For other parameters possible to control the POS settings, please
+    look at :func:`target_pos_setup`
+
     """
 
     assert isinstance(name, basestring), \
@@ -432,10 +628,10 @@ def pos_target_add(
         and not '/' in boot_disk, \
         'boot_disk is the base name of the disk from which ' \
         'the device boots, eg "sda"; got: %s' % boot_disk
-    assert isinstance(partsizes, basestring) \
-        and _partsizes_regex.search(partsizes), \
-        "partsizes must match %s; got: %s" \
-        % (_partsizes_regex.pattern, partsizes)
+    assert isinstance(pos_partsizes, basestring) \
+        and _partsizes_regex.search(pos_partsizes), \
+        "pos_partsizes must match %s; got: %s" \
+        % (_partsizes_regex.pattern, pos_partsizes)
     assert isinstance(linux_serial_console, basestring) \
         and _linux_serial_console_regex.search(linux_serial_console), \
         "linux_serial_console must be astring matching %s; got: %s" \
@@ -460,6 +656,11 @@ def pos_target_add(
     # check in commonl that can work for both client and server
     assert extra_tags == None or isinstance(extra_tags, dict), \
         "extra_tags has to be a dictionary of tags; got %s" % network
+
+    if not power_on_pre_hook:
+        power_on_pre_hook = ttbl.dhcp.power_on_pre_pos_setup
+    else:
+        assert callable(power_on_pre_hook)
 
     # from the name given, following convention TYPE-NNNETWORK, guess
     # the target type, target index and network name.
@@ -517,20 +718,6 @@ def pos_target_add(
                 'console': 'x86_64',
             }
         },
-        # FIXME: allow to toggle capabilities
-        'pos_capable': {
-            'boot_to_pos': 'pxe',
-            'boot_to_normal': 'pxe',
-            'mount_fs': 'multiroot',
-            'boot_config': 'uefi',
-            'boot_config_fix': 'uefi',
-        },
-        'pos_boot_interconnect': nw_name,
-        # force boot off TFTP
-        #'pos_http_url_prefix': "",
-        'pos_boot_dev': boot_disk,
-        'pos_partsizes': partsizes,
-        'linux_serial_console_default': linux_serial_console
     }
     if target_type_long:
         tags['type_long'] = target_type_long
@@ -539,10 +726,21 @@ def pos_target_add(
     if extra_tags:			# add/modify tags?
         tags.update(extra_tags)
 
+    target_pos_setup(
+        target, nw_name, boot_disk, linux_serial_console,
+        pos_nfs_server = pos_nfs_server, pos_nfs_path = pos_nfs_path,
+        pos_rsync_server = pos_rsync_server,
+        boot_config = boot_config, boot_config_fix = boot_config_fix,
+        boot_to_normal = boot_to_normal, boot_to_pos = boot_to_pos,
+        mount_fs = mount_fs,
+        pos_http_url_prefix = pos_http_url_prefix,
+        pos_image = pos_image,
+        pos_partsizes = pos_partsizes)
+
     # Add the target to the system
     ttbl.config.target_add(target, tags = tags, target_type = target_type)
                                         # hook up PXE/POS control
-    target.power_on_pre_fns.append(ttbl.dhcp.power_on_pre_pos_setup)
+    target.power_on_pre_fns.append(power_on_pre_hook)
     target.add_to_interconnect(    	# Add target to the interconnect
         nw_name, dict(
             mac_addr = mac_addr,
