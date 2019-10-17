@@ -1376,6 +1376,7 @@ def image_seed_match(lp, goal):
 
     goall = image_spec_to_tuple(str(goal))
     scores = {}
+    check_empties = {}
     for part_name, seed in lp.iteritems():
         score = 0
         check_empties[part_name] = None
