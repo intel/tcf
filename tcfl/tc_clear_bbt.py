@@ -892,14 +892,14 @@ EOF
             # the .t
             tc = cls.paths[_srcdir]
             tc.t_files.append(os.path.basename(path))
-            tc._scan_t_subcases(path, srcdir + "/")
+            tc._scan_t_subcases(path, srcdir + "##")
             tc.report_info("%s will be run by %s" % (path, _srcdir),
                            dlevel = 3)
         else:
             # there is no testcase for this directory, go create it;
             # set the full filename as origin.
             tc = cls(srcdir, path)
-            tc._scan_t_subcases(path, srcdir + "/")
+            tc._scan_t_subcases(path, srcdir + "##")
             cls.paths[_srcdir] = tc
 
             # now, we will also run anything in the any-bundle
@@ -911,6 +911,6 @@ EOF
             any_bundle_path = os.path.join(_srcdir, "..", "..", "any-bundle",
                                            "*.t")
             for any_t_file_path in glob.glob(any_bundle_path):
-                tc._scan_t_subcases(any_t_file_path, srcdir + "/any#")
+                tc._scan_t_subcases(any_t_file_path, srcdir + "##any-bundle/")
 
         return [ tc ]
