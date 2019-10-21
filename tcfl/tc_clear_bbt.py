@@ -265,6 +265,7 @@ bundle_run_timeouts = {
     'kvm-host': 480,
     'os-clr-on-clr': 640,
     'perl-basic': 480,
+    'bat-perl-basic-perl-use_parallel.t': 900,
     'perl-extras': 12000,    # 4k subcases, needs to be split to parallelize
     'quick-perms.t': 3000,
     'telemetrics': 480,
