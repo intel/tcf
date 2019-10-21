@@ -545,6 +545,7 @@ swupd_bundle_add_timeouts = {
     'network-basic-dev': 1200, #758MB
     'openstack-common': 800, # (360MB)
     'os-clr-on-clr': 8000,
+    'os-clr-on-clr-dev': 8000,	# quite large too
     'os-core-dev': 800,
     'os-testsuite': 1000,
     'os-testsuite-phoronix': 2000,	# 4000MiB
