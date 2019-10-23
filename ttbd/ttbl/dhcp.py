@@ -18,6 +18,7 @@ import subprocess
 import commonl
 import ttbl
 import ttbl.config
+import ttbl.power
 
 #: Directory where the TFTP tree is located
 tftp_dir = "/var/lib/tftpboot"
@@ -149,7 +150,8 @@ def _tag_get_from_ic_target(kws, tag, ic, target, default = ""):
 
 tftp_prefix = "ttbd" + ttbl.config.instance_suffix
 
-class pci(ttbl.tt_power_control_impl):
+# FIXME: use daemon_pc
+class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):
 
     class error_e(Exception):
         pass
@@ -191,6 +193,7 @@ class pci(ttbl.tt_power_control_impl):
                  debug = False,
                  ip_mode = 4):
         assert ip_mode in (4, 6)
+        ttbl.power.impl_c.__init__(self)
         ttbl.tt_power_control_impl.__init__(self)
         self.allow_unmapped = allow_unmapped
         if mac_ip_map == None:
@@ -467,7 +470,7 @@ host %(hostname)s {
             self.pxe_dir = os.path.join(tftp_dir, tftp_prefix)
             self.dhcpd_pidfile = os.path.join(self.state_dir, "dhcpd.pid")
 
-    def power_on_do(self, target):
+    def on(self, target, _component):
         """
         Start DHCPd servers on the network interface
         described by `target`
@@ -518,7 +521,7 @@ host %(hostname)s {
 
         self._dhcpd_start()
 
-    def power_off_do(self, target):
+    def off(self, target, _component):
         if self.target == None:
             self.target = target
         else:
@@ -527,7 +530,7 @@ host %(hostname)s {
         commonl.process_terminate(self.dhcpd_pidfile,
                                   path = self.dhcpd_path, tag = "dhcpd")
 
-    def power_get_do(self, target):
+    def get(self, target, _component):
         if self.target == None:
             self.target = target
         else:
@@ -538,6 +541,17 @@ host %(hostname)s {
             return True
         else:
             return False
+
+    # COMPAT: old interface, ttbl.tt_power_control_impl
+    def power_on_do(self, target):
+        return self.on(target, "n/a")
+
+    def power_off_do(self, target):
+        return self.off(target, "n/a")
+
+    def power_get_do(self, target):
+        return self.get(target, "n/a")
+
 
 #: List of string with Linux kernel command options to be passed by
 #: the bootloader

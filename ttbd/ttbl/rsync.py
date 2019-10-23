@@ -11,8 +11,10 @@ import prctl
 import commonl
 import ttbl
 import ttbl.config
+import ttbl.power
 
-class pci(ttbl.tt_power_control_impl):
+# FIXME: use daemon_pc
+class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):
 
     class error_e(Exception):
         pass
@@ -50,7 +52,8 @@ class pci(ttbl.tt_power_control_impl):
                  share_name, share_path,
                  port = 873,
                  uid = None, gid = None, read_only = True):
-        ttbl.tt_power_control_impl.__init__(self)
+        ttbl.power.impl_c.__init__(self)
+        ttbl.tt_power_control_impl.__init__(self)	# COMPAT
         self.address = address
         self.port = port
         self.share_name = share_name
@@ -59,7 +62,7 @@ class pci(ttbl.tt_power_control_impl):
         self.uid = uid
         self.gid = gid
 
-    def power_on_do(self, target):
+    def on(self, target, _component):
         """
         Start the daemon, generating first the config file
         """
@@ -124,15 +127,25 @@ timeout = 300
             raise self.start_e("rsync failed to start")
         ttbl.daemon_pid_add(pid)	# FIXME: race condition if it died?
 
-    def power_off_do(self, target):
+    def off(self, target, _component):
         pidfile = os.path.join(
             target.state_dir, "rsync-%s:%d.pid" % (self.address, self.port))
         commonl.process_terminate(pidfile, path = self.path, tag = "rsync")
 
-    def power_get_do(self, target):
+    def get(self, target, _component):
         pidfile = os.path.join(
             target.state_dir, "rsync-%s:%d.pid" % (self.address, self.port))
         pid = commonl.process_alive(pidfile, self.path)
         if pid != None:
             return True
         return False
+
+    # COMPAT: old interface, ttbl.tt_power_control_impl
+    def power_on_do(self, target):
+        return self.on(target, "n/a")
+
+    def power_off_do(self, target):
+        return self.off(target, "n/a")
+
+    def power_get_do(self, target):
+        return self.get(target, "n/a")
