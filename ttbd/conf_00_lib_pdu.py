@@ -459,54 +459,47 @@ def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
         assert isinstance(powered_on_start, bool)
 
     # First add the base target, with no expectations in case it
-    # doesn't show in USB, so wec an manipulate it to diagnose
-    if pc_url == "manual":
-        pc_base = ttbl.pc.manual(ykush_serial)
-    elif pc_url == None:
+    # doesn't show in USB, so we can manipulate it to diagnose
+    if pc_url == None:
+        # although with no power control, it shall be there...
         pc_base = ttbl.pc.delay_til_usb_device(serial = ykush_serial)
     else:
         pc_base = ttbl.pc.dlwps7(pc_url)
 
-    ttbl.config.target_add(
-        ttbl.tt.tt_power(ykush_serial + "-base",
-                         power_control = pc_base,
-                         power = True),
-        # Always keep them on, unless we decide otherwise--we need
-        # them to control other components
-        tags = dict(idle_poweroff = 0))
-    ttbl.config.targets[ykush_serial + "-base"].disable("")
+    target = ttbl.test_target(ykush_serial + "-base")
+    target.interface_add("power", ttbl.power.interface(pc_base))
+    # Always keep them on, unless we decide otherwise--we need
+    # them to control other components
+    ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+    target.disable("")
+    if powered_on_start:
+        target.power.put_on(target, ttbl.who_daemon(), {}, None)
 
     # Now try to add the one that expects to find the USB device; this
     # can fail if the USB device doesn't show up for whichever reason
-    if pc_url == "manual":
-        pc = [
-            ttbl.pc.manual(ykush_serial),
-            ttbl.pc.delay_til_usb_device(serial = ykush_serial),
-        ],
-    elif pc_url == None:
-        pc = ttbl.pc.delay_til_usb_device(serial = ykush_serial)
-    else:
-        pc = [
-            ttbl.pc.dlwps7(pc_url),
-            ttbl.pc.delay_til_usb_device(serial = ykush_serial,
-                                         timeout = 5, poll_period = 1),
-        ]
+    pcl = []
+    if pc_url:
+        pcl.append(( "main", ttbl.pc.dlwps7(pc_url) ))
+    pcl.append(( "usb-device-check",
+                 ttbl.pc.delay_til_usb_device(serial = ykush_serial)))
 
-    ttbl.config.target_add(
-        ttbl.tt.tt_power(ykush_serial,
-                         power_control = pc,
-                         power = True),
+    target = ttbl.test_target(ykush_serial)
+    target.interface_add("power", ttbl.power.interface(*pcl))
+    # Always keep them on, unless we decide otherwise--we need
+    # them to control other components
+    ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+    target.disable("")
+    if powered_on_start:
+        target.power.put_on(target, ttbl.who_daemon(), {}, None)
+
+    for i in [ 1, 2, 3]:
+        target = ttbl.test_target("%s-%d" % (ykush_serial, i))
+        target.interface_add(
+            "power",
+            ttbl.power.interface(ttbl.pc_ykush.ykush(ykush_serial, i)))
         # Always keep them on, unless we decide otherwise--we need
         # them to control other components
-        tags = dict(idle_poweroff = 0))
-    ttbl.config.targets[ykush_serial].disable("")
-
-    for _port in [ 1, 2, 3]:
-        ttbl.config.target_add(
-            ttbl.tt.tt_power("%s-%d" % (ykush_serial, _port),
-                             ttbl.pc_ykush.ykush(ykush_serial, _port),
-                             power = powered_on_start),
-            # Always keep them on, unless we decide otherwise--we need
-            # them to control other components
-            tags = dict(idle_poweroff = 0))
-        ttbl.config.targets["%s-%d" % (ykush_serial, _port)].disable("")
+        ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+        target.disable("")
+        if powered_on_start:
+            target.power.put_on(target, ttbl.who_daemon(), {}, None)

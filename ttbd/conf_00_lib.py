@@ -186,9 +186,7 @@ def qemu_pos_add(target_name,
     )
 
 
-
-
-class vlan_pci(ttbl.tt_power_control_impl):
+class vlan_pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):	# COMPAT
     """Power controller to implement networks on the server side.
 
     Supports:
@@ -237,8 +235,10 @@ class vlan_pci(ttbl.tt_power_control_impl):
 
     Example configuration (see :ref:`naming networks <bp_naming_networks>`):
 
+    >>> target = ttbl.test_target("nwa")
+    >>> target.interface_add("power", ttbl.power.interface(vlan_pci()))
     >>> ttbl.config.interconnect_add(
-    >>>     ttbl.tt.tt_power("nwa", vlan_pci()),
+    >>>     target,
     >>>     tags = {
     >>>         'ipv4_addr': '192.168.97.1',
     >>>         'ipv4_prefix_len': 24,
@@ -329,19 +329,17 @@ class vlan_pci(ttbl.tt_power_control_impl):
       interface is to be connected; for example, for a network called
       *nwc*
 
-      .. code-block:: python
-
-         ttbl.config.target_add(
-             ttbl.tt.tt_power('nwc', vlan_pci()),
-             tags = dict(
-                 mac_addr = "a0:ce:c8:00:18:73",
-                 ipv6_addr = 'fc00::13:1',
-                 ipv6_prefix_len = 112,
-                 ipv4_addr = '192.168.13.1',
-                 ipv4_prefix_len = 24,
-             )
-         )
-         ttbl.config.targets['NAME'].tags['interfaces'].append('interconnect_c')
+      >>> target = ttbl.test_target("nwa")
+      >>> target.interface_add("power", ttbl.power.interface(vlan_pci()))
+      >>> ttbl.config.interconnect_add(
+      >>>     target,
+      >>>     tags = {
+      >>>         'ipv4_addr': '192.168.97.1',
+      >>>         'ipv4_prefix_len': 24,
+      >>>         'ipv6_addr': 'fc00::61:1',
+      >>>         'ipv6_prefix_len': 112,
+      >>>         'mac_addr': "a0:ce:c8:00:18:73",
+      >>>     })
 
       or for an existing network (such as the configuration's default
       *nwa*):
@@ -369,17 +367,18 @@ class vlan_pci(ttbl.tt_power_control_impl):
     - add the tag *vlan* to also be a member of an ethernet VLAN
       network (requires also a *mac_addr*):
 
-      .. code-block:: python
-
-         ttbl.config.inteconnect_add(
-             ttbl.tt.tt_power('nwc', vlan_pci()),
-             tags = dict(
-                 mac_addr = "a0:ce:c8:00:18:73",
-                 vlan = 30,
-                 ipv6_addr = 'fc00::13:1',
-                 ipv6_prefix_len = 112,
-                 ipv4_addr = '192.168.13.1',
-                 ipv4_prefix_len = 24))
+      >>> target = ttbl.test_target("nwa")
+      >>> target.interface_add("power", ttbl.power.interface(vlan_pci()))
+      >>> ttbl.config.interconnect_add(
+      >>>     target,
+      >>>     tags = {
+      >>>         'ipv4_addr': '192.168.97.1',
+      >>>         'ipv4_prefix_len': 24,
+      >>>         'ipv6_addr': 'fc00::61:1',
+      >>>         'ipv6_prefix_len': 112,
+      >>>         'mac_addr': "a0:ce:c8:00:18:73",
+      >>>         'vlan': 30,
+      >>>     })
 
       in this case, all packets in the interface described by MAC addr
       *a0:ce:c8:00:18:73* with tag *30*.
@@ -407,7 +406,8 @@ class vlan_pci(ttbl.tt_power_control_impl):
 
     """
     def __init__(self):
-        ttbl.tt_power_control_impl.__init__(self)
+        ttbl.tt_power_control_impl.__init__(self)	# COMPAT
+        ttbl.power.impl_c.__init__(self)
 
     @staticmethod
     def _if_rename(target):
@@ -439,7 +439,8 @@ class vlan_pci(ttbl.tt_power_control_impl):
         else:
             return 'virtual'
 
-    def power_on_do(self, target):
+
+    def on(self, target, _component):
         # Bring up the lower network interface; lower is called
         # whatever (if it is a physical device) or _bNAME; bring it
         # up, make it promiscuous
@@ -563,7 +564,7 @@ class vlan_pci(ttbl.tt_power_control_impl):
                 raise RuntimeError("tcpdump failed to start after 5s")
 
 
-    def power_off_do(self, target):
+    def off(self, target, component):
         # Kill tcpdump, if it was started
         pidfile = os.path.join(target.state_dir, "tcpdump.pid")
         commonl.process_terminate(pidfile, tag = "tcpdump",
@@ -593,8 +594,8 @@ class vlan_pci(ttbl.tt_power_control_impl):
 
         target.fsdb.set('power_state', 'off')
 
-    def power_get_do(self, target):
 
+    def get(self, target, _component):
         # we know we have created an interface named bNWNAME, so let's
         # check it is there
         if not os.path.isdir("/sys/class/net/b" + target.id):
@@ -613,8 +614,21 @@ class vlan_pci(ttbl.tt_power_control_impl):
         else:
             raise AssertionError("Unknown mode %s" % mode)
 
-        # FIXME: check IP addresses are assigned, if is up
-        return True
+        # FIXME: check IP addresses are assigned, if is up, until then
+        # return None, as we can't ensure the config is properly set
+        # so it has to be reset
+        return None
+
+    # COMPAT: old interface, ttbl.tt_power_control_impl
+    def power_on_do(self, target):
+        return self.on(target, "n/a")
+
+    def power_off_do(self, target):
+        return self.off(target, "n/a")
+
+    def power_get_do(self, target):
+        return self.get(target, "n/a")
+
 
 # declare the property we normal users to be able to set
 ttbl.test_target.properties_user.add('tcpdump')
@@ -661,16 +675,7 @@ def nw_default_targets_add(letter, pairs = 5):
     nw_name = "nw" + letter
 
     # Add the network target
-    ttbl.config.interconnect_add(
-        ttbl.tt.tt_power(nw_name, [ vlan_pci() ]),
-        tags = dict(
-            ipv6_addr = 'fc00::%02x:1' % nw_idx,
-            ipv6_prefix_len = 112,
-            ipv4_addr = '192.168.%d.1' % nw_idx,
-            ipv4_prefix_len = 24,
-        ),
-        ic_type = "ethernet"
-    )
+    nw_pos_add(letter, [ vlan_pci() ])
     
     global vnc_port_count
     count = 0

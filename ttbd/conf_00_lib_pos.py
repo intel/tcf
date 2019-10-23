@@ -89,7 +89,9 @@ def nw_indexes(nw_name):
 
 
 def nw_pos_add(nw_name, power_rail = None,
-               mac_addr = None, vlan = None):
+               mac_addr = None, vlan = None,
+               ipv4_prefix_len = 24,
+               ipv6_prefix_len = 112):
     """Adds configuration for a network with :ref:`Provisioning OS
     <provisioning_os>` support.
 
@@ -150,7 +152,7 @@ def nw_pos_add(nw_name, power_rail = None,
       - N > 0: the number is used as the VLAN ID.
 
     :param list power_rail: (optional) list of
-      :class:`ttbl.tt_power_control_impl` objects that control power
+      :class:`ttbl.power.impl_c` objects that control power
       to this network.
 
       This can be used to power on/off switches, start daemons, etc
@@ -173,38 +175,45 @@ def nw_pos_add(nw_name, power_rail = None,
 
     if power_rail == None:
         power_rail = []
-    else:
-        assert all(isinstance(i, ttbl.tt_power_control_impl)
-                   for i in power_rail)
+    # we don't check the power_rail, since ttb.power.interface() will
+    # do for us.
 
     x, y, _vlan_id = nw_indexes(nw_name)
     nw_name = "nw" + nw_name
 
     # Create the network target
-    interconnect = ttbl.tt.tt_power(
-        nw_name,
-        # Virtual networking inside the server, for the VMs
-        [ vlan_pci() ]
-        # Power rails passed by the user, to power on switches or whatever
-        + power_rail
-        # the rest of the components we need
-        + [
-            ttbl.dhcp.pci("192.%d.%d.1" % (x, y), "192.%d.%d.0" % (x, y), 24,
-                          "192.%d.%d.10" % (x, y), "192.%d.%d.20" % (x, y)),
-            ttbl.dhcp.pci("fc00::%02x:%02x:1" % (x, y),
-                          "fc00::%02x:%02x:0" % (x, y), 112,
-                          "fc00::%02x:%02x:0a" % (x, y),
-                          "fc00::%02x:%02x:1d" % (x, y),
-                          ip_mode = 6),
-            ttbl.rsync.pci("192.%d.%d.1" % (x, y), 'images',
-                           '/home/ttbd/images')
-        ])
+    interconnect = ttbl.test_target(nw_name)
+
+    interconnect.interface_add(
+        "power",
+        ttbl.power.interface(
+            *		# yeah, asterisk, so this is converted to *args...
+            # Virtual networking inside the server, for the VMs
+            [ ( "vlan setup", vlan_pci() ) ]
+            # Power rails passed by the user, to power on switches or whatever
+            + power_rail
+            # the rest of the components we need
+            + [
+                ( "dhcp4", ttbl.dhcp.pci("192.%d.%d.1" % (x, y),
+                                         "192.%d.%d.0" % (x, y),
+                                         ipv4_prefix_len,
+                                         "192.%d.%d.10" % (x, y),
+                                         "192.%d.%d.20" % (x, y)) ),
+                ( "dhcp6", ttbl.dhcp.pci("fc00::%02x:%02x:1" % (x, y),
+                                         "fc00::%02x:%02x:0" % (x, y),
+                                         ipv6_prefix_len,
+                                         "fc00::%02x:%02x:0a" % (x, y),
+                                         "fc00::%02x:%02x:1d" % (x, y),
+                                         ip_mode = 6) ),
+                ( "rsync", ttbl.rsync.pci("192.%d.%d.1" % (x, y), 'images',
+                                          '/home/ttbd/images') )
+            ]))
 
     tags = dict(
         ipv6_addr = 'fc00::%02x:%02x:1' % (x, y),
-        ipv6_prefix_len = 112,
+        ipv6_prefix_len = ipv6_prefix_len,
         ipv4_addr = '192.%d.%d.1' % (x, y),
-        ipv4_prefix_len = 24,
+        ipv4_prefix_len = ipv4_prefix_len,
         # Provisioning OS support to boot off PXE on nfs root
         pos_http_url_prefix = "http://192.%d.%d.1/ttbd-pos/%%(bsp)s/" % (x, y),
         # FIXME: have the daemon hide the internal path?
@@ -221,13 +230,10 @@ def nw_pos_add(nw_name, power_rail = None,
     elif vlan > 0:
         tags['vlan'] = vlan
 
-    # add it
-    ttbl.config.interconnect_add(
-        interconnect,
-        tags = tags,
-        ic_type = "ethernet"
-    )
+    ttbl.config.interconnect_add(interconnect, tags = tags,	# add it
+                                 ic_type = "ethernet")
     return interconnect
+
 
 _target_name_regex = re.compile(
     "(?P<type>[0-9a-zA-Z_]+)"
@@ -446,7 +452,9 @@ def pos_target_add(
         boot_to_pos = None,
         mount_fs = None,
         pos_http_url_prefix = None,
-        pos_image = None):
+        pos_image = None,
+        ipv4_prefix_len = 24,
+        ipv6_prefix_len = 112):
     """Add a PC-class target that can be provisioned using Provisioning
     OS.
 
@@ -471,7 +479,7 @@ def pos_target_add(
 
       >>> pos_target_add('nuc5-02a', 'c0:3f:d5:67:07:81', ...)
 
-    :param ttbl.tt_power_control_impl power_rail: Power control instance
+    :param ttbl.power.impl_c power_rail: Power control instance
       to power switch this target, eg:
 
       >>> pos_target_add('nuc5-02a', 'c0:3f:d5:67:07:81',
@@ -616,11 +624,11 @@ def pos_target_add(
     assert power_rail \
         and (
             # a single power rail or a char spec of it
-            isinstance(power_rail, (ttbl.tt_power_control_impl, basestring))
+            isinstance(power_rail, (ttbl.power.impl_c, basestring))
             or (
                 # a power rail list
                 isinstance(power_rail, list)
-                and all(isinstance(i, ttbl.tt_power_control_impl)
+                and all(isinstance(i, ttbl.power.impl_c)
                         for i in power_rail))
         ), \
         "power_rail must be a power rail spec, see doc; got %s" % power_rail
@@ -678,37 +686,7 @@ def pos_target_add(
     nw_name = "nw" + network
     x, y, _ = nw_indexes(network)
 
-    # Our real power rail starts with the object that starts recording
-    # from the serial ports. FIXME:
-    # - this needs to be removed once we switch everyone to the
-    #   new console management mode, to simply list the console objects
-    #   to start recording
-    # - this now can't take into account the serial port that can only
-    #   be seen when the system is half powered up -- for that we
-    #   expect the user to provide the power rail themselves.
-    pcl = [ ttbl.cm_serial.pc() ]
-    if isinstance(power_rail, basestring):
-        # legacy support for URLs for dlwps7
-        if "@" in power_rail:	# use given user password
-            pcl.append(ttbl.pc.dlwps7("http://%s" % power_rail))
-        else:				# use default password
-            pcl.append(ttbl.pc.dlwps7("http://admin:1234@%s" % power_rail))
-    elif isinstance(power_rail, ttbl.tt_power_control_impl):
-        # already asserted above
-        pcl.append(power_rail)
-    elif isinstance(power_rail, list):
-        # already asserted above
-        pcl = power_rail
-    else:
-        raise AssertionError()	# we checked we'd never get here anyway
-
-    target = ttbl.tt.tt_serial(		# create the target object
-        name,
-        power_control = pcl,
-        serial_ports = [
-            "pc",
-            { "port": "/dev/tty-%s" % name, "baudrate": 115200 },
-        ])
+    target = ttbl.test_target(name)		# create the target object
     tags = {				# bake in base tags
         'linux': True,
         'bsp_models': { 'x86_64': None },
@@ -726,6 +704,43 @@ def pos_target_add(
     if extra_tags:			# add/modify tags?
         tags.update(extra_tags)
 
+    # Consoles
+    #
+    # serial_pc defaults to open /dev/tty-TARGETNAME; we need to
+    # create the object because we'll need to start it upon power on
+    serial0 = ttbl.console.serial_pc()
+    target.interface_add("console", ttbl.console.interface(
+        serial0 = serial0,
+        ssh0 = ttbl.console.ssh_pc("root@" + '192.%d.%d.%d' % (x, y, index)),
+        default = "serial0",
+        #preferred = "ssh0",
+    ))
+
+    # Power Rail
+    #
+    pcl = [ ( "serial0", serial0 ) ]
+    if isinstance(power_rail, basestring):
+        # legacy support for URLs for dlwps7
+        # remove user/pasword
+        _name = re.sub(r"^([^\s]+:)?([^\s]+@)?", "", power_rail)
+        if "@" in power_rail:	# use given user password
+            pcl.append((_name, ttbl.pc.dlwps7("http://%s" % power_rail)))
+        else:				# use default password
+            pcl.append((_name,
+                        ttbl.pc.dlwps7("http://admin:1234@%s" % power_rail)))
+    elif isinstance(power_rail, ttbl.power.impl_c):
+        # already asserted above
+        pcl.append(power_rail)
+    elif isinstance(power_rail, list):
+        # FIXME: do this in tuple
+        # already asserted above
+        pcl = power_rail
+    else:
+        raise AssertionError()	# we checked we'd never get here anyway
+    target.interface_add("power", ttbl.power.interface(*pcl))
+
+    # POS support
+    #
     target_pos_setup(
         target, nw_name, boot_disk, linux_serial_console,
         pos_nfs_server = pos_nfs_server, pos_nfs_path = pos_nfs_path,
@@ -736,17 +751,17 @@ def pos_target_add(
         pos_http_url_prefix = pos_http_url_prefix,
         pos_image = pos_image,
         pos_partsizes = pos_partsizes)
+    # hook up PXE/POS control before powering on
+    target.power_on_pre_fns.append(power_on_pre_hook)
 
     # Add the target to the system
     ttbl.config.target_add(target, tags = tags, target_type = target_type)
-                                        # hook up PXE/POS control
-    target.power_on_pre_fns.append(power_on_pre_hook)
     target.add_to_interconnect(    	# Add target to the interconnect
         nw_name, dict(
             mac_addr = mac_addr,
             ipv4_addr = '192.%d.%d.%d' % (x, y, index),
-            ipv4_prefix_len = 24,
+            ipv4_prefix_len = ipv4_prefix_len,
             ipv6_addr = 'fc00::%02x:%02x:%02x' % (x, y, index),
-            ipv6_prefix_len = 112)
+            ipv6_prefix_len = ipv6_prefix_len)
         )
     return target
