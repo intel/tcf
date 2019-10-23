@@ -752,6 +752,12 @@ def _dict_print_dotted(d, _prefix = ""):
         else:
             print prefix + ": " + str(val)
 
+def _power_get(rt):
+    if 'powered' in rt:
+        return rt['powered'] == True
+    else:
+        return None
+
 def rest_target_print(rt, verbosity = 0):
     """
     Print information about a REST target taking into account the
@@ -761,17 +767,16 @@ def rest_target_print(rt, verbosity = 0):
     :type rt: dict
 
     """
-
     if verbosity == 0:
         print "%(fullid)s" % rt
     elif verbosity == 1:
         # Simple list, just show owner and power state
-        if 'powered' in rt:
-            if rt['powered'] == True:
-                power = " ON"
-            else:
-                power = ""
-        else:
+        _power = _power_get(rt)
+        if _power == True:
+            power = " ON"
+        elif _power == False:
+            power = " OFF"
+        else:				# no power control
             power = ""
         if rt['owner'] != None:
             owner = "[" + rt['owner'] + "]"
@@ -883,7 +888,8 @@ def rest_target_list_table(args, spec):
             suffix = ""
             if rt['owner']:
                 suffix += "@"
-            if rt.get('powered', False) == True:
+            _power = _power_get(rt)
+            if _power == True:
                 suffix += "!"
             l.append((rt_fullid, suffix))
         except requests.exceptions.ConnectionError as e:
