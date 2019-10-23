@@ -90,6 +90,14 @@ class test_target_logadapter_c(logging.LoggerAdapter):
         else:
             return 'target-%s: %s ' % (target.id, msg), kwargs
 
+_who_daemon = None
+
+def who_daemon():
+    """
+    Returns the internal user for daemon operations
+    """
+    return _who_daemon
+
 def who_split(who):
     """
     Returns a tuple with target owner specification split in two parts, the
@@ -1245,7 +1253,13 @@ class test_target(object):
           not acquired by anyone, :class:`test_target_busy_e` if the
           target is owned by someone else.
         """
-        assert isinstance(who, basestring)
+        assert isinstance(who, basestring), \
+            "who %s: who parameter has to be a str; got %s" \
+            % (who, type(who).__name__)
+        if who == who_daemon():
+            # this is the path for executing internal daemon processes
+            yield
+            return
         if self.owner_get() == None:
             raise test_target_not_acquired_e(self)
         if who != self.owner_get():

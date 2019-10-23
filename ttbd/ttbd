@@ -237,6 +237,10 @@ def login():
 
     user = flask_login.current_user
     user_id = user.get_id()
+
+    if user == ttbl.who_daemon():
+        flask.abort(404, "user %s: not allowed (reserved)" % email)
+
     logd("user %s: trying to authenticate with token '%s'" % (user_id, email))
 
     if isinstance(user, ttbl.user_control.User) \
@@ -1505,8 +1509,38 @@ if __name__ == "__main__":
         commonl.check_dir_writeable(ttbl.test_target.state_path,
                                     "storing state")
     args.state_path = ttbl.test_target.state_path
-
     args.config_path = os.path.expanduser(args.config_path)
+
+    # get the key for this instance; we need to do this before we read
+    # the configuration, as we'll use ttbl._who_daemon
+    key_filename = os.path.join(args.var_lib_path, "session.key")
+    try:
+        with open(key_filename) as f:
+            sk = cPickle.load(f)
+            if not isinstance(sk, str):
+                raise Exception("Bad type in saved key")
+            if len(sk) != 24:
+                raise Exception("Bad length in saved key")
+            logw("Reloaded key")
+    except Exception as e:
+        sk = os.urandom(24)
+        logi("New key (because %s)" % e)
+        umask_original = os.umask(0)
+        commonl.rm_f(key_filename)
+        try:
+            fd = os.open(key_filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                         0o600)
+        finally:
+            os.umask(umask_original)
+        with os.fdopen(fd, 'w') as f:
+            cPickle.dump(sk, f, protocol = 2)
+
+    # this is the username we use for internal tasks who always gets a
+    # pass on access checks if the target is unlocked
+    # wee ttbl.with_target_locked_and_acquired()
+    ttbl._who_daemon = "internal-" + commonl.mkid(sk, 6)
+
+    # read the configuration
     commonl.check_dir(args.config_path, "storing configuration")
     # FIXME: this has to be done as the options are specified?
     try:
@@ -1552,28 +1586,6 @@ if __name__ == "__main__":
     app.config['state_path'] = ttbl.test_target.state_path
     ttbl.user_control.User.state_dir = args.var_lib_path
     app.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(4)
-    key_filename = os.path.join(args.var_lib_path, "session.key")
-    try:
-        with open(key_filename) as f:
-            sk = cPickle.load(f)
-            if type(sk) != str:
-                raise Exception("Bad type in saved key")
-            if len(sk) != 24:
-                raise Exception("Bad length in saved key")
-            logw("Reloaded key")
-    except Exception as e:
-        sk = os.urandom(24)
-        logi("New key (because %s)" % e)
-        umask_original = os.umask(0)
-        commonl.rm_f(key_filename)
-        try:
-            fd = os.open(key_filename, os.O_WRONLY | os.O_CREAT | os.O_EXCL,
-                         0o600)
-        finally:
-            os.umask(umask_original)
-        with os.fdopen(fd, 'w') as f:
-            cPickle.dump(sk, f, protocol = 2)
-
     app.secret_key = base64.b64encode(sk)
 
     # SSL config: default to at least TLS v1.2
