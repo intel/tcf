@@ -638,7 +638,7 @@ fi
 sudo mv $tmpdir/.tcf.metadata.yaml $destdir
 
 # If we said we wanted it in a tar file, pack it up and remove the directory
-if ! [ -z "$tarname" ]; then
+if ! [ -z "${tarname:-}" ]; then
     cd $(dirname $destdir)
     basename=$(basename $destdir)
     # --numeric-owner: so when we extract we keep exactly what we
