@@ -1,3 +1,4 @@
+keyring
 Jinja2
 PyYAML
 junit_xml

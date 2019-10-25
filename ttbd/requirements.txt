@@ -1,6 +1,7 @@
 flask
 flask-login
 flask-principal
+keyring
 pexpect
 ply
 prctl

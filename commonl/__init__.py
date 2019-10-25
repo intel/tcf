@@ -27,6 +27,7 @@ import hashlib
 import imp
 import importlib
 import inspect
+import keyring
 import logging
 import numbers
 import os
@@ -1216,6 +1217,11 @@ def split_user_pwd_hostname(s):
     Return a tuple decomponsing ``[USER[:PASSWORD]@HOSTNAME``
 
     :returns: tuple *( USER, PASSWORD, HOSTNAME )*, *None* in missing fields.
+
+    Note that if password is *KEYRING*, the user's keyring will be
+    looked up for the password, with *USER* as username and *HOSTNAME*
+    as service. See how to use keyring in a `headless system
+    <https://keyring.readthedocs.io/en/stable/#using-keyring-on-headless-linux-systems>`_.
     """
     assert isinstance(s, basestring)
     user = None
@@ -1231,4 +1237,6 @@ def split_user_pwd_hostname(s):
     else:
         user = user_password
         password = None
+    if password == "KEYRING":
+        password = keyring.get_password(hostname, user)
     return user, password, hostname
