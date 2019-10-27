@@ -1101,10 +1101,11 @@ class target_c(object):
         :param str property_name: Name of the property to read
         :returns str: value of the property (if set) or None
         """
-        self.report_info("reading property '%s'" % property_name, dlevel = 1)
+        self.report_info("reading property '%s'" % property_name, dlevel = 3)
         r = self.rtb.rest_tb_property_get(
             self.rt, property_name, ticket = self.ticket)
-        self.report_info("read property '%s': '%s'" % (property_name, r))
+        self.report_info("read property '%s': '%s'" % (property_name, r),
+                         dlevel = 2)
         if r == None and default != None:
             return default
         return r
@@ -1119,10 +1120,11 @@ class target_c(object):
         if value:
             assert isinstance(value, basestring)
         self.report_info("setting property '%s' to '%s'"
-                         % (property_name, value), dlevel = 1)
+                         % (property_name, value), dlevel = 3)
         self.rtb.rest_tb_property_set(
             self.rt, property_name, value, ticket = self.ticket)
-        self.report_info("set property '%s' to '%s'" % (property_name, value))
+        self.report_info("set property '%s' to '%s'" % (property_name, value),
+                         dlevel = 2)
 
     def thing_plug(self, thing):
         """
