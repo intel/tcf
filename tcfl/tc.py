@@ -6239,6 +6239,10 @@ class tc_c(object):
                     tc_instances += _is_testcase_call(_tc_driver, tc_name,
                                                       file_name, from_path,
                                                       subcases_cmdline)
+                    for _tc in tc_instances:
+                        logger.info("testcase found @ %s by %s",
+                                    _tc.origin, _tc_driver)
+                        
                 # this is so ugly, need to merge better with result_c's handling
                 except subprocess.CalledProcessError as e:
                     retval = result_c.from_exception_cpe(tc_fake, e)
@@ -6270,7 +6274,6 @@ class tc_c(object):
                 for testcase_patcher in cls.testcase_patchers:
                     testcase_patcher(_tc)
                 _tc._components_fixup()
-                logger.info("testcase found @ %s", _tc.origin)
             tcis += tc_instances
             break
         else:
