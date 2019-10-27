@@ -22,7 +22,7 @@ def nw_default_targets_zephyr_add(letter, bsps = [ 'x86', 'arm', 'nios2',
     assert isinstance(letter, basestring)
     assert len(letter) == 1
 
-    nw_idx = ord(letter)
+    x, y, _vlan_id = nw_indexes(letter)
     nw_name = "nw" + letter
 
     # Add five QEMU Zephyr targets on the network, one of each architecture
@@ -38,13 +38,13 @@ def nw_default_targets_zephyr_add(letter, bsps = [ 'x86', 'arm', 'nios2',
                 tags = {
                     "interconnects": {
                         nw_name: dict(
-                            ipv4_addr = "192.168.%d.%d" % (nw_idx, count),
+                            ipv4_addr = "192.%d.%d.%d" % (x, y, count),
                             ipv4_prefix_len = 24,
-                            ipv6_addr = "fc00::%02x:%02x" % (nw_idx, count),
+                            ipv6_addr = "fc00::%02x:%02x:%02x" % (x, y, count),
                             ipv6_prefix_len = 112,
                             ic_index = count,
-                            mac_addr = "02:%02x:00:00:00:%02x" \
-                                % (nw_idx, count),
+                            mac_addr = "02:%02x:00:00:%02x:%02x" \
+                                % (x, y, count),
                         ),
                     }
                 }

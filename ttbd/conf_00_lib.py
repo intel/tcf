@@ -671,7 +671,7 @@ def nw_default_targets_add(letter, pairs = 5):
     assert isinstance(letter, basestring)
     assert len(letter) == 1
 
-    nw_idx = ord(letter)
+    x, y, _vlan_id = nw_indexes(letter)
     nw_name = "nw" + letter
 
     # Add the network target
@@ -690,9 +690,9 @@ def nw_default_targets_add(letter, pairs = 5):
                      # generic kernels
                      sd_iftype = 'ide',
                      mr_partsizes = "1:4:5:8",
-                     mac_addr = "02:%02x:00:00:00:%02x" % (nw_idx, v),
-                     ipv4_addr = "192.168.%d.%d" % (nw_idx, v),
-                     ipv6_addr = "fc00::%02x:%02x" % (nw_idx, v),
+                     mac_addr = "02:%02x:00:00:%02x:%02x" % (x, y, v),
+                     ipv6_addr = 'fc00::%02x:%02x:%02x' % (x, y, v),
+                     ipv4_addr = '192.%d.%d.%d' % (x, y, v),
                      extra_cmdline = "-cpu host" \
                      " -display vnc=0.0.0.0:%d" % vnc_port_count)
         target = ttbl.config.targets[target_name]
