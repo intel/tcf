@@ -28,7 +28,12 @@ import traceback
 import types
 
 import pexpect
-import pexpect.fdpexpect
+try:
+    import pexpect.fdpexpect
+except ImportError:
+    # RHEL 7 -> fdpexpect is a separate module, not a submod of pexpectg    import fdpexpect
+    import fdpexpect
+    pexpect.fdpexpect = fdpexpect
 
 import commonl
 import ttbl
