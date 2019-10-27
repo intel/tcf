@@ -729,15 +729,21 @@ def rest_logout(args):
         if rtb.valid_session:
             rtb.logout()
 
-def _dict_print_dotted(d, _prefix = ""):
-    for key, val in sorted(d.items(), key = lambda i: i[0]):
-        prefix = _prefix + key
-        if isinstance(val, dict):
-            _dict_print_dotted(val, prefix + ".")
-        elif isinstance(val, list):
-            print prefix + ": [ " + ", ".join(str(i) for i in val) + " ]"
-        else:
-            print prefix + ": " + str(val)
+def _dict_print_dotted(d, prefix = ""):
+
+    if isinstance(d, dict):
+        if prefix.strip() != "":
+            prefix = prefix + "."
+        for key, val in sorted(d.items(), key = lambda i: i[0]):
+            _dict_print_dotted(val, prefix + key)
+    elif isinstance(d, (list, set, tuple)):
+        # could use iter(x), but don't wanna catch strings, etc
+        count = 0
+        for v in d:
+            _dict_print_dotted(v, prefix + "[%d]" % count)
+            count += 1
+    else:
+        print prefix + ":", d
 
 def _power_get(rt):
     if 'powered' in rt:
