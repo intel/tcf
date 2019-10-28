@@ -2077,7 +2077,7 @@ class test_target_console_mixin(object):
             count = count + 1
 
 
-class test_target_images_mixin(object):
+class test_target_images_mixin(object):	# COMPAT
     class error(Exception):
         pass
 

@@ -441,7 +441,7 @@ Debugging Interface
 Power Control Interface
 -----------------------
 
-.. autoclass:: ttbl.tt_power_control_mixin
+.. automodule:: ttbl.power
 .. automodule:: ttbl.dhcp
 .. automodule:: ttbl.pc
 .. automodule:: ttbl.raritan_emx
@@ -456,6 +456,7 @@ Other interfaces
 .. automodule:: ttbl.buttons
 .. automodule:: ttbl.capture
 .. automodule:: ttbl.fastboot
+.. automodule:: ttbl.images
 .. automodule:: ttbl.ioc_flash_server_app
 
 

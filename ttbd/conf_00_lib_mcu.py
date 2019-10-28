@@ -25,6 +25,7 @@ import ttbl.capture
 import ttbl.cm_serial
 import ttbl.dhcp
 import ttbl.flasher
+import ttbl.images
 import ttbl.pc
 import ttbl.pc_ykush
 import ttbl.rsync
@@ -463,8 +464,8 @@ def a101_dfu_add(name,
 
 
 
-def arduino2_add(name = None,
-                 serial_number = None,
+def arduino2_add(name,
+                 usb_serial_number,
                  serial_port = None,
                  ykush_serial = None,
                  ykush_port_board = None,):
@@ -479,7 +480,7 @@ def arduino2_add(name = None,
     .. code-block:: python
 
        arduino2_add(name = "arduino2-NN",
-                    serial_number = "SERIALNUMBER",
+                    usb_serial_number = "SERIALNUMBER",
                     serial_port = "/dev/tty-arduino2-NN",
                     ykush_serial = "YKXXXXX",
                     ykush_port_board = N)
@@ -537,47 +538,69 @@ def arduino2_add(name = None,
        ``/dev/tty-TARGETNAME``. Follow :ref:`these instructions
        <usb_tty_serial>` using the boards' *serial number*.
     """
+    if usb_serial_number == None:
+        usb_serial_number = name
     if serial_port == None:
         serial_port = "/dev/tty-" + name
+    if ykush_serial and ykush_port_board:
+        power_rail = ttbl.pc_ykush.ykush(ykush_serial, ykush_port_board)
+    else:
+        power_rail = []
 
-    pc_board = ttbl.pc_ykush.ykush(ykush_serial, ykush_port_board)
+    target = ttbl.test_target(name)
     ttbl.config.target_add(
-        ttbl.tt.tt_arduino2(
-            name,
-            serial_port = serial_port,
-            power_control = [
-                pc_board,
-                # delay until the board powers up and it's built in
-                # flasher comes online as a USB device -- if it
-                # doesn't come up, power cycle it
-                ttbl.pc.delay_til_usb_device(
-                    serial_number,
-                    poll_period = 10,
-                    action = pc_board.power_cycle_raw,
-                    # must be a sequence!
-                    action_args = (2,)
-                    ),
-                ttbl.pc.delay_til_file_appears(	# Serial port comes up
-                    serial_port, poll_period = 4, timeout = 25,
+        target,
+        tags = dict(
+            bsp_models = dict(
+                arm = None,
+            ),
+            bsps = dict(
+                arm = dict(
+                    zephyr_board = "arduino_due",
+                    zephyr_kernelname = 'zephyr.bin',
+                    sketch_fqbn = "sam:1.6.9:arduino_due_x_dbg",
+                    sketch_kernelname = "sketch.ino.bin",
+                    console = ""
                 ),
-                ttbl.cm_serial.pc(),
-            ]),
-        tags = {
-            'bsp_models': { 'arm': None },
-            'bsps' : {
-                "arm": dict(zephyr_board = "arduino_due",
-                            zephyr_kernelname = 'zephyr.bin',
-                            sketch_fqbn = "sam:1.6.9:arduino_due_x_dbg",
-                            sketch_kernelname = "sketch.ino.bin",
-                            board = "arduino_due",
-                            kernelname = 'zephyr.bin',
-                            console = "",
-                            kernel = [ "unified", "micro", "nano" ] )
-            },
-            'quark_se_stub': "no",
-        },
+            ),
+        ),
         target_type = "arduino2")
 
+    console_file_name = "/dev/tty-%s" % name
+    serial0_pc = ttbl.console.serial_pc(console_file_name)
+
+    target.interface_add(
+        "power",
+        ttbl.power.interface(
+            *
+            power_rail +
+            [
+                ( "USB device present",
+                  ttbl.pc.delay_til_usb_device(usb_serial_number) ),
+                ( "TTY file present",
+                  ttbl.pc.delay_til_file_appears(
+                      console_file_name, poll_period = 1, timeout = 25,
+                  )),
+                ( "serial0", serial0_pc )
+            ]
+        )
+    )
+
+    target.interface_add(
+        "console",
+        ttbl.console.interface(
+            serial0 = serial0_pc,
+            default = "serial0",
+        )
+    )
+
+    target.interface_add(
+        "images",
+        ttbl.images.interface(**{
+            "kernel": ttbl.images.bossac_c(),
+            "kernel-arm": "kernel"
+        })
+    )
 
 
 def emsk_add(name = None,
@@ -738,9 +761,9 @@ def emsk_add(name = None,
 
 
 def esp32_add(name,
-              serial_number,
-              ykush_serial,
-              ykush_port_board,
+              usb_serial_number = None,
+              ykush_serial = None,
+              ykush_port_board = None,
               serial_port = None):
     """\
     **Configure an ESP-32 MCU board**
@@ -767,7 +790,8 @@ def esp32_add(name,
 
     :param str name: name of the target
 
-    :param str serial_number: USB serial number for the *esp32*
+    :param str usb_serial_number: (optional) USB serial number for the
+      *esp32*; defaults to same as the target
 
     :param str ykush_serial: :ref:`USB serial number
       <ykush_serial_number>` of the YKUSH hub used for power control
@@ -820,36 +844,67 @@ def esp32_add(name,
        <usb_tty_serial>` using the boards' *serial number*.
 
     """
+    if usb_serial_number == None:
+        usb_serial_number = name
     if serial_port == None:
         serial_port = "/dev/tty-" + name
-    pc_board = ttbl.pc_ykush.ykush(ykush_serial, ykush_port_board)
+    if ykush_serial and ykush_port_board:
+        power_rail = ttbl.pc_ykush.ykush(ykush_serial, ykush_port_board)
+    else:
+        # FIXME: add a fake power rail that resets the board on on() with
+        # esptool.py --after hard_reset read_mac
+        power_rail = []
 
+    target = ttbl.test_target(name)
     ttbl.config.target_add(
-        ttbl.tt.tt_esp32(name, serial_number,
-                         power_control = [
-                             pc_board,
-                             # delay until the board powers up and
-                             # it's built in flasher comes online as a
-                             # USB device -- if it doesn't come up,
-                             # power cycle it
-                             ttbl.pc.delay_til_usb_device(serial_number),
-                             # No need to delay until the serial port file
-                             # appears, let the console logger figure that
-                             # out, as it retries a few times
-                             ttbl.cm_serial.pc(),
-                         ],
-                         serial_port = serial_port),
-        tags = {
-            'bsp_models': {
-                'xtensa': None,
-            },
-            'bsps' : {
-                "xtensa":  dict(zephyr_board = "esp32",
-                                zephyr_kernelname = 'zephyr.elf',
-                                console = ""),
-            },
-        },
-        target_type = "esp32"
+        target,
+        tags = dict(
+            bsp_models = dict(
+                xtensa = None,
+            ),
+            bsps = dict(
+                xtensa = dict(
+                    zephyr_board = "esp32",
+                    zephyr_kernelname = 'zephyr.elf',
+                    console = ""),
+            ),
+        ),
+        target_type = "esp32")
+
+    console_file_name = "/dev/tty-%s" % name
+    serial0_pc = ttbl.console.serial_pc(console_file_name)
+
+    target.interface_add(
+        "power",
+        ttbl.power.interface(
+            *
+            power_rail +
+            [
+                ( "USB device present",
+                  ttbl.pc.delay_til_usb_device(usb_serial_number) ),
+                ( "TTY file present",
+                  ttbl.pc.delay_til_file_appears(
+                      console_file_name, poll_period = 1, timeout = 25,
+                  )),
+                ( "serial0", serial0_pc )
+            ]
+        )
+    )
+
+    target.interface_add(
+        "console",
+        ttbl.console.interface(
+            serial0 = serial0_pc,
+            default = "serial0",
+        )
+    )
+
+    target.interface_add(
+        "images",
+        ttbl.images.interface(**{
+            "kernel": ttbl.images.esptool_c(),
+            "kernel-xtensa": "kernel"
+        })
     )
 
 

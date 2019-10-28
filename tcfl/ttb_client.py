@@ -480,7 +480,7 @@ class rest_target_broker(object):
             "GET", "targets/%s/power_get" % rt['id'])
         return r['powered']
 
-    def rest_tb_target_images_set(self, rt, images, ticket = ''):
+    def rest_tb_target_images_set(self, rt, images, ticket = ''): # COMPAT
         """
         Write/configure images to the targets (depending on the
         target)
@@ -1084,7 +1084,7 @@ def rest_target_images_set(args):
     images = dict((image_spec.split(":", 1)) for image_spec in args.images)
     return rtb.rest_tb_target_images_set(rt, images, ticket = args.ticket)
 
-def rest_tb_target_images_upload(rtb, _images):
+def rest_tb_target_images_upload(rtb, _images):	# COMPAT
     """
     Upload images from a list images
 
@@ -1131,30 +1131,6 @@ def rest_tb_target_images_upload(rtb, _images):
         remote_images[image_type] = remote_filename
 
     return remote_images
-
-def rest_tb_target_images_upload_set(rtb, rt, _images, ticket = ''):
-    """
-    :param rtb: Remote Target Broker
-    :param rt: Remote Target descriptor
-    :param _images: list of images, which can be specified as:
-
-      - string with ``"IMAGE1:FILE1 IMAGE2:FILE2..."``
-      - list or set of strings ``["IMAGE1:FILE1", "IMAGE2:FILE2", ...]``
-      - list or set of tuples ``[("IMAGE1", "FILE1"),  ("IMAGE2", "FILE2"), ...]``
-
-
-    """
-    remote_images = rest_tb_target_images_upload(rtb, _images)
-    return rtb.rest_tb_target_images_set(rt, remote_images, ticket = ticket)
-
-def rest_target_images_upload_set(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    rtb, rt = _rest_target_find_by_id(args.target)
-    return rest_tb_target_images_upload_set(rtb, rt, args.images)
 
 def rest_broker_file_upload(args):
     """

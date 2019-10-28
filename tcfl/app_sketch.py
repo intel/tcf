@@ -94,9 +94,8 @@ class app_sketch(tcfl.app.app_c):
 
     @staticmethod
     def deploy(images, testcase, target, app_src):
-        images.add(('kernel-%(bsp)s' % target.kws,
-                    '%(sketch_outdir)s/%(sketch_srcfile)s.bin'
-                    % target.kws))
+        images['kernel-%(bsp)s' % target.kws] = \
+            '%(sketch_outdir)s/%(sketch_srcfile)s.bin' % target.kws
 
     @staticmethod
     def clean(testcase, target, app_src):

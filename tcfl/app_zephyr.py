@@ -379,13 +379,11 @@ CONFIG_BOOT_DELAY=0
     @staticmethod
     def deploy(images, testcase, target, app_src):
         if target.kws['zephyr_is_cmake']:
-            images.add((
-                'kernel-%(bsp)s' % target.kws,
-                '%(zephyr_objdir)s/zephyr/%(zephyr_kernelname)s' % target.kws))
+            images['kernel-%(bsp)s' % target.kws] = \
+                '%(zephyr_objdir)s/zephyr/%(zephyr_kernelname)s' % target.kws
         else:
-            images.add((
-                'kernel-%(bsp)s' % target.kws,
-                '%(zephyr_objdir)s/%(zephyr_kernelname)s' % target.kws))
+            images['kernel-%(bsp)s' % target.kws] = \
+                '%(zephyr_objdir)s/%(zephyr_kernelname)s' % target.kws
 
     @staticmethod
     def setup(testcase, target, app_src):

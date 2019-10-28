@@ -3511,7 +3511,7 @@ class tc_c(object):
     # list of images to the images set to be uploaded to the target
     # using the images interface.
     def _deploy_50_for_target(self, _target):
-        images = set()
+        images = dict()
         result = result_c(0, 0, 0, 0, 0)
         for bsp in _target.bsps:
             # FIXME: use msgid_c here
@@ -3538,7 +3538,7 @@ class tc_c(object):
 
         if images:
             if getattr(_target, "images", None) != None:
-                result = _target.images.upload_set(images)
+                result = _target.images.flash(images)
             else:
                 result = result_c(0, 0, 0, 1, 0)
                 _target.report_info("Images collected by deploy phase, but "
@@ -7148,8 +7148,6 @@ import target_ext_console
 target_c.extension_register(target_ext_console.extension, "console")
 import target_ext_power
 target_c.extension_register(target_ext_power.extension, "power")
-import target_ext_images
-target_c.extension_register(target_ext_images.images)
 import target_ext_debug
 target_c.extension_register(target_ext_debug.debug)
 import target_ext_tunnel
@@ -7158,6 +7156,8 @@ import target_ext_shell
 target_c.extension_register(target_ext_shell.shell)
 import target_ext_ssh
 target_c.extension_register(target_ext_ssh.ssh)
+import target_ext_images
+target_c.extension_register(target_ext_images.extension, "images")
 import target_ext_ioc_flash_server_app
 target_c.extension_register(target_ext_ioc_flash_server_app.extension,
                             "ioc_flash_server_app")

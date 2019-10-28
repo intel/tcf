@@ -297,27 +297,6 @@ if __name__ == "__main__":
                     help = "Target's name or URL whose broker we'll use")
     ap.set_defaults(func = ttb_client.rest_broker_file_list)
 
-    ap = arg_subparsers.add_parser("images-set",
-                                   help = "Set images in the target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("images", metavar = "TYPE:FILENAME",
-                    action = "store", default = None, nargs = '+',
-                    help = "List of images to set FIXME")
-    ap.set_defaults(func = ttb_client.rest_target_images_set)
-
-    ap = arg_subparsers.add_parser(
-        "images-upload-set",
-        help = "Upload and set images in the target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("images", metavar = "TYPE:LOCALFILENAME",
-                    action = "store", default = None, nargs = '+',
-                    help = "Each LOCALFILENAME is uploaded to the broker and "
-                    "then set as an image of the given TYPE")
-    ap.set_defaults(func = ttb_client.rest_target_images_upload_set)
-
-
     ap = arg_subparsers.add_parser(
         "debug-start", help = "Start debugging bridge")
     ap.add_argument("target", metavar = "TARGET", action = "store",
@@ -348,6 +327,7 @@ if __name__ == "__main__":
     tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_console._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_images._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_ioc_flash_server_app._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_fastboot._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_power._cmdline_setup(arg_subparsers)

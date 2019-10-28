@@ -207,7 +207,7 @@ def build(ab, testcase, target, app_src):
 
 def deploy(images, ab, testcase, target, app_src):
     app_src = _args_check(ab, testcase, target, app_src)
-    assert isinstance(images, set)
+    assert isinstance(images, dict)
     try:
         r = ab.deploy(images, testcase, target, app_src)
         if r == None:
@@ -343,7 +343,7 @@ class app_c(object):
             target.debug.openocd("reg pc %s" % target.kws['__start'])
             target.debug.resume()
         else:
-            target.power.reset()	# Will power on if off
+            target.power.cycle()	# Will power on if off
 
         # We want to start each target only once
         testcase.buffers['started-%s' % target.want_name] = True
