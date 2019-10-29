@@ -154,6 +154,62 @@ class extension(tc.target_extension_c):
             self.target.ttbd_iface_call("power", "cycle")
         self.target.report_info("reset")
 
+    def _healthcheck(self):
+        target = self.target
+        print "Powering off"
+        target.power.off()
+        print "Powered off"
+
+        print "Querying power status"
+        power = target.power.get()
+        if power != False:
+            msg = "Power should be False, reported %s" % power
+            raise Exception(msg)
+        print "Power is reported correctly as %s" % power
+
+        print "Powering on"
+        target.power.on()
+        print "Powered on"
+
+        print "Querying power status"
+        power = target.power.get()
+        if power != True:
+            msg = "Power should be True, reported %s" % power
+            raise Exception(msg)
+        print "Power is reported correctly as %s" % power
+
+        print "Power cycling"
+        target.power.cycle()
+        print "Power cycled"
+
+        print "Power conmponents: listing"
+        try:
+            components = target.power.list()
+        except RuntimeError as e:
+            print "Power components: not supported"
+        else:
+            print "Power components: listed %s" \
+                % " ".join("%s:%s" % (k, v) for k, v in components)
+
+        print "Querying power status"
+        power = target.power.get()
+        if power != True:
+            msg = "Power should be True, reported %s" % power
+            raise Exception(msg)
+        print "Power is reported correctly as %s" % power
+
+        print "Powering off"
+        target.power.off()
+        print "Powered off"
+
+        print "Querying power status"
+        power = target.power.get()
+        if power != False:
+            msg = "Power should be False, reported %s" % power
+            raise Exception(msg)
+        print "Power is reported correctly as %s" % power
+        print "Power test passed"
+
 
 def _cmdline_power_off(args):
     with msgid_c("cmdline"):
@@ -256,3 +312,5 @@ def _cmdline_setup(arg_subparser):
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target")
     ap.set_defaults(func = _cmdline_power_get)
+
+

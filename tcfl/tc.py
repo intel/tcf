@@ -574,7 +574,7 @@ class target_c(object):
         #: Shall we acquire this target? By default the testcases get
         #: the targets they request acquired for exclusive use, but in
         #: some cases, it might not be needed (default: True)
-        self.acquire = True
+        self.do_acquire = True
 
     @classmethod
     def extension_register(cls, ext_cls, name = None):
@@ -2950,7 +2950,7 @@ class tc_c(object):
         #: in general (default), the testcases need to acquire the
         #: targets where they are going to be executed, but in some
         #: cases, they do not.
-        self.targets_acquire = True
+        self.do_acquire = True
 
     def __thread_init__(self, expecter_parent):
         """
@@ -4555,14 +4555,14 @@ class tc_c(object):
         timeout = self.assign_timeout
         period = assign_period
 
-        if not self.targets_acquire or self.is_static():
+        if not self.do_acquire or self.is_static():
             yield
             return
 
         acquired = []
         pending = []
         for target in self.target_group.targets.values():
-            if target.acquire:
+            if target.do_acquire:
                 pending.append(target)
         if not pending:
             yield
@@ -6379,7 +6379,7 @@ class subtc_c(tc_c):
         self.summary = None
         self.output = None
         # we don't need to acquire our targets, won't use them
-        self.targets_acquire = False
+        self.do_acquire = False
 
     def update(self, result, summary, output):
         """
