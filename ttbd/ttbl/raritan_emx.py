@@ -11,11 +11,12 @@
 import urlparse
 
 import ttbl
+import ttbl.power
 import raritan
 import raritan.rpc
 import raritan.rpc.pdumodel
 
-class pci(ttbl.tt_power_control_impl): # pylint: disable = abstract-method
+class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl): # pylint: disable = abstract-method
     """
     Power control interface for the Raritan EMX family of PDUs (eg: PX3-\*)
 
@@ -109,6 +110,7 @@ class pci(ttbl.tt_power_control_impl): # pylint: disable = abstract-method
         assert isinstance(url, basestring)
         assert isinstance(outlet_number, int) and outlet_number > 0
 
+        ttbl.power.impl_c.__init__(self)
         self.url = urlparse.urlparse(url)
         # note the indexes for the SW are 0-based, while in the labels
         # in the HW for humans, they are 1 based.
@@ -136,15 +138,15 @@ class pci(ttbl.tt_power_control_impl): # pylint: disable = abstract-method
             self._outlet_rpc = outlets[self.outlet_number]
         return self._outlet_rpc
 
-    def power_on_do(self, _target):
+    def on(self, _target, _component):
         self._outlet.setPowerState(
             raritan.rpc.pdumodel.Outlet.PowerState.PS_ON)
 
-    def power_off_do(self, _target):
+    def off(self, _target, _component):
         self._outlet.setPowerState(
             raritan.rpc.pdumodel.Outlet.PowerState.PS_OFF)
 
-    def power_get_do(self, _target):
+    def get(self, _target, _component):
         # We cannot call self._outlet.getState() directly--there seems
         # to be a compat issue between this version of the API in the
         # unit I tested with and what this API expects, with a missing
@@ -160,3 +162,13 @@ class pci(ttbl.tt_power_control_impl): # pylint: disable = abstract-method
         if state == 0:
             return False
         return True
+
+    # COMPAT: old interface, ttbl.tt_power_control_impl
+    def power_on_do(self, target):
+        return self.on(target, "n/a")
+
+    def power_off_do(self, target):
+        return self.off(target, "n/a")
+
+    def power_get_do(self, target):
+        return self.get(target, "n/a")
