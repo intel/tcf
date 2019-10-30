@@ -453,9 +453,29 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
 
     :params str hostname: *USER[:PASSWORD]@HOSTNAME* for the SSH server
 
+    :param int port: (optional) port to connect to (defaults to 22)
+
+    :param dict exta_ports: (optional) dictionary of extra SSH options
+      and values to set in the SSH configuration (as described in
+      :manpage:`ssh_config(5)`.
+
+      Note they all have to be strings; e.g.:
+
+      >>> serial0_pc = ttbl.console.ssh_pc(
+      >>>     "USER:PASSWORD@HOSTNAME",
+      >>>     extra_opts = {
+      >>>         "Ciphers": "aes128-cbc,3des-cbc",
+      >>>         "Compression": "no",
+      >>>     })
+
+      Be careful what is changed, since it can break operation.
+
+    See :class:`generic_c` for descriptions on *chunk_size* and
+    *interchunk_wait*, :class:`impl_c` for *command_sequence*.
+
     For example:
 
-    >>> ssh0_pc = ttbl.console.ssh_pc('HOSTNAME', 'USERNAME', "PASSWORD")
+    >>> ssh0_pc = ttbl.console.ssh_pc("USERNAME:PASSWORD@HOSTNAME")
     >>>
     >>> ttbl.config.targets[name].interface_add(
     >>>     "power",
@@ -473,13 +493,19 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
 
     FIXME:
      - pass password via agent? file descriptor?
-     - pass connection parameters (-o stuff)
 
     """
     def __init__(self, hostname, port = 22,
-                 chunk_size = 0, interchunk_wait = 0.1):
+                 chunk_size = 0, interchunk_wait = 0.1,
+                 extra_opts = None):
         assert isinstance(hostname, basestring)
         assert port > 0
+        assert extra_opts == None \
+            or ( isinstance(extra_opts, dict) \
+                 and all(isinstance(k, str) and isinstance(v, str)
+                         for k, v in extra_opts.items())), \
+            "extra_opts: expected dict of string:string; got %s" \
+            % type(extra_opts)
 
         generic_c.__init__(self,
                            chunk_size = chunk_size,
@@ -511,12 +537,16 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
         self.password = password
         # SSHPASS always has to be defined
         self.env_add['SSHPASS'] = password if password else ""
-
+        self.extra_opts = extra_opts
 
     def on(self, target, component):
         # generate configuration file from parameters
         with open(os.path.join(target.state_dir, component + "-ssh-config"),
                   "w+") as cf:
+            _extra_opts = ""
+            if self.extra_opts:
+                for k, v in self.extra_opts.items():
+                    _extra_opts += "%s = %s\n" % (k, v)
             cf.write("""\
 UserKnownHostsFile = %s/%s-ssh-known_hosts
 StrictHostKeyChecking = no
@@ -526,8 +556,8 @@ TCPKeepAlive = yes
 ForwardX11 = no
 ForwardAgent = no
 EscapeChar = none
-""" % (target.state_dir, component))
-        return ttbl.power.socat_pc.on(self, target, component)
+%s""" % (target.state_dir, component, _extra_opts))
+        ttbl.power.socat_pc.on(self, target, component)
 
     # console interface; state() is implemented by generic_c
     def setup(self, target, component, parameters):
