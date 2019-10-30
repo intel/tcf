@@ -68,22 +68,24 @@ def healthcheck(args):
     with tcfl.msgid_c("cmdline"):
         target = tcfl.tc.target_c.create_from_cmdline_args(args)
 
-        print "Acquiring", target.acquire
+        print "acquiring", target.acquire
         target.acquire()
-        print "Acquired"
+        print "OK: acquired"
 
         if hasattr(target, "power"):
             target.power._healthcheck()
+        else:
+            print "WARNING: No power control interface"
 
-        print "Releasing"
+        print "releasing"
         target.release()
-        print "Released"
+        print "OK: released"
 
-        print "Releasing again, should just work"
+        print "releasing again, should just work"
         target.release()
-        print "Released again"
+        print "OK: released again"
 
-        print "%s: healthcheck completed" % target.id
+        print "healthcheck completed" % target.id
 
 
 if __name__ == "__main__":
