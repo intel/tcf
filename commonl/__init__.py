@@ -1222,6 +1222,23 @@ def split_user_pwd_hostname(s):
     looked up for the password, with *USER* as username and *HOSTNAME*
     as service. See how to use keyring in a `headless system
     <https://keyring.readthedocs.io/en/stable/#using-keyring-on-headless-linux-systems>`_.
+
+    - to set a password in the keyring::
+
+        $ echo KEYRINGPASSWORD | gnome-keyring-daemon --unlock
+        $ keyring set "USER"  HOSTNAME
+        Password for 'HOSTNAME' in 'USER': <ENTER PASSWORD HERE>
+
+    - to be able to run the daemon has to be executed under a dbus session::
+
+        $ dbus-session -- sh
+        $ echo KEYRINGPASSWORD | gnome-keyring-daemon --unlock
+        $ ttbd...etc
+
+      FIXME: details of systemd integration
+
+    If password is *FILENAME:<FILENAME>* the password will be taken
+    from that file.
     """
     assert isinstance(s, basestring)
     user = None
@@ -1239,4 +1256,8 @@ def split_user_pwd_hostname(s):
         password = None
     if password == "KEYRING":
         password = keyring.get_password(hostname, user)
+    elif password and password.startswith("FILENAME:"):
+        _, filename = password.split(":", 1)
+        with open(filename) as f:
+            password = f.read().strip()
     return user, password, hostname
