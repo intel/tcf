@@ -450,7 +450,7 @@ class tc_zephyr_subsanity_c(tc.tc_c):
         # class for normal sanity check testcases that require a
         # target and unit test cases that don't.
         for target in self.targets.values():
-            target.acquire = False
+            target.do_acquire = False
         self.report_pass("NOTE: This is a subtestcase of %(tc_name)s "
                          "(%(runid)s:%(tc_hash)s); refer to it for full "
                          "information" % self.parent.kws, dlevel = 1)
