@@ -177,7 +177,8 @@ class interface(ttbl.tt_interface):
         # Called when the interface is added to a target to initialize
         # the needed target aspect (such as adding tags/metadata)
         target.tags_update(dict(consoles = self.impls.keys()))
-
+        target.properties_user.add("console-default")
+        target.properties_keep_on_release.add("console-default")
 
     def _release_hook(self, target, _force):
         # nothing to do on target release
