@@ -313,10 +313,15 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
             env = env,
         )
         ttbl.power.socat_pc.on(self, target, component)
+        ttbl.console.generic_c.enable(self, target, component)
+
+    def off(self, target, component):
+        generic_c.disable(self, target, component)
+        ttbl.power.socat_pc.off(self, target, component)
 
     # console interface; state() implemented by generic_c
     def enable(self, target, component):
-        return self.on(target, component)
+        self.on(target, component)
 
     def disable(self, target, component):
         return self.off(target, component)

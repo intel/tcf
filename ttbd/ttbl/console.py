@@ -10,12 +10,28 @@ Access target's serial consoles / bidirectional channels
 Implemented by :class:`ttbl.console.interface`.
 """
 
+import codecs
 import errno
+import fcntl
 import os
 import time
 
 import commonl
 import ttbl
+
+try:
+    # FIXME: we don't prolly need this anymore
+    from pexpect.exceptions import TIMEOUT as pexpect_TIMEOUT
+    from pexpect.exceptions import EOF as pexpect_EOF
+except ImportError:
+    from pexpect import TIMEOUT as pexpect_TIMEOUT
+    from pexpect import EOF as pexpect_EOF
+try:
+    import pexpect.fdpexpect
+except ImportError:
+    # RHEL 7 -> fdpexpect is a separate module, not a submod of pexpectg    import fdpexpect
+    import fdpexpect
+    pexpect.fdpexpect = fdpexpect
 
 class impl_c(object):
     """
@@ -24,9 +40,74 @@ class impl_c(object):
     The target will list the available consoles in the targets'
     *consoles* tag
 
+
+    :param list command_sequence: (optional) when the console is
+      enabled (from :meth:`target.console.enable
+      <tcfl.target_ext_console.extension.enable>` or when powering up
+      a target that also enables the console at the same time via :meth:`target.power.on
+      <tcfl.target_ext_power.extension.on>` ), run a sequence of
+      send/expect commands.
+
+      This is commonly used when the serial line is part of a server
+      and a set of commands have to be typed before the serial
+      connection has to be established. For example, for some
+      Lantronix KVM serial servers, when accessing the console over
+      SSH we need to wait for the prompt and then issue a *connect
+      serial* command:
+
+      >>> serial0_pc = ttbl.console.ssh_pc(
+      >>>     "USER:PASSWORD@LANTRONIXHOSTNAME",
+      >>>     command_sequence = [
+      >>>         ( "",
+      >>>           # command prompt, 'CR[USERNAME@IP]> '... or not, so just
+      >>>           # look for 'SOMETHING> '
+      >>>           # ^ will not match because we are getting a CR
+      >>>           re.compile("[^>]+> ") ),
+      >>>         ( "connect serial\r\n",
+      >>>           "To exit serial port connection, type 'ESC exit'." ),
+      >>>     ],
+      >>>     extra_opts = {
+      >>>         # old, but that's what the Lantronix server has :/
+      >>>         "KexAlgorithms": "diffie-hellman-group1-sha1",
+      >>>         "Ciphers" : "aes128-cbc,3des-cbc",
+      >>>     })
+
+      This is a list of tupples *( SEND, EXPECT )*; *SEND* is a string
+      sent over to the console (unless the empty string; then nothing
+      is sent).  *EXPECT* can be anything that can be fed to Python's
+      Expect :method:`expect <pexpect.pexpect.spawn.expect>` function:
+
+      - a string
+      - a compiled regular expression
+      - a list of such
+
+      The timeout for each expectation is hardcoded to five seconds
+      (FIXME).
+
+      Note for this to work, the driver that uses this class must call
+      the *_command_sequence_run()* method from their
+      :meth:`impl_c.enable` methods.
+
     """
-    def __init__(self):
+    def __init__(self, command_sequence = None):
+        assert command_sequence == None \
+            or isinstance(command_sequence, list), \
+            "command_sequence: expected list of tuples; got %s" \
+            % type(command_sequence)
+        self.command_sequence = command_sequence
         self.parameters = {}
+
+    class exception(Exception):
+        """
+        General console driver exception
+        """
+        pass
+
+    class timeout_e(exception):
+        """
+        Console enablement command sequence timed out
+        """
+        pass
 
     def enable(self, target, component):
         """
@@ -34,8 +115,8 @@ class impl_c(object):
 
         :param str component: console to enable
         """
-        raise NotImplementedError("%s/%s: enabling console not implemented"
-                                  % (target.id, component))
+        if self.command_sequence:
+            self._command_sequence_run(target, component)
 
     def disable(self, target, component):
         """
@@ -44,8 +125,7 @@ class impl_c(object):
         :param str console: (optional) console to disable; if missing,
           the default one.
         """
-        raise NotImplementedError("%s/%s: disabling console not implemented"
-                                  % (target.id, component))
+        pass
 
     def state(self, target, component):
         """
@@ -116,6 +196,84 @@ class impl_c(object):
         raise NotImplementedError("%s/%s: console control not implemented"
                                   % (target.id, component))
 
+
+
+    def _log_expect_error(self, target, console, expect, msg):
+        target.log.error("%s: expect error: %s" % (console, msg))
+        if isinstance(expect.before, basestring):
+            for line in expect.before.splitlines():
+                target.log.error("%s: expect output[before]: %s"
+                                 % (console, line.strip()))
+        else:
+            target.log.error("%s: expect output[before]: %s"
+                             % (console, expect.before))
+        if isinstance(expect.after, basestring):
+            for line in expect.after.splitlines():
+                target.log.error("%s: expect output[after]: %s"
+                                 % (console, line.strip()))
+        else:
+            target.log.error("%s: expect output[after]: %s"
+                             % (console, expect.after))
+
+    def _response(self, target, console, expect, response, timeout):
+        ts0 = time.time()
+        ts = ts0
+        while ts - ts0 < timeout:
+            try:
+                r = expect.expect(response, timeout = timeout - (ts - ts0))
+                ts = time.time()
+                target.log.error("%s: found response: [+%.1fs] #%s: %s"
+                                 % (console, ts - ts0, r, response))
+                return
+            except pexpect_TIMEOUT as e:
+                self._log_expect_error(target, console, expect, "timeout")
+                raise self.timeout_e(
+                    "%s: timeout [+%.1fs] waiting for response: %s"
+                    % (console, timeout, response))
+            except pexpect_EOF as e:
+                ts = time.time()
+                offset = os.lseek(expect.fileno(), 0, os.SEEK_CUR)
+                self._log_expect_error(target, console, expect,
+                                       "EOF at offset %d" % offset)
+                time.sleep(0.5)
+                continue
+            except Exception as e:
+                self._log_expect_error(target, console, expect, str(e))
+                raise
+        if ts - ts0 >= timeout:
+            self._log_expect_error(target, console, expect, "timeout")
+            raise self.timeout_e(
+                "%s: timeout [+%.1fs] waiting for response: %s"
+                % (console, timeout, response))
+
+    def _command_sequence_run(self, target, component):
+        write_file_name = os.path.join(target.state_dir,
+                                       "console-%s.write" % component)
+        read_file_name = os.path.join(target.state_dir,
+                                      "console-%s.read" % component)
+        log_file_name = os.path.join(
+            target.state_dir, "console-%s.command.log" % component)
+        with codecs.open(read_file_name, "r", encoding = 'utf-8') as rf, \
+             open(write_file_name, "w") as wf, \
+             open(log_file_name, "w+") as logf:
+            timeout = 3
+            rfd = rf.fileno()
+            flag = fcntl.fcntl(rfd, fcntl.F_GETFL)
+            fcntl.fcntl(rfd, fcntl.F_SETFL, flag | os.O_NONBLOCK)
+            expect = pexpect.fdpexpect.fdspawn(rf, logfile = logf,
+                                               timeout = timeout)
+            for command, response in self.command_sequence:
+                if command:
+                    target.log.debug(
+                        "%s: writing command: %s"
+                        % (component, command.encode('unicode-escape',
+                                                     errors = 'replace')))
+                    wf.write(command)
+                if response:
+                    target.log.debug("%s: expecting response: %s"
+                                     % (component, response))
+                    self._response(target, component,
+                                   expect, response, timeout)
 
 class interface(ttbl.tt_interface):
     """Interface to access the target's consoles
@@ -291,14 +449,15 @@ class generic_c(impl_c):
 
     :param float interchunk_wait: (optional) if *chunk_size* is
       enabled, time to wait in seconds in between each chunk.
-
     """
-    def __init__(self, chunk_size = 0, interchunk_wait = 0.2):
+    def __init__(self, chunk_size = 0, interchunk_wait = 0.2,
+                 command_sequence = None):
         assert chunk_size >= 0
         assert interchunk_wait > 0
+
         self.chunk_size = chunk_size
         self.interchunk_wait = interchunk_wait
-        impl_c.__init__(self)
+        impl_c.__init__(self, command_sequence = command_sequence)
 
     def state(self, target, component):
         # if the write file is gone, most times this means the thing
@@ -423,8 +582,16 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
             "%s,creat=0,rawer,b115200,parenb=0,cs8,bs1" % serial_file_name)
 
     # console interface; state() is implemented by generic_c
+    def on(self, target, component):
+        ttbl.power.socat_pc.on(self, target, component)
+        generic_c.enable(self, target, component)
+
+    def off(self, target, component):
+        generic_c.disable(self, target, component)
+        ttbl.power.socat_pc.off(self, target, component)
+
     def enable(self, target, component):
-        return self.on(target, component)
+        self.on(target, component)
 
     def disable(self, target, component):
         return self.off(target, component)
@@ -497,7 +664,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
     """
     def __init__(self, hostname, port = 22,
                  chunk_size = 0, interchunk_wait = 0.1,
-                 extra_opts = None):
+                 extra_opts = None, command_sequence = None):
         assert isinstance(hostname, basestring)
         assert port > 0
         assert extra_opts == None \
@@ -509,7 +676,8 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
 
         generic_c.__init__(self,
                            chunk_size = chunk_size,
-                           interchunk_wait = interchunk_wait)
+                           interchunk_wait = interchunk_wait,
+                           command_sequence = command_sequence)
         ttbl.power.socat_pc.__init__(
             self,
             "PTY,link=console-%(component)s.write,rawer"
@@ -558,6 +726,11 @@ ForwardAgent = no
 EscapeChar = none
 %s""" % (target.state_dir, component, _extra_opts))
         ttbl.power.socat_pc.on(self, target, component)
+        generic_c.enable(self, target, component)
+
+    def off(self, target, component):
+        generic_c.disable(self, target, component)
+        ttbl.power.socat_pc.off(self, target, component)
 
     # console interface; state() is implemented by generic_c
     def setup(self, target, component, parameters):
@@ -592,7 +765,7 @@ EscapeChar = none
         return dict(result = self.parameters)
 
     def enable(self, target, component):
-        return self.on(target, component)
+        self.on(target, component)
 
     def disable(self, target, component):
         return self.off(target, component)
