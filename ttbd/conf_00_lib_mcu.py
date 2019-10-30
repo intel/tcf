@@ -2546,9 +2546,9 @@ def stm32_add(name = None,
 
 
 def tinytile_add(name,
-                 serial_number,
-                 ykush_serial,
-                 ykush_port_board,
+                 usb_serial_number,
+                 ykush_serial = None,
+                 ykush_port_board = None,
                  ykush_port_serial = None,
                  serial_port = None):
     """**Configure a tinyTILE for the fixture described below.**
@@ -2575,7 +2575,7 @@ def tinytile_add(name,
 
     :param str name: name of the target
 
-    :param str serial_number: USB serial number for the tinyTILE
+    :param str usb_serial_number: USB serial number for the tinyTILE
 
     :param str ykush_serial: :ref:`USB serial number
       <ykush_serial_number>` of the YKUSH hub
@@ -2669,36 +2669,54 @@ def tinytile_add(name,
        <usb_tty_sibling>` a USB serial number.
 
     """
+    if usb_serial_number == None:
+        usb_serial_number = name
+    if serial_port == None:
+        serial_port = "/dev/tty-" + name
+    serial0_pc = ttbl.console.serial_pc()
+
+    target = ttbl.test_target(name)
+
+    power_rail = []
+    if ykush_serial and ykush_port_board:
+        power_rail.append((
+            "%s/%s main power" % (ykush_serial, ykush_port_board),
+            ttbl.pc_ykush.ykush(ykush_serial, ykush_port_board) ))
+    power_rail.append((
+        "%s USB device present" % usb_serial_number,
+        ttbl.pc.delay_til_usb_device(usb_serial_number) ))
     if ykush_port_serial:
-        if serial_port == None:
-            serial_port = "/dev/tty-" + name
-        power_rail = [
-            ttbl.pc_ykush.ykush(ykush_serial, ykush_port_serial),
-            ttbl.pc.delay_til_file_appears(serial_port),
-            ttbl.cm_serial.pc()
-        ]
-    else:
-        power_rail = []
-    pc_board = ttbl.pc_ykush.ykush(ykush_serial, ykush_port_board)
+        power_rail.append((
+            "%s/%s TTY power" % (ykush_serial, ykush_port_serial),
+            ttbl.pc_ykush.ykush(ykush_serial, ykush_port_serial) ))
     power_rail += [
-        pc_board,
-        ttbl.pc.delay_til_usb_device(serial_number)
+        ( "%s TTY present" % serial_port,
+          ttbl.pc.delay_til_file_appears(serial_port) ),
+        ( "serial0", serial0_pc ),
     ]
 
+    target.interface_add("power", ttbl.power.interface(*power_rail))
+
+    target.interface_add("console",
+                         ttbl.console.interface(serial0 = serial0_pc,
+                                                default = "serial0"))
+
+    target.interface_add("images",
+                         ttbl.images.interface(**{
+                             "kernel": ttbl.images.bossac_c(),
+                             "kernel-arm": "kernel"
+                         }))
+
     ttbl.config.target_add(
-        ttbl.tt.tt_dfu(name, serial_number, power_rail, pc_board,
-                       serial_ports = [
-                           "pc",
-                           dict(port = serial_port, baudrate = 115200)
-                       ]),
+        target,
         tags = {
             'bsp_models': {
-                'x86+arc+arm': ['x86', 'arc', 'arm'],
+                #'x86+arc+arm': ['x86', 'arc', 'arm'],
                 'x86+arc': ['x86', 'arc'],
-                'x86+arm': ['x86', 'arm'],
-                'arc+arm': ['arc', 'arm'],
+                #'x86+arm': ['x86', 'arm'],
+                #'arc+arm': ['arc', 'arm'],
                 'x86': None,
-                'arm': None,
+                #'arm': None,
                 'arc': None
             },
             'bsps' : {
@@ -2706,10 +2724,10 @@ def tinytile_add(name,
                              zephyr_kernelname = 'zephyr.bin',
                              dfu_interface_name = "x86_app",
                              console = ""),
-                "arm":  dict(zephyr_board = "arduino_101_ble",
-                             zephyr_kernelname = 'zephyr.bin',
-                             dfu_interface_name = "ble_core",
-                             console = ""),
+                #"arm":  dict(zephyr_board = "arduino_101_ble",
+                #             zephyr_kernelname = 'zephyr.bin',
+                #             dfu_interface_name = "ble_core",
+                #             console = ""),
                 "arc": dict(zephyr_board = "arduino_101_sss",
                             zephyr_kernelname = 'zephyr.bin',
                             dfu_interface_name = 'sensor_core',
@@ -2718,7 +2736,6 @@ def tinytile_add(name,
         },
         target_type = "tinytile"
     )
-
 
 
 class tt_qemu_zephyr(ttbl.tt_qemu.tt_qemu):
