@@ -45,6 +45,7 @@ Execution log
 - the target might have produced none; GDB might be needed at this point
 - information for all testcase build, deployment and execution phases
   is included; filter by the first column
+- report generated at {{ report_timestamp_h }}
 
 {% for ident, tgname, message in log -%}
 {{ "%-10s %-25s %s" | format(ident, tgname, message) }}

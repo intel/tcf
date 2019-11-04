@@ -162,7 +162,9 @@ class report_mongodb_c(tcfl.report.report_c):
         # _mongo_setup() again, we also do it if we are in a different PID.
         self.made_in_pid = None
 
-    def _report(self, level, alevel, ulevel, _tc, tag, message, attachments):
+    def _report(self, level, alevel, ulevel, 
+                _tc, tag, message, attachments,
+                options):
         """
         Report data to documents in mongodb; we accumulate all the
         data until the completion message and at that point we
