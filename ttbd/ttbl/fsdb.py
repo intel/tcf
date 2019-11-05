@@ -10,7 +10,8 @@ import fnmatch
 import os
 import shutil
 import time
-import uuid
+
+import commonl
 
 class fsdb(object):
     """This is a veeeery simple file-system based 'DB', atomic access
@@ -28,9 +29,6 @@ class fsdb(object):
     class exception(Exception):
         pass
 
-    # A UUID for this process
-    uuid_ns = uuid.uuid4()
-
     def __init__(self, location):
         """
         Initialize the database to be saved in the give location
@@ -41,6 +39,7 @@ class fsdb(object):
         self.location = location
         assert os.path.isdir(location) \
             and os.access(location, os.R_OK | os.W_OK | os.X_OK)
+        self.uuid_seed = commonl.mkid(str(id(self)))
 
     def keys(self, pattern = None):
         """
@@ -83,8 +82,9 @@ class fsdb(object):
             # collision if more than one process is trying to modify
             # at the same time; they can override each other, that's
             # ok--the last one wins.
-            location_new = \
-            	location + "-%s" % uuid.uuid5(self.uuid_ns, "%f" % time.time())
+            location_new = location + "-%s-%s-%s" \
+                % (os.getpid(), self.uuid_seed, time.time())
+            commonl.rm_f(location_new)
             os.symlink(value, location_new)
             os.rename(location_new, location)
 
