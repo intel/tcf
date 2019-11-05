@@ -856,7 +856,7 @@ been tested yet, shall be similar.
 
    - NFS server: provides the POS root filesystem.
 
-     Ensure UDP support is enabled::
+     Ensure UDP support is enabled (not for RHEL >= 7.6)::
 
        # sed -i 's|RPCNFSDARGS="|RPCNFSDARGS="--udp |' /etc/sysconfig/nfs
        # systemctl enable nfs-server
