@@ -476,6 +476,14 @@ def _console_read_thread_fn(target, console, fd, offset):
             offset = 0
         while True:
             try:
+                size = target.console.size(console)
+                if size == None or size == 0:
+                    time.sleep(0.5)	# Give the port some time
+                    continue
+                elif size < offset:	# target power cycled?
+                    sys.stderr.write(
+                        "\n\r\r\nWARNING: target power cycled\r\r\n\n")
+                    offset = 0
                 # Instead of reading and sending directy to the
                 # stdout, we need to break it up in chunks; the
                 # console is in non-blocking mode (for reading
@@ -497,13 +505,6 @@ def _console_read_thread_fn(target, console, fd, offset):
                     time.sleep(0.5)	# Give the port some time
 
                 offset += len(data)
-                # FIXME: hack, shall be able to get current size from
-                # read call, even when streaming
-                size = target.console.size(console)
-                if size != None and size < offset:	# target power cycled?
-                    sys.stderr.write(
-                        "\n\r\r\nWARNING: target power cycled\r\r\n\n")
-                    offset = 0
             except Exception as e:	# pylint: disable = broad-except
                 logging.exception(e)
                 raise
@@ -594,13 +595,16 @@ def _cmdline_console_read(args):
             fd = open(args.output, "wb")
         try:
             while True:
-                offset += target.console.read(console, offset,
-                                              max_size, fd)
+                size = target.console.size(console)
+                if size and size > 0:
+                    # If zero, it hasn't even started printing, so
+                    # don't bother
+                    if size < offset:	# target power cycled?
+                        offset = 0
+                    offset += target.console.read(console, offset,
+                                                  max_size, fd)
                 if not args.follow:
                     break
-                size = target.console.size(console)
-                if size < offset:	# target power cycled?
-                    offset = 0
                 time.sleep(0.25)	# no need to bombard the server..
         finally:
             if fd != sys.stdout:
