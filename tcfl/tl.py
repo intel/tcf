@@ -744,6 +744,8 @@ def swupd_bundle_add(ic, target, bundle_list,
         count = 0
         top = 10
         for count in range(1, top + 1):
+            # WORKAROUND: server keeps all active
+            target.testcase.targets_active()
             # We use -p so the format is the POSIX standard as
             # defined in
             # https://pubs.opengroup.org/onlinepubs/009695399/utilities
