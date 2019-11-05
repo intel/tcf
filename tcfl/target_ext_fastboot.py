@@ -61,7 +61,7 @@ class extension(tc.target_extension_c):
         self.target.report_info("%s: running" % command_name, dlevel = 2)
         r = self.target.ttbd_iface_call(
             "fastboot", "run", method = "PUT",
-            parameters = json.dumps([ command_name ] + list(args)))
+            parameters = [ command_name ] + list(args))
         self.target.report_info("%s: ran" % (command_name),
                                 { 'diagnostics': r['diagnostics']},
                                 dlevel = 1)

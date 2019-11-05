@@ -94,6 +94,7 @@ import datetime
 import errno
 import imp
 import inspect
+import json
 import logging
 import numbers
 import os
@@ -1565,8 +1566,12 @@ class target_c(object):
           pattern), specify which component the call applies to.
 
         Rest of the arguments are a dictionary keyed by string with
-        values that will be serialized as JSON to pass the remote call
+        values that will be serialized to pass the remote call
         as arguments, and thus are interface specific.
+
+        Anything that is an interable or dictionary will be
+        serialized as JSON. The rest are kept as body arguments so the
+        daemon can decode it properly.
         """
         assert isinstance(interface, basestring)
         assert isinstance(call, basestring)
@@ -1576,6 +1581,11 @@ class target_c(object):
         assert method.upper() in ( "PUT", "GET", "DELETE", "POST" ), \
             "method must be PUT|GET|DELETE|POST; got %s" % method
 
+        for k, v in kwargs.items():
+            if isinstance(v, basestring):
+                continue
+            if isinstance(v, (collections.Sequence, collections.Mapping)):
+                kwargs[k] = json.dumps(v)
         if component:
             kwargs['component'] = component
         if self.ticket:
@@ -1584,7 +1594,7 @@ class target_c(object):
             method,
             "targets/%s/%s/%s" % (self.id, interface, call),
             stream = stream, raw = raw,
-            data = kwargs)
+            data = kwargs if kwargs else None)
 
 
     #

@@ -52,7 +52,7 @@ class extension(tc.target_extension_c):
 
     def _sequence(self, sequence):
         self.target.ttbd_iface_call("buttons", "sequence", method = "PUT",
-                                    sequence = json.dumps(sequence))
+                                    sequence = sequence)
 
     def press(self, button_name):
         self.target.report_info("%s: pressing" % button_name, dlevel = 1)
