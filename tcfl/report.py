@@ -242,11 +242,12 @@ class report_console_c(report_c):
         if self.log_file != None:
             _basename, ext = os.path.splitext(self.log_file)
             if ext in self.compress:
+                kws = dict(log_file = self.log_file)
                 # use shell + exec to try to game possible buffering
                 # issues w/ Python and blocks
                 command = self.compress[ext]
                 pipe = subprocess.Popen(
-                    "exec " + command + " > %s" % self.log_file,
+                    "exec " + command % kws + " > %s" % self.log_file,
                     shell = True, stdin = subprocess.PIPE)
                 self.logf = pipe.stdin
             else:
@@ -270,6 +271,14 @@ class report_console_c(report_c):
     #: New programs can be added with:
     #:
     #: >>> tcfl.report.report_console_c.compress[".EXT"] = "program -options"
+    #:
+    #: Note that you can generate both a compressed and uncompressed
+    #: log file by using tee:
+    #: compressed stream; this is meant for debugging, since the
+    #: compressed stream will be buffered by the compression program.
+    #:
+    #: >>> tcfl.report.report_console_c.compress[".xz"] = \
+    #: >>>     "tee %(log_file)s.raw | xz -T0 -6qzc",
     compress = {
         ".bz2": "bzip2 -9qzc",
         ".xz": "xz -T0 -6qzc",
