@@ -1004,7 +1004,7 @@ class target_c(object):
             domain = domain % self.kws
             name = name % self.kws
         if level == None:		# default args are computed upon def'on
-            level = 1
+            level = 2
         assert isinstance(level, int)
         assert isinstance(dlevel, int)
         level += dlevel
@@ -5396,8 +5396,9 @@ class tc_c(object):
             if not self._phase_skip("configure"):
                 if self.subtc:
                     self.report_info(
-                        "NOTE: this testcase will unfold subcases: %s" %
-                        " ".join(self.subtc.keys()), dlevel = 1)
+                        "NOTE: this testcase unfolds %d subcases: %s" %
+                        (len(self.subtc), " ".join(self.subtc.keys())),
+                        dlevel = 1)
                 else:
                     self.report_info(
                         "NOTE: this testcase does not unfold subcases",
