@@ -19,6 +19,7 @@ import time
 import commonl
 import ttbl
 
+import pexpect
 try:
     # FIXME: we don't prolly need this anymore
     from pexpect.exceptions import TIMEOUT as pexpect_TIMEOUT
