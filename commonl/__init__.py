@@ -1256,6 +1256,9 @@ def split_user_pwd_hostname(s):
         password = None
     if password == "KEYRING":
         password = keyring.get_password(hostname, user)
+    if password and password.startswith("KEYRING:"):
+        _, domain = password.split(":", 1)
+        password = keyring.get_password(domain, user)
     elif password and password.startswith("FILENAME:"):
         _, filename = password.split(":", 1)
         with open(filename) as f:
