@@ -5531,6 +5531,7 @@ class tc_c(object):
             # remember this returns a list, so we have to concatenate them
             results += tc._run(msgid_c.parent(),
                                dict(expecter_parent = self.tls.expecter))
+            del tc	# not needed any more
 
         # Undo the hack from before, as we might need these values to
         # be proper for reporting later on
@@ -6772,7 +6773,13 @@ def _run(args):
 
         tc_c._tcs_total = len(tcs_filtered)
         threads_no = int(args.threads)
-        tp = _multiprocessing_tc_pool_c(processes = threads_no)
+        # we do oly two executions per process--it doesn't matter in
+        # terms of the cost of bringing up the new process, since the
+        # interaction with the target takes way longer; but we want
+        # the resources to be cleaned up, otherwise memory consumption
+        # / leaks which we can't control accumulate.
+        tp = _multiprocessing_tc_pool_c(processes = threads_no,
+                                        maxtasksperchild = 2)
         # So now run as many testcases as possible
         threads = []
         time_start = time.time()
@@ -6783,6 +6790,7 @@ def _run(args):
                 tc._ident = msgid_c.ident()
                 _threads = tc._run_on_targets(tp, rt_all,
                                               rt_selected, ic_selected)
+                del tc	# we don't need it anymore
             if isinstance(_threads, result_c):
                 result += _threads
             elif _threads == []:
