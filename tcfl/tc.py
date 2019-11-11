@@ -102,6 +102,7 @@ import pprint
 import random
 import re
 import shutil
+import signal
 import string
 import subprocess
 import sys
@@ -3980,6 +3981,10 @@ class tc_c(object):
                     self.__method_trampoline_thread,
                     (msgid_c(l = 2), fname, fn, _type, targets,
                      dict(expecter_parent = self.tls.expecter)))
+                # so we can Ctrl-C right away--the system is designed
+                # to cleanup top bottom, with everything being
+                # expendable
+                threads[fname].daemon = True
             thread_pool.close()
             thread_pool.join()
             for thread in threads.values():
@@ -5471,11 +5476,15 @@ class tc_c(object):
             with msgid_c(self.ticket, depth = 1, l = self.hashid_len) as msgid:
                 self._ident = msgid_c.ident()
                 try:
-                    self.report_info("will run on target group '%s'"
-                                     % (self.target_group.descr),
-                                     # be less verbose for subcases,
-                                     # since we know this info already
-                                     dlevel = 2 if self.parent else 0 )
+                    self.report_info(
+                        "will run on target group '%s' (PID %d / TID %x)"
+                        % (
+                            self.target_group.descr, os.getpid(),
+                            threading.current_thread().ident
+                        ),
+                        # be less verbose for subcases,
+                        # since we know this info already
+                        dlevel = 2 if self.parent else 0 )
                     for _target in self.target_group.targets.values():
                         # We need to update all the target's KWS, as we
                         # have added KWS to the tescase (tc_hash and
@@ -5894,6 +5903,7 @@ class tc_c(object):
                     # this just updates the core keys, but later calls
                     # to kw_set() and company will refresh the main
                     # target.kws dict.
+                tc_for_tg.report_info("queuing for execution", dlevel = 3)
                 thread = tp.apply_async(
                     tc_for_tg._run,
                     (
@@ -5901,6 +5911,12 @@ class tc_c(object):
                         dict(expecter_parent = self.tls.expecter)
                     )
                 )
+                # so we can Ctrl-C easily; we don't care for the
+                # cleanup, we consider all expendable resournces
+                # and the toplevel tempdirs will be cleaned below
+                # Targets acquired will be released as idle by the
+                # daemon 
+                thread.daemon = True
                 threads.append(thread)
             self.log.info("%d jobs launched" % len(threads))
             return threads
@@ -6773,6 +6789,18 @@ def _run(args):
 
         tc_c._tcs_total = len(tcs_filtered)
         threads_no = int(args.threads)
+
+        def _sigint_handler(signum, frame):
+            logging.error("brute force termination")
+            if args.remove_tmpdir:
+                shutil.rmtree(tc_c.tmpdir, True)
+            os.kill(0, 9)
+            tp.terminate()
+            sys.exit()
+
+        signal.signal(signal.SIGINT, _sigint_handler)
+        signal.signal(signal.SIGQUIT, _sigint_handler)
+
         # we do oly two executions per process--it doesn't matter in
         # terms of the cost of bringing up the new process, since the
         # interaction with the target takes way longer; but we want
@@ -6780,12 +6808,14 @@ def _run(args):
         # / leaks which we can't control accumulate.
         tp = _multiprocessing_tc_pool_c(processes = threads_no,
                                         maxtasksperchild = 2)
+        
         # So now run as many testcases as possible
         threads = []
         time_start = time.time()
         tc_c.jobs = len(tcs_filtered)
         for tc in tcs_filtered.values():
             tc.mkticket()
+            tc.report_info("queuing for pairing", dlevel = 3)
             with msgid_c(tc.ticket, l = tc_c.hashid_len) as _msgid:
                 tc._ident = msgid_c.ident()
                 _threads = tc._run_on_targets(tp, rt_all,
