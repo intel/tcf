@@ -133,7 +133,6 @@ import types
 # case, use process pools for the testcases.
 
 _multiprocessing_method_pool_c = None
-_multiprocessing_tc_pool_c = None
 _multiprocessing_sync_manager = None
 _multiprocessing = None
 
@@ -146,7 +145,8 @@ def import_mp_pathos():
     global _multiprocessing_sync_manager
     global _multiprocessing
     _multiprocessing_method_pool_c = pathos.pools._ThreadPool
-    _multiprocessing_tc_pool_c = pathos.pools._ProcessPool
+    def _multiprocessing_tc_pool_c(**kwargs):
+        return pathos.pools._ProcessPool(maxtasksperchild = 2, **kwargs)
     _multiprocessing_sync_manager = multiprocess.managers.SyncManager
     _multiprocessing = pathos.multiprocessing
 
@@ -159,7 +159,8 @@ def import_mp_std():
     global _multiprocessing_sync_manager
     global _multiprocessing
     _multiprocessing_method_pool_c = multiprocessing.pool.ThreadPool
-    _multiprocessing_tc_pool_c = multiprocessing.pool.ThreadPool
+    def _multiprocessing_tc_pool_c(**kwargs):
+        return multiprocessing.pool.ThreadPool(**kwargs)
     _multiprocessing_sync_manager = multiprocessing.managers.SyncManager
     _multiprocessing = multiprocessing
 
