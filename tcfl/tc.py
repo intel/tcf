@@ -6806,8 +6806,7 @@ def _run(args):
         # interaction with the target takes way longer; but we want
         # the resources to be cleaned up, otherwise memory consumption
         # / leaks which we can't control accumulate.
-        tp = _multiprocessing_tc_pool_c(processes = threads_no,
-                                        maxtasksperchild = 2)
+        tp = _multiprocessing_tc_pool_c(processes = threads_no)
         
         # So now run as many testcases as possible
         threads = []
