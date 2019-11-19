@@ -15,6 +15,61 @@ Configuration API for PDUs and other power switching equipment
 import logging
 import urlparse
 
+
+def apc_pdu_add(name, powered_on_start = None, hostname = None):
+    """Add targets to control the individual sockets of an APC PDU power
+    switch.
+
+    The APC PDU needs to be setup and configured (refer to the
+    instructions in :class:`ttbl.apc.pci`); this function exposes the
+    different targets for to expose the individual sockets for debug.
+
+    Add to a configuration file
+    ``/etc/ttbd-production/conf_10_targets.py`` (or similar):
+
+    .. code-block:: python
+
+       apc_pdu_add("sp16")
+
+    where *sp16* is the name (hostname of the PDU)
+
+    yields::
+
+      $ tcf list
+      local/sp16-1
+      local/sp16-2
+      local/sp16-3
+      ...
+      local/sp16-24
+
+    for a 24 outlet PDU
+
+    :param bool powered_on_start: (optional) if *True*, turn on the
+      sockets when we call this function; defaults to *False*.
+
+    :param str hostname: (optional) hostname or IP address of the APC
+      unit if different from the *name*.
+
+    """
+    assert name == None or isinstance(name, basestring)
+    assert hostname == None or isinstance(hostname, basestring)
+    assert powered_on_start == None or isinstance(powered_on_start, bool)
+
+    if hostname == None:
+        hostname = name
+
+    _apc = ttbl.apc.pci(hostname, 1)
+    for i in range(1.._apc.outlets):
+        target = ttbl.test_target("%s-%d" % (name, i))
+        target.interface_add(
+            "power",
+            ttbl.power.interface(ttbl.apc.pci(hostname, i)))
+        ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+        target.disable("")
+        if powered_on_start:
+            target.power.put_on(target, ttbl.who_daemon(), {}, None)
+
+
 def dlwps7_add(hostname, powered_on_start = None,
                user = "admin", password = "1234"):
     """Add test targets to individually control each of a DLWPS7's sockets
