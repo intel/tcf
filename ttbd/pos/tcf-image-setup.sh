@@ -14,7 +14,9 @@ DIRECTORY: where to expand the image to
   NAME:SPIN:VERSION:[SUBVERSION]:ARCHITECTURE
 
   if .tar.xz is appended to the name, the image tree will be packed in
-  a tar.xz file and the directory removed.
+  a tar.xz file and the directory removed which shall be extracted as root::
+
+    # tar xf FILE.tar.xz --numeric-owner --force-local --selinux --acls --xattrs -C /home/ttbd/images
 
 Clear Linux:
 
