@@ -68,7 +68,7 @@ def healthcheck(args):
     with tcfl.msgid_c("cmdline"):
         target = tcfl.tc.target_c.create_from_cmdline_args(args)
 
-        print "acquiring", target.acquire
+        print "acquiring"
         target.acquire()
         print "OK: acquired"
 
@@ -81,11 +81,7 @@ def healthcheck(args):
         target.release()
         print "OK: released"
 
-        print "releasing again, should just work"
-        target.release()
-        print "OK: released again"
-
-        print "healthcheck completed" % target.id
+        print "%s: healthcheck completed" % target.id
 
 
 if __name__ == "__main__":
