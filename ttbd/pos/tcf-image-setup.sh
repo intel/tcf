@@ -116,6 +116,8 @@ if [ $# -lt 2 -o $# -gt 3 ]; then
     exit 1
 fi
 
+setupl=${SETUPL:-}
+
 destdir=$1
 if echo $destdir | grep -q ".tar.xz"; then
     tarname=$destdir
@@ -182,7 +184,7 @@ if [ -z "$image_type" ]; then
             ;;
         tcf-live.iso)
             image_type=tcflive;;
-        Fedora-Workstation-Live-*.iso)
+        openSUSE-*.iso|centos-*.iso|Fedora-Workstation-Live-*.iso)
             image_type=fedoralive;;
         ubuntu-*.iso)
             # assuming these are common
@@ -534,8 +536,10 @@ case $image_type in
         # Disable SELinux -- can't figure out how to allow it to work
         # properly in allowing ttyUSB0 access to agetty so we can have
         # a serial console.
-        sudo sed -i 's/SELINUX=enforcing/SELINUX=disabled/' $destdir/etc/selinux/config
-        info $image_type: disabled SELinux
+        if [ -r $destdir/etc/selinux/config ]; then
+            sudo sed -i 's/SELINUX=enforcing/SELINUX=disabled/' $destdir/etc/selinux/config
+            info $image_type: disabled SELinux
+        fi
         ;;
     *)
         ;;
@@ -639,6 +643,10 @@ EOF
 fi
 sudo mv $tmpdir/.tcf.metadata.yaml $destdir
 
+for setup in ${setupl}; do
+    $setup $destdir
+done
+    
 # If we said we wanted it in a tar file, pack it up and remove the directory
 if ! [ -z "${tarname:-}" ]; then
     cd $(dirname $destdir)
@@ -648,6 +656,7 @@ if ! [ -z "${tarname:-}" ]; then
     #                  system
     # --force-local: if name has :, it is still local
     # --selinux --acls --xattrs: keep all those attributes identical
+    info $tarname: packing up
     sudo XZ_OPT="--threads=0 -9e" \
          tar cJf $tarname --numeric-owner --force-local --selinux --acls --xattrs $basename
     sudo rm -rf $destdir
