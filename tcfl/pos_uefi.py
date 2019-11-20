@@ -103,11 +103,20 @@ def _linux_boot_guess_from_lecs(target, _image):
             options = value
 
     # note we assume the LEC entries are in [/mnt]/boot because LEC
-    # specifies them relateive to the filesystem
-    if kernel:
+    # specifies them relateive to the filesystem...except in Fedora,
+    # for example. This is quite ugly, but can't think of a better way
+    # to do it.
+    # FIXME: analyze where /boot is mounted, use that
+    if kernel and not kernel.startswith('/boot'):
         kernel = "/boot/" + kernel
-    if initrd:
+    if initrd and not initrd.startswith('/boot'):
         initrd = "/boot/" + initrd
+
+    if '$kernelopts' in options:
+        # ok, this is a very bad Fedora hack
+        #options = "ro rhgb quiet LANG=en_US.UTF-8"
+        options = "ro LANG=en_US.UTF-8"
+        
     return kernel, initrd, options
 
 
@@ -289,9 +298,10 @@ def _linux_boot_guess_from_grub_cfg(target, _image):
     # note we assume the grub.cfg entries are in [/mnt]/boot because
     # grub.cfg is in /boot and there is usually a filesystem just for
     # /boot, thus the entries are relative.
-    if entry.linux:
+    # FIXME: analyze where /boot is mounted, use that
+    if entry.linux and not entry.linux.startswith('/boot'):
         entry.linux = "/boot/" + entry.linux
-    if initrd:
+    if entry.initrd and not entry.initrd.startswith('/boot'):
         entry.initrd = "/boot/" + entry.initrd
     target.report_info(
         "POS/EFI: %s: scanning found kernel %s initrd %s args %s"
@@ -366,9 +376,15 @@ def _linux_boot_guess(target, image):
     # systemd-boot
     kernel, initrd, options = _linux_boot_guess_from_lecs(target, image)
     if kernel:
+        target.report_info("POS: guessed kernel from systemd-boot config: "
+                           "kernel %s initrd %s options %s"
+                           % (kernel, initrd, options))
         return kernel, initrd, options
     kernel, initrd, options = _linux_boot_guess_from_grub_cfg(target, image)
     if kernel:
+        target.report_info("POS: guessed kernel from grub config: "
+                           "kernel %s initrd %s options %s"
+                           % (kernel, initrd, options))
         return kernel, initrd, options
     # from files listed in /boot
     kernel, initrd, options = _linux_boot_guess_from_boot(target, image)
