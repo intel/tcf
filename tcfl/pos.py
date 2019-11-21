@@ -1013,8 +1013,12 @@ EOF""")
 
     def _fsinfo_load(self):
         # Query filesystem information -> self.fsinfo
+        # call partprobe first; we want to make sure the system is
+        # done reading the partition tables for slow devices in the
+        # system (eg: we booted off somewhere else)
         output = self.target.shell.run(
-            "lsblk --json -bni -o NAME,SIZE,TYPE,FSTYPE,UUID,LABEL,MOUNTPOINT",
+            "sync && partprobe && "
+            "lsblk --json -bni -o NAME,SIZE,TYPE,FSTYPE,UUID,PARTLABEL,LABEL,MOUNTPOINT",
             output = True, trim = True)
         # this output will be
         #
