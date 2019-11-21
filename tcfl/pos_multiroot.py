@@ -94,13 +94,17 @@ def _disk_partition(target):
     root_size = partsize_l[3]
 
     # note we set partition #0 as boot
+    # Note we set the name of the boot partition; we use that later to
+    # detect the disk has a partitioning scheme we support. See above.
     cmdline = """parted -a optimal -ms %(device)s unit GiB \
 mklabel gpt \
 mkpart primary fat32 0%% %(boot_size)s \
 set 1 boot on \
+name 1 %(boot_label_name)s \
 mkpart primary linux-swap %(boot_size)s %(swap_end)s \
 mkpart primary ext4 %(swap_end)s %(scratch_end)s \
 """ % dict(
+    boot_label_name = target._boot_label_name,
     device = device,
     boot_size = boot_size,
     swap_end = boot_size + swap_size,
@@ -255,12 +259,37 @@ def mount_fs(target, image, boot_dev):
 
     :returns: name of the root partition device
     """
+    # does the disk have a partition scheme we recognize?
+    pos_partsizes = target.rt['pos_partsizes']
+    # the name we'll give to the boot partition; see
+    # _disk_partition(); if we can't find it, we assume the things
+    # needs to be repartitioned. Note it includes the sizes, so if we
+    # change the sizes in the config it reformats automatically.  #
+    # TCF-multiroot-NN:NN:NN:NN
+    target._boot_label_name = "TCF-multiroot-" + pos_partsizes
+    pos_reinitialize_force = True
+    boot_dev_base = os.path.basename(boot_dev)
+    for blockdevice in target.pos.fsinfo.get('blockdevices', []):
+        name = blockdevice['name']
+        if name == boot_dev_base:
+            # boot device found, check it is partitioned according to
+            # our schema
+            for child in blockdevice.get('children', []):
+                if child['partlabel'] == target._boot_label_name:
+                    pos_reinitialize_force = False
+                    break
+    else:
+        target.report_info("POS: repartitioning due to different"
+                           " partition schema")
+
     pos_reinitialize = target.property_get("pos_reinitialize", False)
     if pos_reinitialize:
-        # Need to reinit the partition table (we were told to by
-        # setting pos_repartition to anything
         target.report_info("POS: repartitioning per pos_reinitialize "
                            "property")
+    if pos_reinitialize or pos_reinitialize_force:
+        # Need to reinit the partition table (we were told to by
+        # setting pos_repartition to anything or we didn't recognize
+        # the existing partitioning scheme)
         for tag in target.rt.keys():
             # remove pos_root_*, as they don't apply anymore
             if tag.startswith("pos_root_"):
@@ -286,7 +315,7 @@ def mount_fs(target, image, boot_dev):
                 dev_info = child
     if dev_info == None:
         # it cannot be we might have to repartition because at this
-        # point *we* have partitoned.
+        # point *we* have partitioned.
         raise tc.error_e(
             "Can't find information for root device %s in FSinfo array"
             % root_part_dev_base,
