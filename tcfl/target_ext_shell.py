@@ -355,7 +355,7 @@ class shell(tc.target_extension_c):
 
         or collecting the output:
 
-        >>> target.shell.run("ls -1 /etc/", output = True)
+        >>> target.shell.run("ls --color=never -1 /etc/", output = True)
         >>> for file in output.split('\\r\\n'):
         >>>     target.report_info("file %s" % file)
         >>>     target.shell.run("md5sum %s" % file)

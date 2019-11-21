@@ -318,7 +318,7 @@ def _linux_boot_guess_from_boot(target, image):
     os_release = tl.linux_os_release_get(target, prefix = "/mnt")
     distro = os_release.get('ID', None)
 
-    output = target.shell.run("ls -1 /mnt/boot", output = True)
+    output = target.shell.run("ls --color=never -1 /mnt/boot", output = True)
     kernel_regex = re.compile("(initramfs|initrd|bzImage|vmlinuz)(-(.*))?")
     kernel_versions = {}
     initramfs_versions = {}
