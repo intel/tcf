@@ -710,7 +710,7 @@ class file_c(report_c):
             # the same for all and makes no sense to have it.
             ident = self.ident_simplify(tcfl.msgid_c.ident(),
                                         _tc.kws.get('runid', ''),
-                                        _tc.kws['tc_hash'])
+                                        _tc.kws.get('tc_hash', ""))
             if ident == "":
                 # If empty, give it a to snip token that we'll replace
                 # later in mkreport
