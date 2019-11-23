@@ -154,6 +154,21 @@ class report_c(object):
 
 
     @classmethod
+    def ident_simplify(cls, ident, runid, hashid):
+        """
+        If any looks like:
+
+          RUNID:HASHID[SOMETHING]
+
+        simplify it by returning *SOMETHING*
+        """
+        if ident.startswith(runid + ":"):
+            ident = ident[len(runid) + 1:]
+        if ident.startswith(hashid):
+            ident = ident[len(hashid):]
+        return ident
+
+    @classmethod
     def report(cls, level, alevel, ulevel, _tc,
                tag, message, attachments):
         """
@@ -693,9 +708,9 @@ class file_c(report_c):
         with contextlib.closing(f):
             # Remove the ticket from the ident string, as it will be
             # the same for all and makes no sense to have it.
-            ident = tcfl.msgid_c.ident()
-            if ident.startswith(_tc._ident):
-                ident = ident[len(_tc._ident):]
+            ident = self.ident_simplify(tcfl.msgid_c.ident(),
+                                        _tc.kws.get('runid', ''),
+                                        _tc.kws['tc_hash'])
             if ident == "":
                 # If empty, give it a to snip token that we'll replace
                 # later in mkreport
