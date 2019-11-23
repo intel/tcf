@@ -180,19 +180,13 @@ class report_mongodb_c(tcfl.report.report_c):
         if getattr(_tc, "skip_reports", False) == True:
             return	# We don't operate on the global reporter fake TC
 
-        # We don't report on ident-less objects, they don't
-        # have enough information for us to record
-        if not hasattr(_tc, "_ident"):
-            return
-
         # FIXME: runid should be in tc_c.runid, as well as hashid,
         # instead of having to parse like this -- so they can be
         # extracted as in the block below
-        if ':' in _tc._ident:
-            runid, hashid = _tc._ident.split(':', 1)
-        else:
-            runid = ""
-            hashid = _tc._ident
+        runid = _tc.kws['runid']
+        hashid = _tc.kws['tc_hash']
+        if not hashid:	            # can't do much if we don't have this
+            return
 
         # Extract the target name where this message came from (if the
         # reporter is a target)
@@ -218,9 +212,7 @@ class report_mongodb_c(tcfl.report.report_c):
         # Otherwise we repeat it all the time, and it doesn't make
         # sense because it is at the top level doc[runid] and
         # doc[hashid] plus it's ID in the DB.
-        ident = tcfl.msgid_c.ident()
-        if ident.startswith(_tc._ident):
-            ident = ident[len(_tc._ident):]
+        ident = self.ident_simplify(tcfl.msgid_c.ident(), runid, hashid)
         result = dict(
             timestamp = datetime.datetime.utcnow(),
             ident = ident,
@@ -310,7 +302,10 @@ class report_mongodb_c(tcfl.report.report_c):
         doc['hashid'] = hashid
         doc['tc_name'] = tc_name
         doc['timestamp' ] = datetime.datetime.utcnow()
-        doc['_id'] = _tc._ident
+        if runid:
+            doc['_id'] = runid + ":" + hashid
+        else:
+            doc['_id'] = hashid
 
         doc['target_name'] = _tc.target_group.name \
                              if _tc.target_group else 'n/a'
