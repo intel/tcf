@@ -741,12 +741,14 @@ def swupd_bundle_add(ic, target, bundle_list,
         # so we can dynamically adjust this
         if add_timeout == None:
             if bundle in swupd_bundle_add_timeouts:
-                add_timeout = swupd_bundle_add_timeouts[bundle]
+                _add_timeout = swupd_bundle_add_timeouts[bundle]
                 target.report_info(
                     "bundle-add: adjusting timeout to %d per configuration "
-                    "tcfl.tl.swupd_bundle_add_timeouts" % add_timeout)
+                    "tcfl.tl.swupd_bundle_add_timeouts" % _add_timeout)
             else:
-                add_timeout = 240
+                _add_timeout = 240
+        else:
+            _add_timeout = add_timeout
 
         count = 0
         top = 10
@@ -763,7 +765,7 @@ def swupd_bundle_add(ic, target, bundle_list,
                 " %(su_prefix)sswupd bundle-add %(debug)s %(bundle)s%(su_postfix)s"
                 " || echo FAILED''-%(hashid)s"
                 % kws,
-                output = True, timeout = add_timeout)
+                output = True, timeout = _add_timeout)
             if not 'FAILED-%(tc_hash)s' % testcase.kws in output:
                 # We assume it worked
                 break
