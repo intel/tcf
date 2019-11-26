@@ -16,7 +16,11 @@ DIRECTORY: where to expand the image to
   if .tar.xz is appended to the name, the image tree will be packed in
   a tar.xz file and the directory removed which shall be extracted as root::
 
-    # tar xf FILE.tar.xz --numeric-owner --force-local --selinux --acls --xattrs -C /home/ttbd/images
+    # tar xf DISTRO:SPIN:VERSION:SUBVERSION:ARCH.tar.xz --numeric-owner --force-local --selinux --acls --xattrs -C /home/ttbd/images
+
+  if copying these files around with SSH, use
+  PATH/DISTRO:SPIN:VERSION:SUBVERSION:ARCH.tar.xz to avoid scp erroring
+  because it considers the : host separators. Likewise for tar.
 
 Clear Linux:
 
@@ -28,11 +32,6 @@ Clear Linux Desktop:
   $ wget https://download.clearlinux.org/releases/29400/clear/clear-29400-live-desktop.iso.xz
   $ $progname clear:desktop:29400::x86_64 clear-29400-live.img.xz
 
-Clear Linux (older versions):
-
-  $ wget https://download.clearlinux.org/releases/25930/clear/clear-25930-live.img.xz
-  $ $progname clear:live:25930::x86_64 clear-25930-live.img.xz clear
-
 Yocto:
 
   $ wget http://downloads.yoctoproject.org/releases/yocto/yocto-2.5.1/machines/genericx86-64/core-image-minimal-genericx86-64.wic
@@ -41,7 +40,11 @@ Yocto:
 Fedora:
 
   $ https://mirrors.rit.edu/fedora/fedora/linux/releases/29/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-29-1.2.iso
-  $ $progname fedora:live:29::x86_64 Fedora-Workstation-Live-x86_64-29-1.2.iso
+  $ $progname fedora:workstation:29::x86_64 Fedora-Workstation-Live-x86_64-29-1.2.iso
+
+RHEL guest image:
+
+  $ $progname rhel:guest:8.1::x86_64 rhel-guest-image-8.1-263.x86_64.qcow2 
 
 Ubuntu:
 
@@ -342,8 +345,22 @@ elif [ $image_type == fedoralive -o $image_type == tcflive ]; then
     fi
     mounted_dirs="$tmpdir/root ${mounted_dirs:-}"
 elif [ $image_type == qcow2 ]; then
-
-    sudo mount -r -o ${ROOT_MOUNTOPTS:-noload} ${root_part} $tmpdir/root
+    root_fstype=$(lsblk -n -o fstype ${root_part})
+    if [ -z ${ROOT_MOUNTOPTS:-} ]; then
+        # we are mounting readonly, guess how to so it doesn't complain
+        case $root_fstype in 
+            xfs)
+                ROOT_MOUNTOPTS=norecovery;;
+            ext4)
+                ROOT_MOUNTOPTS=norecovery;;
+            btrfs)
+                ROOT_MOUNTOPTS=noload;;
+            *)
+                warning "can't guess know best options for read-only rootfs $root_fstype"
+                ROOT_MOUNTOPTS=""
+        esac
+    fi
+    sudo mount -r -o ${ROOT_MOUNTOPTS:-} ${root_part} $tmpdir/root
     info mounted ${root_part} in $tmpdir/root
     # do this after mounting works better, sometimes fails otherwise
     root_fstype=$(lsblk -n -o fstype ${root_part})
@@ -579,6 +596,15 @@ case $root_fstype in
 filesystems:
   /:
     fstype: btrfs
+    mkfs_opts: -f
+
+EOF
+        ;;
+    xfs)
+        cat >> $md <<EOF
+filesystems:
+  /:
+    fstype: xfs
     mkfs_opts: -f
 
 EOF
