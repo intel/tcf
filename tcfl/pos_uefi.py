@@ -748,8 +748,8 @@ def boot_config_multiroot(target, boot_dev, image):
         target.shell.run("mkfs.fat -F32 /dev/%(boot_part_dev)s; sync" % kws)
     target.report_info(
         "POS/EFI: /dev/%(boot_part_dev)s: mounting in /boot" % kws)
-    target.shell.run(" mount /dev/%(boot_part_dev)s /boot"
-                     " && mkdir -p /boot/loader/entries " % kws)
+    target.shell.run("mount /dev/%(boot_part_dev)s /boot; "
+                     "mkdir -p /boot/loader/entries " % kws)
 
     # Do we have enough space? if not, remove the oldest stuff that is
     # not the file we are looking for

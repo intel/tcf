@@ -691,7 +691,7 @@ def swupd_bundle_add(ic, target, bundle_list,
     # (assumed to be correct). Use -u for UTC settings to avoid TZ
     # issues
     if fix_time:
-        target.shell.run("date -us '%s' && hwclock -wu"
+        target.shell.run("date -us '%s'; hwclock -wu"
                          % str(datetime.datetime.utcnow()))
 
     if wait_online:		        # wait for connectivity to be up

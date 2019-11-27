@@ -1017,8 +1017,9 @@ EOF""")
         # done reading the partition tables for slow devices in the
         # system (eg: we booted off somewhere else)
         output = self.target.shell.run(
-            "sync && partprobe && "
-            "lsblk --json -bni -o NAME,SIZE,TYPE,FSTYPE,UUID,PARTLABEL,LABEL,MOUNTPOINT",
+            "sync;"
+            " partprobe;"
+            " lsblk --json -bni -o NAME,SIZE,TYPE,FSTYPE,UUID,PARTLABEL,LABEL,MOUNTPOINT",
             output = True, trim = True)
         # this output will be
         #
