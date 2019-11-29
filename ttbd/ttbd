@@ -167,8 +167,7 @@ def _target_id_to_dict(target_id):
         'owner': target.owner_get(),
     }
     # Export a properties
-    for prop in target.fsdb.keys():
-        r[prop] = target.fsdb.get(prop)
+    r.update(target.fsdb.get_as_dict())
     # Override a few standard properties
     r['disabled'] = target.fsdb.get('disabled') == "True"
     # Use the cached version, otherwise it takes too long

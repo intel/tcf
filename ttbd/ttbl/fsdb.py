@@ -58,6 +58,23 @@ class fsdb(object):
                     l.append(filename)
         return l
 
+    def get_as_dict(self, pattern = None):
+        """
+        List the fields/keys and values available in the database
+
+        :param str pattern: (optional) pattern against the key names
+          must match, in the style of :mod:`fnmatch`. By default, all
+          keys are listed.
+        """
+        d = {}
+        for _rootname, _dirnames, filenames in os.walk(self.location):
+            if pattern:
+                filenames = fnmatch.filter(filenames, pattern)
+            for filename in filenames:
+                if os.path.islink(os.path.join(self.location, filename)):
+                    d[filename] = self.get(filename)
+        return d
+
     def set(self, field, value):
         """
         Set a field in the database
