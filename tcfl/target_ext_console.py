@@ -518,8 +518,8 @@ def _cmdline_console_write_interactive(target, console, crlf, offset):
     # capture user's keyboard input and send it to the target.
     print """\
 WARNING: This is a very limited interactive console
-         Escape character twice ^[^[ to exit
-"""
+         Escape character twice ^[^[ to exit; CRLF is '%s'
+""" % crlf.encode('unicode-escape')
     time.sleep(1)
     fd = os.fdopen(sys.stdout.fileno(), "w+")
     console_read_thread = threading.Thread(
@@ -542,18 +542,21 @@ WARNING: This is a very limited interactive console
                 chars = sys.stdin.read()
                 if not chars:
                     continue
+                _chars = ''
                 for char in chars:
                     # if the terminal sends a \r (user hit enter),
                     # translate to crlf
                     if crlf and char == "\r":
-                        target.console.write(crlf, console = console)
+                        _chars += crlf
+                    else:
+                        _chars += char
                     if char == '\x1b':
                         if one_escape:
                             raise _done_c()
                         one_escape = True
                     else:
                         one_escape = False
-                target.console.write(chars, console = console)
+                target.console.write(_chars, console = console)
             except _done_c:
                 break
             except IOError as e:
@@ -728,13 +731,13 @@ def _cmdline_setup(arg_subparser):
                     help = "CRLF lines with \\r")
     ap.add_argument("-n", dest = "crlf",
                     action = "store_const", const = "\n",
-                    help = "CRLF lines with \\n")
+                    help = "CRLF lines with \\n (default)")
     ap.add_argument("-R", dest = "crlf",
                     action = "store_const", const = "\r\n",
                     help = "CRLF lines with \\r\\n")
     ap.add_argument("-N", dest = "crlf",
                     action = "store_const", const = "",
-                    help = "Don't add any CRLF to lines (default)")
+                    help = "Don't add any CRLF to lines")
     ap.add_argument("data", metavar = "DATA",
                     action = "store", default = None, nargs = '*',
                     help = "Data to write; if none given, "
@@ -743,7 +746,7 @@ def _cmdline_setup(arg_subparser):
                     dest = "offset", type = int, default = 0,
                     help = "(for interfactive) read the console "
                     "output starting from (-1 for last)")
-    ap.set_defaults(func = _cmdline_console_write, crlf = "")
+    ap.set_defaults(func = _cmdline_console_write, crlf = "\n")
 
 
     ap = arg_subparser.add_parser("console-setup",
