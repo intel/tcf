@@ -6,6 +6,7 @@
 #
 
 import contextlib
+import errno
 import os
 
 import cm_logger
@@ -162,7 +163,12 @@ class cm_serial(ttbl.test_target_console_mixin):
             console_id = self.console_default
         logfile_name = os.path.join(self.state_dir,
                                     "console-%s.log" % console_id)
-        return os.stat(logfile_name).st_size
+        try:
+            return os.stat(logfile_name).st_size
+        except OSError as e:
+            if e.errno == errno.ENOENT:
+                return 0
+            raise
 
     def console_do_write(self, data, console_id = None):
         if console_id == None:
