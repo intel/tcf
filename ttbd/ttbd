@@ -517,17 +517,8 @@ def _property_get(target_id):
     try:
         info = ""
         with log_to_str_too(target.log, iostr_wrapper):
-            if user_is_admin or target.property_is_user(prop):
-                # A user property can be read by anyone
-                # Any admin can read any property
-                value = target.property_get(prop)
-            elif not target.property_is_user(prop):
-                # A non-user property cannot be read by anyone
-                raise ttbl.test_target_not_admin_e(target)
-            else:
-                # A non-admin must own the target before getting
-                # anything that is not a user property 
-                value = target.property_get_locked(who_make(ticket), prop)
+            # anyone can get properties
+            value = target.property_get(prop)
     except ttbl.test_target_e as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
     except Exception as e:
