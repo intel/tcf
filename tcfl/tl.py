@@ -89,8 +89,19 @@ def console_dump_on_failure(testcase):
         else:
             reporter = target.report_blck
             reporter("console dump due to blockage")
-        for line in target.console.read().split('\n'):
-            reporter("console: " + line.strip())
+        console_list = target.console.list()
+        # FIXME: need something way better this that streams the
+        # console output instead of reading a potentially huge console
+        # output and booming the memory consumption
+        if len(console_list) == 1:
+            for line in target.console.read().split('\n'):
+                reporter("console: " + line.rstrip())
+        else:
+            for console in console_list:
+                if console in target.console.aliases:
+                    continue
+                for line in target.console.read(console = console).split('\n'):
+                    reporter("console[%s]: " % console + line.rstrip())
 
 
 def setup_verify_slip_feature(zephyr_client, zephyr_server, _ZEPHYR_BASE):
