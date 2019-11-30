@@ -87,6 +87,46 @@ Testcase drivers load and execute existing testcases.
 
 .. automodule:: examples.test_ptest_runner
 
+
+Creating a file in the target from the command line
+---------------------------------------------------
+
+The following Unix shell construct::
+
+  $ cat <<EOF > somefile
+  line1
+  line2
+  line3
+  EOF
+
+can also be done in a TCF script:
+
+.. code-block: python
+
+   target.shell.run("""
+   cat <<EOF > somefile
+   line1
+   line2
+   line3
+   EOF""")
+
+but since the shell console is actually *typing* the characters, it is
+slightly more reliable to use:
+
+.. code-block: python
+
+   target.shell.run("""
+   cat > somefile
+   line1
+   line2
+   line3
+   \x04
+   """)
+
+*\x04* is the ASCII end-of-transmission character, *Ctrl-D*. This is
+the equivalent of typing the file contents on the command line.
+
+
 TCF client tricks
 =================
 
@@ -206,7 +246,7 @@ from to the target's SSH port::
 
 .. note:: make sure you specify the user to login as; it likely won't
           be the same as in your client machine.
-  
+
 Release the target so it can be used by someone else::
 
   $ kill -9 %1               # kill the while loop that keeps it acquired
@@ -535,7 +575,7 @@ From a script, you can use :func:`tcfl.tc.target_c.shell.run
                             "3 packets transmitted, 3 received")
 
 you can also get the output by adding ``output = True``:
-  
+
 .. code-block:: python
 
            ...
@@ -1104,7 +1144,7 @@ and on another, just the byte stream::
 
 interacting with it on the first console will give you an idea of what
 is actually printed that can be used to latch on.
-  
+
 Newlines when reading output of a command
 -----------------------------------------
 
@@ -1249,7 +1289,7 @@ You will need:
    dev IFNAME** for VLAN number ``NN``::
 
      # nmcli con add type vlan con-name TCF-Infrastructure dev enp0s20u4 id 4 ip4 192.168.4.209/24
-     
+
 Conventions for assignment of addresses in the infastructure network:
 
 - use IPv4 (easier)
@@ -1311,7 +1351,7 @@ note that you can also use VLANs if you add with **id NN** for VLAN
 number ``NN``::
 
   # nmcli con add type vlan con-name NETWORKNAME dev IFNAME id NN ip4 192.168.2.205/24
-     
+
 
 .. _generate_ssl_certificate:
 
@@ -1366,7 +1406,7 @@ easier.
 
 - Information about a given device can be obtained with::
 
-    $ udevadm info /dev/snd/controlC0 
+    $ udevadm info /dev/snd/controlC0
     P: /devices/pci0000:00/0000:00:1f.3/sound/card0/controlC0
     N: snd/controlC0
     S: snd/by-path/pci-0000:00:1f.3
@@ -1383,7 +1423,7 @@ easier.
 
   those *KEYS=* we can use to match in the *udev* rule files to do
   actions.
-    
+
 - Verbosity can be controlled with::
 
     # udevadm control -l LEVEL    (see --help)
@@ -2491,7 +2531,7 @@ in a number of devices, for example:
 
 These usually come as USB vendor ID 0x0403, product ID starting with
 0x6NNN.
-  
+
 When there are multiple FTDI devices that have the same serial number,
 the system needs to be able to tell them apart, so we can flash a new
 serial number in them, which we usually make match the target name, or
