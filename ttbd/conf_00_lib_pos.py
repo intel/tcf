@@ -239,7 +239,7 @@ _target_name_regex = re.compile(
     "(?P<type>[0-9a-zA-Z_]+)"
     "-(?P<index>[0-9]+)"
     "(?P<network>[a-zA-Z]+)")
-_target_type_regex = re.compile("^[0-9a-zA-Z_]+$")
+_target_type_regex = re.compile("^[-0-9a-zA-Z_]+$")
 _target_type_long_regex = re.compile("^[- 0-9a-zA-Z_]+$")
 _target_index_regex = re.compile("^[0-9]+$")
 _target_network_regex = re.compile("^[a-zA-Z]+$")
