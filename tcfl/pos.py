@@ -55,10 +55,12 @@ import json
 import logging
 import operator
 import os
+import pprint
 import random
 import re
 import traceback
 import subprocess
+import time
 
 import distutils.version
 import Levenshtein
@@ -1011,14 +1013,48 @@ EOF""")
                 target.shell.run(line_acc + line)
                 line_acc = ""
 
+    def fsinfo_get_block(self, name):
+        target = self.target
+        for blockdevice in target.pos.fsinfo.get('blockdevices', []):
+            if blockdevice['name'] == name:
+                return blockdevice
+        raise tc.error_e(
+            "POS: can't find information about block device '%s' -- is "
+            "the right pos_boot_device set in the configuration?"
+            % name,
+            dict(fsinfo = pprint.pformat(target.pos.fsinfo)))
+
+    def fsinfo_get_child(self, child_name):
+        target = self.target
+        for blockdevice in target.pos.fsinfo.get('blockdevices', []):
+            for child in blockdevice.get('children', []):
+                if child['name'] == child_name:
+                    return child
+        return None
+
+    def fsinfo_get_child_by_partlabel(self, blkdev, partlabel):
+        target = self.target
+        for blockdevice in target.pos.fsinfo.get('blockdevices', []):
+            if blockdevice['name'] != blkdev:
+                continue
+            for child in blockdevice.get('children', []):
+                if child['partlabel'] == partlabel:
+                    return child
+        return None
+
     def _fsinfo_load(self):
         # Query filesystem information -> self.fsinfo
         # call partprobe first; we want to make sure the system is
         # done reading the partition tables for slow devices in the
-        # system (eg: we booted off somewhere else)
+        # system (eg: we booted off somewhere else) -- hence the sleep
+        # 3s too ..have to wait a wee or lsblk reports empty; wish
+        # there was a way to sync partprobe?
+        # WARNING: don't print anything other than lsblk's output!
+        # will confuse the json loader
         output = self.target.shell.run(
             "sync;"
             " partprobe;"
+            " sleep 3s; "
             " lsblk --json -bni -o NAME,SIZE,TYPE,FSTYPE,UUID,PARTLABEL,LABEL,MOUNTPOINT",
             output = True, trim = True)
         # this output will be
@@ -1047,6 +1083,53 @@ EOF""")
             raise tc.blocked_e("can't parse JSON: %s" % e,
                                dict(output = output,
                                     trace = traceback.format_exc()))
+
+
+    def fsinfo_read(self, boot_partlabel = None):
+        """
+        Re-read the target's partition tables, load the information
+
+        Internal API for POS drivers
+
+        This will load the partition table, ensuring the information
+        is loaded and that there is at least an entry in the partition
+        table for the boot partition of the device the trget's
+        describes as POS boot device (target's *pos_boot_dev*).
+        """
+        target = self.target
+        # Re-read partition tables
+        timeout = 60
+        ts0 = time.time()
+        ts = ts0
+        device_basename = target.kws['pos_boot_dev']
+        while ts - ts0 < timeout:
+            ts = time.time()
+            target.pos._fsinfo_load()
+            boot_part = target.pos.fsinfo_get_child(
+                # lookup partition one; if found properly, the info has loaded
+                device_basename + target.kws['p_prefix'] + "1")
+            if boot_part == None:
+                target.report_info(
+                    "POS/multiroot: boot partition still not found by lsblk "
+                    "after %.1fs/%.1fs; retrying after 3s"
+                    % (ts - ts0, timeout))
+                time.sleep(3)
+                continue
+            if boot_partlabel and boot_part['partlabel'] != boot_partlabel:
+                target.report_info(
+                    "POS/multiroot: boot partition with label %s still "
+                    "not found by lsblk after %.1fs/%.1fs; retrying after 3s"
+                    % (target._boot_label_name, ts - ts0, timeout))
+                time.sleep(3)
+                continue
+            break
+        else:
+            raise tc.blocked_e(
+                "POS/multiroot: new partition info not found by lsblk " \
+                "after %.1fs" % (timeout),
+                dict(fsinfo = str(target.pos.fsinfo)))
+            # Now set the root device information, so we can pick stuff to
+
 
     #:
     #: List of directories to clean up when trying to make up space in
@@ -1271,7 +1354,7 @@ EOF""")
 
                 # keep console more or less clean, so we can easily parse it
                 target.shell.run("dmesg -n alert")
-                self._fsinfo_load()
+                target.pos.fsinfo_read()
 
                 # List the available images and decide if we have the
                 # one we are asked to install, autocomplete missing

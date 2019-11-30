@@ -65,17 +65,7 @@ def _disk_partition(target):
     target.shell.run('swapoff -a || true')	    # in case we autoswapped
 
     # find device size (FIXME: Linux specific)
-    dev_info = None
-    for blockdevice in target.pos.fsinfo.get('blockdevices', []):
-        if blockdevice['name'] == device_basename:
-            dev_info = blockdevice
-            break
-    else:
-        raise tc.error_e(
-            "%s: can't find information about this block device -- is "
-            "the right pos_boot_device set in the configuration?"
-            % device_basename,
-            dict(fsinfo = pprint.pformat(target.pos.fsinfo)))
+    dev_info = target.pos.fsinfo_get_block(device_basename)
     size_gb = int(dev_info['size']) / 1024 / 1024 / 1024
     target.report_info("POS: %s is %d GiB in size" % (device, size_gb),
                        dlevel = 2)
@@ -121,13 +111,11 @@ mkpart primary ext4 %(swap_end)s %(scratch_end)s \
         pid += 1
 
     target.shell.run(cmdline)
-    # Now set the root device information, so we can pick stuff to
+    target.pos.fsinfo_read(target._boot_label_name)
     # format quick
     for root_dev in root_devs:
         target.property_set('pos_root_' + root_dev, "EMPTY")
 
-    # Re-read partition tables
-    target.shell.run('partprobe %s' % device)
 
     # now format filesystems
     #
@@ -232,7 +220,7 @@ def _rootfs_guess(target, image, boot_dev):
             target.report_info("POS: repartitioning because couldn't find "
                                "root partitions")
             _disk_partition(target)
-            target.pos._fsinfo_load()
+            target.pos.fsinfo_read(target._boot_label_name)
         except Exception as e:
             reason = str(e)
             if tries < 3:
@@ -269,15 +257,10 @@ def mount_fs(target, image, boot_dev):
     target._boot_label_name = "TCF-multiroot-" + pos_partsizes
     pos_reinitialize_force = True
     boot_dev_base = os.path.basename(boot_dev)
-    for blockdevice in target.pos.fsinfo.get('blockdevices', []):
-        name = blockdevice['name']
-        if name == boot_dev_base:
-            # boot device found, check it is partitioned according to
-            # our schema
-            for child in blockdevice.get('children', []):
-                if child['partlabel'] == target._boot_label_name:
-                    pos_reinitialize_force = False
-                    break
+    child = target.pos.fsinfo_get_child_by_partlabel(boot_dev_base,
+                                                     target._boot_label_name)
+    if child:
+        pos_reinitialize_force = False
     else:
         target.report_info("POS: repartitioning due to different"
                            " partition schema")
@@ -295,7 +278,7 @@ def mount_fs(target, image, boot_dev):
             if tag.startswith("pos_root_"):
                 target.property_set(tag, None)
         _disk_partition(target)
-        target.pos._fsinfo_load()
+        target.pos.fsinfo_read(target._boot_label_name)
         target.property_set('pos_reinitialize', None)
 
     root_part_dev = _rootfs_guess(target, image, boot_dev)
@@ -307,7 +290,7 @@ def mount_fs(target, image, boot_dev):
     target.report_info("POS: will use %s for root partition (had %s before)"
                        % (root_part_dev, image_prev))
 
-    # fsinfo looks like described in target.pos._fsinfo_load()
+    # fsinfo looks like described in target.pos.fsinfo_read()
     dev_info = None
     for blockdevice in target.pos.fsinfo.get('blockdevices', []):
         for child in blockdevice.get('children', []):
@@ -371,7 +354,7 @@ def mount_fs(target, image, boot_dev):
             if 'special device ' + root_part_dev \
                + ' does not exist.' in output:
                 _disk_partition(target)
-                target.pos._fsinfo_load()
+                target.pos.fsinfo_read(target._boot_label_name)
             else:
                 # ok, this probably means probably the partitions are not
                 # formatted; so let's just reformat and retry 
