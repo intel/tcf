@@ -249,12 +249,13 @@ def target_power_cycle_to_normal_pxe(target):
     target.property_set("pos_mode", "local")
     target.power.cycle()
 
+persistent_tcf_d = '/persistent.tcf.d'
 
 def mk_persistent_tcf_d(target, subdirs = None):
     if subdirs == None:
-        dirs = [ '/mnt/persistent.tcf.d' ]
+        dirs = [ '/mnt' + persistent_tcf_d ]
     else:
-        dirs = [ '/mnt/persistent.tcf.d/' + subdir for subdir in subdirs ]
+        dirs = [ '/mnt' + persistent_tcf_d + subdir for subdir in subdirs ]
 
     # just create / recreate all the thirs
     target.shell.run('mkdir -p ' + " ".join(dirs))
@@ -262,18 +263,18 @@ def mk_persistent_tcf_d(target, subdirs = None):
     # Ensure there is a README -- this is slow, so don't do it if
     # already there
     output = target.shell.run(
-        'test -f /mnt/persistent.tcf.d/README || echo N""O' ,
+        'test -f /mnt' + persistent_tcf_d + '/README || echo N""O' ,
         output = True)
     if 'NO' in output:
         target.shell.run("""\
-cat <<EOF > /mnt/persistent.tcf.d/README
+cat <<EOF > /mnt%s/README
 This directory has been created by TCF's Provisioning OS to store files to
 be provisioned in the root file system.
 
 When flashing a new image to this partition, the contents in this tree
 will not be removed/replaced. It is then faster to rsync things in
 from the client machine.
-EOF""")
+EOF""" % persistent_tcf_d)
 
 def deploy_linux_kernel(ic, target, _kws):
     """Deploy a linux kernel tree in the local machine to the target's
@@ -737,7 +738,7 @@ EOF""")
 
     def rsync(self, src = None, dst = None,
               persistent_name = None,
-              persistent_dir = '/persistent.tcf.d', path_append = "/.",
+              persistent_dir = persistent_tcf_d, path_append = "/.",
               rsync_extra = ""):
         """
         rsync data from the local machine to a target
@@ -823,7 +824,7 @@ EOF""")
           specification.
 
         :param str persistent_dir: (optional) name for the persistent
-          area in the target, defaults to `/persistent.tcf.d`.
+          area in the target, defaults to :data:`persistent_tcf_d`.
         """
         target = self.target
         target.shell.run("mkdir -p /mnt/%s" % persistent_dir)
@@ -935,9 +936,11 @@ EOF""")
         cmdline = \
             "time sudo rsync -cHaAX %s --numeric-ids %s" \
             " --inplace" \
-            " --exclude=persistent.tcf.d --exclude='persistent.tcf.d/*'" \
+            " --exclude=%s --exclude='%s/*'" \
             " --port %%(rsync_port)s %s%s %%(rsync_server)s::rootfs/%s%s" \
-            % (rsync_extra, _delete, src, path_append, dst, path_append)
+            % (rsync_extra, _delete,
+               persistent_tcf_d, persistent_tcf_d,
+               src, path_append, dst, path_append)
         target.report_info(
             "POS: rsyncing %s to target's %s" % (src, dst), dlevel = -1,
             attachments = dict(cmdline = cmdline))
@@ -1146,20 +1149,40 @@ EOF""")
     #:
     #: >>> self.pos.rootfs_make_room_candidates.insert(0, "/mnt/opt")
     #:
+    #: to this we will add the cache locations from
+    #: data:`cache_locations_per_distro`
     rootfs_make_room_candidates =  [
         "/mnt/tmp/",
         "/mnt/var/tmp/",
         "/mnt/var/log/",
         "/mnt/var/cache/",
-        "/mnt/var/lib/swupd",
-        "/mnt/var/lib/rpm",
         "/mnt/var/lib/systemd",
-        "/mnt/var/lib/",
-        # do this last, the cache is important...
-        "/mnt/persistent.tcf.d/"
+        "/mnt/var/lib/spool",
+        # do this last, the caches is important...
+        # after this we'd add the cache locations; one
     ]
 
-    def _rootfs_make_room(self, target, minimum_megs):
+    #: Dictionary of locations we cache for each distribution
+    #:
+    #: keyed by the beginning of the distro name, this allows us to
+    #: respect the space where content has been previousloy downloaded, so
+    #: future executions don't have to download it again. This can heavily
+    #: cut test setup time.
+    cache_locations_per_distro = {
+        'clear': [
+            # we try to keep the downloaded content across
+            # re-flashings, so we don't have to re-download it.
+            '/var/lib/swupd',
+        ],
+        'fedora': [
+            "/var/lib/rpm",
+        ],
+        'rhel': [
+            "/var/lib/rpm",
+        ],
+    }
+
+    def _rootfs_make_room(self, target, cache_locations, minimum_megs):
         # rsync needs have *some* space to work, otherwise it will
         # fail
         #
@@ -1172,7 +1195,7 @@ EOF""")
         # candidate, etc..
 
         dlevel = 2	# initially don't care too much
-        for candidate in self.rootfs_make_room_candidates:
+        for candidate in self.rootfs_make_room_candidates + cache_locations:
             output = target.shell.run(
                 "df -BM --output=avail /mnt   # got enough free space?",
                 output = True, trim = True)
@@ -1204,15 +1227,17 @@ EOF""")
         # fall through means we couldn't wipe enough stuff
 
 
-    def _rootfs_cache_manage(self, target, root_part_dev):
+    def _rootfs_cache_manage(self, target, root_part_dev,
+                             cache_locations_mnt):
         # Figure out how much space is being consumed by the
         # TCF persistent cache, we might have to clean up
         du_regex = re.compile(r"^(?P<megs>[0-9]+)M\s+total$",
                               re.MULTILINE)
         # we don't care if the dir doesn't exist; -c makes it 0
         du_output = target.shell.run(
-            "du -BM -sc /mnt/persistent.tcf.d 2> /dev/null || true"
-            "  # how much cached space; cleanup?", output = True)
+            "du -BM -sc %s 2> /dev/null || true"
+            " # how much cached space; cleanup?"
+            % " ".join(cache_locations_mnt), output = True)
         match = du_regex.search(du_output)
         if not match:
             # if it doesn't exist, we still shall be able to parse
@@ -1231,8 +1256,9 @@ EOF""")
             target.report_skip("POS: cache uses %d/%dM: skipping cleanup" %
                                (megs, megs_top))
         else:
-            tl.linux_rsync_cache_lru_cleanup(target, "/mnt/persistent.tcf.d",
-                                             megs_top * 1024)
+            for location in cache_locations_mnt:
+                tl.linux_rsync_cache_lru_cleanup(target, location,
+                                                 megs_top * 1024)
 
 
     def deploy_image(self, ic, image,
@@ -1371,12 +1397,34 @@ EOF""")
                 root_part_dev = self.mount_fs(image_final, boot_dev)
                 kws['root_part_dev'] = root_part_dev
 
-                self._rootfs_cache_manage(target, root_part_dev)
-                self._rootfs_make_room(target, 150)
+                # Keep a lid on how big is the cached content
+                cache_locations = [ persistent_tcf_d ]
+                for distro, locations in self.cache_locations_per_distro.items():
+                    if image_final_tuple[0].startswith(distro):
+                        cache_locations += locations
+                cache_locations_mnt = []
+                for location in cache_locations:
+                    # reroot relative to where it is mounted
+                    cache_locations_mnt.append(os.path.join("/mnt", location))
+                self._rootfs_cache_manage(target, root_part_dev,
+                                          cache_locations_mnt)
+                self._rootfs_make_room(target, cache_locations_mnt, 150)
                 target.report_info("POS: rsyncing %(image)s from "
                                    "%(rsync_server)s to %(root_part_dev)s"
                                    % kws,
                                    dlevel = -2)
+
+                # generate what we will exclude from wiping by rsync;
+                # this is basically /persistent.tcf.d and any other
+                # directories that are specific to each distro and
+                # contain downloaded content (like RPMs and such), to
+                # speed things up.
+                target.shell.run("""\
+cat > /tmp/deploy.ex
+%s
+%s/*
+%s
+\x04""" % (persistent_tcf_d, persistent_tcf_d, '\n'.join(cache_locations)))
                 # DO NOT use --inplace to sync the image; this might
                 # break certain installations that rely on hardlinks
                 # to share files and then updating one pushes the same
