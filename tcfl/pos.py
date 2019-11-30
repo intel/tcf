@@ -1377,10 +1377,13 @@ EOF""")
                                    "%(rsync_server)s to %(root_part_dev)s"
                                    % kws,
                                    dlevel = -2)
+                # DO NOT use --inplace to sync the image; this might
+                # break certain installations that rely on hardlinks
+                # to share files and then updating one pushes the same
+                # content to all.
                 output = target.shell.run(
-                    "time -p rsync -cHaAX --numeric-ids --delete --inplace"
-                    " --exclude=/persistent.tcf.d"
-                    " --exclude='/persistent.tcf.d/*'"
+                    "time -p rsync -acHAX --numeric-ids --delete "
+                    " --exclude-from=/tmp/deploy.ex"
                     " %(rsync_server)s/%(image)s/. /mnt/." % kws,
                     # 500s bc rsync takes a long time, but FIXME, we need
                     # to break this up and just increase timeout on the
