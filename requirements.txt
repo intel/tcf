@@ -8,4 +8,4 @@ python-Levenshtein
 requests
 setuptools
 pykwalify
-
+cloudshell-pdu-raritan
