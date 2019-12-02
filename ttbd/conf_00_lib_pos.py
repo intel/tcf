@@ -214,6 +214,10 @@ def nw_pos_add(nw_name, power_rail = None,
         ipv6_prefix_len = ipv6_prefix_len,
         ipv4_addr = '192.%d.%d.1' % (x, y),
         ipv4_prefix_len = ipv4_prefix_len,
+        # implemented by tinyproxy running in the server
+        ftp_proxy = "http://192.%d.%d.1:8888" % (x, y),
+        http_proxy = "http://192.%d.%d.1:8888" % (x, y),
+        https_proxy = "http://192.%d.%d.1:8888" % (x, y),
         # Provisioning OS support to boot off PXE on nfs root
         pos_http_url_prefix = "http://192.%d.%d.1/ttbd-pos/%%(bsp)s/" % (x, y),
         # FIXME: have the daemon hide the internal path?
