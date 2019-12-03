@@ -532,6 +532,7 @@ swupd_bundle_add_timeouts = {
     'LyX': 500,
     'R-rstudio': 1200, # 1041MB
     'big-data-basic': 800, # (1049MB)
+    'c-basic': 500,
     'computer-vision-basic': 800, #1001MB
     'container-virt': 800, #197.31MB
     'containers-basic-dev': 1200, #921MB
