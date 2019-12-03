@@ -739,7 +739,7 @@ EOF""")
     def rsync(self, src = None, dst = None,
               persistent_name = None,
               persistent_dir = persistent_tcf_d, path_append = "/.",
-              rsync_extra = ""):
+              rsync_extra = "", skip_local = False):
         """
         rsync data from the local machine to a target
 
@@ -844,7 +844,10 @@ EOF""")
                 "persistent_name  can't be a subdirectory" \
                 " and has to be a string"
             _persistent_name = persistent_name
-        if src != None:
+        # We don't want to transfer from local machine if skip_local is True
+        # If skip_local is true, we proceed to make a copy from persistent
+        # area to final destination
+        if not skip_local and src != None:
             target.report_info(
                 "rsyncing %s to target's persistent area /mnt%s/%s"
                 % (src, persistent_dir, persistent_name))
@@ -1585,6 +1588,7 @@ def deploy_path(ic, target, _kws, cache = True):
     source_path = getattr(target, "deploy_path_src", None)
     dst_path = getattr(target, "deploy_path_dest", "/")
     rsync_extra = getattr(target, "deploy_rsync_extra", "")
+    skip_local = getattr(target, "deploy_skip_local", False)
     if source_path == None:
         target.report_info("not deploying local path because "
                            "*target.deploy_path_src is missing or None ",
@@ -1604,9 +1608,12 @@ def deploy_path(ic, target, _kws, cache = True):
     for src in source_path:
         cache_name = os.path.basename(src)
 
-        # Get local file type - regular file / directory
-        local_type = subprocess.check_output([
-            "/usr/bin/stat", "-c%F", src]).strip()
+        local_type = None
+        # FIXME: Should we check file type if we skip local transfer?
+        if not skip_local:
+            # Get local file type - regular file / directory
+            local_type = subprocess.check_output([
+                "/usr/bin/stat", "-c%F", src]).strip()
 
         # Get remote file type - regular file / directory / doesn't exist
         remote_type = target.shell.run(
@@ -1651,7 +1658,7 @@ def deploy_path(ic, target, _kws, cache = True):
         if cache:
             # FIXME: do we need option_delete here too? option_delete = True
             target.pos.rsync(_source_path, dst_path, path_append = "",
-                             rsync_extra = rsync_extra)
+                             rsync_extra = rsync_extra, skip_local = skip_local)
         else:
             target.pos.rsync_np(_source_path, dst_path, option_delete = True,
                                 path_append = "", rsync_extra = rsync_extra)
