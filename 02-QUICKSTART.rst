@@ -45,10 +45,7 @@
 
    .. include:: doc/02-client-setup-LL-04-login.rst
 
-   For login in with the same *username* and *password* to all servers
-   at the same time::
-
-     $ TCF_USER=<USERNAME> TCF_PASSWORD=<PASSWORD> tcf login -q
+   Run *tcf login --help* for other login options.
 
 
      
