@@ -2,6 +2,8 @@
 Examples and HOWTOs
 ===================
 
+.. _examples_script:
+
 Automation/testcase script examples
 ===================================
 
