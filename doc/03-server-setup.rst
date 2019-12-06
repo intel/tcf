@@ -816,6 +816,7 @@ been tested yet, shall be similar.
      # install -o ttbd -g ttbd -m 2775 -d \
          /home/ttbd \
          /home/ttbd/images/tcf-live/ \
+         /home/ttbd/images/tcf-live/x86_64 \
          /home/ttbd/public_html /home/ttbd/public_html/x86_64
 
 4. Disable the firewall (FIXME: do not require this)::
