@@ -6246,6 +6246,7 @@ class tc_c(object):
             tc_fake._ident = msgid_c.ident()
             with msgid_c(tc_fake.ticket, depth = 1, l = cls.hashid_len) \
                  as _msgid:
+                cwd_original = os.getcwd()
                 try:
                     tc_instances += _is_testcase_call(_tc_driver, tc_name,
                                                       file_name, from_path,
@@ -6277,7 +6278,14 @@ class tc_c(object):
                     tc_fake.finalize(retval)
                     result += retval
                     continue
-
+                finally:
+                    cwd = os.getcwd()
+                    if cwd != cwd_original:
+                        logging.error(
+                            "%s: driver changed working directory from "
+                            "%s to %s; this is a BUG in the driver!"
+                            % (_tc_driver.origin, cwd_original, cwd))
+                        os.chdir(cwd_original)
             if not tc_instances:
                 continue
 
