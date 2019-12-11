@@ -1408,7 +1408,12 @@ EOF""")
                 cache_locations_mnt = []
                 for location in cache_locations:
                     # reroot relative to where it is mounted
-                    cache_locations_mnt.append(os.path.join("/mnt", location))
+                    cache_locations_mnt.append(os.path.join(
+                        "/mnt",
+                        # make the path relative to / so join() joins
+                        # it correctly and doesn't throw away the
+                        # prefix
+                        os.path.relpath(location, os.path.sep)))
                 self._rootfs_cache_manage(target, root_part_dev,
                                           cache_locations_mnt)
                 self._rootfs_make_room(target, cache_locations_mnt, 150)
