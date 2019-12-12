@@ -218,7 +218,8 @@ class report_mongodb_c(tcfl.report.report_c):
             ident = ident,
             level = level,
             tag = tag,
-            message = message if tag != "DATA" else "",
+            # MongoDB doesn't like bad UTF8, so filter a wee bit
+            message = tcfl.report._mkutf8(message) if tag != "DATA" else "",
         )
         if target_name:
             result["target_name"] = target_name
@@ -271,6 +272,10 @@ class report_mongodb_c(tcfl.report.report_c):
                             if not attachment.closed:
                                 f.seek(attachment.tell())
                             result['attachment'][key] = f.read()
+                    elif isinstance(attachment, basestring):
+                        # MongoDB doesn't like bad UTF8, so filter a wee bit
+                        result["attachment"][key] = \
+                            tcfl.report._mkutf8(attachment)
                     else:
                         result["attachment"][key] = attachment
 

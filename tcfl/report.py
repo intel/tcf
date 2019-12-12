@@ -727,7 +727,7 @@ class file_c(report_c):
                 # later in mkreport
                 ident = "<snip>"
             _prefix = "%s %d %s%s\t" % (tag, level, ident, tgname)
-            self._write(f, u"%s %s\n" % (_prefix, message))
+            self._write(f, u"%s %s\n" % (_prefix, _mkutf8(message)))
             if attachments != None:
                 assert isinstance(attachments, dict)
                 for key, attachment in attachments.iteritems():
