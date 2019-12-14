@@ -90,13 +90,17 @@ class impl_c(object):
       the *_command_sequence_run()* method from their
       :meth:`impl_c.enable` methods.
 
+    :param int command_timeout: (optional) number of seconds to wait
+      for a response ot a command before declaring a timeout
     """
-    def __init__(self, command_sequence = None):
+    def __init__(self, command_sequence = None, command_timeout = 5):
         assert command_sequence == None \
             or isinstance(command_sequence, list), \
             "command_sequence: expected list of tuples; got %s" \
             % type(command_sequence)
+        assert command_timeout > 0
         self.command_sequence = command_sequence
+        self.command_timeout = command_timeout
         self.parameters = {}
 
     class exception(Exception):
@@ -258,7 +262,7 @@ class impl_c(object):
         with codecs.open(read_file_name, "r", encoding = 'utf-8') as rf, \
              open(write_file_name, "w") as wf, \
              open(log_file_name, "w+") as logf:
-            timeout = 3
+            timeout = self.command_timeout
             rfd = rf.fileno()
             flag = fcntl.fcntl(rfd, fcntl.F_GETFL)
             fcntl.fcntl(rfd, fcntl.F_SETFL, flag | os.O_NONBLOCK)
