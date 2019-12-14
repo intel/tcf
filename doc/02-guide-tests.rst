@@ -400,7 +400,7 @@ How this is done is specific to the driver given in the configuration,
 but it might be a target that is physically connected to another via a
 USB cutter. The USB cutter is an object implementing a :class:`plugger
 interface <ttbl.things.impl_c>` which is configured as described in
-:module:`ttbl.things` in the config files.
+:mod:`ttbl.things` in the config files.
 
 - to find available things to connect, use the `tcf thing-list` or
   within a test script, :meth:`tcfl.things.list
