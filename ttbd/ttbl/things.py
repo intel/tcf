@@ -78,7 +78,7 @@ class interface(ttbl.tt_interface):
     device and host are targets. This is so that we can make sure
     they are owned by someone before plugging, as it can alter state.
 
-    :param ttbl.things.impl THINGNAME: multiple list of thing names
+    :param ttbl.things.impl_c THINGNAME: multiple list of thing names
       and their implementation; THINGNAME has to be the name of a
       target in this server
 
