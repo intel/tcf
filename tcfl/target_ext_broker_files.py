@@ -28,7 +28,7 @@ class broker_files(tc.target_extension_c):
     Note these files are, for example:
 
     - images for the server to flash into targets (usually handled with
-      the :class:`tcfl.target_ext_images.images` extension)
+      the :class:`tcfl.target_ext_images.extension` extension)
 
     - copying specific log files from the server (eg: downloading TCP
       dump captures form *tcpdump* as done by the

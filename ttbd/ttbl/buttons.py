@@ -131,7 +131,7 @@ class interface(ttbl.tt_interface):
 
     :param dict impls: dictionary keyed by button name and which
       values are instantiation of button drivers inheriting from
-      :class:`ttbl.buttons.impl`.
+      :class:`ttbl.buttons.impl_c`.
 
       Names have to be valid python symbol names. 
 

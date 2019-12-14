@@ -327,34 +327,34 @@ def target_pos_setup(target,
       interconnect declares in the same metadata.
 
     :param str boot_config: (optional) :data:`capability
-      tcfl.pos.capability_fns` to configure the boot
+      <tcfl.pos.capability_fns>` to configure the boot
       loader.
 
-      e.g.: :ref:`*uefi* <tcfl.pos_uefi.boot_config_multiroot>` (default)
+      e.g.: :func:`*uefi* <tcfl.pos_uefi.boot_config_multiroot>` (default)
 
     :param str boot_config_fix: (optional) :data:`capability
-      tcfl.pos.capability_fns` to fix the boot
+      <tcfl.pos.capability_fns>` to fix the boot
       loader configuration.
 
-      e.g.: :ref:`*uefi* <tcfl.pos_uefi.boot_config_fix>` (default)
+      e.g.: :func:`*uefi* <tcfl.pos_uefi.boot_config_fix>` (default)
 
     :param str boot_to_normal: (optional) :data:`capability
-      tcfl.pos.capability_fns` to boot the system in normal (non
+      <tcfl.pos.capability_fns>` to boot the system in normal (non
       provisioning) mode
 
-      e.g.: :ref:`*pxe* <tcfl.pos.target_power_cycle_to_normal_pxe>` (default)
+      e.g.: :func:`*pxe* <tcfl.pos.target_power_cycle_to_normal_pxe>` (default)
 
     :param str boot_to_pos: (optional) :data:`capability
-      tcfl.pos.capability_fns` to boot the system in provisioning
+      <tcfl.pos.capability_fns>` to boot the system in provisioning
       mode.
 
-      e.g.: :ref:`*pxe* <tcfl.pos.target_power_cycle_to_pos_pxe>` (default)
+      e.g.: :func:`*pxe* <tcfl.pos.target_power_cycle_to_pos_pxe>` (default)
 
     :param str mount_fs: (optional) :data:`capability
-      tcfl.pos.capability_fns` to partition, select and mount the root
+      <tcfl.pos.capability_fns>` to partition, select and mount the root
       filesystem during provisioning mode
 
-      e.g.: :ref:`*multiroot* <tcfl.pos_multiroot>` (default)
+      e.g.: :func:`*multiroot* <tcfl.pos_multiroot>` (default)
 
     :param str pos_http_url_prefix: (optional) prefix to give to the
       kernel/initrd for booting over TFTP or HTTP. Note: you want a
@@ -601,7 +601,7 @@ def pos_target_add(
       >>>    fixture_usb_disk = "4289273ADF334"
       >>> ))
 
-    :param func power_on_pre_hook: (optional) function the server
+    :param power_on_pre_hook: (optional) function the server
       calls before powering on the target so so it boots Provisioning
       OS mode or normal mode.
 
@@ -611,7 +611,7 @@ def pos_target_add(
 
       - :func:`ttbl.dhcp.power_on_pre_pos_setup`
       - :meth:`ttbl.ipmi.pci.pre_power_pos_setup`
-      - :meth:`ttbl.ipmi.pci_ipmiutil.pre_power_pos_setup`
+      - :meth:`ttbl.ipmi.pci_ipmitool.pre_power_pos_setup`
 
       Default is :func:`ttbl.dhcp.power_on_pre_pos_setup`.
 

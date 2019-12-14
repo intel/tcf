@@ -86,7 +86,7 @@ class ssh(tc.target_extension_c):
            E#1   @local  returncode: 255
 
     For seeing verbose SSH output to debug, append ``-v`` to
-    ``_ssh_cmdline_options``::
+    variable *_ssh_cmdline_options*::
 
     >>> target.ssh._ssh_cmdline_options.append("-v")
 
@@ -147,8 +147,8 @@ class ssh(tc.target_extension_c):
         Run a shell command over SSH, return exitcode and output
 
         Similar to :func:`subprocess.call`; note SSH is normally run
-        in verbose mode (unless ``-q`` has been set it
-        :data:`_ssh_cmdline_options`, so the stderr will contain SSH
+        in verbose mode (unless ``-q`` has been set in
+        *_ssh_cmdline_options*, so the stderr will contain SSH
         debug information.
 
         :param str cmd: shell command to execute via SSH, substituting

@@ -30,7 +30,6 @@ import pyghmi.ipmi.command
 # we get  pyghmi.exc.IpmiException('Session no longer connected')
 
 class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):
-
     """
     Power controller to turn on/off a server via IPMI
 
@@ -69,7 +68,7 @@ class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):
 
     .. warning:: putting BMCs on an open network is not a good idea;
                  it is recommended they are only exposed to an
-                  :ref:`infrastructure network <separated_networks>`
+                 :ref:`infrastructure network <separated_networks>`
 
     :params str hostname: *USER[:PASSWORD]@HOSTNAME* of where the IPMI BMC is
       located
@@ -116,6 +115,14 @@ class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):
             return None
 
     def pre_power_pos_setup(self, target):
+        """
+        If target's *pos_mode* is set to *pxe*, tell the BMC to boot
+        off the network.
+
+        This is meant to be use as a pre-power-on hook (see
+        :class:`ttbl.power.interface` and
+        :data:`ttbl.test_target.power_on_pre_fns`).
+        """
         if target.fsdb.get("pos_mode") == 'pxe':
             target.log.error("POS boot: telling system to boot network")
             self.bmc.set_bootdev("network")
@@ -192,6 +199,14 @@ class pci_ipmitool(ttbl.power.impl_c, ttbl.tt_power_control_impl):
         return None
 
     def pre_power_pos_setup(self, target):
+        """
+        If target's *pos_mode* is set to *pxe*, tell the BMC to boot
+        off the network.
+
+        This is meant to be use as a pre-power-on hook (see
+        :class:`ttbl.power.interface` and
+        :data:`ttbl.test_target.power_on_pre_fns`).
+        """
         # we use bootparam/set/bootflag since it is working much
         # better, because we seem not to be able to get the system to
         # acknowledge the BIOS boot order

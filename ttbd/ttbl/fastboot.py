@@ -70,40 +70,7 @@ class interface(ttbl.tt_interface):
       ``"R1J56L1006ba8b"``.
 
     :param dict allowed_commands: Commands that can be executed with
-      fastboot. This is a KEY/VALUE list. Each KEY is a command name
-      (which doesn't necessarily need to map a fastboot command
-      itself). The *VALUE* is a list of arguments to fastboot.
-
-      The user must send the same amount of arguments as in the
-      *VALUE* list.
-
-      Each entry in the *VALUE* list is either a string or a regular
-      expression. What ever the user sends must match the string or
-      regular expression. Otherwise it will be rejected.
-
-      The entry can be a tuple *( STR|REGEX, REPLACEMENT )* that
-      allows to replace what the user sends (using
-      :func:`re.sub`). In the example above:
-
-      >>> ( re.compile("^(.+)$"), "%USERPATH%/\\g<1>" )
-
-      it is meant to take a filename uploaded to the server's user
-      storage area. A match is done on the totality of the argument
-      (ala: file name) and then ``\\g<1>`` in the substitution string
-      is replaced by that match (group #1), to yield
-      ``%USERPATH%/FILENAME``.
-
-      Furthermore, the following substitutions are done on the final
-      strings before passing the arguments to fastboot:
-
-        - ``%USERPATH%`` will get replaced by the current user path
-
-      .. warning:: There is a potential to exploit the system's
-                   security if wide access is given to touch files or
-                   execute commands without filtering what the user is
-                   given. Be very restrictive about what commands and
-                   arguments are whitelisted.
-
+      fastboot. See :data:`interface.allowed_commands`.
     """
     def __init__(self, usb_serial_number, allowed_commands):
         assert isinstance(usb_serial_number, basestring), \
@@ -148,6 +115,42 @@ class interface(ttbl.tt_interface):
             count += 1
 
         ttbl.tt_interface.__init__(self)
+        
+        #: Commands that can be executed with fastboot.
+        #:
+        #: This is a KEY/VALUE list. Each KEY is a command name
+        #: (which doesn't necessarily need to map a fastboot command
+        #: itself). The *VALUE* is a list of arguments to fastboot.
+        #:
+        #: The user must send the same amount of arguments as in the
+        #: *VALUE* list.
+        #:
+        #: Each entry in the *VALUE* list is either a string or a regular
+        #: expression. What ever the user sends must match the string or
+        #: regular expression. Otherwise it will be rejected.
+        #:
+        #: The entry can be a tuple *( STR|REGEX, REPLACEMENT )* that
+        #: allows to replace what the user sends (using
+        #: :func:`re.sub`). In the example above:
+        #:
+        #: >>> ( re.compile("^(.+)$"), "%USERPATH%/\\g<1>" )
+        #:
+        #: it is meant to take a filename uploaded to the server's user
+        #: storage area. A match is done on the totality of the argument
+        #: (ala: file name) and then ``\\g<1>`` in the substitution string
+        #: is replaced by that match (group #1), to yield
+        #: ``%USERPATH%/FILENAME``.
+        #:
+        #: Furthermore, the following substitutions are done on the final
+        #: strings before passing the arguments to fastboot:
+        #:
+        #:   - ``%USERPATH%`` will get replaced by the current user path
+        #:
+        #: .. warning:: There is a potential to exploit the system's
+        #:              security if wide access is given to touch files or
+        #:              execute commands without filtering what the user is
+        #:              given. Be very restrictive about what commands and
+        #:              arguments are whitelisted.
         self.allowed_commands = allowed_commands
         self.usb_serial_number = usb_serial_number
 

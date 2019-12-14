@@ -428,6 +428,10 @@ User access control and authentication
 Console Management Interface
 ----------------------------
 
+.. automodule:: ttbl.console
+
+LEGACY *compat*:
+
 .. autoclass:: ttbl.test_target_console_mixin
 .. automodule:: ttbl.cm_serial
 .. automodule:: ttbl.cm_loopback
@@ -442,13 +446,18 @@ Power Control Interface
 -----------------------
 
 .. automodule:: ttbl.power
-.. automodule:: ttbl.dhcp
 .. automodule:: ttbl.pc
+.. automodule:: ttbl.ipmi
 .. automodule:: ttbl.raritan_emx
+.. automodule:: ttbl.apc
 .. automodule:: ttbl.pc_ykush
+.. automodule:: ttbl.usbrly08b
+
+Daemons that can be started in the server as part of a power rail:
+
 .. automodule:: ttbl.rsync
 .. automodule:: ttbl.socat
-.. automodule:: ttbl.usbrly08b
+.. automodule:: ttbl.dhcp
 
 Other interfaces
 ----------------

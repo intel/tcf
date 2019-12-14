@@ -414,15 +414,15 @@ class target_c(object):
     if the target exposes it or not; these is the current list of
     implemented interfaces:
 
-    - :py:class:`console <tcfl.target_ext_console.console>`
+    - :py:class:`console <tcfl.target_ext_console.extension>`
     - :py:class:`capture <tcfl.target_ext_capture.extension>` for
       stream and snapshot captures of audio, video, network traffic,
       etc
     - :py:class:`debug <tcfl.target_ext_debug.debug>`
-    - :py:class:`fastboot <tcfl.target_ext_fastboot.fastboot>`
-    - :py:class:`images <tcfl.target_ext_images.images>`
+    - :py:class:`fastboot <tcfl.target_ext_fastboot.extension>`
+    - :py:class:`images <tcfl.target_ext_images.extension>`
     - :py:class:`ioc_flash_server_app <tcfl.target_ext_ioc_flash_server_app.extension>`
-    - :py:class:`power <tcfl.target_ext_power.power>`
+    - :py:class:`power <tcfl.target_ext_power.extension>`
     - :py:class:`shell <tcfl.target_ext_shell.shell>`
     - :py:class:`ssh <tcfl.target_ext_ssh.ssh>`
     - :py:class:`tunnel <tcfl.target_ext_tunnel.tunnel>`
@@ -1175,7 +1175,7 @@ class target_c(object):
            send the data (otherwise use the default one).
 
         Note this function is equivalent to
-        :meth:`tcfl.target_ext_console.console.write`, which is the raw
+        :meth:`tcfl.target_ext_console.extension.write`, which is the raw
         version of this function.
 
         However, this function works with the send/expect engine and
@@ -6077,15 +6077,15 @@ class tc_c(object):
 
         When creating :term:`testcase driver`, the driver has to
         create its own version of this function. The default
-        implementation recognizes python files called *test_*.py* that
+        implementation recognizes python files called *test_\*.py* that
         contain one or more classes that subclass :class:`tcfl.tc.tc_c`.
 
         See examples of drivers in:
 
-        - :meth:`tcfl.tc_clear_bbt.tc_clear_bbt.is_testcase`
+        - :meth:`tcfl.tc_clear_bbt.tc_clear_bbt_c.is_testcase`
         - :meth:`tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.is_testcase`
-        - :meth:`examples.test_ptest_runner._driver` (:term:`impromptu
-          testcase driver)
+        - :meth:`examples.test_ptest_runner` (:term:`impromptu
+          testcase driver`)
 
         note drivers need to be registered with
         :meth:`tcfl.tc.tc_c.driver_add`; on the other hand, a Python

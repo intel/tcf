@@ -136,8 +136,11 @@ class impl_c(object):
         Same parameters as :meth:`on`
 
         :returns: power state:
+
           - *True*: powered on
+
           - *False*: powered off
+
           - *None*: this is a *fake* power unit, so it has no actual
             power state
         """
@@ -597,11 +600,12 @@ class daemon_c(impl_c):
             self.env_add = env_add
         else:
             self.env_add = {}
+        #: dictionary of keywords that can be use to template the
+        #: command line with *%(FIELD)S*
+        self.kws = {}
         if kws:
             assert isinstance(kws, dict)
             self.kws = kws
-        else:
-            self.kws = {}
         if path == None:
             self.path = cmdline[0]
         else:
@@ -743,7 +747,7 @@ class socat_pc(daemon_c):
 
     :param str address1: first address for socat; will be templated
       with *%(FIELD)s* to the target's keywords and anything added in
-      :data:`kws`.
+      :data:`daemon_c.kws`.
     :param str address2: second address for socat; templated as
       *address1*
     :param dict env_add: variables to add to the environment when
@@ -783,7 +787,7 @@ class socat_pc(daemon_c):
       Note you need to use *rawer* to ensure a clean pipe, otherwise
       the PTY later might add \\rs.
 
-    - ``/dev/ttyS0,creat=0,rawer,b115200,parenb=0,cs8,bs1
+    - ``/dev/ttyS0,creat=0,rawer,b115200,parenb=0,cs8,bs1``
 
       opens a serial port and writes to it whatever is written to
       ``console-COMPONENT.write`` and anything that is read from the
@@ -800,13 +804,13 @@ class socat_pc(daemon_c):
     console channels are meant to be completely transparent.
 
     For examples, look at :class:`ttbl.console.serial_pc` and
-    :class:`ttbl.console.ipmi_sol_pc`.
+    :class:`ttbl.ipmi.sol_console_pc`.
 
     ** Catchas and Tricks for debugging **
     
     Sometimes it just dies and we are left wondering
 
-    - prepend to *EXEC* *strace -fo /tmp/strace.log *, as in::
+    - prepend to *EXEC* *strace -fo /tmp/strace.log*, as in::
 
         EXEC:'strace -fo /tmp/strace.log COMMANDTHATDIES'
 

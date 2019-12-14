@@ -41,13 +41,12 @@ class impl_c(object):
     The target will list the available consoles in the targets'
     *consoles* tag
 
-
     :param list command_sequence: (optional) when the console is
       enabled (from :meth:`target.console.enable
       <tcfl.target_ext_console.extension.enable>` or when powering up
-      a target that also enables the console at the same time via :meth:`target.power.on
-      <tcfl.target_ext_power.extension.on>` ), run a sequence of
-      send/expect commands.
+      a target that also enables the console at the same time via
+      :meth:`target.power.on <tcfl.target_ext_power.extension.on>`),
+      run a sequence of send/expect commands.
 
       This is commonly used when the serial line is part of a server
       and a set of commands have to be typed before the serial
@@ -76,10 +75,12 @@ class impl_c(object):
       This is a list of tupples *( SEND, EXPECT )*; *SEND* is a string
       sent over to the console (unless the empty string; then nothing
       is sent).  *EXPECT* can be anything that can be fed to Python's
-      Expect :method:`expect <pexpect.pexpect.spawn.expect>` function:
+      Expect :meth:`expect <pexpect.spawn.expect>` function:
 
       - a string
+
       - a compiled regular expression
+
       - a list of such
 
       The timeout for each expectation is hardcoded to five seconds
@@ -144,7 +145,7 @@ class impl_c(object):
         """
         Setup console parameters (implementation specific)
 
-        Check :meth:`interface.read` for common parameters
+        Check :meth:`impl_c.read` for common parameters
 
         :param dict parameters: dictionary of implementation specific
           parameters
@@ -158,7 +159,7 @@ class impl_c(object):
         Return data read from the console since it started recording
         from a given byte offset.
 
-        Check :meth:`interface.read` for common parameters
+        Check :meth:`impl_c.read` for common parameters
 
         :params int offset: offset from which to read
 
@@ -178,7 +179,7 @@ class impl_c(object):
         """
         Return the amount of data currently read from the console.
 
-        Check :meth:`interface.read` for common parameters
+        Check :meth:`impl_c.read` for common parameters
 
         :returns: number of bytes read from the console since the last
           power up.
@@ -190,7 +191,7 @@ class impl_c(object):
         """
         Write bytes the the console
 
-        Check :meth:`interface.read` for common parameters
+        Check :meth:`impl_c.read` for common parameters
 
         :param data: string of bytes or data to write to the console
         """
@@ -440,9 +441,11 @@ class generic_c(impl_c):
     the same piece takes whatever data is being provided and passes it
     on, or it can be written directly.
 
-    See :class:`ttbl.console.serial_pc` for an example of this model
-    implemented in a serial port and :class:`ttbl.console.sol_pc` for
-    implementing an IPMI Serial-Over-Lan console.
+    See :class:`serial_pc` for an example of this model implemented
+    over a tranditional serial port and
+    :class:`ttbl.ipmi.sol_console_pc` for implementing an IPMI
+    Serial-Over-Lan console. :class:`ssh_pc` for implementing a
+    console simulated over an SSH connection.
 
     :param int chunk_size: (optional) when writing, break the writing
       in chunks of this size and wait *interchunk_wait* in between
@@ -450,6 +453,7 @@ class generic_c(impl_c):
 
     :param float interchunk_wait: (optional) if *chunk_size* is
       enabled, time to wait in seconds in between each chunk.
+
     """
     def __init__(self, chunk_size = 0, interchunk_wait = 0.2,
                  command_sequence = None):

@@ -491,7 +491,7 @@ class esptool_c(impl_c):
       are picked up)
 
       configure path to it globally by setting
-      :attr:`esptool_path` in a /etc/ttbd-production/conf_*.py file:
+      :attr:`path` in a /etc/ttbd-production/conf_*.py file:
 
       .. code-block:: python
 

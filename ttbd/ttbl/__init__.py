@@ -185,12 +185,12 @@ class acquirer_c(object):
         operation, return busy if not available.
 
         :param str who: user name
-        :param boot force: force the acquisition (overriding current
+        :param bool force: force the acquisition (overriding current
           user); this assumes the user *who* has permissions to do so;
           if not, raise an exception child of :class:`exception`.
 
         :raises busy_e: if the target is busy and could not be acquired
-        :raises timeout_e: some sort of timeout happened
+        :raises acquirer_c.timeout_e: some sort of timeout happened
         :raises no_rights_e: not enough privileges for the operation
         """
         raise NotImplementedError
@@ -200,9 +200,9 @@ class acquirer_c(object):
         Release the resource from the given user
 
         :param str who: user name
-        :param boot force: force the release (overriding current
+        :param bool force: force the release (overriding current
           user); this assumes the user *who* has permissions to do so;
-          if not, raise an exception child of :class:`exception`.
+          if not, raise an exception child of :class:`acquirer_c.exception`.
         """
         raise NotImplementedError
 
@@ -411,7 +411,7 @@ class tt_interface(object):
         :param dict impls: dictionary keyed by name of objects of type
           *cls* to serve as implementatons for the itnerface.
         :param type cls: base class for the implementations (eg:
-        :class:`ttbl.console.impl_c`)
+          :class:`ttbl.console.impl_c`)
 
         """
         assert isinstance(impls, collections.Iterable)

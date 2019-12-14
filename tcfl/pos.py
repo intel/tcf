@@ -249,6 +249,11 @@ def target_power_cycle_to_normal_pxe(target):
     target.property_set("pos_mode", "local")
     target.power.cycle()
 
+#: Name of the directory created in the target's root filesystem to
+#: cache test content
+#:
+#: This is maintained by the provisioning process, althought it might
+#: be cleaned up to make room.
 persistent_tcf_d = '/persistent.tcf.d'
 
 def mk_persistent_tcf_d(target, subdirs = None):

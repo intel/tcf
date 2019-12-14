@@ -82,7 +82,7 @@ Glossary
 
      This allows test content written in anything than Python to be
      exectured by the automation process without modifying it. See
-     :meth:`tcfl.tc.tc_c.is_testacase`.
+     :meth:`tcfl.tc.tc_c.is_testcase`.
 
    test target
 
