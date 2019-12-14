@@ -46,7 +46,7 @@ number of reported testcases will vary wildly if the system cannot be
 provisioned or powered on or if the testcase execution timesout.
 
 Note this also servers as an example of an :term:`impromptu test driver
-<impromptu test case driver>`.
+<impromptu testcase driver>`.
 
 To execute, :download:`the testcase
 <../examples/test_ptest_runner.py>`.
