@@ -33,6 +33,7 @@ Other target interfaces
 .. automodule:: tcfl.target_ext_power
 .. automodule:: tcfl.target_ext_shell
 .. automodule:: tcfl.target_ext_ssh
+.. automodule:: tcfl.target_ext_things
 .. automodule:: tcfl.target_ext_tunnel
 
 *TCF run* Application builders
@@ -455,6 +456,7 @@ Power Control Interface
 
 Daemons that can be started in the server as part of a power rail:
 
+.. automodule:: ttbl.qemu
 .. automodule:: ttbl.rsync
 .. automodule:: ttbl.socat
 .. automodule:: ttbl.dhcp
@@ -467,13 +469,14 @@ Other interfaces
 .. automodule:: ttbl.fastboot
 .. automodule:: ttbl.images
 .. automodule:: ttbl.ioc_flash_server_app
+.. automodule:: ttbl.things
 
 
 Common helper library
 ---------------------
 
-.. automodule:: commonl.expr_parser
+.. automodule:: commonl
 
-.. automodule:: commonl.tcob
+.. automodule:: commonl.expr_parser
 
 .. include:: 09-api-LL-extras.rst

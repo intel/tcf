@@ -489,7 +489,7 @@ For implementing this, you need:
 - a thing (which is also a target)
 - a plugger, which is the driver that implements the actual physical
   act of plugging one target into another, implementing the interface
-  defined in :class:`ttbl.thing_plugger_mixin`.
+  defined in :class:`ttbl.things.interface`.
 
 For this, the target to which the thing is connected has to be
 properly configured; if you are coonecting a *THINGNAME* using method

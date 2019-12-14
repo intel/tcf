@@ -127,7 +127,7 @@ remote system the test suite is executed by running::
 we can create a script that executes each of those commands, but it
 becomes repetitive.
 
-A different sollution is a :term:`impromptu test driver`; this is a
+A different sollution is a :term:`impromptu testcase driver`; this is a
 Python test class instance called *_driver* by it's own in a file, eg:
 *test_something.py* which can get subcase parameter execution from
 TCF's command line::
@@ -186,7 +186,7 @@ is implemented by either:
   (:meth:`ttbl.test_target.interface_add`). See
   (:meth:`ttbl.buttons.interface` as an example of an interface
   implemented on the daemon and it's counterpart,
-  :meth:`tcfl.target_ext_buttons.buttons` for the client side).
+  :meth:`tcfl.target_ext_buttons.extension` for the client side).
 
 Note details about the actual drivers that implement the interfaces do
 not necessarily belong here and are detailed in the actual driver code.
@@ -431,11 +431,23 @@ Things are entities that can be connected to a target, for example:
 
 each driver is responsible to implement the different thing
 plug/unplug methods by adding methods and their handling functions to
-the :attr:`ttbl.test_target.thing_methods` dictionary.
+the target's *things* interface:
 
-Then the target client can plug or unplug those things using the
-API :meth:`tcfl.tc.target_c.thing_plug` or
-:meth:`tcfl.tc.target_c.thing_plug`.
+>>> target.interface_add("things", ttbl.things.interface(**impls))
+
+The implementations are objects subclass of
+:class:`ttbl.things.impl_c`, such as:
+
+- :class:`ttbl.usbrly08b.plugger`: uses a USBRLY8b relay bank to
+  connect/disconnect a USB2 device to a target.
+
+- :class:`ttbl.qemu.plugger`: given a QEMU target and a USB device
+  available to the host, connect it or disconnect it from the QEMU
+  target.
+
+Then the target client can plug or unplug those things using the API
+:meth:`target.things.plug <tcfl.target_ext_things.extension.plug>` or
+:meth:`target.things.unplug <tcfl.target_ext_things.extension.unplug>`.
 
 .. _authentication:
 
