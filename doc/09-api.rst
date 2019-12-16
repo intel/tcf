@@ -376,6 +376,11 @@ Provisioning OS specific metadata
 
   Note this will be compiled into a Python regex.
 
+*ttbd* HTTP API
+===============
+
+.. include:: 09-api-http.rst
+
 *ttbd* Configuration API for targets
 ====================================
 
