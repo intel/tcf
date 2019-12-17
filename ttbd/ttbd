@@ -256,12 +256,12 @@ def login():
     message = ""
     for authenticator in ttbl.config._authenticators:
         try:
-            logd("user %s: authenticating  with %s" % (email, authenticator))
+            logd("user %s: authenticating with %s" % (email, authenticator))
             _token_roles = authenticator.login(
                 email, password,
                 remote_address = flask.request.remote_addr)
-            logi("user %s: authenticated  with %s: roles %s"
-                 % (email, authenticator, _token_roles))
+            logi("user %s: authenticated with %s: roles: %s"
+                 % (email, authenticator, " ".join(_token_roles)))
             token_roles.update(_token_roles)
             break
         except ttbl.authenticator_c.invalid_credentials_e as e:
@@ -278,8 +278,10 @@ def login():
             # Try next authenticator
 
     if not 'user' in token_roles:
-        logi("user %s: not allowed, no 'user' role (just %s)"
-             % (email, list(token_roles)))
+        logi("user %s: not allowed, no 'user' role (roles: %s)"
+             % (email,
+                " ".join(token_roles) if token_roles
+                else "<empty, meaning no permissions>"))
         flask.abort(404, "user %s: not allowed, no 'user' role: %s"
                     % (email, message))
 
@@ -296,11 +298,14 @@ def login():
     elif 'admin' in token_roles:
         user.set_role('admin')
 
-    logi("user %s: authenticated with roles %s" % (email, list(token_roles)))
-    return flask.jsonify({'login': "user %s: authenticated with roles %s"
-                          % (email, list(token_roles))})
+    logi("user %s: authenticated with roles: %s"
+         % (email, " ".join(token_roles)))
+    return flask.jsonify({
+        'login': "user %s: authenticated with roles: %s" \
+        % (email, " ".join(token_roles))
+    })
 
-@app.route(API_PREFIX + 'logout', methods = ['GET'])
+@app.route(API_PREFIX + 'logout', methods = [ 'PUT' ])
 @flask_login.login_required
 def logout():
     flask_login.logout_user()
