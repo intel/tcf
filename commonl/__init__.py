@@ -213,10 +213,7 @@ def cmdline_log_options(parser):
     """Initializes a parser with the standard command line options to
     control verbosity when using the logging module
 
-    :param parser: command line argument parser
-    :type parser: argparser.ArgParser()
-    :returns: none
-    :raises: unknown
+    :param python:argparse.ArgParser parser: command line argument parser
 
     -v|--verbose to increase verbosity (defaults to print/log errors only)
 
@@ -249,8 +246,8 @@ def mkid(something, l = 10):
     """
     Generate a 10 character base32 ID out of an iterable object
 
-    :param something: anything from which an id has to be generated
-    :type something: anything iterable
+    :param something: anything from which an id has to be generate
+      (anything iterable)
     """
     h = hashlib.sha512(something)
     return base64.b32encode(h.digest())[:l].lower()
@@ -261,10 +258,8 @@ def trim_trailing(s, trailer):
     """
     Trim *trailer* from the end of *s* (if present) and return it.
 
-    :param s: string to trim from
-    :type s: string
-    :param trailer: string to trim
-    :type trailer: string
+    :param str s: string to trim from
+    :param str trailer: string to trim
     """
     tl = len(trailer)
     if s[-tl:] == trailer:
@@ -474,10 +469,8 @@ def hash_file(hash_object, filepath, blk_size = 8192):
     Run a the contents of a file though a hash generator.
 
     :param hash_object: hash object (from :py:mod:`hashlib`)
-    :param filepath: path to the file to feed
-    :type filepath: str
-    :param blk_size: read the file in chunks of that size (in bytes)
-    :type blk_size: integer
+    :param str filepath: path to the file to feed
+    :param int blk_size: read the file in chunks of that size (in bytes)
     """
     assert hasattr(hash_object, "update")
     with open(filepath, 'rb') as f:
