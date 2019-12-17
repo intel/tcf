@@ -5,11 +5,14 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+import collections
 import logging
+import time
 import urlparse
 
 import ldap
 
+import commonl
 import ttbl
 
 class authenticator_ldap_c(ttbl.authenticator_c):
@@ -166,3 +169,170 @@ class authenticator_ldap_c(ttbl.authenticator_c):
                 if group in role.get('groups', []):
                     token_roles.add(role_name)
         return token_roles
+
+
+class ldap_map_c(object):
+    """General LDAP mapper
+
+    This objects allows maps and caches entities in an LDAP database, to
+    speed up looking up of values from other values.
+
+    For example, to get the *displayName* based on the *sAMAccountName*:
+
+    >>> account_name = self.lookup("Some User", 'displayName', 'sAMAccountName')
+
+    looks up an LDAP entity that has *Some User* as field
+    *displayName* and returns it's *sAMAccountName*.
+
+    This does the same, but caches the results so that the next
+    time it looks it up, it doesn't need to hit LDAP:
+
+    >>> account_name = self.lookup_cached("Some User", 'displayName', 'sAMAccountName')
+
+    this object caches the objects, as we assume LDAP behaves
+    mostly as a read-only database.
+
+    :param str url: URL of the LDAP server; in the form
+      *ldap[s]://[BIND_USERNAME[:BIND_PASSWORD]]@HOST:PORT*.
+
+      The bind username and password can be specified in the
+      arguments below (eg: when either have a *@* or *:* and they
+      follow the same rules for password discovery.
+
+    :param str bind_username: (optional) login for binding to
+      LDAP; might not be needed in all setups.
+
+    :param str bind_password: (optional) password to binding to
+      LDAP; migt not be needed in all setups.
+
+      Will be handled by :func:`commonl.password_get`, so
+      passwords such as:
+
+       - *KEYRING* will ask the accounts keyring for the password
+          for service *url* for username *bind_username*
+
+       - *KEYRING:SERVICE* will ask the accounts keyring for the password
+          for service *SERVICE* for username *bind_username*
+
+       - *FILENAME:PATH* will read the password from filename *PATH*.
+
+      otherwise is considered a hardcoded password.
+
+    :param int max_age: (optional) number of seconds each cached
+      entry is to live. Once an entry is older than this, the LDAP
+      server is queried again for that entry.
+    """
+
+    class error_e(ValueError):
+        pass
+
+    class invalid_credentials_e(error_e):
+        pass
+
+    def __init__(self, url,
+                 bind_username = None, bind_password = None,
+                 max_age = 200):
+        assert isinstance(url, basestring)
+        assert bind_username == None or isinstance(bind_username, basestring)
+        assert bind_password == None or isinstance(bind_password, basestring)
+        assert max_age > 0
+
+        url_parsed = urlparse.urlparse(url)
+        if url_parsed.scheme != "ldap" or url_parsed.netloc == "":
+            raise ValueError("%s: malformed LDAP URL?" % url)
+        self.url = commonl.url_remove_user_pwd(url_parsed)
+        if bind_username == None:
+            self.bind_username = url_parsed.username
+        else:
+            self.bind_username = bind_username
+        if bind_password == None:
+            self.bind_password = url_parsed.password
+        else:
+            self.bind_password = bind_password
+        self.bind_password = commonl.password_get(self.url, self.bind_username,
+                                                  self.bind_password)
+        # dictionary of [ field_lookup, field_report ] = {
+        #   VALUE: ( TIMESTAMP, REPORTED_FIELD ),
+        # }
+        self._cache = collections.defaultdict(dict)
+        self.conn = None
+        #: maximum number of seconds an entry will live in the cache
+        #: before it is considered old and refetched from the servers.
+        self.max_age = max_age
+
+    def _conn_setup(self):
+        if self.conn:
+            return
+        self.conn = ldap.initialize(self.url)
+        self.conn.set_option(ldap.OPT_REFERRALS, 0)
+        self.conn.simple_bind_s(self.bind_username, self.bind_password)
+
+    def lookup(self, what, field_lookup, field_report):
+        """
+        Lookup the first LDAP record whose field *field_lookup*
+        contains a value of *what*
+
+        :returns: the value of the field *field_record* for the
+          record found; *None* if not found or the record doesn't have
+          the field.
+        """
+        assert isinstance(what, basestring)
+        assert isinstance(field_lookup, basestring)
+        assert isinstance(field_report, basestring)
+
+        while True:	# retry
+            try:
+                self._conn_setup()
+                record = self.conn.search_s(
+                    "", ldap.SCOPE_SUBTREE, '%s=%s' % (field_lookup, what),
+                    [ field_lookup, field_report ])
+                return record
+            except ldap.INVALID_CREDENTIALS as e:
+                raise self.invalid_credentials_e(
+                    "%s: invalid credentials for LDAP %s=%s: %s"
+                    % (self.url, field_lookup, what, e))
+            except (ldap.error, ldap.CONNECT_ERROR) as e:
+                logging.warning("LDAP: connection error, retrying: %s / %s",
+                                type(e), e)
+                # ok, reinit the connection, rebind, retry
+                self.conn = None
+                continue
+            except Exception as e:
+                logging.exception("error %s: %s", type(e), e)
+                raise self.error_e(
+                    "%s: generic error in LDAP searching %s=%s: %s"
+                    % (self.url, field_lookup, what, e))
+
+    def lookup_cached(self, value, field_lookup, field_report):
+        """
+        Same operation as :meth:`lookup`; however, it caches the
+        result, so if the last lookup is younger than :data:`max_age`,
+        said result is used. Otherwise a new LDAP lookup is done and
+        the value cached.
+        """
+        assert isinstance(value, basestring)
+        assert isinstance(field_lookup, basestring)
+        assert isinstance(field_report, basestring)
+
+        cache = self._cache[( field_lookup, field_report)]
+        if value in cache:
+            # hit in the cache
+            ts, mapped_value = cache[value]
+            now = time.time()
+            if now - ts < self.max_age:
+                return mapped_value	                # still fresh, use it
+            # cache entry is stale, delete it and lookup
+            del cache[value]
+        records = self.lookup(value, field_lookup, field_report)
+        # returns a list of records, so let's check each, although
+        # mostl likely it'll be only
+        now = time.time()
+        for _dn, record in records:
+            # displayName is also a list of names, so we match on one
+            # that contains exactly the name we are looking for
+            mapped_value = record[field_report][0]
+            if value in record[field_lookup]:
+                cache[value] = ( now, mapped_value )
+                return mapped_value
+        # nothing found, so bomb it.
+        return None
