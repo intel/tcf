@@ -1048,22 +1048,64 @@ class dict_missing_c(dict):
 def ipv4_len_to_netmask_ascii(length):
     return socket.inet_ntoa(struct.pack('>I', 0xffffffff ^ ((1 << (32 - length) ) - 1)))
     
-def split_user_pwd_hostname(s):
+
+def password_get(domain, user, password):
     """
-    Return a tuple decomponsing ``[USER[:PASSWORD]@HOSTNAME``
+    Get the password for a domain and user
 
-    :returns: tuple *( USER, PASSWORD, HOSTNAME )*, *None* in missing fields.
+    This returns a password obtained from a configuration file, maybe
+    accessing secure password storage services to get the real
+    password. This is intended to be use as a service to translate
+    passwords specified in config files, which in some time might be
+    cleartext, in others obtained from services.
 
-    Note that if password is *KEYRING*, the user's keyring will be
-    looked up for the password, with *USER* as username and *HOSTNAME*
-    as service. See how to use keyring in a `headless system
-    <https://keyring.readthedocs.io/en/stable/#using-keyring-on-headless-linux-systems>`_.
+    >>> real_password = password_get("somearea", "rtmorris", "KEYRING")
+
+    will query the *keyring* service for the password to use for user
+    *rtmorris* on domain *somearea*.
+
+    >>> real_password = password_get("somearea", "rtmorris", "KEYRING:Area51")
+
+    would do the same, but *keyring*'s domain would be *Area51*
+    instead.
+
+    >>> real_password = password_get(None, "rtmorris",
+    >>>                              "FILE:/etc/config/some.key")
+
+    would obtain the password from the contents of file
+    */etc/config/some.key*.
+
+    >>> real_password = password_get("somearea", "rtmorris", "sikrit")
+
+    would just return *sikrit* as a password.
+
+    :param str domain: a domain to which this password operation
+      applies; see below *password* (can be *None*)
+
+    :param str user: the username for maybe obtaining a password from
+      a password service; see below *password*.
+
+    :param str password: a password obtained from the user or a
+      configuration setting; can be *None*. If the *password* is
+
+      - *KEYRING* will ask the accounts keyring for the password
+         for domain *domain* for username *user*
+
+      - *KEYRING:DOMAIN* will ask the accounts keyring for the password
+         for domain *DOMAIN* for username *user*, ignoring the
+         *domain* parameter.
+
+      - *FILE:PATH* will read the password from filename *PATH*.
+
+    :returns: the actual password to use
+
+    Password management procedures (FIXME):
 
     - to set a password in the keyring::
 
         $ echo KEYRINGPASSWORD | gnome-keyring-daemon --unlock
-        $ keyring set "USER"  HOSTNAME
-        Password for 'HOSTNAME' in 'USER': <ENTER PASSWORD HERE>
+        $ keyring set "USER"  DOMAIN
+        Password for 'DOMAIN' in 'USER': <ENTER PASSWORD HERE>
 
     - to be able to run the daemon has to be executed under a dbus session::
 
@@ -1071,10 +1113,36 @@ def split_user_pwd_hostname(s):
         $ echo KEYRINGPASSWORD | gnome-keyring-daemon --unlock
         $ ttbd...etc
 
-      FIXME: details of systemd integration
+    """
+    assert domain == None or isinstance(domain, basestring)
+    assert isinstance(user, basestring)
+    assert password == None or isinstance(password, basestring)
+    if password == "KEYRING":
+        password = keyring.get_password(domain, user)
+        if password == None:
+            raise RuntimeError("keyring: no password for user %s @ %s"
+                               % (user, domain))
+    elif password and password.startswith("KEYRING:"):
+        _, domain = password.split(":", 1)
+        password = keyring.get_password(domain, user)
+        if password == None:
+            raise RuntimeError("keyring: no password for user %s @ %s"
+                               % (user, domain))
+    elif password and password.startswith("FILE:"):
+        _, filename = password.split(":", 1)
+        with open(filename) as f:
+            password = f.read().strip()
+    # fallthrough, if none of them, it's just a password
+    return password
 
-    If password is *FILENAME:<FILENAME>* the password will be taken
-    from that file.
+
+def split_user_pwd_hostname(s):
+    """
+    Return a tuple decomponsing ``[USER[:PASSWORD]@HOSTNAME``
+
+    :returns: tuple *( USER, PASSWORD, HOSTNAME )*, *None* in missing fields.
+
+    See :func:`password_get` for details on how the password is handled.
     """
     assert isinstance(s, basestring)
     user = None
@@ -1090,13 +1158,20 @@ def split_user_pwd_hostname(s):
     else:
         user = user_password
         password = None
-    if password == "KEYRING":
-        password = keyring.get_password(hostname, user)
-    if password and password.startswith("KEYRING:"):
-        _, domain = password.split(":", 1)
-        password = keyring.get_password(domain, user)
-    elif password and password.startswith("FILENAME:"):
-        _, filename = password.split(":", 1)
-        with open(filename) as f:
-            password = f.read().strip()
+    password = password_get(hostname, user, password)
     return user, password, hostname
+
+
+def url_remove_user_pwd(url):
+    """
+    Given a URL, remove the username and password if any::
+
+      print(url_remove_user_pwd("https://user:password@host:port/path"))
+      https://host:port/path
+    """
+    _url = url.scheme + "://" + url.hostname
+    if url.port:
+        _url += ":%d" % url.port
+    if url.path:
+        _url += url.path
+    return _url
