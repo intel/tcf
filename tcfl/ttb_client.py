@@ -223,6 +223,12 @@ class rest_target_broker(object):
         del cls._rts_cache
         cls._rts_cache = None
 
+    def tb_state_trash(self):
+        # remove the state so tb_state_save() later will not save any
+        # cookies and thus effectively log out this user from the
+        # client side standpoint.
+        self.cookies = {}
+
     def tb_state_save(self, filepath):
         """Save cookies in *path* so they can be loaded by when the object is
         created.
@@ -236,12 +242,16 @@ class rest_target_broker(object):
             logger.warning("%s: created state storage directory", filepath)
             os.mkdir(filepath)
         fname = filepath + "/cookies-%s.pickle" % url_safe
-        with os.fdopen(os.open(fname, os.O_CREAT | os.O_WRONLY, 0o600),
-                       "w") as f, \
-                self.lock:
-            cPickle.dump(self.cookies, f, protocol = 2)
-            logger.debug("%s: state saved %s",
-                         self._url, pprint.pformat(self.cookies))
+        if self.cookies == {}:
+            logger.debug("%s: state deleted (no cookies)", self._url)
+            commonl.rm_f(fname)
+        else:
+            with os.fdopen(os.open(fname, os.O_CREAT | os.O_WRONLY, 0o600),
+                           "w") as f, \
+                    self.lock:
+                cPickle.dump(self.cookies, f, protocol = 2)
+                logger.debug("%s: state saved %s",
+                             self._url, pprint.pformat(self.cookies))
 
     # FIXME: this timeout has to be proportional to how long it takes
     # for the target to flash, which we know from the tags
@@ -726,6 +736,7 @@ def rest_login(args):
 def rest_logout(args):
     for rtb in rest_target_brokers.itervalues():
         logger.info("%s: checking for a valid session", rtb._url)
+        rtb.tb_state_trash()
         if rtb.valid_session:
             rtb.logout()
 
