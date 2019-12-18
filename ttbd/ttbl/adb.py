@@ -61,7 +61,7 @@ class pc(ttbl.power.daemon_c):
         ttbl.power.daemon_c.__init__(self, cmdline, precheck_wait = 0.5,
                                      env_add = env_add, name = name)
 
-    def verify(self, _cmdline_expanded):
+    def verify(self, target, component, _cmdline_expanded):
         return commonl.tcp_port_busy(self.server_port)
 
     def on(self, target, _component):

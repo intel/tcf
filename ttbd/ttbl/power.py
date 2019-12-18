@@ -638,7 +638,7 @@ class daemon_c(impl_c):
         pass
 
 
-    def verify(self, cmdline_expanded):
+    def verify(self, target, component, cmdline_expanded):
         """
         Function that verifies if the daemon has started or not
 
@@ -716,7 +716,8 @@ class daemon_c(impl_c):
             time.sleep(self.precheck_wait)
         pid = commonl.process_started(pidfile, self.path,
                                       component + "-" + self.name, target.log,
-                                      self.verify, ( _cmdline, ))
+                                      self.verify,
+                                      ( target, component, _cmdline, ))
         if pid == None:
             raise self.start_e("%s: %s failed to start"
                                % (component, self.name))
@@ -846,7 +847,7 @@ class socat_pc(daemon_c):
             precheck_wait = precheck_wait,
             env_add = env_add)
 
-    def verify(self, cmdline_expanded):
+    def verify(self, target, component, cmdline_expanded):
         # this is the log file name, that has been expanded already by
         # the daemon_c class calling start
         return os.path.exists(cmdline_expanded[2])
