@@ -122,7 +122,13 @@ class impl_c(object):
         :param str component: console to enable
         """
         if self.command_sequence:
-            self._command_sequence_run(target, component)
+            try:
+                self._command_sequence_run(target, component)
+            except:
+                target.log.info("%s: disabling since command sequence"
+                                " for enabling failed" % component)
+                self.disable(target, component)
+                raise
 
     def disable(self, target, component):
         """
@@ -221,7 +227,8 @@ class impl_c(object):
             target.log.error("%s: expect output[after]: %s"
                              % (console, expect.after))
 
-    def _response(self, target, console, expect, response, timeout):
+    def _response(self, target, console, expect, response, timeout,
+                  response_str):
         ts0 = time.time()
         ts = ts0
         while ts - ts0 < timeout:
@@ -229,13 +236,13 @@ class impl_c(object):
                 r = expect.expect(response, timeout = timeout - (ts - ts0))
                 ts = time.time()
                 target.log.error("%s: found response: [+%.1fs] #%s: %s"
-                                 % (console, ts - ts0, r, response))
+                                 % (console, ts - ts0, r, response_str))
                 return
             except pexpect_TIMEOUT as e:
                 self._log_expect_error(target, console, expect, "timeout")
                 raise self.timeout_e(
                     "%s: timeout [+%.1fs] waiting for response: %s"
-                    % (console, timeout, response))
+                    % (console, timeout, response_str))
             except pexpect_EOF as e:
                 ts = time.time()
                 offset = os.lseek(expect.fileno(), 0, os.SEEK_CUR)
@@ -250,7 +257,7 @@ class impl_c(object):
             self._log_expect_error(target, console, expect, "timeout")
             raise self.timeout_e(
                 "%s: timeout [+%.1fs] waiting for response: %s"
-                % (console, timeout, response))
+                % (console, timeout, response_str))
 
     def _command_sequence_run(self, target, component):
         write_file_name = os.path.join(target.state_dir,
@@ -276,10 +283,14 @@ class impl_c(object):
                                                      errors = 'replace')))
                     wf.write(command)
                 if response:
+                    if hasattr(response, "pattern"):
+                        response_str = "regex:" + response.pattern
+                    else:
+                        response_str = response
                     target.log.debug("%s: expecting response: %s"
-                                     % (component, response))
+                                     % (component, response_str))
                     self._response(target, component,
-                                   expect, response, timeout)
+                                   expect, response, timeout, response_str)
 
 class interface(ttbl.tt_interface):
     """Interface to access the target's consoles
