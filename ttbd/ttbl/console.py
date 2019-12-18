@@ -768,7 +768,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
             cf.write("""\
 UserKnownHostsFile = %s/%s-ssh-known_hosts
 StrictHostKeyChecking = no
-ServerAliveCountMax = 6
+ServerAliveCountMax = 20
 ServerAliveInterval = 10
 TCPKeepAlive = yes
 ForwardX11 = no
