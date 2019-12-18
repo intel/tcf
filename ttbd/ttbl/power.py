@@ -586,19 +586,42 @@ class daemon_c(impl_c):
     Generic power controller to start daemons in the server machine
 
     FIXME: document
+
+    :param list(str) cmdline: command line arguments to pass to
+      :func:`subprocess.check_output`; this is a list of
+      strings, first being the path to the command, the rest being the
+      arguments.
+
+      All the entries in the list are templated with *%(FIELD)s*
+      expansion, where each field comes either from the *kws*
+      dictionary or the target's metadata.
     """
     #: KEY=VALUE to add to the environment
     #: Keywords to add for templating the arguments
     def __init__(self, cmdline,
                  precheck_wait = 0, env_add = None, kws = None,
                  path = None, name = None,
-                 pidfile = None, mkpidfile = True):
+                 pidfile = None, mkpidfile = True, paranoid = False):
         assert isinstance(cmdline, list), \
             "cmdline has to be a list of strings; got %s" \
             % type(cmdline).__name__
         assert precheck_wait >= 0
-        impl_c.__init__(self)
+        impl_c.__init__(self, paranoid = paranoid)
         self.cmdline = cmdline
+        #: extra command line elements that can be added by anybody
+        #: subclassing this; note an *on()* method that adds to this
+        #: needs to reset it each time (otherwise it'll keep
+        #: appending):
+        #:
+        #: >>> class something(daemon_c):
+        #: >>>
+        #: >>>     def on(target, component):
+        #: >>>         self.cmdline_extra = [ "-v", "--login", "JOHN" ]
+        #: >>>         daemon_c.on(self, target, component)
+        #:
+        #: vs using *self.cmdline_extra.append()*
+        
+        self.cmdline_extra = []
         self.precheck_wait = precheck_wait
         if env_add:
             assert isinstance(env_add, dict)
@@ -658,6 +681,31 @@ class daemon_c(impl_c):
         """
         raise NotImplementedError
 
+    def _stderr_stream(self, target, component, stderrf):
+        count = 0
+        for line in stderrf:
+            target.log.error("%s stderr: %s" % (component, line.rstrip()))
+            count += 1
+        if count == 0:
+            target.log.error("%s: stderr not available" % component)
+
+    def log_stderr(self, target, component, stderrf = None):
+        if stderrf:
+            stderrf.flush()
+            stderrf.seek(0, 0)
+            self._stderr_stream(target, component, stderrf)
+        else:
+            name = os.path.join(target.state_dir,
+                                component + "-" + self.name + ".stderr")
+            try:
+                with open(name) as stderrf:
+                    self._stderr_stream(target, component, stderrf)
+            except IOError as e:
+                if e.errno == errno.ENOENT:
+                    target.log.error("%s: stderr not available" % component)
+                else:
+                    target.log.error("%s: can't open stderr file: %s"
+                                     % (component, e))
 
     def on(self, target, component):
         stderrf_name = os.path.join(target.state_dir,
@@ -665,13 +713,22 @@ class daemon_c(impl_c):
 
         kws = dict(target.kws)
         kws.update(self.kws)
+        # bring in runtime properties (override the rest)
+        kws.update(target.fsdb.get_as_dict())
         kws['component'] = component
         # render the real commandline against kws
         _cmdline = []
-        for i in self.cmdline:
-            # some older Linux distros complain if this string is unicode
-            _cmdline.append(str(i % kws))
-
+        count = 0
+        try:
+            for i in self.cmdline + self.cmdline_extra:
+                # some older Linux distros complain if this string is unicode
+                _cmdline.append(str(i % kws))
+            count += 1
+        except KeyError as e:
+            message = "configuration error? can't template command line #%d," \
+                " missing field or target property: %s" % (count, e)
+            target.log.error(message)
+            raise self.start_e(message)
         target.log.info("%s: command line: %s"
                         % (component, " ".join(_cmdline)))
         if self.env_add:
@@ -711,7 +768,6 @@ class daemon_c(impl_c):
             raise self.start_e("%s: %s failed to start: %s"
                                % (component, self.name, e))
 
-        del stderrf	# we don't care for this file here
         if self.precheck_wait:
             time.sleep(self.precheck_wait)
         pid = commonl.process_started(pidfile, self.path,
@@ -719,6 +775,7 @@ class daemon_c(impl_c):
                                       self.verify,
                                       ( target, component, _cmdline, ))
         if pid == None:
+            self.log_stderr(target, component, stderrf)
             raise self.start_e("%s: %s failed to start"
                                % (component, self.name))
         ttbl.daemon_pid_add(pid)
@@ -727,6 +784,8 @@ class daemon_c(impl_c):
     def off(self, target, component):
         kws = dict(target.kws)
         kws.update(self.kws)
+        # bring in runtime properties (override the rest)
+        kws.update(target.fsdb.get_as_dict())
         kws['component'] = component
         pidfile = self.pidfile % kws
         try:
@@ -740,6 +799,8 @@ class daemon_c(impl_c):
     def get(self, target, component):		# power interface
         kws = dict(target.kws)
         kws.update(self.kws)
+        # bring in runtime properties (override the rest)
+        kws.update(target.fsdb.get_as_dict())
         kws['component'] = component
         return commonl.process_alive(self.pidfile % kws, self.path) != None
 
