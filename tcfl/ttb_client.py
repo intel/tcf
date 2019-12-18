@@ -676,6 +676,68 @@ def rest_shutdown(path):
     for rtb in rest_target_brokers.itervalues():
         rtb.tb_state_save(path)
 
+
+def _credentials_get(domain, aka, args):
+    # env general
+    user_env = os.environ.get("TCF_USER", None)
+    password_env = os.environ.get("TCF_PASSWORD", None)
+    # server specific
+    user_env_aka = os.environ.get("TCF_USER_" + aka, None)
+    password_env_aka = os.environ.get("TCF_PASSWORD_" + aka, None)
+
+    # from commandline
+    user_cmdline = args.user
+    password_cmdline = args.password
+
+    # default to what came from environment
+    user = user_env
+    password = password_env
+    # override with server specific from envrionment
+    if user_env_aka:
+        user = user_env_aka
+    if password_env_aka:
+        password = password_env_aka
+    # override with what came from the command line
+    if user_cmdline:
+        user = user_cmdline
+    if password_cmdline:
+        password = password_cmdline
+
+    if not user:
+        if args.quiet:
+            raise RuntimeError(
+                "Cannot obtain login name and"
+                " -q was given (can't ask); "
+                " please specify a login name or use environment"
+                " TCF_USER[_AKA]")
+        if not sys.stdout.isatty():
+            raise RuntimeError(
+                "Cannot obtain login name and"
+                " terminal is not a TTY (can't ask); "
+                " please specify a login name or use environment"
+                " TCF_USER[_AKA]")
+        user = raw_input('Login for %s [%s]: ' \
+                         % (domain, getpass.getuser()))
+        if user == "":	# default to LOGIN name
+            user = getpass.getuser()
+            print "I: defaulting to login name %s (login name)" % user
+
+    if not password:
+        if args.quiet:
+            raise RuntimeError(
+                "Cannot obtain password and"
+                " -q was given (can't ask); "
+                " please specify a login name or use environment"
+                " TCF_PASSWORD[_AKA]")
+        if not sys.stdout.isatty():
+            raise RuntimeError(
+                "Cannot obtain password and"
+                " terminal is not a TTY (can't ask); "
+                " please specify a login name or use environment"
+                " TCF_PASSWORD[_AKA]")
+        password = getpass.getpass("Password for %s at %s: " % (user, domain))
+    return user, password
+
 def rest_login(args):
     """
     Login into remote servers.
@@ -685,44 +747,21 @@ def rest_login(args):
     :returns: True if it can be logged into at least 1 remote server.
     """
     logged = False
+    if not args.split and sys.stdout.isatty() and not args.quiet:
+        if args.user == None:
+            args.user = raw_input('Login [%s]: ' % getpass.getuser())
+        if args.password in ( "ask", None):
+            args.password = getpass.getpass("Password: ")
     for rtb in rest_target_brokers.itervalues():
         logger.info("%s: checking for a valid session", rtb._url)
         if not rtb.valid_session:
-            if args.quiet:
-                if rtb.aka:
-                    aka = "_" + rtb.aka
-                else:
-                    aka = ""
-                userid = os.environ.get("TCF_USER" + aka,
-                                        os.environ.get("TCF_USER", None))
-                userpass = os.environ.get("TCF_PASSWORD" + aka,
-                                          os.environ.get("TCF_PASSWORD", None))
-                if not userid:
-                    logger.error("Unable to get user from env variable: "
-                                 "TCF_USER" + aka)
-                    continue
-                if not userpass:
-                    logger.error("Unable to get password from env variable: "
-                                 "TCF_PASSWORD" + aka)
-                    continue
-                logger.info("%s: login in with user/pwd from environment "
-                            "TCF_USER/PASSWORD", rtb._url)
-            else:
-                if args.userid == None:
-                    userid = raw_input('Login for %s [%s]: ' \
-                                       % (rtb._url, getpass.getuser()))
-                    if userid == "":
-                        userid = getpass.getuser()
-                else:
-                    userid = args.userid
-                userpass = getpass.getpass(
-                    "Login to %s as %s\nPassword: " % (rtb._url, userid))
+            user, password = _credentials_get(rtb._url, rtb.aka, args)
             try:
-                if rtb.login(userid, userpass):
+                if rtb.login(user, password):
                     logged = True
                 else:
                     logger.error("%s (%s): cannot login: with given "
-                                 "credentials %s", rtb._url, rtb.aka, userid)
+                                 "credentials %s", rtb._url, rtb.aka, user)
             except Exception as e:
                 logger.error("%s (%s): cannot login: %s",
                              rtb._url, rtb.aka, e)
