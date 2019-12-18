@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # FIXME: experiment, not sure this is the best way to do this
+# FIXME: move as method under *images*
 """
 Interface to flash the target using *ioc_flash_server_app* 
 ----------------------------------------------------------
