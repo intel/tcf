@@ -117,7 +117,7 @@ class impl_c(object):
         :param ttbl.test_target target: target on which to act
         :param str component: name of the power controller we are modifying
         """
-        raise NotImplementedError("%s/%s: power control not implemented"
+        raise NotImplementedError("%s/%s: power-on not implemented"
                                   % (target.id, component))
 
     def off(self, target, component):
@@ -126,7 +126,7 @@ class impl_c(object):
 
         Same parameters as :meth:`on`
         """
-        raise NotImplementedError("%s/%s: power control not implemented"
+        raise NotImplementedError("%s/%s: power-off not implemented"
                                   % (target.id, component))
 
     def get(self, target, component):
@@ -144,7 +144,7 @@ class impl_c(object):
           - *None*: this is a *fake* power unit, so it has no actual
             power state
         """
-        raise NotImplementedError("%s/%s: power control not implemented"
+        raise NotImplementedError("%s/%s: getting power state not implemented"
                                   % (target.id, component))
 
 
@@ -166,7 +166,6 @@ class interface(ttbl.tt_interface):
         # what the user dictates. Because the power on/off order of
         # each rail component matters.
         self.impls_set(impls, kwimpls, impl_c)
-
 
     def _target_setup(self, target):
         # Called when the interface is added to a target to initialize
@@ -807,7 +806,7 @@ class socat_pc(daemon_c):
     :class:`ttbl.ipmi.sol_console_pc`.
 
     ** Catchas and Tricks for debugging **
-    
+
     Sometimes it just dies and we are left wondering
 
     - prepend to *EXEC* *strace -fo /tmp/strace.log*, as in::
@@ -824,7 +823,7 @@ class socat_pc(daemon_c):
                  precheck_wait = 0.2):
         assert isinstance(address1, basestring)
         assert isinstance(address2, basestring)
-                
+
         daemon_c.__init__(
             self,
             cmdline = [
