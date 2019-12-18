@@ -469,15 +469,35 @@ class generic_c(impl_c):
     :param float interchunk_wait: (optional) if *chunk_size* is
       enabled, time to wait in seconds in between each chunk.
 
+    :param dict escape_chars: (optional) dictionary of escape
+      sequences for given characters to prefix in input stream.
+
+      If given, this is a dictionary of characters to strings, eg:
+
+      >>> escape_chars = {
+      >>>   '\x1b': '\x1b',
+      >>>   '~': '\\',
+      >>> }
+
+      in this case, when the input string to send to the device
+      contains a *\\x1b* (the ESC character), it will be prefixed with
+      another one. If it contains a *~*, it will be prefixed with a
+      backslash.
+
     """
     def __init__(self, chunk_size = 0, interchunk_wait = 0.2,
-                 command_sequence = None):
+                 command_sequence = None, escape_chars = None):
         assert chunk_size >= 0
         assert interchunk_wait > 0
+        assert escape_chars == None or isinstance(escape_chars, dict)
 
         self.chunk_size = chunk_size
         self.interchunk_wait = interchunk_wait
         impl_c.__init__(self, command_sequence = command_sequence)
+        if escape_chars == None:
+            self.escape_chars = {}
+        else:
+            self.escape_chars = escape_chars
 
     def state(self, target, component):
         # if the write file is gone, most times this means the thing
@@ -509,6 +529,14 @@ class generic_c(impl_c):
             # not even existing, so empty
             return 0
 
+    def _escape(self, data):
+        _data = type(data)()
+        for c in data:
+            if c in self.escape_chars:
+                _data += self.escape_chars[c] + c
+            else:
+                _data += c
+        return _data
 
     def write(self, target, component, data):
         file_name = os.path.join(target.state_dir,
@@ -517,6 +545,8 @@ class generic_c(impl_c):
                          component, len(data), data.encode('unicode-escape'))
         fd = os.open(file_name, os.O_RDWR, 0)
         try:
+            if self.escape_chars:
+                data = self._escape(data)
             if self.chunk_size:
                 # somethings have no flow control and you need to make
                 # it happen like...this
