@@ -694,7 +694,7 @@ def kws_update_from_rt(kws, rt, kws_origin = None, origin = None,
     else:
         # Said concept does not exist in the server...
         kws[prefix + 'target'] = file_name_make_safe(rt['id'])
-    kws[prefix + 'type'] = rt['type']
+    kws[prefix + 'type'] = rt.get('type', 'n/a')
     if kws_origin:
         assert isinstance(kws_origin, dict)
         kws_origin[prefix + 'target'] = origin

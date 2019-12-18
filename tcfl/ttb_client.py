@@ -838,7 +838,7 @@ def _target_select_by_spec( rt, spec, _kws = None):
     kws_bsp = dict()
     commonl.kws_update_from_rt(kws, rt)
     rt_full_id = rt['fullid']
-    rt_type = rt['type']
+    rt_type = rt.get('type', 'n/a')
 
     for bsp in bsps:
         kws_bsp.clear()
