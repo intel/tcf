@@ -104,6 +104,9 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         # after a while
         self.conn = ldap.initialize(self.url)
         self.conn.set_option(ldap.OPT_REFERRALS, 0)
+        # let the connection die reasonably fast so a new one is
+        # re-opened if the peer killed it.
+        self.conn.set_option(ldap.OPT_NETWORK_TIMEOUT, 5)
 
         record = None
         # First bind to LDAP and search the user's email
@@ -265,6 +268,9 @@ class ldap_map_c(object):
             return
         self.conn = ldap.initialize(self.url)
         self.conn.set_option(ldap.OPT_REFERRALS, 0)
+        # let the connection die reasonably fast so a new one is
+        # re-opened if the peer killed it.
+        self.conn.set_option(ldap.OPT_NETWORK_TIMEOUT, 5)
         self.conn.simple_bind_s(self.bind_username, self.bind_password)
 
     def lookup(self, what, field_lookup, field_report):
