@@ -187,7 +187,8 @@ class acquirer_c(object):
         :param str who: user name
         :param bool force: force the acquisition (overriding current
           user); this assumes the user *who* has permissions to do so;
-          if not, raise an exception child of :class:`exception`.
+          if not, raise an exception child of
+          :class:`ttbl.acquirer_c.exception`.
 
         :raises busy_e: if the target is busy and could not be acquired
         :raises acquirer_c.timeout_e: some sort of timeout happened
@@ -202,7 +203,8 @@ class acquirer_c(object):
         :param str who: user name
         :param bool force: force the release (overriding current
           user); this assumes the user *who* has permissions to do so;
-          if not, raise an exception child of :class:`acquirer_c.exception`.
+          if not, raise an exception child of
+          :class:`ttbl.acquirer_c.exception`.
         """
         raise NotImplementedError
 
@@ -381,6 +383,9 @@ class tt_interface(object):
         #: Map of names in :data:`impls` that are actually an alias
         #: and which entry they are aliasing.
         self.aliases = dict()
+        #: class the implementations to for this interface are based
+        #: on [set by the initial call to :meth:`impls_set`]
+        self.cls = None
 
     def _target_setup(self, target):
         # FIXME: move to public interface
@@ -398,6 +403,51 @@ class tt_interface(object):
         """
         raise NotImplementedError
 
+    def _init_by_name(self, name, impl, aliases):
+        if isinstance(impl, self.cls):
+            if name in self.impls:
+                raise AssertionError("component '%s' already exists "
+                                     % name)
+            self.impls[name] = impl
+        elif isinstance(impl, basestring):		# alias...
+            aliases[name] = impl			# ...process later
+        else:
+            raise AssertionError(
+                "'%s' implementation is type %s, " \
+                "expected %s or str" % (
+                    name, type(impl).__name__,
+                    self.cls
+                ))
+
+    def _aliases_update(self, aliases):
+        for alias, component in aliases.iteritems():
+            if component not in self.impls:
+                raise AssertionError(
+                    "alias '%s' refers to an component "
+                    "'%s' that does not exist (%s)"
+                    % (alias, component, " ".join(self.impls.keys())))
+            self.aliases[alias] = component
+
+    def impl_add(self, name, impl):
+        """
+        Append a new implementation to the list of implementations
+        this interface supports.
+
+        This can be used after an interface has been declared, such
+        as:
+
+        >>> target = ttbl.test_target('somename')
+        >>> target.interface_add('power', ttbl.power.interface(*power_rail))
+        >>> target.power.impl_add('newcomponent', impl_object)
+
+        :param str name: implementation's name
+        :param impl: object that defines the implementation; this must
+          be an instance of the class :data:`cls` (this gets set by the
+          first call to :meth:`impls_set`.
+        """
+        aliases = {}
+        self._init_by_name(name, impl, aliases)
+        self._aliases_update(aliases)
 
     def impls_set(self, impls, kwimpls, cls):
         """
@@ -420,23 +470,9 @@ class tt_interface(object):
             % type(impls).__name__
         assert issubclass(cls, object)
 
+        # initialize for impl_add()
+        self.cls = cls
         aliases = {}
-
-        def _init_by_name(name, impl):
-            if isinstance(impl, cls):
-                if name in self.impls:
-                    raise AssertionError("component '%s' already exists "
-                                         % name)
-                self.impls[name] = impl
-            elif isinstance(impl, basestring):		# alias...
-                aliases[name] = impl			# ...process later
-            else:
-                raise AssertionError(
-                    "'%s' implementation is type %s, " \
-                    "expected %s or str" % (
-                        name, type(impl).__name__,
-                        cls.__name__
-                    ))
 
         count = 0
         for impl in impls:
@@ -449,9 +485,9 @@ class tt_interface(object):
                     "tuple[0] has to be a string, got %s" % type(name)
                 assert isinstance(pc, cls), \
                     "tuple[1] has to be a %s, got %s" % (cls, type(pc))
-                _init_by_name(name, pc)
+                self._init_by_name(name, pc, aliases)
             elif isinstance(impl, cls):
-                _init_by_name("component%d" % count, impl)
+                self._init_by_name("component%d" % count, impl, aliases)
             else:
                 raise RuntimeError("list of implementations have to be "
                                    "either instances of subclasses of %s "
@@ -461,15 +497,8 @@ class tt_interface(object):
             count += 1
 
         for name, impl in kwimpls.items():
-            _init_by_name(name, impl)
-
-        for alias, component in aliases.iteritems():
-            if component not in self.impls:
-                raise AssertionError(
-                    "alias '%s' refers to an component "
-                    "'%s' that does not exist (%s)"
-                    % (alias, component, " ".join(self.impls.keys())))
-            self.aliases[alias] = component
+            self._init_by_name(name, impl, aliases)
+        self._aliases_update(aliases)
 
     @staticmethod
     def _arg_get(args, name):
