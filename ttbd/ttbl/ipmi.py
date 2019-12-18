@@ -231,6 +231,90 @@ class pci_ipmitool(ttbl.power.impl_c, ttbl.tt_power_control_impl):
         # this reports None because this is is just a delay loop
         return None
 
+class pos_mode_c(ttbl.power.impl_c):
+    """
+    Power controller to redirect a machine's boot to network upon ON
+
+    This can be used in the power rail of a machine that can be
+    provisioned with :ref:`Provisioning OS <provisioning_os>`, instead
+    of using pre power-on hooks (such as
+    :meth:`pci_ipmitool.pre_power_pos_setup`).
+
+    When the target is being powered on, this will be called, and
+    based if the value of the *pos_mode* property is *pxe*, the IPMI
+    protocol will be used to tell the BMC to order the target to boot
+    off the network with::
+
+      $ ipmitool chassis bootparam set bootflag force_pxe
+
+    otherwise, it'll force to boot off the local disk with::
+
+      $ ipmitool chassis bootparam set bootflag force_disk
+
+    Note that for this to be succesful and remove the chance of race
+    conditions, this has to be previous to the component that powers
+    on the machine via the BMC.
+    """
+    def __init__(self, hostname, timeout = 2, retries = 3):
+        assert isinstance(hostname, basestring)
+        assert retries > 0
+        assert timeout > 0
+        ttbl.power.impl_c.__init__(self, paranoid = True)
+        self.power_on_recovery = True
+        self.get_samples = 0
+        user, password, hostname = commonl.split_user_pwd_hostname(hostname)
+        self.hostname = hostname
+        self.user = user
+        self.bmc = None
+        self.env = dict()
+        # If I change the argument order, -E doesn't work ok and I get
+        # password asked in the command line
+        self.cmdline = [
+            "ipmitool",
+            "-v", "-v", "-v",
+            "-N", "%d" % timeout,
+            "-R", "%d" % retries,
+            "-H", hostname
+        ]
+        if user:
+            self.cmdline += [ "-U", user ]
+        self.cmdline += [ "-E", "-I", "lanplus" ]
+        if password:
+            self.env['IPMI_PASSWORD'] = password
+        self.timeout = 20
+        self.wait = 0.5
+
+    def _run(self, target, command):
+        try:
+            result = subprocess.check_output(
+                self.cmdline + command, env = self.env, shell = False,
+                stderr = subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
+            target.log.error("ipmitool %s failed: %s",
+                             " ".join(command), e.output)
+            raise
+        return result.rstrip()	# remove trailing NLs
+
+
+    def on(self, target, _component):
+        # we use bootparam/set/bootflag since it is working much
+        # better, because we seem not to be able to get the system to
+        # acknowledge the BIOS boot order
+        if target.fsdb.get("pos_mode") == 'pxe':
+            target.log.error("DEBUG POS boot: telling system to boot network")
+            # self._run(target, [ "chassis", "bootdev", "pxe" ])
+            self._run(target, [ "chassis", "bootparam",
+                                "set", "bootflag", "force_pxe" ])
+        else:
+            self._run(target, [ "chassis", "bootparam",
+                                "set", "bootflag", "force_disk" ])
+
+    def off(self, target, _component):
+        pass
+
+    def get(self, target, component):
+        return None
+
 
 class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
     """
