@@ -47,7 +47,7 @@ class pos_mode_c(ttbl.power.impl_c):
         assert isinstance(verify, bool)
         ttbl.power.impl_c.__init__(self, paranoid = True)
         self.power_on_recovery = False
-        self.get_samples = 0
+        self.paranoid_get_samples = 0
         url = urlparse.urlparse(bmc_url)
         self.username = url.username
         self.password = commonl.password_get(url.hostname, self.username,

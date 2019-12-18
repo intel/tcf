@@ -261,7 +261,7 @@ class pos_mode_c(ttbl.power.impl_c):
         assert timeout > 0
         ttbl.power.impl_c.__init__(self, paranoid = True)
         self.power_on_recovery = True
-        self.get_samples = 0
+        self.paranoid_get_samples = 0
         user, password, hostname = commonl.split_user_pwd_hostname(hostname)
         self.hostname = hostname
         self.user = user

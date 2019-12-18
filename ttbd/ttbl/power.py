@@ -99,6 +99,9 @@ class impl_c(object):
         self.paranoid = paranoid
         self.timeout = 10	# used for paranoid checks
         self.wait = 0.5
+        #: for paranoid power getting, now many samples we need to get
+        #: that are the same for the value to be considered stable
+        self.paranoid_get_samples = 6
 
     class retry_all_e(Exception):
         """
@@ -236,7 +239,6 @@ class interface(ttbl.tt_interface):
 
         results = []
         ts0 = ts = time.time()
-        stable_top = 6
         stable_count = 0
         _states = {
             False: 'off',
@@ -248,16 +250,16 @@ class interface(ttbl.tt_interface):
             target.log.info("%s: impl power get #%d +%.2fs returned %s",
                             component, stable_count, ts - ts0, _states[result])
             results.append(result)
-            if stable_count > stable_top:
+            stable_count += 1
+            if stable_count >= impl.paranoid_get_samples:
                 # we have enough samples, take the last stabe_top and
                 # see if they are all the same:
-                cs = set(results[-stable_top:])
+                cs = set(results[-impl.paranoid_get_samples:])
                 if len(cs) == 1:
                     # stable result; return it
                     return cs.pop()
             time.sleep(impl.wait)
             ts = time.time()
-            stable_count += 1
         raise RuntimeError(
             "%s: power-get timed out for an stable result (+%.2fs): %s"
             % (component, impl.timeout, " ".join(results)))
