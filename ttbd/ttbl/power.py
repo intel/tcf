@@ -191,7 +191,9 @@ class interface(ttbl.tt_interface):
         while ts - ts0 < impl.timeout:
             impl.on(target, component)
             target.log.info("%s: impl powered on +%.1fs", component, ts - ts0)
-            if self._impl_get(impl, target, component) == True:	# check
+            new_state = self._impl_get(impl, target, component)
+            if new_state == None \
+               or self._impl_get(impl, target, component) == True: # check
                 return
             target.log.info("%s: ipmi didn't power on +%.1f retrying",
                             component, ts - ts0)
@@ -212,7 +214,9 @@ class interface(ttbl.tt_interface):
         while ts - ts0 < impl.timeout:
             impl.off(target, component)
             target.log.info("%s: impl powered off +%.1fs", component, ts - ts0)
-            if self._impl_get(impl, target, component) == False:	# check
+            new_state = self._impl_get(impl, target, component)
+            if new_state == None \
+               or self._impl_get(impl, target, component) == False: # check
                 return
             target.log.info("%s: ipmi didn't power off +%.1f retrying",
                             component, ts - ts0)
