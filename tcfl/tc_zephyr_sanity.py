@@ -1327,7 +1327,8 @@ class tc_zephyr_sanity_c(tc.tc_c):
             # any location, so we are going to reopen a new one to
             # read from the start--because we don't want to modify the
             # file pointer
-            f = open(f_existing.name)
+            if f_existing:
+                f = open(f_existing.name)
         main_triggered = set()
         triggered = set()
         # Note the triggers; each regex might depend on a trigger and
