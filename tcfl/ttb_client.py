@@ -610,47 +610,6 @@ class rest_target_broker(object):
             _data['ticket'] = ticket
         return self.send_request('POST', url, data = _data)
 
-    def rest_tb_target_debug_info(self, rt, ticket = ''):
-        r = self.send_request('GET', "targets/%s/debug" % rt['id'],
-                              data = { 'ticket': ticket })
-        return r['info']
-
-    def rest_tb_target_debug_start(self, rt, ticket = ''):
-        return self.send_request('PUT', "targets/%s/debug" % rt['id'],
-                                 data = { 'ticket': ticket })
-
-    def rest_tb_target_debug_stop(self, rt, ticket = ''):
-        return self.send_request('DELETE', "targets/%s/debug" % rt['id'],
-                                 data = { 'ticket': ticket })
-
-    def rest_tb_target_debug_halt(self, rt, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/debug_halt" % rt['id'],
-            data = { 'ticket': ticket })
-
-    def rest_tb_target_debug_reset(self, rt, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/debug_reset" % rt['id'],
-            data = { 'ticket': ticket })
-
-    def rest_tb_target_debug_reset_halt(self, rt, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/debug_reset_halt" % rt['id'],
-            data = { 'ticket': ticket })
-
-    def rest_tb_target_debug_resume(self, rt, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/debug_resume" % rt['id'],
-            data = { 'ticket': ticket })
-
-    def rest_tb_target_debug_openocd(self, rt, command, ticket = ''):
-        r = self.send_request(
-            "PUT", "targets/%s/debug_openocd" % rt['id'],
-            data = {
-                'ticket': ticket,
-                'command': command
-            })
-        return r['openocd_output']
 
 def rest_init(path, url, ignore_ssl = False, aka = None):
     """
@@ -1057,57 +1016,6 @@ def rest_target_release(args):
         rtb.rest_tb_target_release(rt, force = args.force,
                                    ticket = args.ticket)
 
-def rest_target_debug_halt(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_debug_halt(rt, ticket = args.ticket)
-
-def rest_target_debug_reset(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_debug_reset(rt, ticket = args.ticket)
-
-def rest_target_debug_reset_halt(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_debug_reset_halt(rt, ticket = args.ticket)
-
-def rest_target_debug_resume(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_debug_resume(rt, ticket = args.ticket)
-
-def rest_target_debug_openocd(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    rtb, rt = _rest_target_find_by_id(args.target)
-    res = rtb.rest_tb_target_debug_openocd(rt, args.command,
-                                           ticket = args.ticket)
-    print res
-
 def rest_target_images_set(args):
     """
     :param argparse.Namespace args: object containing the processed
@@ -1196,32 +1104,3 @@ def rest_broker_file_list(args):
     for name, hexdigest in rtb.rest_tb_file_list().iteritems():
         print name, hexdigest
 
-def rest_target_debug_info(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        print rtb.rest_tb_target_debug_info(rt, ticket = args.ticket)
-
-def rest_target_debug_start(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_debug_start(rt, ticket = args.ticket)
-
-def rest_target_debug_stop(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_debug_stop(rt, ticket = args.ticket)

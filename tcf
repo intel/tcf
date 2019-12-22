@@ -251,38 +251,6 @@ if __name__ == "__main__":
         nargs = "+", help = "Target's name or URL")
     arg_parser_target_release.set_defaults(func = ttb_client.rest_target_release)
 
-    ap = arg_subparsers.add_parser("debug-halt",
-                                   help = "Halt target's CPUs")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_debug_halt)
-
-    ap = arg_subparsers.add_parser("debug-reset",
-                                   help = "Reset target's CPUs")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_debug_reset)
-
-    ap = arg_subparsers.add_parser("debug-reset-halt",
-                                   help = "Reset and halt target's CPUs")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_debug_reset_halt)
-
-    ap = arg_subparsers.add_parser("debug-resume",
-                                   help = "Resume target's CPUs")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_debug_resume)
-
-    ap = arg_subparsers.add_parser("debug-openocd",
-                                   help = "Run an OpenOCD command, return output")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("command", metavar = "COMMAND", action = "store",
-                    default = None, help = "OpenOCD command")
-    ap.set_defaults(func = ttb_client.rest_target_debug_openocd)
-
     ap = arg_subparsers.add_parser("broker-file-upload",
                                    help = "Upload a local file to a broker")
     ap.add_argument("target", metavar = "TARGET", action = "store",
@@ -327,25 +295,6 @@ if __name__ == "__main__":
                     help = "Target's name or URL whose broker we'll use")
     ap.set_defaults(func = ttb_client.rest_broker_file_list)
 
-    ap = arg_subparsers.add_parser(
-        "debug-start", help = "Start debugging bridge")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_debug_start)
-
-    ap = arg_subparsers.add_parser(
-        "debug-stop", help = "Stop debugging bridge")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_debug_stop)
-
-    ap = arg_subparsers.add_parser(
-        "debug-info", help = "Report information needed to connect "
-        "to the debugging bridge")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_debug_info)
-
     # Setup different modules and drivers
     tcfl.tc.argp_setup(arg_subparsers)
     # FIXME: ugly
@@ -356,6 +305,7 @@ if __name__ == "__main__":
     tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_console._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_debug._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_images._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_ioc_flash_server_app._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_fastboot._cmdline_setup(arg_subparsers)

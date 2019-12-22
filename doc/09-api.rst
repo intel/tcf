@@ -471,6 +471,7 @@ Other interfaces
 
 .. automodule:: ttbl.buttons
 .. automodule:: ttbl.capture
+.. automodule:: ttbl.debug
 .. automodule:: ttbl.fastboot
 .. automodule:: ttbl.images
 .. automodule:: ttbl.ioc_flash_server_app

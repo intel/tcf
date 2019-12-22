@@ -2196,7 +2196,7 @@ class test_target_images_mixin(object):	# COMPAT
     def image_get(self, image_type):
         return self.tags.get("image-%s" % image_type, "")
 
-class tt_debug_impl(object):
+class tt_debug_impl(object):	# COMPAT
     """
     Debug object implementation
     """
@@ -2239,7 +2239,7 @@ class tt_debug_impl(object):
         raise NotImplementedError
 
 
-class tt_debug_mixin(tt_debug_impl):
+class tt_debug_mixin(tt_debug_impl):	# COMPAT
     """Generic debug interface to start and stop debugging on a
     target.
 

@@ -418,7 +418,7 @@ class target_c(object):
     - :py:class:`capture <tcfl.target_ext_capture.extension>` for
       stream and snapshot captures of audio, video, network traffic,
       etc
-    - :py:class:`debug <tcfl.target_ext_debug.debug>`
+    - :py:class:`debug <tcfl.target_ext_debug.extension>`
     - :py:class:`fastboot <tcfl.target_ext_fastboot.extension>`
     - :py:class:`images <tcfl.target_ext_images.extension>`
     - :py:class:`ioc_flash_server_app <tcfl.target_ext_ioc_flash_server_app.extension>`
@@ -7168,7 +7168,7 @@ target_c.extension_register(target_ext_console.extension, "console")
 import target_ext_power
 target_c.extension_register(target_ext_power.extension, "power")
 import target_ext_debug
-target_c.extension_register(target_ext_debug.debug)
+target_c.extension_register(target_ext_debug.extension, "debug")
 import target_ext_tunnel
 target_c.extension_register(target_ext_tunnel.tunnel)
 import target_ext_shell
