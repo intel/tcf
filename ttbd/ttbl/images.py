@@ -107,7 +107,7 @@ class interface(ttbl.tt_interface):
     def _release_hook(self, target, _force):
         pass
 
-    def put_flash(self,target, who, args, user_path):
+    def put_flash(self, target, who, args, user_path):
         images = json.loads(self._arg_get(args, "images"))
         with target.target_owned_and_locked(who):
             # do a single call to one flasher with everything that
