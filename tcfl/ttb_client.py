@@ -779,22 +779,6 @@ def rest_logout(args):
         if rtb.valid_session:
             rtb.logout()
 
-def _dict_print_dotted(d, prefix = ""):
-
-    if isinstance(d, dict):
-        if prefix.strip() != "":
-            prefix = prefix + "."
-        for key, val in sorted(d.items(), key = lambda i: i[0]):
-            _dict_print_dotted(val, prefix + key)
-    elif isinstance(d, (list, set, tuple)):
-        # could use iter(x), but don't wanna catch strings, etc
-        count = 0
-        for v in d:
-            _dict_print_dotted(v, prefix + "[%d]" % count)
-            count += 1
-    else:
-        print prefix + ":", d
-
 def _power_get(rt):
     if 'powered' in rt:
         return rt['powered'] == True
@@ -828,7 +812,7 @@ def rest_target_print(rt, verbosity = 0):
         print "%s %s%s" % (rt['fullid'], owner, power)
     elif verbosity == 2:
         print rt['fullid']
-        _dict_print_dotted(rt, "  ")
+        commonl._dict_print_dotted(rt, "  ")
     elif verbosity == 3:
         pprint.pprint(rt)
     else:

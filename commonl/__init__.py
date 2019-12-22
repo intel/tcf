@@ -1175,3 +1175,20 @@ def url_remove_user_pwd(url):
     if url.path:
         _url += url.path
     return _url
+
+
+def _dict_print_dotted(d, prefix = "", separator = "."):
+
+    if isinstance(d, dict):
+        if prefix.strip() != "":
+            prefix = prefix + separator
+        for key, val in sorted(d.items(), key = lambda i: i[0]):
+            _dict_print_dotted(val, prefix + key)
+    elif isinstance(d, (list, set, tuple)):
+        # could use iter(x), but don't wanna catch strings, etc
+        count = 0
+        for v in d:
+            _dict_print_dotted(v, prefix + "[%d]" % count)
+            count += 1
+    else:
+        print prefix + ":", d
