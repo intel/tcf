@@ -237,7 +237,7 @@ if __name__ == "__main__":
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target's name or URL")
     ap.add_argument("property", metavar = "PROPERTY", action = "store",
-                    default = None, help = "OpenOCD command")
+                    default = None, help = "Name of property")
     ap.set_defaults(func = ttb_client.rest_target_property_get)
 
 
