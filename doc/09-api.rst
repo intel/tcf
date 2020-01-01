@@ -356,6 +356,15 @@ Provisioning OS specific metadata
   expected to be found in *http://:data:`POS_HTTP_URL_PREFIX
   <pos_http_url_prefix>`/vmlinuz-POS_IMAGE*
 
+.. _pos_reinitialize:
+
+- *pos_reinitialize*: when set to any value, the client provisioning
+  code understands the boot drive for the target has to be
+  repartitioned and reformated before provisioning::
+
+    $ tcf property-set TARGET pos_reinitialize True
+    $ tcf run -t TARGETs <something that deploys>
+
 .. _uefi_boot_manager_ipv4_regex:
 
 - *uefi_boot_manager_ipv4_regex*: allows specifying a Python regular
@@ -402,6 +411,7 @@ Provisioning OS specific metadata
 .. automodule:: conf_00_lib_pdu
    :members:
    :undoc-members:
+.. automodule:: conf_06_default
 
 *ttbd* Configuration API
 ========================
@@ -415,13 +425,6 @@ Provisioning OS specific metadata
 .. automodule:: ttbl
 .. automodule:: ttbl.fsdb
 
-Target types drivers
---------------------
-
-.. automodule:: ttbl.tt
-.. automodule:: ttbl.tt_qemu
-.. automodule:: ttbl.tt_qemu2
-.. automodule:: ttbl.flasher
 
 User access control and authentication
 --------------------------------------

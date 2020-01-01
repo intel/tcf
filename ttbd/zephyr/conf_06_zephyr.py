@@ -1,68 +1,33 @@
 #! /usr/bin/python2
 #
-# Copyright (c) 2017 Intel Corporation
+# Copyright (c) 2017-2020 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-
 #
-# Configuration file for ttbd (place in ~/.ttbd/) or run ttbd with
-# `--config-file PATH/TO/THISFILE`
-#
-import ttbl.tt_qemu
-
-def nw_default_targets_zephyr_add(letter, bsps = [ 'x86', 'arm', 'nios2',
-                                                   'riscv32', 'xtensa' ]):
-    """
-    Add the default Zephyr targets to a configuration
-
-    This adds a configuration which consists of a network and five
-    QEMU Linux and five QEMU Zephyr (times available BSPSs)
-    """
-    assert isinstance(letter, basestring)
-    assert len(letter) == 1
-
-    x, y, _vlan_id = nw_indexes(letter)
-    nw_name = "nw" + letter
-
-    # Add five QEMU Zephyr targets on the network, one of each architecture
-    #
-    # Numbering them sequentially so their IP address matches and does
-    # not conflict with the linux targets in the same network
-    base = 30
-    for bsp in bsps:
-        for count in range(base, base + 2):
-            ttbl.config.target_add(
-                tt_qemu_zephyr("qz%02d%s-%s" % (count, letter, bsp), [ bsp ]),
-                target_type = "qemu-zephyr-%s" % bsp,
-                tags = {
-                    "interconnects": {
-                        nw_name: dict(
-                            ipv4_addr = "192.%d.%d.%d" % (x, y, count),
-                            ipv4_prefix_len = 24,
-                            ipv6_addr = "fc00::%02x:%02x:%02x" % (x, y, count),
-                            ipv6_prefix_len = 112,
-                            ic_index = count,
-                            mac_addr = "02:%02x:00:00:%02x:%02x" \
-                                % (x, y, count),
-                        ),
-                    }
-                }
-            )
-        base = count + 1
-
-
-#
-# Add QEMUs targets
-#
-#
-# These are for a default example, you can add as many as you care and
-# your server can execute concurrently.
+# Add default QEMU Zephyr OS targets on default networks added by
+# conf_06_default.
 
 if ttbl.config.defaults_enabled:
 
-    # Creates 10 QEMU targets of each BSP interconnected to networks nwa,
-    # and nwb  (defined in conf_06_defaults)
+    for letter in default_networks:	# conf_06_default.default_networks
+        x, y, _vlan_id = nw_indexes(letter)
+        nw_name = "nw" + letter
+        # network has been created by conf_06_default
+        index = index_start
+        for bsp in target_qemu_zephyr_desc.keys():
+            target = target_qemu_zephyr_add(
+                "qz-%02d%s-%s" % (index, letter, bsp),
+                bsp, nw_name = nw_name)
+            target.add_to_interconnect(    	# Add target to the interconnect
+                nw_name, dict(
+                    mac_addr = "02:%02x:00:00:%02x:%02x" % (x, y, index),
+                    ipv4_addr = '192.%d.%d.%d' % (x, y, index),
+                    ipv4_prefix_len = 24,
+                    ipv6_addr = 'fc00::%02x:%02x:%02x' % (x, y, index),
+                    ipv6_prefix_len = 112)
+            )
+            index += 1
 
-    for letter in [ 'a', 'b' ]:
-        nw_default_targets_zephyr_add(letter)
+    index_start += len(target_qemu_zephyr_desc)	# conf_06_default.index_start
+

@@ -142,8 +142,7 @@ class impl_c(object):
 
 
 class interface(ttbl.tt_interface):
-    """
-    Generic debug interface to start and stop debugging on a
+    """Generic debug interface to start and stop debugging on a
     target.
 
     When debug is started before the target is powered up, then upon
@@ -170,8 +169,10 @@ class interface(ttbl.tt_interface):
     >>>                          'x86': qemu_pc
     >>> })
 
-    See :func:`target_qemu_pos_add` or :func:`target_qemu_zephyr_add`
-    for an example of this.
+    See :func:`conf_00_lib_pos.target_qemu_pos_add` or
+    :func:`conf_00_lib_mcu.target_qemu_zephyr_add` for an example of
+    this.
+
     """
     def __init__(self, *impls, **kwimpls):
         ttbl.tt_interface.__init__(self)

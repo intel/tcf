@@ -312,7 +312,7 @@ This interface can be implemented by:
 
 There are currently a few implementations:
 
-* QEMU targets (:class:`ttbl.tt_qemu.tt_qemu`) implement power
+* QEMU targets (:class:`ttbl.qemu.pc`) implement power
   control by starting/stopping QEMU daemons.
 
 * `Digital Logger's Web Power Switch 7

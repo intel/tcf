@@ -21,9 +21,8 @@ import time
 
 import commonl
 import ttbl
-import ttbl.capture
 import ttbl.cm_serial
-import ttbl.dhcp
+import ttbl.debug
 import ttbl.flasher
 import ttbl.images
 import ttbl.pc
@@ -31,17 +30,15 @@ import ttbl.pc_ykush
 import ttbl.rsync
 import ttbl.socat
 import ttbl.tt
-import ttbl.tt_qemu
-import ttbl.tt_qemu2
 import ttbl.usbrly08b
 
-# OpenOCD paths -- multiple versions
-sdk_path = os.path.join(
+zephyr_sdk_path = os.path.join(
     os.environ.get("ZEPHYR_SDK_INSTALL_DIR", "/opt/zephyr-sdk-0.10.0"),
     "sysroots/x86_64-pokysdk-linux")
+
 # From the Zephyr SDK
-openocd_sdk_path = os.path.join(sdk_path, "usr/bin/openocd")
-openocd_sdk_scripts = os.path.join(sdk_path, "usr/share/openocd/scripts")
+openocd_sdk_path = os.path.join(zephyr_sdk_path, "usr/bin/openocd")
+openocd_sdk_scripts = os.path.join(zephyr_sdk_path, "usr/share/openocd/scripts")
 
 # System installed 0.10
 openocd_path = "/usr/bin/openocd"
@@ -2046,6 +2043,218 @@ def quark_c1000_add(name = None,
         target_type = target_type)
 
 
+#: QEMU Zephyr target descriptors
+#:
+#: Dictionary describing the supported BSPs for QEMU targets and what
+#: Zephyr board and commandline they map to.
+#:
+#: The *key* is the TCF *BSP* which maps to the binary
+#: *qemu-system-BSP*. If the field *zephyr_board* is present, it
+#: refers to how that BSP is known to the Zephyr OS.
+#:
+#: New entries can be added with:
+#:
+#: >>> target_qemu_zephyr_desc['NEWBSP'] = dict(
+#: >>>     cmdline = [
+#: >>>         '/usr/bin/qemu-system-NEWBSP',
+#: >>>         'arg1', 'arg2', ...
+#: >>>     ],
+#: >>>     zephyr_board = 'NEWBSPZEPHYRNAME'
+#: >>> )
+target_qemu_zephyr_desc = {
+    # from zephyr.git/boards/ARCH/TYPE/board.cmake
+    'arm': dict(
+        cmdline = [
+            zephyr_sdk_path + "/usr/bin/qemu-system-arm",
+            "-cpu", "cortex-m3",
+            "-machine", "lm3s6965evb",
+            "-nographic",
+            "-vga", "none",
+        ],
+        zephyr_board = 'qemu_cortex_m3',
+    ),
+
+    'nios2': dict(
+        cmdline = [
+            zephyr_sdk_path + "/usr/bin/qemu-system-nios2",
+            "-machine", "altera_10m50_zephyr",
+            "-nographic",
+        ],
+    ),
+
+    'riscv32': dict(
+        cmdline = [
+            zephyr_sdk_path + "/usr/bin/qemu-system-riscv32",
+            "-nographic",
+            "-machine", "sifive_e",
+        ],
+    ),
+
+    'x86': dict(
+        cmdline = [
+            zephyr_sdk_path + "/usr/bin/qemu-system-i386",
+            "-m", "8",
+            "-cpu", "qemu32,+nx,+pae",
+            "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04",
+            "-nographic",
+            "-no-acpi",
+        ],
+    ),
+
+    'x86_64': dict(
+        cmdline = [
+            zephyr_sdk_path + "/usr/bin/qemu-system-x86_64",
+            "-nographic",
+        ],
+    ),
+
+    'xtensa': dict(
+        cmdline = [
+            zephyr_sdk_path + "/usr/bin/qemu-system-xtensa",
+	    "-machine", "sim",
+            "-semihosting",
+            "-nographic",
+            "-cpu", "sample_controller"
+        ],
+    ),
+}
+
+
+
+def target_qemu_zephyr_add(
+        name,
+        bsp = None, zephyr_board = None, target_type = None,
+        nw_name = None,
+        cmdline = None):
+    """
+    Add a QEMU target that can run the `Zephyr OS <http://zephyrproject.org>`_.
+
+    :param str name: target's :ref:`name <bp_naming_targets>`.
+
+    :param str bsp: what architecture the target shall implement;
+      shall be available in :data:`target_qemu_zephyr_desc`.
+
+    :param str zephyr_board: (optional) type of this target's BSP for
+      the Zephyr OS; defaults to whatever :data:`target_qemu_zephyr_desc`
+      declares or *BSP* if none.
+
+    :param str target_type: (optional) what type the target shall
+      declare; defaults to *qz-BSP*.
+
+    :param str nw_name: (optional) name of network/interconnect to
+      which the target is connected. Note that the configuration code
+      shall manually configure the network metadata as this serves
+      only to ensure a TAP device is created before the QEMU daemon is
+      started. E.g.::
+
+      >>> target = target_qemu_zephyr_add("qzx86-36a", 'x86', nw_name = "nwa")
+      >>> x, y, _ = nw_indexes('a')
+      >>> index = 36
+      >>> target.add_to_interconnect(    	# Add target to the interconnect
+      >>>     "nwa", dict(
+      >>>         mac_addr = "02:%02x:00:00:%02x:%02x" % (x, y, index),
+      >>>         ipv4_addr = '192.%d.%d.%d' % (x, y, index),
+      >>>         ipv4_prefix_len = 24,
+      >>>         ipv6_addr = 'fc00::%02x:%02x:%02x' % (x, y, index),
+      >>>         ipv6_prefix_len = 112)
+      >>> )
+
+    :param str target_type: (optional) what type the target shall
+      declare; defaults to *qz-BSP*.
+
+    :param str cmdline: (optional) command line to start this QEMU
+      virtual machine; defaults to whatever :data:`target_qemu_zephyr_desc`
+      declares.
+
+      Normally you *do not need* to set this; see
+      :class:`ttbl.qemu.pc` for details on the command line
+      specification if you think you do.
+    """
+    assert bsp == None or isinstance(bsp, basestring)
+    assert nw_name == None or isinstance(nw_name, basestring)
+    assert zephyr_board == None or isinstance(zephyr_board, basestring)
+    assert target_type == None or isinstance(target_type, basestring)
+    assert cmdline == None or isinstance(cmdline, list) \
+        and all(isinstance(i, basestring) for i in cmdline)
+
+    if bsp == None:
+        raise AssertionError("FIXME: auto bsp extraction from name pending")
+    else:
+        assert bsp in target_qemu_zephyr_desc.keys(), \
+            "Unknown BSP %s (not found in " \
+            "conf_00_lib_mcu.target_qemu_zephyr_desc)"
+    if not zephyr_board:
+        zephyr_board = target_qemu_zephyr_desc[bsp].get("zephyr_board",
+                                                        "qemu_" + bsp)
+    if not target_type:
+        target_type = "qz-" + bsp
+    if not cmdline:
+        cmdline = target_qemu_zephyr_desc[bsp]['cmdline']
+
+    cmdline_zephyr = [
+
+        # Consoles: add one serial port
+        #
+        # for each console called NAME, QEMU writes data received to
+        # console-NAME.read, TCF writes data to send to
+        # console-NAME.write; we later add a consoles interface
+        # implemented with the ttbl.console.generic_c object that can
+        # read/write into the files created by QEMU.
+        #
+        "-chardev", "socket,id=serial0,server,nowait,path=%(path)s/console-serial0.write,logfile=%(path)s/console-serial0.read",
+        "-serial", "chardev:serial0",
+    ]
+
+    target = ttbl.test_target(name)
+    ttbl.config.target_add(target, target_type = target_type,
+                           tags = {
+                               'bsp_models': { bsp: None },
+                               'bsps': {
+                                   bsp: dict(
+                                       zephyr_board = zephyr_board,
+                                       zephyr_kernelname = 'zephyr.elf',
+                                   )
+                               }
+                           })
+
+    # The QEMU object exposes a power control interface for starting /
+    # stopping, image flashing and debug setings, we'll add them below.
+    qemu_pc = ttbl.qemu.pc(cmdline + cmdline_zephyr, nic_model = "e1000")
+
+    # The QEMU object exposes an image setting interface for specifying a
+    # bios / kernel / initrd file
+    target.interface_add(
+        "images",
+        ttbl.images.interface(**{
+            "kernel": qemu_pc,
+            # needed because Zephyr layer sends as kernel-BSP and
+            # otherwise the images interface will not even send it our way
+            "kernel-" + bsp: "kernel",
+            "bios": qemu_pc,
+            "initrd": qemu_pc,
+        })
+    )
+    power_rail = []
+    if nw_name:
+        power_rail.append((
+            "tuntap-" + nw_name, ttbl.qemu.network_tap_pc()
+        ))
+    power_rail.append(( "main_power", qemu_pc ))
+    target.interface_add("power", ttbl.power.interface(*power_rail))
+    target.interface_add(
+        "console",
+        ttbl.console.interface(
+            # this object is only needed to read/write to
+            # console-COMPONENT.{read,write}, which QEMU creates
+            serial0 = ttbl.console.generic_c(chunk_size = 8,
+                                             interchunk_wait = 0.15),
+            default = "serial0",
+        )
+    )
+    target.interface_add("debug", ttbl.debug.interface(**{ bsp: qemu_pc }))
+    return target
+
+
 
 def sam_xplained_add(name = None,
                      serial_number = None,
@@ -2736,287 +2945,3 @@ def tinytile_add(name,
         },
         target_type = "tinytile"
     )
-
-
-class tt_qemu_zephyr(ttbl.tt_qemu.tt_qemu):
-    """
-    Implement a QEMU test target that can run Zephyr kernels
-    and display the output over a serial port.
-
-    Supports power control, serial console and image flashing
-    interfaces.
-
-    """
-    def __init__(self, _id, bsps, tags = None):
-        if tags == None:
-            tags = {}
-        # With all the supported BSPs, create a list of supported
-        # models; each individual BSP and then one of all at the same
-        # time.
-        bsp_models = {}
-        for bsp in bsps:
-            bsp_models[bsp] = None
-        bsp_models["+".join(bsps)] = bsps
-        tags_bsp =  {
-            'x86': dict(zephyr_board = 'qemu_x86',
-                        zephyr_kernelname = 'zephyr.elf',
-                        board = 'qemu_x86',
-                        kernelname = 'zephyr.elf',
-                        console = 'x86', quark_se_stub = False),
-            'arm': dict(zephyr_board = 'qemu_cortex_m3',
-                        zephyr_kernelname = 'zephyr.elf',
-                        board = 'qemu_cortex_m3',
-                        kernelname = 'zephyr.elf',
-                        console = 'arm', quark_se_stub = False),
-            'nios2': dict(zephyr_board = 'qemu_nios2',
-                          zephyr_kernelname = 'zephyr.elf',
-                          board = 'qemu_nios2',
-                          kernelname = 'zephyr.elf',
-                          console = 'nios2', quark_se_stub = False),
-            'riscv32': dict(zephyr_board = 'qemu_riscv32',
-                            zephyr_kernelname = 'zephyr.elf',
-                            board = 'qemu_riscv32',
-                            kernelname = 'zephyr.elf',
-                            console = 'riscv32', quark_se_stub = False),
-            'xtensa': dict(zephyr_board = 'qemu_xtensa',
-                           zephyr_kernelname = 'zephyr.elf',
-                           board = 'qemu_xtensa',
-                           kernelname = 'zephyr.elf',
-                           console = 'xtensa', quark_se_stub = False),
-        }
-        _tags = dict(tags)
-        _tags['bsps'] = {}
-        # List only the BSPs we have activated
-        for bsp in bsps:
-            _tags['bsps'][bsp] = tags_bsp[bsp]
-        _tags['bsp_models'] = bsp_models
-
-        ttbl.tt_qemu.tt_qemu.__init__(self, _id, bsps, _tags = _tags)
-        # On pre power up, we'll complete these command lines by
-        # adding the networking interface information, depending on
-        # what the tag say on _slip_pty_pre_on()
-        self._qemu_cmdlines = dict(
-            x86 = \
-            sdk_path + "/usr/bin/qemu-system-i386 "
-            "-m 8 -cpu qemu32,+nx,+pae "
-	    "-device isa-debug-exit,iobase=0xf4,iosize=0x04 "
-            "-no-reboot "
-            "-nographic -vga none -display none -net none "
-            "-clock dynticks -no-acpi "
-            "-L /usr/share/qemu -bios bios.bin "
-            "-machine type=pc-0.14 "
-            # Serial console tt_qemu.py can grok
-            "-chardev socket,id=ttyS0,server,nowait,path=%(path)s/%(bsp)s-console.write,logfile=%(path)s/%(bsp)s-console.read "
-            "-serial chardev:ttyS0 "
-            # Zephyr kernel boot
-            "-kernel %(qemu-image-kernel-x86)s "
-            "-nodefaults ",
-            arm = \
-            sdk_path + "/usr/bin/qemu-system-arm "
-            "-cpu cortex-m3 "
-            "-machine lm3s6965evb -display none "
-            # Serial console tt_qemu.py can grok
-            "-chardev socket,id=ttyS0,server,nowait,path=%(path)s/%(bsp)s-console.write,logfile=%(path)s/%(bsp)s-console.read "
-            "-serial chardev:ttyS0 "
-            # Zephyr kernel boot
-            "-kernel %(qemu-image-kernel-arm)s "
-            "-nodefaults -net none ",
-            nios2 = \
-            sdk_path + "/usr/bin/qemu-system-nios2 "
-            "-machine altera_10m50_zephyr -display none "
-            # Serial console tt_qemu.py can grok
-            "-chardev socket,id=ttyS0,server,nowait,path=%(path)s/%(bsp)s-console.write,logfile=%(path)s/%(bsp)s-console.read "
-            "-serial chardev:ttyS0 "
-            # Zephyr kernel boot
-            "-kernel %(qemu-image-kernel-nios2)s "
-            "-nodefaults -net none ",
-            riscv32 = \
-            sdk_path + "/usr/bin/qemu-system-riscv32 "
-            "-machine sifive -nographic -m 32 "
-            # Serial console tt_qemu.py can grok
-            "-chardev socket,id=ttyS0,server,nowait,path=%(path)s/%(bsp)s-console.write,logfile=%(path)s/%(bsp)s-console.read "
-            "-serial chardev:ttyS0 "
-            # Zephyr kernel boot
-            "-kernel %(qemu-image-kernel-riscv32)s "
-            "-nodefaults -net none ",
-            xtensa = \
-            sdk_path + "/usr/bin/qemu-system-xtensa "
-            "-cpu sample_controller -machine sim -semihosting -nographic "
-            # Serial console tt_qemu.py can grok
-            "-chardev socket,id=ttyS0,server,nowait,path=%(path)s/%(bsp)s-console.write,logfile=%(path)s/%(bsp)s-console.read "
-            "-serial chardev:ttyS0 "
-            "-kernel %(qemu-image-kernel-xtensa)s "
-            "-nodefaults -net none ",
-        )
-        # This is so tt_qemu._power_get_bsps() can do its thing
-        self.qemu_cmdlines = copy.deepcopy(self._qemu_cmdlines)
-        self.power_on_pre_fns.append(self._slip_power_on_pre)
-        self.power_on_post_fns.append(self._slip_power_on_post)
-        # Actually tell QEMU to start once we are done starting
-        # support daemons and whatever; othewise the guest might start
-        # using the network before it is setup
-        self.power_on_post_fns.append(self._qmp_start)
-        self.power_off_pre_fns.append(self._slip_power_off_pre)
-
-
-    def _qmp_chardev_pty(self, ic_name, bsp):
-        """Connect to the Qemu Monitor and ask what is the PTY assigned to
-        the SLIP interface.
-
-        :param str ic_name: Name of the interconnect this PTY is
-          assigned to
-        :param str bsp: Name of the BSP in the over all target this
-          PTY is assigned to
-        :returns str: path to PTY assigned to the SLIP interface
-        :raises: anything on errors
-        """
-        try:
-            with ttbl.tt_qemu.qmp_c(self.pidfile[bsp] + ".qmp") as qmp:
-                r = qmp.command("query-chardev")
-                for chardev in r:
-                    # this  looks kindof like:
-                    # { u'frontend-open': True, u'label': u'slip-pty-IC_NAME',
-                    #   u'filename': u'pty:/dev/pts/4' }
-                    # We take 'filename'
-                    if chardev['label'] == 'slip-pty-%s' % ic_name:
-                        # We assume it's pty:FILENAME
-                        return chardev['filename'].split(':', 1)[1]
-                return None
-        except IOError as e:
-            if e.errno == errno.ENOENT:
-                return None
-            raise
-
-    def _slip_power_on_pre(self, _target):
-        kws = dict(self.kws)
-        # Get fresh values for these keys
-        for key in self.fsdb.keys():
-            if key.startswith("qemu-"):
-                kws[key] = self.fsdb.get(key)
-
-        # Zephyr does QEMU networking with SLIP interfaces; for each
-        # interconnect we are plugged to, we create an SLIP interface
-        # to it. _slip_power_on_post() will, after firing up QEMU,
-        # fire off TUNSLIP daemons to implement the actual networking
-        # into a bridge.
-        count = 0
-        for bsp in self.bsps:
-            # For each interconnect this thing is hooked up to, we
-            # have created an slip-pty-ic_name device in QEMU
-            self.qemu_cmdlines[bsp] = self._qemu_cmdlines[bsp]
-            for ic_name, ic_kws in self.tags.get('interconnects', {}).iteritems():
-                if not 'ipv4_addr' in ic_kws and not 'ipv6_addr' in ic_kws:
-                    continue
-
-                # CAP_NET_ADMIN is 12 (from /usr/include/linux/prctl.h
-                if not commonl.prctl_cap_get_effective() & 1 << 12:
-                    # If we don't have network setting privilege,
-                    # don't even go there
-                    self.log.warning("daemon lacks CAP_NET_ADMIN: will not "
-                                     "add networking capabilities ")
-                    continue
-
-                if not commonl.if_present("_b%s" % ic_name):
-                    self.log.warning("network %s powered off? networking "
-                                     "disabled" % ic_name)
-                    # If the network is not powered up, skip it
-                    # FIXME: replace with it calling vlan_pci.something()
-                    # that brings up the basic interface (_bICNAME) so
-                    # that once we power the network, it works
-                    continue
-
-                # Zephyr networking using SLIP on UART1
-                self.qemu_cmdlines[bsp] += \
-                    "-chardev pty,id=slip-pty-%s " \
-                    "-serial chardev:slip-pty-%s " %  (ic_name, ic_name)
-            count += 1
-
-    def _slip_power_on_post(self, _target):
-        kws = dict(self.kws)
-        # Get fresh values for these keys
-        for key in self.fsdb.keys():
-            if key.startswith("qemu-"):
-                kws[key] = self.fsdb.get(key)
-
-        # Zephyr can do QEMU networking with SLIP interfaces; for it
-        # we need to fire up a TUN daemon to do the routing, so after
-        # we power up, we start it.
-        count = 0
-        for bsp in self.bsps:
-            # For each interconnect this thing is hooked up to, we
-            # have created an slip-pty-ic_name device in QEMU
-            for ic_name, ic_kws in self.tags.get('interconnects', {}).iteritems():
-                if not 'ipv4_addr' in ic_kws and not 'ipv6_addr' in ic_kws:
-                    continue
-                _kws = dict(kws)
-                _kws.update(ic_kws)
-                _kws['ic_name'] = ic_name
-                _kws['bsp_count'] = count
-
-                # network interface name; we need it short, otherwise
-                # it is rejected by the kernel; hash the target name
-                # and the BSP count to generate a two-letter id.
-                ifname = ic_name + commonl.mkid(self.id + "%d" % count, l = 2)
-                _kws['ifname' ] = ifname
-                # This helps to identify which is our interface name
-                self.fsdb.set("ifname", ifname)
-
-                # Start tunslip on the PTY + TAP devices created by
-                # QEMU and _slip_power_on_pre
-                slip_pty = self._qmp_chardev_pty(ic_name, bsp)
-                if slip_pty == None:
-                    return
-
-                # Create the TAP interface
-                commonl.if_remove_maybe("t%s%s%d" % (ic_name, self.id, count))
-                subprocess.check_call(
-                    "ip link add "
-                    "  link _b%(ic_name)s "
-                    "  name %(ifname)s"
-                    "  address %(mac_addr)s"
-                    "  up"
-                    "  type macvtap mode bridge; "
-                    "ip link set %(ifname)s"
-                    "  promisc on "
-                    "  up" % _kws, shell = True)
-
-                # The tap device we create has a number instead of a
-                # BSP name, otherwise it will grow too long
-                time.sleep(0.5)	# If we start too fast, QEMU replies -EIO
-                tapindex = commonl.if_index("%(ifname)s" % _kws)
-                p = subprocess.Popen(
-                    [
-                        # "strace", "-o", "tunslip.strace",
-                        "/usr/bin/tunslip6", "-N", "-x",
-                        "-t", "/dev/tap%d" % tapindex,
-                        "-T", "-s", slip_pty
-                    ],
-                    shell = False, cwd = self.state_dir,
-                    close_fds = True)
-                # FIXME: ugly, this is racy -- need a way to determine if
-                # this was succesfully run
-                time.sleep(0.5)
-                if p.returncode != None:
-                    raise RuntimeError("QEMU %s: tunslip6 exited with %d"
-                                       % (bsp, p.returncode))
-                ttbl.daemon_pid_add(p.pid)	# FIXME: race condition if it died?
-                self.fsdb.set("tunslip-%s-pid" % bsp, str(p.pid))
-
-            count += 1
-
-    def _slip_power_off_pre(self, _target):
-        # Before powering off the VM, kill the tun daemon if we
-        # started it
-        count = 0
-        for bsp in self.bsps:
-            for ic_name, ic_kws in self.tags.get('interconnects', {}).iteritems():
-                if not 'ipv4_addr' in ic_kws and not 'ipv6_addr' in ic_kws:
-                    continue
-                tunslip_pids = self.fsdb.get("tunslip-%s-pid" % bsp)
-                if tunslip_pids != None and commonl.process_alive(tunslip_pids):
-                    tunslip_pid = int(tunslip_pids)
-                    commonl.process_terminate(
-                        tunslip_pid, tag = "QEMU's tunslip [%s]: " % bsp)
-                self.fsdb.set("ifname", None)
-                ifname = ic_name + commonl.mkid(self.id + "%d" % count, l = 2)
-                commonl.if_remove_maybe(ifname)

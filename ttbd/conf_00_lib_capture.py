@@ -125,6 +125,22 @@ capture_screenshot_ffmpeg_v4l = ttbl.capture.generic_snapshot(
 )
 
 
+#: A capturer to take screenshots from VNC
+#:
+#: Note the fields are target's tags and others specified in
+#: :class:`ttbl.capture.generic_snapshot` and
+#: :class:`ttbl.capture.generic_stream`.
+capture_screenshot_vnc = ttbl.capture.generic_snapshot(
+    "%(id)s VNC @localhost:%(vnc_port)s",
+    # need to make sure vnc_port is defined in the target's tags
+    # needs the .png, otherwise it balks at guessing extensions
+    # don't do -q, otherwise when it fails, it fails silently
+    "gvnccapture localhost:%(vnc_port)s %(output_file_name)s",
+    mimetype = "image/png",
+    extension = ".png"
+)
+
+
 #: Capture video off a v4l device using ffmpeg
 #:
 #: See capture_screenshot_ffmpeg_v4l for setup instructions, as they

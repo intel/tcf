@@ -12,7 +12,12 @@ flash OS images
 
 """
 import re
+import shutil
 import string
+import subprocess
+
+import ttbl
+import ttbl.qemu
 
 def nw_indexes(nw_name):
     """Return the network indexes that correspond to a one or two letter
@@ -377,18 +382,10 @@ def target_pos_setup(target,
 
       e.g.: *tcf-live* (default)
 
-    :part str pos_partsizes: (optional) when using the *multiroot*
-      *mount_fs* capability, this tells it how to partition the disk
-      by giving the sizes (in GiB) of the partitions:
-
-      - boot
-      - swap
-      - scratch (available for any use)
-      - root filesystem (multiple are created until the disk is
-      - exhausted)
-
-      Filesystem images are flashed to each root filesystem and
-      recycled for speed.
+    :part str pos_partsizes: (optional) sizes of the different
+      partitions when using the :ref:`multiroot <pos_multiroot>`
+      system to manage the target's disk; see
+      :ref:`pos_multiroot_partsizes`.
 
       e.g.: *"1:10:30:20"* (default)
 
@@ -459,7 +456,8 @@ def pos_target_add(
         pos_image = None,
         ipv4_prefix_len = 24,
         ipv6_prefix_len = 112):
-    """Add a PC-class target that can be provisioned using Provisioning
+    """
+    Add a PC-class target that can be provisioned using Provisioning
     OS.
 
     :param str name: target's name, following the convention
@@ -768,4 +766,252 @@ def pos_target_add(
             ipv6_addr = 'fc00::%02x:%02x:%02x' % (x, y, index),
             ipv6_prefix_len = ipv6_prefix_len)
         )
+    return target
+
+#: Map QEMU's hard drive interfaces to how Provisioning OS sees them
+#: as their boot device
+#:
+#: Can be extended in configuration with:
+#:
+#: >>> qemu_iftype_to_pos_boot_dev['NEWIFTYPE'] = 'xka1'
+qemu_iftype_to_pos_boot_dev = {
+    'virtio': 'vda',
+    'scsi': 'sda',
+    'ide': 'sda',
+}
+
+def target_qemu_pos_add(target_name,
+                        nw_name,
+                        mac_addr,
+                        ipv4_addr,
+                        ipv6_addr,
+                        consoles = None,
+                        disk_size = "30G",
+                        mr_partsizes = "1:4:5:5",
+                        # more distros support ide than virtio/scsi with
+                        # generic kernels
+                        sd_iftype = 'ide',
+                        extra_cmdline = "",
+                        ram_megs = 2048):
+    """Add a QEMU virtual machine capable of booting over Provisioning OS.
+
+    This target supports one or more serial consoles, a graphics
+    interface exported via VNC and a single hard drive using
+    :class:`ttbl.qemu.pc` as backend.
+
+    Note this target uses a UEFI bios *and* defines UEFI storage
+    space; this is needed so the right boot order is maintained.
+
+    Add to a server configuration file ``/etc/ttbd-*/conf_*.py``
+
+    >>> target = target_qemu_pos_add("qu-05a"
+    >>>                              "nwa",
+    >>>                              mac_addr = "02:61:00:00:00:05",
+    >>>                              ipv4_addr = "192.168.95.5",
+    >>>                              ipv6_addr = "fc00::61x:05")
+
+    See an example usage in :func:`conf_06_default.nw_default_targets_add`
+    to create default targets.
+
+    Extra paramenters can be added by using the *extra_cmdline*
+    arguments, such as for example, to add another drive:
+
+    >>> extra_cmdline = "-drive file=%%(path)s/hd-extra.qcow2,if=virtio,aio=threads"
+
+    Adding to other networks:
+
+    >>> target.add_to_interconnect(
+    >>>     'nwb', dict(
+    >>>         mac_addr = "02:62:00:00:00:05",
+    >>>         ipv4_addr = "192.168.98.5",
+    >>>         ipv6_addr = "fc00::62:05")
+
+
+    :param str target_name: name of the target to create
+
+    :param str nw_name: name of the network to which this target will
+      be connected that provides Provisioning OS services.
+
+    :param str mac_addr: MAC address for this target (for QEMU usually
+      a fake one).
+
+      Will be given to the virtual device created and can't be the
+      same as any other MAC address in the system or the networks. It
+      is recommended to be in the format:
+
+      >>> 02:HX:00:00:00:HY
+
+      where HX and HY are two hex digits; *02:...* is a valid ethernet
+      space.
+
+    :param str ipv4_addr: IPv4 Address (32bits, *DDD.DDD.DDD.DDD*, where
+      *DDD* are decimal integers 0-255) that will be assigned to this
+      target in the network.
+
+    :param str ipv6_addr: IPv6 Address (128bits, standard ipv6 colon
+      format) that will be assigned to this target in the network.
+
+    :param list(str) consoles: (optional) names of serial consoles to
+      create (defaults to just one, *ttyS0*). E.g:
+
+      >>> consoles = [ "ttyS0", "ttyS1", "com3" ]
+
+      these names are used to create the internal QEMU name and how
+      the TCF daemon will refer to them as console names. In the
+      machine, they will be standard serial ports in that order.
+
+    :param str disk_size: (optional) size specification for the
+      target's hard drive, as understood by QEMU's qemu-img create
+      program. Defaults to:
+
+      >>> disk_size = "30G"
+
+    :param str mr_partsizes: (optional) sizes of the different
+      partitions when using the :ref:`multiroot <pos_multiroot>`
+      system to manage the target's disk; see
+      :ref:`pos_multiroot_partsizes`.
+
+      e.g.: *"1:10:30:20"* (default)
+
+    :param str sd_iftype: (optional) interface to use for the disks
+      (defaults to *ide* as is the one most Linux distro support off
+      the bat). Available types are (per QEMU -drive option: ide,
+      scsi, sd, mtd, floppy, pflash, virtio)
+
+    :param int ram_megs: (optional) size of memory in megabytes
+      (defaults to 2048)
+
+    :param str extra_cmdline: a string with extra command line to add;
+      %(FIELD)s supported (target tags).
+
+    **Notes**
+
+    - The hardrive gets fully reinitialized every time the server is
+      restarted (the backend file gets wiped and re-created).
+
+      It is still possible to force a re-partitioning of the backend
+      by setting POS property :ref:`pos_reinitialize <pos_reinitialize>`.
+
+    """
+    assert isinstance(target_name, basestring)
+    if consoles == None or consoles == []:
+        consoles = [ 'ttyS0' ]
+    else:
+        assert isinstance(consoles, list) \
+            and all([ isinstance(console, basestring)
+                      for console in consoles ])
+        assert len(consoles) >= 1
+    assert ram_megs > 0
+    # rest of parameters are checked by other functions we call
+
+    target = ttbl.test_target(target_name)	# create the target object
+
+    # Figure out the HD type
+    pos_boot_dev = qemu_iftype_to_pos_boot_dev.get(sd_iftype, None)
+    if pos_boot_dev == None:
+        raise AssertionError("Don't know dev name for disk iftype %s"
+                             % sd_iftype)
+
+    # Create an HD for this guy -- we do it after creating the
+    # target so the state path is created -- double check if the
+    # drive already exists so not to override it? nah, screw
+    # it--it is supposed to be all throwaway
+    subprocess.check_call([
+        "qemu-img", "create", "-q", "-f", "qcow2",
+        "%s/hd.qcow2" % (target.state_dir),
+        disk_size
+    ])
+    # reinitialize also the EFI vars storage
+    shutil.copy("/usr/share/OVMF/OVMF_VARS.fd", target.state_dir)
+
+    # QEMU object
+    #
+    # Note this object exposes many interface implementations, we'll
+    # hook them up later.
+    cmdline = [
+        "/usr/bin/qemu-system-x86_64",
+        "-enable-kvm",
+        "-cpu", "host",
+        "-m", str(ram_megs),
+        # FIXME: do VNC tunneling so clients can access
+        "-display", "vnc=unix:%(path)s/qemu.vnc",
+        # EFI BIOS
+        "-drive", "if=pflash,format=raw,readonly,file=/usr/share/edk2/ovmf/OVMF_CODE.fd",
+        "-drive", "if=pflash,format=raw,file=%(path)s/OVMF_VARS.fd",
+        # Storage
+        "-drive", "file=%%(path)s/hd.qcow2,if=%s,aio=threads" % sd_iftype,
+        "-boot", "order=nc",	# for POS over PXE
+    ]
+    # Create as many consoles as directed
+    for console in consoles:
+        kws = { "console": console }
+        cmdline += [
+            "-chardev", "socket,id=%(console)s,server,nowait,path=%%(path)s/console-%(console)s.write,logfile=%%(path)s/console-%(console)s.read" % kws,
+            "-serial", "chardev:%(console)s" % kws
+        ]
+    cmdline += extra_cmdline.split()
+    qemu_pc = ttbl.qemu.pc(qemu_cmdline = cmdline, nic_model = "virtio")
+
+    # The QEMU object exposes a power control interface to start/stop
+    power_rail = []
+    if nw_name:			# got networking?
+        power_rail.append(( "tuntap-" + nw_name, ttbl.qemu.network_tap_pc() ))
+    power_rail.append(( "main_power", qemu_pc ))
+    target.interface_add("power", ttbl.power.interface(*power_rail))
+
+    # The QEMU object exposes an image setting interface
+    target.interface_add("images", ttbl.images.interface(
+        ( "kernel", qemu_pc ),
+        ( "bios", qemu_pc ),
+        ( "initrd", qemu_pc ),
+    ))
+
+    # Serial console interface: add all the consoles declared in the
+    # command line; the generic object console_pc can read from any of
+    # them as it takes as parameter the console name to read off/write
+    # the QEMU generated cmdline in
+    # STATE_DIR/console-NAME.{read,write}
+    console_pc = ttbl.console.generic_c(chunk_size = 8,
+                                        interchunk_wait = 0.15)
+    consolel = []
+    for console in consoles:
+        consolel.append(
+            ( console, console_pc )
+        )
+    target.interface_add("console", ttbl.console.interface(*consolel))
+
+    target.interface_add("debug", ttbl.debug.interface(
+        ( "x86_64", qemu_pc )
+    ))
+
+    ttbl.config.target_add(		# add the trget
+        target,
+        target_type = "qemu-uefi-x86_64",
+        tags = dict(
+            bsp_models = { 'x86_64': None },
+            bsps = dict(
+                x86_64 = dict(console = 'x86_64', linux = True),
+            ),
+        )
+    )
+
+    target.add_to_interconnect(		# Network support
+        nw_name,
+        dict(
+            ipv4_addr = ipv4_addr, ipv4_prefix_len = 24,
+            ipv6_addr = ipv6_addr, ipv6_prefix_len = 112,
+            mac_addr = mac_addr,
+        )
+    )
+
+    target_pos_setup(target, nw_name,	# POS setup
+                     pos_boot_dev, consoles[0],
+                     boot_config = 'uefi',
+                     boot_config_fix = None,
+                     boot_to_normal = 'pxe',
+                     boot_to_pos = 'pxe',
+                     mount_fs = 'multiroot',
+                     pos_partsizes = mr_partsizes)
+    # make TFTP force PXE boot when pos_mode == pxe
+    target.power_on_pre_fns.append(ttbl.dhcp.power_on_pre_pos_setup)
     return target
