@@ -584,7 +584,19 @@ pos_cmdline_opts = {
 }
 
 def power_on_pre_pos_setup(target):
+    """
+    Hook called before power on to setup TFTP to boot a target in Provisioning Mode
 
+    The DHCP server started by :mod:`ttbl.dhcp` is always configured
+    to direct a target to PXE boot *syslinux*; this will ask the TFTP
+    server for a config file for the mac address of the target.
+
+    This function is called before powering on the target to create
+    said configuration file; based on the value of the target's
+    *pos_mode* property, a config file that boots the Provisioning OS
+    or that redirects to the local disk will be created.
+    
+    """
     pos_mode = target.fsdb.get("pos_mode")
     if pos_mode == None:
         target.log.info("POS boot: ignoring, pos_mode property not set")
@@ -652,7 +664,7 @@ def power_on_pre_pos_setup(target):
         # each image (see, eg: tcf-live's) which is filled in
         # extra_opts a few lines above
         config = """\
-say TCF Network boot to Service OS
+say TCF Network boot to Provisioning OS
 #serial 0 115200
 default boot
 prompt 0
