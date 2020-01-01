@@ -97,9 +97,9 @@ class interface(ttbl.tt_interface):
     state.
 
     """
-    def __init__(self, **kwimpls):
+    def __init__(self, *impls, **kwimpls):
         ttbl.tt_interface.__init__(self)
-        self.impls_set([], kwimpls, impl_c)
+        self.impls_set(impls, kwimpls, impl_c)
 
     def _target_setup(self, target):
         target.tags_update(dict(images = self.impls.keys()))
