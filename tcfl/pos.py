@@ -11,6 +11,9 @@
 #   each's __doc__
 
 """
+Core Provisioning OS functionality
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 This module provides tools to image devices with a Provisioning OS.
 
 The general operation mode for this is instructing the device to boot

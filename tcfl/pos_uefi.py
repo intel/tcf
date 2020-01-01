@@ -4,7 +4,13 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-"""This module provides capabilities to configure the boot of a UEFI
+"""
+.. _pos_uefi:
+
+Provisioning OS: bootloader configuration for EFI systems
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This module provides capabilities to configure the boot of a UEFI
 system with the Provisioning OS.
 
 One of the top level call is :func:`boot_config_multiroot` which is

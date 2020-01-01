@@ -13,6 +13,11 @@
 # - do not pass device--each function should gather it from target's
 #   tags
 """
+.. _pos_multiroot:
+
+Provisioning OS: partitioning schema for multiple root FSs per device
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 The Provisioning OS multiroot methodology partitions a system with
 multiple root filesystems; different OSes are installed in each root
 so it is fast to switch from one to another to run things in
@@ -44,6 +49,21 @@ transfer (and thus slowest to fastest operation):
 - can update an existing root filesystem: in this case very little
   change is done and we are just verifying nothing was unduly
   modified.
+
+.. _pos_multiroot_partsizes:
+
+Partition Size specification
+----------------------------
+
+To simplify setup of targets, a string such as *"1:4:10:50"* is given
+to denote the sizes of the different partitions:
+
+- 1 GiB for /boot
+- 4 GiB for swap
+- 10 GiB for scratch (can be used for whatever the script wants, needs
+  to be formated/initialized before use)
+- 50 GiB for multiple root partitions (until the disk size is exhausted)
+
 """
 import operator
 import os
