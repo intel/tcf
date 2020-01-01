@@ -11,9 +11,12 @@ Implemented by :class:`ttbl.console.interface`.
 """
 
 import codecs
+import contextlib
 import errno
 import fcntl
 import os
+import socket
+import stat
 import time
 
 import commonl
@@ -538,32 +541,44 @@ class generic_c(impl_c):
                 _data += c
         return _data
 
+
+    
+    def _write(self, fd, data):
+        if self.escape_chars:
+            data = self._escape(data)
+        if self.chunk_size:
+            # somethings have no flow control and you need to make
+            # it happen like...this
+            # yeh, I know an iterator in python..yadah--this is
+            # quite clear
+            # Chunking is needed to feed to things like VMs console
+            # inputs and some things whose flow control is not really
+            # working as it should.
+            left = len(data)
+            itr = 0
+            while left > 0:
+                _chunk_size = min(left, self.chunk_size)
+                os.write(fd, data[itr : itr + _chunk_size])
+                time.sleep(self.interchunk_wait)
+                itr += _chunk_size
+                left -= _chunk_size
+        else:
+            os.write(fd, data)
+    
     def write(self, target, component, data):
         file_name = os.path.join(target.state_dir,
                                  "console-%s.write" % component)
         target.log.debug("%s: writing %dB to console (%s)",
                          component, len(data), data.encode('unicode-escape'))
-        fd = os.open(file_name, os.O_RDWR, 0)
-        try:
-            if self.escape_chars:
-                data = self._escape(data)
-            if self.chunk_size:
-                # somethings have no flow control and you need to make
-                # it happen like...this
-                # yeh, I know an iterator in python..yadah--this is
-                # quite clear
-                left = len(data)
-                itr = 0
-                while left > 0:
-                    _chunk_size = min(left, self.chunk_size)
-                    os.write(fd, data[itr : itr + _chunk_size])
-                    time.sleep(self.interchunk_wait)
-                    itr += _chunk_size
-                    left -= _chunk_size
-            else:
-                os.write(fd, data)
-        finally:
-            os.close(fd)
+        if stat.S_ISSOCK(os.stat(file_name).st_mode):
+            # consoles whose input is implemented as a socket
+            with contextlib.closing(socket.socket(socket.AF_UNIX,
+                                                  socket.SOCK_STREAM)) as f:
+                f.connect(file_name)
+                self._write(f.fileno(), data)
+        else:
+            with contextlib.closing(os.open(file_name, os.O_RDWR, 0)) as fd:
+                self._write(fd, data)
 
 
 class serial_pc(ttbl.power.socat_pc, generic_c):
