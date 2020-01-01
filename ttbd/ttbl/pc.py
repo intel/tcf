@@ -171,8 +171,7 @@ class delay_til_file_gone(ttbl.power.impl_c, ttbl.tt_power_control_impl):
                          component, time.time() - t0, self.off_file)
 
     def get(self, target, component):
-        # this reports None because this is is just a delay loop
-        return None
+        return not os.path.exists(self.filename)
 
     # COMPAT: old interface, ttbl.tt_power_control_impl
     def power_on_do(self, target):
@@ -242,8 +241,7 @@ class delay_til_file_appears(ttbl.power.impl_c, ttbl.tt_power_control_impl):
         pass
 
     def get(self, target, component):
-        # this reports None because this is is just a delay loop
-        return None
+        return os.path.exists(self.filename)
 
     # COMPAT: old interface, ttbl.tt_power_control_impl
     def power_on_do(self, target):
