@@ -483,8 +483,8 @@ class tt_interface(object):
                 name, pc = impl
                 assert isinstance(name, basestring), \
                     "tuple[0] has to be a string, got %s" % type(name)
-                assert isinstance(pc, cls), \
-                    "tuple[1] has to be a %s, got %s" % (cls, type(pc))
+                assert isinstance(pc, (cls, basestring)), \
+                    "tuple[1] has to be a %s or str, got %s" % (cls, type(pc))
                 self._init_by_name(name, pc, aliases)
             elif isinstance(impl, cls):
                 self._init_by_name("component%d" % count, impl, aliases)
