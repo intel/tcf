@@ -339,7 +339,7 @@ def console_rx_poller(expecter, target, console = None):
     # we could spend our time trying to read a 1G console log file
     # from a really broken test case that spews a lot of stuff.
     # FIXME: move this to configuration
-    max_size = 3000
+    max_size = 64 * 1024
 
     # Read anything new since the last time we read -- this relies
     # on we having an exclusive lock on the target
