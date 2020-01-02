@@ -1099,7 +1099,8 @@ EOF""")
                                     trace = traceback.format_exc()))
 
 
-    def fsinfo_read(self, boot_partlabel = None):
+    def fsinfo_read(self, boot_partlabel = None,
+                    raise_on_not_found = True, timeout = None):
         """
         Re-read the target's partition tables, load the information
 
@@ -1109,10 +1110,27 @@ EOF""")
         is loaded and that there is at least an entry in the partition
         table for the boot partition of the device the trget's
         describes as POS boot device (target's *pos_boot_dev*).
+
+        :param str boot_partlabel: (optional) label of the partition
+          we need to be able to find while scanning; will retry a few
+          times up to a minute forcing a scan; defaults to nothing
+          (won't look for it).
+        :param bool raise_on_not_found: (optional); raise a blocked
+          exception if the partition label is not found after
+          retrying; default *True*.
+        :param int timeout: (optional) seconds to wait for the
+          partition tables to be re-read; defaults to 30s (some HW
+          needs more than others and there is no way to make a good
+          determination) or whatever is specified in target
+          tag/property :ref:`pos_partscan_timeout`. 
         """
+        assert timeout == None or timeout > 0, \
+            "timeout must be None or a positive number of seconds; " \
+            "got %s" % timeout
         target = self.target
+        if timeout == None:
+            timeout = int(target.kws.get('pos_partscan_timeout', 30))
         # Re-read partition tables
-        timeout = 60
         ts0 = time.time()
         ts = ts0
         device_basename = target.kws['pos_boot_dev']
@@ -1138,11 +1156,12 @@ EOF""")
                 continue
             break
         else:
-            raise tc.blocked_e(
-                "POS/multiroot: new partition info not found by lsblk " \
-                "after %.1fs" % (timeout),
-                dict(fsinfo = str(target.pos.fsinfo)))
-            # Now set the root device information, so we can pick stuff to
+            if raise_on_not_found:
+                raise tc.blocked_e(
+                    "POS/multiroot: new partition info not found by lsblk " \
+                    "after %.1fs" % (timeout),
+                    dict(fsinfo = str(target.pos.fsinfo)))
+                # Now set the root device information, so we can pick stuff to
 
 
     #:
@@ -1391,7 +1410,10 @@ EOF""")
 
                 # keep console more or less clean, so we can easily parse it
                 target.shell.run("dmesg -n alert")
-                target.pos.fsinfo_read()
+                # don't raise if not found, as if it is an
+                # uninitialized disk we'll have to initialize it on
+                # mount_fs() below.
+                target.pos.fsinfo_read(raise_on_not_found = False)
 
                 # List the available images and decide if we have the
                 # one we are asked to install, autocomplete missing

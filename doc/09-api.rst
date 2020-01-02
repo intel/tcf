@@ -190,8 +190,8 @@ Common metadata
     in this interconnect (when describing ethernet or similar
     interconnects)
 
-  - *ipv4_addr* (str): IPv4 Address (32bits, DDD.DDD.DDD.DDD, where
-    DDD are decimal integers 0-255) that will be assigned to this
+  - *ipv4_addr* (str): IPv4 Address (32bits, *DDD.DDD.DDD.DDD*, where
+    *DDD* are decimal integers 0-255) that will be assigned to this
     target in this interconnect
 
   - *ipv4_prefix_len* (int): length in bits of the network portion of
@@ -356,6 +356,15 @@ Provisioning OS specific metadata
   expected to be found in *http://:data:`POS_HTTP_URL_PREFIX
   <pos_http_url_prefix>`/vmlinuz-POS_IMAGE*
 
+.. _pos_partscan_timeout:
+
+- *pos_partscan_timeout*: maximum number of seconds we wait for a
+  partition table scan to show information about the partition table
+  before we consider it is really empty (some HW takes a long time).
+
+  This is used in :func:`tcfl.pos.fsinfo_read
+  <tcfl.target_ext_pos.extension.fsinfo_read>`.
+  
 .. _pos_reinitialize:
 
 - *pos_reinitialize*: when set to any value, the client provisioning
