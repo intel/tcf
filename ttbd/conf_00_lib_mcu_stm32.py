@@ -20,13 +20,13 @@ import ttbl.flasher
 
 stm32_models = dict()
 
-ttbl.flasher.openocd_c._addrmaps['unneeded'] = dict(
+ttbl.openocd.addrmaps['unneeded'] = dict(
     # FIXME: we need this so the mappings in flasher.c don't get all
     # confused
     arm = dict()
 )
 
-ttbl.flasher.openocd_c._boards['disco_l475_iot1'] = dict(
+ttbl.openocd.boards['disco_l475_iot1'] = dict(
     addrmap = 'unneeded',	# unneeded
     targets = [ 'arm' ],
     target_id_names = { 0: 'stm32f2x.cpu' },
@@ -49,7 +49,7 @@ reset_config srst_only
 """)
 
 
-ttbl.flasher.openocd_c._boards['nucleo_f103rb'] = dict(
+ttbl.openocd.boards['nucleo_f103rb'] = dict(
     addrmap = 'unneeded',	# unneeded
     targets = [ 'arm' ],
     target_id_names = { 0: 'stm32f2x.cpu' },
@@ -80,7 +80,7 @@ $_TARGETNAME configure -event gdb-detach {
 )
 
 
-ttbl.flasher.openocd_c._boards['nucleo_f207zg'] = dict(
+ttbl.openocd.boards['nucleo_f207zg'] = dict(
     addrmap = 'unneeded',	# unneeded
     targets = [ 'arm' ],
     target_id_names = { 0: 'stm32f2x.cpu' },
@@ -113,7 +113,7 @@ $_TARGETNAME configure -event gdb-detach {
 )
 
 
-ttbl.flasher.openocd_c._boards['nucleo_f429zi'] = dict(
+ttbl.openocd.boards['nucleo_f429zi'] = dict(
     addrmap = 'unneeded',	# unneeded
     targets = [ 'arm' ],
     target_id_names = { 0: 'stm32f4x.cpu' },
@@ -142,7 +142,7 @@ $_TARGETNAME configure -event gdb-detach {
 )
 
 
-ttbl.flasher.openocd_c._boards['nucleo_f746zg'] = dict(
+ttbl.openocd.boards['nucleo_f746zg'] = dict(
     addrmap = 'unneeded',	# unneeded
     targets = [ 'arm' ],
     target_id_names = { 0: 'stm32f7x.cpu' },
@@ -168,7 +168,7 @@ $_TARGETNAME configure -event gdb-detach {
 )
 
 
-ttbl.flasher.openocd_c._boards['nucleo_l073rz'] = dict(
+ttbl.openocd.boards['nucleo_l073rz'] = dict(
     addrmap = 'unneeded',	# unneeded
     targets = [ 'arm' ],
     target_id_names = { 0: 'stm32f2x.cpu' },
@@ -211,7 +211,7 @@ $_TARGETNAME configure -event gdb-detach {
 """)
 
 
-ttbl.flasher.openocd_c._boards['stm32f3_disco'] = dict(
+ttbl.openocd.boards['stm32f3_disco'] = dict(
     addrmap = 'unneeded',	# unneeded
     targets = [ 'arm' ],
     target_id_names = { 0: 'stm32f2x.cpu' },

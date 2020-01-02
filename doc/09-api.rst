@@ -448,13 +448,6 @@ Console Management Interface
 
 .. automodule:: ttbl.console
 
-LEGACY *compat*:
-
-.. autoclass:: ttbl.test_target_console_mixin
-.. automodule:: ttbl.cm_serial
-.. automodule:: ttbl.cm_loopback
-.. automodule:: ttbl.cm_logger
-
 Debugging Interface
 -------------------
 
@@ -473,10 +466,11 @@ Power Control Interface
 
 Daemons that can be started in the server as part of a power rail:
 
+.. automodule:: ttbl.dhcp
 .. automodule:: ttbl.qemu
+.. automodule:: ttbl.openocd
 .. automodule:: ttbl.rsync
 .. automodule:: ttbl.socat
-.. automodule:: ttbl.dhcp
 
 Other interfaces
 ----------------

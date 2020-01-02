@@ -21,15 +21,14 @@ import time
 
 import commonl
 import ttbl
-import ttbl.cm_serial
 import ttbl.debug
 import ttbl.flasher
 import ttbl.images
+import ttbl.openocd
 import ttbl.pc
 import ttbl.pc_ykush
 import ttbl.rsync
 import ttbl.socat
-import ttbl.tt
 import ttbl.usbrly08b
 
 zephyr_sdk_path = os.path.join(
@@ -190,6 +189,7 @@ def arduino101_add(name = None,
        <usb_tty_sibling>` a USB serial number.
 
     """
+    raise NotImplementedError("Needs porting to new openocd code in branch openocd")
     if variant == None:
         _variant = ""
     elif variant == 'factory':
@@ -408,6 +408,7 @@ def a101_dfu_add(name,
                        ykush_port_serial = PORTNUMBER2,
                        serial_port = "/dev/tty-a101-NN")
     """
+    raise NotImplementedError("Needs porting to new openocd code in branch openocd")
     if ykush_port_serial:
         if serial_port == None:
             serial_port = "/dev/tty-" + name
@@ -705,6 +706,7 @@ def emsk_add(name = None,
        <usb_tty_serial>` using the boards' *serial number*.
 
     """
+    raise NotImplementedError("Needs porting to new openocd code in branch openocd")
     zephyr_boards = dict(
         emsk7d_v22 = 'em_starterkit_em7d_v22',
         emsk7d = 'em_starterkit_em7d',
@@ -1000,6 +1002,7 @@ def frdm_add(name = None,
 
         Yup, I dislike computers too.
     """
+    raise NotImplementedError("Needs porting to new openocd code in branch openocd")
     if serial_port == None:
         serial_port = "/dev/tty-" + name
 
@@ -1064,352 +1067,6 @@ def ma_add(name = None,
                     ykush_serial, ykush_port_board,
                     openocd_path, openocd_scripts, debug,
                     variant = "qc10000_crb")
-
-
-
-class minnowboard_EFI_boot_grub_pc(ttbl.tt_power_control_impl):
-    """A power control interface that directs EFI to boot grub
-
-    When something (with a serial console that can access EFI) is
-    powering up, this looks at the output. If it takes us to the EFI
-    shell, then it runs fs0:\\EFI\\BOOT\bootx64 manually, which shall
-    launch the automatic grub process.
-
-    It relies on :download:`../ttbd/setup-efi-grub2-elf.sh`
-    making *grub2* print a banner ``TCF Booting kernel-HEXID.elf``.
-
-    Intended for Minnowboard and to be placed in the power rail of
-    anything right after powering up the anything.
-    """
-    def __init__(self, console_name = None):
-        ttbl.tt_power_control_impl.__init__(self)
-        self.console_name = console_name
-
-    def power_on_do(self, target):	# pylint = disable:missing-docstring
-        index, matched_text, offset = target.expect(
-            [
-                # Booted right!
-                re.compile(r"TCF Booting kernel-.*\.elf"),
-                # Booted into EFI Shell, no mappings found
-                # -> power-cycle
-                re.compile('(Cannot find required map name|No mapping found)',
-                           re.MULTILINE | re.DOTALL),
-                # Booted into EFI Shell -- note different versions of
-                # the EFI bios print different stuff...
-                # -> coerce
-                re.compile('.*Shell>',
-                           re.MULTILINE | re.DOTALL),
-                # EFI most likely didn't find the USB drive
-                # -> let's try a power cycle
-                re.compile("bootx64.* is not recognized as an internal "
-                           "or external command, operable program, or "
-                           "batch file", re.MULTILINE | re.DOTALL),
-                # Grub couldn't find the USB drive
-                # -> let's try a power cycle
-                re.compile("error: disk .* not found.*"
-                           "error: you need to load the kernel first.*"
-                           "grub>", re.MULTILINE | re.DOTALL),
-            ],
-            timeout = 50,
-            what = "waiting for console traces of boot")
-        if index == 0:
-            target.log.info("Boot sequence: booted off grub2")
-            return
-        # Error handling -- something failed, so we will
-        # have the power rail control sequence power
-        # everything off (disconnecting the USB drive from
-        # the target), wait half a second and power it up
-        # again. Maybe this time the boot drive will be
-        # properly detected.
-        elif index == 2:
-            target.log.info("Boot sequence: USB boot drive not set "
-                            "as default; asking EFI to boot off fs0:")
-            try:
-                target.expect_sequence(
-                    [ {
-                        "send": "fs0:\\EFI\\BOOT\\bootx64\r\n",
-                        "receive": re.compile(r"TCF Booting kernel-.*\.elf"),
-                        "fail": re.compile(
-                            "(Invalid mapping name"
-                            "|Cannot find mapped device"
-                            "|is not recognized as an internal or external command.*)"),
-                        "wait": 1,
-                        # delay .3 seconds between characters,
-                        # otherwise minnowboard might loose some
-                        "delay": 0.3,
-                    } ],
-                    offset = offset)
-                target.log.info("Boot sequence: booted off grub2 after "
-                                "EFI coercion")
-            except target.expect_e as e:
-                target.log.warning("Boot sequence: EFI coercion failed; "
-                                   "power-cycling and retrying: %s" % e)
-                raise self.retry_all_e(0.5)
-        elif index == 1 or index == 2:
-            target.log.warning("Boot sequence: EFI didn't find the USB "
-                               "boot drive? power-cycling and retrying: %s"
-                               % matched_text)
-            raise self.retry_all_e(0.5)
-        elif index == 3:
-            target.log.warning("Boot sequence: Grub didn't find the USB "
-                               "boot drive? power-cycling and retrying: %s"
-                               % matched_text)
-            raise self.retry_all_e(0.5)
-        else:
-            raise AssertionError("Boot sequence: landed at unknown "
-                                 "index %s" % index)
-
-    def power_off_do(self, _target):
-        pass
-
-    def reset_do(self, _target):
-        pass
-
-    def power_get_do(self, _target):
-        return True
-
-
-def minnowboard_add(name, power_controller, usb_drive_serial,
-                    usbrly08b_serial, usbrly08b_bank, serial_port = None):
-    """**Configure a Minnowboard for use with Zephyr**
-
-    The `Minnowboard <https://minnowboard.org/>`_ is an open hardware
-    board that can be used to run Linux, Zephyr and other OSes. This
-    configuration supports power control, a serial console and image
-    flashing.
-
-    Add to a server configuration file (note the serial numbers and
-    paths are examples that you need to adapt to your configuration):
-
-    .. code-block:: python
-
-       ttbl.config.target_add(ttbl.tt.tt_power(
-           "minnowboard-NN-disk",
-           power_control = [ ttbl.usbrly08b.plugger("00023456", 0) ],),
-           tags = { 'skip_cleanup': True }
-       )
-       ttbl.config.targets['minnowboard-56-disk'].disable('')
-       minnowboard_add("minnowboard-NN",
-                       power_controller = ttbl.pc.dlwps7("http://admin:1234@sp06/6"),
-                       usb_drive_serial = "76508A8E",
-                       usbrly08b_serial = "00023456", usbrly08b_bank = 0)
-
-    .. notes:
-       - adding the disk target allows to access the disk easily
-         (power it off to connect it to the server, on to the target).
-       - ensure the disk is not in the cleanups (*skip_cleanup* is
-         True), otherwise it will be powered off in the middle of the
-         minnowboard operation.
-       - ensure it is disabled, so it is not picked up by most runs.
-
-    restart the server and it yields::
-
-      $ tcf list
-      local/minnowboard-NN
-
-    :param str name: name of the target
-
-    :param ttbl.tt_power_control_impl power_controller: an
-      implementation of a power controller than can power off or on
-      the Minnowboard, for example a DLWPS7::
-
-        ttbl.pc.dlwps7("http://admin:1234@sp06/6")
-
-    :param str usb_drive_serial: USB Serial number for the USB boot
-      drive that is multiplexed to the Minnowboard and the server
-      host as per the *Overview* below.
-
-    :param str usbrly08b_serial: USB Serial number for the USBRLY8b
-      board that is going to be used to multiplex the USB boot drive
-      from the minnowboard to the server host.
-
-    :param int usbrly08b_bank: relay bank number (#0 will use relays
-      1, 2, 3 and 4, #1 will use 5, 6, 7 and 8).
-
-    :param str serial_port: (optional) name of the serial port
-      (defaults to ``/dev/tty-NAME``)
-
-    **Overview**
-
-    The Minnowboard provides a serial port which is used to control
-    the BIOS (when needed) and to access the OS. Any AC power controller
-    can be used to power on/off the Minnowboard's power brick.
-
-    The target type implemented here can only boot ELF kernels and is
-    implemented using the :class:`grub2 loader <ttbl.tt.grub2elf>`. In
-    summary, a USB drive is used as a boot drive that is multiplexed
-    using a USBRLY8b relay bank from the Minnowboard to the
-    server:
-
-     - when the Minnowboard is off, the USB drive is connected to the
-       server, so it can be setup / partitioned / formatted / flashed
-
-     - when Minnowboard is on, the USB drive is connected to it.
-
-    **Bill of materials**
-
-    - A Minnowboard and its power brick
-
-    - An open socket on an AC power switch, like the :class:`Digital
-      Logger Web Power Switch 7 <ttbl.pc.dlwps7>`
-
-    - A USB serial cable terminated with 6 way header (eg:
-      https://www.amazon.com/Converter-Terminated-Galileo-BeagleBone-Minnowboard/dp/B06ZYPLFNB)
-      preferibly with a serial number (easier to configure)
-
-    - a USB drive (any size will do)
-
-    - four relays on a USBRLY08b USB relay bank
-      (https://www.robot-electronics.co.uk/htm/usb_rly08btech.htm)
-      [either 1, 2, 3 and 4 or 5, 6, 7 and 8]
-
-    - One USB Type A female to male cable, one USB Type A male cable
-
-    - Two USB ports into the server
-
-    **Connecting the test target fixture**
-
-    1. connect the Minnowboard's power trick to the socket in the AC
-       power switch and to the board DC input
-
-    2. connect the USB serial cable to the Minnowboard's TTY
-       connection and to the server
-
-    3. Cut and the USB-A male-to-female cable and separate the four
-       lines on each end; likewise, cut and separate the four lines on
-       the other USB-A male cable; follow the detailed instructions in
-       :class:`ttbl.usbrly08b.plugger` where:
-
-       - Ensure the USBRLY8B is properly connected and setup as per
-         :class:`ttbl.usbrly08b.rly08b`
-
-       - *DUT* is the USB-A female where we'll connect the USB drive,
-         plug the USB drive to it. Label as *minnowboard-NN boot*
-
-       - *Host A1/ON/NO* is the USB-A male connector we'll connect to
-         the Minnowboard's USB 2.0 port -- label as
-         *minnowboard-NN ON* and plug to the board
-
-       - *Host A2/OFF/NC* is the USB-A make connector we'll connect to
-         the server's USB port -- label as *minnowboard-NN OFF* and
-         plug to the server.
-
-       Note tinning the cables for better contact will reduce the
-       chance of the USB device misbehaving.
-
-       It is critical to get this part right; the cable connected to
-       the NC terminals has to be what is connected to the server when
-       the target is *off*.
-
-       It is recommended to test this thoroughly in a separate system
-       first.
-
-    4. Ensure the Minnowboard MAX is flashed with *64 bit* firmware,
-       otherwise it will fail to boot.
-
-       To update it, connect it to a solid power (so TCF doesn't power
-       it off in the middle), download the images from
-       https://firmware.intel.com/projects/minnowboard-max (0.97 as of
-       writing this) and follow the instructions.
-
-    **Configuring the system for the fixture**
-
-    1. Choose a name for the target: *minnowboard-NNx* (see :ref:`naming
-       best practices <bp_naming_targets>`).
-
-    2. Find the serial number of the USB drive, blank it to ensure it
-       is properly initialized; example, in this case being
-       */dev/sdb*::
-
-         $ lsblk -nro NAME,TRAN,SERIAL | grep USB-DRIVE-SERIAL
-         sdb usb USB-DRIVE-SERIAL
-         $ dd if=/dev/zero of=/dev/sdb
-
-    3. Find the serial number of the USBRLY8b and determine the relay
-       bank to use; bank 0 for relays 1, 2, 3 and bank 1 for relays 4
-       or 5, 6, 7 and 8.
-
-    4. Configure *udev* to add a name for the serial device for the
-       board's serial console so it can be easily found at
-       ``/dev/tty-TARGETNAME``. Follow :ref:`these instructions
-       <usb_tty_serial>` using the serial dongle's *serial number*; e.g.::
-
-         SUBSYSTEM == "tty", ENV{ID_SERIAL_SHORT} == "AC0054PT", \\
-           SYMLINK += "tty-minnowboard-NN"
-
-    5. Connect the Minnowboard to a display [vs the serial port, to
-       make it easier] and with a keyboard, plug the USB drive
-       directly and boot into the BIOS.
-
-       a. Enter into the *Boot Options Manager*, ensure *EFI USB
-          Device* is enabled; otherwise, add the option.
-
-          Depending on the BIOS revision, the save/commit mechanism
-          might be tricky to get right, so double check it by
-          rebooting and entering the BIOS again to verify that *EFI
-          booting from USB* is enabled.
-
-       b. In the same *Boot Options Manager*, change the boot order to
-          consider the *EFI booting from USB* option to be the first
-          thing booted.
-
-          Note that the EFI Bios tends to reset the boot drive order
-          if at some point it fails to detect it, so a boot coercer
-          like :class:`minnowboard_EFI_boot_grub_pc` is needed. This
-          will workaound the issue.
-
-
-    FIXME:
-     - FIXME: need to have it re-plug the dongle if the server
-       doesn't see it
-
-    Troubleshooting:
-
-     - UEFI keeps printing::
-
-         map: Cannot find required map name.
-
-       Make sure:
-
-        - the USB relay plugger is properly connected and the drive is
-          re-directed to the target when powered on, to the server
-          when off
-
-        - the drive is not DOS formatted, it needs a GPT
-          partition table. Wipe it hard and re-deploy (eg: running tcf
-          run) so it will be re-flashed from the ground up::
-
-            # dd if=/dev/zero of=/dev/DEVICENODE bs=$((1024 * 1024)) count=100
-
-        - Minnowboard is picky and some drives are faulty for it, even
-          if they work ok in any other machine; replace the drive?
-
-    - UEFI will do nothing when *BOOTX64* is executed::
-
-        Shell> fs0:\\EFI\\BOOT\\bootx64
-        Shell>
-
-      Double check the Minnowboard is flashed with a 64 bit firmware;
-      see above in **Connecting the test target fixture**.
-
-    """
-    if serial_port == None:
-        serial_port = "/dev/tty-" + name
-    ttbl.config.target_add(
-        ttbl.tt.grub2elf(name, power_controller, usb_drive_serial,
-                         usbrly08b_serial, usbrly08b_bank,
-                         serial_port,
-                         boot_coercer = minnowboard_EFI_boot_grub_pc()),
-        tags = {
-            'bsp_models': { 'x86': None },
-            'bsps': {
-                'x86': dict(zephyr_board = 'minnowboard',
-                            zephyr_kernelname = 'zephyr.strip',
-                            console = "")
-            },
-        },
-        target_type = "minnowboard-max")
-
 
 
 def mv_add(name = None,
@@ -1524,6 +1181,7 @@ def mv_add(name = None,
        described :ref:`here <fw_update_d2000>`).
 
     """
+    raise NotImplementedError("Needs porting to new openocd code in branch openocd")
     if serial_port == None:
         serial_port = "/dev/tty-" + name
 
@@ -1695,6 +1353,7 @@ def nios2_max10_add(name,
            SYMLINK += "tty-max10-46"
 
     """
+    raise NotImplementedError("Needs porting to new openocd code in branch openocd")
     if serial_port == None:
         serial_port = "/dev/tty-" + name
 
@@ -1810,6 +1469,7 @@ def nrf5x_add(name,
        ``/dev/tty-TARGETNAME``. Follow :ref:`these instructions
        <usb_tty_serial>` using the boards' *serial number*.
     """
+    raise NotImplementedError("Needs porting to new openocd code in branch openocd")
     assert isinstance(family, basestring) \
         and family in [ "nrf51_blenano",
                         "nrf51_pca10028",
@@ -1982,6 +1642,7 @@ def quark_c1000_add(name = None,
 
 
     """
+    raise NotImplementedError("Needs porting to new openocd code in branch openocd")
 #
 # FIXME: re-add once verified to work
 #
@@ -2398,6 +2059,7 @@ def sam_xplained_add(name = None,
        <usb_tty_serial>` using the board's *serial number*.
 
     """
+    raise NotImplementedError("Needs porting to new openocd code in branch openocd")
     if serial_port == None:
         serial_port = "/dev/tty-" + name
 
@@ -2516,6 +2178,7 @@ def simics_zephyr_add(name, simics_cmds = simics_zephyr_cmds):
         SIMICS_BASE_PACKAGE=/opt/simics/5.0/simics-5.0.136
 
     """
+    raise NotImplementedError("Needs porting to new interface style")
     ttbl.config.target_add(
         ttbl.tt.simics(name, simics_cmds = simics_cmds),
         tags = dict(
@@ -2705,36 +2368,57 @@ def stm32_add(name = None,
         # this comes from conf_00_lib_mcu_stm32.stm32_models, which is
         # read before we use this function
         zephyr_board = stm32_models.get(model, {}).get('zephyr', model)
-    flasher = ttbl.flasher.openocd_c(model, serial_number,
-                                     openocd_path, openocd_scripts, debug)
-    pc_board = ttbl.pc_ykush.ykush(ykush_serial, ykush_port_board)
+
+    target = ttbl.test_target(name)
+    openocd_pc = ttbl.openocd.pc(serial_number, model, debug,
+                                 openocd_path, openocd_scripts)
+    serial0_pc = ttbl.console.serial_pc(serial_port)
+
+    power_rail = []
+    if ykush_serial and ykush_port_board:
+        power_rail.append((
+            "%s/%s main power" % (ykush_serial, ykush_port_board),
+            ttbl.pc_ykush.ykush(ykush_serial, ykush_port_board)
+        ))
+    elif ykush_serial == None and ykush_port_board == None:
+        pass
+    else:
+        raise ValueError(
+            "ykush_serial and ykush_port_board have to be"
+            " both specified or both omitted")
+
+    power_rail += [
+        (
+            "%s USB device present" % serial_number,
+            ttbl.pc.delay_til_usb_device(serial_number,
+                                         poll_period = .2, timeout = 5)
+        ),
+        (			# delay until serial port comes up
+            "%s TTY present" % serial_port,
+            ttbl.pc.delay_til_file_appears(serial_port,
+                                           poll_period = .2, timeout = 5)
+        ),
+        ( "serial0", serial0_pc ),
+        ( "OpenOCD", openocd_pc ),
+    ]
+
+    target.interface_add("power", ttbl.power.interface(*power_rail))
+
+    target.interface_add("console", ttbl.console.interface(**{
+        "serial0": serial0_pc
+    }))
+
+    target.interface_add("images", ttbl.images.interface(**{
+        "kernel-arm": openocd_pc,
+        "kernel": "kernel-arm",
+    }))
+
+    target.interface_add("debug", ttbl.debug.interface(**{
+        "arm": openocd_pc,
+    }))
 
     ttbl.config.target_add(
-        ttbl.tt.tt_flasher(
-            name,
-            serial_ports = [
-                "pc",
-                dict(port = serial_port, baudrate = 115200)
-            ],
-            flasher = flasher,
-            power_control = [
-                pc_board,		# power switch for the board
-                # delay until device comes up
-                ttbl.pc.delay_til_usb_device(
-                    serial_number,
-                    poll_period = 1,
-                    timeout = 30,
-                    action = pc_board.power_cycle_raw,
-                    # must be a sequence!
-                    action_args = (4,)
-                ),
-                ttbl.pc.delay_til_file_appears(	# Serial port comes up
-                    serial_port, poll_period = 1, timeout = 25,
-                ),
-                ttbl.cm_serial.pc(),	# Connect serial ports
-                flasher,            	# Start / stop OpenOCD
-            ]
-        ),
+        target,
         tags = {
             'bsp_models' : { 'arm': None },
             'bsps' : {
@@ -2749,9 +2433,6 @@ def stm32_add(name = None,
             'power_cycle_wait': 0.5,
         },
         target_type = model)
-    # We still don't have the nucleos fully supported
-    ttbl.config.targets[name].disable('')
-
 
 
 def tinytile_add(name,
@@ -2912,8 +2593,9 @@ def tinytile_add(name,
 
     target.interface_add("images",
                          ttbl.images.interface(**{
-                             "kernel": ttbl.images.bossac_c(),
-                             "kernel-arm": "kernel"
+                             "kernel": ttbl.images.dfu_c(),
+                             "kernel-x86": "kernel"
+                             "kernel-arc": "kernel"
                          }))
 
     ttbl.config.target_add(
