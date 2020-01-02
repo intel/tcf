@@ -78,28 +78,14 @@ class interface(ttbl.tt_interface):
     device and host are targets. This is so that we can make sure
     they are owned by someone before plugging, as it can alter state.
 
-    :param ttbl.things.impl_c THINGNAME: multiple list of thing names
-      and their implementation; THINGNAME has to be the name of a
-      target in this server
-
-    >>> ttbl.config.target_add(
-    >>>     ttbl.test_target("drive_34"), 
-    >>>     tags = { },
-    >>>     target_type = "usb_disk")
-    >>> 
-    >>> ttbl.config.targets['qu04a'].interface_add(
-    >>>     "things",
-    >>>     ttbl.things.interface(
-    >>>         drive_34 = ttbl.tt_qemu2.plugger(
-    >>>             "drive_34", driver = "usb-host", hostbus = 1, hostaddr = 67),
-    >>>         usb_disk = "drive_34",	# alias for a101_04
-    >>>     )
-    >>> )
-
+    For the specificatio of *impls* and *kwimpls*, see
+    :func:`ttbl.tt_interface.impls_set`, taking into account all
+    implementations need to be objects derived from
+    :class:`ttbl.things.impl_c`.
     """
-    def __init__(self, **kwimpls):
+    def __init__(self, *impls, **kwimpls):
         ttbl.tt_interface.__init__(self)
-        self.impls_set([], kwimpls, impl_c)
+        self.impls_set(impls, kwimpls, impl_c)
 
     def _target_setup(self, target):
         # Called when the interface is added to a target to initialize

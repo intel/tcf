@@ -451,18 +451,60 @@ class tt_interface(object):
 
     def impls_set(self, impls, kwimpls, cls):
         """
-        Record in *self.impls* a given set of implementations
+        Record in *self.impls* a given set of implementations (or components)
 
         This is only used for interfaces that support multiple components.
 
         :param list impls: list of objects of type *cls* or of tuples
           *(NAME, IMPL)* to serve as implementations for the
           interface; when non named, they will be called *componentN*
+
         :param dict impls: dictionary keyed by name of objects of type
-          *cls* to serve as implementatons for the itnerface.
+          *cls* to serve as implementatons for the interface.
+
         :param type cls: base class for the implementations (eg:
           :class:`ttbl.console.impl_c`)
 
+        This is meant to be used straight in the constructor of a
+        derivative of :class:`ttbl.tt_interface` such as:
+
+        >>> class my_base_impl_c(object):
+        >>>     ...
+        >>> class my_interface(ttbl.tt_interface):
+        >>>     def __init__(*impls, **kwimpls):
+        >>>         ttbl.tt_interface(self)
+        >>>         self.impls_set(impls, kwimplws, my_base_implc_c)
+        
+        and it allows to specify the interface implementations in
+        multiple ways:
+
+        - a sorted list of implementations (which will be given generic
+          component names such as *component0*, *component1*):
+
+          >>> target.interface_add("my", my_interface(
+          >>>     an_impl(args),
+          >>>     another_impl(args),
+          >>> ))
+
+        - *COMPONENTNAME = IMPLEMENTATION* (python initializers),
+          which allows to name the components (and keep the order
+          in Python 3 only):
+
+          >>> target.interface_add("my", my_interface(
+          >>>     something = an_impl(args),
+          >>>     someotherthing = another_impl(args),
+          >>> ))
+
+        - a list of tuples *( COMPONENTNAME, IMPLEMENTATION )*, which
+          allow to name the implementations keeping the order (in Python 2):
+
+          >>> target.interface_add("my", my_interface(
+          >>>     ( something, an_impl(args) ),
+          >>>     ( someotherthing, another_impl(args) ),
+          >>> ))
+        
+        all forms can be combined; as well, if the implementation is
+        the name of an existing component, then it becomes an alias.
         """
         assert isinstance(impls, collections.Iterable)
         assert isinstance(kwimpls, dict), \
