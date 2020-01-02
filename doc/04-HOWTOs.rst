@@ -331,7 +331,7 @@ Find more:
 
 - `tcf --help | grep debug-`
 
-- the :class:`debug extension API <tcfl.target_ext_debug.debug>` to
+- the :class:`debug extension API <tcfl.target_ext_debug.extension>` to
   :class:`target objects <tcfl.tc.target_c>` for use inside Python testcases
 
 - the :class:`*ttbd*\'s Debug interface <ttbl.tt_debug_mixin>`
