@@ -32,7 +32,6 @@ commonl.requirements.verify_flask_version()
 # https://blog.al4.co.nz/2016/01/streaming-json-with-flask/
 
 import base64
-import ttbl.cm_logger
 import codecs
 import contextlib
 import cPickle
@@ -77,11 +76,6 @@ import urlparse
 import glob
 
 #import prctl
-
-# Run the encoding on UTF-8; sometimes when started in background
-# Python gets confused about what is the default encoding.
-reload(sys)	# need this reload to get setdefaultencoding()
-sys.setdefaultencoding('utf8')
 
 try:
     import sdnotify
@@ -172,8 +166,7 @@ def _target_id_to_dict(target_id):
     r['disabled'] = target.fsdb.get('disabled') == "True"
     # Use the cached version, otherwise it takes too long
     # this is "On" if powered, Off otherwise
-    if hasattr(target, 'power') \
-       or isinstance(target, ttbl.tt_power_control_mixin):	# COMPAT
+    if hasattr(target, 'power'):
         r['powered'] = target.fsdb.get('powered') != None
     r.update(target.tags)
     # Make the interfaces list a space separated string
@@ -533,122 +526,6 @@ def _property_get(target_id):
         'diagnostics': iostr.getvalue()
     })
 
-# FIXME: this is a pattern, use a decorator?
-@app.route(API_PREFIX + 'targets/<string:target_id>/power_on', methods = ['PUT'])
-@flask_login.login_required
-def _target_power_on(target_id):
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    ticket = flask.request.form.get('ticket', "")
-    if not isinstance(target, ttbl.tt_power_control_mixin):
-        return flask.abort(400, "%s: target does not implement power control interface" % target_id)
-    # See FIXME at file reader about diagnostics
-    iostr = StringIO.StringIO()
-    iostr_wrapper = codecs.StreamReaderWriter(
-        iostr, codec_utf8.streamreader, codec_utf8.streamwriter, errors = 'replace')
-    try:
-        with log_to_str_too(target.log, iostr_wrapper):
-            target.power_on(who_make(ticket))
-        target.timestamp()	# If this works, it is acquired and locked
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({ 'diagnostics': iostr.getvalue() })
-
-@app.route(API_PREFIX + 'targets/<string:target_id>/power_off', methods = ['PUT'])
-@flask_login.login_required
-def _target_power_off(target_id):
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    ticket = flask.request.form.get('ticket', "")
-    if not isinstance(target, ttbl.tt_power_control_mixin):
-        return flask.abort(400, "%s: target does not implement the "
-                           "power control interface" % target_id)
-    # See FIXME at file reader about diagnostics
-    iostr = StringIO.StringIO()
-    iostr_wrapper = codecs.StreamReaderWriter(
-        iostr, codec_utf8.streamreader, codec_utf8.streamwriter, errors = 'replace')
-    try:
-        with log_to_str_too(target.log, iostr_wrapper):
-            target.power_off(who_make(ticket))
-        target.timestamp()	# If this works, it is acquired and locked
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({ 'diagnostics': iostr.getvalue() })
-
-@app.route(API_PREFIX + 'targets/<string:target_id>/reset',
-           methods = ['PUT'])
-@flask_login.login_required
-def _target_reset(target_id):
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    ticket = flask.request.form.get('ticket', "")
-    if not isinstance(target, ttbl.tt_power_control_mixin):
-        return flask.abort(400, "%s: target does not implement the "
-                           "power control interface" % target_id)
-    # See FIXME at file reader about diagnostics
-    iostr = StringIO.StringIO()
-    iostr_wrapper = codecs.StreamReaderWriter(
-        iostr, codec_utf8.streamreader, codec_utf8.streamwriter, errors = 'replace')
-    try:
-        with log_to_str_too(target.log, iostr_wrapper):
-            target.reset(who_make(ticket))
-        target.timestamp()	# If this works, it is acquired and locked
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({ 'diagnostics': iostr.getvalue() })
-
-@app.route(API_PREFIX + 'targets/<string:target_id>/power_cycle',
-           methods = ['PUT'])
-@flask_login.login_required
-def _target_power_cycle(target_id):
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    ticket = flask.request.form.get('ticket', "")
-    if 'wait' in flask.request.form:
-        wait = float(flask.request.form['wait'])
-    else:
-        wait = None
-    if not isinstance(target, ttbl.tt_power_control_mixin):
-        return flask.abort(400, "%s: target does not implement the "
-                           "power control interface" % target_id)
-    # See FIXME at file reader about diagnostics
-    iostr = StringIO.StringIO()
-    iostr_wrapper = codecs.StreamReaderWriter(
-        iostr, codec_utf8.streamreader, codec_utf8.streamwriter, errors = 'replace')
-    try:
-        with log_to_str_too(target.log, iostr_wrapper):
-            target.power_cycle(who_make(ticket), wait)
-        target.timestamp()	# If this works, it is acquired and locked
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({ 'diagnostics': iostr.getvalue() })
-
-@app.route(API_PREFIX + 'targets/<string:target_id>/power_get',
-           methods = ['GET'])
-@flask_login.login_required
-def _target_power_get(target_id):
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    if not isinstance(target, ttbl.tt_power_control_mixin):
-        return flask.abort(400, "%s: target does not implement the "
-                           "power control interface" % target_id)
-    try:
-        powered = target.power_get()
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({ 'powered': powered })
-
-
 def tb_file_local_path_get(username, filepath):
     """
     Verify the *image_name* is available in the target broker's
@@ -661,44 +538,6 @@ def tb_file_local_path_get(username, filepath):
         return None
     else:
         return local_filepath
-
-@app.route(API_PREFIX + 'targets/<string:target_id>/images_set',
-           methods = ['PUT'])
-@flask_login.login_required
-def _target_images_set(target_id):
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    ticket = flask.request.form.get('ticket', "")
-    if not isinstance(target, ttbl.test_target_images_mixin):
-        return flask.abort(400, "%s: target does not implement the "
-                           "image management interface" % target_id)
-    images = {}
-    ticket = ""
-    for t, n in flask.request.form.items():
-        if t == 'ticket':
-            # FIXME: this is heck dirty, reimplement this call's
-            # signature splitting args better
-            ticket = n
-            continue
-        l = tb_file_local_path_get(flask_login.current_user.get_id(), n)
-        if l == None:
-            return flask.abort(400, "%s: file does not exist in broker" % n)
-        images[t] = l
-    # See FIXME at file reader about diagnostics
-    iostr = StringIO.StringIO()
-    iostr_wrapper = codecs.StreamReaderWriter(
-        iostr, codec_utf8.streamreader, codec_utf8.streamwriter, errors = 'replace')
-    iostr_wrapper = codecs.StreamReaderWriter(
-        iostr, codec_utf8.streamreader, codec_utf8.streamwriter, errors = 'replace')
-    try:
-        with log_to_str_too(target.log, iostr_wrapper):
-            target.images_set(who_make(ticket), images)
-        target.timestamp()	# If this works, it is acquired and locked
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({ 'diagnostics': iostr.getvalue() })
 
 
 @app.route(API_PREFIX + 'targets/<string:target_id>/ip_tunnel',
@@ -794,81 +633,6 @@ def _target_interface(target_id, interface, call):
         return flask.Response(fd, direct_passthrough = True)
     else:
         return flask.jsonify(result)
-
-
-# FIXME: rewrite to pass the data in the body as a binary sequence
-# (like read does) to remove file size limitations. This will require
-# a protocol roll up or a new call.
-@app.route(API_PREFIX + 'targets/<string:target_id>/console/',
-           methods = ['GET'])
-@flask_login.login_required
-def _target_console_read(target_id, console = None):
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    ticket = flask.request.form.get('ticket', "")
-    if not isinstance(target, ttbl.test_target_console_mixin):
-        return flask.abort(400, "%s: target does not implement the "
-                           "console interface" % target_id)
-    console = flask.request.form.get('console', None)
-    if 'offset' in flask.request.form:
-        offset = int(flask.request.form['offset'])
-    else:
-        offset = 0
-    try:
-        g = target.console_read(who_make(ticket), console, offset)
-        if who_make(ticket) == target.owner_get():
-            # when this is the owner, this marks the target as active
-            target.timestamp()
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.Response(g, direct_passthrough = True)
-
-
-@app.route(API_PREFIX + 'targets/<string:target_id>/console_size',
-           methods = ['GET'])
-@flask_login.login_required
-def _target_console_size(target_id, console = None):
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    ticket = flask.request.form.get('ticket', "")
-    if not isinstance(target, ttbl.test_target_console_mixin):
-        return flask.abort(400, "%s: target does not implement the "
-                           "console interface" % target_id)
-    console = flask.request.form.get('console', None)
-    try:
-        byte_count = target.console_size(who_make(ticket), console)
-        if who_make(ticket) == target.owner_get():
-            # when this is the owner, this marks the target as active
-            target.timestamp()
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify(dict(byte_count = byte_count))
-
-
-@app.route(API_PREFIX + 'targets/<string:target_id>/console/',
-           methods = ['POST'])
-@flask_login.login_required
-def _target_console_write(target_id, console = None):
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    ticket = flask.request.form.get('ticket', "")
-    if not isinstance(target, ttbl.test_target_console_mixin):
-        return flask.abort(400, "%s: target does not implement the "
-                           "console interface" % target_id)
-    console = flask.request.form.get('console', None)
-    data = flask.request.form.get('data')
-    try:
-        target.console_write(who_make(ticket), data, console)
-        target.timestamp()	# If this works, it is acquired and locked
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({})
 
 
 # catch any '../something', 'something/../something', "something/.."
@@ -1511,7 +1275,6 @@ if __name__ == "__main__":
             raise
         # It is already a session leader...can ignore
 
-    ttbl.cm_logger.setup()
     # Cleanup process...now this is quite very ugly...see _cleanup()
     cleanup_process = multiprocessing.Process(target = cleanup_process_fn)
     cleanup_process.daemon = True

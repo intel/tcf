@@ -22,7 +22,6 @@ import time
 import commonl
 import ttbl
 import ttbl.debug
-import ttbl.flasher
 import ttbl.images
 import ttbl.openocd
 import ttbl.pc
@@ -1300,7 +1299,7 @@ def nios2_max10_add(name,
     :param str serial_port: name of the serial port  [defaults to
       /dev/tty-TARGETNAME]
 
-    :param ttbl.tt_power_control_impl pc: power controller to switch
+    :param ttbl.power.impl_c pc: power controller to switch
       on/off the MAX10 board.
 
     **Bill of materials**
@@ -2594,7 +2593,7 @@ def tinytile_add(name,
     target.interface_add("images",
                          ttbl.images.interface(**{
                              "kernel": ttbl.images.dfu_c(),
-                             "kernel-x86": "kernel"
+                             "kernel-x86": "kernel",
                              "kernel-arc": "kernel"
                          }))
 

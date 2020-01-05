@@ -151,7 +151,7 @@ def _tag_get_from_ic_target(kws, tag, ic, target, default = ""):
 tftp_prefix = "ttbd" + ttbl.config.instance_suffix
 
 # FIXME: use daemon_pc
-class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):
+class pci(ttbl.power.impl_c):
 
     class error_e(Exception):
         pass
@@ -194,7 +194,6 @@ class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):
                  ip_mode = 4):
         assert ip_mode in (4, 6)
         ttbl.power.impl_c.__init__(self)
-        ttbl.tt_power_control_impl.__init__(self)
         self.allow_unmapped = allow_unmapped
         if mac_ip_map == None:
             self._mac_ip_map = {}
@@ -541,16 +540,6 @@ host %(hostname)s {
             return True
         else:
             return False
-
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
-
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        return self.get(target, "n/a")
 
 
 #: List of string with Linux kernel command options to be passed by

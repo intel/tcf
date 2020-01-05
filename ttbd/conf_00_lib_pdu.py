@@ -15,6 +15,15 @@ Configuration API for PDUs and other power switching equipment
 import logging
 import urlparse
 
+def target_pdu_socket_add(name, pc, tags = None, power = True):
+    if tags == None:
+        tags = {}
+    target = ttbl.test_target(name, _tags = tags)
+    target.interface_add("power", ttbl.power.interface(pc))
+    if power:
+        # FIXME: untested
+        target.power.put_on(target, ttbl.who_daemon(), {}, None)
+    return target
 
 def apc_pdu_add(name, powered_on_start = None, hostname = None):
     """Add targets to control the individual sockets of an APC PDU power
@@ -246,13 +255,14 @@ def dlwps7_add(hostname, powered_on_start = None,
     for i in range(1, 9):
         name = "%s-%d" % (hostname, i)
         pc_url = "http://%s:%s@%s/%d" % (user, password, hostname, i)
-        ttbl.config.target_add(
-            ttbl.tt.tt_power(name, ttbl.pc.dlwps7(pc_url),
-                             power = powered_on_start),
+        target = target_pdu_socket_add(
+            name,
+            ttbl.pc.dlwps7(pc_url), 
+            power = powered_on_start,
             # Always keep them on, unless we decide otherwise--we need
             # them to control other components
             tags = dict(idle_poweroff = 0))
-        ttbl.config.targets[name].disable("")
+        target.disable("")
 
 
 try:
@@ -321,15 +331,14 @@ try:
             targetname = _url.hostname.split('.')[0]
         for outlet in range(1, outlets + 1):
             name = "%s-%d" % (targetname, outlet),
-            ttbl.config.target_add(
+            target = target_pdu_socket_add(
                 name,
-                ttbl.tt.tt_power(
-                    name, ttbl.raritan_emx.pci(url, outlet, https_verify),
-                    power = powered_on_start),
+                ttbl.raritan_emx.pci(url, outlet, https_verify),
+                power = powered_on_start,
                 # Always keep them on, unless we decide otherwise--we need
                 # them to control other components
                 tags = dict(idle_poweroff = 0))
-            ttbl.config.targets[name].disable("")
+            target.disable("")
 
 except ImportError as e:
     logging.exception("Can't use raritan PDUs, missing libraries: %s", e)
@@ -411,13 +420,14 @@ def usbrly08b_targets_add(serial_number, target_name_prefix = None,
         target_name_prefix = "usbrly08b-" + serial_number
     for relay in range(1, 9):
         name = "%s-%02d" % (target_name_prefix, relay)
-        ttbl.config.target_add(
-            ttbl.tt.tt_power(name,
-                             ttbl.usbrly08b.pc(serial_number, relay),
-                             power = power),
+        target = target_pdu_socket_add(
+            name,
+            ttbl.usbrly08b.pc(serial_number, relay),
+            power = powered_on_start,
             # Always keep them on, unless we decide otherwise--we need
             # them to control other components
             tags = dict(idle_poweroff = 0))
+        target.disable("")
 
 
 def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):

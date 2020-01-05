@@ -16,7 +16,7 @@ import raritan
 import raritan.rpc
 import raritan.rpc.pdumodel
 
-class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl): # pylint: disable = abstract-method
+class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
     """
     Power control interface for the Raritan EMX family of PDUs (eg: PX3-\*)
 
@@ -117,7 +117,7 @@ class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl): # pylint: disable = ab
         self.outlet_number = outlet_number - 1
         self.https_verify = https_verify
         self._outlet_rpc = None
-        ttbl.tt_power_control_impl.__init__(self)
+
 
     @property
     def _outlet(self):
@@ -162,13 +162,3 @@ class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl): # pylint: disable = ab
         if state == 0:
             return False
         return True
-
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
-
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        return self.get(target, "n/a")

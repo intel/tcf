@@ -463,6 +463,7 @@ class rest_target_broker(object):
                               data = { 'ticket': ticket })
         return r['tunnels']
 
+    # COMPAT
     def rest_tb_target_power_on(self, rt, ticket = ''):
         self.send_request(
             "PUT", "targets/%s/power_on" % rt['id'],
@@ -489,22 +490,6 @@ class rest_target_broker(object):
         r = self.send_request(
             "GET", "targets/%s/power_get" % rt['id'])
         return r['powered']
-
-    def rest_tb_target_images_set(self, rt, images, ticket = ''): # COMPAT
-        """
-        Write/configure images to the targets (depending on the
-        target)
-
-        :param images: Dictionary of image types and filenames, like in
-          :meth:`ttbl.test_target_images_mixin.images_set`.
-        :type images: dict
-        :raises: Exception in case of errors
-        """
-        data = { 'ticket': ticket }
-        data.update(images)
-        self.send_request(
-            "PUT", "targets/%s/images_set" % rt['id'],
-            data = data)
 
     def rest_tb_file_upload(self, remote_filename, local_filename):
         with open(local_filename, 'rb') as f:

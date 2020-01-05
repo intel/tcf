@@ -38,11 +38,7 @@ class extension(tc.target_extension_c):
     """
 
     def __init__(self, target):
-        if 'images' in target.rt.get('interfaces', []):
-            self.compat = False
-        elif 'test_target_images_mixin' in target.rt.get('interfaces', []):
-            self.compat = True
-        else:
+        if 'images' not in target.rt.get('interfaces', []):
             raise self.unneeded
 
     #: When a deployment fails, how many times can we retry before
@@ -56,9 +52,6 @@ class extension(tc.target_extension_c):
         """
         Return a list of image types that can be flashed in this target
         """
-        if self.compat:
-            raise RuntimeError("target does not support new images interface")
-
         r = self.target.ttbd_iface_call("images", "list", method = "GET")
         return r['result']
 
@@ -104,9 +97,6 @@ class extension(tc.target_extension_c):
             raise AssertionError(
                 "images has to be a dictionary IMAGETYPE:IMAGEFILE; got %s" \
                 % type(images))
-        if self.compat:
-            raise RuntimeError("target does not support new images"
-                               " interface, use set() or upload_set()")
 
         target = self.target
         images_str = " ".join("%s:%s" % (k, v) for k, v in images.items())
@@ -141,73 +131,6 @@ class extension(tc.target_extension_c):
         target.report_info("flashed:" + images_str, dlevel = 1)
 
 
-    def upload_set(self, images, wait = None, retries = None):	# COMPAT
-        """
-        DEPRECATED: use :meth:`flash`
-        """
-        if self.compat:
-            self.target.report_info(
-                "using deprecated target.images.upload_set()", level = 1)
-            return self.flash(images, upload = True)
-
-        if wait == None:
-            wait = self.wait
-        if retries == None:
-            retries = self.retries
-
-        target = self.target
-        testcase = target.testcase
-
-        images_str = " ".join([ i[0] + ":" + i[1] for i in images ])
-        retval = None
-        tries = 0
-
-        target.report_info("deploying", dlevel = 1)
-        for tries in range(retries):
-            remote_images = ttb_client.rest_tb_target_images_upload(
-                target.rtb, images)
-            with msgid_c("#%d" % (tries + 1)):
-                try:
-                    target.report_info("deploying (try %d/%d) %s"
-                                       % (tries + 1, retries, images_str),
-                                       dlevel = 1)
-                    target.rtb.rest_tb_target_images_set(
-                        target.rt, remote_images, ticket = testcase.ticket)
-                    retval = tc.result_c(1, 0, 0, 0, 0)
-                    target.report_pass("deployed (try %d/%d) %s"
-                                       % (tries + 1, retries, images_str))
-                    break
-                except requests.exceptions.HTTPError as e:
-                    if wait > 0:
-                        if getattr(target, "power", None):
-                            target.report_blck(
-                                "deploying (try %d/%d) failed; "
-                                "recovery: power cycling [with %ds break]"
-                                % (tries + 1, retries, wait),
-                                { "deploy failure error": e.message })
-                            target.power.cycle(wait = wait)
-                        else:
-                            target.report_blck(
-                                "deploying (try %d/%d) failed; "
-                                "recovery: waiting %ds break"
-                                % (tries + 1, retries, wait),
-                                { "deploy failure error": e.message })
-                            time.sleep(wait)
-                        wait += wait
-                        target.report_info(
-                            "deploy failure (try %d/%d) "
-                            "recovery: power cycled" % (tries + 1, retries))
-                    else:
-                        target.report_blck(
-                            "deploying (try %d/%d) failed; retrying"
-                            % (tries + 1, retries),
-                            { "deploy failure error": e.message })
-                    retval = tc.result_c(0, 0, 0, 1, 0)
-
-        target.report_tweet("deploy (%d tries)" % (tries + 1), retval)
-        return retval.summary()
-
-
 def _cmdline_images_list(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "images")
@@ -229,16 +152,6 @@ def _cmdline_images_flash(args):
         target = tc.target_c.create_from_cmdline_args(args, iface = "images")
         target.images.flash(_image_list_to_dict(args.images),
                             upload = args.upload)
-
-def _cmdline_images_upload_set(args):	# COMPAT
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "images")
-        target.images.upload_set(_image_list_to_dict(args.images))
-
-def _cmdline_images_set(args):	# COMPAT
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "images")
-        target.images.flash(_image_list_to_dict(args.images), upload = False)
 
 
 def _cmdline_setup(arg_subparser):
@@ -264,24 +177,3 @@ def _cmdline_setup(arg_subparser):
                     action = "store_true", default = False,
                     help = "upload FILENAME first and then flash")
     ap.set_defaults(func = _cmdline_images_flash)
-
-    # COMPAT
-    ap = arg_subparser.add_parser(
-        "images-upload-set",
-        help = "Upload and set images in the target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("images", metavar = "TYPE:LOCALFILENAME",
-                    action = "store", default = None, nargs = '+',
-                    help = "Each LOCALFILENAME is uploaded to the broker and "
-                    "then set as an image of the given TYPE")
-    ap.set_defaults(func = _cmdline_images_upload_set)
-
-    ap = arg_subparser.add_parser("images-set",
-                                  help = "Set images in the target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("images", metavar = "TYPE:FILENAME",
-                    action = "store", default = None, nargs = '+',
-                    help = "List of images to set FIXME")
-    ap.set_defaults(func = _cmdline_images_set)

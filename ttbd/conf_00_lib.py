@@ -18,18 +18,15 @@ import time
 import commonl
 import ttbl
 import ttbl.capture
-import ttbl.cm_serial
 import ttbl.dhcp
-import ttbl.flasher
 import ttbl.pc
 import ttbl.pc_ykush
 import ttbl.rsync
 import ttbl.socat
-import ttbl.tt
 import ttbl.usbrly08b
 
 
-class vlan_pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):	# COMPAT
+class vlan_pci(ttbl.power.impl_c):
     """Power controller to implement networks on the server side.
 
     Supports:
@@ -250,7 +247,6 @@ class vlan_pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):	# COMPAT
 
     """
     def __init__(self):
-        ttbl.tt_power_control_impl.__init__(self)	# COMPAT
         ttbl.power.impl_c.__init__(self)
 
     @staticmethod
@@ -462,16 +458,6 @@ class vlan_pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):	# COMPAT
         # return None, as we can't ensure the config is properly set
         # so it has to be reset
         return None
-
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
-
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        return self.get(target, "n/a")
 
 
 # FIXME: replace tcpdump with a interconnect capture interface

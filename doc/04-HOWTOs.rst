@@ -306,9 +306,9 @@ How can I debug a target?
 -------------------------
 
 TCF provides for means to connect remote debuggers to targets that
-support them; if the target supports the
-:py:class:`ttbl.tt_debug_mixin` (which you can find with `tcf list -vv
-TARGETNAME | grep interfaces`).
+support them; if the target supports the :mod:`debug <ttbl.debug>`
+interface (which you can find with `tcf list -vv TARGETNAME | grep
+interfaces`).
 
 How it is done and what are the capabilities depends on the target,
 but in general, assuming you have a target with an image deployed::

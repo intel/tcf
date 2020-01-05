@@ -28,57 +28,8 @@ import ttbl.power
 # FIXME: move all these to ttbl.power once the old implementation is
 #        all removed
 # FIXME: replace with ttbl.power.fake()
-# COMPAT: old interface, ttbl.tt_power_control_impl
-class nil(ttbl.tt_power_control_impl):
-    """
-    """
-    def __init__(self, id):
-        ttbl.tt_power_control_impl.__init__(self)
-        self.id = id
 
-    def power_on_do(self, target):
-        target.fsdb.set('pc-nil-%s' % self.id, 'On')
-
-    def power_off_do(self, target):
-        target.fsdb.set('pc-nil-%s' % self.id, None)
-
-    def power_get_do(self, target):
-        return target.fsdb.get('pc-nil-%s' % self.id) != None
-
-# COMPAT: old interface, ttbl.tt_power_control_impl
-# FIXME: remove, unused, impractical
-class manual(ttbl.tt_power_control_impl):
-    """
-    Implement a manual power control interface that prompts the user
-    to do the stuff.
-
-    """
-    def __init__(self, id):
-        ttbl.tt_power_control_impl.__init__(self)
-        self.id = id
-        self.log = logging.getLogger("target-" +  id)
-        self.log.error("USER: ensure power is off to target %s; "
-                       "press [Ctrl-D] when done", self.id)
-        sys.stdin.read()
-
-    def power_on_do(self, target):
-        self.log.error("USER: power on target %s; press [Ctrl-D] when done",
-                       self.id)
-        sys.stdin.read()
-        target.fsdb.set('powered-manual-%s' % self.id, 'On')
-
-    def power_off_do(self, target):
-        self.log.error("USER: power off target %s; press [Ctrl-D] when done",
-                       self.id)
-        sys.stdin.read()
-        target.fsdb.set('powered-manual-%s' % self.id, None)
-
-    def power_get_do(self, target):
-        # Tracks the power state of the whole target
-        return target.fsdb.get('powered-manual-%s' % self.id) != None
-
-
-class delay(ttbl.tt_power_control_impl, ttbl.power.impl_c):
+class delay(ttbl.power.impl_c):
     """
     Introduce artificial delays when calling on/off/get to allow
     targets to settle.
@@ -88,7 +39,6 @@ class delay(ttbl.tt_power_control_impl, ttbl.power.impl_c):
     """
     def __init__(self, on = 0, off = 0):
         ttbl.power.impl_c.__init__(self)
-        ttbl.tt_power_control_impl.__init__(self)
         self.on_delay = float(on)
         self.off_delay = float(off)
 
@@ -104,20 +54,8 @@ class delay(ttbl.tt_power_control_impl, ttbl.power.impl_c):
         # this reports None because this is is just a delay loop
         return None
 
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
 
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        # this reports None because this is is just a delay loop
-        return None
-
-
-
-class delay_til_file_gone(ttbl.power.impl_c, ttbl.tt_power_control_impl):
+class delay_til_file_gone(ttbl.power.impl_c):
     """
     Delay until a file dissapears.
 
@@ -127,7 +65,6 @@ class delay_til_file_gone(ttbl.power.impl_c, ttbl.tt_power_control_impl):
     def __init__(self, poll_period = 0.25, timeout = 25,
                  on = None, off = None, get = None):
         ttbl.power.impl_c.__init__(self)
-        ttbl.tt_power_control_impl.__init__(self)
         self.on_file = on
         self.off_file = off
         self.get_file = get
@@ -173,19 +110,8 @@ class delay_til_file_gone(ttbl.power.impl_c, ttbl.tt_power_control_impl):
     def get(self, target, component):
         return not os.path.exists(self.filename)
 
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
 
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        # this reports None because this is is just a delay loop
-        return None
-
-
-class delay_til_file_appears(ttbl.power.impl_c, ttbl.tt_power_control_impl):
+class delay_til_file_appears(ttbl.power.impl_c):
     """
     Delay until a file appears.
 
@@ -196,7 +122,6 @@ class delay_til_file_appears(ttbl.power.impl_c, ttbl.tt_power_control_impl):
                  poll_period = 0.25, timeout = 25,
                  action = None, action_args = None):
         ttbl.power.impl_c.__init__(self)
-        ttbl.tt_power_control_impl.__init__(self)
         self.filename = filename
         self.poll_period = poll_period
         self.timeout = timeout
@@ -243,20 +168,8 @@ class delay_til_file_appears(ttbl.power.impl_c, ttbl.tt_power_control_impl):
     def get(self, target, component):
         return os.path.exists(self.filename)
 
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
 
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        # this reports None because this is is just a delay loop
-        return None
-
-
-
-class delay_til_usb_device(ttbl.power.impl_c, ttbl.tt_power_control_impl):
+class delay_til_usb_device(ttbl.power.impl_c):
     """
     Delay power-on until a USB device dis/appears.
 
@@ -281,7 +194,6 @@ class delay_til_usb_device(ttbl.power.impl_c, ttbl.tt_power_control_impl):
     def __init__(self, serial, when_powering_on = True, want_connected = True,
                  poll_period = 0.25, timeout = 25,
                  action = None, action_args = None):
-        ttbl.tt_power_control_impl.__init__(self)
         ttbl.power.impl_c.__init__(self)
         self.serial = serial
         self.when_powering_on = when_powering_on
@@ -450,20 +362,8 @@ class delay_til_usb_device(ttbl.power.impl_c, ttbl.tt_power_control_impl):
                 % (component, self.serial, e))
             return False
 
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
 
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        # this reports None because this is is just a delay loop
-        return None
-
-
-
-class dlwps7(ttbl.power.impl_c, ttbl.tt_power_control_impl):
+class dlwps7(ttbl.power.impl_c):
     """
     Implement a power control interface to the Digital Logger's Web
     Power Switch 7
@@ -492,7 +392,6 @@ class dlwps7(ttbl.power.impl_c, ttbl.tt_power_control_impl):
     driver fail.
     """
     def __init__(self, _url, reboot_wait_s = 0.5):
-        ttbl.tt_power_control_impl.__init__(self)
         ttbl.power.impl_c.__init__(self)
         assert isinstance(_url, basestring)
         assert isinstance(reboot_wait_s, (int, float))
@@ -550,26 +449,3 @@ class dlwps7(ttbl.power.impl_c, ttbl.tt_power_control_impl):
             return False
         else:
             return True
-
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
-
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        # this reports None because this is is just a delay loop
-        return None
-
-    def power_cycle_do(self, target, wait = 0):
-        if self.power_get_do(target):
-            r = requests.get(self.url + "/outlet?%d=OFF" % self.outlet)
-            commonl.request_response_maybe_raise(r)
-            if self.reboot_wait_s > 0 or wait > 0:
-                time.sleep(max(self.reboot_wait_s, wait))
-        r = requests.get(self.url + "/outlet?%d=ON" % self.outlet)
-        commonl.request_response_maybe_raise(r)
-        # Give it time to settle
-        time.sleep(self.reboot_wait_s)
-        self.power_get_do(target)

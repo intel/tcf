@@ -26,10 +26,7 @@ import ttbl.console
 
 import pyghmi.ipmi.command
 
-# FIXME: retry ops if the session has timeout/disconnectde, just redo it
-# we get  pyghmi.exc.IpmiException('Session no longer connected')
-
-class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):
+class pci(ttbl.power.impl_c):
     """
     Power controller to turn on/off a server via IPMI
 
@@ -43,38 +40,21 @@ class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):
     configure the power switching of a machine that also has a serial
     port would look like:
 
-    >>> ttbl.config.target_add(
-    >>>      ttbl.tt.tt_serial(
-    >>>          "machine1",
-    >>>          power_control = [
-    >>>              ttbl.cm_serial.pc(),
-    >>>              ttbl.ipmi.pci("bmc_admin:secret@server1.internal.net"),
-    >>>          ],
-    >>>          serial_ports = [
-    >>>              "pc",
-    >>>              { "port": "/dev/tty-machine1", "baudrate": 115200 },
-    >>>          ]),
-    >>>     tags = {
-    >>>         'linux': True,
-    >>>         'bsp_models': { 'x86_64': None },
-    >>>         'bsps': {
-    >>>             'x86_64': {
-    >>>                 'linux': True,
-    >>>                 'console': 'x86_64',
-    >>>             }
-    >>>         },
-    >>>     },
-    >>>     target_type = "Brand Model")
+    >>> ...
+    >>> target.interface_add("power", ttbl.power.interface(
+    >>>     ( "BMC", ttbl.ipmi.pci("bmc_admin:secret@server1.internal.net") ),
+    >>>     ...
+    >>> )
 
     .. warning:: putting BMCs on an open network is not a good idea;
                  it is recommended they are only exposed to an
                  :ref:`infrastructure network <separated_networks>`
 
     :params str hostname: *USER[:PASSWORD]@HOSTNAME* of where the IPMI BMC is
-      located
+      located; see :func:`commonl.password_get` for things *PASSWORD*
+      can be to obtain the password from service providers.
     """
     def __init__(self, hostname):
-        ttbl.tt_power_control_impl.__init__(self)
         ttbl.power.impl_c.__init__(self, paranoid = True)
         user, password, hostname = commonl.split_user_pwd_hostname(hostname)
         self.hostname = hostname
@@ -128,19 +108,7 @@ class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):
             self.bmc.set_bootdev("network")
 
 
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
-
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        # this reports None because this is is just a delay loop
-        return None
-
-
-class pci_ipmitool(ttbl.power.impl_c, ttbl.tt_power_control_impl):
+class pci_ipmitool(ttbl.power.impl_c):
     """
     Power controller to turn on/off a server via IPMI
 
@@ -149,7 +117,6 @@ class pci_ipmitool(ttbl.power.impl_c, ttbl.tt_power_control_impl):
 
     """
     def __init__(self, hostname):
-        ttbl.tt_power_control_impl.__init__(self)
         ttbl.power.impl_c.__init__(self, paranoid = True)
         user, password, hostname = commonl.split_user_pwd_hostname(hostname)
         self.hostname = hostname
@@ -219,17 +186,6 @@ class pci_ipmitool(ttbl.power.impl_c, ttbl.tt_power_control_impl):
             self._run(target, [ "chassis", "bootparam",
                                 "set", "bootflag", "force_disk" ])
 
-
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
-
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        # this reports None because this is is just a delay loop
-        return None
 
 class pos_mode_c(ttbl.power.impl_c):
     """

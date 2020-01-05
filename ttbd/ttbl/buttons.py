@@ -95,30 +95,26 @@ class interface(ttbl.tt_interface):
     and volume down button of a tablet to control power switching. In
     the case of most Android tablets, the power rail then becomes:
 
-    >>> ttbl.config.target_add(
-    >>>     ttbl.tt.tt_power("android_tablet", [
-    >>>         ttbl.buttons.pci_buttons_released(
-    >>>             [ "vol_up", "vol_down", "power" ]),
-    >>>         ttbl.buttons.pci_button_sequences(
-    >>>             sequence_off = [
-    >>>                 ( 'power', 'press' ),
-    >>>                 ( 'vol_down', 'press' ),
-    >>>                 ( 'resetting', 11 ),
-    >>>                 ( 'vol_down', 'release' ),
-    >>>                 ( 'power', 'release' ),
-    >>>             ],
-    >>>             sequence_on = [
-    >>>                 ( 'power', 'press' ),
-    >>>                 ( 'powering', 5 ),
-    >>>                 ( 'power', 'release' ),
-    >>>             ]
-    >>>         ),
-    >>>         ttbl.pc.delay_til_usb_device("SERIALNUMBER"),
-    >>>         ttbl.adb.pci(4036, target_serial_number = "SERIALNUMBER"),
-    >>>     ]),
-    >>>     tags = dict(idle_poweroff = 0),
-    >>>     target_type = "ANDROID TABLET'S TYPE"
-    >>> )
+    >>> target.interface_add("power", ttbl.power.interface(
+    >>>     ttbl.buttons.pci_buttons_released(
+    >>>         [ "vol_up", "vol_down", "power" ]),
+    >>>     ttbl.buttons.pci_button_sequences(
+    >>>         sequence_off = [
+    >>>             ( 'power', 'press' ),
+    >>>             ( 'vol_down', 'press' ),
+    >>>             ( 'resetting', 11 ),
+    >>>             ( 'vol_down', 'release' ),
+    >>>             ( 'power', 'release' ),
+    >>>         ],
+    >>>         sequence_on = [
+    >>>             ( 'power', 'press' ),
+    >>>             ( 'powering', 5 ),
+    >>>             ( 'power', 'release' ),
+    >>>         ]
+    >>>     ),
+    >>>     ttbl.pc.delay_til_usb_device("SERIALNUMBER"),
+    >>>     ttbl.adb.pci(4036, target_serial_number = "SERIALNUMBER"),
+    >>> ))
     >>> 
     >>> ttbl.config.targets['android_tablet'].interface_add(
     >>>     "buttons",
@@ -211,14 +207,13 @@ def _check_iface(target):
         raise RuntimeError("%s: target has no buttons interface" % target.id)
 
 
-class button_click_pc(ttbl.power.impl_c, ttbl.tt_power_control_impl):
+class button_click_pc(ttbl.power.impl_c):
     """
     Power control implementation that clicks a button as a step to
     power on or off something on a target.
     """
     def __init__(self, button, time_on = 5, time_off = 20):
         ttbl.power.impl_c.__init__(self)
-        ttbl.tt_power_control_impl.__init__(self)	# COMPAT
         assert isinstance(button, basestring)
         self.button = button
         self.time_on = time_on
@@ -246,25 +241,14 @@ class button_click_pc(ttbl.power.impl_c, ttbl.tt_power_control_impl):
         # no real press status, so can't tell
         return None
 
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
 
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        return self.get(target, "n/a")
-
-
-class button_sequence_pc(ttbl.power.impl_c, ttbl.tt_power_control_impl):
+class button_sequence_pc(ttbl.power.impl_c):
     """
     Power control implementation that executest a button sequence on
     power on, another on power off.
     """
     def __init__(self, sequence_on = None, sequence_off = None):
         ttbl.power.impl_c.__init__(self)
-        ttbl.tt_power_control_impl.__init__(self)	# COMPAT
         self.sequence_on = sequence_on
         self.sequence_off = sequence_off
 
@@ -282,18 +266,8 @@ class button_sequence_pc(ttbl.power.impl_c, ttbl.tt_power_control_impl):
         # no real press status, so can't tell
         return None
 
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
-
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        return self.get(target, "n/a")
-
     
-class buttons_released_pc(ttbl.power.impl_c, ttbl.tt_power_control_impl):
+class buttons_released_pc(ttbl.power.impl_c):
     """
     Power control implementation that ensures a list of buttons
     are released (not pressed) before powering on a target.
@@ -301,7 +275,6 @@ class buttons_released_pc(ttbl.power.impl_c, ttbl.tt_power_control_impl):
     def __init__(self, button_list):
         assert isinstance(button_list, list)
         ttbl.power.impl_c.__init__(self)
-        ttbl.tt_power_control_impl.__init__(self)	# COMPAT
         self.sequence = [ ( 'release', button )
                           for button in button_list ]
 
@@ -315,13 +288,3 @@ class buttons_released_pc(ttbl.power.impl_c, ttbl.tt_power_control_impl):
     def get(self, target, _component):
         # no real press status, so can't tell
         return None
-
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
-
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        return self.get(target, "n/a")

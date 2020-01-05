@@ -284,8 +284,10 @@ Interfaces
 Power control
 ^^^^^^^^^^^^^
 
+# FIXME: COMPAT: move this to ttbl.power
+
 Allows powering on, off resetting or power cycling hardware
-(:class:`ttbl.tt_power_control_mixin`).
+(:mod:`ttbl.power`).
 
 This interface can be implemented by:
 
@@ -336,6 +338,9 @@ There are currently a few implementations:
 
 Console management
 ^^^^^^^^^^^^^^^^^^
+
+# FIXME: COMPAT: move to ttbl.console
+
 This interface is used to list serial consoles, read from them
 (logging their output) and writing to them. It is implemented by
 :class:`ttbl.test_target_console_mixin`.
@@ -372,6 +377,7 @@ This interface is not target-specific and provides three primitives:
 
 Image deployment
 ^^^^^^^^^^^^^^^^
+# FIXME: COMPAT: move to ttbl.images
 
 This interface is used to deploy files available to the daemon into a
 target.

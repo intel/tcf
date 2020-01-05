@@ -20,7 +20,7 @@ import ttbl.power
 # FIXME: ename to _pc
 # FIXME: move this file to ykush.py, since it provides other
 #        components, not just a power controller
-class ykush(ttbl.power.impl_c, ttbl.tt_power_control_impl, ttbl.things.impl_c):
+class ykush(ttbl.power.impl_c, ttbl.things.impl_c):
 
     class notfound_e(ValueError):
         pass
@@ -80,7 +80,6 @@ class ykush(ttbl.power.impl_c, ttbl.tt_power_control_impl, ttbl.things.impl_c):
             raise ValueError("ykush ports are 1, 2 and 3, gave %s" % port)
         ttbl.power.impl_c.__init__(self)
         ttbl.things.impl_c.__init__(self)
-        ttbl.tt_power_control_impl.__init__(self)
         self.port = port
         self.ykush_serial = ykush_serial
         self.retries = 10
@@ -317,17 +316,6 @@ class ykush(ttbl.power.impl_c, ttbl.tt_power_control_impl, ttbl.things.impl_c):
         except self.notfound_e:
             # If it is not connected, it is off
             return False
-
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
-
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        # this reports None because this is is just a delay loop
-        return None
 
     # things interface, to use as a plugger
     # get() is implemented above

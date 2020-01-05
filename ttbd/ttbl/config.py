@@ -125,8 +125,6 @@ def target_add(target, _id = None, tags = None, target_type = None,
         if id in targets.keys():
             raise ValueError("target ID %s already exists" % _id)
         targets[_id] = target
-    if isinstance(target, ttbl.test_target_console_mixin):
-        target.console_list()
     target.tags.setdefault('interconnects', {})
     target.tags_update(dict(id = target.id, path = target.state_dir))
     assert isinstance(target.tags['interconnects'], dict)

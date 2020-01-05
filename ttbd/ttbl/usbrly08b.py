@@ -132,7 +132,7 @@ class rly08b(object):
             return response
 
 
-class pc(rly08b, ttbl.power.impl_c, ttbl.tt_power_control_impl):
+class pc(rly08b, ttbl.power.impl_c):
     """
     Power control implementation that uses a relay to close/open a
     circuit on on/off
@@ -140,7 +140,6 @@ class pc(rly08b, ttbl.power.impl_c, ttbl.tt_power_control_impl):
     def __init__(self, serial_number, relay):
         self.relay = relay
         rly08b.__init__(self, serial_number)
-        ttbl.tt_power_control_impl.__init__(self)	# COMPAT
         ttbl.power.impl_c.__init__(self)
 
     def on(self, target, _component):
@@ -193,16 +192,6 @@ class pc(rly08b, ttbl.power.impl_c, ttbl.tt_power_control_impl):
                            "#%d powered off"
                            % (self.serial_number, self.relay))
             return False
-
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
-
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        return self.get(target, "n/a")
 
 
 class button_c(pc, ttbl.buttons.impl_c):
@@ -317,16 +306,12 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
 
       To connect a USB device from system A to system B, so power off
       means connected to B, power-on connected to A, add to the
-      configuration::
+      configuration:
 
-        ttbl.config.target_add(
-          ttbl.tt.tt_power(
-              "devicename",
-              power_control = [
-                  ttbl.usbrly08b.plugger("00023456", 0),
-              ]),
-            target_type = "device-switcher"
-        )
+      >>> target.interface_add("power", ttbl.power.inteface(
+      >>>      ttbl.usbrly08b.plugger("00023456", 0)
+      >>> )
+      >>> ...
 
       Thus to connect to system B::
 
@@ -346,35 +331,22 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
       on (in this example, a NUC mini-PC with a USB drive connected
       to boot off it, the configuration block would be as::
 
-        ttbl.config.target_add(
-          ttbl.tt.tt_power(
-              "nuc-43",
-              power_control = [
-                  # Ensure the dongle is / has been connected to the server
-                  ttbl.pc.delay_til_usb_device("7FA50D00FFFF00DD",
-                                               when_powering_on = False,
-                                               want_connected = True),
-                  ttbl.usbrly08b.plugger("00023456", 0),
-                  # Ensure the dongle disconnected from the server
-                  ttbl.pc.delay_til_usb_device("7FA50D00FFFF00DD",
-                                               when_powering_on = True,
-                                               want_connected = False),
-                  # power on the target
-                  ttbl.pc.dlwps7("http://admin:1234@SPNAME/SPPORT"),
-                  # let it boot
-                  ttbl.pc.delay(2)
-              ]),
-            tags = {
-                'linux': True,
-                'bsp_models': { 'x86_64': None },
-                'bsps': {
-                    'x86_64': {
-                        'linux': True,
-                    }
-                }
-            },
-            target_type = "nuc-linux-x86_64"
-        )
+      >>> target.interface_add("power", ttbl.power.interface(
+      >>>     # Ensure the dongle is / has been connected to the server
+      >>>     ttbl.pc.delay_til_usb_device("7FA50D00FFFF00DD",
+      >>>                                  when_powering_on = False,
+      >>>                                  want_connected = True),
+      >>>     ttbl.usbrly08b.plugger("00023456", 0),
+      >>>     # Ensure the dongle disconnected from the server
+      >>>     ttbl.pc.delay_til_usb_device("7FA50D00FFFF00DD",
+      >>>                                  when_powering_on = True,
+      >>>                                  want_connected = False),
+      >>>     # power on the target
+      >>>     ttbl.pc.dlwps7("http://admin:1234@SPNAME/SPPORT"),
+      >>>     # let it boot
+      >>>     ttbl.pc.delay(2)
+      >>> )
+      >>> ...
 
       Note that the serial number *7FA50D00FFFF00DD* is that of the
       USB drive and *00023456* is the serial number of the USB-RLY8b
@@ -491,90 +463,3 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
                            % (self.serial_number, self.bank))
             return False
 
-if __name__ == "__main__":
-    import unittest
-
-    logging.basicConfig()
-
-    class _tt(object):
-        log = logging
-
-    class _test(unittest.TestCase):
-        longMessage = True
-        serial = None
-
-        def test_0(self):
-            tt = _tt()
-            for relay in range(1, 9):
-                y1 = pc(self.serial, relay)
-                y1.power_get_do(tt)
-
-        def test_1(self):
-            tt = _tt()
-            for relay in range(1, 9):
-                y1 = pc(self.serial, relay)
-                y1.power_on_do(tt)
-                self.assertTrue(y1.power_get_do(tt))
-
-        def test_2(self):
-            tt = _tt()
-            for relay in range(1, 9):
-                y1 = pc(self.serial, relay)
-                y1.power_off_do(tt)
-                self.assertFalse(y1.power_get_do(tt))
-
-        def test_3(self):
-            tt = _tt()
-            for relay in range(1, 9):
-                y1 = pc(self.serial, relay)
-                y1.power_off_do(tt)
-                self.assertFalse(y1.power_get_do(tt))
-                y1.power_on_do(tt)
-                self.assertTrue(y1.power_get_do(tt))
-
-        def test_4(self):
-            tt = _tt()
-            for relay in range(1, 9):
-                y1 = pc(self.serial, relay)
-
-                y1.power_on_do(tt)
-                self.assertTrue(y1.power_get_do(tt))
-
-                y1.power_off_do(tt)
-                self.assertFalse(y1.power_get_do(tt))
-
-        def test_5(self):
-            tt = _tt()
-            for relay in range(1, 9):
-                y1 = pc(self.serial, relay)
-
-                y1.power_off_do(tt)
-                self.assertFalse(y1.power_get_do(tt))
-
-                y1.power_off_do(tt)
-                self.assertFalse(y1.power_get_do(tt))
-
-                y1.power_on_do(tt)
-                self.assertTrue(y1.power_get_do(tt))
-
-                y1.power_on_do(tt)
-                self.assertTrue(y1.power_get_do(tt))
-
-                y1.power_off_do(tt)
-                self.assertFalse(y1.power_get_do(tt))
-
-                y1.power_off_do(tt)
-                self.assertFalse(y1.power_get_do(tt))
-
-                y1.power_on_do(tt)
-                self.assertTrue(y1.power_get_do(tt))
-
-                y1.power_on_do(tt)
-                self.assertTrue(y1.power_get_do(tt))
-
-    if 'SERIAL' in os.environ:
-        _test.serial = os.environ['SERIAL']
-    else:
-        logging.warning("missing serial number for test RLY08B, "
-                        "export SERIAL env variable")
-    unittest.main()

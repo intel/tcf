@@ -451,7 +451,7 @@ Console Management Interface
 Debugging Interface
 -------------------
 
-.. autoclass:: ttbl.tt_debug_mixin
+.. autoclass:: ttbl.debug
 
 Power Control Interface
 -----------------------

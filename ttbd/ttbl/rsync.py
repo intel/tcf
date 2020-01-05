@@ -14,7 +14,7 @@ import ttbl.config
 import ttbl.power
 
 # FIXME: use daemon_pc
-class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):
+class pci(ttbl.power.impl_c):
 
     class error_e(Exception):
         pass
@@ -34,17 +34,12 @@ class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):
     E.g.: an interconnect gets an rsync server to share some files
     that targets might use:
 
-    >>> ttbl.config.interconnect_add(
-    >>>     ttbl.tt.tt_power('nwa', [
-    >>>         ttbl.rsync.pci("192.168.43.1", 'images',
-    >>>                        '/home/ttbd/images'),
-    >>>         vlan_pci()
-    >>>     ]),
-    >>>     tags = dict(
-    >>>         rsync_server = '192.168.43.1::images',
-    >>>         ...,
-    >>>     ic_type = "ethernet"
+    >>> ttbl.interface_add("power", ttbl.power.inteface(
+    >>>     ttbl.rsync.pci("192.168.43.1", 'images',
+    >>>                    '/home/ttbd/images'),
+    >>>     vlan_pci()
     >>> )
+    >>> ...
 
     """
 
@@ -53,7 +48,6 @@ class pci(ttbl.power.impl_c, ttbl.tt_power_control_impl):
                  port = 873,
                  uid = None, gid = None, read_only = True):
         ttbl.power.impl_c.__init__(self)
-        ttbl.tt_power_control_impl.__init__(self)	# COMPAT
         self.address = address
         self.port = port
         self.share_name = share_name
@@ -139,13 +133,3 @@ timeout = 300
         if pid != None:
             return True
         return False
-
-    # COMPAT: old interface, ttbl.tt_power_control_impl
-    def power_on_do(self, target):
-        return self.on(target, "n/a")
-
-    def power_off_do(self, target):
-        return self.off(target, "n/a")
-
-    def power_get_do(self, target):
-        return self.get(target, "n/a")

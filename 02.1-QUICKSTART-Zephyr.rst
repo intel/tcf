@@ -95,7 +95,7 @@ which you can find by listing it
 with ``-vv``::
 
   $ tcf list -vv arduino101-15 | grep interfaces:
-  interfaces: test_target_console_mixin test_target_images_mixin tt_debug_mixin tt_power_control_mixin
+  interfaces: console images debug power
 
 use *tcf --help* to discover what is available.
 

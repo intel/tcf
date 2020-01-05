@@ -78,7 +78,7 @@ class extension(tc.target_extension_c):
         if 'console' in target.rt.get('interfaces', []):
             self.compat = False
         elif 'test_target_console_mixin' in target.rt.get('interfaces', []):
-            self.compat = True
+            self.compat = True	# COMPAT
         else:
             raise self.unneeded
         self.target = target

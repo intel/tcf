@@ -11,7 +11,6 @@ Configuration data for STM32 MCUs used with the Zephyr OS and others
 --------------------------------------------------------------------
 """
 
-import ttbl.flasher
 
 #
 # Configurations settings for STM32

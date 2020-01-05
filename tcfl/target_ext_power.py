@@ -29,10 +29,6 @@ class extension(tc.target_extension_c):
     >>> target.power.cycle()
     >>> target.power.get()
     >>> target.power.list()
-
-    Currently this interface supportd the legacy server interface
-    (declared as *tt_power_control_mixin* in the target's *interface*
-    tag and the new *power* interface).
     """
 
     def __init__(self, target):
@@ -40,7 +36,7 @@ class extension(tc.target_extension_c):
             self.compat = False
             return
         if 'tt_power_control_mixin' in target.rt.get('interfaces', []):
-            self.compat = True
+            self.compat = True	# COMPAT
             return
         raise self.unneeded
 
