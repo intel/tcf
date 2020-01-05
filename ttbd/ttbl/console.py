@@ -577,8 +577,8 @@ class generic_c(impl_c):
                 f.connect(file_name)
                 self._write(f.fileno(), data)
         else:
-            with contextlib.closing(os.open(file_name, os.O_RDWR, 0)) as fd:
-                self._write(fd, data)
+            with contextlib.closing(open(file_name, "a")) as f:
+                self._write(f.fileno(), data)
 
 
 class serial_pc(ttbl.power.socat_pc, generic_c):
