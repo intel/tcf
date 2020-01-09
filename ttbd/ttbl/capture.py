@@ -479,6 +479,7 @@ class generic_snapshot(impl_c):
             time.strftime("%Y%m%d-%H%M%S"), self.extension)
         kws = dict(output_file_name = file_name)
         kws.update(target.kws)
+        kws.update(target.fsdb.get_as_dict())
         cmdline = []
         try:
             for command in self.pre_commands:
@@ -598,6 +599,7 @@ class generic_stream(impl_c):
                                      time.strftime("%Y%m%d-%H%M%S"))
         kws = dict(output_file_name = file_name)
         kws.update(target.kws)
+        kws.update(target.fsdb.get_as_dict())
         target.property_set("capturer-%s-output" % capturer, file_name)
         try:
             for command in self.pre_commands:
@@ -631,6 +633,7 @@ class generic_stream(impl_c):
         file_name = target.property_get("capturer-%s-output" % capturer)
         kws = dict(output_file_name = file_name)
         kws.update(target.kws)
+        kws.update(target.fsdb.get_as_dict())
         try:
             target.property_set("capturer-%s-output" % capturer, None)
             commonl.process_terminate(
