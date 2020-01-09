@@ -141,7 +141,6 @@ class expect_text_on_console_c(tc.expectation_c):
 
         of = open(filename, "a+", 0)
         buffers_poll['of'] = of
-        buffers_poll['ofd'] = of.fileno()
 
 
     def _poll(self, testcase, run_name, buffers_poll):
@@ -167,7 +166,7 @@ class expect_text_on_console_c(tc.expectation_c):
                 dlevel = 3)
             read_offset = 0
         of = buffers_poll['of']
-        ofd = buffers_poll['ofd']
+        ofd = of.fileno()
 
         try:
             ts_start = time.time()
@@ -179,9 +178,8 @@ class expect_text_on_console_c(tc.expectation_c):
             # system, so because read_to_fd() is bypassing caching, flush
             # first and sync after the read.
             of.flush()
-            total_bytes = target.rtb.rest_tb_target_console_read_to_fd(
-                ofd, target.rt, self.console,
-                read_offset, self.max_size, target.ticket)
+            total_bytes = target.console.read(self.console, read_offset,
+                                              self.max_size, of)
             ts_end = time.time()
             of.flush()
             os.fsync(ofd)
@@ -303,7 +301,7 @@ class expect_text_on_console_c(tc.expectation_c):
         pass
 
 
-class entension(tc.target_extension_c):
+class extension(tc.target_extension_c):
     """
     Extension to :py:class:`tcfl.tc.target_c` to run methods from the console
     management interface to TTBD targets.

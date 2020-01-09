@@ -1218,18 +1218,9 @@ class target_c(object):
         <tcfl.target_ext_console.console.write>`, which is the raw
         version of this function.
 
-        However, this function works with the send/expect engine and
-        will flush the expect buffer so that next time we call
-        :meth:`expect`, it wil look for the expected data **only** in
-        data received after calling this function.
+        See :meth:`send` for a version that works with the expect sequence
 
         """
-        console = self.console._console_get(console)
-        # Why does this work? Because next expect runs a new
-        # console_rx_eval function that will get it's offset
-        # to be zero and thus it'll initialize to the offset from the
-        # poller, which this _flush() call is resetting.
-        #FIXME: expecter.console_rx_flush(self.testcase.tls.expecter, self, console)
         # the console member is only present if the member extension has
         # been loaded for the target (determined at runtime), hence
         # pylint gets confused
@@ -1287,9 +1278,10 @@ class target_c(object):
         search_offset = 0
         if context in self.testcase.buffers:
             buffers_poll = self.testcase.buffers[context]
-            fd = buffers_poll.get('ofd', None)
-            if fd:
-                stat_info = os.fstat(fd)
+            of = buffers_poll.get('of', None)
+            if of:
+                ofd = of.fileno()
+                stat_info = os.fstat(ofd)
                 search_offset = stat_info.st_size
         self.testcase.tls.buffers[context + 'search_offset'] = search_offset
         self.console_tx(str(data) + crlf, console)
@@ -3204,16 +3196,19 @@ class tc_c(object):
         # instance specific list of files/paths to wipe at the end
         self._cleanup_files = set()
 
-        self.tls.expecter = expecter.expecter_c(
-            self._expecter_log, c, poll_period = poll_period,
-            timeout = self.tls.expecter.timeout)
-        self.subcases = list(self.subcases)
+        if other:
+            self.subcases = list(other.subcases)
+        else:
+            self.subcases = list()
         self.subtc = collections.OrderedDict()
-        self.parent = self.parent
-        for subtc_name, subtc in other.subtc.iteritems():
-            subtc_copy = subtc._clone()
-            subtc_copy.parent = self
-            self.subtc[subtc_name] = subtc_copy
+        if other:
+            self.parent = other.parent
+            for subtc_name, subtc in other.subtc.iteritems():
+                subtc_copy = subtc._clone()
+                subtc_copy.parent = self
+                self.subtc[subtc_name] = subtc_copy
+        else:
+            self.parent = None
 
         # sequentially incremented everytime we call expect()
         self._expect_count = 0
