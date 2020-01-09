@@ -4729,7 +4729,7 @@ class tc_c(object):
             % (exp, type(exp).__name__)
         self.tls._expectations.append(exp)
 
-    def expect_tl_remove(self, exp):
+    def expect_tls_remove(self, exp):
         """
         Remove an expectation from the testcase global expectation list
 
