@@ -425,56 +425,60 @@ def linux_rsync_cache_lru_cleanup(target, path, max_kbytes):
     assert isinstance(path, basestring)
     assert max_kbytes > 0
 
+    testcase = target.testcase
     target.report_info(
         "rsync cache: reducing %s to %dMiB" % (path, max_kbytes / 1024.0))
 
     prompt_original = target.shell.shell_prompt_regex
-    with target.on_console_rx_cm(
-            re.compile("^(.*Error|Exception):.*^>>> ", re.MULTILINE | re.DOTALL),
-            timeout = False, result = 'errr'):
-        try:
-            target.send("TTY=dumb python || python2 || python3")	 # launch python!
-            # This lists all the files in the path recursively, sorting
-            # them by oldest modification time first.
-            #
-            # In Python? Why? because it is much faster than doing it in
-            # shell when there are very large trees with many
-            # files. Make sure it is 2 and 3 compat.
-            #
-            # Note we are feeding lines straight to the python
-            # interpreter, so we need an extra newline for each
-            # indented block to close them.
-            #
-            # The list includes the mtime, the size and the name  (not using
-            # bisect.insort() because it doesn't support an insertion key
-            # easily).
-            #
-            # Then start iterating newest first until the total
-            # accumulated size exceeds what we have been 
-            # asked to free and from there on, wipe all files.
-            #
-            # Note we list directories after the files; since
-            # sorted(), when sorted by mtime is most likely they will
-            # show after their contained files, so we shall be able to
-            # remove empty dirs. Also, sorted() is stable. If they
-            # were actually needed, they'll be brought back by rsync
-            # at low cost.
-            #
-            # We use statvfs() to get the filesystem's block size to
-            # approximate the actual space used in the disk
-            # better. Still kinda naive.
-            #
-            # why not use scandir()? this needs to be able to run in
-            # python2 for older installations.
-            #
-            # walk: walk depth first, so if we rm all the files in a dir,
-            # the dir is empty and we will wipe it too after wiping
-            # the files; if stat fails with FileNotFoundError, that's
-            # usually a dangling symlink; ignore it. OSError will
-            # likely be something we can't find, so we ignore it too.
-            #
-            # And don't print anything...takes too long for large trees
-            target.shell.run("""
+    python_error_ex = target.console.text(
+        re.compile("^(.*Error|Exception):.*^>>> ", re.MULTILINE | re.DOTALL),
+        name = "python error",
+        timeout = 0, poll_period = 1,
+        raise_on_found = tcfl.tc.error_e("error detected in python"))
+    testcase.expect_tls_append(python_error_ex)
+    try:
+        target.send("TTY=dumb python || python2 || python3")	 # launch python!
+        # This lists all the files in the path recursively, sorting
+        # them by oldest modification time first.
+        #
+        # In Python? Why? because it is much faster than doing it in
+        # shell when there are very large trees with many
+        # files. Make sure it is 2 and 3 compat.
+        #
+        # Note we are feeding lines straight to the python
+        # interpreter, so we need an extra newline for each
+        # indented block to close them.
+        #
+        # The list includes the mtime, the size and the name  (not using
+        # bisect.insort() because it doesn't support an insertion key
+        # easily).
+        #
+        # Then start iterating newest first until the total
+        # accumulated size exceeds what we have been 
+        # asked to free and from there on, wipe all files.
+        #
+        # Note we list directories after the files; since
+        # sorted(), when sorted by mtime is most likely they will
+        # show after their contained files, so we shall be able to
+        # remove empty dirs. Also, sorted() is stable. If they
+        # were actually needed, they'll be brought back by rsync
+        # at low cost.
+        #
+        # We use statvfs() to get the filesystem's block size to
+        # approximate the actual space used in the disk
+        # better. Still kinda naive.
+        #
+        # why not use scandir()? this needs to be able to run in
+        # python2 for older installations.
+        #
+        # walk: walk depth first, so if we rm all the files in a dir,
+        # the dir is empty and we will wipe it too after wiping
+        # the files; if stat fails with FileNotFoundError, that's
+        # usually a dangling symlink; ignore it. OSError will
+        # likely be something we can't find, so we ignore it too.
+        #
+        # And don't print anything...takes too long for large trees
+        target.shell.run("""
 import os, errno, stat
 fsbsize = os.statvfs('%(path)s').f_bsize
 l = []
@@ -507,8 +511,9 @@ for e in sorted(l, key = lambda e: e[0], reverse = True):
 
 exit()
 """ % dict(path = path, max_bytes = max_kbytes * 1024))
-        finally:
-            target.shell.shell_prompt_regex = prompt_original
+    finally:
+        target.shell.shell_prompt_regex = prompt_original
+        testcase.expect_tls_remove(python_error_ex)
 
 #
 # Well, so this is a hack anyway; we probably shall replace this with
