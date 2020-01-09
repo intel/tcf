@@ -1370,7 +1370,7 @@ class test_target(object):
                 (name, self.id, self.interface_origin[name]))
         obj._target_setup(self)
         self.tags['interfaces'].append(name)
-        self.interface_origin[name] = commonl.origin_get()
+        self.interface_origin[name] = commonl.origin_get(2)
         setattr(self, name, obj)
         self.release_hooks.add(obj._release_hook)
 
