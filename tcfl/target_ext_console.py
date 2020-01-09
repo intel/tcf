@@ -135,6 +135,8 @@ class expect_text_on_console_c(tc.expectation_c):
         # also, the target could put more data out before we start
         # reading, so this is just an approx
         read_offset = target.console.size()
+        if read_offset == None:
+            read_offset = 0	# happens when the console is disabled
         if read_offset > self.previous_max:
             read_offset -= self.previous_max
         buffers_poll['read_offset'] = read_offset
@@ -152,6 +154,8 @@ class expect_text_on_console_c(tc.expectation_c):
         self._poll_init(testcase, run_name, buffers_poll)
         read_offset = buffers_poll['read_offset']
         console_size = target.console.size(self.console)
+        if console_size == None:
+            console_size = 0	# console disabled
         # If the target has rebooted, then the console file was
         # truncated to zero and our read offsets changed
         if console_size < read_offset:
@@ -624,7 +628,7 @@ class extension(tc.target_extension_c):
         r = self.target.ttbd_iface_call("console", "size", method = "GET",
                                         component = console)
         if r['result'] == None:
-            return None
+            return None			# console disabled
         return int(r['result'])
 
     def write(self, data, console = None):
