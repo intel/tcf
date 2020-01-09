@@ -787,7 +787,7 @@ def target_qemu_pos_add(target_name,
                         ipv6_addr,
                         consoles = None,
                         disk_size = "30G",
-                        mr_partsizes = "1:4:5:5",
+                        mr_partsizes = "1:2:2:10",
                         # more distros support ide than virtio/scsi with
                         # generic kernels
                         sd_iftype = 'ide',
