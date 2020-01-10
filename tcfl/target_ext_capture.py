@@ -430,9 +430,16 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
                     (0, 0, 255),	# red
                     1) # thin line
                 self._draw_text(collateral_img, self.name, rect[0], rect[3])
-            target.report_info(
-                '%s/%s: detected %d matches'
-                % (run_name, self.name, len(r)), dict(capture = most_recent))
+            if len(r) == 1:
+                target.report_info(
+                    '%s/%s: detected one match'
+                    % (run_name, self.name),
+                    dict(screenshot = most_recent), alevel = 2)
+            else:
+                target.report_info(
+                    '%s/%s: detected %d matches'
+                    % (run_name, self.name, len(r)),
+                    dict(screenshot = most_recent), alevel = 2)
             return r
 
     def flush(self, testcase, run_name, buffers_poll, buffers, results):
