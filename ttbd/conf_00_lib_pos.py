@@ -934,7 +934,15 @@ def target_qemu_pos_add(target_name,
         "-cpu", "host",
         "-m", str(ram_megs),
         # FIXME: do VNC tunneling so clients can access
-        "-display", "vnc=unix:%(path)s/qemu.vnc",
+        #
+        # VNC ports for accessing remotely and the capture interface
+        # (ttbd/conf_00_lib_capture.capture_screenshot_vnc)
+        # - share=force-shared: cannot be enabled, otherwise gvnccapture
+        #   gets resource unavailable 3
+        # - we cannot use unix:PATH fro VNC path, otherwise
+        #   gvnccapture can't find it. We can't socat it into a port
+        #   because QEMU removes the UNIX socket once closed.
+        "-display", "vnc=localhost:%(vnc-port)s",
         # EFI BIOS
         "-drive", "if=pflash,format=raw,readonly,file=/usr/share/edk2/ovmf/OVMF_CODE.fd",
         "-drive", "if=pflash,format=raw,file=%(path)s/OVMF_VARS.fd",
@@ -979,6 +987,10 @@ def target_qemu_pos_add(target_name,
             ( console, console_pc )
         )
     target.interface_add("console", ttbl.console.interface(*consolel))
+    target.interface_add("capture", ttbl.capture.interface(
+        vnc0_screenshot = capture_screenshot_vnc,
+        screen = "vnc0_screenshot",
+    ))
 
     target.interface_add("debug", ttbl.debug.interface(
         ( "x86_64", qemu_pc )

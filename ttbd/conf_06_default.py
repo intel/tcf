@@ -31,10 +31,5 @@ if ttbl.config.defaults_enabled:
                 mac_addr = "02:%02x:00:00:%02x:%02x" % (x, y, v),
                 ipv4_addr = '192.%d.%d.%d' % (x, y, v),
                 ipv6_addr = 'fc00::%02x:%02x:%02x' % (x, y, v))
-            target.interface_add("capture", ttbl.capture.interface(
-                # capture screenshots from VNC, return a PNG
-                vnc0 = capture_screenshot_vnc,
-                screen = "vnc0",
-            ))
 
     index_start = 5
