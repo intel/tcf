@@ -122,29 +122,53 @@ def _target_enable(args):
             target.enable()
 
 def healthcheck(args):
+    tcfl.tc.report.report_c.driver_add(		# FIXME: hack console driver
+        tcfl.tc.report.report_console_c(0, None))
+
+        
     with tcfl.msgid_c("cmdline"):
         target = tcfl.tc.target_c.create_from_cmdline_args(args)
 
-        print "acquiring"
+        if args.interfaces == []:
+            # no interface list give; scan the list of interfaces the
+            # target exposes, starting with "power" (always)
+            args.interfaces.append("power")
+
+            # list extensions/interfaces w/ healthcheck
+            for attr, value in target.__dict__.items():
+                if isinstance(value, tcfl.tc.target_extension_c) \
+                   and hasattr(value, "_healthcheck") \
+                   and attr != "power":	# we did this first
+                    args.interfaces.append(attr)
+        
+        target.report_info("acquiring")
         target.acquire()
-        print "OK: acquired"
+        target.report_pass("acquired")
 
-        if hasattr(target, "power"):
-            target.power._healthcheck()
-        else:
-            print "WARNING: No power control interface"
-
-        if hasattr(target, "tunnel"):
-            target.tunnel._healthcheck()
-
-        if hasattr(target, "store"):
-            target.store._healthcheck()
-
-        print "releasing"
+        for interface_name in args.interfaces:
+            interface = getattr(target, interface_name, None)
+            if interface == None:
+                target.report_blck("%s: non-existing interface"
+                                    % interface_name)
+                continue
+            if not isinstance(interface, tcfl.tc.target_extension_c):
+                target.report_blck(
+                    "%s: interface not a real interface (type %s)"
+                    % (interface_name, type(interface)))
+                continue
+            
+            if interface == "power" and not hasattr(target, "power"):
+                target.report_info("WARNING: No power control interface")
+            
+            target.report_info(
+                "HEALTHCHECK for %s interface" % interface_name, level = 0)
+            interface._healthcheck()
+            
+        target.report_info("released")
         target.release()
-        print "OK: released"
+        target.report_pass("released")
 
-        print "%s: healthcheck completed" % target.id
+        target.report_pass("HEALTHCHECK completed")
 
 def _cookies(args):
     if '/' in args.target:
@@ -382,6 +406,12 @@ if __name__ == "__main__":
 
     ap = arg_subparsers.add_parser("healthcheck",
                                    help = "Do a very basic health check")
+    ap.set_defaults(level = logging.ERROR)
+    ap.add_argument(
+        "-i", "--interface", metavar = "INTERFACE",
+        dest = "interfaces", action = "append", default = [],
+        help = "Names of interfaces to healtcheck (default all "
+        "exposed by the target)")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target's name or URL")
     ap.set_defaults(func = healthcheck)
