@@ -12,7 +12,7 @@ The capture interface allows to capture screenshots, audio and video
 streams, network traffic, etc.
 
 This provides an abstract interface to access it as well as means to
-wait for things to be found when such captures, such as images on screenshots. 
+wait for things to be found when such captures, such as images on screenshots.
 
 """
 # Roadmap:
@@ -53,37 +53,12 @@ import shutil
 
 import commonl
 import tc
-import ttb_client
+from . import msgid_c
+
 
 import cv2
 import numpy
 import imutils
-
-#
-# basic capture API
-#
-
-def _rest_tb_target_capture_start(rtb, rt, capturer, ticket = ''):
-    assert isinstance(capturer, basestring)
-    return rtb.send_request("POST", "targets/%s/capture/start" % rt['id'],
-                            data = { 'capturer': capturer, 'ticket': ticket })
-
-def _rest_tb_target_capture_stop_and_get(rtb, rt, capturer, local_filename,
-                                         ticket = ''):
-    assert isinstance(capturer, basestring)
-    total = 0
-    if local_filename != None:
-        with open(local_filename, "w") as lf, \
-            contextlib.closing(rtb.send_request(
-                "POST", "targets/%s/capture/stop_and_get" % rt['id'],
-                data = { 'capturer': capturer, 'ticket': ticket },
-                stream = True, raw = True)) as r:
-            # http://docs.python-requests.org/en/master/user/quickstart/#response-content
-            chunk_size = 1024
-            for chunk in r.iter_content(chunk_size):
-                os.write(lf.fileno(), chunk)
-                total += len(chunk)
-    return total
 
 def _rest_tb_target_capture_list(rtb, rt, ticket = ''):
     return rtb.send_request("GET", "targets/%s/capture/list" % rt['id'],
@@ -542,9 +517,8 @@ class extension(tc.target_extension_c):
         :returns: dictionary of values passed by the server
         """
         self.target.report_info("%s: starting capture" % capturer, dlevel = 3)
-        r = _rest_tb_target_capture_start(self.target.rtb, self.target.rt,
-                                          capturer,
-                                          ticket = self.target.ticket)
+        r = self.target.ttbd_iface_call("capture", "start", method = "POST",
+                                        capturer = capturer)
         self.target.report_info("%s: started capture" % capturer, dlevel = 2)
         return r
 
@@ -563,12 +537,28 @@ class extension(tc.target_extension_c):
         :returns: dictionary of values passed by the server
         """
         self.target.report_info("%s: stopping capture" % capturer, dlevel = 3)
-        r = _rest_tb_target_capture_stop_and_get(
-            self.target.rtb, self.target.rt,
-            capturer, local_filename, ticket = self.target.ticket)
-        self.target.report_info("%s: stopped capture, %d bytes"
-                                % (capturer, r), dlevel = 2)
-        return r
+        if local_filename != None:
+            with open(local_filename, "w") as of, \
+                 contextlib.closing(
+                     self.target.ttbd_iface_call(
+                         "capture", "stop_and_get", method = "POST",
+                         capturer = capturer,
+                         stream = True, raw = True)) as r:
+                # http://docs.python-requests.org/en/master/user/quickstart/#response-content
+                chunk_size = 4096
+                read_bytes = 0
+                for chunk in r.iter_content(chunk_size):
+                    of.write(chunk)
+                    read_bytes += len(chunk)
+                of.flush()
+                self.target.report_info("%s: stopped capture, read %dB"
+                                        % (capturer, read_bytes), dlevel = 2)
+        else:
+            self.target.ttbd_iface_call(
+                "capture", "stop_and_get", method = "POST",
+                capturer = capturer, stream = True, raw = True)
+            self.target.report_info("%s: stopped capture" % capturer,
+                                    dlevel = 2)
 
     def stop(self, capturer):
         """
@@ -580,11 +570,7 @@ class extension(tc.target_extension_c):
         :param str capturer: capturer to use, as listed in the
           target's *capture*
         """
-        self.target.report_info("%s: stopping capture" % capturer, dlevel = 3)
-        _rest_tb_target_capture_stop_and_get(
-            self.target.rtb, self.target.rt,
-            capturer, None, ticket = self.target.ticket)
-        self.target.report_info("%s: stopped capture" % capturer, dlevel = 2)
+        self.stop_and_get(capturer, None)
 
     def get(self, capturer, local_filename):
         """
@@ -602,12 +588,78 @@ class extension(tc.target_extension_c):
 
         :returns: dictionary of capturers and their state
         """
-        self.target.report_info("listing", dlevel = 3)
-        data = _rest_tb_target_capture_list(self.target.rtb, self.target.rt,
-                                            ticket = self.target.ticket)
-        capturers = data['capturers']
-        self.target.report_info("listed: %s" % capturers, dlevel = 2)
-        return capturers
+        r = self.target.ttbd_iface_call("capture", "list", method = "GET")
+        return r['capturers']
+
+    def _healthcheck(self):
+        # not much we can do here without knowing what the interfaces
+        # can do, we can start and stop them, they might fail to start
+        # since they might need the target to be powered on
+        target = self.target
+
+        capture_spec = {}
+        for capture in target.rt['capture'].split():	# gather types
+            capturer, streaming, mimetype = capture.split(":", 2)
+            capture_spec[capturer] = (streaming, mimetype)
+        capturers = target.capture.list()		# gather states
+
+        target.report_info("capturers: listed %s" \
+            % " ".join("%s:%s" % (k, v) for k, v in capturers.items()))
+        try:
+            if hasattr(target, "power"):		# ensure is on
+                target.power.on()			# some might need it
+        except RuntimeError as e:
+            target.report_fail(
+                "can't power on target; some capture healthcheck will fail",
+                dict(exception = e))
+
+        def _start_and_check(capturer):
+            try:
+                target.capture.start(capturer)
+                target.report_pass("capturer %s: starts" % capturer)
+            except RuntimeError as e:
+                target.report_fail("capturer %s: can't start" % capturer,
+                                   dict(exception = e))
+
+            if capture_spec[capturer][0] == "stream":
+                state = target.capture.list()['capturer']
+                if state == "streaming":
+                    target.report_pass(
+                        "capturer %s is in expected streaming state" % capturer)
+                else:
+                    target.report_fail(
+                        "capturer %s is not in expected streaming mode, but %s"
+                        % (capturer, state))
+
+        for capturer, _state in capturers.items():
+
+            _start_and_check(capturer)
+            try:
+                target.capture.stop_and_get(capturer, "/dev/null")
+                target.report_pass("capturer %s: stops and gets to /dev/null"
+                                   % capturer)
+            except RuntimeError as e:
+                target.report_fail(
+                    "capturer %s: can't stop and get to /dev/null" % capturer,
+                    dict(exception = e))
+
+            _start_and_check(capturer)
+            try:
+                target.capture.get(capturer, "/dev/null")
+                target.report_pass("capturer %s: gets to /dev/null" % capturer)
+            except RuntimeError as e:
+                target.report_fail(
+                    "capturer %s: can't get to /dev/null" % capturer,
+                    dict(exception = e))
+
+            _start_and_check(capturer)
+            try:
+                target.capture.stop(capturer)
+                target.report_pass("capturer %s: stops" % capturer)
+            except RuntimeError as e:
+                target.report_fail("capturer %s: can't stop" % capturer,
+                                   dict(exception = e))
+
 
     def image_on_screenshot(
             self, template_image_filename, capturer = 'screen',
@@ -676,7 +728,7 @@ class extension(tc.target_extension_c):
         :param str template_image_filename: name of the file that
           contains the image that we will look for in the
           screenshot. This can be in jpeg, png, gif and other
-          formats. 
+          formats.
 
           If the filename is relative, it is considered to
           be relative to the file the contains the source file that
@@ -737,36 +789,32 @@ class extension(tc.target_extension_c):
             poll_period, timeout, raise_on_timeout, raise_on_found)
 
 
-def cmdline_capture_start(args):
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    _rest_tb_target_capture_start(rtb, rt,
-                                  args.capturer, ticket = args.ticket)
+def _cmdline_capture_start(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args)
+        target.capture.start(args.capturer)
 
-def cmdline_capture_stop_and_get(args):
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    r = _rest_tb_target_capture_stop_and_get(
-        rtb, rt,
-        args.capturer, args.filename, ticket = args.ticket)
-    return r
+def _cmdline_capture_stop_and_get(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args)
+        target.capture.stop_and_get(args.capturer, args.filename)
 
-def cmdline_capture_stop(args):
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    r = _rest_tb_target_capture_stop_and_get(
-        rtb, rt,
-        args.capturer, None, ticket = args.ticket)
-    return r
+def _cmdline_capture_stop(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args)
+        target.capture.stop_and_get(args.capturer, None)
 
-def cmdline_capture_list(args):
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    data = _rest_tb_target_capture_list(rtb, rt, ticket = args.ticket)
-    capturers = data['capturers']
-    capture_spec = {}
-    for capture in rt['capture'].split():
-        capturer, streaming, mimetype = capture.split(":", 2)
-        capture_spec[capturer] = (streaming, mimetype)
-    for name, state in capturers.iteritems():
-        print "%s:%s:%s:%s" % (
-            name, capture_spec[name][0], capture_spec[name][1], state)
+def _cmdline_capture_list(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args)
+        capturers = target.capture.list()
+        capture_spec = {}
+        for capture in target.rt['capture'].split():
+            capturer, streaming, mimetype = capture.split(":", 2)
+            capture_spec[capturer] = (streaming, mimetype)
+        for name, state in capturers.iteritems():
+            print "%s:%s:%s:%s" % (
+                name, capture_spec[name][0], capture_spec[name][1], state)
 
 
 def cmdline_setup(argsp):
@@ -775,7 +823,7 @@ def cmdline_setup(argsp):
                     default = None, help = "Target's name or URL")
     ap.add_argument("capturer", metavar = "CAPTURER-NAME", action = "store",
                     type = str, help = "Name of capturer that should start")
-    ap.set_defaults(func = cmdline_capture_start)
+    ap.set_defaults(func = _cmdline_capture_start)
 
     ap = argsp.add_parser("capture-get",
                           help = "stop capturing and get the result to a file")
@@ -785,7 +833,7 @@ def cmdline_setup(argsp):
                     type = str, help = "Name of capturer that should stop")
     ap.add_argument("filename", action = "store", type = str,
                     help = "File to which to dump the captured content")
-    ap.set_defaults(func = cmdline_capture_stop_and_get)
+    ap.set_defaults(func = _cmdline_capture_stop_and_get)
 
     ap = argsp.add_parser("capture-stop-and-get",
                           help = "stop capturing and get the result to a file")
@@ -795,7 +843,7 @@ def cmdline_setup(argsp):
                     type = str, help = "Name of capturer that should stop")
     ap.add_argument("filename", action = "store", type = str,
                     help = "File to which to dump the captured content")
-    ap.set_defaults(func = cmdline_capture_stop_and_get)
+    ap.set_defaults(func = _cmdline_capture_stop_and_get)
 
     ap = argsp.add_parser("capture-stop", help = "stop capturing, discarding "
                           "the capture")
@@ -803,9 +851,9 @@ def cmdline_setup(argsp):
                     default = None, help = "Target's name or URL")
     ap.add_argument("capturer", metavar = "CAPTURER-NAME", action = "store",
                     type = str, help = "Name of capturer that should stop")
-    ap.set_defaults(func = cmdline_capture_stop)
+    ap.set_defaults(func = _cmdline_capture_stop)
 
     ap = argsp.add_parser("capture-list", help = "List available capturers")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
-    ap.set_defaults(func = cmdline_capture_list)
+    ap.set_defaults(func = _cmdline_capture_list)
