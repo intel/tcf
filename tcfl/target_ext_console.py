@@ -53,7 +53,7 @@ class expect_text_on_console_c(tc.expectation_c):
     def __init__(self,
                  text_or_regex,
                  console = None,	# default
-                 poll_period = 1,
+                 poll_period = 0.25,
                  timeout = 30,
                  previous_max = 4096,
                  raise_on_timeout = tc.failed_e,
