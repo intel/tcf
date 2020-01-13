@@ -84,6 +84,7 @@ to crossreference what was being ran, to sort out issues.
 
 The *hash* length (number of characters used) is controlled by
 :data:`tcfl.tc.tc_c.hashid_len`.
+
 """
 import ast
 import atexit
@@ -115,6 +116,7 @@ import threading
 import time
 import traceback
 import types
+
 
 # FIXME: rename want_name to role
 
@@ -240,36 +242,73 @@ class exception(Exception):
             "expected dict, got type %s" % type(self.args[1]).__name__
         return self.args[1]
 
+    def __repr__(self):
+        return self.args[0]
+
+    tag = None
+
+    def _descr(self):
+        result = valid_results.get(self.tag, None)
+        if result == None:
+            raise AssertionError(
+                "Invalid tag '%s', not a tcfl.tc.valid_result" % self.tag)
+        return result
+
+    def descr(self):
+        """
+        Return the conceptual name of this exception in present tense
+
+        >>> pass_e().descr()
+        >>> "pass"
+        >>> fail_e().descr()
+        >>> "fail"
+        ...
+        """
+        return self._descr()[0]
+
+    def descr_past(self):
+        """
+        Return the conceptual name of this exception in past tense
+
+        >>> pass_e().descr()
+        >>> "passed"
+        >>> fail_e().descr()
+        >>> "failed"
+        ...
+        """
+        return self._descr()[1]
+
+
 class pass_e(exception):
     """
     The test case passed
     """
-    pass
+    tag = 'PASS'	# see valid_results and exception.descr*
 
 class blocked_e(exception):
     """
     The test case could not be completed because something failed and
     disallowed testing if it woud pass or fail
     """
-    pass
+    tag = 'BLCK'	# see valid_results and exception.descr*
 
 class error_e(exception):
     """
     Executing the test case found an error
     """
-    pass
+    tag = 'ERRR'	# see valid_results and exception.descr*
 
 class failed_e(exception):
     """
     The test case failed
     """
-    pass
+    tag = 'FAIL'	# see valid_results and exception.descr*
 
 class skip_e(exception):
     """
     A decission was made to skip executing the test case
     """
-    pass
+    tag = 'SKIP'	# see valid_results and exception.descr*
 
 #: List of valid results and translations in present and past tense
 #:
