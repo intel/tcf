@@ -591,7 +591,7 @@ def rest_target_print(rt, verbosity = 0):
         print "%s %s%s" % (rt['fullid'], owner_s, power)
     elif verbosity == 2:
         print rt['fullid']
-        commonl._dict_print_dotted(rt, "  ")
+        commonl.data_dump_recursive(rt, prefix = "  ")
     elif verbosity == 3:
         pprint.pprint(rt)
     else:
