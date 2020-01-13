@@ -1124,7 +1124,7 @@ EOF""")
           partition tables to be re-read; defaults to 30s (some HW
           needs more than others and there is no way to make a good
           determination) or whatever is specified in target
-          tag/property :ref:`pos_partscan_timeout`. 
+          tag/property :ref:`pos_partscan_timeout`.
         """
         assert timeout == None or timeout > 0, \
             "timeout must be None or a positive number of seconds; " \
@@ -1517,10 +1517,13 @@ cat > /tmp/deploy.ex
                     # maybe something, maybe nothing
                     boot_config_fn(target, boot_dev, image_final)
 
+            except tc.exception as e:
+                target.report_info("POS: deployment %s: %s"
+                                   % (e.descr_past(), e.args[0]))
+                raise
             except Exception as e:
-                target.report_info(
-                    "BUG? exception %s: %s %s" %
-                    (type(e).__name__, e, traceback.format_exc()))
+                target.report_info("POS: exception during deployment: %s"
+                                   % str(e))
                 raise
             else:
                 # run this only when we are doing a clean exit
@@ -1574,7 +1577,7 @@ def image_seed_match(lp, goal):
 
             # Here, we are checking if spin for image and seed are equal.
             # If the spin are not equal, we should check if there is
-            # an empty one to reduce time; therefore, we enable a 
+            # an empty one to reduce time; therefore, we enable a
             # flag to check empties.
             if seedl[1] != goall[1]:
                 check_empties[part_name] = True
