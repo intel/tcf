@@ -6901,7 +6901,7 @@ class tc_c(object):
                     for _tc in tc_instances:
                         logger.info("testcase found @ %s by %s",
                                     _tc.origin, _tc_driver)
-                        
+
                 # this is so ugly, need to merge better with result_c's handling
                 except subprocess.CalledProcessError as e:
                     retval = result_c.from_exception_cpe(tc_fake, e)
@@ -7554,7 +7554,7 @@ def _run(args):
         # the resources to be cleaned up, otherwise memory consumption
         # / leaks which we can't control accumulate.
         tp = _multiprocessing_tc_pool_c(processes = threads_no)
-        
+
         # So now run as many testcases as possible
         threads = []
         time_start = time.time()
