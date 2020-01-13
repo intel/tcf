@@ -28,8 +28,8 @@ import glob
 import hashlib
 import imp
 import importlib
+import io
 import inspect
-import keyring
 import logging
 import numbers
 import os
@@ -43,9 +43,12 @@ import subprocess
 import sys
 import tempfile
 import termios
+import thread
+import threading
 import time
 import traceback
 
+import keyring
 import requests
 
 from . import expr_parser
@@ -1054,7 +1057,6 @@ class dict_missing_c(dict):
 
 def ipv4_len_to_netmask_ascii(length):
     return socket.inet_ntoa(struct.pack('>I', 0xffffffff ^ ((1 << (32 - length) ) - 1)))
-    
 
 def password_get(domain, user, password):
     """
@@ -1324,19 +1326,231 @@ def flat_keys_to_dict(d):
     return tr
 
 
+class tls_prefix_c(object):
 
-def _dict_print_dotted(d, prefix = "", separator = "."):
+    def __init__(self, tls, prefix):
+        assert isinstance(prefix, basestring)
+        self.tls = tls
+        self.prefix = unicode(prefix)
+        self.prefix_old = None
 
-    if isinstance(d, dict):
+    def __enter__(self):
+        self.prefix_old = getattr(self.tls, "prefix_c", u"")
+        self.tls.prefix_c = self.prefix_old + self.prefix
+        return self
+
+    def __exit__(self, _exct_type, _exce_value, _traceback):
+        self.tls.prefix_c = self.prefix_old
+        self.prefix_old = None
+
+    def __repr__(self):
+        return getattr(self.tls, "prefix_c", None)
+
+
+def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
+                        depth_limit = 10):
+    """
+    Dump a general data tree to stdout in a recursive way
+
+    For example:
+
+    >>> data = [ dict(keya = 1, keyb = 2), [ "one", "two", "three" ], "hello", sys.stdout ]
+
+    produces the stdout::
+
+      [0].keya: 1
+      [0].keyb: 2
+      [1][0]: one
+      [1][1]: two
+      [1][2]: three
+      [2]: hello
+      [3]: <open file '<stdout>', mode 'w' at 0x7f13ba2861e0>
+
+    - in a list/set/tuple, each item is printed prefixing *[INDEX]*
+    - in a dictionary, each item is prefixed with it's key
+    - strings and cardinals are printed as such
+    - others are printed as what their representation as a string produces
+
+    See also :func:`data_dump_recursive_tls`
+
+    :param d: data to print
+    :param str prefix: prefix to start with (defaults to nothing)
+    :param str separator: used to separate dictionary keys from the
+      prefix (defaults to ".")
+    :param FILE of: output stream where to print (defaults to
+      *sys.stdout*)
+    :param int depth_limit: maximum nesting levels to go deep in the
+      data structure (defaults to 10)
+    """
+    assert isinstance(prefix, basestring)
+    assert isinstance(separator, basestring)
+    assert depth_limit > 0
+
+    if isinstance(d, dict) and depth_limit > 0:
         if prefix.strip() != "":
             prefix = prefix + separator
         for key, val in sorted(d.items(), key = lambda i: i[0]):
-            _dict_print_dotted(val, prefix + key)
+            data_dump_recursive(val, prefix + str(key),
+                                separator = separator, of = of,
+                                depth_limit = depth_limit - 1)
+    elif isinstance(d, (list, set, tuple)) and depth_limit > 0:
+        # could use iter(x), but don't wanna catch strings, etc
+        count = 0
+        for v in d:
+            data_dump_recursive(v, prefix + u"[%d]" % count,
+                                separator = separator, of = of,
+                                depth_limit = depth_limit - 1)
+            count += 1
+    else:
+        of.write(prefix + u": " + unicode(d) + u"\n")
+
+
+_dict_print_dotted = data_dump_recursive	# COMPAT
+
+def data_dump_recursive_tls(d, tls, separator = u".", of = sys.stdout,
+                            depth_limit = 10):
+    """
+    Dump a general data tree to stdout in a recursive way
+
+    This function works as :func:`data_dump_recursive_tls` (see for
+    more information on the usage and arguments). However, it uses TLS
+    for storing the prefix as it digs deep into the data structure.
+
+    A variable called *prefix_c* is created in the TLS structure on
+    which the current prefix is stored; this is meant to be used in
+    conjunction with stream writes such as
+    :class:`io_tls_prefix_lines_c`.
+
+    :param thread._local tls: thread local storage to use (as returned
+      by *threading.local()*
+    """
+    assert isinstance(separator, basestring)
+    assert depth_limit > 0
+
+    if isinstance(d, dict):
+        for key, val in sorted(d.items(), key = lambda i: i[0]):
+            with tls_prefix_c(tls, str(key) + ": "):
+                data_dump_recursive_tls(val, tls,
+                                        separator = separator, of = of,
+                                        depth_limit = depth_limit - 1)
     elif isinstance(d, (list, set, tuple)):
         # could use iter(x), but don't wanna catch strings, etc
         count = 0
         for v in d:
-            _dict_print_dotted(v, prefix + "[%d]" % count)
+            with tls_prefix_c(tls, u"[%d]: " % count):
+                data_dump_recursive_tls(v, tls,
+                                        separator = separator, of = of,
+                                        depth_limit = depth_limit - 1)
             count += 1
     else:
-        print prefix + ":", d
+        of.write(unicode(d) + u"\n")
+
+
+class io_tls_prefix_lines_c(io.TextIOWrapper):
+    """
+    Write lines to a stream with a prefix obtained from a thread local
+    storage variable.
+
+    This is a limited hack to transform a string written as::
+
+      line1
+      line2
+      line3
+
+    into::
+
+      PREFIXline1
+      PREFIXline2
+      PREFIXline3
+
+    without any intervention by the caller other than setting the
+    prefix in thread local storage and writing to the stream; this
+    allows other clients to write to the stream without needing to
+    know about the prefixing.
+
+    Usage:
+
+    .. code-block:: python
+
+       import io
+       import commonl
+       import threading
+   
+       tls = threading.local()
+   
+       f = io.open("/dev/stdout", "w")
+       with commonl.tls_prefix_c(tls, "PREFIX"), \
+            commonl.io_tls_prefix_lines_c(tls, f.detach()) as of:
+   
+           of.write(u"line1\nline2\nline3\n")
+
+    Limitations:
+
+    - hack, only works ok if full lines are being printed; eg:
+
+      .. code-block:: python
+
+         of.write("line1\nline2\nli")
+         of.write("ne3\n")
+
+      will yield::
+
+        PREFIXline1
+        PREFIXline2
+        liPREFIXne3
+
+    - FIXME: flush would be a better place? to hook the prefix?
+    """
+    def __init__(self, tls, *args, **kwargs):
+        assert isinstance(tls, thread._local)
+        io.TextIOWrapper.__init__(self, *args, **kwargs)
+        self.tls = tls
+
+    def write(self, s):
+        """
+        Write string to the stream, prefixing each line with the
+        prefix obtained from *self.tls*\'s *prefix_c* attribute.
+        """
+        prefix = getattr(self.tls, "prefix_c", None)
+        if prefix == None:
+            io.TextIOWrapper.write(self, s)
+            return
+        offset = 0
+        while True:
+            pos = s.find('\r\n', offset)
+            if pos >= 0:
+                io.TextIOWrapper.write(self, prefix + s[offset:pos + 2])
+                offset = pos + 2
+                continue
+            pos = s.find('\n', offset)
+            if pos >= 0:
+                io.TextIOWrapper.write(self, prefix + s[offset:pos + 1])
+                offset = pos + 1
+                continue
+            pos = s.find('\r', offset)
+            if pos >= 0:
+                offset = pos + 1
+                io.TextIOWrapper.write(self, prefix + s[offset:pos + 1])
+                continue
+            io.TextIOWrapper.write(self, s[offset:])
+            break
+
+
+def mkutf8(s):
+    #
+    # We need a generic 'just write this and heck with encodings', but
+    # we don't know how the data is coming to us.
+    #
+    # If already unicode, pass it through; if str, assume is UTF-8 and
+    # try to safely decode it it to UTF-8. If anything else, rep() it into unicode.
+    #
+    # I am still so confused by Python's string / unicode / encoding /
+    # decoding rules
+    #
+    if isinstance(s, unicode):
+        return s
+    elif isinstance(s, str):
+        return s.decode('utf-8', errors = 'replace')
+    else:
+        # represent it in unicode, however the object says
+        return unicode(s)
