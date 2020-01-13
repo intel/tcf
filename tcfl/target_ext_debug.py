@@ -143,7 +143,7 @@ def _cmdline_debug_list(args):
                 print component + ": <debugging started, target probably off>"
             else:
                 print component + ":",
-                commonl._dict_print_dotted(value)
+                commonl.data_dump_recursive(value)
 
 def _cmdline_debug_gdb(args):
     with msgid_c("cmdline"):
