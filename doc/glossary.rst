@@ -20,8 +20,14 @@ Glossary
 
      In the context of *tcf run*, a hash is a six character code that
      uniquely identifies the test case name and the target/s where it
-     ran.
+     ran along with its :term:`BSP model`.
 
+     It stays stable across different runs.
+
+   hashid
+
+     Same as :term:`hash`.
+     
    herd
 
      Group of TCF servers that are meant to be used together, they all
@@ -45,11 +51,11 @@ Glossary
      testcase output to clarify when it was generated.
 
    site
-   
+
      Server herds can be split into *sites*, which is a subgroup of
      servers of the same herd that are physically located in the same
      place and might be sharing physical infrastructure
-     
+
    static testcase
 
      A :term:`test case` that doesn't run on remote targets but in the
