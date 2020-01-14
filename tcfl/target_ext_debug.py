@@ -105,7 +105,6 @@ class extension(tc.target_extension_c):
         :param list(str) components: (optional) list of components
           where to operate (defaults to all)
         """
-        print "DEBUG reset"
         self.target.ttbd_iface_call("debug", "reset", method = "PUT",
                                     components = json.dumps(components))
 

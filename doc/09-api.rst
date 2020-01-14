@@ -48,8 +48,8 @@ Other target interfaces
 *TCF run* report drivers
 -------------------------
 
-.. automodule:: tcfl.report
-.. automodule:: tcfl.report_mongodb
+See :ref:`report reference <tcf_guide_report_driver>`.
+
                 
 *TCF* client configuration
 ==========================

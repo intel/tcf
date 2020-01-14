@@ -1234,7 +1234,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         After a Zephyr sanity check is executed succesfully, the
         output of each target is examined by the data harvesting
         engine to extract data to store in the database with
-        :meth:`tcfl.tc.tc_c.report_data`.
+        :meth:`target.report_data <tcfl.tc.reporter_c.report_data>`.
 
         The harvester is a very simple state machine controlled by up
         to three regular expressions whose objective is to extract a

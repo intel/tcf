@@ -43,9 +43,9 @@ run. All the instances will then be run in parallel throgh a
 multiprocessing pool.
 
 To testcases report results via the report API, which are handled by
-drivers defined following :class:`tcfl.report.report_c`, which can be
-subclassed and extended to report to different destinations according
-to need. Default drivers report to console and logfiles.
+drivers defined following :class:`tcfl.tc.report_driver_c`, which can
+be subclassed and extended to report to different destinations
+according to need. Default drivers report to console and logfiles.
 
 .. _tc_id:
 
@@ -186,7 +186,6 @@ import requests.exceptions
 import app
 import commonl
 import commonl.expr_parser
-import report
 import tcfl
 import ttb_client
 
@@ -346,8 +345,8 @@ class _simple_namespace:
 #
 
 log_dir = None
-report_console = None
-report_failures = None
+report_console_impl = None
+report_file_impl = None
 # FIXME: no like, this is a hack and shall use tc_c.ticket
 ticket = None
 
@@ -355,18 +354,18 @@ def _globals_init():
     # This function is used by test routines to cleanup the global state
 
     global log_dir
-    global report_console
-    global report_failures
+    global report_console_impl
+    global report_file_impl
     # Should be possible to move most of these to tc_c
     log_dir = None
     tc_c._dry_run = False
     tc_c.runid = None
-    if report_console:
-        report.report_c.driver_rm(report_console)
-        report_console = None
-    if report_failures:
-        report.report_c.driver_rm(report_failures)
-        report_failures = None
+    if report_console_impl:
+        report_driver_c.remove(report_console_impl)
+        report_console_impl = None
+    if report_file_impl:
+        report_driver_c.remove(report_file_impl)
+        report_file_impl = None
 
 class target_extension_c(object):
     r"""Implement API extensions to targets
@@ -436,8 +435,382 @@ class target_extension_c(object):
         # verify this is a valid extension name
         pass
 
+class report_driver_c(object):
+    """Reporting driver interface
 
-class target_c(object):
+    To create a reporting driver, subclass this class, implement
+    :meth:`report` and then create an instance, adding it calling
+    :meth:`add`.
+
+    A testcase reports information by calling the `report_*()` APIs in
+    :class:`reporter_c`, which multiplexes into each reporting driver
+    registered with :meth:`add`, calling each drivers :meth:`report`
+    function which will direct it to the appropiate place.
+
+    Drivers can be created to dump the information in any format and
+    to whichever location, as needed.
+
+    For examples, look at:
+
+    - :mod:`tcfl.report_console`
+    - :mod:`tcfl.report_jinja2`
+    - :mod:`tcfl.report_taps`
+    - :mod:`tcfl.report_mongodb`
+
+    """
+
+    def report(self, reporter, tag, ts, delta,
+               level, message, alevel, attachments):
+        """Low level report from testcases
+
+        The reporting API calls this function for the final recording
+        of a reported message. In here basically anything can be
+        done--but they being called frequently, it has to be efficient
+        or will slow testcase execution considerably. Actions done in
+        this function can be:
+
+        - filtering (to only run for certain testcases, log levels, tags or
+          messages)
+        - dump data to a database
+        - record to separate files based on whichever logic
+        - etc
+
+        When a testcase is completed, it will issue a message
+        *COMPLETION <result>*, which marks the end of the testcase.
+
+        When all the testcases are run, the global testcase reporter
+        (:data:`tcfl.tc.tc_global`) will issue a *COMPLETION <result>*
+        message. The global testcase reporter can be identified because
+        it has an attribute *skip_reports* set to *True* and thus can
+        be identified with:
+
+        .. code-block:: python
+
+           if getattr(_tc, "skip_reports", False) == True:
+               do_somethin_for_the_global_reporter
+
+        Important points:
+
+        - **do not rely on globals**; this call is not lock protected
+          for concurrency; will be called for *every* single report the
+          internals of the test runner and the testcases do from
+          multiple threads at the same time. Expect a *lot* of calls.
+
+          Must be ready to accept multiple threads calling from
+          different contexts. It is a good idea to use thread local
+          storage (TLS) to store state if needed. See an example in
+          :class:`tcfl.report_console.driver`).
+
+        :param reporter_c reporter: who is reporting this; this can be
+          a :class:`testcase <tc_c>` or a :class:`target <target_c>`.
+
+        :param str tag: type of report (PASS, ERRR, FAIL, BLCK, INFO,
+          DATA); note they are all same length and described in
+          :data:`valid_results`.
+
+        :param float ts: timestamp for when the message got generated
+          (in seconds)
+
+        :param float delta: time lapse from when the testcase started
+          execution until this message was generated.
+
+        :param int level: report level for the *message* (versus for
+          the attachments); note report levels greater or equal to
+          1000 are used to pass control messages, so they might not be
+          subject to normal verbosity control (for example, for a log
+          file you might want to always include them).
+
+        :param str message: single line string describing the message
+          to report.
+
+          If the message starts with  *"COMPLETION "*, this is the
+          final message issued to mark the result of executing a
+          single testcase. At this point, you can use fields such
+          as :data:`tc_c.result` and :data:`tc_c.result_eval` and it
+          can be used as a synchronization point to for example, flush
+          a file to disk or upload a complete record to a database.
+
+          Python2: note this has been converted to unicode UTF-8
+
+        :param int alevel: report level for the attachments
+
+        :param dict attachments: extra information to add to the
+          message being reported; shall be reported as *KEY: VALUE*;
+          VALUE shall be recursively reported:
+
+          - lists/tuples/sets shall be reported indicating the index
+            of the member (such as *KEYNAME[3]: VALUE*
+
+          - dictionaries shall be recursively reported
+
+          - strings and integers shall be reported as themselves
+
+          - any other data type can be reported as what it's *repr*
+            function returns when converting it to unicode ro whatever
+            representation the driver can do.
+
+          You can use functions such :func:`commonl.data_dump_recursive`
+          to convert a dictionary to a unicode representation.
+
+          This might contain strings that are not valid UTF-8, so you
+          need to convert them using :func:`commonl.mkutf8` or
+          similar. :func:`commonl.data_dump_recursive` do that for you.
+
+        """
+        raise NotImplementedError
+
+    _drivers = []
+    @classmethod
+    def add(cls, obj, origin = None):
+        """
+        Add a driver to handle other report mechanisms
+
+        A report driver is used by *tcf run*, the meta test runner, to
+        report information about the execution of testcases.
+
+        A driver implements the reporting in whichever way it decides
+        it needs to suit the application, uploading information to a
+        server, writing it to files, printing it to screen, etc.
+
+        >>> class my_report_driver(tcfl.tc.report_driver_c)
+        >>>     ...
+        >>> tcfl.tc.report_driver_c.add(my_report_driver())
+
+        :param tcfl.tc.report_driver_c obj: object subclasss of
+          :class:`tcfl.tc.report_driver_c` that implements the
+          reporting.
+
+        :param str origin: (optional) where is this being registered;
+          defaults to the caller of this function.
+        """
+        assert isinstance(obj, cls)
+        if origin == None:
+            o = inspect.stack()[1]
+            origin = "%s:%s" % (o[1], o[2])
+        setattr(obj, "origin", origin)
+        cls._drivers.append(obj)
+
+    @classmethod
+    def remove(cls, obj):
+        """
+        Remove a report driver previously added with :meth:`add`
+
+        :param tcfl.tc.report_driver_c obj: object subclasss of
+          :class:`tcfl.tc.report_driver_c` that implements the
+          reporting.
+
+        """
+        assert isinstance(obj, cls)
+        cls._drivers.remove(obj)
+
+    @classmethod
+    def ident_simplify(cls, ident, runid, hashid):
+        """
+        If any looks like:
+
+          RUNID:HASHID[SOMETHING]
+
+        simplify it by returning *SOMETHING*
+        """
+        if ident.startswith(runid + ":"):
+            ident = ident[len(runid) + 1:]
+        if ident.startswith(hashid):
+            ident = ident[len(hashid):]
+        return ident
+
+
+class reporter_c(object):
+    """
+    High level reporting API
+
+    Embedded as part of a target or testcase, allows them to report in
+    a unified way
+
+    This class accesses members that are undefined in here but defined
+    by the class that inherits it (tc_c and target_c):
+
+    - self.kws
+
+    """
+    def __init__(self, testcase = None):
+        # this is to be set by whoever inherits this
+        self._report_prefix = "reporter_c._report_prefix/uninitialized"
+        #: time when this testcase or target was created (and thus all
+        #: references to it's inception are done); note if this is for
+        #: a testcase, in __init_shallow__() we update this for when
+        #: we assign it to a target group to run.
+        if testcase:
+            self.ts_start = testcase.ts_start
+        else:
+            self.ts_start = time.time()
+
+    @staticmethod
+    def _argcheck(message, attachments, level, dlevel, alevel):
+        assert isinstance(message, basestring)
+        if attachments:
+            assert isinstance(attachments, dict)
+            # FIXME: valid values?
+        assert level >= 0
+        # just check is some kind of integer (positive, negative or zero)
+        assert dlevel >= 0 or dlevel < 0
+        assert alevel >= 0 or alevel < 0
+
+    def _report(self, level, alevel, tag, message, attachments):
+        ts = time.time()
+        delta = ts - self.ts_start
+        for driver in report_driver_c._drivers:
+            driver.report(
+                self, tag, ts, delta, level, commonl.mkutf8(message),
+                alevel, attachments)
+
+    def report_pass(self, message, attachments = None,
+                    level = None, dlevel = 0, alevel = 2):
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "PASS", message, attachments)
+
+    def report_fail(self, message, attachments = None,
+                    level = None, dlevel = 0, alevel = 2):
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "FAIL", message, attachments)
+
+    def report_error(self, message, attachments = None,
+                     level = None, dlevel = 0, alevel = 2):
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "ERRR", message, attachments)
+
+    def report_blck(self, message, attachments = None,
+                    level = None, dlevel = 0, alevel = 2):
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "BLCK", message, attachments)
+
+    def report_skip(self,  message, attachments = None,
+                    level = None, dlevel = 0, alevel = 2):
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "SKIP", message, attachments)
+
+    def report_info(self, message, attachments = None,
+                    level = None, dlevel = 0, alevel = 2):
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "INFO", message, attachments)
+
+    def report_data(self, domain, name, value, expand = True,
+                    level = 2, dlevel = 0):
+        """Report measurable data
+
+        When running a testcase, if data is collected that has to be
+        reported for later analysis, use this function to report
+        it. This will be reported by the report driver in a way that
+        makes it easy to collect later on.
+
+        Measured data is identified by a *domain* and a *name*, plus
+        then the actual value.
+
+        A way to picture how this data can look once aggregated is as
+        a table per domain, on which each invocation is a row and each
+        column will be the values for each name.
+
+        :param str domain: to which domain this measurement applies
+          (eg: "Latency Benchmark %(type)s");
+
+        :param str name: name of the value  (eg: "context switch
+          (microseconds)"); it is recommended to always add the unit
+          the measurement represents.
+
+        :param value: value to report for the given domain and name;
+           any type can be reported.
+
+        :param bool expand: (optional) by default, the *domain* and
+          *name* fields will be %(FIELD)s expanded with the keywords
+          of the testcase or target. If *False*, it will not be
+          expanded.
+
+          This enables to, for example, specify a domain of "Latency
+          measurements for target %(type)s" which will automatically
+          create a different domain for each type of target.
+        """
+        assert isinstance(domain, basestring)
+        assert isinstance(name, basestring)
+        assert level >= 0
+        assert dlevel >= 0
+        assert isinstance(expand, bool)
+
+        if expand:
+            domain = domain % self.kws
+            name = name % self.kws
+        level += dlevel
+
+        self._report(level, 1000, "DATA",
+                     domain + "::" + name + "::%s" % value,
+                     dict(domain = domain, name = name, value = value))
+
+    def report_tweet(self, what, result, extra_report = "",
+                     ignore_nothing = False, attachments = None,
+                     level = None, dlevel = 0, alevel = 2,
+                     dlevel_failed = 0, dlevel_blocked = 0,
+                     dlevel_passed = 0, dlevel_skipped = 0, dlevel_error = 0):
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(what, attachments, level, dlevel, alevel)
+        assert dlevel_failed >= 0
+        assert dlevel_blocked >= 0
+        assert dlevel_passed >= 0
+        assert dlevel_skipped >= 0
+        assert dlevel_error >= 0
+        level += dlevel
+        r = False
+        if result.failed > 0:
+            tag = "FAIL"
+            msg = valid_results[tag][1]
+            level += dlevel_failed
+        elif result.errors > 0:
+            tag = "ERRR"
+            msg = valid_results[tag][1]
+            level += dlevel_error
+        elif result.blocked > 0:
+            tag = "BLCK"
+            msg = valid_results[tag][1]
+            level += dlevel_blocked
+        elif result.passed > 0:
+            tag = "PASS"
+            msg = valid_results[tag][1]
+            r = True
+            level += dlevel_passed
+        elif result.skipped > 0:
+            tag = "SKIP"
+            msg = valid_results[tag][1]
+            r = True
+            level += dlevel_skipped
+        else:            # When here, nothing was run, all the counts are zero
+            if ignore_nothing == True:
+                return True
+            self._report(level, level + alevel, "BLCK",
+                         what + " / nothing ran " + extra_report, attachments)
+            return False
+        self._report(level, level + alevel,
+                     tag, what + " " + msg + " " + extra_report, attachments)
+        return r
+
+
+
+class target_c(reporter_c):
     """A remote target that can be manipulated
 
     :param dict rt: remote target descriptor (dictionary) as returned
@@ -479,6 +852,7 @@ class target_c(object):
     def __init__(self, rt, testcase, bsp_model, target_want_name):
         assert isinstance(rt, dict)
         assert isinstance(testcase, tc_c)
+        reporter_c.__init__(self, testcase = testcase)
         #: Name this target is known to by the testcase (as it was
         #: claimed with the :func:`tcfl.tc.target` decorator)
         self.want_name = target_want_name
@@ -519,7 +893,6 @@ class target_c(object):
         #: BSP (inside the :term:`BSP model`) this target is currently
         #: configured for
         self.bsp = None
-        self._prefix = ""
         # KW handling for targets is a little bit messed up, as we
         # want to include the keywords root testcase kws, the ones for
         # the testcase instance, the ones for the target (incuding
@@ -528,6 +901,7 @@ class target_c(object):
         # BSP.  So we keep the "originals" for modification with
         # kw_set in self._kw and then the update KWS modifies the
         # self.kws set of keywords merging everthing together.
+        # note self.kws comes from reporter_c
         #: Target specific keywords
         self._kws = {}
         #: Target specific keywords for each BSP
@@ -545,9 +919,11 @@ class target_c(object):
         #: find where to put stuff.
         self.tmpdir = testcase.tmpdir
 
-        #: Keywords for ``%(KEY)[sd]`` substitution specific to this
-        #: target and current active :term:`BSP model` and BSP as set
-        #: with :meth:`bsp_set`.
+        #: Keywords for ``%(KEY)[sd]`` substitution specific to the
+        #: testcase or target and its current active :term:`BSP model`
+        #: and BSP as set with :meth:`bsp_set`.
+        #:
+        #: FIXME: elaborate on testcase keywords, target keyworkds
         #:
         #: These are obtained from the remote target descriptor
         #: (`self.rt`) as obtained from the remote *ttbd* server.
@@ -577,9 +953,9 @@ class target_c(object):
         #: :meth:`TARGET.property_set<tcfl.tc.target_c.property_set>`
         #: (or it's command line equivalent ``tcf property-set TARGET
         #: PROPERTY VALUE``) will show up as keywords.
-        self.kws = {}
+        self.kws = {}		# Updated when we update the kws
         #: Origin of keys defined in self.kws
-        self.kws_origin = {}
+        self.kws_origin = {}	# in tc_c.__init_shallow__()
         # Generate KWS in case the extensions have to use it
         if bsp_model:
             self._bsp_model_set(bsp_model)
@@ -953,155 +1329,6 @@ class target_c(object):
                 "be done if the current BSP model carries only one BSP"
             bsp = self.bsps[0]
         return self._app_get_for_bsp(None, bsp = bsp, noraise = noraise)[0]
-
-
-    def report_pass(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "PASS", message, attachments)
-
-    def report_fail(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "FAIL", message, attachments)
-
-    def report_error(self, message, attachments = None,
-                     level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "ERRR", message, attachments)
-
-    def report_blck(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "BLCK", message, attachments)
-
-    def report_skip(self,  message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "SKIP", message, attachments)
-
-    def report_info(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "INFO", message, attachments)
-
-    def report_data(self, domain, name, value, expand = True,
-                    level = None, dlevel = 0):
-        """Report measurable data
-
-        When running a testcase, if data is collected that has to be
-        reported for later analysis, use this function to report
-        it. This will be reported by the report driver in a way that
-        makes it easy to collect later on.
-
-        Measured data is identified by a *domain* and a *name*, plus
-        then the actual value.
-
-        A way to picture how this data can look once aggregated is as
-        a table per domain, on which each invocation is a row and each
-        column will be the values for each name.
-
-        :param str domain: to which domain this measurement applies
-          (eg: "Latency Benchmark %(type)s");
-
-        :param str name: name of the value  (eg: "context switch
-          (microseconds)"); it is recommended to always add the unit
-          the measurement represents.
-
-        :param value: value to report for the given domain and name;
-           any type can be reported.
-
-        :param bool expand: (optional) by default, the *domain* and
-          *name* fields will be %(FIELD)s expanded with the keywords
-          of the testcase or target. If *False*, it will not be
-          expanded.
-
-          This enables to, for example, specify a domain of "Latency
-          measurements for target %(type)s" which will automatically
-          create a different domain for each type of target.
-        """
-        assert isinstance(domain, basestring)
-        assert isinstance(name, basestring)
-        if expand:
-            domain = domain % self.kws
-            name = name % self.kws
-        if level == None:		# default args are computed upon def'on
-            level = 2
-        assert isinstance(level, int)
-        assert isinstance(dlevel, int)
-        level += dlevel
-        report.report_c.report(
-            level, 1000, 1000, self,
-            "DATA", domain + "::" + name + "::%s" % value,
-            dict(domain = domain, name = name, value = value))
-
-    def report_tweet(self, what, result, extra_report = "",
-                     ignore_nothing = False, attachments = None,
-                     level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(what, attachments, level, dlevel, alevel, ulevel)
-        level += dlevel
-        r = False
-        if result.failed > 0:
-            tag = "FAIL"
-            msg = valid_results[tag][1]
-        elif result.errors > 0:
-            tag = "ERRR"
-            msg = valid_results[tag][1]
-        elif result.blocked > 0:
-            tag = "BLCK"
-            msg = valid_results[tag][1]
-        elif result.passed > 0:
-            tag = "PASS"
-            msg = valid_results[tag][1]
-            r = True
-        elif result.skipped > 0:
-            tag = "SKIP"
-            msg = valid_results[tag][1]
-            r = True
-        else:            # When here, nothing was run, all the counts are zero
-            if ignore_nothing == True:
-                return True
-            report.report_c.report(level, level + alevel, level + ulevel, self,
-                                   "BLCK",
-                                   what + " / nothing ran " + extra_report,
-                                   attachments)
-            return False
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               tag, what + " " + msg + " " + extra_report,
-                               attachments)
-        return r
 
     def shcmd_local(self, cmd, origin = None, reporter = None,
                     logfile = None):
@@ -1647,16 +1874,6 @@ class target_c(object):
         self._kws[kw] = value
         self._kws_origin.setdefault(kw, []).append(origin)
 
-    @staticmethod
-    def _report_argcheck(message, attachments, level, dlevel, alevel, ulevel):
-        assert isinstance(message, basestring)
-        if attachments:
-            assert isinstance(attachments, dict)
-        assert isinstance(level, int)
-        assert isinstance(dlevel, int)
-        assert isinstance(alevel, int)
-        assert isinstance(ulevel, int)
-
     # Semi private API, linkage with tc_c API
     def bsp_model_suffix(self):
         if self.bsp_model:
@@ -1696,11 +1913,11 @@ class target_c(object):
                 tgname = "|" + self.fullid
         else:
             tgname = ""
-        self._prefix = self.testcase.report_mk_prefix() \
-                       + tgname + self.bsp_suffix()
+        self._report_prefix = self.testcase.report_mk_prefix() \
+            + tgname + self.bsp_suffix()
 
     def report_mk_prefix(self):
-        return self._prefix
+        return self._report_prefix
 
 
 
@@ -1983,12 +2200,16 @@ class result_c():
 
         By default, this is the mapping:
 
-        - :meth:`tc_c.report_pass` is used for :exc:`pass_e`
-        - :meth:`tc_c.report_error` is used for :exc:`error_e`
-        - :meth:`tc_c.report_fail` is used for :exc:`failed_e`
-        - :meth:`tc_c.report_blck` is used for :exc:`blocked_e`
-          and any other exception
-        - :meth:`tc_c.report_skip` is used for :exc:`skip_e`
+        - :meth:`tc.report_pass<reporter_c.report_pass>` is used for
+          :exc:`pass_e`
+        - :meth:`tc.report_pass<reporter_c.report_error>` is used for
+          :exc:`error_e`
+        - :meth:`tc.report_pass<reporter_c.report_fail>` is used for
+          :exc:`failed_e`
+        - :meth:`tc.report_pass<reporter_c.report_blck>` is used for
+          :exc:`blocked_e` and any other exception
+        - :meth:`tc.report_pass<reporter_c.report_skip>` is used for
+          :exc:`skip_e`
 
         However, it can be forced by passing as *force_result* or each
         testcase can be told to consider specific exceptions as others
@@ -2018,8 +2239,7 @@ class result_c():
             assert isinstance(_tc, tc_c)
             tc = _tc
 
-        trace_alevel = 4
-        trace_dlevel = 4
+        trace_alevel = 1
         if force_result == None:
             force_result = tc.exception_to_result.get(type(e), None)
         if isinstance(e, pass_e) or force_result == pass_e:
@@ -2050,9 +2270,9 @@ class result_c():
             dlevel = 0
             alevel = 0
             trace_alevel = 0
-            trace_dlevel = 0
-
-        _attachments = { "%s%s trace" % (phase, tag) : traceback.format_exc() }
+        _attachments = {
+            "%s%s trace" % (phase, tag) : traceback.format_exc()
+        }
         _attachments.update(attachments)
         report_fn("%s%s: %s" % (phase, tag, _e), _attachments,
                   dlevel = dlevel, alevel = trace_alevel)
@@ -2835,7 +3055,7 @@ class _tc_mc(type):
 #
 # The core testcase object
 #
-class tc_c(object):
+class tc_c(reporter_c):
     r"""
     A testcase, with instructions for configuring, building, deploying,
     setting up, running, evaluating, tearing down and cleaning up.
@@ -2931,8 +3151,8 @@ class tc_c(object):
     The testcase methods use the APIs exported by this class and module:
 
      - to report information at the appropiate log level:
-       :meth:`report_pass`, :meth:`report_fail`, :meth:`report_blck`
-       and :meth:`report_info`
+       :meth:`reporter_c.report_pass`, :meth:`reporter_c.report_fail`,
+       :meth:`reporter_c.report_blck` and :meth:`reporter_c.report_info`
 
      - raise an exception to indicate result of this method:
 
@@ -2995,6 +3215,7 @@ class tc_c(object):
     build_only = []
 
     def __init__(self, name, tc_file_path, origin):
+        reporter_c.__init__(self)
         for hook_pre in self.hook_pre:
             assert callable(hook_pre), \
                 "tcfl.tc.tc_c.hook_pre contains %s, defined as type '%s', " \
@@ -3074,10 +3295,6 @@ class tc_c(object):
         self._report_prefix = ""
         self._prefix_update()	# Update the prefix
 
-        # Prefix used for lines that print reports
-        self._report_prefix = ""
-        self._prefix_update()	# Update the prefix
-
         #: Result of the last evaluation run
         #:
         #: When an evaluation is run (setup/start/eval/teardown), this
@@ -3111,6 +3328,10 @@ class tc_c(object):
         self._kw_set("tmpdir", self.tmpdir)
         self._kw_set("tc_hash", self.ticket)
 
+        #: time when this testcase was created (and thus all
+        #: references to it's inception are done); note in
+        #: __init_shallow__() we update this for when we assign it to
+        #: a target group to run.
         self.ts_start = time.time()
         self.ts_end = None
 
@@ -3254,6 +3475,10 @@ class tc_c(object):
         self._expectations_global = []
         self._expectations_global_names = set()
 
+        # update it's inception time (from reporter_c.__init__), since
+        # calling this means this is being assigned to a target group
+        # to run.
+        self.ts_start = time.time()
 
     def __thread_init__(self, tls_parent):
         """
@@ -3299,155 +3524,6 @@ class tc_c(object):
     #:
     #: FIXME: add a registry to warn of used ids
     hashid_len = 6
-
-    # Reporting interface FIXME: document
-    def report_pass(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "PASS", message, attachments)
-
-    def report_error(self, message, attachments = None,
-                     level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "ERRR", message, attachments)
-
-    def report_fail(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "FAIL", message, attachments)
-
-    def report_blck(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "BLCK", message, attachments)
-
-    def report_skip(self,  message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "SKIP", message, attachments)
-
-    def report_info(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "INFO", message, attachments)
-
-    def report_data(self, domain, name, value, expand = True):
-        """Report measurable data
-
-        When running a testcase, if data is collected that has to be
-        reported for later analysis, use this function to report
-        it. This will be reported by the report driver in a way that
-        makes it easy to collect later on.
-
-        Measured data is identified by a *domain* and a *name*, plus
-        then the actual value.
-
-        A way to picture how this data can look once aggregated is as
-        a table per domain, on which each invocation is a row and each
-        column will be the values for each name.
-
-        :param str domain: to which domain this measurement applies
-          (eg: "Latency Benchmark %(type)s");
-
-        :param str name: name of the value  (eg: "context switch
-          (microseconds)"); it is recommended to always add the unit
-          the measurement represents.
-
-        :param value: value to report for the given domain and name;
-           any type can be reported.
-
-        :param bool expand: (optional) by default, the *domain* and
-          *name* fields will be %(FIELD)s expanded with the keywords
-          of the testcase or target. If *False*, it will not be
-          expanded.
-
-          This enables to, for example, specify a domain of "Latency
-          measurements for target %(type)s" which will automatically
-          create a different domain for each type of target.
-        """
-        assert isinstance(domain, basestring)
-        assert isinstance(name, basestring)
-        if expand:
-            domain = domain % self.kws
-            name = name % self.kws
-        report.report_c.report(
-            2, 1000, 1000, self, "DATA", domain + "::" + name + "::%s" % value,
-            dict(domain = domain, name = name, value = value))
-
-    def report_tweet(self, what, result, extra_report = "",
-                     ignore_nothing = False, attachments = None,
-                     level = None, dlevel = 0, alevel = 2, ulevel = 5,
-                     dlevel_failed = 0, dlevel_blocked = 0,
-                     dlevel_passed = 0, dlevel_skipped = 0, dlevel_error = 0):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(what, attachments, level, dlevel, alevel, ulevel)
-        level += dlevel
-        r = False
-        if result.failed > 0:
-            tag = "FAIL"
-            msg = valid_results[tag][1]
-            level += dlevel_failed
-        elif result.errors > 0:
-            tag = "ERRR"
-            msg = valid_results[tag][1]
-            level += dlevel_error
-        elif result.blocked > 0:
-            tag = "BLCK"
-            msg = valid_results[tag][1]
-            level += dlevel_blocked
-        elif result.passed > 0:
-            tag = "PASS"
-            msg = valid_results[tag][1]
-            r = True
-            level += dlevel_passed
-        elif result.skipped > 0:
-            tag = "SKIP"
-            msg = valid_results[tag][1]
-            level += dlevel_skipped
-            r = True
-        else:            # When here, nothing was run, all the counts are zero
-            if ignore_nothing == True:
-                return True
-            report.report_c.report(level, level + alevel, level + ulevel, self,
-                                   "BLCK",
-                                   what + " / nothing ran " + extra_report,
-                                   attachments)
-            return False
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               tag, what + " " + msg + " " + extra_report,
-                               attachments)
-        return r
 
     def relpath_to_abs(self, path):
         """
@@ -3907,16 +3983,6 @@ class tc_c(object):
     #
     # Linkage into the report API and support for it
     #
-
-    @staticmethod
-    def _report_argcheck(message, attachments, level, dlevel, alevel, ulevel):
-        assert isinstance(message, basestring)
-        if attachments:
-            assert isinstance(attachments, dict)
-        assert isinstance(level, int)
-        assert isinstance(dlevel, int)
-        assert isinstance(alevel, int)
-        assert isinstance(ulevel, int)
 
     def _report_mk_prefix(self):
         """
@@ -6651,7 +6717,7 @@ class tc_c(object):
                 # cleanup, we consider all expendable resournces
                 # and the toplevel tempdirs will be cleaned below
                 # Targets acquired will be released as idle by the
-                # daemon 
+                # daemon
                 thread.daemon = True
                 threads.append(thread)
             self.log.info("%d jobs launched" % len(threads))
@@ -7107,7 +7173,10 @@ def find(args):
     if len(tcs) == 0:
         logger.warning("No testcases found")
 
-
+#: Global testcase reporter
+#:
+#: Used to report top-level progress and messages beyond the actual
+#: testcases we have to execute
 tc_global = tc_c("toplevel", "", "builtin")
 tc_global.skip_reports = True
 
@@ -7332,6 +7401,10 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
         % tc_c._selected_str(ic_selected), dlevel = 4)
 
 
+# This need to be imported here since they rely on definitions
+import report_console
+import report_jinja2
+
 def _run(args):
     """
     Runs one ore more test cases
@@ -7441,14 +7514,19 @@ def _run(args):
         log_file = os.path.join(tc_c.tmpdir, "run.log")
 
     # Init report drivers FIXME: need a hook to add more
-    global report_console
-    global report_failures
-    report_console = report.report_console_c(
-        args.verbosity - args.quietosity, log_dir, log_file,
-        verbosity_logf = args.log_file_verbosity)
-    report.report_c.driver_add(report_console)
-    report_failures = report.file_c(log_dir)
-    report.report_c.driver_add(report_failures)
+    global report_console_impl
+    global report_file_impl
+    if log_file:
+        if os.path.dirname(log_file) == '':
+            log_file = os.path.join(log_dir, log_file)
+        else:
+            log_file = os.path.abspath(log_file)
+    report_console_impl = report_console.driver(
+        args.verbosity - args.quietosity,
+        log_file, verbosity_logf = args.log_file_verbosity)
+    report_driver_c.add(report_console_impl)
+    report_file_impl = report_jinja2.driver(log_dir)
+    report_driver_c.add(report_file_impl)
 
     # Setup defaults in the base testcase class
     global ticket

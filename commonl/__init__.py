@@ -1402,7 +1402,7 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
                                 depth_limit = depth_limit - 1)
             count += 1
     else:
-        of.write(prefix + u": " + unicode(d) + u"\n")
+        of.write(prefix + u": " + mkutf8(d) + u"\n")
 
 
 _dict_print_dotted = data_dump_recursive	# COMPAT
@@ -1443,7 +1443,7 @@ def data_dump_recursive_tls(d, tls, separator = u".", of = sys.stdout,
                                         depth_limit = depth_limit - 1)
             count += 1
     else:
-        of.write(unicode(d) + u"\n")
+        of.write(mkutf8(d) + u"\n")
 
 
 class io_tls_prefix_lines_c(io.TextIOWrapper):

@@ -524,7 +524,8 @@ When you need more detail, you can:
   case, there is no good configuration for the chosen target
 
   The output driver can be changed to lay out the information
-  diferently; look at :class:`tcfl.report.report_c`.
+  diferently; look at :ref:`more information on report drivers
+  <tcf_guide_report_driver>`.
 
 Linux targets: Common tricks
 ----------------------------
@@ -921,11 +922,11 @@ Making the client always generate report files
 
 .. code-block:: python
 
-   tcfl.report.file_c.templates['text']['report_pass'] = True
+   tcfl.report_jinja2.driver.templates['text']['report_pass'] = True
 
-Reporting is handled by the :mod:`reporting API <tcfl.report>` and the
-*report* files are created by the Jinja2 :class:`reporter
-<tcfl.report.file_c>` based on a template called *text*.
+Reporting is handled by the :mod:`reporting API <tcfl.tc.reporter_c>`
+and the *report* files are created by the Jinja2 :mod:`reporter
+<tcfl.report_jinja2>` based on a template called *text*.
 
 .. _report_domain_breakup:
 
@@ -941,8 +942,8 @@ metadata for it, so the templating engine can use it
 
 >>> ...
 >>> tcfl.tc.tc_c.hook_pre.append(_my_hook_fn)
->>> filename = tcfl.report.templates["text"]["output_file_name"]
->>> tcfl.report.templates["text"]["output_file_name"] = \
+>>> filename = tcfl.report_jinja2.driver.templates["text"]["output_file_name"]
+>>> tcfl.report_jinja2.driver.templates["text"]["output_file_name"] = \
 >>>     "%(category)s/" + file_name
 
 The `_my_hook_fn()` would look as:
@@ -952,7 +953,7 @@ The `_my_hook_fn()` would look as:
 >>>     testcase.tag_set("category", categoryvalue)
 
 If the data needed is not available until after the testcase executes,
-you can use :class:`reporting hooks <tcfl.report.file_c.hooks>`.
+you can use :class:`reporting hooks <tcfl.report_jinja2.driver.hooks>`.
 
 Capturing network traffic
 -------------------------

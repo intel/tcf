@@ -1,71 +1,105 @@
 #! /usr/bin/python2
 #
-# Copyright (c) 2017 Intel Corporation
+# Copyright (c) 2017-20 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+"""Report data to a MongoDB database
+---------------------------------
 
-# TCF report driver for MongoDB
+This driver dumps all reported data to a MongoDB database, creating
+one document per testcase.
+
+Each document is a dictionary hierarchy of which includes summary data
+and detailed messages and attachments.
+
+See :class:`tcfl.report_mongodb.driver <driver>` for configuration
+details.
+
+The execution messages (pass/errr/fail/skip/block) are stored in a
+subdocument called *results*. Data reports in a subdocument called
+*data*.
+
+For each testcase and the targets where it is ran on (identified by a
+*hashid*) we generate a *document*; each report done for that this
+*hashid* is a *record* in said document with any attachments stored.
+
+Testcase execution results
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Each result document is keyed by *runid:hashid* and structured
+as:
+
+- result
+- runid
+- hashid
+- tc_name
+- target_name
+- target_types
+- target_server
+- timestamp
+- targets: dict of keyed by target name
+
+  - TARGETNAME:
+
+    - id
+    - server
+    - type
+    - bsp_model
+
+- results: list of
+
+  - timestamp
+  - ident
+  - level
+  - tag
+  - message
+  - attachments
+
+- data: dictionary of data domain, name and value
+
+Notes:
+
+- When a field is missing we don't insert it to save space, it
+  has to be considered an empty string (if we expected one) or
+  none present
+
+
+Troubleshooting
+^^^^^^^^^^^^^^^
+
+- When giving SSL and passwords in the URL, the connection fails
+  with messages such as *ConfigurationError: command SON(...)
+  failed: auth failed*
+
+  The installation of PyMongo in your system might be too old, we
+  need > v3.
+
+Pending
+^^^^^^^
+
+- when told to store an attachment PyMongo can't take, it is just
+  throwing an exception--we shall convert that to something so the
+  document is not lost
+"""
+
 import codecs
 import datetime
 import os
 import pymongo
 
-import tcfl.tc
-import tcfl.report
+import commonl
+import tcfl
+import tc
 
-class report_mongodb_c(tcfl.report.report_c):
-    """Report results of testcase execution into a MongoDB database
+class driver(tc.report_driver_c):
+    """
+    Report results of testcase execution into a MongoDB database
 
-    The database used is pointed to by MongoDB URL :attr:`url` and
-    name :attr:`db_name`.
+    The records are written to a database pointed to by MongoDB URL :attr:`url`,
+    database name :attr:`db_name`, collection :attr:`collection name`.
 
-    **Testcase execution results**
-
-    The results of execution (pass/errr/fail/skip/block) are stored in
-    a collection called *results*.
-
-    For each testcase and the targets where it is ran on
-    (identified by a *hashid*) we generate a *document*; each
-    report done for that this *hashid* is a *record* in said
-    document with any attachments stored.
-
-    Each result document is keyed by *runid:hashid* and structured
-    as:
-
-    - result:
-    - runid:
-    - hashid
-    - tc_name
-    - target_name
-    - target_types
-    - target_server
-    - timestamp
-    - targest: dict of keyed by target name
-
-      - TARGETNAME:
-
-        - id
-        - server
-        - type
-        - bsp_model
-
-    - results: list of
-
-      - timestamp
-      - ident
-      - level
-      - tag
-      - message
-      - attachments
-
-    Notes:
-
-    - When a field is missing we don't insert it to save space, it
-      has to be considered an empty string (if we expected one) or
-      none present
-
-    Usage:
+    **Usage**
 
     1. Ensure you have a access to a MongoDB in ``HOST:PORT``,
        where you can create (or there is already) a database called
@@ -76,69 +110,42 @@ class report_mongodb_c(tcfl.report.report_c):
 
        .. code-block:: python
 
-          import tcfl.report
           import tcfl.report_mongodb
-          m = tcfl.report_mongodb.report_mongodb_c()
-          m.url = "mongodb://HOST:PORT" # Or a more complex mongodb URL
-          m.db_name = "DATABASENAME"
-          m.collection_name = "COLLECTIONNAME"
+          m = tcfl.report_mongodb.driver(
+              url = "mongodb://HOST:PORT", # Or a more complex mongodb URL
+              db_name = "DATABASENAME",
+              collection_name = "COLLECTIONNAME"
+          )
           # Optional: modify the record before going in
           m.complete_hooks.append(SOMEHOOKFUNCTION)
-          tcfl.report.report_c.driver_add(m)
+          tcfl.tc.report_driver_c.driver_add(m)
 
-    **Troubleshooting**
+    :param str url: MongoDB URL where to connect to
 
-    - When giving SSL and passwords in the URL, the connection fails
-      with messages such as *ConfigurationError: command SON(...)
-      failed: auth failed*
+    :param str db_name: name of the database to which to connect
 
-      The installation of PyMongo in your system might be too old, we
-      need > v3.
+    :param str collection_name: name of the collection in the database
+      to fill out
 
+    :param dict extra_params: MongoDB client extra params, as described in
+       :class:`pymongo.mongo_client.MongoClient`; this you want to use
+       to configure SSL, such as:
+
+       .. code-block:: python
+
+          tcfl.report_mongodb.report_mongodb_c.extra_params = dict(
+              ssl_keyfile = PATH_TO_KEY_FILE,
+              ssl_certfile = PATH_TO_CERT_FILE,
+              ssl_ca_certs = PATH_TO_CA_FILE,
+          )
     """
-    # FIXME: need a better idea on how to figure out the
-    #        revisions, definitely something along the lines of a
-    #        dictionary of repositoryies with their URLs, top
-    #        levels (relative to where?) and the rev for each; for
-    #        example, if I call /usr/share/tcf/examples/xyz.py
-    #        that refere to something off $ZEPHYR_BASE, how do I
-    #        record the version of xyz.py and the fact that it
-    #        sucked off $ZEPHYR_BASE?
+    def __init__(self, url, db_name, collection_name, extra_params = None):
+        assert isinstance(url, basestring)
+        assert isinstance(db_name, basestring)
+        assert isinstance(collection_name, basestring)
+        assert extra_params == None or isinstance(extra_params, dict)
 
-    #: MongoDB URL where to connect to
-    url = None
-    #: MongoDB client extra params, as described in
-    #: :class:`pymongo.mongo_client.MongoClient`; this you want to use
-    #: to configure SSL, such as:
-    #:
-    #: .. code-block:: python
-    #:
-    #:    tcfl.report_mongodb.report_mongodb_c.extra_params = dict(
-    #:        ssl_keyfile = PATH_TO_KEY_FILE,
-    #:        ssl_certfile = PATH_TO_CERT_FILE,
-    #:        ssl_ca_certs = PATH_TO_CA_FILE,
-    #:    )
-    extra_params = dict()
-    #: Name of the database to which to connect
-    db_name = None
-    #: Name of the collection in the database to fill out
-    collection_name = None
-
-    #: List of functions to run when a document is completed before
-    #: uploading to MongoDB; each is passed the arguments:
-    #:
-    #: :param tcfl.tc.tc_c _tc: testcase object
-    #: :param str runid: current TC's runid
-    #: :param str hashid: current TC's hashid
-    #: :param str tc_name: current testcase name
-    #: :param dict doc: current document that will be inserted into
-    #:   the database; the hook function can add fields, but it is not
-    #:   recommended modifying existing fields.
-
-    complete_hooks = []
-
-    def __init__(self):
-        tcfl.report.report_c.__init__(self)
+        tc.report_driver_c.__init__(self)
         # Where we keep all the file descriptors to the different
         # files we are writing to based on the code
         self.docs = {}
@@ -162,47 +169,62 @@ class report_mongodb_c(tcfl.report.report_c):
         # _mongo_setup() again, we also do it if we are in a different PID.
         self.made_in_pid = None
 
-    def _report(self, level, alevel, ulevel, _tc, tag, message, attachments):
+        self.url = url
+        self.db_name = db_name
+        self.collection_name = collection_name
+        self.extra_params = extra_params if extra_params else dict()
+
+        #: List of functions to run when a document is completed before
+        #: uploading to MongoDB; each is passed the arguments:
+        #:
+        #: :param tc.tc_c _tc: testcase object
+        #: :param str runid: current TC's runid
+        #: :param str hashid: current TC's hashid
+        #: :param str tc_name: current testcase name
+        #: :param dict doc: current document that will be inserted into
+        #:   the database; the hook function can add fields, but it is not
+        #:   recommended modifying existing fields.
+        self.complete_hooks = []
+
+
+    def report(self, reporter, tag, ts, delta,
+               level, message,
+               alevel, attachments):
         """
-        Report data to documents in mongodb; we accumulate all the
-        data until the completion message and at that point we
-        upload to MongoDB.
+        Collect data to report to a MongoDB record
+
+        We accumulate all the data until the completion message and at
+        that point we upload to MongoDB.
         """
         # Extreme chitchat we ignore it -- this is mainly the failed
         # to acquire (busy, retrying), which can add to a truckload of
         # messages
         if tag == "INFO" and level >= 6:
             return
-        # MongoDB not configured
-        if not self.url or not self.db_name:
+        # skip global reporter, not meant to be used here
+        if reporter == tc.tc_global:
             return
-        # Okie, this is a hack -- don't report on things tagged as this
-        if getattr(_tc, "skip_reports", False) == True:
-            return	# We don't operate on the global reporter fake TC
 
-        # FIXME: runid should be in tc_c.runid, as well as hashid,
-        # instead of having to parse like this -- so they can be
-        # extracted as in the block below
-        runid = _tc.kws['runid']
-        hashid = _tc.kws['tc_hash']
+        runid = reporter.kws['runid']
+        hashid = reporter.kws['tc_hash']
         if not hashid:	            # can't do much if we don't have this
             return
 
         # Extract the target name where this message came from (if the
         # reporter is a target)
-        if isinstance(_tc, tcfl.tc.target_c):
-            target_name = " @" + _tc.fullid + _tc.bsp_suffix()
-            target_server = _tc.rtb.aka
-            target_type = _tc.type
-            tc_name = _tc.testcase.name
-        elif isinstance(_tc, tcfl.tc.tc_c):
+        if isinstance(reporter, tc.target_c):
+            target_name = " @" + reporter.fullid + reporter.bsp_suffix()
+            target_server = reporter.rtb.aka
+            target_type = reporter.type
+            tc_name = reporter.testcase.name
+        elif isinstance(reporter, tc.tc_c):
             target_name = None
             target_server = None
             target_type = None
-            tc_name = _tc.name
+            tc_name = reporter.name
         else:
-            assert False, "_tc is %s, not tcfl.tc.{tc,target}_c" \
-                % type(_tc).__name__
+            raise AssertionError(
+                "reporter is not tc.{tc,target}_c but %s" % type(reporter))
 
         doc = self.docs.setdefault((runid, hashid, tc_name),
                                    dict(results = [], data = {}))
@@ -219,7 +241,7 @@ class report_mongodb_c(tcfl.report.report_c):
             level = level,
             tag = tag,
             # MongoDB doesn't like bad UTF8, so filter a wee bit
-            message = tcfl.report._mkutf8(message) if tag != "DATA" else "",
+            message = commonl.mkutf8(message) if tag != "DATA" else "",
         )
         if target_name:
             result["target_name"] = target_name
@@ -231,16 +253,13 @@ class report_mongodb_c(tcfl.report.report_c):
         if tag == "DATA":
             # We store data attachments in a different place, so it is
             # easier to get to them.
-            #
-            # These must exist, otherwise it is a bug
-            #
-            # data Domain and name must be valid MongoDB fields, so we
-            # replace periods and starting dollar signs with an
-            # underscore.
             domain = attachments['domain']
             assert isinstance (domain, basestring), \
                 "data domain name '%s' is a %s, need a string" \
                 % (domain, type(domain).__name__)
+            # clean up field (domain.name=value), can't have ., $ on start
+            # as *domain* and *name* are being used as MongoDB fields,
+            # thus must be valid field names.
             domain = domain.replace(".", "_")
             if domain.startswith("$"):
                 domain = domain.replace("$", "_", 1)
@@ -253,31 +272,20 @@ class report_mongodb_c(tcfl.report.report_c):
                 name = name.replace("$", "_", 1)
             value = attachments['value']
             doc['data'].setdefault(domain, {})
+            if isinstance(value, basestring):
+                # MongoDB doesn't like bad UTF8, so filter a wee bit
+                value = commonl.mkutf8(value)
             doc['data'][domain][name] = value
-        else:
-            if attachments:
-                result['attachment'] = {}
-                for key, attachment in attachments.iteritems():
-                    if attachment == None:
-                        continue
-                    if hasattr(attachment, "name"):
-                        # Is it a file? reopen it to read so we don't
-                        # modify the original pointer FIXME: kinda
-                        # lame, will fail for big files
-                        with codecs.open(attachment.name, "r",
-                                         encoding = 'utf-8',
-                                         errors = 'ignore') as f:
-                            # We don't want to report all the file,
-                            # just since the last change
-                            if not attachment.closed:
-                                f.seek(attachment.tell())
-                            result['attachment'][key] = f.read()
-                    elif isinstance(attachment, basestring):
-                        # MongoDB doesn't like bad UTF8, so filter a wee bit
-                        result["attachment"][key] = \
-                            tcfl.report._mkutf8(attachment)
-                    else:
-                        result["attachment"][key] = attachment
+        elif attachments:
+            result['attachment'] = {}
+            for key, attachment in attachments.iteritems():
+                if attachment == None:
+                    continue
+                if isinstance(attachment, basestring):
+                    # MongoDB doesn't like bad UTF8, so filter a wee bit
+                    result["attachment"][key] = commonl.mkutf8(attachment)
+                else:
+                    result["attachment"][key] = attachment
 
         doc['results'].append(result)
         del result
@@ -286,7 +294,7 @@ class report_mongodb_c(tcfl.report.report_c):
         # collection
         if message.startswith("COMPLETION"):
             doc['result'] = tag
-            self._complete(_tc, runid, hashid, tc_name, doc)
+            self._complete(reporter, runid, hashid, tc_name, doc)
             del self.docs[(runid, hashid, tc_name)]
             del doc
 
@@ -298,10 +306,8 @@ class report_mongodb_c(tcfl.report.report_c):
         self.results = self.db[self.collection_name]
         self.made_in_pid = os.getpid()
 
-    def _complete(self, _tc, runid, hashid, tc_name, doc):
-        """
-        Deliver to mongodb after adding a few more fields
-        """
+    def _complete(self, reporter, runid, hashid, tc_name, doc):
+        # Deliver to mongodb after adding a few more fields
 
         doc['runid'] = runid
         doc['hashid'] = hashid
@@ -312,17 +318,17 @@ class report_mongodb_c(tcfl.report.report_c):
         else:
             doc['_id'] = hashid
 
-        doc['target_name'] = _tc.target_group.name \
-                             if _tc.target_group else 'n/a'
-        if _tc.targets:
+        doc['target_name'] = reporter.target_group.name \
+                             if reporter.target_group else 'n/a'
+        if reporter.targets:
             servers = set()		# We don't care about reps in servers
             target_types = []	# Here we want one per target
             doc['targets'] = {}
             # Note this is sorted by target-want-name, the names
             # assigned by the testcase to the targets, so all the
             # types and server lists are sorted by that.
-            for tgname in sorted(_tc.targets.keys()):
-                target = _tc.targets[tgname]
+            for tgname in sorted(reporter.targets.keys()):
+                target = reporter.targets[tgname]
                 doc['targets'][tgname] = dict(
                     server = target.rtb.aka, id = target.id,
                     type = target.type, bsp_model = target.bsp_model)
@@ -339,8 +345,8 @@ class report_mongodb_c(tcfl.report.report_c):
 
         tags = {}
         components = []
-        for tag in _tc._tags:
-            (value, _origin) = _tc.tag_get(tag, "", "")
+        for tag in reporter._tags:
+            (value, _origin) = reporter.tag_get(tag, "", "")
             tags[tag] = str(value)
             if tag == 'components':
                 components = value.split()
@@ -362,9 +368,12 @@ class report_mongodb_c(tcfl.report.report_c):
                 break
             except pymongo.errors.PyMongoError as e:
                 if retry_count <= 3:
-                    raise tcfl.tc.blocked_e(
+                    raise tc.blocked_e(
                         "MongoDB error, can't record result: %s" % e)
                 else:
                     self.results = None
-                    _tc.warning("MongoDB error, reconnecting (%d/3): %s"
-                                % (e, retry_count))
+                    reporter.warning("MongoDB error, reconnecting (%d/3): %s"
+                                     % (e, retry_count))
+
+# backwards compat	# COMPAT
+report_mongodb_c = driver
