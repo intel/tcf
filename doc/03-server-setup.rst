@@ -995,6 +995,33 @@ d. Make the POS root image available over NFS as read-only (note we
      Export list for localhost:
      /home/ttbd/images/tcf-live/x86_64 *
 
+e. Perform final image setup:
+
+   - Allow login in via SSH--this is used when the serial console is
+     not very stable; allows us to do basic start via serial console
+     and switch to SSH to do the job:
+
+       1. Mount a FS read write where *sshd* can write its state::
+
+            $ cd /home/ttbd/images/tcf-live/x86_64/etc/
+            $ echo 'tmpfs /var/empty/sshd tmpfs defaults 0 0' | sudo tee -a fstab
+
+       1. Create *sshd*'s host keys::
+
+            $ cd /home/ttbd/images/tcf-live/x86_64/etc/ssh
+            $ for v in rsa ecdsa ed25519; do \
+                sudo ssh-keygen -f ssh_host_${v}_key -q -t $v -C '' -N ''; done
+
+       3. Allow SSH to login as root and with no password (note this
+          is safe in the POS environment since it is only being used
+          for provisioning the target)::
+
+            $ cat <<EOF | sudo tee -a sshd_config
+            PermitRootLogin yes
+            PermitEmptyPasswords yes
+            EOF
+
+     
 .. _ttbd_pos_deploying_images:
 
 POS: Deploying other images
