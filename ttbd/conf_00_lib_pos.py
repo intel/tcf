@@ -986,6 +986,11 @@ def target_qemu_pos_add(target_name,
         consolel.append(
             ( console, console_pc )
         )
+    consolel += [
+        ( "ssh0", ttbl.console.ssh_pc("root@" + ipv4_addr) ),
+        ( "default",  consolel[0][0] ),
+        ( "preferred",  "ssh0" ),
+    ]
     target.interface_add("console", ttbl.console.interface(*consolel))
     target.interface_add("capture", ttbl.capture.interface(
         vnc0_screenshot = capture_screenshot_vnc,
@@ -1002,7 +1007,7 @@ def target_qemu_pos_add(target_name,
         tags = dict(
             bsp_models = { 'x86_64': None },
             bsps = dict(
-                x86_64 = dict(console = 'x86_64', linux = True),
+                x86_64 = dict(linux = True),
             ),
         )
     )
