@@ -100,6 +100,9 @@ running locally on your machine:
 
      $ sudo install -d -o $LOGNAME -g $LOGNAME /etc/ttbd-staging
 
+   (note you can also create a config file ``conf_NAME.py`` anywhere
+   and invoke later with ``--config-file conf_NAME.py``.
+     
 5. link the following config files from your source tree::
 
      $ cd /etc/ttbd-staging
@@ -127,10 +130,20 @@ running locally on your machine:
    configuration statements to enable hardware as needed. The default
    configuration has only virtual machines.
 
-8. If you will use local Linux VMs (qlf*), set up the images by
-   following this FIXME: procedure.
+8. To start manually, running on the console::
 
-9. Create a configuration for systemd to start the daemon::
+     $ ttbd --config-path :/etc/ttbd-staging -vvvv
+
+   Depending on your user's permissions and privleges, you might not
+   be able to access certain system features or hardware devices. Or
+   if there is a config file that you want used anywhere else::
+
+     $ ttbd --config-file conf_NAME.py -vvvv
+
+   which can be combined also with ``--config-path`` to load both.
+   
+9. (optionally) To start using *systemd* create a configuration for
+   systemd to start the daemon::
 
      # cp ~user/tcf.git/ttbd/ttbd@.service /etc/systemd/systemctl/ttbd@staging.service
 
