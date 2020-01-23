@@ -375,6 +375,9 @@ class rest_target_broker(object):
                and all_targets != True:
                 continue
             rt['fullid'] = self.aka + "/" + rt['id']
+            # FIXME: hack, we need this for _rest_target_find_by_id,
+            # we need to change where we store it in this cache
+            rt['rtb'] = self
             _targets.append(rt)
         del r
         return _targets
@@ -774,8 +777,7 @@ def _rest_target_find_by_id(_target):
         return rt['rtb'], rt
     # Dirty messy search
     for rt in rest_target_broker.rts_cache.itervalues():
-        if rt['id'] == _target \
-           or rt['url'] == _target:
+        if rt['id'] == _target:
             return rt['rtb'], rt
     raise IndexError("target-id '%s': not found" % _target)
 
@@ -910,6 +912,7 @@ def rest_target_list(args):
         l = []
         for rt_fullid, rt in sorted(rest_target_broker.rts_cache.iteritems(),
                                     key = lambda x: x[0]):
+            rt.pop('rtb')	# can't json this
             try:
                 if spec and not _target_select_by_spec(rt, spec):
                     continue
