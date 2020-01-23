@@ -126,7 +126,7 @@ def target_add(target, _id = None, tags = None, target_type = None,
             raise ValueError("target ID %s already exists" % _id)
         targets[_id] = target
     target.tags.setdefault('interconnects', {})
-    target.tags_update(dict(id = target.id, path = target.state_dir))
+    target.tags_update(dict(id = target.id))
     assert isinstance(target.tags['interconnects'], dict)
 
 def interconnect_add(ic, _id = None, tags = None, ic_type = None,
