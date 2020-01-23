@@ -438,31 +438,6 @@ class rest_target_broker(object):
             })
         return r['value']
 
-    def rest_tb_target_ip_tunnel_add(self, rt, ip_addr, port, proto,
-                                     ticket = ''):
-        r = self.send_request("POST", "targets/%s/ip_tunnel" % rt['id'],
-                              data = {
-                                  'ip_addr': ip_addr,
-                                  'port': port,
-                                  'proto': proto,
-                                  'ticket': ticket,
-                              })
-        return int(r['port'])
-
-    def rest_tb_target_ip_tunnel_remove(self, rt, ip_addr, port, proto,
-                                        ticket = ''):
-        self.send_request("DELETE", "targets/%s/ip_tunnel" % rt['id'],
-                          data = {
-                              'ip_addr': ip_addr,
-                              'port': port,
-                              'proto': proto,
-                              'ticket': ticket,
-                          })
-
-    def rest_tb_target_ip_tunnel_list(self, rt, ticket = ''):
-        r = self.send_request("GET", "targets/%s/ip_tunnel" % rt['id'],
-                              data = { 'ticket': ticket })
-        return r['tunnels']
 
     # COMPAT
     def rest_tb_target_power_on(self, rt, ticket = ''):

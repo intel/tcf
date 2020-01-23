@@ -539,39 +539,6 @@ def tb_file_local_path_get(username, filepath):
     else:
         return local_filepath
 
-
-@app.route(API_PREFIX + 'targets/<string:target_id>/ip_tunnel',
-           methods = [ 'POST', 'DELETE', 'GET' ])
-@flask_login.login_required
-def _target_ip_tunnel(target_id):
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    ticket = flask.request.form.get('ticket', "")
-    # These are only used for POST/DELETE
-    ip_addr = flask.request.form.get('ip_addr', None)
-    ports = flask.request.form.get('port', None)
-    proto = flask.request.form.get('proto', None)
-    try:
-        if flask.request.method == "POST":
-            port = int(ports)
-            local_port = target.ip_tunnel_add(who_make(ticket),
-                                              ip_addr, port, proto)
-            r = dict(port = local_port)
-        elif flask.request.method == "DELETE":
-            port = int(ports)
-            target.ip_tunnel_remove(who_make(ticket), ip_addr, port, proto)
-            r = dict()
-        elif flask.request.method == "GET":
-            tunnels = target.ip_tunnel_list(who_make(ticket))
-            r = dict(tunnels = tunnels)
-        target.timestamp()	# If this works, it is acquired and locked
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify(r)
-
-
 @app.route(API_PREFIX + 'targets/<string:target_id>/' \
            + '<string:interface>/<string:call>',
            methods = [ 'PUT', 'POST', 'DELETE', 'GET' ])

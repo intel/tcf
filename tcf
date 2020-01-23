@@ -77,6 +77,9 @@ def healthcheck(args):
         else:
             print "WARNING: No power control interface"
 
+        if hasattr(target, "tunnel"):
+            target.tunnel._healthcheck()
+
         print "releasing"
         target.release()
         print "OK: released"
@@ -297,9 +300,6 @@ if __name__ == "__main__":
 
     # Setup different modules and drivers
     tcfl.tc.argp_setup(arg_subparsers)
-    # FIXME: ugly
-    import tcfl.target_ext_tunnel
-    tcfl.target_ext_tunnel.cmdline_setup(arg_subparsers)
     # imported by tcfl.tc
     tcfl.tc.pos.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
@@ -311,6 +311,7 @@ if __name__ == "__main__":
     tcfl.tc.target_ext_fastboot._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_power._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_things._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_tunnel.cmdline_setup(arg_subparsers)
 
     ap = arg_subparsers.add_parser("healthcheck",
                                    help = "Do a very basic health check")

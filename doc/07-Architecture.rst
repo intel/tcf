@@ -281,6 +281,8 @@ processes with undertermined life cycles.
 Interfaces
 ----------
 
+.. automodule:: ttbl.tunnel
+
 Power control
 ^^^^^^^^^^^^^
 

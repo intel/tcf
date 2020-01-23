@@ -10,6 +10,9 @@ Create and remove network tunnels to the target via the server
 
 """
 
+import pprint
+
+from . import msgid_c
 import tc
 import ttb_client
 
@@ -42,12 +45,24 @@ class tunnel(tc.target_extension_c):
         # FIXME: this shall validate the IP address using python-ipaddress
         if ip_addr:
             return ip_addr
-        if self.ip_addr:
-            return self.ip_addr
-        ip_addr = self.target.rt.get(
-            'ipv4_addr', self.target.rt.get('ipv6_addr', None))
-        if ip_addr:
-            return ip_addr
+        target = self.target
+        interconnects = target.rt.get('interconnects', {}).keys()
+        boot_ic = target.rt.get('pos_boot_interconnect', None)
+        if boot_ic:
+            # if the boot interconnect is available in the list of
+            # interconnect, arrange the list so it is the first one we
+            # try
+            if boot_ic in interconnects:
+                interconnects.remove(boot_ic)
+            interconnects = [ boot_ic ] + interconnects
+        for ic_name in interconnects:
+            ic = target.rt['interconnects'][ic_name]
+            ipv4_addr = ic.get('ipv4_addr', None)
+            if ipv4_addr:
+                return ipv4_addr
+            ipv6_addr = ic.get('ipv6_addr', None)
+            if ipv6_addr:
+                return ipv6_addr
         raise RuntimeError(
             "Cannot identify any IPv4 or IPv6 address to use; "
             "please set it in "
@@ -55,21 +70,22 @@ class tunnel(tc.target_extension_c):
             "or pass it explicitly")
 
 
-    def add(self, port, ip_addr = None, proto = None):
+    def add(self, port, ip_addr = None, protocol = None):
         """
         Setup a TCP/UDP/SCTP v4 or v5 tunnel to the target
 
-        A local port of the given protocol in the server is fowarded
+        A local port of the given protocol in the server is forwarded
         to the target's port. Teardown with :meth:`remove`.
 
         If the tunnel already exists, it is not recreated, but the
         port it uses is returned.
 
-        Redirects targets TCP4 port 3000 to server_port in the server
-        that provides ``target`` (target.kws['server']).
+        Example: redirect target's TCP4 port 3000 to a port in the server
+          that provides ``target`` (target.kws['server']).
 
-        >>> server_name = target.rtb.parsed_url.hostname
-        >>> server_port = target.tunnel.add(3000)
+          >>> server_port = target.tunnel.add(3000)
+          >>> server_name = target.rtb.parsed_url.hostname
+          >>> server_name = target.kws['server']    # alternatively
 
         Now connecting to ``server_name:server_port`` takes you to the
         target's port 3000.
@@ -78,27 +94,36 @@ class tunnel(tc.target_extension_c):
         :param str ip_addr: (optional) target's IP address to use (it
           must be listed on the targets's tags *ipv4_address* or
           *ipv6_address*).
-        :param str proto: (optional) Protocol to tunnel:
-          {udp,sctp,tcp}[{4,6}] (defaults to v4 and to TCP)
+        :param str protocol: (optional) Protocol to tunnel:
+          {udp,sctp,tcp}[{4,6}] (defaults to TCP v4)
         :returns int local_port: port in the server where to connect
           to in order to access the target.
         """
-        if proto == None:
-            proto = 'tcp'
+        if protocol == None:
+            protocol = 'tcp'
         else:
-            assert isinstance(proto, basestring)
-        assert isinstance(port, int)
+            assert isinstance(protocol, basestring), \
+                "protocol shall be a string; got %s" % type(protocol)
+        assert port > 0
         target = self.target
         ip_addr = self._ip_addr_get(ip_addr)
 
-        r = target.rtb.rest_tb_target_ip_tunnel_add(
-            target.rt, ip_addr, port, proto, ticket = target.ticket)
-        self.target.report_info("%s tunnel added from %s:%d to %s:%d"
-                                % (proto, target.rtb.parsed_url.hostname, r,
-                                   ip_addr, port))
-        return r
+        r = self.target.ttbd_iface_call("tunnel", "tunnel",
+                                        ip_addr = ip_addr,
+                                        protocol = protocol,
+                                        port = port,
+                                        method = "PUT")
+        server_port = r['result']
+        self.target.report_info(
+            "%s tunnel added from %s:%d to %s:%d" % (
+                protocol,
+                target.rtb.parsed_url.hostname, server_port,
+                ip_addr, port)
+        )
+        return server_port
 
-    def remove(self, port, ip_addr = None, proto = None):
+
+    def remove(self, port, ip_addr = None, protocol = None):
         """
         Teardown a TCP/UDP/SCTP v4 or v5 tunnel to the target
         previously created with :meth:`add`.
@@ -110,51 +135,119 @@ class tunnel(tc.target_extension_c):
         :param str proto: (optional) Protocol to tunnel:
           {udp,sctp,tcp}[{4,6}] (defaults to v4 and to TCP)
         """
-        if proto == None:
-            proto = 'tcp'
+        if protocol == None:
+            protocol = 'tcp'
         else:
-            assert isinstance(proto, basestring)
-        assert isinstance(port, int)
+            assert isinstance(protocol, basestring), \
+                "protocol shall be a string; got %s" % type(protocol)
+        assert port > 0
         ip_addr = self._ip_addr_get(ip_addr)
 
-        target = self.target
-        target.rtb.rest_tb_target_ip_tunnel_remove(
-            target.rt, ip_addr, port, proto, ticket = target.ticket)
+        self.target.ttbd_iface_call("tunnel", "tunnel",
+                                    ip_addr = ip_addr,
+                                    protocol = protocol,
+                                    port = port,
+                                    method = "DELETE")
+
 
     def list(self):
         """
         List existing IP tunnels
 
-        :returns: list of tuples (protocol, target-ip-address, port,
-          port-in-server)
+        :returns: list of tuples::
+          (protocol, target-ip-address, target-port, server-port)
+
+        Reminder that the server's hostname can be obtained from:
+
+        >>> target.rtb.parsed_hostname
         """
+        r = self.target.ttbd_iface_call("tunnel", "list", method = "GET")
+        return r['result']
+
+
+    def _healthcheck(self):
         target = self.target
-        return target.rtb.rest_tb_target_ip_tunnel_list(target.rt,
-                                                        ticket = target.ticket)
+        tunnels = target.tunnel.list()
+        for protocol, ip_address, target_port, server_port in tunnels:
+            print "Removing existing tunnel %s %s -> %s:%s" \
+                % (protocol, server_port, ip_address, target_port)
+            target.tunnel.remove(target_port, ip_address, protocol)
 
-# FIXME: work out tcf creating target_c instances, so it is easier to
-# automate creating cmdline wrappers
+        server_port = target.tunnel.add(22)
+        print "OK: added tunnel to port 22"
 
-def cmdline_tunnel_add(args):
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    port = rtb.rest_tb_target_ip_tunnel_add(rt, args.ip_addr,
-                                            args.port, args.protocol,
-                                            ticket = args.ticket)
-    print "%s:%d" % (rtb.parsed_url.hostname, port)
+        tunnels = target.tunnel.list()
+        assert len(tunnels) == 1, \
+            "FAIL: list() lists %d tunnels; expected 1; got %s" % (
+                len(tunnels), pprint.pformat(tunnels))
+        print "OK: list() lists only one tunnel"
+        assert tunnels[0][2] == 22, \
+            "target port is not 22 as requested; got %s" % tunnels[0]
 
-def cmdline_tunnel_remove(args):
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    rtb.rest_tb_target_ip_tunnel_remove(rt, args.ip_addr,
-                                        args.port, args.protocol,
-                                        ticket = args.ticket)
+        server_port = target.tunnel.add(23)
+        print "OK: added tunnel to port 23"
 
-def cmdline_tunnel_list(args):
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    tunnels = rtb.rest_tb_target_ip_tunnel_list(rt, ticket = args.ticket)
-    for tunnel in tunnels:
-        print "%s %s:%s %s:%s" % (tunnel[0],
-                                  rtb.parsed_url.hostname, tunnel[3],
-                                  tunnel[1], tunnel[2])
+        tunnels = target.tunnel.list()
+
+        assert len(tunnels) == 2, \
+            "FAIL: list() lists %d tunnels; expected 2; got %s" % (
+                len(tunnels), pprint.pformat(tunnels))
+        print "OK: list() lists two tunnels"
+        assert 23 in [ _tunnel[2] for _tunnel in tunnels ], \
+            "target port 23 not in tunnel list as requested; got %s" \
+                % pprint.pformat(tunnels)
+        assert 22 in [ tunnel[2] for tunnel in tunnels ], \
+            "target port 22 not in tunnel list as requested; got %s" \
+                % pprint.pformat(tunnels)
+        print "OK: we got a tunnel to 23 and to 22"
+
+        target.tunnel.remove(22)
+        print "OK: removed tunnel to port 22"
+        tunnels = target.tunnel.list()
+        assert len(tunnels) == 1, \
+            "reported tunnels are %d; expected 1" % len(tunnels)
+
+        # leftover tunnel is the one to port 23
+        assert tunnels[0][2] == 23, \
+            "target port is not 23 as expected; got %s" % tunnels[0]
+        assert 23 in [ tunnel[2] for tunnel in tunnels ], \
+            "target port 23 not in tunnel list as requested; got %s" \
+                % pprint.pformat(tunnels)
+        print "OK: list() lists only tunnel to port 23"
+        target.tunnel.remove(23)
+        print "OK: removed tunnel to port 23"
+        tunnels = target.tunnel.list()
+        assert len(tunnels) == 0, \
+            "reported tunnels are %d; expected 0; got %s" % (
+                len(tunnels), pprint.pformat(tunnels))
+        print "OK: no tunnels listed after removing all"
+
+        # can't really test the tunnel because we don't know if the
+        # target is listening, has a real IP interface, etc...this is
+        # a very basic healhcheck on the server side
+
+def _cmdline_tunnel_add(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args, iface = "tunnel")
+        server_port = target.tunnel.add(args.port, args.ip_addr, args.protocol)
+        print "%s:%d" % (target.rtb.parsed_url.hostname, server_port)
+
+def _cmdline_tunnel_remove(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args, iface = "tunnel")
+        target.tunnel.remove(args.port, args.ip_addr, args.protocol)
+
+
+def _cmdline_tunnel_list(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args, iface = "tunnel")
+        for proto, ip_addr, port, local_port in  target.tunnel.list():
+            print "%s %s:%s %s:%s" % (
+                proto,
+                target.rtb.parsed_url.hostname, local_port,
+                ip_addr, port
+            )
+
 
 def cmdline_setup(argsp):
     ap = argsp.add_parser("tunnel-add", help = "create an IP tunnel")
@@ -165,12 +258,12 @@ def cmdline_setup(argsp):
     ap.add_argument("protocol", metavar = "PROTOCOL", action = "store",
                     nargs = "?", default = None, type = str,
                     help = "Protocol to tunnel {tcp,udp,sctp}[{4,6}] "
-                    "(defaults to tcp and to IPv4)")
+                    "(defaults to TCPv4)")
     ap.add_argument("ip_addr", metavar = "IP-ADDR", action = "store",
                     nargs = "?", default = None, type = str,
                     help = "target's IP address to tunnel to "
                     "(default is the first IP address the target declares)")
-    ap.set_defaults(func = cmdline_tunnel_add)
+    ap.set_defaults(func = _cmdline_tunnel_add)
 
     ap = argsp.add_parser("tunnel-remove",
                           help = "remove an existing IP tunnel")
@@ -186,9 +279,9 @@ def cmdline_setup(argsp):
                     nargs = "?", default = None,
                     help = "target's IP address to tunnel to "
                     "(default is the first IP address the target declares)")
-    ap.set_defaults(func = cmdline_tunnel_remove)
+    ap.set_defaults(func = _cmdline_tunnel_remove)
 
     ap = argsp.add_parser("tunnel-list", help = "List existing IP tunnels")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
-    ap.set_defaults(func = cmdline_tunnel_list)
+    ap.set_defaults(func = _cmdline_tunnel_list)

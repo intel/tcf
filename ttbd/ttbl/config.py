@@ -11,7 +11,9 @@ Configuration API for *ttbd*
 import threading
 import collections
 import re
+
 import ttbl
+import ttbl.tunnel
 
 urls = []
 targets = {}
@@ -72,6 +74,10 @@ def _nested_list_flatten(l):
         else:
             yield e
 
+# implementation of the tunneling interface; since it contains no
+# state, only one instance is needed that all target can share
+_iface_tunnel = ttbl.tunnel.interface()
+
 def target_add(target, _id = None, tags = None, target_type = None,
                acquirer = None):
     """
@@ -128,6 +134,15 @@ def target_add(target, _id = None, tags = None, target_type = None,
     target.tags.setdefault('interconnects', {})
     target.tags_update(dict(id = target.id, path = target.state_dir))
     assert isinstance(target.tags['interconnects'], dict)
+
+    # default interfaces
+
+    # tunneling interface; always on, since we can't make a
+    # determination with the limited information we have here if the
+    # target has an IP or not...and it is very cheap.
+    global _iface_tunnel
+    target.interface_add("tunnel", _iface_tunnel)
+
 
 def interconnect_add(ic, _id = None, tags = None, ic_type = None,
                      acquirer = None):
