@@ -1086,6 +1086,7 @@ if __name__ == "__main__":
         args.state_path = "/var/run/ttbd" + ttbl.config.instance_suffix
         # State that stays through reboots
         args.var_lib_path = os.path.join("/var/lib/ttbd", args.system_wide)
+    args.var_lib_path = os.path.expanduser(args.var_lib_path)
 
     os.umask(0o007)
 
