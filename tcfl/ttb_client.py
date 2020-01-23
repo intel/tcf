@@ -375,8 +375,6 @@ class rest_target_broker(object):
                and all_targets != True:
                 continue
             rt['fullid'] = self.aka + "/" + rt['id']
-            rt["url"] = self._base_url + 'targets/' + rt["id"]
-            rt['rtb'] = self
             _targets.append(rt)
         del r
         return _targets
@@ -760,9 +758,7 @@ def rest_target_print(rt, verbosity = 0):
     elif verbosity == 3:
         pprint.pprint(rt)
     else:
-        rtb =  rt.pop('rtb')	# DIRTY: Can't get skipkeys to work that well
-        print json.dumps(rt, skipkeys = True, indent = 8)
-        rt['rbt'] = rtb
+        print json.dumps(rt, skipkeys = True, indent = 4)
 
 def _rest_target_find_by_id(_target):
     """
@@ -911,14 +907,22 @@ def rest_target_list(args):
         rest_target_list_table(args, spec)
         return
     else:
+        l = []
         for rt_fullid, rt in sorted(rest_target_broker.rts_cache.iteritems(),
                                     key = lambda x: x[0]):
             try:
                 if spec and not _target_select_by_spec(rt, spec):
                     continue
-                rest_target_print(rt, args.verbosity)
+                l.append(rt)
             except requests.exceptions.ConnectionError as e:
                 logger.error("%s: can't use: %s", rt_fullid, e)
+
+        if  args.verbosity == 4:
+            # print as a JSON dump
+            print json.dumps(l, skipkeys = True, indent = 4)
+        else:
+            for rt in l:
+                rest_target_print(rt, args.verbosity)
 
 
 def rest_target_find_all(all_targets = False):
