@@ -17,6 +17,7 @@ import commonl.requirements
 # Verify that we can run TCF
 commonl.requirements.verify_python_version()
 
+import cPickle
 import collections
 import argparse
 import os
@@ -88,6 +89,20 @@ def healthcheck(args):
         print "OK: released"
 
         print "%s: healthcheck completed" % target.id
+
+def _cookies(args):
+    if '/' in args.target:
+        # cache is by full id
+        rtb = ttb_client.rest_target_broker.rts_cache[args.target]['rtb']
+    else:
+        for rt_fullid, rt in ttb_client.rest_target_broker.rts_cache.iteritems():
+            if rt['id'] == args.target:
+                rtb = rt['rtb']
+                break
+        else:
+            raise ValueError("%s: unknown target" % args.target)
+
+    commonl._dict_print_dotted(rtb.cookies, separator = "")
 
 
 if __name__ == "__main__":
@@ -182,6 +197,14 @@ if __name__ == "__main__":
 
     ap = arg_subparsers.add_parser("logout", help = "Logout from the different brokers")
     ap.set_defaults(func = ttb_client.rest_logout)
+
+    ap = arg_subparsers.add_parser("cookies",
+                                   help = "Show logging cookies (to feed"
+                                   " into curl, etc) maybe only for one server")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = [], help = "Target name")
+    ap.set_defaults(func = _cookies)
+
 
     arg_parser_target_list = arg_subparsers.add_parser(
         "list", help = "List the targets; by default, in a terminal, it will "
