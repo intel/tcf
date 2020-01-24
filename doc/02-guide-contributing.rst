@@ -75,6 +75,43 @@ installing system wide (and potentially conflicting versions),
 requires some setup. This is usually called the *staging* server,
 running locally on your machine:
 
+0. Install dependencies:
+
+   - Fedora / RHEL / CentOS::
+
+       # dnf install -y \
+         dfu-util \
+         dosfstools \
+         gcc \
+         git \
+         ipmitool \
+         livecd-tools \
+         make \
+         openocd \
+         openssh-clients \
+         parted \
+         pyOpenSSL \
+         pyserial \
+         python-flask \
+         python-flask-login \
+         python-flask-principal \
+         python-ldap \
+         python-pexpect \
+         python-ply \
+         python-requests \
+         python-systemd \
+         python-tornado \
+         python-werkzeug \
+         python2-devel \
+         python2-keyring \
+         python2-pyghmi \
+         python2-pysnmp \
+         pyusb \
+         qemu \
+         socat \
+         sshpass
+       $ pip install --user sdnotify python-prctl
+
 1. Disable SELinux::
 
    # setenforce 0
