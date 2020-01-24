@@ -85,7 +85,7 @@ class interface(ttbl.tt_interface):
         'generic', 'w', 't'
     )
 
-    def put_run(self, target, who, args, user_path):
+    def put_run(self, target, who, args, _files, user_path):
         baudrate = args.get('baudrate', None)
         mode = args.get('mode', None)
         assert mode in self.allowed_modes, \

@@ -512,34 +512,34 @@ class interface(ttbl.tt_interface):
     # called by the daemon when a METHOD request comes to the HTTP path
     # /ttb-vVERSION/targets/TARGET/interface/console/CALL
 
-    def get_list(self, target, _who, _args, _user_path):
+    def get_list(self, target, _who, _args, _files, _user_path):
         # return a dictionary indicating the individual state of
         # each power component
         _, data, _ = self._get(target)
         # return a sorted list, so the order is maintained
         return dict(power = [ ( i, s ) for i, s in data.items() ])
 
-    def get_get(self, target, _who, _args, _user_path):
+    def get_get(self, target, _who, _args, _files, _user_path):
         # return a single bool saying if all the power rail
         # components are on
         result, _, _  = self._get(target)
         return dict(result = result)
 
-    def put_on(self, target, who, args, _user_path):
+    def put_on(self, target, who, args, _files, _user_path):
         impls, _all = self.args_impls_get(args)
         with target.target_owned_and_locked(who):
             target.timestamp()
             self._on(target, impls, "", _all)
             return {}
 
-    def put_off(self, target, who, args, _user_path):
+    def put_off(self, target, who, args, _files, _user_path):
         impls, _all = self.args_impls_get(args)
         with target.target_owned_and_locked(who):
             target.timestamp()
             self._off(target, impls, "", _all)
             return {}
 
-    def put_cycle(self, target, who, args, _user_path):
+    def put_cycle(self, target, who, args, _files, _user_path):
         impls, _all = self.args_impls_get(args)
         # default wait is two seconds
         wait = float(args.get('wait',
@@ -552,8 +552,8 @@ class interface(ttbl.tt_interface):
             self._on(target, impls, " (because power-cycle)", _all)
             return {}
 
-    def put_reset(self, target, who, args, _user_path):
-        self.put_cycle(target, who, args, _user_path)
+    def put_reset(self, target, who, args, _files, _user_path):
+        self.put_cycle(target, who, args, _files, _user_path)
 
 
 

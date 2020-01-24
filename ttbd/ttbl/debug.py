@@ -202,7 +202,7 @@ class interface(ttbl.tt_interface):
         return v
 
 
-    def get_list(self, target, who, args, _user_path):
+    def get_list(self, target, who, args, _files, _user_path):
         components = json.loads(self._arg_get(args, "components"))
         if not components:
             components = self.impls.keys()
@@ -217,7 +217,7 @@ class interface(ttbl.tt_interface):
                                         none_ok = True)
             return dict(result = r)
 
-    def put_start(self, target, who, args, _user_path):
+    def put_start(self, target, who, args, _files, _user_path):
         components = json.loads(self._arg_get(args, "components"))
         if not components:
             components = self.impls.keys()
@@ -245,7 +245,7 @@ class interface(ttbl.tt_interface):
         target.fsdb.set("debug", None)
 
 
-    def put_stop(self, target, who, args, _user_path):
+    def put_stop(self, target, who, args, _files, _user_path):
         components = json.loads(self._arg_get(args, "components"))
         if not components:
             components = self.impls.keys()
@@ -253,7 +253,7 @@ class interface(ttbl.tt_interface):
             self._stop(target, components)
             return {}
 
-    def put_halt(self, target, who, args, _user_path):
+    def put_halt(self, target, who, args, _files, _user_path):
         components = json.loads(self._arg_get(args, "components"))
         if not components:
             components = self.impls.keys()
@@ -263,7 +263,7 @@ class interface(ttbl.tt_interface):
                 impl.debug_halt(target, components)
             return {}
 
-    def put_resume(self, target, who, args, _user_path):
+    def put_resume(self, target, who, args, _files, _user_path):
         components = json.loads(self._arg_get(args, "components"))
         if not components:
             components = self.impls.keys()
@@ -273,14 +273,14 @@ class interface(ttbl.tt_interface):
                 impl.debug_resume(target, components)
             return {}
 
-    def put_reset(self, target, who, args, _user_path):
+    def put_reset(self, target, who, args, _files, _user_path):
         with target.target_owned_and_locked(who):
             for impl, components \
                 in self._impls_by_component(args).items():
                 impl.debug_reset(target, components)
             return {}
 
-    def put_reset_halt(self, target, who, args, _user_path):
+    def put_reset_halt(self, target, who, args, _files, _user_path):
         components = json.loads(self._arg_get(args, "components"))
         if not components:
             components = self.impls.keys()

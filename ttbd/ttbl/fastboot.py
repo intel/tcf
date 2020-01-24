@@ -71,6 +71,7 @@ class interface(ttbl.tt_interface):
 
     :param dict allowed_commands: Commands that can be executed with
       fastboot. See :data:`interface.allowed_commands`.
+
     """
     def __init__(self, usb_serial_number, allowed_commands):
         assert isinstance(usb_serial_number, basestring), \
@@ -221,7 +222,7 @@ class interface(ttbl.tt_interface):
     # called by the daemon when a METHOD request comes to the HTTP path
     # /ttb-vVERSION/targets/TARGET/interface/console/CALL
 
-    def put_run(self, target, who, args, user_path):
+    def put_run(self, target, who, args, _files, user_path):
         """
         Run a fastboot command
 
@@ -282,7 +283,7 @@ class interface(ttbl.tt_interface):
                     raise RuntimeError(msg)
 
 
-    def get_list(self, _target, _who, _args, _user_path):
+    def get_list(self, _target, _who, _args, _files, _user_path):
         data = dict()
         for command, param_list in self.allowed_commands.iteritems():
             _param_list = []

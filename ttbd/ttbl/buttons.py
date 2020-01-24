@@ -173,7 +173,7 @@ class interface(ttbl.tt_interface):
                     "unknown action '%s'; expected 'press', " \
                     "'release', 'wait'" % action)
 
-    def put_sequence(self, target, who, args, _user_path):
+    def put_sequence(self, target, who, args, _files, _user_path):
         """Execute a sequence of button actions on a target
 
         The sequence argument has to be a list of pairs:
@@ -191,7 +191,7 @@ class interface(ttbl.tt_interface):
             self.sequence(target, sequence)
             return {}
 
-    def get_list(self, target, _who, _args, _user_path):
+    def get_list(self, target, _who, _args, _files, _user_path):
         """
         List buttons on a target and their state
         """

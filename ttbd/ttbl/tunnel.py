@@ -98,7 +98,7 @@ class interface(ttbl.tt_interface):
         return ( ip_addr, port, protocol, tunnel_id )
 
 
-    def put_tunnel(self, target, who, args, _user_path):
+    def put_tunnel(self, target, who, args, _files, _user_path):
         """
         Setup a TCP/UDP/SCTP v4 or v5 tunnel to the target
 
@@ -174,7 +174,7 @@ class interface(ttbl.tt_interface):
                     pid, tag = "socat's tunnel [%s]: " % tunnel_id)
             target.fsdb.set(tunnel_id, None)
 
-    def delete_tunnel(self, target, who, args, _user_path):
+    def delete_tunnel(self, target, who, args, _files, _user_path):
         """
         Teardown a TCP/UDP/SCTP v4 or v6 tunnel to the target
         previously created with :meth:`put_tunnel`.
@@ -202,7 +202,8 @@ class interface(ttbl.tt_interface):
         return dict()
 
 
-    def get_list(self, target, who, _args, _user_path):
+    @staticmethod
+    def get_list(target, who, _args, _files, _user_path):
         """
         List existing tunnels
 

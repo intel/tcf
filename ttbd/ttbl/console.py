@@ -365,13 +365,13 @@ class interface(ttbl.tt_interface):
     # called by the daemon when a METHOD request comes to the HTTP path
     # /ttb-vVERSION/targets/TARGET/interface/console/CALL
 
-    def get_setup(self, _target, _who, args, _user_path):
+    def get_setup(self, _target, _who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         parameters = dict(impl.parameters)
         parameters['real_name'] = component
         return dict(result = parameters)
 
-    def put_setup(self, target, who, args, _user_path):
+    def put_setup(self, target, who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         parameters = dict()
         for k, v in args.iteritems():
@@ -386,33 +386,33 @@ class interface(ttbl.tt_interface):
             target.timestamp()
             return impl.setup(target, component, parameters)
 
-    def get_list(self, target, who, args, _user_path):
+    def get_list(self, _target, _who, _args, _files, _user_path):
         return dict(
             aliases = self.aliases,
             result = self.aliases.keys() + self.impls.keys())
 
-    def put_enable(self, target, who, args, _user_path):
+    def put_enable(self, target, who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         with target.target_owned_and_locked(who):
             target.timestamp()
             impl.enable(target, component)
             return dict()
 
-    def put_disable(self, target, who, args, _user_path):
+    def put_disable(self, target, who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         with target.target_owned_and_locked(who):
             target.timestamp()
             impl.disable(target, component)
             return dict()
     
-    def get_state(self, target, who, args, _user_path):
+    def get_state(self, target, _who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         state = impl.state(target, component)
         self.assert_return_type(state, bool, target,
                                 component, "console.state")
         return dict(result = state)
 
-    def get_read(self, target, who, args, _user_path):
+    def get_read(self, target, who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         offset = int(args.get('offset', 0))
         if target.target_is_owned_and_locked(who):
@@ -424,14 +424,14 @@ class interface(ttbl.tt_interface):
             return { 'stream_file': '/dev/null', 'offset': 0 }
         return r
 
-    def get_size(self, target, who, args, _user_path):
+    def get_size(self, target, _who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         size = impl.size(target, component)
         self.assert_return_type(size, int, target,
                                 component, "console.size", none_ok = True)
         return dict(result = size)
 
-    def put_write(self, target, who, args, _user_path):
+    def put_write(self, target, who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         with target.target_owned_and_locked(who):
             target.timestamp()

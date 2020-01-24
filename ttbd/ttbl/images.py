@@ -107,7 +107,7 @@ class interface(ttbl.tt_interface):
     def _release_hook(self, target, _force):
         pass
 
-    def put_flash(self, target, who, args, user_path):
+    def put_flash(self, target, who, args, _files, user_path):
         images = json.loads(self._arg_get(args, "images"))
         with target.target_owned_and_locked(who):
             # do a single call to one flasher with everything that
@@ -129,7 +129,7 @@ class interface(ttbl.tt_interface):
 
     # FIXME: save the names of the last flashed in fsdb so we can
     # query them? relative to USERDIR or abs to system where allowed
-    def get_list(self, _target, _who, _args, _user_path):
+    def get_list(self, _target, _who, _args, _files, _user_path):
         return dict(
             aliases = self.aliases,
             result = self.aliases.keys() + self.impls.keys())

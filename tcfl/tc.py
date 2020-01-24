@@ -1545,6 +1545,7 @@ class target_c(object):
 
     def ttbd_iface_call(self, interface, call, method = "PUT",
                         component = None, stream = False, raw = False,
+                        files = None,
                         **kwargs):
         """
         Execute a general interface call to TTBD, the TCF remoting server
@@ -1564,6 +1565,11 @@ class target_c(object):
         :param str component: (optional, default *None*) for
           interfaces that implement multiple components (a common
           pattern), specify which component the call applies to.
+        :param dict files: (optional) dictionary of keys pointing to
+          file names that have to be streamed to the server. Keys are
+          strings with names of the files, values opened file
+          descriptors (or iterables). FIXME: needs more clarification
+          on how this works.
 
         Rest of the arguments are a dictionary keyed by string with
         values that will be serialized to pass the remote call
@@ -1593,7 +1599,7 @@ class target_c(object):
         return self.rtb.send_request(
             method,
             "targets/%s/%s/%s" % (self.id, interface, call),
-            stream = stream, raw = raw,
+            stream = stream, raw = raw, files = files,
             data = kwargs if kwargs else None)
 
 

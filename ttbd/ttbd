@@ -564,17 +564,23 @@ def _target_interface(target_id, interface, call):
             method_name = flask.request.method.lower() + "_" + call
             method = getattr(iface, method_name, None)
             if method:
-                result = method(target, who_make(ticket),
-                                flask.request.form, user_path)
+                result = method(
+                    target, who_make(ticket),
+                    # https://flask.palletsprojects.com/en/1.1.x/patterns/fileuploads/
+                    flask.request.form, flask.request.files,
+                    user_path)
                 iface.assert_return_type(
                     result, dict, target,
                     flask.request.form.get('component', None),
                     method_name, none_ok = False)
             else:
-                result = iface.request_process(target, who_make(ticket),
-                                               flask.request.method,
-                                               call, flask.request.form,
-                                               user_path)
+                result = iface.request_process(
+                    target, who_make(ticket),
+                    flask.request.method,
+                    call,
+                    # https://flask.palletsprojects.com/en/1.1.x/patterns/fileuploads/
+                    flask.request.form, flask.request.files,
+                    user_path)
         assert isinstance(result, dict), \
             "BUG: %s: request_process() did not return a dictionary" \
             " but a %s" \

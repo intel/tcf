@@ -629,7 +629,8 @@ class tt_interface(object):
                type(val).__name__, expected_type.__name__)
 
 
-    def request_process(self, target, who, method, call, args, user_path):
+    def request_process(self, target, who, method, call,
+                        args, files, user_path):
         """
         Process a request into this interface from a proxy / brokerage
 
@@ -646,6 +647,9 @@ class tt_interface(object):
           the different methods the interface exposes)
         :param dict args: dictionary of key/value with the arguments
           to the call, some might be JSON encoded.
+        :param dict files: dictionary of key/value with the files
+          uploaded via forms
+        (https://flask.palletsprojects.com/en/1.1.x/api/#flask.Request.form)
         :param str user_path: Path to where user files are located
 
         :returns: dictionary of results, call specific

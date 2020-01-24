@@ -116,7 +116,7 @@ class interface(ttbl.tt_interface):
     # called by the daemon when a METHOD request comes to the HTTP path
     # /ttb-vVERSION/targets/TARGET/interface/things/CALL
 
-    def get_list(self, target, who, _args, _user_path):
+    def get_list(self, target, who, _args, _files, _user_path):
         data = {}
         for thing_name, impl in self.impls.iteritems():
             thing = ttbl.config.targets[thing_name]
@@ -130,7 +130,7 @@ class interface(ttbl.tt_interface):
                 data[thing_name] = None
         return dict(result = data)
 
-    def get_get(self, target, who, args, _user_path):
+    def get_get(self, target, who, args, _files, _user_path):
         """
         Plug *thing* into *target*
 
@@ -144,7 +144,7 @@ class interface(ttbl.tt_interface):
         return {}
 
 
-    def put_plug(self, target, who, args, _user_path):
+    def put_plug(self, target, who, args, _files, _user_path):
         """
         Plug *thing* into *target*
 
@@ -160,7 +160,7 @@ class interface(ttbl.tt_interface):
                 target.timestamp()	# If this works, it is acquired and locked
         return {}
 
-    def put_unplug(self, target, who, args, _user_path):
+    def put_unplug(self, target, who, args, _files, _user_path):
         """
         Unplug *thing* from *target*
 
