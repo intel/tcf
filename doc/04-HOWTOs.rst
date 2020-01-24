@@ -1362,7 +1362,7 @@ Generating an SSL certificate
 
 To use secure layers HTTPS connections between daemon and client, you
 must have a valid certificate and key, or use an autosigned
-certificate. This can be fed to the broker server with the options
+certificate. This can be fed to the target server with the options
 ``--ssl-crt`` and ``--ssl-key``.
 
 If  you want to create your own certificate you must have installed

@@ -60,7 +60,7 @@ class impl_c(object):
 class interface(ttbl.tt_interface):
     """
     Interface to flash a list of images (OS, BIOS, Firmware...) that
-    can be uploaded to the target broker and flashed onto a target.
+    can be uploaded to the target server and flashed onto a target.
 
     Any image type can be supported, it is up to the configuration to
     set the image types and the driver that can flash them. E.g.:
