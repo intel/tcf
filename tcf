@@ -80,6 +80,9 @@ def healthcheck(args):
         if hasattr(target, "tunnel"):
             target.tunnel._healthcheck()
 
+        if hasattr(target, "store"):
+            target.store._healthcheck()
+
         print "releasing"
         target.release()
         print "OK: released"
@@ -254,50 +257,6 @@ if __name__ == "__main__":
         nargs = "+", help = "Target's name or URL")
     arg_parser_target_release.set_defaults(func = ttb_client.rest_target_release)
 
-    ap = arg_subparsers.add_parser("broker-file-upload",
-                                   help = "Upload a local file to a broker")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None,
-                    help = "Target's name or URL whose broker we'll use")
-    ap.add_argument("remote_filename", action = "store",
-                    help = "Path to remote file file (defaults to same as " \
-                    "local). Note the file will be stored in a hierarchy "
-                    "relative to a top level path specified by the daemon "
-                    "which is unique for each user")
-    ap.add_argument("local_filename", action = "store",
-                    help = "Path to local file to upload")
-    ap.set_defaults(func = ttb_client.rest_broker_file_upload)
-
-    ap = arg_subparsers.add_parser("broker-file-dnload",
-                                   help = "Download a file from the broker")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None,
-                    help = "Target's name or URL whose broker we'll use")
-    ap.add_argument("remote_filename", action = "store",
-                    help = "Path to remote file name. "
-                    "Note the file will be stored in a hierarchy "
-                    "relative to a top level path specified by the daemon "
-                    "which is unique for each user")
-    ap.add_argument("local_filename", action = "store",
-                    help = "Path to local file to upload")
-    ap.set_defaults(func = ttb_client.rest_broker_file_dnload)
-
-    ap = arg_subparsers.add_parser("broker-file-delete",
-                                   help = "Delete a file stored in the broker")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None,
-                    help = "Target's name or URL whose broker we'll use")
-    ap.add_argument("remote_filename", action = "store",
-                    help = "Path to remote file")
-    ap.set_defaults(func = ttb_client.rest_broker_file_delete)
-
-    ap = arg_subparsers.add_parser("broker-file-list",
-                                   help = "List files stored in the broker")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None,
-                    help = "Target's name or URL whose broker we'll use")
-    ap.set_defaults(func = ttb_client.rest_broker_file_list)
-
     # Setup different modules and drivers
     tcfl.tc.argp_setup(arg_subparsers)
     # imported by tcfl.tc
@@ -310,6 +269,7 @@ if __name__ == "__main__":
     tcfl.tc.target_ext_ioc_flash_server_app._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_fastboot._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_power._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_store._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_things._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_tunnel.cmdline_setup(arg_subparsers)
 

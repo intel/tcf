@@ -218,7 +218,7 @@ def tcpdump_collect(ic, filename = None):
             + "-%d" % (ic.testcase.eval_count + 1) \
             + ".tcpdump"
     ic.power.off()		# ensure tcpdump flushes
-    ic.broker_files.dnload(ic.kws['tc_hash'] + ".cap", filename)
+    ic.store.dnload(ic.kws['tc_hash'] + ".cap", filename)
     ic.report_info("tcpdump available in file %s" % filename)
 
 def linux_os_release_get(target, prefix = ""):

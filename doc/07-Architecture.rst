@@ -278,10 +278,15 @@ similarly; we could not use POSIX advisory locking because it is tied
 to running processes and the daemon works as a loose collection of
 processes with undertermined life cycles.
 
+
+.. automodule:: ttbl.tunnel
+
+.. automodule:: ttbl.store
+
 Interfaces
 ----------
 
-.. automodule:: ttbl.tunnel
+(old doc, needs updating and moving to ttbl.INTERFACE)
 
 Power control
 ^^^^^^^^^^^^^
@@ -361,21 +366,6 @@ The class :class:`ttbl.cm_serial.cm_serial` implements a driver for
 serial ports (over serial, TCP and others as supported by the PySerial
 submodule).
 
-File deployment
-^^^^^^^^^^^^^^^
-
-A user can upload files to a TTBD daemon which are stored in a user's
-specifc area. This is used for the image deployment interface, for
-example, so the user can upload a file than then is going to be
-flashed or deployed into a target.
-
-This interface is not target-specific and provides three primitives:
-- file upload
-- file removal
-- file list
-
-*ttbd* implements it directly in Flask routing methods
-``_file_upload``, ``_file_delete`` and ``_files_list``.
 
 Image deployment
 ^^^^^^^^^^^^^^^^

@@ -969,7 +969,7 @@ property called *tcpdump* set to a file name where to capture it::
 when all the network traffic is done, it can be downloaded::
 
   $ tcf power-off nwb
-  $ tcf broker-file-dnload nwb somename.cap local_somename.cap
+  $ tcf store-dnload nwb somename.cap local_somename.cap
 
 which now can be opened with wireshark to see what happened (or
 analyzed with other tools).
@@ -989,7 +989,7 @@ and on teardown:
 
 >>>
 >>>     def teardown_whatever(self, ic, ...):
->>>         ic.broker_files.dnload(
+>>>         ic.store.dnload(
 >>>              self.kws['tc_hash'] + ".cap",
 >>>              "report-%(runid)s:%(tc_hash)s.tcpdump" % self.kws)
 >>>         self.report_info("tcpdump available in file "

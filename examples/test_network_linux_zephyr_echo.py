@@ -193,7 +193,7 @@ class _test(tcfl.tc.tc_c):
         tcfl.tl.console_dump_on_failure(self)
         # Get the TCP dump from the interconnect to a file in the CWD
         # called report-RUNID:HASH.tcpdump
-        ic.broker_files.dnload(
+        ic.store.dnload(
             self.kws['tc_hash'] + ".cap",
             "report-%(runid)s:%(tc_hash)s.tcpdump" % self.kws)
         self.report_info("tcpdump available in file "

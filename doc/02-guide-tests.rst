@@ -333,8 +333,8 @@ server to a file in the current work directory called
 >>>         ic.power.off()	# ensure tcpdump flushes
 >>>         # Get the TCP dump from the interconnect to a file in the CWD
 >>>         # called tcpdump-HASH.cap
->>>         ic.broker_files.dnload(self.kws['tc_hash'] + ".cap",
->>>                                "tcpdump-%(runid)s:%(tc_hash)s.cap" % self.kws)
+>>>         ic.store.dnload(self.kws['tc_hash'] + ".cap",
+>>>                         "tcpdump-%(runid)s:%(tc_hash)s.cap" % self.kws)
 
 
 From the command line, this would be::
@@ -344,7 +344,7 @@ From the command line, this would be::
   $ tcf power-cycle NETWORKTARGET
   ... do network operations ...
   $ tcf power-off NETWORKTARGET
-  $ tcf broker-file-dnload NETWORKTARGET CAPTURENAME myfile.cap
+  $ tcf store-dnload NETWORKTARGET CAPTURENAME myfile.cap
   $ tcf release NETWORKTARGET
 
 now *myfile.cap* can be opened with *Wireshark* or processed with any

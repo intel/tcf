@@ -1040,34 +1040,3 @@ def rest_tb_target_images_upload(rtb, _images):	# COMPAT
         remote_images[image_type] = remote_filename
 
     return remote_images
-
-def rest_broker_file_upload(args):
-    """
-    FIXME
-    """
-    rtb = _rest_target_broker_find_by_id_url(args.target)
-    rtb.rest_tb_file_upload(args.remote_filename, args.local_filename)
-
-def rest_broker_file_dnload(args):
-    """
-    Download a file from a target broker
-    """
-    rtb = _rest_target_broker_find_by_id_url(args.target)
-    rtb.rest_tb_file_dnload(args.remote_filename, args.local_filename)
-
-def rest_broker_file_delete(args):
-    """
-    FIXME
-    """
-    rtb = _rest_target_broker_find_by_id_url(args.target)
-    rtb.rest_tb_file_delete(args.remote_filename)
-
-def rest_broker_file_list(args):
-    """Print a list of files names available to the user in the broker
-    and their sha256 hash.
-
-    """
-    rtb = _rest_target_broker_find_by_id_url(args.target)
-    for name, hexdigest in rtb.rest_tb_file_list().iteritems():
-        print name, hexdigest
-

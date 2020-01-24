@@ -7167,8 +7167,6 @@ import app_manual
 tcfl.app.driver_add(app_manual.app_manual)
 
 # Target API extensions
-import target_ext_broker_files
-target_c.extension_register(target_ext_broker_files.broker_files)
 import target_ext_console
 target_c.extension_register(target_ext_console.extension, "console")
 import target_ext_power
@@ -7194,5 +7192,7 @@ import target_ext_fastboot
 target_c.extension_register(target_ext_fastboot.extension, "fastboot")
 import pos
 target_c.extension_register(pos.extension, "pos")
+import target_ext_store
+target_c.extension_register(target_ext_store.extension, "store")
 import target_ext_things
 target_c.extension_register(target_ext_things.extension, "things")

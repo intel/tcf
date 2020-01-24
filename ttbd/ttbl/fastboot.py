@@ -58,8 +58,8 @@ class interface(ttbl.tt_interface):
     this allows to control which commands can be executed in the sever
     using fastboot, allowing access to the server's user storage area
     (to which files can be uploaded using the *tcf broker-upload*
-    command or :func:`tcfl.tc.target_c.broker_files.upload
-    <tcfl.target_ext_broker_files.broker_files.upload>`).
+    command or :meth:`target.store.upload
+    <tcfl.target_ext_store.extension.upload>`).
 
     The server configuration will decide which commands can be
     executed or not (a quick list can be obtained with *tcf

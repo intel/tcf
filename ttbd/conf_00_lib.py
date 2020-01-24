@@ -61,7 +61,7 @@ class vlan_pci(ttbl.power.impl_c):
     called *FILENAME* in the daemon file storage area for the user who
     owns the target. The file can then be recovered with::
 
-      $ tcf broker-file-download FILENAME
+      $ tcf store-download FILENAME
 
     *FILENAME* must be a valid file name, with no directory
     components.

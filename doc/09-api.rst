@@ -22,7 +22,6 @@ Provisioning/deploying/flashing PC-class devices with a Provisioning OS
 Other target interfaces
 -----------------------
 
-.. automodule:: tcfl.target_ext_broker_files
 .. automodule:: tcfl.target_ext_buttons
 .. automodule:: tcfl.target_ext_capture
 .. automodule:: tcfl.target_ext_console
@@ -33,6 +32,7 @@ Other target interfaces
 .. automodule:: tcfl.target_ext_power
 .. automodule:: tcfl.target_ext_shell
 .. automodule:: tcfl.target_ext_ssh
+.. automodule:: tcfl.target_ext_store
 .. automodule:: tcfl.target_ext_things
 .. automodule:: tcfl.target_ext_tunnel
 

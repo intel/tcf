@@ -133,10 +133,10 @@ ttbl.config.target_add(tt_qemu.tt_qemu("%s", [ 'x86' ],
         self.assertEqual(sp.join(), 0, msg = sp.output_str)
 
     @unittest.expectedFailure
-    def test_05_broker_file_delete(self):
+    def test_05_store_delete(self):
         sp = commonl.subpython(
             self.srcdir + "/tcf --config-path : --url http://localhost:%d "
-            "broker-file-delete %s %s"\
+            "store-delete %s %s"\
             % (self.port, self.image))
         self.assertEqual(sp.join(), 0, msg = sp.output_str)
 

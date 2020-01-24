@@ -14,6 +14,7 @@ import re
 
 import ttbl
 import ttbl.tunnel
+import ttbl.store
 
 urls = []
 targets = {}
@@ -77,6 +78,7 @@ def _nested_list_flatten(l):
 # implementation of the tunneling interface; since it contains no
 # state, only one instance is needed that all target can share
 _iface_tunnel = ttbl.tunnel.interface()
+_iface_store = ttbl.store.interface()
 
 def target_add(target, _id = None, tags = None, target_type = None,
                acquirer = None):
@@ -142,6 +144,8 @@ def target_add(target, _id = None, tags = None, target_type = None,
     # target has an IP or not...and it is very cheap.
     global _iface_tunnel
     target.interface_add("tunnel", _iface_tunnel)
+    global _iface_store
+    target.interface_add("store", _iface_store)
 
 
 def interconnect_add(ic, _id = None, tags = None, ic_type = None,
