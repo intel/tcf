@@ -22,7 +22,7 @@ def target_pdu_socket_add(name, pc, tags = None, power = True):
     target.interface_add("power", ttbl.power.interface(pc))
     if power:
         # FIXME: untested
-        target.power.put_on(target, ttbl.who_daemon(), {}, None)
+        target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
     return target
 
 def apc_pdu_add(name, powered_on_start = None, hostname = None):
@@ -76,7 +76,7 @@ def apc_pdu_add(name, powered_on_start = None, hostname = None):
         ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
         target.disable("")
         if powered_on_start:
-            target.power.put_on(target, ttbl.who_daemon(), {}, None)
+            target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
 
 
 def dlwps7_add(hostname, powered_on_start = None,
@@ -538,7 +538,7 @@ def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
     ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
     target.disable("")
     if powered_on_start:
-        target.power.put_on(target, ttbl.who_daemon(), {}, None)
+        target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
 
     # Now try to add the one that expects to find the USB device; this
     # can fail if the USB device doesn't show up for whichever reason
@@ -555,7 +555,7 @@ def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
     ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
     target.disable("")
     if powered_on_start:
-        target.power.put_on(target, ttbl.who_daemon(), {}, None)
+        target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
 
     for i in [ 1, 2, 3]:
         target = ttbl.test_target("%s-%d" % (ykush_serial, i))
@@ -567,4 +567,4 @@ def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
         ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
         target.disable("")
         if powered_on_start:
-            target.power.put_on(target, ttbl.who_daemon(), {}, None)
+            target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
