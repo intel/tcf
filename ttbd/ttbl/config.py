@@ -41,6 +41,8 @@ ssl_enabled_check_disregard = None
 #: are the same network but spread around multiple servers, when they
 #: are in truth different networks.
 defaults_enabled = True
+default_networks = [ 'a', 'b' ]
+default_qemu_count = 4
 
 #: Number of processes to start
 #:

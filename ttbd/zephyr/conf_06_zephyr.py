@@ -10,7 +10,7 @@
 
 if ttbl.config.defaults_enabled:
 
-    for letter in default_networks:	# conf_06_default.default_networks
+    for letter in ttbl.config.default_networks:
         x, y, _vlan_id = nw_indexes(letter)
         nw_name = "nw" + letter
         # network has been created by conf_06_default

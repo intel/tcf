@@ -11,10 +11,7 @@ import ttbl
 
 if ttbl.config.defaults_enabled:
 
-    # this is here so other config files can refer to it
-    default_networks = [ 'a', 'b' ]
-
-    for letter in default_networks:
+    for letter in ttbl.config.default_networks:
         x, y, _vlan_id = nw_indexes(letter)
         nw_name = "nw" + letter
 
@@ -23,7 +20,7 @@ if ttbl.config.defaults_enabled:
 
         # Add QEMU UEFI POS capable targets with addresses
         v = 1
-        for v in range(2, 4):
+        for v in range(2, 2 + ttbl.config.default_qemu_count):
             target_name = "qu-%02d" % v + letter
             target = target_qemu_pos_add(
                 target_name,
