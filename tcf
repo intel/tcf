@@ -326,8 +326,6 @@ if __name__ == "__main__":
 
     ap = arg_subparsers.add_parser("healthcheck",
                                    help = "Do a very basic health check")
-    commonl.cmdline_log_options(ap)
-    ap.set_defaults(level = logging.ERROR)
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target's name or URL")
     ap.set_defaults(func = healthcheck)
