@@ -201,66 +201,73 @@ def login():
     authentication mechanisms that we have defined and see who can
     authenticate it.
     """
-    email = flask.request.form.get('email', None)
-    if email == None:
-        return flask.abort(404, "missing user ID")
+    while True:
+        username = flask.request.form.get('username', None)
+        if username:
+            break
+        # backwards compat
+        username = flask.request.form.get('email', None)
+        if username:
+            break
+        return flask.abort(404, "missing user ID 'username' field")
+
     password = flask.request.form.get('password', None)
 
     user = flask_login.current_user
     user_id = user.get_id()
 
     if user == ttbl.who_daemon():
-        flask.abort(404, "user %s: not allowed (reserved)" % email)
+        flask.abort(404, "user %s: not allowed (reserved)", username)
 
-    logd("user %s: trying to authenticate with token '%s'" % (user_id, email))
+    logd("user %s: trying to authenticate with token '%s'", user_id, username)
 
     if isinstance(user, ttbl.user_control.User) \
-       and user.get_id() == email \
+       and user.get_id() == username \
        and user.is_authenticated():
         logi("user %s: authenticated, has a valid session" % user_id)
         return True
 
     # Go over all the configured authentication mechanisms and try to
-    # obtain roles that this combination of email/password allows us
+    # obtain roles that this combination of username/password allows us
     # Each authenticator might plug us to LDAP, or to a local
     # database...who knows
     token_roles = set()
     message = ""
     for authenticator in ttbl.config._authenticators:
         try:
-            logd("user %s: authenticating with %s" % (email, authenticator))
+            logd("user %s: authenticating with %s", username, authenticator)
             _token_roles = authenticator.login(
-                email, password,
+                username, password,
                 remote_address = flask.request.remote_addr)
-            logi("user %s: authenticated with %s: roles: %s"
-                 % (email, authenticator, " ".join(_token_roles)))
+            logi("user %s: authenticated with %s: roles: %s",
+                 username, authenticator, " ".join(_token_roles))
             token_roles.update(_token_roles)
             break
         except ttbl.authenticator_c.invalid_credentials_e as e:
-            logi("user %s: invalid credentials from %s: %s"
-                 % (email, authenticator, e))
+            logi("user %s: invalid credentials from %s: %s",
+                 username, authenticator, e)
             pass
         except ttbl.authenticator_c.unknown_user_e as e:
-            logi("user %s: unknown user to '%s'" % (email, authenticator))
+            logi("user %s: unknown user to '%s'", username, authenticator)
             pass
         except Exception as e:
-            logi("user %s: auth error with %s: %s" % (email, authenticator, e))
+            logi("user %s: auth error with %s: %s", username, authenticator, e)
             logx(e)
             pass
             # Try next authenticator
 
     if not 'user' in token_roles:
-        logi("user %s: not allowed, no 'user' role (roles: %s)"
-             % (email,
-                " ".join(token_roles) if token_roles
-                else "<empty, meaning no permissions>"))
-        flask.abort(404, "user %s: not allowed, no 'user' role: %s"
-                    % (email, message))
+        logi("user %s: not allowed, no 'user' role (roles: %s)",
+             username,
+             " ".join(token_roles) if token_roles
+             else "<empty, meaning no permissions>")
+        flask.abort(404, "user %s: not allowed, no 'user' role: %s",
+                    username, message)
 
     # Now let's go ahead and make sure there is a user instance that
     # Flask understands
     if not user or not isinstance(user, ttbl.user_control.User):
-        user = ttbl.user_control.User(email)
+        user = ttbl.user_control.User(username)
         if 'admin' in token_roles:
             user.set_role('admin')
         flask_login.login_user(user, remember = True)
@@ -270,11 +277,11 @@ def login():
     elif 'admin' in token_roles:
         user.set_role('admin')
 
-    logi("user %s: authenticated with roles: %s"
-         % (email, " ".join(token_roles)))
+    logi("user %s: authenticated with roles: %s",
+         username, " ".join(token_roles))
     return flask.jsonify({
         'login': "user %s: authenticated with roles: %s" \
-        % (email, " ".join(token_roles))
+        % (username, " ".join(token_roles))
     })
 
 @app.route(API_PREFIX + 'logout', methods = [ 'PUT' ])
@@ -314,7 +321,6 @@ def _targets_gets():
     for target in ttbl.config.targets.values():
         _list.append(target.to_dict(projections))
     return flask.jsonify({'targets': _list})
-
 
 @app.route(API_PREFIX + 'targets/<string:target_id>', methods = ['GET'])
 @flask_login.login_required
