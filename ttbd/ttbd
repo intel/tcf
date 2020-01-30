@@ -37,6 +37,7 @@ import contextlib
 import cPickle
 import datetime
 import errno
+import json
 import signal
 import threading
 import ttblc
@@ -151,28 +152,6 @@ def _error_handler(error):
     r = flask.make_response(flask.jsonify({ 'message': error.description }))
     r.status_code = error.code
     return r
-
-def _target_id_to_dict(target_id):
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    r = {
-        'id': target_id,
-        'type': target.type,
-        'owner': target.owner_get(),
-    }
-    # Export a properties
-    r.update(target.fsdb.get_as_dict())
-    # Override a few standard properties
-    r['disabled'] = target.fsdb.get('disabled') == "True"
-    # Use the cached version, otherwise it takes too long
-    # this is "On" if powered, Off otherwise
-    if hasattr(target, 'power'):
-        r['powered'] = target.fsdb.get('powered') != None
-    r.update(target.tags)
-    # Make the interfaces list a space separated string
-    r['interfaces_names'] = " ".join(target.tags['interfaces'])
-    return r
-
 
 @contextlib.contextmanager
 def log_to_str_too(logger, io):
@@ -309,33 +288,42 @@ def logout():
             identity = flask_principal.AnonymousIdentity())
     return flask.jsonify({'ok': "Session closed"})
 
+
 @app.route(API_PREFIX + "validate_session", methods = ['GET'])
 @flask_login.login_required
 def validate_session():
     return flask.jsonify({'status': "You have a valid session"})
 
+
+def _flask_arg_projections():
+    projections_json = flask.request.form.get('projection', None)
+    if projections_json:
+        projections = json.loads(projections_json)
+        if not isinstance(projections, list):
+            raise ValueError("parameter projections: expected JSON-encoded "
+                             "list of strings naming fields")
+        return projections
+    else:
+        return []
+
 @app.route(API_PREFIX + 'targets/', methods = ['GET'])
 @flask_login.login_required
 def _targets_gets():
+    projections = _flask_arg_projections()
     _list = []
-    for target_id in ttbl.config.targets.keys():
-        try:
-            _list.append(_target_id_to_dict(target_id))
-        except Exception as e:
-            loge("%s: error listing target: %s\n%s\n"
-                 % (target_id, e, traceback.format_exc()))
-            _list.append(dict(id = target_id, owner = "error"))
+    for target in ttbl.config.targets.values():
+        _list.append(target.to_dict(projections))
     return flask.jsonify({'targets': _list})
 
 
 @app.route(API_PREFIX + 'targets/<string:target_id>', methods = ['GET'])
 @flask_login.login_required
-def _targets_get(target_id):
-    if target_id not in ttbl.config.targets.keys():
-        flask.abort(404, "%s: can't find target" % target_id)
-    else:
-        _list = [_target_id_to_dict(target_id)]
-    return flask.jsonify({'targets': _list})
+def _target_get(target_id):
+    projections = _flask_arg_projections()
+    target = ttbl.config.targets.get(target_id, None)
+    if target == None:
+        flask.abort(404, "%s: unknown target" % target_id)
+    return flask.jsonify(target.to_dict(projections))
 
 
 @app.route(API_PREFIX + 'targets/<string:target_id>/acquire', methods = ['PUT'])

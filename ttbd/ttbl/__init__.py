@@ -804,6 +804,49 @@ class test_target(object):
         self.power_off_pre_fns = []
         self.power_off_post_fns = []
 
+    def to_dict(self, projections = None):
+        """
+        Return all of the target's data as a dictionary
+
+        :param list projections: (optional) list of fields to include
+          (default: all).
+
+          Field names can use periods to dig into dictionaries.
+
+          Field names can match :mod:`python.fnmatch` regular
+          expressions.
+        """
+
+        # Set read-only values from config as base
+        # why convert from flat to dict and then back to dict? Well,
+        # because it is way easier to filter on flat triyng to keep
+        # what has to be there and what not. And the performance at
+        # the end might not be much more or less...
+        r = commonl.flat_slist_to_dict(
+            commonl.dict_to_flat(self.tags, projections))
+        # Override with changeable stuff set by users
+        #
+        # Note things such as 'disabled', and 'powered' come from
+        # self.fsdb
+        r.update(commonl.flat_slist_to_dict(
+            self.fsdb.get_as_slist(*projections)))
+
+	# mandatory fields, override them all
+        if commonl.field_needed('owner', projections):
+            owner = self.owner_get()
+            if owner:
+                r['owner'] = owner
+            else:
+                # forcibly delete the key if it might have existed
+                # from the tags or fsdb
+                try:
+                    del r['owner']
+                except KeyError:
+                    pass
+
+        r['id'] = self.id
+        return r
+
 
     @property
     def type(self):

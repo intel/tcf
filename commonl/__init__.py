@@ -19,9 +19,11 @@ Command line and logging helpers
 """
 import argparse
 import base64
+import bisect
 import contextlib
 import errno
 import fcntl
+import fnmatch
 import glob
 import hashlib
 import imp
@@ -1175,6 +1177,147 @@ def url_remove_user_pwd(url):
     if url.path:
         _url += url.path
     return _url
+
+
+def field_needed(field, projections):
+    """
+    Check if the name *field* matches any of the *patterns* (ala
+    :mod:`fnmatch`).
+
+    :param str field: field name
+    :param list(str) projections: list of :mod:`fnmatch` patterns
+      against which to check field. Can be *None* and *[ ]* (empty).
+
+    :returns bool: *True* if *field* matches a pattern in *patterns*
+      or if *patterns* is empty or *None*. *False* otherwise.
+    """
+    if projections:
+        # there is a list of must haves, check here first
+        for projection in projections:
+            if fnmatch.fnmatch(field, projection):
+                return True	# we need this field
+        return False		# we do not need this field
+    else:
+        return True	# no list, have it
+
+def dict_to_flat(d, projections = None):
+    """
+    Convert a nested dictionary to a sorted list of tuples *( KEY, VALUE )*
+
+    The KEY is like *KEY[.SUBKEY[.SUBSUBKEY[....]]]*, where *SUBKEY*
+    are keys in nested dictionaries.
+
+    :param dict d: dictionary to convert
+    :param list(str) projections: (optional) list of :mod:`fnmatch`
+      patterns of flay keys to bring in (default: all)
+    :returns list: sorted list of tuples *KEY, VAL*
+
+    """
+
+    fl = []
+
+    def __update_recursive(val, field, field_flat, projections = None,
+                           depth_limit = 10, prefix = "  "):
+        # Merge d into dictionary od with a twist
+        #
+        # projections is a list of fields to include, if empty, means all
+        # of them
+        # a field X.Y.Z means od['X']['Y']['Z']
+
+        # GRRRR< has to dig deep first, so that a.a3.* goes all the way
+        # deep before evaluating if keepers or not -- I think we need to
+        # change it like that and maybe the evaluation can be done before
+        # the assignment.
+
+        if field_needed(field_flat, projections):
+            bisect.insort(fl, ( field_flat, val ))
+        elif isinstance(val, dict) and depth_limit > 0:	# dict to dig in
+            for key, value in val.iteritems():
+                __update_recursive(value, key, field_flat + "." + str(key),
+                                   projections, depth_limit - 1,
+                                   prefix = prefix + "    ")
+
+    for key, _val in d.iteritems():
+        __update_recursive(d[key], key, key, projections, 10)
+
+    return fl
+
+def _key_rep(r, key, key_flat, val):
+    # put val in r[key] if key is already fully expanded (it has no
+    # periods); otherwise expand it recursively
+    if '.' in key:
+        # this key has sublevels, iterate over them
+        lhs, rhs = key.split('.', 1)
+        if lhs not in r:
+            r[lhs] = {}
+        elif not isinstance(r[lhs], dict):
+            r[lhs] = {}
+
+        _key_rep(r[lhs], rhs, key_flat, val)
+    else:
+        r[key] = val
+
+def flat_slist_to_dict(fl):
+    """
+    Given a sorted list of flat keys and values, convert them to a
+    nested dictionary
+
+    :param list((str,object)): list of tuples of key and any value
+      alphabetically sorted by tuple; same sorting rules as in
+      :func:`flat_keys_to_dict`.
+
+    :return dict: nested dictionary as described by the flat space of
+      keys and values
+    """
+    tr = {}
+    for key, val in fl:
+        _key_rep(tr, key, key, val)
+    return tr
+
+
+def flat_keys_to_dict(d):
+    """
+    Given a dictionary of flat keys, convert it to a nested dictionary
+
+    Similar to :func:`flat_slist_to_dict`, differing in the
+    keys/values being in a dictionary.
+
+    A key/value:
+
+    >>> d["a.b.c"] = 34
+
+    means:
+
+    >>> d['a']['b']['c'] = 34
+
+    Key in the input dictonary are processed in alphabetical order
+    (thus, key a.a is processed before a.b.c); later keys override
+    earlier keys:
+
+    >>> d['a.a'] = 'aa'
+    >>> d['a.a.a'] = 'aaa'
+    >>> d['a.a.b'] = 'aab'
+
+    will result in:
+
+    >>> d['a']['a'] = { 'a': 'aaa', 'b': 'aab' }
+
+    The
+
+    >>> d['a.a'] = 'aa'
+
+    gets overriden by the other settings
+
+    :param dict d: dictionary of keys/values
+    :returns dict: (nested) dictionary
+    """
+    tr = {}
+
+    for key in sorted(d.keys()):
+        _key_rep(tr, key, key, d[key])
+
+    return tr
+
 
 
 def _dict_print_dotted(d, prefix = "", separator = "."):

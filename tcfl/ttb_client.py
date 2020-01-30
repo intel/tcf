@@ -118,6 +118,10 @@ class rest_target_broker(object):
     # Hold the information about the remote target, as acquired from
     # the servers
     _rts_cache = None
+    # FIXME: WARNING!!! hack only for tcf list's commandline
+    # --projection; don't use for anything else, needs to be cleaned
+    # up.
+    projection = None
 
     API_VERSION = 1
     API_PREFIX = "/ttb-v" + str(API_VERSION) + "/"
@@ -187,7 +191,12 @@ class rest_target_broker(object):
         @classmethod
         def _rts_get(cls, rtb):
             try:
-                rt_list = rtb.rest_tb_target_list(all_targets = True)
+                # FIXME: the projection thing is a really bad hack so
+                #        that the command line 'tcf list' can use
+                #        --projection, until we clean that up.
+                rt_list = rtb.rest_tb_target_list(
+                    all_targets = True,
+                    projection = rest_target_broker.projection)
             except requests.exceptions.RequestException as e:
                 logger.error("%s: can't use: %s", rtb._url, e)
                 return {}
@@ -356,7 +365,8 @@ class rest_target_broker(object):
                     self.valid_session = valid_session
         return valid_session
 
-    def rest_tb_target_list(self, all_targets = False, target_id = None):
+    def rest_tb_target_list(self, all_targets = False, target_id = None,
+                            projection = None):
         """
         List targets in this server
 
@@ -364,10 +374,17 @@ class rest_target_broker(object):
           as disabled.
         :param str target_id: Only get information for said target id
         """
-        if target_id:
-            r = self.send_request("GET", "targets/" + target_id)
+        if projection:
+            data = { 'projection': json.dumps(projection) }
         else:
-            r = self.send_request("GET", "targets/")
+            data = None
+        if target_id:
+            r = self.send_request("GET", "targets/" + target_id, data = data)
+            # FIXME: imitate same output format until we unfold all
+            # these calls--it was a bad idea
+            r['targets'] = [ r ]
+        else:
+            r = self.send_request("GET", "targets/", data = data)
         _targets = []
         for rt in r['targets']:
             # Skip disabled targets
@@ -718,12 +735,11 @@ def rest_target_print(rt, verbosity = 0):
         print "%(fullid)s" % rt
     elif verbosity == 1:
         # Simple list, just show owner and power state
-        _power = _power_get(rt)
-        if _power == True:
+        if 'powered' in rt:
+            # having that attribute means the target is powered; otherwise it
+            # is either off or has no power control
             power = " ON"
-        elif _power == False:
-            power = " OFF"
-        else:				# no power control
+        else:
             power = ""
         if rt['owner'] != None:
             owner = "[" + rt['owner'] + "]"
@@ -830,10 +846,11 @@ def rest_target_list_table(args, spec):
             if spec and not _target_select_by_spec(rt, spec):
                 continue
             suffix = ""
-            if rt['owner']:
+            if rt.get('owner', None):	# target might declare no owner
                 suffix += "@"
-            _power = _power_get(rt)
-            if _power == True:
+            if 'powered' in rt:
+                # having that attribute means the target is powered;
+                # otherwise it is either off or has no power control
                 suffix += "!"
             l.append((rt_fullid, suffix))
         except requests.exceptions.ConnectionError as e:
@@ -879,6 +896,9 @@ def rest_target_list(args):
     if args.target:
         specs.append("(" + ") or (".join(args.target) +  ")")
     spec = " and ".join(specs)
+
+    if args.projection:
+        rest_target_broker.projection = args.projection
 
     if args.verbosity < 1 and sys.stderr.isatty() and sys.stdout.isatty():
         rest_target_list_table(args, spec)

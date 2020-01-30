@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+import bisect
 import errno
 import fnmatch
 import os
@@ -58,19 +59,52 @@ class fsdb(object):
                     l.append(filename)
         return l
 
-    def get_as_dict(self, pattern = None):
+    def get_as_slist(self, *patterns):
+        """
+        List the fields/keys available in the database
+
+        :param list(str) patterns: (optional) list of patterns of fields
+          we must list in the style of :mod:`fnmatch`. By default, all
+          keys are listed.
+
+        :returns list(str, obf): list of *(FLATKEY, VALUE)* sorted by
+          *FLATKEY* (so *a.b.c*, representing *['a']['b']['c']* goes
+          after *a.b*, representing *['a']['b']*).
+        """
+        fl = []
+        for _rootname, _dirnames, filenames in os.walk(self.location):
+            if patterns:	# that means no args given
+                use = []
+                for filename in filenames:
+                    if commonl.field_needed(filename, patterns):
+                        use.append(filename)
+            else:
+                use = filenames
+            for filename in use:
+                if os.path.islink(os.path.join(self.location, filename)):
+                    bisect.insort(fl, ( filename, self.get(filename) ))
+        return fl
+
+    def get_as_dict(self, *patterns):
         """
         List the fields/keys and values available in the database
 
         :param str pattern: (optional) pattern against the key names
           must match, in the style of :mod:`fnmatch`. By default, all
           keys are listed.
+
+        :returns dict: return the keys and values
         """
         d = {}
         for _rootname, _dirnames, filenames in os.walk(self.location):
-            if pattern:
-                filenames = fnmatch.filter(filenames, pattern)
-            for filename in filenames:
+            if patterns:	# that means no args given
+                use = []
+                for filename in filenames:
+                    if commonl.field_needed(filename, patterns):
+                        use.append(filename)
+            else:
+                use = filenames
+            for filename in use:
                 if os.path.islink(os.path.join(self.location, filename)):
                     d[filename] = self.get(filename)
         return d

@@ -231,6 +231,10 @@ if __name__ == "__main__":
         "-a", "--all", action = "store_true", default = False,
         help = "List also disabled targets")
     arg_parser_target_list.add_argument(
+        "-p", "--projection", action = "append",
+        help = "List of fields to return (*? [CHARS] or [!CHARS] supported)"
+        " as per python's fnmatch module")
+    arg_parser_target_list.add_argument(
         "target", metavar = "TARGETSPEC", nargs = "*",
         action = "store", default = None,
         help = "Target's names or URLs or a general target specification "
