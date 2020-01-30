@@ -9,6 +9,7 @@ import bisect
 import errno
 import fnmatch
 import os
+import re
 import shutil
 import time
 
@@ -109,6 +110,8 @@ class fsdb(object):
                     d[filename] = self.get(filename)
         return d
 
+    _field_valid_regex = re.compile(r"^[-\.a-zA-Z0-9_]+$")
+
     def set(self, field, value):
         """
         Set a field in the database
@@ -116,6 +119,9 @@ class fsdb(object):
         :param str field: name of the field to set
         :param str value: value to stored; None to remove that field
         """
+        if not self._field_valid_regex.match(field):
+            raise ValueError("%s: invalid field name (valid: %s)" \
+                             % (field, self._field_valid_regex.pattern))
         if value != None:
             assert isinstance(value, basestring)
             assert len(value) < 1023

@@ -331,37 +331,52 @@ def _target_get(target_id):
         flask.abort(404, "%s: unknown target" % target_id)
     return flask.jsonify(target.to_dict(projections))
 
-
-@app.route(API_PREFIX + 'targets/<string:target_id>/acquire', methods = ['PUT'])
-@flask_login.login_required
-def _target_acquire(target_id):
-    # a valid user can try to acquire multiple times (it's a PUT request after all) and it
-    # would succeed if already acquired.
-    # FIXME: some security checks on this ticket?
-    ticket = flask.request.form.get('ticket', "")
-    if flask.request.form.get('force', 'false').lower() == 'true':
-        force = True
-        if not current_user_is_admin():
-            flask_logd_abort(400, "forced acquisition requires admin rights")
+def _target_property_set(target, prop, value, user_is_admin, ticket):
+    if value != None \
+       and not isinstance(value, ( basestring, int, float, bool)):
+        flask_logi_abort(
+            400, "property %s: invalid data type %s;"
+            " only null/string/number/boolean allowed"
+            % (prop, type(value).__name__))
+    if user_is_admin:
+        target.property_set(prop, value)
+    elif not target.property_is_user(prop):
+        raise ttbl.test_target_not_admin_e(target)
     else:
-        force = False
+        # A non-admin must own the target before setting anything
+        target.property_set_locked(who_make(ticket), prop, value)
 
-    if target_id not in ttbl.config.targets.keys():
-        return flask.abort(404, "%s: can't find target" % target_id)
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
+
+@app.route(API_PREFIX + 'targets/<string:target_id>',
+           methods = [ 'PATCH', 'PUT' ])
+@flask_login.login_required
+def _target_patch(target_id):
+    target = ttbl.config.targets.get(target_id, None)
+    if target == None:
+        flask.abort(404, "%s: unknown target" % target_id)
+    ticket = flask.request.form.get('ticket', "")
+    user_is_admin = current_user_is_admin()
     try:
-        target.acquire(who_make(ticket), force)
-        target.timestamp()
-    except ttbl.test_target_busy_e as e:
-        flask_log_abort(3, 400, "%s" % e, exc_info = False)
+        # Set parameter via form parameters
+        for prop in flask.request.form.keys():
+            # we pop 'ticket' because we don't want to allow it as a
+            # parameter, since we use it as a descriptor until we move away
+            # from it
+            if prop == 'ticket':
+                continue
+            _target_property_set(target, prop, flask.request.form[prop],
+                                 user_is_admin, ticket)
+        # Set parameter via JSON data body
+        data = flask.request.get_json()
+        if data:
+            # If any, convert to our interal flat key space
+            for prop, val in commonl.dict_to_flat(data):
+                _target_property_set(target, prop, val, user_is_admin, ticket)
     except ttbl.test_target_e as e:
-        # Not considered as errors, no traces printed -- as these are
-        # normal during operation.
-        flask_logd_abort(400, "%s" % e, exc_info = False)
+        flask_logi_abort(400, "%s" % e, exc_info = True)
     except Exception as e:
         flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({})
+    return flask.jsonify({ })
 
 
 @app.route(API_PREFIX + 'targets/<string:target_id>/active', methods = ['PUT'])
@@ -460,7 +475,7 @@ def _target_release(target_id):
 @app.route(API_PREFIX + 'targets/<string:target_id>/property_set',
            methods = ['PUT'])
 @flask_login.login_required
-def _property_set(target_id):
+def _property_set(target_id):	# COMPAT
     # FIXME: we need a way to disable this command selectively
     with ttbl.config.targets_lock:
         target = ttbl.config.targets[target_id]
@@ -475,13 +490,7 @@ def _property_set(target_id):
     try:
         info = ""
         with log_to_str_too(target.log, iostr_wrapper):
-            if user_is_admin:
-                target.property_set(prop, value)
-            elif not target.property_is_user(prop):
-                raise ttbl.test_target_not_admin_e(target)
-            else:
-                # A non-admin must own the target before setting anything
-                target.property_set_locked(who_make(ticket), prop, value)
+            _target_property_set(target, prop, value, user_is_admin, ticket)
     except ttbl.test_target_e as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
     except Exception as e:
@@ -494,7 +503,7 @@ def _property_set(target_id):
 @app.route(API_PREFIX + 'targets/<string:target_id>/property_get',
            methods = [ 'GET', 'PUT' ])
 @flask_login.login_required
-def _property_get(target_id):
+def _property_get(target_id):	# COMPAT
     # FIXME: we need a way to disable this command selectively
     with ttbl.config.targets_lock:
         target = ttbl.config.targets[target_id]

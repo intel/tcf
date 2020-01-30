@@ -76,6 +76,23 @@ def _target_get(args):
     rt = rtb.send_request("GET", "targets/" + args.target, data = data)
     print json.dumps(rt, skipkeys = True, indent = 4)
 
+def _target_patch(args):
+    # set data
+    data = collections.OrderedDict()	# respect user's order
+    for data_s in args.data:
+        if not "=" in data_s:
+            raise AssertionError(
+                "data specification has to be in the format KEY=JSON-DATA;"
+                " got (%s) %s" % (type(data_s), data_s))
+        k, v = data_s.split("=", 1)
+        data[k] = v
+    rtb, _rt = ttb_client._rest_target_find_by_id(args.target)
+    if data:
+        rtb.send_request("PATCH", "targets/" + args.target, data = data)
+    else:
+        # JSON from stdin
+        rtb.send_request("PATCH", "targets/" + args.target,
+                         json = json.loads(sys.stdin.read()))
 
 def healthcheck(args):
     with tcfl.msgid_c("cmdline"):
@@ -253,6 +270,15 @@ if __name__ == "__main__":
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target's name")
     ap.set_defaults(func = _target_get)
+
+    ap = arg_subparsers.add_parser(
+        "patch", help = "Store target information in the server")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target's name")
+    ap.add_argument("data", metavar = "KEY=JSON-VALUE", nargs = "*",
+                    default = None, help = "Data items to store; if"
+                    " none, specify a JSON dictionary over stdin")
+    ap.set_defaults(func = _target_patch)
 
     ap = arg_subparsers.add_parser(
         "acquire", help = "Acquire ownership of a target")

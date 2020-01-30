@@ -1082,8 +1082,14 @@ class test_target(object):
 
         :param str prop: Property name
         :param str value: Value for the property (None for deleting)
+
+        Due to the hierarchical aspect of the key property namespace,
+        if a property *a.b* is set, any property called *a.b.NAME*
+        will be cleared out.
         """
         self.fsdb.set(prop, value)
+        for key in self.fsdb.keys(prop + ".*"):
+            self.fsdb.set(key, None)
 
     def property_set_locked(self, who, prop, value):
         """
@@ -1094,8 +1100,9 @@ class test_target(object):
         :param str value: Value for the property (None for deleting)
         """
         assert isinstance(who, basestring)
+        assert isinstance(prop, basestring)
         with self.target_owned_and_locked(who):
-            self.fsdb.set(prop, value)
+            self.property_set(prop, value)
 
     def property_get(self, prop, default = None):
         """
