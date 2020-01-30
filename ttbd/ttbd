@@ -355,8 +355,7 @@ def _target_acquire(target_id):
         flask_logd_abort(400, "%s" % e, exc_info = False)
     except Exception as e:
         flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    r = _target_id_to_dict(target_id)
-    return flask.jsonify(_target_id_to_dict(target_id))
+    return flask.jsonify({})
 
 
 @app.route(API_PREFIX + 'targets/<string:target_id>/active', methods = ['PUT'])
