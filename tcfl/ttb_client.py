@@ -382,7 +382,8 @@ class rest_target_broker(object):
             r = self.send_request("GET", "targets/" + target_id, data = data)
             # FIXME: imitate same output format until we unfold all
             # these calls--it was a bad idea
-            r['targets'] = [ r ]
+            if not 'targets' in r:
+                r['targets'] = [ r ]
         else:
             r = self.send_request("GET", "targets/", data = data)
         _targets = []
