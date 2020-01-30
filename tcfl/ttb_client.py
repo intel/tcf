@@ -736,11 +736,12 @@ def rest_target_print(rt, verbosity = 0):
             power = " ON"
         else:
             power = ""
-        if rt['owner'] != None:
-            owner = "[" + rt['owner'] + "]"
+        owner = rt.get('owner', None)
+        if owner != None:
+            owner_s = "[" + owner + "]"
         else:
-            owner = ""
-        print "%s %s%s" % (rt['fullid'], owner, power)
+            owner_s = ""
+        print "%s %s%s" % (rt['fullid'], owner_s, power)
     elif verbosity == 2:
         print rt['fullid']
         commonl._dict_print_dotted(rt, "  ")
