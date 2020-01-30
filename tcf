@@ -22,6 +22,7 @@ import collections
 import argparse
 import os
 import commonl
+import json
 import tcfl
 import tcfl.ttb_client as ttb_client
 import tcfl.config
@@ -63,6 +64,17 @@ def join_args_for_make_shell_command(args):
         _arg = re.sub(r'(\$)', r'$$', _arg)
         s += " '" + _arg + "'"
     return s
+
+def _target_get(args):
+    # pure target get w/o going through the cache
+
+    if args.projection:
+        data = { 'projection': json.dumps(args.projection) }
+    else:
+        data = None
+    rtb, _rt = ttb_client._rest_target_find_by_id(args.target)
+    rt = rtb.send_request("GET", "targets/" + args.target, data = data)
+    print json.dumps(rt, skipkeys = True, indent = 4)
 
 
 def healthcheck(args):
@@ -225,6 +237,18 @@ if __name__ == "__main__":
         "which might include values of tags, etc, in single quotes (eg: "
         "'zephyr_board and not type:\"^qemu.*\"'")
     arg_parser_target_list.set_defaults(func = ttb_client.rest_target_list)
+
+    ap = arg_subparsers.add_parser(
+        "get", help = "Return target information straight from the "
+        "server formated as JSON (unlike 'list', which will add some "
+        "client fields)")
+    ap.add_argument(
+        "-p", "--projection", action = "append",
+        help = "List of fields to return (*? [CHARS] or [!CHARS] supported)"
+        " as per python's fnmatch module")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target's name")
+    ap.set_defaults(func = _target_get)
 
     ap = arg_subparsers.add_parser(
         "acquire", help = "Acquire ownership of a target")
