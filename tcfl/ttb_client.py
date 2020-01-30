@@ -716,12 +716,6 @@ def rest_logout(args):
         if rtb.valid_session:
             rtb.logout()
 
-def _power_get(rt):
-    if 'powered' in rt:
-        return rt['powered'] == True
-    else:
-        return None
-
 def rest_target_print(rt, verbosity = 0):
     """
     Print information about a REST target taking into account the
