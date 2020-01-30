@@ -264,7 +264,8 @@ class rest_target_broker(object):
 
     # FIXME: this timeout has to be proportional to how long it takes
     # for the target to flash, which we know from the tags
-    def send_request(self, method, url, data = None, files = None,
+    def send_request(self, method, url,
+                     data = None, json = None, files = None,
                      stream = False, raw = False, timeout = 480):
         """
         Send request to server using url and data, save the cookies
@@ -296,20 +297,24 @@ class rest_target_broker(object):
             cookies = self.cookies
         session = tls_var("session", requests.Session)
         if method == 'GET':
-            r = session.get(url_request, cookies = cookies,
+            r = session.get(url_request, cookies = cookies, json = json,
                             data = data, verify = self.verify_ssl,
                             stream = stream, timeout = timeout)
+        elif method == 'PATCH':
+            r = session.patch(url_request, cookies = cookies, json = json,
+                              data = data, verify = self.verify_ssl,
+                              stream = stream, timeout = timeout)
         elif method == 'POST':
-            r = session.post(url_request, cookies = cookies,
+            r = session.post(url_request, cookies = cookies, json = json,
                              data = data, files = files,
                              verify = self.verify_ssl,
                              stream = stream, timeout = timeout)
         elif method == 'PUT':
-            r = session.put(url_request, cookies = cookies,
+            r = session.put(url_request, cookies = cookies, json = json,
                             data = data, verify = self.verify_ssl,
                             stream = stream, timeout = timeout)
         elif method == 'DELETE':
-            r = session.delete(url_request, cookies = cookies,
+            r = session.delete(url_request, cookies = cookies, json = json,
                                data = data, verify = self.verify_ssl,
                                stream = stream, timeout = timeout)
         else:
