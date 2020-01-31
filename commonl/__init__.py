@@ -1039,12 +1039,17 @@ class dict_missing_c(dict):
 
     to print "idonthavethis_UNDEFINED_SYMBOL" intead of raising KeyError
     """
-    def __init__(self, d):
+    def __init__(self, d, missing = None):
+        assert isinstance(d, dict)
+        assert missing == None or isinstance(missing, basestring)
         dict.__init__(self, d)
+        self.missing = missing
 
     def __getitem__(self, key):
         if self.__contains__(key):
             return dict.__getitem__(self, key)
+        if self.missing:
+            return self.missing
         return "%s_UNDEFINED_SYMBOL.%s" % (key, origin_fn_get(2, "."))
 
 def ipv4_len_to_netmask_ascii(length):
