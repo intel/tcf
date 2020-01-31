@@ -20,6 +20,7 @@ def target_pdu_socket_add(name, pc, tags = None, power = True):
         tags = {}
     target = ttbl.test_target(name, _tags = tags)
     target.interface_add("power", ttbl.power.interface(pc))
+    ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
     if power:
         # FIXME: untested
         target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
