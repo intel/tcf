@@ -379,6 +379,39 @@ def _target_patch(target_id):
     return flask.jsonify({ })
 
 
+@app.route(API_PREFIX + 'targets/<string:target_id>/acquire', methods = ['PUT'])
+@flask_login.login_required
+def _target_acquire(target_id):
+    # a valid user can try to acquire multiple times (it's a PUT request after all) and it
+    # would succeed if already acquired.
+    # FIXME: some security checks on this ticket?
+    ticket = flask.request.form.get('ticket', "")
+    if flask.request.form.get('force', 'false').lower() == 'true':
+        force = True
+        if not current_user_is_admin():
+            flask_logd_abort(400, "forced acquisition requires admin rights")
+    else:
+        force = False
+
+    if target_id not in ttbl.config.targets.keys():
+        return flask.abort(404, "%s: can't find target" % target_id)
+    with ttbl.config.targets_lock:
+        target = ttbl.config.targets[target_id]
+    try:
+        target.acquire(who_make(ticket), force)
+        target.timestamp()
+    except ttbl.test_target_busy_e as e:
+        flask_log_abort(3, 400, "%s" % e, exc_info = False)
+    except ttbl.test_target_e as e:
+        # Not considered as errors, no traces printed -- as these are
+        # normal during operation.
+        flask_logd_abort(400, "%s" % e, exc_info = False)
+    except Exception as e:
+        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
+    r = _target_id_to_dict(target_id)
+    return flask.jsonify({})
+
+
 @app.route(API_PREFIX + 'targets/<string:target_id>/active', methods = ['PUT'])
 @flask_login.login_required
 def _target_active(target_id):
