@@ -684,9 +684,9 @@ class tt_interface(object):
     def instrument_mkindex(name, upid, kws):
         if name:
             name = name % kws
-            index = commonl.mkid(name + pprint.pformat(upid))
+            index = commonl.mkid(name + pprint.pformat(upid), l = 4)
         else:
-            index = commonl.mkid(pprint.pformat(upid))
+            index = commonl.mkid(pprint.pformat(upid), l = 4)
         return name, index
 
     def instrumentation_publish_component(
