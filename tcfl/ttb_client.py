@@ -435,69 +435,6 @@ class rest_target_broker(object):
             "PUT", "targets/%s/release" % rt['id'],
             data = { 'force': force, 'ticket': ticket })
 
-    # COMPAT
-    def rest_tb_target_power_on(self, rt, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/power_on" % rt['id'],
-            data = { 'ticket': ticket })
-
-    def rest_tb_target_console_read(self, rt, console, offset, ticket = ''):
-        url = "targets/%s/console/" % rt['id']
-        data = {
-            'offset': offset,
-        }
-        if console:
-            data['console'] = console
-        if ticket != '':
-            data['ticket'] = ticket
-        return self.send_request("GET", url, data = data,
-                                 stream = False, raw = True)
-
-    def rest_tb_target_console_size(self, rt, console, ticket = ''):
-        r = self.send_request(
-            'GET', "targets/%s/console_size" % rt['id'],
-            data = {
-                'console': console,
-                'ticket': ticket
-            }
-        )
-        return r['byte_count']
-
-    def rest_tb_target_console_read_to_fd(self, fd, rt, console, offset,
-                                          max_size = 0, ticket = ''):
-        url = "targets/%s/console/" % rt['id']
-        data = {
-            'offset': offset,
-        }
-        if console:
-            data['console'] = console
-        if ticket != '':
-            data['ticket'] = ticket
-        with contextlib.closing(self.send_request("GET", url, data = data,
-                                                  stream = True,
-                                                  raw = True)) as r:
-            # http://docs.python-requests.org/en/master/user/quickstart/#response-content
-            chunk_size = 1024
-            total = 0
-            for chunk in r.iter_content(chunk_size):
-                os.write(fd, chunk)
-                # don't use chunk_size, as it might be less
-                total += len(chunk)
-                if max_size > 0 and total >= max_size:
-                    break
-            return total
-
-    def rest_tb_target_console_write(self, rt, console, data, ticket = ''):
-        url = "targets/%s/console/" % rt['id']
-        # gosh this naming sucks...
-        _data = dict(data = data)
-        if console:
-            _data['console'] = console
-        if ticket != '':
-            _data['ticket'] = ticket
-        return self.send_request('POST', url, data = _data)
-
-
 def rest_init(path, url, ignore_ssl = False, aka = None):
     """
     Initialize access to a remote target broker.

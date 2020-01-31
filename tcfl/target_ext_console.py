@@ -75,21 +75,14 @@ class extension(tc.target_extension_c):
 
     def __init__(self, target):
         interfaces = target.rt.get('interfaces', [])
-        if 'console' in target.rt.get('interfaces', []):
-            self.compat = False
-        elif 'test_target_console_mixin' in target.rt.get('interfaces', []):
-            self.compat = True	# COMPAT
-        else:
+        if 'console' not in target.rt.get('interfaces', []):
             raise self.unneeded
         self.target = target
         # this won't change runtime, so it is ok to cache it
         self.console_list = self.list()
         # this becomes a ALIAS: REAL-NAME
-        if not self.compat:
-            r = self.target.ttbd_iface_call("console", "list", method = "GET")
-            self.aliases = r['aliases']
-        else:
-            self.aliases = {}	# COMPAT
+        r = self.target.ttbd_iface_call("console", "list", method = "GET")
+        self.aliases = r['aliases']
         # Which is the default console that was set in runtime?
         # call it only once from here, otherwise everytime we try to
         # get the console to use by default we do a call
@@ -261,8 +254,6 @@ class extension(tc.target_extension_c):
 
         List of current parameters can be obtained with :meth:`setup_get`.
         """
-        if self.compat:
-            raise RuntimeError("target does not support new console interface")
         console = self._console_get(console)
         return self.target.ttbd_iface_call("console", "setup",
                                            component = console,
@@ -272,20 +263,14 @@ class extension(tc.target_extension_c):
         """
         Return a dictionary with current parameters.
         """
-        if self.compat:
-            raise RuntimeError("target does not support new console interface")
         console = self._console_get(console)
         r = self.target.ttbd_iface_call("console", "setup", method = "GET",
                                         component = console)
         return r['result']
 
     def list(self):
-        if self.compat:
-            r = self.target.rt.get('consoles', [])
-            return r
-        else:
-            r = self.target.ttbd_iface_call("console", "list", method = "GET")
-            return r['result']
+        r = self.target.ttbd_iface_call("console", "list", method = "GET")
+        return r['result']
 
     def read(self, console = None, offset = 0, max_size = 0, fd = None):
         """
@@ -307,33 +292,6 @@ class extension(tc.target_extension_c):
         assert fd == None or isinstance(fd, file)
 
         target = self.target
-        if self.compat:
-            #
-            # COMPAT: ttbl.test_target_console_mixin
-            #
-            if console == None or console == "":
-                console_name = "<default>"
-            else:
-                console_name = console
-            target.report_info("%s: reading from @%d"
-                               % (console_name, offset), dlevel = 4)
-            if fd:
-                r = self.target.rtb.rest_tb_target_console_read_to_fd(
-                    fd.fileno(),
-                    self.target.rt, console, offset,
-                    ticket = self.target.ticket)
-                ret = r
-                l = r
-            else:
-                r = self.target.rtb.rest_tb_target_console_read(
-                    self.target.rt, console, offset,
-                    ticket = self.target.ticket)
-                ret = r.text
-                l = len(ret)
-            target.report_info("%s: read %dB from console @%d"
-                               % (console_name, l, offset), dlevel = 3)
-            return ret
-
         console = self._console_get(console)
         if fd:
             target.report_info("%s: reading from @%d"
@@ -388,10 +346,6 @@ class extension(tc.target_extension_c):
 
         :param str console: (optional) console to read from
         """
-        if self.compat:
-            return int(self.target.rtb.rest_tb_target_console_size(
-                self.target.rt, console, ticket = self.target.ticket))
-
         console = self._console_get(console)
         r = self.target.ttbd_iface_call("console", "size", method = "GET",
                                         component = console)
@@ -412,20 +366,6 @@ class extension(tc.target_extension_c):
             data_report = data
         # escape unprintable chars
         data_report = data_report.encode('unicode-escape', errors = 'replace')
-        if self.compat:
-            if console == None or console == "":
-                console_name = "<default>"
-            else:
-                console_name = console
-            self.target.report_info("%s: writing %dB to console"
-                                    % (console_name, len(data)),
-                                    dlevel = 3)
-            self.target.rtb.rest_tb_target_console_write(
-                self.target.rt, console, data, ticket = self.target.ticket)
-            self.target.report_info("%s: wrote %dB (%s) to console"
-                                    % (console_name, len(data), data_report))
-            return
-
         console = self._console_get(console)
         self.target.report_info("%s: writing %dB to console"
                                 % (console, len(data)), dlevel = 3)
