@@ -1069,7 +1069,7 @@ EOF""")
             "sync;"
             " partprobe;"
             " sleep 3s; "
-            " lsblk --json -bni -o NAME,SIZE,TYPE,FSTYPE,UUID,PARTLABEL,LABEL,MOUNTPOINT",
+            " lsblk --json -bni -o NAME,SIZE,TYPE,FSTYPE,UUID,PARTLABEL,LABEL,MOUNTPOINT 2> /dev/null",
             output = True, trim = True)
         # this output will be
         #
