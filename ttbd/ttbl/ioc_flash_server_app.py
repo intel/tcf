@@ -47,7 +47,7 @@ class interface(ttbl.tt_interface):
     def _target_setup(self, target):
         self.instrumentation_publish_component(
             target, "ioc_flash_server_app",
-            commonl.mkid(self.tty_path), "RS-232C serial port",
+            commonl.mkid(self.tty_path, l = 4), "RS-232C serial port",
             { 'serial_port': self.tty_path })
 
     def _release_hook(self, target, _force):

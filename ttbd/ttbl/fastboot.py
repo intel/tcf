@@ -160,7 +160,7 @@ class interface(ttbl.tt_interface):
     def _target_setup(self, target):
         self.instrumentation_publish_component(
             target, "fastboot",
-            commonl.mkid(self.usb_serial_number), "ADB bridge",
+            commonl.mkid(self.usb_serial_number, l = 4), "ADB bridge",
             { 'usb_serial_number': self.usb_serial_number })
 
 
