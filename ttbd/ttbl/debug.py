@@ -34,7 +34,7 @@ import json
 
 import ttbl
 
-class impl_c(object):
+class impl_c(ttbl.tt_interface_impl_c):
     """
     Driver interface for a component's debugging capabilities
 
@@ -57,7 +57,7 @@ class impl_c(object):
     *debug* interface.
     """
     def __init__(self):
-        pass
+        ttbl.tt_interface_impl_c.__init__(self)
 
     def debug_list(self, target, component):
         """
@@ -180,6 +180,7 @@ class interface(ttbl.tt_interface):
 
     def _target_setup(self, target):
         target.fsdb.set("debug", None)
+        self.instrumentation_publish(target, "debug")
 
     def _release_hook(self, target, _force):
         self._stop(target, self.impls.keys())

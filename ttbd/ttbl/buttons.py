@@ -22,7 +22,7 @@ import json
 import ttbl
 
 
-class impl_c(object):
+class impl_c(ttbl.tt_interface_impl_c):
     """
     Implementation interface for a button driver
 
@@ -30,6 +30,7 @@ class impl_c(object):
     can be obtained.
     """
     def __init__(self):
+        ttbl.tt_interface_impl_c.__init__(self)
         self.parameters = {}
 
     def press(self, target, button):

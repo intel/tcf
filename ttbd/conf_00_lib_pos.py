@@ -981,13 +981,16 @@ def target_qemu_pos_add(target_name,
     # STATE_DIR/console-NAME.{read,write}
     console_pc = ttbl.console.generic_c(chunk_size = 8,
                                         interchunk_wait = 0.15)
+    console_pc.upid_set(qemu_pc.name, **qemu_pc.upid)
+    ssh_pc = ttbl.console.ssh_pc("root@" + ipv4_addr)
+    ssh_pc.upid_set(qemu_pc.name, **qemu_pc.upid)
     consolel = []
     for console in consoles:
         consolel.append(
             ( console, console_pc )
         )
     consolel += [
-        ( "ssh0", ttbl.console.ssh_pc("root@" + ipv4_addr) ),
+        ( "ssh0", ssh_pc ),
         ( "default",  consolel[0][0] ),
         ( "preferred",  "ssh0" ),
     ]

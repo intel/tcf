@@ -14,6 +14,7 @@ Interface to flash the target using *ioc_flash_server_app*
 import os
 import subprocess
 
+import commonl
 import ttbl
 
 
@@ -43,8 +44,11 @@ class interface(ttbl.tt_interface):
         ttbl.tt_interface.__init__(self)
         self.tty_path = tty_path
 
-    def _target_setup(self, _):
-        pass
+    def _target_setup(self, target):
+        self.instrumentation_publish_component(
+            target, "ioc_flash_server_app",
+            commonl.mkid(self.tty_path), "RS-232C serial port",
+            { 'serial_port': self.tty_path })
 
     def _release_hook(self, target, _force):
         # nothing needed here

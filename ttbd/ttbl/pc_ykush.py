@@ -84,6 +84,8 @@ class ykush(ttbl.power.impl_c, ttbl.things.impl_c):
         self.ykush_serial = ykush_serial
         self.retries = 10
         self.soft_retries = 4
+        self.upid_set("Yepkit YKUSH power control hub",
+                      serial_number = self.ykush_serial)
 
     def _find_dev(self, target):
         try:

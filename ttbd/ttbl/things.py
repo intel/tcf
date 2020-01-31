@@ -22,7 +22,7 @@ plug or unplug the targets.
 
 import ttbl.config
 
-class impl_c(object):
+class impl_c(ttbl.tt_interface_impl_c):
     """
     Define how to plug a thing (which is a target) into a target
 
@@ -100,6 +100,7 @@ class interface(ttbl.tt_interface):
             thing = ttbl.config.targets[name]
             thing.thing_to.add(target)
         target.tags_update(dict(things = self.impls.keys()))
+        self.instrumentation_publish(target, "things")
 
     def _release_hook(self, target, _force):
         # unplug all the things plugged to this target

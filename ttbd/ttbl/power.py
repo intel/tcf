@@ -56,7 +56,7 @@ import subprocess
 import commonl
 import ttbl
 
-class impl_c(object):
+class impl_c(ttbl.tt_interface_impl_c):
     """Implementation interface to drive a  power component
 
     A power component is an individual entity that provides one of the
@@ -102,6 +102,7 @@ class impl_c(object):
         #: for paranoid power getting, now many samples we need to get
         #: that are the same for the value to be considered stable
         self.paranoid_get_samples = 6
+        ttbl.tt_interface_impl_c.__init__(self)
 
     class retry_all_e(Exception):
         """
@@ -174,6 +175,7 @@ class interface(ttbl.tt_interface):
         # Called when the interface is added to a target to initialize
         # the needed target aspect (such as adding tags/metadata)
         target.tags_update(dict(power_rail = self.impls.keys()))
+        self.instrumentation_publish(target, "power")
 
 
     def _release_hook(self, target, _force):

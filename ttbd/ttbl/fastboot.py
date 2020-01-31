@@ -12,6 +12,7 @@ import json
 import re
 import subprocess
 
+import commonl
 import ttbl
 
 class interface(ttbl.tt_interface):
@@ -156,8 +157,12 @@ class interface(ttbl.tt_interface):
         self.usb_serial_number = usb_serial_number
 
 
-    def _target_setup(self, _):
-        pass
+    def _target_setup(self, target):
+        self.instrumentation_publish_component(
+            target, "fastboot",
+            commonl.mkid(self.usb_serial_number), "ADB bridge",
+            { 'usb_serial_number': self.usb_serial_number })
+
 
     def _release_hook(self, target, _force):
         # nothing needed here

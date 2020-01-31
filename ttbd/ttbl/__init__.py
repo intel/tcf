@@ -18,6 +18,7 @@ import errno
 import ipaddress
 import logging
 import os
+import pprint
 import random
 import re
 import signal
@@ -309,6 +310,56 @@ class symlink_acquirer_c(acquirer_c):
             if e.errno == errno.ENOENT:
                 return None
             raise
+
+class tt_interface_impl_c(object):
+    def __init__(self, name = None, **kwargs):
+        self.name = name
+        #: Unique Physical IDentification
+        #:
+        #: flat dictionary of keys to report HW information for
+        #: inventory purposes of whichever HW component is used to
+        #: implement this driver.
+        #:
+        #: Normally set from the driver with a call to
+        #: :meth:`upid_set`; howevr, after instantiation, more fields
+        #: can be added to a driver with information that can be
+        #: useful to locate a piece of HW. Eg:
+        #:
+        #: >>> console_pc = ttbl.console.generic_c(chunk_size = 8,
+        #: >>>     interchunk_wait = 0.15)
+        #: >>> console_pc.upid_set("RS-232C over USB", dict(
+        #: >>>     serial_number = "RS33433E",
+        #: >>>     location = "USB port #4 front"))
+        self.upid = kwargs
+
+    def upid_set(self, name, **kwargs):
+        """
+        Set :data:`upid` information in a single shot
+
+        :param str name: Name of the physical component that
+          implements this interface functionality
+        :param dict kwargs: fields and values (strings) to report for
+          the physical component that implements this interface's
+          functionality; it is important to specify here a unique
+          piece of information that will allow this component to be
+          reported separately in the instrumentation section of the
+          inventory. Eg: serial numbers or paths to unique devices.
+
+        For example:
+
+        >>> impl_object.upid_set("ACME power controller", serial_number = "XJ323232")
+
+        This is normally called from the *__init__()* function of a
+        component driver, that must inherit :class:`tt_interface_impl_c`.
+        """
+        assert name == None or isinstance(name, basestring)
+        for key, val in kwargs.iteritems():
+            assert val == None or isinstance(val, (basestring, int,
+                                                   float, bool)), \
+                "UPID field '%s' must be string|number|bool; got %s" \
+                % (key, type(val))
+        self.name = name
+        self.upid = kwargs
 
 
 class tt_interface(object):
@@ -627,6 +678,78 @@ class tt_interface(object):
             "%s::%s[%s](): driver returned %s, expected %s" \
             % (target.id, call, component,
                type(val).__name__, expected_type.__name__)
+
+
+    @staticmethod
+    def instrument_mkindex(name, upid, kws):
+        if name:
+            name = name % kws
+            index = commonl.mkid(name + pprint.pformat(upid))
+        else:
+            index = commonl.mkid(pprint.pformat(upid))
+        return name, index
+
+    def instrumentation_publish_component(
+            self, target, iface_name,
+            index, instrument_name, upid, components = None, kws = None):
+        """
+        Publish in the target's inventory information about the
+        instrumentations that implements the functionalities of the
+        components of this interface
+        """
+
+        assert components == None or isinstance(components, list)
+        if kws == None:
+            kws = commonl.dict_missing_c({}, "n/a")
+            kws.update(target.kws)
+            kws.update(target.fsdb.get_as_dict())
+        if index == None:
+            instrument_name, index = \
+                self.instrument_mkindex(instrument_name, upid, kws)
+        prefix = "instrumentation." + index
+        target.property_set(prefix + ".name", instrument_name)
+        for key, val in upid.iteritems():
+            target.property_set(prefix + "." + key, val % kws)
+        if components:
+            target.property_set(prefix + ".functions." + iface_name,
+                                ":".join(components))
+        else:
+            target.property_set(prefix + ".functions." + iface_name,
+                                "true")
+
+    def instrumentation_publish(self, target, iface_name):
+        """
+        Publish in the target's inventory information about the
+        instrumentations that implements the functionalities of the
+        components of this interface
+        """
+        assert isinstance(target, ttbl.test_target)
+        assert isinstance(iface_name, basestring)
+
+        components_by_index = collections.defaultdict(list)
+        name_by_index = {}
+        upid_by_index = {}
+        kws = commonl.dict_missing_c({}, "n/a")
+        kws.update(target.kws)
+        kws.update(target.fsdb.get_as_dict())
+        for component in self.impls.keys():
+            # validate image types (from the keys) are valid from
+            # the components and aliases
+            impl, _ = self.impl_get_by_name(component, "component")
+            instrument_name, index = \
+                self.instrument_mkindex(impl.name, impl.upid, kws)
+            # FIXME: there must be a more efficient way than using
+            # pprint.pformat
+            components_by_index[index].append(component)
+            name_by_index[index] = instrument_name
+            upid_by_index[index] = impl.upid
+
+        for index, components in components_by_index.iteritems():
+            self.instrumentation_publish_component(
+                target, iface_name, index,
+                name_by_index.get(index, None), upid_by_index[index],
+                components,
+                kws = kws)
 
 
     def request_process(self, target, who, method, call,

@@ -46,7 +46,7 @@ mime_type_regex = re.compile(
     "^([_a-zA-Z0-9]+/[_a-zA-Z0-9]+)"
     "(,[_a-zA-Z0-9]+/[_a-zA-Z0-9]+)*$")
 
-class impl_c(object):
+class impl_c(ttbl.tt_interface_impl_c):
     """
     Implementation interface for a capture driver
 
@@ -68,6 +68,7 @@ class impl_c(object):
             "multiple [_a-zA-Z0-9]+/[_a-zA-Z0-9]+ separated by commas" \
             % mimetype
         self.mimetype = mimetype
+        ttbl.tt_interface_impl_c.__init__(self)
 
     def start(self, target, capturer):
         """
@@ -180,6 +181,7 @@ class interface(ttbl.tt_interface):
                 descr += ":" + impl.mimetype
             capturers.append(descr)
         target.tags_update(dict(capture = " ".join(capturers)))
+        self.instrumentation_publish(target, "capture")
 
     def start(self, who, target, capturer):
         """
@@ -467,6 +469,9 @@ class generic_snapshot(impl_c):
             self.pre_commands = []
         self.extension = extension
         impl_c.__init__(self, False, mimetype)
+        # we make the cmdline be the unique physical identifier, since
+        # it is like a different implementation each
+        self.upid_set(name, serial_number = commonl.mkid(cmdline))
 
     def start(self, target, capturer):
         impl_c.start(self, target, capturer)
@@ -589,7 +594,9 @@ class generic_stream(impl_c):
         else:
             self.pre_commands = []
         impl_c.__init__(self, True, mimetype)
-
+        # we make the cmdline be the unique physical identifier, since
+        # it is like a different implementation each
+        self.upid_set(name, serial_number = commonl.mkid(cmdline))
 
     def start(self, target, capturer):
         impl_c.start(self, target, capturer)

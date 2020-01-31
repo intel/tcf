@@ -27,12 +27,12 @@ import serial
 import ttbl
 
 
-class impl_c(object):
+class impl_c(ttbl.tt_interface_impl_c):
     """
     Driver interface for flashing with :class:`interface`
     """
     def __init__(self):
-        pass
+        ttbl.tt_interface_impl_c.__init__(self)
 
     def flash(self, target, images):
         """
@@ -103,6 +103,7 @@ class interface(ttbl.tt_interface):
 
     def _target_setup(self, target):
         target.tags_update(dict(images = self.impls.keys()))
+        self.instrumentation_publish(target, "images")
 
     def _release_hook(self, target, _force):
         pass
@@ -202,6 +203,7 @@ class bossac_c(impl_c):
         impl_c.__init__(self)
         self.serial_port = serial_port
         self.console = console
+        self.upid_set("bossac jtag", serial_port = serial_port)
 
     #: Path to *bossac*
     #:
@@ -402,6 +404,7 @@ class dfu_c(impl_c):
             or isinstance(usb_serial_number, basestring)
         impl_c.__init__(self)
         self.usb_serial_number = usb_serial_number
+        self.upid_set("USB DFU flasher", usb_serial_number = usb_serial_number)
 
     #: Path to the dfu-tool
     #:
@@ -515,6 +518,7 @@ class esptool_c(impl_c):
         impl_c.__init__(self)
         self.serial_port = serial_port
         self.console = console
+        self.upid_set("ESP JTAG flasher", serial_port = serial_port)
 
     #: Path to *esptool.py*
     #:

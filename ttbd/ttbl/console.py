@@ -37,7 +37,7 @@ except ImportError:
     import fdpexpect
     pexpect.fdpexpect = fdpexpect
 
-class impl_c(object):
+class impl_c(ttbl.tt_interface_impl_c):
     """
     Implementation interface for a console driver
 
@@ -105,6 +105,7 @@ class impl_c(object):
         self.command_sequence = command_sequence
         self.command_timeout = command_timeout
         self.parameters = {}
+        ttbl.tt_interface_impl_c.__init__(self)
 
     class exception(Exception):
         """
@@ -357,6 +358,7 @@ class interface(ttbl.tt_interface):
         target.tags_update(dict(consoles = self.impls.keys()))
         target.properties_user.add("console-default")
         target.properties_keep_on_release.add("console-default")
+        self.instrumentation_publish(target, "console")
 
     def _release_hook(self, target, _force):
         # nothing to do on target release

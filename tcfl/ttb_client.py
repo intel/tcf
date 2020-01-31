@@ -443,6 +443,7 @@ class rest_target_broker(object):
             "PUT", "targets/%s/release" % rt['id'],
             data = { 'force': force, 'ticket': ticket })
 
+    # COMPAT: remove once all servrs are updated
     def rest_tb_property_set(self, rt, prop, value, ticket = ''):
         self.send_request(
             "PUT", "targets/%s/property_set" % rt['id'],
@@ -452,6 +453,7 @@ class rest_target_broker(object):
                 'value': value
             })
 
+    # COMPAT: remove once all servrs are updated
     def rest_tb_property_get(self, rt, prop, ticket = ''):
         r = self.send_request(
             "PUT", "targets/%s/property_get" % rt['id'],

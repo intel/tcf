@@ -110,7 +110,7 @@ class fsdb(object):
                     d[filename] = self.get(filename)
         return d
 
-    _field_valid_regex = re.compile(r"^[-\.a-zA-Z0-9_]+$")
+    field_valid_regex = re.compile(r"^[-\.a-zA-Z0-9_]+$")
 
     def set(self, field, value):
         """
@@ -119,7 +119,7 @@ class fsdb(object):
         :param str field: name of the field to set
         :param str value: value to stored; None to remove that field
         """
-        if not self._field_valid_regex.match(field):
+        if not self.field_valid_regex.match(field):
             raise ValueError("%s: invalid field name (valid: %s)" \
                              % (field, self._field_valid_regex.pattern))
         if value != None:

@@ -337,6 +337,13 @@ class pc(ttbl.power.daemon_c,
             mkpidfile = False)
         self.paranoid_get_samples = 1
         ttbl.images.impl_c.__init__(self)
+        self.upid_set(
+            "QEMU virtual machine",
+            # if multiple virtual machines are created associated to a
+            #   target, this shall generate a different ID for
+            #   each...in most cases
+            serial_number = commonl.mkid(" ".join(qemu_cmdline) + nic_model)
+        )
 
     #
     # Images interface (ttbl.images.impl_c)

@@ -580,6 +580,8 @@ class pc(ttbl.power.daemon_c, ttbl.images.impl_c, ttbl.debug.impl_c):
         ttbl.power.daemon_c.__init__(self, cmdline = cmdline)
         ttbl.images.impl_c.__init__(self)
         ttbl.debug.impl_c.__init__(self)
+        self.upid_set("OpenOCD supported JTAG",
+                      usb_serial_number = self.serial)
 
 
     class error(Exception):
