@@ -441,28 +441,6 @@ class rest_target_broker(object):
             "PUT", "targets/%s/power_on" % rt['id'],
             data = { 'ticket': ticket })
 
-    def rest_tb_target_power_off(self, rt, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/power_off" % rt['id'],
-            data = { 'ticket': ticket })
-
-    def rest_tb_target_reset(self, rt, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/reset" % rt['id'],
-            data = { 'ticket': ticket })
-
-    def rest_tb_target_power_cycle(self, rt, ticket = '', wait = None):
-        data = { 'ticket': ticket }
-        if wait != None:
-            data['wait'] = "%f" % wait
-        self.send_request("PUT", "targets/%s/power_cycle" % rt['id'],
-                          data = data)
-
-    def rest_tb_target_power_get(self, rt):
-        r = self.send_request(
-            "GET", "targets/%s/power_get" % rt['id'])
-        return r['powered']
-
     def rest_tb_file_upload(self, remote_filename, local_filename):
         with open(local_filename, 'rb') as f:
             self.send_request(

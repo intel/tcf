@@ -33,10 +33,6 @@ class extension(tc.target_extension_c):
 
     def __init__(self, target):
         if 'power' in target.rt.get('interfaces', []):
-            self.compat = False
-            return
-        if 'tt_power_control_mixin' in target.rt.get('interfaces', []):
-            self.compat = True	# COMPAT
             return
         raise self.unneeded
 
@@ -49,11 +45,6 @@ class extension(tc.target_extension_c):
         components are on; fake power components report power state as
         *None* and those are not taken into account.
         """
-        if self.compat:
-            self.target.report_info("Getting power", dlevel = 1)
-            r = self.target.rtb.rest_tb_target_power_get(self.target.rt)
-            self.target.report_info("Got power")
-            return r
         r = self.target.ttbd_iface_call("power", "get", method = "GET")
         return r['result']
 
@@ -65,8 +56,6 @@ class extension(tc.target_extension_c):
           (*True* if powered, *False* if not, *None* if not
           applicable, for fake power controls)
         """
-        if self.compat:
-            raise RuntimeError("target does not support new power interface")
         self.target.report_info("listing", dlevel = 1)
         r = self.target.ttbd_iface_call("power", "list", method = "GET")
         self.target.report_info("listed")
@@ -80,14 +69,8 @@ class extension(tc.target_extension_c):
           power off, defaults to whole target's power rail
         """
         assert component == None or isinstance(component, basestring)
-        if self.compat and component:
-            raise RuntimeError("target does not support new power interface")
         self.target.report_info("powering off", dlevel = 1)
-        if self.compat:
-            self.target.rtb.rest_tb_target_power_off(
-                self.target.rt, ticket = self.target.ticket)
-        else:
-            self.target.ttbd_iface_call("power", "off", component = component)
+        self.target.ttbd_iface_call("power", "off", component = component)
         self.target.report_info("powered off")
 
     def on(self, component = None):
@@ -98,14 +81,8 @@ class extension(tc.target_extension_c):
           power on, defaults to whole target's power rail
         """
         assert component == None or isinstance(component, basestring)
-        if self.compat and component:
-            raise RuntimeError("target does not support new power interface")
         self.target.report_info("powering on", dlevel = 1)
-        if self.compat:
-            self.target.rtb.rest_tb_target_power_on(
-                self.target.rt, ticket = self.target.ticket)
-        else:
-            self.target.ttbd_iface_call("power", "on", component = component)
+        self.target.ttbd_iface_call("power", "on", component = component)
         if component == None and hasattr(self.target, 'console'):
             self.target.console._power_on_post()
             self.target.testcase.tls.expecter.power_on_post(self.target)
@@ -122,12 +99,8 @@ class extension(tc.target_extension_c):
         assert wait == None or wait >= 0
         assert component == None or isinstance(component, basestring)
         self.target.report_info("power cycling", dlevel = 1)
-        if self.compat:
-            self.target.rtb.rest_tb_target_power_cycle(
-                self.target.rt, ticket = self.target.ticket, wait = wait)
-        else:
-            self.target.ttbd_iface_call("power", "cycle",
-                                        component = component, wait = wait)
+        self.target.ttbd_iface_call("power", "cycle",
+                                    component = component, wait = wait)
         if component == None and hasattr(self.target, 'console'):
             self.target.console._power_on_post()
             self.target.testcase.tls.expecter.power_on_post(self.target)
@@ -140,14 +113,9 @@ class extension(tc.target_extension_c):
         This interface is **deprecated**.
         """
         self.target.report_info("resetting", dlevel = 1)
-        if self.compat:
-            self.target.rtb.rest_tb_target_reset(
-                self.target.rt, ticket = self.target.ticket)
-            self.target.testcase.tls.expecter.power_on_post(self.target)
-        else:
-            self.target.report_info("DEPRECATED: reset()", level = 0)
-            # reset is deprecated at the server level
-            self.target.ttbd_iface_call("power", "cycle")
+        self.target.report_info("DEPRECATED: reset()", level = 0)
+        # reset is deprecated at the server level
+        self.target.ttbd_iface_call("power", "cycle")
         self.target.report_info("reset")
 
     def _healthcheck(self):
