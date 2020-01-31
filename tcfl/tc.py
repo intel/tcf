@@ -1103,10 +1103,12 @@ class target_c(object):
         :returns str: value of the property (if set) or None
         """
         self.report_info("reading property '%s'" % property_name, dlevel = 3)
-        r = self.rtb.rest_tb_property_get(
-            self.rt, property_name, ticket = self.ticket)
-        self.report_info("read property '%s': '%s'" % (property_name, r),
-                         dlevel = 2)
+        r = self.rtb.send_request(
+            "GET", "targets/" + self.id,
+            data = { "projections": json.dumps([ property_name ]) })
+        r = r.get(property_name, None)
+        self.report_info("read property '%s': '%s' [%s]"
+                         % (property_name, r, default), dlevel = 2)
         if r == None and default != None:
             return default
         return r
@@ -1122,10 +1124,30 @@ class target_c(object):
             assert isinstance(value, basestring)
         self.report_info("setting property '%s' to '%s'"
                          % (property_name, value), dlevel = 3)
-        self.rtb.rest_tb_property_set(
-            self.rt, property_name, value, ticket = self.ticket)
+        self.rtb.send_request("PATCH", "targets/" + self.id,
+                              json = { property_name: value })
         self.report_info("set property '%s' to '%s'" % (property_name, value),
                          dlevel = 2)
+
+    def disable(self, reason = 'disabled by the administrator'):
+        """
+        Disable a target, setting an optional reason
+
+        :param str reason: (optional) string describing the reason
+          [default: none]
+
+        This sets a field *disabled* in the inventory with
+        the messages; convention is this means it is disabled.
+        """
+        self.property_set('disabled', reason)
+
+    def enable(self):
+        """
+        Enable a (maybe disabled) target
+
+        This removes the *disabled* field from the inventory.
+        """
+        self.property_set('disabled', None)
 
     def thing_plug(self, thing):
         """

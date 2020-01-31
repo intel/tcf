@@ -94,6 +94,33 @@ def _target_patch(args):
         rtb.send_request("PATCH", "targets/" + args.target,
                          json = json.loads(sys.stdin.read()))
 
+def _target_property_set(args):
+    with tcfl.msgid_c("cmdline"):
+        target = tcfl.tc.target_c.create_from_cmdline_args(args)
+        target.property_set(args.property, args.value)
+
+def _target_property_get(args):
+    with tcfl.msgid_c("cmdline"):
+        target = tcfl.tc.target_c.create_from_cmdline_args(args)
+        r = target.property_get(args.property)
+        if r:	# print nothing if None
+            print r
+        
+
+def _target_disable(args):
+    with tcfl.msgid_c("cmdline"):
+        for target_name in args.target:
+            target = tcfl.tc.target_c.create_from_cmdline_args(
+                args, target_name = target_name)
+            target.disable(args.reason)
+
+def _target_enable(args):
+    with tcfl.msgid_c("cmdline"):
+        for target_name in args.target:
+            target = tcfl.tc.target_c.create_from_cmdline_args(
+                args, target_name = target_name)
+            target.enable()
+
 def healthcheck(args):
     with tcfl.msgid_c("cmdline"):
         target = tcfl.tc.target_c.create_from_cmdline_args(args)
@@ -295,13 +322,16 @@ if __name__ == "__main__":
                                    help = "Enable a disabled target")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_enable)
+    ap.set_defaults(func = _target_enable)
 
     ap = arg_subparsers.add_parser("disable",
                                    help = "Disable an enabled target")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_disable)
+    ap.add_argument("-r", "--reason", metavar = "REASON", action = "store",
+                    default = 'disabled by the administrator',
+                    help = "Reason why targets are disabled")
+    ap.set_defaults(func = _target_disable)
 
     ap = arg_subparsers.add_parser("property-set",
                                    help = "Set a target's property")
@@ -313,7 +343,7 @@ if __name__ == "__main__":
                     nargs = "?",
                     default = None, help = "Value of property (none "
                     "to remove it)")
-    ap.set_defaults(func = ttb_client.rest_target_property_set)
+    ap.set_defaults(func = _target_property_set)
 
     ap = arg_subparsers.add_parser("property-get",
                                    help = "Get a target's property")
@@ -321,7 +351,7 @@ if __name__ == "__main__":
                     default = None, help = "Target's name or URL")
     ap.add_argument("property", metavar = "PROPERTY", action = "store",
                     default = None, help = "Name of property")
-    ap.set_defaults(func = ttb_client.rest_target_property_get)
+    ap.set_defaults(func = _target_property_get)
 
 
     arg_parser_target_release = arg_subparsers.add_parser(

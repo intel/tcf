@@ -394,7 +394,7 @@ class rest_target_broker(object):
         _targets = []
         for rt in r['targets']:
             # Skip disabled targets
-            if target_id != None and rt.get('disabled', False) == True \
+            if target_id != None and rt.get('disabled', None) != None \
                and all_targets != True:
                 continue
             rt['fullid'] = self.aka + "/" + rt['id']
@@ -430,39 +430,10 @@ class rest_target_broker(object):
         self.send_request("PUT", "targets/%s/active" % rt['id'],
                           data = { 'ticket': ticket })
 
-    def rest_tb_target_enable(self, rt, ticket = ''):
-        data = { 'ticket': ticket }
-        return self.send_request("PUT", "targets/%s/enable" % rt['id'], data)
-
-    def rest_tb_target_disable(self, rt, ticket = ''):
-        data = { 'ticket': ticket }
-        return self.send_request("PUT", "targets/%s/disable" % rt['id'], data)
-
     def rest_tb_target_release(self, rt, ticket = '', force = False):
         self.send_request(
             "PUT", "targets/%s/release" % rt['id'],
             data = { 'force': force, 'ticket': ticket })
-
-    # COMPAT: remove once all servrs are updated
-    def rest_tb_property_set(self, rt, prop, value, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/property_set" % rt['id'],
-            data = {
-                'ticket': ticket,
-                'property': prop,
-                'value': value
-            })
-
-    # COMPAT: remove once all servrs are updated
-    def rest_tb_property_get(self, rt, prop, ticket = ''):
-        r = self.send_request(
-            "PUT", "targets/%s/property_get" % rt['id'],
-            data = {
-                'ticket': ticket,
-                'property': prop
-            })
-        return r['value']
-
 
     # COMPAT
     def rest_tb_target_power_on(self, rt, ticket = ''):
@@ -892,9 +863,10 @@ def rest_target_list_table(args, spec):
 
 def rest_target_list(args):
     specs = []
-    # Bring in disabled targets? (note the field is a text, not a bool)
+    # Bring in disabled targets? (note the field is a text, not a
+    # bool, if it has anything, the target is disabled
     if args.all == False:
-        specs.append("( disabled != 'True' )")
+        specs.append("( not disabled )")
     # Bring in target specification from the command line (if any)
     if args.target:
         specs.append("(" + ") or (".join(args.target) +  ")")
@@ -937,7 +909,7 @@ def rest_target_find_all(all_targets = False):
         return list(rest_target_broker.rts_cache.values())
     targets = []
     for rt in rest_target_broker.rts_cache.values():
-        if rt.get('disabled', 'False') in ('True', True):
+        if rt.get('disabled', None) != None:
             continue
         targets.append(rt)
     return targets
@@ -953,47 +925,6 @@ def rest_target_acquire(args):
         rtb, rt = _rest_target_find_by_id(target)
         rtb.rest_tb_target_acquire(
             rt, ticket = args.ticket, force = args.force)
-
-def rest_target_enable(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_enable(rt, ticket = args.ticket)
-
-def rest_target_disable(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_disable(rt, ticket = args.ticket)
-
-def rest_target_property_set(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    rtb, rt = _rest_target_find_by_id(args.target)
-    rtb.rest_tb_property_set(rt, args.property, args.value,
-                             ticket = args.ticket)
-
-def rest_target_property_get(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    rtb, rt = _rest_target_find_by_id(args.target)
-    value = rtb.rest_tb_property_get(rt, args.property, ticket = args.ticket)
-    if value != None:
-        print value
 
 def rest_target_release(args):
     """
