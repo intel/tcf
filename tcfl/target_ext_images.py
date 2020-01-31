@@ -119,7 +119,7 @@ class extension(tc.target_extension_c):
                 img_name_remote = \
                     commonl.file_name_make_safe(os.path.abspath(img_name)) \
                     + "-" + digest.hexdigest()[:10]
-                target.rtb.rest_tb_file_upload(img_name_remote, img_name)
+                target.store.upload(img_name_remote, img_name)
                 _images[img_type] = img_name_remote
                 target.report_info("uploaded: " + images_str, dlevel = 1)
         else:
