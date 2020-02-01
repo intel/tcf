@@ -48,7 +48,9 @@ class expect_text_on_console_c(tc.expectation_c):
     Object that expectes to find a string or regex in a target's
     serial console.
 
-    See parameter description in builder :meth:`console.expect_text`
+    See parameter description in builder :meth:`console.expect_text`,
+    as this is meant to be used with the expecter engine,
+    :meth:`tcfl.tc.tc_c.expect`.
     """
     def __init__(self,
                  text_or_regex,
@@ -231,8 +233,8 @@ class expect_text_on_console_c(tc.expectation_c):
         """
         See :meth:`expectation_c.detect` for reference on the arguments
 
-        :returns: list of squares detected at different scales in
-          relative and absolute coordinates, e.g:
+        :returns: dictionary of data describing the match, including
+          an interator over the console output
         """
         target = self.target
         of = target.console.text_capture_file(self.console)
@@ -666,7 +668,7 @@ class extension(tc.target_extension_c):
     def text_capture_file(self, console = None):
         """
         Return a descriptor to the file where this console is being
-        capture to
+        captured to
         """
         # see poll() above for why we ignore the poll buffers given by
         # the expect system and take the global testcase buffers
@@ -692,6 +694,17 @@ class extension(tc.target_extension_c):
 
         >>> self.expect(
         >>>     target.console.text(re.compile("DONE.*$"), timeout = 30)
+        >>> )
+
+        or for leaving it permanently installed as a hook to, eg,
+        raise an exception if a non-wanted string is found:
+
+        >>> testcase.expect_global_append(
+        >>>     target.console.text(
+        >>>         "Kernel Panic",
+        >>>         timeout = 0, poll_period = 1,
+        >>>         raise_on_found = tc.error_e("kernel panicked"),
+        >>>     )
         >>> )
 
         :param str text_or_regex: string to find; this can also be a
