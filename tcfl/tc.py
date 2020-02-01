@@ -872,7 +872,7 @@ class target_c(reporter_c):
         #: Type name of this target
         self.type = rt['type']
         #: ticket used to acquire this target
-        self.ticket = None
+        self.ticket = testcase.ticket
         #: Testcase that this target is currently executing
         self.testcase = testcase
         #: All of BSPs supported by this target
