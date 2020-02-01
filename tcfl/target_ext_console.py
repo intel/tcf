@@ -41,7 +41,8 @@ def _poll_context(target, console):
     # who will capture from that reuses the capture.
     # Note we also use this for naming the collateral file
     return '%s.%s.%s' % (target.want_name, target.id,
-                         console if console else "default")
+                         console if console else target.console.default)
+
 
 class expect_text_on_console_c(tc.expectation_c):
     """
@@ -90,10 +91,7 @@ class expect_text_on_console_c(tc.expectation_c):
             self.name = commonl.name_make_safe(self.regex.pattern)
 
         self.console = console
-        if console:
-            self.console_name = console
-        else:
-            self.console_name = "default"
+        self.console_name = target.console._console_get(console)
         self.previous_max = previous_max
 
     #: Maximum amonut of bytes to read on each read iteration in
@@ -268,9 +266,10 @@ class expect_text_on_console_c(tc.expectation_c):
                                   of.name), dlevel = 4)
             match = self.regex.search(mapping[search_offset:])
             if match:
-                output = unicode(mapping[search_offset
-                                         : search_offset + match.end()],
-                                 encoding = 'utf-8', errors = 'replace')
+                # this allows us later to pick up stuff in report
+                # handlers without having to have context knowledge
+                testcase.tls.buffers[context + 'search_offset_prev'] = \
+                    search_offset
                 testcase.tls.buffers[context + 'search_offset'] = \
                     search_offset + match.end()
                 # take care of printing a meaningful message here, as
@@ -368,7 +367,12 @@ class extension(tc.target_extension_c):
         # get the console to use by default we do a call
         self.default_property = self.target.property_get("console-default",
                                                          None)
-        self._default = self.default_property
+        if self.default_property:
+            self._default = self.default_property
+        elif 'default' in self.aliases:
+            self._default = self.aliases['default']
+        else:
+            self._default = self.console_list[0]
 
 
     def _console_get(self, console):
@@ -463,7 +467,7 @@ class extension(tc.target_extension_c):
         assert isinstance(shell_setup, bool) or callable(shell_setup)
         target = self.target
         if console == None:
-            if 'preferred' not in self.console_list:
+            if 'preferred' not in self.aliases:
                 # nothing? well, this means keep as default whatever is
                 # the default now
                 return
