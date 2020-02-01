@@ -230,16 +230,21 @@ class exception(Exception):
     keys can contain spaces, for better reporting.
     """
     def __init__(self, description, attachments = None):
-        if attachments:
+        if attachments == None:
+            attachments = {}
+        else:
             assert isinstance(attachments, dict)
         Exception.__init__(self, description, attachments)
 
     def attachments_get(self):
-        if len(self.args) < 1 or not self.args[1]:
-            return {}
-        assert isinstance(self.args[1], dict), \
-            "expected dict, got type %s" % type(self.args[1]).__name__
         return self.args[1]
+
+    def attachments_update(self, d):
+        """
+        Update an exception's attachments
+        """
+        assert isinstance(d, dict)
+        self.args[1].update(d)
 
     def __repr__(self):
         return self.args[0]
