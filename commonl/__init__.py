@@ -47,6 +47,7 @@ import thread
 import threading
 import time
 import traceback
+import types
 
 import keyring
 import requests
@@ -1370,6 +1371,10 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
     - in a dictionary, each item is prefixed with it's key
     - strings and cardinals are printed as such
     - others are printed as what their representation as a string produces
+    - if an attachment is a generator, it is iterated to gather the data.
+    - if an attachment is of :class:generator_factory_c, the method
+      for creating the generator is called and then the generator
+      iterated to gather the data.
 
     See also :func:`data_dump_recursive_tls`
 
@@ -1401,6 +1406,12 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
                                 separator = separator, of = of,
                                 depth_limit = depth_limit - 1)
             count += 1
+    elif isinstance(d, generator_factory_c):
+        of.write(prefix)
+        of.writelines(d.make_generator())
+    elif isinstance(d, types.GeneratorType):
+        of.write(prefix)
+        of.writelines(d)
     else:
         of.write(prefix + u": " + mkutf8(d) + u"\n")
 
@@ -1412,14 +1423,17 @@ def data_dump_recursive_tls(d, tls, separator = u".", of = sys.stdout,
     """
     Dump a general data tree to stdout in a recursive way
 
-    This function works as :func:`data_dump_recursive_tls` (see for
-    more information on the usage and arguments). However, it uses TLS
-    for storing the prefix as it digs deep into the data structure.
+    This function works as :func:`data_dump_recursive` (see for more
+    information on the usage and arguments). However, it uses TLS for
+    storing the prefix as it digs deep into the data structure.
 
     A variable called *prefix_c* is created in the TLS structure on
     which the current prefix is stored; this is meant to be used in
     conjunction with stream writes such as
     :class:`io_tls_prefix_lines_c`.
+
+    Parameters are as documented in :func:`data_dump_recursive`,
+    except for:
 
     :param thread._local tls: thread local storage to use (as returned
       by *threading.local()*
@@ -1442,6 +1456,10 @@ def data_dump_recursive_tls(d, tls, separator = u".", of = sys.stdout,
                                         separator = separator, of = of,
                                         depth_limit = depth_limit - 1)
             count += 1
+    elif isinstance(d, generator_factory_c):
+        of.writelines(d.make_generator())
+    elif isinstance(d, types.GeneratorType):
+        of.writelines(d)
     else:
         of.write(mkutf8(d) + u"\n")
 
@@ -1468,6 +1486,9 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
     allows other clients to write to the stream without needing to
     know about the prefixing.
 
+    Note the lines yielded are unicode-escaped or UTF-8 escaped, for
+    being able to see in reports any special character.
+
     Usage:
 
     .. code-block:: python
@@ -1487,24 +1508,58 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
     Limitations:
 
     - hack, only works ok if full lines are being printed; eg:
-
-      .. code-block:: python
-
-         of.write("line1\nline2\nli")
-         of.write("ne3\n")
-
-      will yield::
-
-        PREFIXline1
-        PREFIXline2
-        liPREFIXne3
-
-    - FIXME: flush would be a better place? to hook the prefix?
     """
     def __init__(self, tls, *args, **kwargs):
         assert isinstance(tls, thread._local)
         io.TextIOWrapper.__init__(self, *args, **kwargs)
         self.tls = tls
+        self.data = u""
+
+    def __write_line(self, s, prefix, offset, pos):
+        # Write a whole (\n ended) line to the stream
+        #
+        # - prefix first
+        # - leftover data since last \n
+        # - current data from offset to the position where \n was
+        #   (unicode-escape encoded)
+        # - newline (since the one in s was unicode-escaped)
+        substr = unicode(s[offset:pos].encode('unicode-escape'))
+        io.TextIOWrapper.write(self, prefix)
+        if self.data:
+            io.TextIOWrapper.write(self, self.data)
+            self.data = u""
+        io.TextIOWrapper.write(self, substr)
+        io.TextIOWrapper.write(self, u"\n")
+        return pos + 1
+
+    def _write(self, s, prefix, acc_offset = 0):
+        # write a chunk of data to the stream -- break it by newlines,
+        # so when one is found __write_line() can write the prefix
+        # first. Accumulate anything left over after the last newline
+        # so we can flush it next time we find one.
+        offset = 0
+        while offset < len(s):
+            pos = s.find('\n', offset)
+            if pos >= 0:
+                offset = self.__write_line(s, prefix, offset, pos)
+                continue
+            self.data += s[offset:]
+            break
+        return acc_offset + len(s)
+
+    def flush(self):
+        """
+        Flush any leftover data in the temporary buffer, write it to the
+        stream, prefixing each line with the prefix obtained from
+        *self.tls*\'s *prefix_c* attribute.
+        """
+        prefix = getattr(self.tls, "prefix_c", None)
+        if prefix == None:
+            io.TextIOWrapper.write(self, self.data)
+        else:
+            # flush whatever is accumulated
+            self._write(u"", prefix)
+        io.TextIOWrapper.flush(self)
 
     def write(self, s):
         """
@@ -1515,26 +1570,20 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
         if prefix == None:
             io.TextIOWrapper.write(self, s)
             return
-        offset = 0
-        while True:
-            pos = s.find('\r\n', offset)
-            if pos >= 0:
-                io.TextIOWrapper.write(self, prefix + s[offset:pos + 2])
-                offset = pos + 2
-                continue
-            pos = s.find('\n', offset)
-            if pos >= 0:
-                io.TextIOWrapper.write(self, prefix + s[offset:pos + 1])
-                offset = pos + 1
-                continue
-            pos = s.find('\r', offset)
-            if pos >= 0:
-                offset = pos + 1
-                io.TextIOWrapper.write(self, prefix + s[offset:pos + 1])
-                continue
-            io.TextIOWrapper.write(self, s[offset:])
-            break
+        self._write(s, prefix, 0)
 
+    def writelines(self, itr):
+        """
+        Write the iterator to the stream, prefixing each line with the
+        prefix obtained from *self.tls*\'s *prefix_c* attribute.
+        """
+        prefix = getattr(self.tls, "prefix_c", None)
+        if prefix == None:
+            io.TextIOWrapper.writelines(self, itr)
+            return
+        offset = 0
+        for data in itr:
+            offset = self._write(data, prefix, offset)
 
 def mkutf8(s):
     #
@@ -1554,3 +1603,38 @@ def mkutf8(s):
     else:
         # represent it in unicode, however the object says
         return unicode(s)
+
+class generator_factory_c(object):
+    """
+    Create generator objects multiple times
+
+    Given a generator function and its arguments, create it when
+    :func:`make_generator` is called.
+
+    >>> factory = generator_factory_c(genrator, arg1, arg2..., arg = value...)
+    >>> ...
+    >>> generator = factory.make_generator()
+    >>> for data in generator:
+    >>>     do_something(data)
+    >>> ...
+    >>> another_generator = factory.make_generator()
+    >>> for data in another_generator:
+    >>>     do_something(data)
+
+    generators once created cannot be reset to the beginning, so this
+    can be used to simulate that behavior.
+
+    :param fn: generator function
+    :param args: arguments to the generator function
+    :param kwargs: keyword arguments to the generator function
+    """
+    def __init__(self, fn, *args, **kwargs):
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+
+    def make_generator(self):
+        """
+        Create and return a generator
+        """
+        return self.fn(*self.args, **self.kwargs)

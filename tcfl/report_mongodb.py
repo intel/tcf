@@ -86,6 +86,8 @@ Pending
 import codecs
 import datetime
 import os
+import types
+
 import pymongo
 
 import commonl
@@ -205,8 +207,8 @@ class driver(tc.report_driver_c):
         if reporter == tc.tc_global:
             return
 
-        runid = reporter.kws['runid']
-        hashid = reporter.kws['tc_hash']
+        runid = reporter.kws.get('runid', None)
+        hashid = reporter.kws.get('tc_hash', None)
         if not hashid:	            # can't do much if we don't have this
             return
 
@@ -281,7 +283,18 @@ class driver(tc.report_driver_c):
             for key, attachment in attachments.iteritems():
                 if attachment == None:
                     continue
-                if isinstance(attachment, basestring):
+                if isinstance(attachment, commonl.generator_factory_c):
+                    for data in attachment.make_generator():
+                        if not key in result["attachment"]:
+                            result["attachment"][key] = data
+                        else:
+                            result["attachment"][key] += data
+                elif isinstance(attachment, types.GeneratorType):
+                    result["attachment"][key] = ""
+                    for data in attachment:
+                        # FIXME: this is assuming the attachment is a string...
+                        result["attachment"][key] += data
+                elif isinstance(attachment, basestring):
                     # MongoDB doesn't like bad UTF8, so filter a wee bit
                     result["attachment"][key] = commonl.mkutf8(attachment)
                 else:
