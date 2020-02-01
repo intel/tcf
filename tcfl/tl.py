@@ -80,29 +80,23 @@ def console_dump_on_failure(testcase):
     for target in testcase.targets.values():
         if not hasattr(target, "console"):
             continue
-        if testcase.result_eval.failed:
-            reporter = target.report_fail
-            reporter("console dump due to failure")
-        elif testcase.result_eval.errors:
-            reporter = target.report_error
-            reporter("console dump due to errors")
-        else:
-            reporter = target.report_blck
-            reporter("console dump due to blockage")
+        attachments = {}
         console_list = target.console.list()
-        # FIXME: need something way better this that streams the
-        # console output instead of reading a potentially huge console
-        # output and booming the memory consumption
         if len(console_list) == 1:
-            for line in target.console.read().split('\n'):
-                reporter("console: " + line.rstrip())
+            attachments["console"] = target.console.generator_factory(None)
         else:
             for console in console_list:
-                if console in target.console.aliases:
-                    continue
-                for line in target.console.read(console = console).split('\n'):
-                    reporter("console[%s]: " % console + line.rstrip())
-
+                attachments['console[' + console + ']'] = \
+                    target.console.generator_factory(console)
+        if testcase.result_eval.failed:
+            target.report_fail("console dump due to failure",
+                               attachments, alevel = 0)
+        elif testcase.result_eval.errors:
+            target.report_error("console dump due to errors",
+                                attachments, alevel = 0)
+        else:
+            target.report_blck("console dump due to blockage",
+                               attachments, alevel = 0)
 
 def setup_verify_slip_feature(zephyr_client, zephyr_server, _ZEPHYR_BASE):
     """
