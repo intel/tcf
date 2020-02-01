@@ -1960,6 +1960,8 @@ class result_c():
         assert isinstance(message, basestring)
         if attachments:
             assert isinstance(attachments, dict)
+        else:
+            attachments = dict()
         if level:
             assert level >= 0
         assert dlevel >= 0
@@ -6443,9 +6445,6 @@ class subtc_c(tc_c):
         self.output = output
 
     def eval_50(self):		# pylint: disable = missing-docstring
-        self.report_pass("NOTE: this is a subtestcase of %(tc_name)s "
-                         "(%(runid)s:%(tc_hash)s); refer to it for full "
-                         "information" % self.parent.kws, dlevel = 1)
         if self.result == None:
             self.result = self.parent.result
             self.result.report(
@@ -6456,6 +6455,9 @@ class subtc_c(tc_c):
                 self, "subcase run summary: %s"
                 % (self.summary if self.summary else "<not provided>"),
                 dlevel = 2, attachments = dict(output = self.output))
+        self.result.report(self, "NOTE: this is a subtestcase of %(tc_name)s "
+                           "(%(runid)s:%(tc_hash)s); refer to it for full "
+                           "information" % self.parent.kws, dlevel = 1)
         return self.result
 
     @staticmethod
