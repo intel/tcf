@@ -2845,6 +2845,8 @@ class expectation_c(object):
       Note you need to tell it also *zero* timeout, otherwise it will
       complain if it didn't find it.
 
+      The exception's attachments will be updated with the dictionary
+      of data returned by the expectation's :meth:`detect`.
     '''
 
     def __init__(self, target, poll_period, timeout = 0,
@@ -2984,6 +2986,9 @@ class expectation_c(object):
           will be returned to the user as the return value of
           :meth:`tcfl.tc.tc_c.expect`.
 
+          As well, if a *raise_on_found* exception was given, these
+          fields are added to the attachments.
+
         """
         raise NotImplementedError
 
@@ -3030,6 +3035,22 @@ class expectation_c(object):
           :meth:`detect` as a result of the detection process.
         """
         raise NotImplementedError
+
+    def on_timeout(self, run_name, poll_context, ellapsed, timeout):
+        """
+        Perform an action when the expectation times out being found
+
+        Called by the innards of the expec engine when the expectation
+        times out; by default, raises a generic exception (as
+        specified during the expectation's creation); can be overriden
+        to offer a more specific message, etc.
+        """
+        raise self.raise_on_timeout(
+            "%s/%s: timed out finding expectation in "
+            "'%s' @%.1f/%.1fs/%.1fs)"
+            % (run_name, self.name, poll_context,
+               ellapsed, timeout, self.timeout),
+            dict())
 
 
 #
@@ -5080,21 +5101,22 @@ class tc_c(reporter_c):
                                        buffers_poll[exp.poll_name],
                                        buffers[exp.name])
                         if r:
+                            assert r == None or isinstance(r, dict), \
+                                "%s/%s: expect returned an unexpected" \
+                                " type '%s'; expected *None* or dictionary" \
+                                % (run_name, exp.name, r)
                             # this is done
                             results[exp.name] = r
                             expectations_pending.remove(exp)
                             if exp in expectations_required:
                                 expectations_required.remove(exp)
-                            if exp.raise_on_found:
+                            if exp.raise_on_found:	# attach context
+                                exp.raise_on_found.attachments_update(r)
                                 raise exp.raise_on_found
                         if exp.timeout > 0 and ellapsed > exp.timeout:
                             # timeout for this specific expectation
-                            raise exp.raise_on_timeout(
-                                "%s/%s: timed out finding expectation in "
-                                "'%s' @%.1f/%.1fs/%.1fs)"
-                                % (run_name, exp.name, poll_context,
-                                   ellapsed, timeout, exp.timeout),
-                                dict())
+                            exp.on_timeout(run_name, poll_context,
+                                           ellapsed, timeout)
                         detect_ts[exp.name] = time_ts
                     else:
                         reporter.report_info(
