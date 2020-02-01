@@ -17,6 +17,7 @@ import curses.ascii
 import errno
 import fcntl
 import getpass
+import io
 import logging
 import mmap
 import os
@@ -287,24 +288,60 @@ class expect_text_on_console_c(tc.expectation_c):
                        search_offset + match.start(),
                        search_offset + match.end(),
                        target.fullid, self.console_name, of.name),
-                    attachments = { "console output": output },
+                    attachments = {
+                        "console output": target.console.generator_factory(
+                            self.console,
+                            search_offset, search_offset + match.end()),
+                    },
                     dlevel = 1, alevel = 0)
                 return {
+                    "target": self.target,
+                    "console": self.console,
+                    "console_name": self.console_name,
                     "pattern": self.regex.pattern,
-                    "from": search_offset,
-                    "start": search_offset + match.start(),
-                    "end": search_offset + match.end(),
-                    "console output": output
+                    "offset": search_offset,
+                    "offset_match_start": search_offset + match.start(),
+                    "offset_match_end": search_offset + match.end(),
+                    # this allows an exception raised when found to
+                    # include this iterator as an attachment that can
+                    # be reported
+                    "console output": target.console.generator_factory(
+                        self.console,
+                        search_offset, search_offset + match.end()),
                 }
-
         return None
+
+    def on_timeout(self, run_name,
+                   poll_context, ellapsed, timeout):
+        testcase = self.target.testcase
+        # If no previous search, that'd be the beginning...
+        search_offset_prev = \
+            testcase.tls.buffers.get(poll_context + 'search_offset_prev', 0)
+        search_offset = \
+            testcase.tls.buffers[poll_context + 'search_offset']
+        raise self.raise_on_timeout(
+            "%s/%s: timed out finding text '%s' in "
+            "console '%s:%s' @%.1f/%.1fs/%.1fs)"
+            % (run_name, self.name, self.regex.pattern,
+               self.target.fullid, self.console_name,
+               ellapsed, timeout, self.timeout),
+            {
+                "target": self.target,
+                "console": self.console,
+                "console_name": self.console_name,
+                "offset prev": search_offset_prev,
+                "offset": search_offset,
+                "console output": self.target.console.generator_factory(
+                    self.console,
+                    search_offset_prev, search_offset),
+            }
+        )
 
     def flush(self, testcase, run_name, buffers_poll, buffers,
               results):
         # we don't have to do anything, the collateral is already
         # generated in buffers['filename'], flushed and synced.
         pass
-
 
 class extension(tc.target_extension_c):
     """
@@ -721,6 +758,78 @@ class extension(tc.target_extension_c):
 
         """
         return expect_text_on_console_c(*args, target = self.target, **kwargs)
+
+
+    def capture_iterator(self, console, offset_from = 0, offset_to = 0):
+        """
+        Iterate over the captured contents of the console
+
+        :class:`expect_text_on_console_c.poll` has created a file
+        where it has written all the contents read from the console;
+        this function is a generator that iterates over it, yielding
+        safe UTF-8 strings.
+
+        Note these are not reseteable, so to use in
+        attachments with multiple report drivers, use instead a
+        :meth:generator_factory.
+
+        :param str console: name of console on which to operate
+        :param int offset_from: (optional) offset where to start
+          (default from beginning)
+        :param int offset_to: (optional) offset where to finish
+          (default to end)
+        """
+        assert console == None or isinstance(console, basestring)
+        #
+        # Provide line-based iteration on the last match in the
+        # console, as given by information on the buffers.
+        #
+        target = self.target
+        # Open as binary so we don't alter the offset counts if it
+        # happens to fix up characters; yield then as safe UTF-8
+        try:
+            with io.open(target.console.capture_filename(console), "rb") as f:
+                f.seek(offset_from)
+                offset = offset_from
+                for line in f:
+                    try:
+                        _line = line.decode(encoding = 'utf-8',
+                                            errors = 'backslashreplace')
+                    except TypeError:
+                        # Per https://bugs.python.org/msg113734, this
+                        # might happen as
+                        #
+                        ## TypeError: don't know how to handle UnicodeDecodeError in error callback
+                        #
+                        # since we are opening as binary--we will fall
+                        # back to a 'replace' encoding.
+                        _line = line.decode(encoding = 'utf-8',
+                                            errors = 'replace')
+                    yield _line
+                    offset += len(line)
+                    if offset_to > 0 and offset >= offset_to:
+                        # read only until the final offset, more or less
+                        if not line.endswith("\n"):
+                            yield u"\n"
+                        break
+        except IOError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            yield u""
+
+    def generator_factory(self, console, offset_from = 0, offset_to = 0):
+        """
+        Return a generator factory that creates iterators to dump
+        console's received data
+
+        :param str console: name of console on which to operate
+        :param int offset_from: (optional) offset where to start
+          (default from beginning)
+        :param int offset_to: (optional) offset where to finish
+          (default to end)
+        """
+        return commonl.generator_factory_c(
+            self.capture_iterator, console, offset_from, offset_to)
 
 
 def f_write_retry_eagain(fd, data):
