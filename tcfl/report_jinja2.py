@@ -288,7 +288,7 @@ class driver(tc.report_driver_c):
                 "w", encoding = 'utf-8', errors = 'replace')
             self.fs[code] = f.name
         else:
-            f = io.open(self.fs[code], "a+b",
+            f = io.open(self.fs[code], "a+",
                         encoding = 'utf-8', errors = 'replace')
         # reassign the stream so we use the prefix printing
         # capabilities
