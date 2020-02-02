@@ -367,8 +367,6 @@ def _target_property_set(target, prop, value, user_is_admin, ticket):
             % (prop, type(value).__name__))
     if user_is_admin:
         target.property_set(prop, value)
-    elif not target.property_is_user(prop):
-        raise ttbl.test_target_not_admin_e(target)
     else:
         # A non-admin must own the target before setting anything
         target.property_set_locked(who_make(ticket), prop, value)
@@ -389,6 +387,11 @@ def _target_patch(target_id):
             target, flask.request.form.keys(), user_is_admin)
         data = flask.request.get_json()
         if data:
+            if 'ticket' in data:
+                if not ticket:
+                    ticket = data.pop('ticket', "")
+                else:
+                    data.pop('ticket')
             data_flat = commonl.dict_to_flat(data)
             _target_property_set_policy_check(
                 target, [ x[0] for x in data_flat ],

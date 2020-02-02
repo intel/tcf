@@ -285,6 +285,8 @@ class rest_target_broker(object):
         :rtype: requests.Response
 
         """
+        assert not (data and json), \
+            "can't specify data and json at the same time"
         # create the url to send request based on API version
         if not self._base_url:
             self._base_url = urlparse.urljoin(

@@ -1125,10 +1125,11 @@ class target_c(object):
             assert isinstance(value, basestring)
         self.report_info("setting property '%s' to '%s'"
                          % (property_name, value), dlevel = 3)
-        json = { property_name: value }
+        data = { property_name: value }
         if self.ticket:
-            json['ticket'] = self.ticket
-        self.rtb.send_request("PATCH", "targets/" + self.id, json = json)
+            data['ticket'] = self.ticket
+        self.rtb.send_request("PATCH", "targets/" + self.id,
+                              json = data)
         self.report_info("set property '%s' to '%s'" % (property_name, value),
                          dlevel = 2)
 
