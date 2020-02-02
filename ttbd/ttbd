@@ -37,6 +37,7 @@ import contextlib
 import cPickle
 import datetime
 import errno
+import fnmatch
 import json
 import signal
 import threading
@@ -331,6 +332,32 @@ def _target_get(target_id):
         flask.abort(404, "%s: unknown target" % target_id)
     return flask.jsonify(target.to_dict(projections))
 
+_admin_required = [
+    'disabled',
+    'instrumentation',
+    'instrumentation.*',
+    'interfaces',
+    'interconnects',
+    'interconnects.*',
+    'pos_capable',
+    'pos_capable.*',
+    'pos_partsizes',
+    'pos_boot_*',
+    'fixture_*',
+    'fixture_*',
+    'support',
+    'support.*',
+    'versions',
+    'versions.*',
+]
+
+def _target_property_set_policy_check(target, props, user_is_admin):
+    for prop in props:
+        for check_prop in _admin_required:
+            if fnmatch.fnmatchcase(prop, check_prop) and not user_is_admin:
+                flask_logi_abort(
+                    403, "not enough privilege to change property %s" % prop)
+
 def _target_property_set(target, prop, value, user_is_admin, ticket):
     if value != None \
        and not isinstance(value, ( basestring, int, float, bool)):
@@ -357,6 +384,16 @@ def _target_patch(target_id):
     ticket = flask.request.form.get('ticket', "")
     user_is_admin = current_user_is_admin()
     try:
+        # check policy setting first
+        _target_property_set_policy_check(
+            target, flask.request.form.keys(), user_is_admin)
+        data = flask.request.get_json()
+        if data:
+            data_flat = commonl.dict_to_flat(data)
+            _target_property_set_policy_check(
+                target, [ x[0] for x in data_flat ],
+                user_is_admin)
+
         # Set parameter via form parameters
         for prop in flask.request.form.keys():
             # we pop 'ticket' because we don't want to allow it as a
@@ -366,11 +403,9 @@ def _target_patch(target_id):
                 continue
             _target_property_set(target, prop, flask.request.form[prop],
                                  user_is_admin, ticket)
-        # Set parameter via JSON data body
-        data = flask.request.get_json()
-        if data:
-            # If any, convert to our interal flat key space
-            for prop, val in commonl.dict_to_flat(data):
+
+        if data:			# Set parameter via JSON data body
+            for prop, val in data_flat:	# convert to our interal flat key space
                 _target_property_set(target, prop, val, user_is_admin, ticket)
     except ttbl.test_target_e as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
@@ -452,8 +487,7 @@ def _target_disable(target_id):
         flask_logd_abort(400, "%s" % e, exc_info = False)
     except Exception as e:
         flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    r = _target_id_to_dict(target_id)
-    return flask.jsonify(_target_id_to_dict(target_id))
+    return flask.jsonify({ })
 
 @app.route(API_PREFIX + 'targets/<string:target_id>/enable', methods = ['PUT'])
 @flask_login.login_required
@@ -476,8 +510,7 @@ def _target_enable(target_id):
         flask_logd_abort(400, "%s" % e, exc_info = False)
     except Exception as e:
         flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    r = _target_id_to_dict(target_id)
-    return flask.jsonify(_target_id_to_dict(target_id))
+    return flask.jsonify({ })
 
 
 @app.route(API_PREFIX + 'targets/<string:target_id>/release', methods = ['PUT'])
@@ -522,6 +555,8 @@ def _property_set(target_id):	# COMPAT
     try:
         info = ""
         with log_to_str_too(target.log, iostr_wrapper):
+            _target_property_set_policy_check(target, [ prop ],
+                                              user_is_admin)
             _target_property_set(target, prop, value, user_is_admin, ticket)
     except ttbl.test_target_e as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
