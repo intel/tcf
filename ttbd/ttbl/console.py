@@ -181,13 +181,19 @@ class impl_c(ttbl.tt_interface_impl_c):
           data is expected to be in a file which will be streamed to
           the client.
 
-          >>> return dict(stream_file = CAPTURE_FILE, stream_offset = OFFSET)
+          >>> return dict(stream_file = CAPTURE_FILE,
+          >>>             stream_generation = MONOTONIC,
+          >>>             stream_offset = OFFSET)
 
-          this allows to support large amounts of data automatically
+          this allows to support large amounts of data automatically;
+          the generation is a number that is monotonically increased,
+          for example, each time a power cycle happens. This is
+          basically when a new file is created.
         """
         raise NotImplementedError("%s/%s: console control not implemented"
                                   % (target.id, component))
-        #return dict(stream_file = CAPTURE_FILE, stream_offset = OFFSET)
+        #return dict(stream_file = CAPTURE_FILE, stream_offset = OFFSET,
+        #            stream_generation = NUMBER)
 
     def size(self, target, component):
         """
@@ -423,7 +429,11 @@ class interface(ttbl.tt_interface):
         stream_file = r.get('stream_file', None)
         if stream_file and not os.path.exists(stream_file):
             # no file yet, no console output
-            return { 'stream_file': '/dev/null', 'offset': 0 }
+            return {
+                'stream_file': '/dev/null',
+                'stream_generation': 0,
+                'stream_offset': 0
+            }
         return r
 
     def get_size(self, target, _who, args, _files, _user_path):
@@ -441,7 +451,10 @@ class interface(ttbl.tt_interface):
                        self._arg_get(args, 'data'))
             return {}    
 
-
+def generation_set(target, console):
+    target.fsdb.set("console-" + console + ".generation",
+                    # trunc the time and make it a string
+                    str(int(time.time())))
 
 class generic_c(impl_c):
     """General base console implementation
@@ -516,6 +529,8 @@ class generic_c(impl_c):
         return dict(
             stream_file = os.path.join(target.state_dir,
                                        "console-%s.read" % component),
+            stream_generation = target.fsdb.get(
+                "console-%s.generation" % component, 0),
             stream_offset = offset
         )
 
@@ -651,6 +666,7 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
     # console interface; state() is implemented by generic_c
     def on(self, target, component):
         ttbl.power.socat_pc.on(self, target, component)
+        generation_set(target, component)
         generic_c.enable(self, target, component)
 
     def off(self, target, component):
@@ -793,6 +809,7 @@ ForwardAgent = no
 EscapeChar = none
 %s""" % (target.state_dir, component, _extra_opts))
         ttbl.power.socat_pc.on(self, target, component)
+        generation_set(target, component)
         generic_c.enable(self, target, component)
 
     def off(self, target, component):

@@ -545,6 +545,13 @@ class pc(ttbl.power.daemon_c,
             # why the power component is set to paranoid mode, so the
             # power interface automatically retries it if it fails.
             ttbl.power.daemon_c.on(self, target, component)
+
+            # Those consoles? update their generational counts so the
+            # clients can know they restarted
+            if hasattr(target, "console"):
+                for console in target.console.impls.keys():
+                    ttbl.console.generation_set(target, console)
+
         finally:
             for fd in fds:		# close fds we opened for ...
                 os.close(fd)            # ... networking, unneeded now

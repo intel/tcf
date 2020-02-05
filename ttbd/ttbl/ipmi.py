@@ -368,6 +368,7 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
             env = env,
         )
         ttbl.power.socat_pc.on(self, target, component)
+        ttbl.console.generation_set(target, component)
         ttbl.console.generic_c.enable(self, target, component)
 
     def off(self, target, component):

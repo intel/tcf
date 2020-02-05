@@ -667,15 +667,29 @@ def _target_interface(target_id, interface, call):
     except Exception as e:
         flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
     if 'stream_file' in result:
-        offset = result.get('stream_offset', 0)
         filepath = result['stream_file']
+        generation = result.get('stream_generation', 0)
+        offset = result.get('stream_offset', 0)
         try:
-            fd = open(filepath, "rb")
+            fd = open(filepath, 'rb')	# flask.Response closes it
+            s = os.fstat(fd.fileno())
+            if offset >= s.st_size:	# cap offset to max size so when...
+                offset = s.st_size	# ...we report it it goes right
             if offset > 0:
                 fd.seek(offset)
+            response = flask.Response(fd, direct_passthrough = True)
+            # attach a header indicating the offset; this allows the
+            # client to calculate how big the stream is at precisely
+            # the time the last byte was sent, by adding the
+            # Content-Length. This is used for example, by the console
+            # code, to know the offset at which to read the next time.
+            # stream-size = X-stream-offset + Content-length
+            response.headers['X-stream-gen-offset'] = \
+                str(generation) + " " + str(offset)
+            return response
         except Exception as e:
-            flask_logi_abort(400, "%s: can't stream file: %s" % (filepath, e), exc_info = True)
-        return flask.Response(fd, direct_passthrough = True)
+            flask_logi_abort(400, "%s: can't stream file: %s" % (filepath, e),
+                             exc_info = True)
     else:
         return flask.jsonify(result)
 

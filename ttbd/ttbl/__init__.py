@@ -363,8 +363,7 @@ class tt_interface_impl_c(object):
 
 
 class tt_interface(object):
-    """
-    A target specific interface
+    """A target specific interface
 
     This class can be subclassed and then instanced to create a target
     specific interface for implementing any kind of functionality. For
@@ -419,8 +418,47 @@ class tt_interface(object):
     - *user_path* is a string describing the space in the filesystem
       where files for this user are stored
 
-    When multiple components are used (such as in
-    :class:`ttbl.power.interface` or :class:`ttbl.console.interface`.
+    Return values:
+
+     - these methods can throw an exception on error (and an error code will
+       be sent to the client)
+
+     - a dictionary of keys and values to return to the client as JSON
+       (so JSON encodeable).
+
+       To stream a file as output, any other keys are ignored and the
+       following keys are interpreted, with special meaning
+
+       - *stream_file*: (string) the named file will be streamed to the client
+       - *stream_offset*: (positive integer) the file *steam_file*
+         *will be streamed starting at the given offset.
+       - *stream-generation*: (positive monotonically increasing
+         integer) a number that describes the current iteration of
+         this file that might be reset [and thus bringing its apparent
+         size to the client to zero] upon certain operations (for
+         example, for serial console captures, when the target power
+         cycles, this number goes up and the capture size starts at
+         zero).
+
+       An X-stream-gen-offset header will be returned to the client
+       with the string *GENERATION OFFSET*, where the current
+       generation of the stream as provided and the offset that was
+       used, possibly capped to the actual maximum offset are
+       returned.
+
+       This way the client can use OFFSET+Conten-Length to tell the
+       next offset to query.
+
+    When multiple components are used to implement the functionality
+    of an interface or to expose multiple instruments that
+    implement the functionality (such as in
+    :class:`ttbl.power.interface` or :class:`ttbl.console.interface`),
+    use methods:
+
+    - :meth:`impls_set`
+
+    See as an example the :class:`debug <ttbl.debug.interface>` class.
+
     """
 
     def __init__(self):
