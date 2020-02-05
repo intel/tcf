@@ -269,7 +269,7 @@ class interface(ttbl.tt_interface):
         return capturer
 
 
-    def request_process(self, target, who, method, call, args,
+    def request_process(self, target, who, method, call, args, _files,
                         _user_path):
         # called by the daemon when a METHOD request comes to the HTTP path
         # /ttb-vVERSION/targets/TARGET/interface/capture/CALL
