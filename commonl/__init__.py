@@ -1523,12 +1523,13 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
         # - current data from offset to the position where \n was
         #   (unicode-escape encoded)
         # - newline (since the one in s was unicode-escaped)
-        substr = unicode(s[offset:pos].encode('unicode-escape'))
+        substr = s[offset:pos]
         io.TextIOWrapper.write(self, prefix)
         if self.data:
-            io.TextIOWrapper.write(self, self.data)
+            io.TextIOWrapper.write(
+                self, unicode(self.data.encode('unicode-escape')))
             self.data = u""
-        io.TextIOWrapper.write(self, substr)
+        io.TextIOWrapper.write(self, unicode(substr.encode('unicode-escape')))
         io.TextIOWrapper.write(self, u"\n")
         return pos + 1
 
@@ -1555,7 +1556,8 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
         """
         prefix = getattr(self.tls, "prefix_c", None)
         if prefix == None:
-            io.TextIOWrapper.write(self, self.data)
+            io.TextIOWrapper.write(
+                self, unicode(self.data.encode('unicode-escape')))
         else:
             # flush whatever is accumulated
             self._write(u"", prefix)

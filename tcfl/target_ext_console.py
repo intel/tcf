@@ -682,12 +682,15 @@ class extension(tc.target_extension_c):
         :param data: data to write (string or bytes)
         :param str console: (optional) console to write to
         """
+        # the reporting of unprintable is left to the report driver;
+        # however, for readability in the reporting, we'll replace \n
+        # (0x0d) with <N>
         if len(data) > 50:
             data_report = data[:50] + "..."
         else:
             data_report = data
-        # escape unprintable chars
-        data_report = data_report.encode('unicode-escape', errors = 'replace')
+        # fuuuugly...Python3 will make this easier
+        data_report = data_report.replace("\n", r"<NL>")
         console = self._console_get(console)
         self.target.report_info("%s: writing %dB to console"
                                 % (console, len(data)), dlevel = 3)
