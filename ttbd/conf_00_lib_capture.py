@@ -131,7 +131,9 @@ capture_screenshot_ffmpeg_v4l = ttbl.capture.generic_snapshot(
 #: :class:`ttbl.capture.generic_snapshot` and
 #: :class:`ttbl.capture.generic_stream`.
 capture_screenshot_vnc = ttbl.capture.generic_snapshot(
-    "%(id)s VNC @localhost:%(vnc-port)s",
+    # dont set the port for the name, otherwise the UPID keeps
+    # changing
+    "VNC %(id)s@localhost",
     # need to make sure vnc-port is defined in the target's tags
     # needs the .png, otherwise it balks at guessing extensions
     # don't do -q, otherwise when it fails, it fails silently
