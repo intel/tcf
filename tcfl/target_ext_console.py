@@ -41,8 +41,8 @@ def _poll_context(target, console):
     # it's console CONSOLE, so this is our context, so anyone
     # who will capture from that reuses the capture.
     # Note we also use this for naming the collateral file
-    return '%s.%s.%s' % (target.want_name, target.id,
-                         console if console else target.console.default)
+    return "console-" + target.want_name + "." + target.id + "." \
+        + (console if console else target.console.default)
 
 
 class expect_text_on_console_c(tc.expectation_c):
@@ -707,7 +707,9 @@ class extension(tc.target_extension_c):
         Return the name of the file where this console is being captured to
         """
         return os.path.relpath(
-            self.target.testcase.report_file_prefix + "console.%s.txt"
+            # _poll_context already adds 'console-', so we don't need
+            # to add more
+            self.target.testcase.report_file_prefix + "%s.txt"
             % _poll_context(self.target, console))
 
     def text_capture_file(self, console = None):
