@@ -218,7 +218,7 @@ def login():
     user_id = user.get_id()
 
     if user == ttbl.who_daemon():
-        flask.abort(404, "user %s: not allowed (reserved)", username)
+        flask.abort(404, "user %s: not allowed (reserved)" % username)
 
     logd("user %s: trying to authenticate with token '%s'", user_id, username)
 
@@ -262,8 +262,8 @@ def login():
              username,
              " ".join(token_roles) if token_roles
              else "<empty, meaning no permissions>")
-        flask.abort(404, "user %s: not allowed, no 'user' role: %s",
-                    username, message)
+        flask.abort(404, "user %s: not allowed, no 'user' role: %s" %
+                    (username, message))
 
     # Now let's go ahead and make sure there is a user instance that
     # Flask understands
