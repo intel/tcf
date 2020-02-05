@@ -47,7 +47,7 @@ def _poll_context(target, console):
 
 class expect_text_on_console_c(tc.expectation_c):
     """
-    Object that expectes to find a string or regex in a target's
+    Object that expects to find a string or regex in a target's
     serial console.
 
     See parameter description in builder :meth:`console.expect_text`,
@@ -235,6 +235,7 @@ class expect_text_on_console_c(tc.expectation_c):
         :returns: dictionary of data describing the match, including
           an interator over the console output
         """
+
         target = self.target
         of = target.console.text_capture_file(self.console)
         if of == None:
@@ -895,7 +896,7 @@ def _console_read_thread_fn(target, console, fd, offset):
                 logging.exception(e)
                 raise
 
-            
+
 def _cmdline_console_write_interactive(target, console, crlf, offset):
     #
     # Poor mans interactive console
@@ -1039,7 +1040,7 @@ def _cmdline_console_setup(args):
                             break
                         except ValueError:
                             pass
-                        break	# just a string or whatever it reps as                        
+                        break	# just a string or whatever it reps as
                 else:
                     key = parameter
                     value = True

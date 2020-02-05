@@ -2877,7 +2877,7 @@ class expectation_c(object):
         """
         Return a string that uniquely identifies the polling source for
         this expectation so multiple expectations that are polling
-        from the same place don't plot repeatedly.
+        from the same place don't poll repeatedly.
 
         For example, if we are looking for multiple image templates in
         a screenshot, it does not make sense to take one screenshot
