@@ -199,9 +199,9 @@ class expect_text_on_console_c(tc.expectation_c):
             # Note we get the new_offset straight() from the read
             # call, which is the most accurate from the server standpoint
             of.flush()
-            new_offset, total_bytes = \
-                target.console.read_offset(self.console, read_offset,
-                                           self.max_size, of)
+            _generation, new_offset, total_bytes = \
+                target.console.read_full(self.console, read_offset,
+                                         self.max_size, of)
             ts_end = time.time()
             of.flush()
             os.fsync(ofd)
@@ -621,7 +621,7 @@ class extension(tc.target_extension_c):
         r = self.target.ttbd_iface_call("console", "list", method = "GET")
         return r['result']
 
-    def read(self, console = None, offset = 0, max_size = 0, fd = None):
+    def _read(self, console = None, offset = 0, max_size = 0, fd = None):
         """
         Read data received on the target's console
 
@@ -631,8 +631,11 @@ class extension(tc.target_extension_c):
           the output (in which case, it returns the bytes read).
         :param int max_size: (optional) if *fd* is given, maximum
           amount of data to read
-        :returns: data read (or if written to a file descriptor,
-          amount of bytes read)
+        :returns: tuple consisting of:
+          - stream generation
+          - stream size after reading
+          - data read (or if written to a file descriptor,
+            amount of bytes read)
         """
         assert console == None or isinstance(console, basestring)
         assert offset >= 0
@@ -687,7 +690,58 @@ class extension(tc.target_extension_c):
             l = len(ret)
         target.report_info("%s: read %dB from console @%d"
                            % (console, l, offset), dlevel = 3)
-        return ret
+        generation_s, offset_s = \
+            r.headers.get('X-stream-gen-offset', "0 0").split()
+        generation = int(generation_s)
+        new_offset = \
+            int(offset_s) \
+            + int(r.headers.get('Content-Length', 0))
+        return generation, new_offset, ret
+
+    def read(self, console = None, offset = 0, max_size = 0, fd = None):
+        """
+        Read data received on the target's console
+
+        :param str console: (optional) console to read from
+        :param int offset: (optional) offset to read from (defaults to zero)
+        :param int fd: (optional) file descriptor to which to write
+          the output (in which case, it returns the bytes read).
+        :param int max_size: (optional) if *fd* is given, maximum
+          amount of data to read
+        :returns: data read (or if written to a file descriptor,
+          amount of bytes read)
+        """
+        return self._read(console = console, offset = offset,
+                          max_size = max_size, fd = fd)[2]
+
+    def read_full(self, console = None, offset = 0, max_size = 0, fd = None):
+        """
+        Like :meth:`read`, reads data received on the target's console
+        returning also the stream generation and offset at which to
+        read the next time to get new data.
+
+        Stream generation is a monotonically increasing number that
+        is incrased every time the target is power cycled.
+
+        :param str console: (optional) console to read from
+
+        :param int offset: (optional) offset to read from (defaults to
+          zero)
+
+        :param int fd: (optional) file descriptor to which to write
+          the output (in which case, it returns the bytes read).
+
+        :param int max_size: (optional) if *fd* is given, maximum
+          amount of data to read
+
+        :returns: tuple consisting of:
+          - stream generation
+          - stream size after reading
+          - data read (or if written to a file descriptor,
+            amount of bytes read)
+        """
+        return self._read(console = console, offset = offset,
+                          max_size = max_size, fd = fd)
 
     def size(self, console = None):
         """
@@ -895,16 +949,10 @@ def _console_read_thread_fn(target, console, fd, offset):
                 offset = 0
         else:
             offset = 0
+        generation = 0
+        generation_prev = None
         while True:
             try:
-                size = target.console.size(console)
-                if size == None or size == 0:
-                    time.sleep(0.5)	# Give the port some time
-                    continue
-                elif size < offset:	# target power cycled?
-                    sys.stderr.write(
-                        "\n\r\r\nWARNING: target power cycled\r\r\n\n")
-                    offset = 0
                 # Instead of reading and sending directy to the
                 # stdout, we need to break it up in chunks; the
                 # console is in non-blocking mode (for reading
@@ -912,8 +960,12 @@ def _console_read_thread_fn(target, console, fd, offset):
                 # \n to \r\n xlation for us.
                 # So we chunk it and add the \r ourselves; there might
                 # be a better method to do this.
-                data = target.console.read(console, offset = offset,
-                                           max_size = 4096)
+                generation, offset, data = \
+                    target.console.read_full(console, offset, 4096)
+                if generation_prev != None and generation_prev != generation:
+                    sys.stderr.write(
+                        "\n\r\r\nWARNING: target power cycled\r\r\n\n")
+                generation_prev = generation
                 if data:
                     # add CR, because the console is in raw mode
                     for line in data.splitlines(True):
@@ -922,10 +974,8 @@ def _console_read_thread_fn(target, console, fd, offset):
                             f_write_retry_eagain(fd, "\r")
                     time.sleep(0.1)
                     fd.flush()
-                else:
-                    time.sleep(0.5)	# Give the port some time
-
-                offset += len(data)
+                else:			# no data, give the port some time
+                    time.sleep(0.5)
             except Exception as e:	# pylint: disable = broad-except
                 logging.exception(e)
                 raise
@@ -1018,15 +1068,15 @@ def _cmdline_console_read(args):
         else:
             fd = open(args.output, "wb")
         try:
+            generation = 0
+            generation_prev = None
             while True:
-                size = target.console.size(console)
-                if size and size > 0:
-                    # If zero, it hasn't even started printing, so
-                    # don't bother
-                    if size < offset:	# target power cycled?
-                        offset = 0
-                    offset += target.console.read(console, offset,
-                                                  max_size, fd)
+                generation, offset, _ = \
+                    target.console.read_full(console, offset, max_size, fd)
+                if generation_prev != None and generation_prev != generation:
+                    sys.stderr.write(
+                        "\n\r\r\nWARNING: target power cycled\r\r\n\n")
+                generation_prev = generation
                 if not args.follow:
                     break
                 time.sleep(0.25)	# no need to bombard the server..
