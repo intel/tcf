@@ -91,85 +91,99 @@ class expect_text_on_console_c(tc.expectation_c):
             # gets escaped out (looking like _______________). oh well
             self.name = commonl.name_make_safe(self.regex.pattern)
 
-        self.console = console
-        self.console_name = target.console._console_get(console)
+        self._console = console
         self.previous_max = previous_max
 
-    #: Maximum amonut of bytes to read on each read iteration in
+    @property
+    def console(self):
+        """
+        Console this expectation is attached to
+
+        Note that if initialized with the default console, we'll
+        always resolve which one is it--since it is needed to keep
+        track of where to store things.
+        """
+        if self._console == None:
+            return self.target.console.default
+        else:
+            return self._console
+
+    #: Maximum amount of bytes to read on each read iteration in
     #: :meth:`poll`; this is so that if a (broken) target is spewing
     #: gigabytes of data, we don't get stuck here just reading from it.
     max_size = 65536
-        
+
     def poll_context(self):
         return _poll_context(self.target, self.console)
 
-    def _poll_init(self, testcase, run_name, buffers_poll):
-        # NOTE: this is called with target.lock held
-
-        target = self.target
-        filename = buffers_poll.get('filename', None)
-        if filename:
-            target.report_info(
-                "%s/%s: existing console capture context %08x/%s" %
-                (run_name, self.name, id(buffers_poll), filename), dlevel = 5)
-            return	# polling is initialized!
-        # this means we never started reading
+    @staticmethod
+    def _poll_context_init(buffers_poll, target, console, lookback_max):
+        # Initialize a reading context from this target/console
         #
-        # there will be only a single reader state per testcase,
-        # no matter how many expectations are pointed to a
-        # target's console--see poll() for how we get there.
+        # We need to do it early so we have an offset from which where
+        # to start looking, so target.console.write() might call this
+        # (thus, it needs to be static).
+        #
+        # There will be only a single reader state per testcase, no
+        # matter how many expectations are pointed to a target's
+        # console--see poll() for how we get there.
         #
         # so then, remove the existing collateral file, register it
-        filename = target.console.capture_filename(console = self.console)
-
-        with testcase.lock:
-            testcase.collateral.add(filename)
+        #
+        testcase = target.testcase
+        # Assumes _testcase.lock is taken
+        assert testcase.lock.locked()
+        assert 'read_offset' not in buffers_poll, \
+            "buffers_poll %08xd DOUBLE INIT" % id(buffers_poll)
+        filename = target.console.capture_filename(console)
+        testcase = target.testcase
+        testcase.collateral.add(filename)
         # rename any existing file, we are starting from scratch
-        target.report_info(
-            "%s/%s: new console capture context %08x/%s" %
-            (run_name, self.name, id(buffers_poll), filename), dlevel = 5)
         commonl.rm_f(filename)
-        buffers_poll['filename'] = filename
-
+        of = open(filename, "a+", 0)
+        # Initialize the offset
         # how much do we care on previous history? no good way to
         # tell, so we set a sensible default we can alter
         # also, the target could put more data out before we start
         # reading, so this is just an approx
-        read_offset = target.console.size()
+        # Will be adjusted in the first read
+        read_offset = target.console.size(console)
         if read_offset == None:
             read_offset = 0	# happens when the console is disabled
-        if read_offset > self.previous_max:
-            read_offset -= self.previous_max
+        read_offset -= lookback_max
+        if read_offset < 0:
+            read_offset = 0
         buffers_poll['read_offset'] = read_offset
-
-        of = open(filename, "a+", 0)
         buffers_poll['of'] = of
+        return buffers_poll
 
+    @staticmethod
+    def _poll_context_init_maybe(target, console, lookback_max):
+        testcase = target.testcase
+        buffers_poll = expect_text_on_console_c._poll_buffers_get_global(
+            testcase, target, console)
+        if not 'of' in buffers_poll:
+            expect_text_on_console_c._poll_context_init(
+                buffers_poll, target, console, lookback_max)
+
+    # FIXME: this will be a global pattern, so move it to def tc.expect()
+    @staticmethod
+    def _poll_buffers_get_global(testcase, target, console):
+        # with testcase.lock!!
+        context = _poll_context(target, console)
+        if context not in testcase.buffers:
+            testcase.buffers[context] = dict()
+        return testcase.buffers[context]
 
     def _poll(self, testcase, run_name, buffers_poll):
-        # NOTE: this is called with target.lock held
+        # NOTE: this is called with target.lock held because
+        # buffers_poll needs to be accessed under that (FIXME: move to
+        # buffers_poll['lock'])
         target = self.target
 
         # polling a console happens by reading the remote console into
         # a local file we keep as collateral
-        self._poll_init(testcase, run_name, buffers_poll)
-        read_offset = buffers_poll['read_offset']
-        console_size = target.console.size(self.console)
-        if console_size == None:
-            console_size = 0	# console disabled
-        # If the target has rebooted, then the console file was
-        # truncated to zero and our read offsets changed
-        if console_size < read_offset:
-            # FIXME: this is a hack until we have a session count
-            # here, which monotonically increases in the server each
-            # time the thing reboots. Ideally it will be returned as part of
-            # read() and size()
-            target.report_info(
-                "%s/%s: target rebooted (console size %d < read offset %d)"
-                " resetting read offset to zero"
-                % (run_name, self.name, console_size, read_offset),
-                dlevel = 3)
-            read_offset = 0
+        read_offset = buffers_poll.get('read_offset', 0)
         of = buffers_poll['of']
         ofd = of.fileno()
 
@@ -177,23 +191,26 @@ class expect_text_on_console_c(tc.expectation_c):
             ts_start = time.time()
             target.report_info(
                 "%s/%s: reading from console %s:%s @%d on %.2fs to %s"
-                % (run_name, self.name, target.fullid, self.console_name,
+                % (run_name, self.name, target.fullid, self.console,
                    read_offset, ts_start, of.name), dlevel = 5)
             # We are dealing with a file as our buffering and accounting
             # system, so because read_to_fd() is bypassing caching, flush
             # first and sync after the read.
+            # Note we get the new_offset straight() from the read
+            # call, which is the most accurate from the server standpoint
             of.flush()
-            total_bytes = target.console.read(self.console, read_offset,
-                                              self.max_size, of)
+            new_offset, total_bytes = \
+                target.console.read_offset(self.console, read_offset,
+                                           self.max_size, of)
             ts_end = time.time()
             of.flush()
             os.fsync(ofd)
-            buffers_poll['read_offset'] = read_offset + total_bytes
+            buffers_poll['read_offset'] = new_offset
             target.report_info(
-                "%s/%s: read from console %s:%s @%d %dB (total %dB) "
+                "%s/%s: read from console %s:%s @%d %dB (new offset @%d) "
                 "on %.2fs (%.2fs) to %s"
-                % (run_name, self.name, target.fullid, self.console_name,
-                   read_offset, total_bytes, read_offset + total_bytes,
+                % (run_name, self.name, target.fullid, self.console,
+                   read_offset, total_bytes, new_offset,
                    ts_end, ts_end - ts_start, of.name),
                 dlevel = 4)
 
@@ -201,30 +218,42 @@ class expect_text_on_console_c(tc.expectation_c):
             raise tc.blocked_e(
                 "%s/%s: error reading console %s:%s @%dB: %s\n"
                 % (run_name, self.name,
-                   target.fullid, self.console_name, read_offset, e),
+                   target.fullid, self.console, read_offset, e),
                 { "error trace": traceback.format_exc() })
 
     def poll(self, testcase, run_name, _buffers_poll):
         # polling a console happens by reading the remote console into
         # a local file we keep as collateral
 
-        # We need to make this capture
-        # global to all threads in this testcase that might be reading
-        # from this target--only deal is that only one at the same
-        # time can write to it, shouldn't be a problem--so all the
-        # state has to be updated subject to a target specific lock --
-        # which now we do not have--so this poll is not specific to
-        # the expect() all or to this expectation itself; it is global
-        # to the testcase--this is why it uses the testcase buffers,
-        # not the buffers provided in the call, to store.
-
-        with testcase.lock:
-            context = self.poll_context()
-            if context not in testcase.buffers:
-                testcase.buffers[context] = dict()
-            buffers_poll = testcase.buffers[context]
+        # We need to make this capture global to all threads in this
+        # testcase that might be reading from this target--only deal
+        # is that only one at the same time can write to it, shouldn't
+        # be a problem--so all the state has to be updated subject to
+        # a target specific lock -- which now we do not have--so this
+        # poll is not specific to the expect() all or to this
+        # expectation itself; it is global to the testcase--this is
+        # why it uses the testcase buffers, not the buffers provided
+        # in the call, to store.
 
         target = self.target
+        with testcase.lock:
+            buffers_poll = self._poll_buffers_get_global(
+                testcase, target, self.console)
+            if 'of' in buffers_poll:
+                filename = buffers_poll['of'].name
+                target.report_info(
+                    "%s/%s: existing console capture context %08x/%s" %
+                    (run_name, self.name, id(buffers_poll), filename),
+                    dlevel = 5)
+            else:
+                self._poll_context_init(buffers_poll, target,
+                                        self.console, self.previous_max)
+                filename = buffers_poll['of'].name
+                target.report_info(
+                    "%s/%s: new console capture context %08x/%s" %
+                    (run_name, self.name, id(buffers_poll), filename),
+                    dlevel = 5)
+
         with target.lock:
             return self._poll(testcase, run_name, buffers_poll)
 
@@ -263,7 +292,7 @@ class expect_text_on_console_c(tc.expectation_c):
                 as mapping:
             target.report_info("%s/%s: looking for `%s` in console %s:%s @%d-%d [%s]"
                                % (run_name, self.name, self.regex.pattern,
-                                  target.fullid, self.console_name,
+                                  target.fullid, self.console,
                                   search_offset, stat_info.st_size,
                                   of.name), dlevel = 4)
             match = self.regex.search(mapping[search_offset:])
@@ -288,7 +317,7 @@ class expect_text_on_console_c(tc.expectation_c):
                     % (run_name, _name, self.regex.pattern,
                        search_offset + match.start(),
                        search_offset + match.end(),
-                       target.fullid, self.console_name, of.name),
+                       target.fullid, self.console, of.name),
                     attachments = {
                         "console output": target.console.generator_factory(
                             self.console,
@@ -298,7 +327,6 @@ class expect_text_on_console_c(tc.expectation_c):
                 return {
                     "target": self.target,
                     "console": self.console,
-                    "console_name": self.console_name,
                     "pattern": self.regex.pattern,
                     "offset": search_offset,
                     "offset_match_start": search_offset + match.start(),
@@ -324,12 +352,11 @@ class expect_text_on_console_c(tc.expectation_c):
             "%s/%s: timed out finding text '%s' in "
             "console '%s:%s' @%.1f/%.1fs/%.1fs)"
             % (run_name, self.name, self.regex.pattern,
-               self.target.fullid, self.console_name,
+               self.target.fullid, self.console,
                ellapsed, timeout, self.timeout),
             {
                 "target": self.target,
                 "console": self.console,
-                "console_name": self.console_name,
                 "offset prev": search_offset_prev,
                 "offset": search_offset,
                 "console output": self.target.console.generator_factory(
@@ -680,6 +707,7 @@ class extension(tc.target_extension_c):
         Write data to a console
 
         :param data: data to write (string or bytes)
+
         :param str console: (optional) console to write to
         """
         # the reporting of unprintable is left to the report driver;
@@ -692,6 +720,7 @@ class extension(tc.target_extension_c):
         # fuuuugly...Python3 will make this easier
         data_report = data_report.replace("\n", r"<NL>")
         console = self._console_get(console)
+        testcase = self.target.testcase
         self.target.report_info("%s: writing %dB to console"
                                 % (console, len(data)), dlevel = 3)
         self.target.ttbd_iface_call("console", "write",
