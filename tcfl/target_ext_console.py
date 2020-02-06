@@ -312,25 +312,7 @@ class expect_text_on_console_c(tc.expectation_c):
                     _name = ""
                 else:
                     _name = "/" + self.name
-                target.report_info(
-                    "%s%s: found '%s' at @%d-%d on console %s:%s [%s]"
-                    % (run_name, _name, self.regex.pattern,
-                       search_offset + match.start(),
-                       search_offset + match.end(),
-                       target.fullid, self.console, of.name),
-                    attachments = {
-                        "console output": target.console.generator_factory(
-                            self.console,
-                            search_offset, search_offset + match.end()),
-                    },
-                    dlevel = 1, alevel = 0)
-                return {
-                    "target": self.target,
-                    "console": self.console,
-                    "pattern": self.regex.pattern,
-                    "offset": search_offset,
-                    "offset_match_start": search_offset + match.start(),
-                    "offset_match_end": search_offset + match.end(),
+                match_data = {
                     # this allows an exception raised when found to
                     # include this iterator as an attachment that can
                     # be reported
@@ -338,6 +320,21 @@ class expect_text_on_console_c(tc.expectation_c):
                         self.console,
                         search_offset, search_offset + match.end()),
                 }
+                target.report_info(
+                    "%s%s: found '%s' at @%d-%d on console %s:%s [%s]"
+                    % (run_name, _name, self.regex.pattern,
+                       search_offset + match.start(),
+                       search_offset + match.end(),
+                       target.fullid, self.console, of.name),
+                    attachments = match_data, dlevel = 1, alevel = 0)
+                match_data["target"] = self.target
+                match_data["console"] = self.console
+                match_data["pattern"] = self.regex.pattern
+                match_data["offset"] = search_offset
+                match_data["offset_match_start"] = \
+                    search_offset + match.start()
+                match_data["offset_match_end"] = search_offset + match.end()
+                return match_data
         return None
 
     def on_timeout(self, run_name,
