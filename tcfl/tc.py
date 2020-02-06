@@ -1770,6 +1770,8 @@ class target_c(reporter_c):
                                % (target_name, iface))
         if args.ticket:
             target.ticket = args.ticket
+        else:
+            target.ticket = None	# target_c.__init__ inits this
         return target
 
     def ttbd_iface_call(self, interface, call, method = "PUT",
