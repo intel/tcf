@@ -133,6 +133,7 @@ class impl_c(ttbl.tt_interface_impl_c):
                                 " for enabling failed" % component)
                 self.disable(target, component)
                 raise
+        target.property_set("console-" + component + ".state", "enabled")
 
     def disable(self, target, component):
         """
@@ -141,7 +142,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         :param str console: (optional) console to disable; if missing,
           the default one.
         """
-        pass
+        target.property_set("console-" + component + ".state", None)
 
     def state(self, target, component):
         """
@@ -594,9 +595,21 @@ class generic_c(impl_c):
                 f.connect(file_name)
                 self._write(f.fileno(), data)
         else:
-            with contextlib.closing(open(file_name, "a")) as f:
-                self._write(f.fileno(), data)
-
+            while True:
+                try:
+                    with contextlib.closing(open(file_name, "a")) as f:
+                        self._write(f.fileno(), data)
+                        break
+                except EnvironmentError as e:
+                    if e.errno == errno.ENOENT \
+                       and target.property_get(
+                           "console-" + component + ".state"):
+                        target.log.error(
+                            "console %s: console died? restarting", component)
+                        self.enable(target, component)
+                        continue
+                    else:
+                        raise
 
 class serial_pc(ttbl.power.socat_pc, generic_c):
     """
