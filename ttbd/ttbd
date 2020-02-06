@@ -233,7 +233,6 @@ def login():
     # Each authenticator might plug us to LDAP, or to a local
     # database...who knows
     token_roles = set()
-    message = ""
     for authenticator in ttbl.config._authenticators:
         try:
             logd("user %s: authenticating with %s", username, authenticator)
@@ -258,12 +257,12 @@ def login():
             # Try next authenticator
 
     if not 'user' in token_roles:
-        logi("user %s: not allowed, no 'user' role (roles: %s)",
-             username,
-             " ".join(token_roles) if token_roles
-             else "<empty, meaning no permissions>")
-        flask.abort(404, "user %s: not allowed, no 'user' role: %s" %
-                    (username, message))
+        message = "user %s: not allowed, no 'user' role (roles: %s)" % (
+            username,
+            " ".join(token_roles) if token_roles
+            else "<empty, meaning no permissions>")
+        logging.info(message)
+        flask.abort(404, message)
 
     # Now let's go ahead and make sure there is a user instance that
     # Flask understands
