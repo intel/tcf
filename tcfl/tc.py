@@ -5135,21 +5135,22 @@ class tc_c(reporter_c):
                 time.sleep(min_poll_period)
                 time_ts += min_poll_period
             if time_ts > time_out:
+                ellapsed = time_ts - time_ts0
                 # timeout exceeded; look at the expectations we
                 # required to pass, sort them by timeout and raise the
                 # one with the lowest timeout and exception...or do nothing
                 for exp in sorted(expectations_required,
                                   key = lambda exp: exp.timeout):
-                    if exp.timeout > 0 and exp.raise_on_timeout:
-                        raise exp.raise_on_timeout(
-                            "%s: timed out finding expectation '%s' in "
-                            "'%s' @%.1f/%.1fs/%.1fs)"
-                            % (run_name, exp.name, poll_context,
-                               ellapsed, exp.timeout, timeout),
-                            dict())
+                    if exp.timeout > 0:
+                        # timeout for this specific expectation
+                        exp.on_timeout(run_name, poll_context,
+                                       ellapsed, timeout)
 
         except Exception as e:
-            result_c.report_from_exception(self, e)
+            # Left over here for when fast debug is needed; this will
+            # print a lot of extra data in every call and is not
+            # always needed.
+            # result_c.report_from_exception(self, e)
             raise
         finally:
             # we got them all, return the results dictionary
