@@ -150,7 +150,7 @@ class shell(tc.target_extension_c):
     #: Deprecated, use :data:`shell_prompt_regex`
     linux_shell_prompt_regex = shell_prompt_regex
 
-    def setup(self):
+    def setup(self, console = None):
         """
         Setup the shell for scripting operation
 
@@ -161,18 +161,21 @@ class shell(tc.target_extension_c):
         """
         target = self.target
         testcase = target.testcase
-        self.run('export PS1="TCF-%s:$PS1"' % self.target.kws['tc_hash'])
+        self.run('export PS1="TCF-%s:$PS1"' % self.target.kws['tc_hash'],
+                 console = console)
         # disable line editing for proper recording of command line
         # when running bash; otherwise the scrolling readline does
         # messes up the output
-        self.run('test ! -z "$BASH" && set +o vi +o emacs')
+        self.run('test ! -z "$BASH" && set +o vi +o emacs',
+                 console = console)
         # Trap the shell to complain loud if a command fails, and catch it
         # See that '' in the middle, is so the catcher later doesn't
         # get tripped by the command we sent to set it up
-        self.run("trap 'echo ERROR''-IN-SHELL' ERR")
+        self.run("trap 'echo ERROR''-IN-SHELL' ERR",
+                 console = console)
         testcase.expect_global_append(
             target.console.text(
-                "ERROR-IN-SHELL", name = "shell error",
+                "ERROR-IN-SHELL", name = "shell error", console = console,
                 timeout = 0, poll_period = 1,
                 raise_on_found = tc.error_e("error detected in shell")),
             skip_duplicate = True
@@ -181,7 +184,7 @@ class shell(tc.target_extension_c):
     def up(self, tempt = None,
            user = None, login_regex = re.compile('login:'), delay_login = 0,
            password = None, password_regex = re.compile('[Pp]assword:'),
-           shell_setup = True, timeout = None):
+           shell_setup = True, timeout = None, console = None):
         """Wait for the shell in a console to be ready
 
         Giving it ample time to boot, wait for a :data:`shell prompt
@@ -218,12 +221,24 @@ class shell(tc.target_extension_c):
           exception if a shell command fails.
 
           By default calls target.shell.setup(); if *False*, nothing
-          will be called. No arguments are passed, the function needs
-          to operate on the default console.
+          will be called. Arguments are passed:
+
+          - *console = CONSOLENAME*: console where to operate; can be
+            *None* for the default console.
 
         :param int timeout: [optional] seconds to wait for the login
           prompt to appear; defaults to 60s plus whatever the target
           specifies in metadata *bios_boot_time*.
+
+        :param str console: [optional] name of the console where to
+          operate; if *None* it will update the current default
+          console to whatever the server considers it shall be (the
+          console called *default*).
+
+          If a previous run set the default console to something else,
+          setting it to *None* will update it to what the server
+          considers shall be the default console (default console at
+          boot).
 
         """
         assert tempt == None or isinstance(tempt, basestring)
@@ -234,7 +249,8 @@ class shell(tc.target_extension_c):
         assert isinstance(password_regex, ( basestring, re._pattern_type ))
         assert isinstance(shell_setup, bool) or callable(shell_setup)
         assert timeout == None or timeout > 0
-
+        assert console == None or isinstance(console, basestring)
+    
         target = self.target
         testcase = target.testcase
         if timeout == None:
@@ -242,15 +258,17 @@ class shell(tc.target_extension_c):
         
         def _login(target):
             # If we have login info, login to get a shell prompt
-            target.expect(login_regex, name = "login prompt")
+            target.expect(login_regex, name = "login prompt",
+                          console = console)
             if delay_login:
                 target.report_info("Delaying %ss before login in"
                                    % delay_login)
                 time.sleep(delay_login)
             target.send(user)
             if password:
-                target.expect(password_regex, name = "password prompt")
-                target.send(password)
+                target.expect(password_regex, name = "password prompt",
+                              console = console)
+                target.send(password, console = console)
 
         try:
             original_timeout = testcase.tls.expect_timeout
@@ -259,11 +277,12 @@ class shell(tc.target_extension_c):
                 tries = 3
                 while tries > 0:
                     try:
-                        target.send(tempt)
+                        target.send(tempt, console = console)
                         if user:
                             _login(self.target)
                         target.expect(self.shell_prompt_regex,
-                                      timeout = 3, name = "early shell prompt")
+                                      console = console, timeout = 3,
+                                      name = "early shell prompt")
                         break
                     except tc.error_e as _e:
                         if tries == 0:
@@ -278,16 +297,16 @@ class shell(tc.target_extension_c):
             else:
                 if user:
                     _login(self.target)
-                target.expect(self.shell_prompt_regex,
+                target.expect(self.shell_prompt_regex, console = console,
                               name = "early shell prompt")
         finally:
             testcase.tls.expect_timeout = original_timeout
 
         # same as target.console.select_preferred()
         if shell_setup == True:    	# passed as a parameter
-            target.shell.setup()
+            target.shell.setup(console = console)
         elif callable(shell_setup):
-            shell_setup()
+            shell_setup(console = console)
         # False, so we don't call shell setup
 
         # don't set a timeout here, leave it to whatever it was defaulted
@@ -295,7 +314,8 @@ class shell(tc.target_extension_c):
     crnl_regex = re.compile("\r+\n")
 
     def _run(self, cmd = None, expect = None, prompt_regex = None,
-             output = False, output_filter_crlf = True, trim = False):
+             output = False, output_filter_crlf = True, trim = False,
+             console = None):
         if cmd:
             assert isinstance(cmd, basestring)
         assert expect == None \
@@ -308,24 +328,29 @@ class shell(tc.target_extension_c):
         target = self.target
 
         if output:
-            offset = self.target.console.size()
+            offset = self.target.console.size(console = console)
 
         if cmd:
-            self.target.send(cmd)
+            self.target.send(cmd, console = console)
         if expect:
             if isinstance(expect, list):
                 for expectation in expect:
                     assert isinstance(expectation, basestring) \
                         or isinstance(expectation, re._pattern_type)
-                    target.expect(expectation, name = "command output")
+                    target.expect(expectation, name = "command output",
+                                  console = console)
             else:
-                target.expect(expect, name = "command output")
+                target.expect(expect, name = "command output",
+                              console = console)
         if prompt_regex == None:
-            self.target.expect(self.shell_prompt_regex, name = "shell prompt")
+            self.target.expect(self.shell_prompt_regex, name = "shell prompt",
+                               console = console)
         else:
-            self.target.expect(prompt_regex, name = "shell prompt")
+            self.target.expect(prompt_regex, name = "shell prompt",
+                               console = console)
         if output:
-            output = self.target.console.read(offset = offset)
+            output = self.target.console.read(offset = offset,
+                                              console = console)
             if output_filter_crlf:
                 # replace \r\n, \r\r\n, \r\r\r\r\n... it happens
                 output = re.sub(self.crnl_regex, self.target.crlf, output)
@@ -346,7 +371,7 @@ class shell(tc.target_extension_c):
 
     def run(self, cmd = None, expect = None, prompt_regex = None,
             output = False, output_filter_crlf = True, timeout = None,
-            trim = False):
+            trim = False, console = None):
         """Runs *some command* as a shell command and wait for the shell
         prompt to show up.
 
@@ -391,6 +416,8 @@ class shell(tc.target_extension_c):
         :param bool trim: if ``output`` is True, trim the command and
           the prompt from the beginning and the end of the output
           respectively (True)
+        :param str console: (optional) on which console to run;
+          (defaults to *None*, the default console).
         :returns str: if ``output`` is true, a string with the output
           of the command.
 
@@ -417,7 +444,7 @@ class shell(tc.target_extension_c):
                 cmd = cmd, expect = expect,
                 prompt_regex = prompt_regex,
                 output = output, output_filter_crlf = output_filter_crlf,
-                trim = trim)
+                trim = trim, console = console)
         finally:
             if timeout:
                 testcase.tls.expect_timeout = original_timeout
