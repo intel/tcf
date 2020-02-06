@@ -215,7 +215,7 @@ class driver(tc.report_driver_c):
             assert isinstance(attachments, dict)
             console_p, logfile_p = self._shall_do(alevel)
             if console_p or logfile_p:
-                _aprefix = "%s%d/%s\t%s [+%.1fs]: " % (
+                _aprefix = "%s%d/%s\t%s [+%.1fs]:    " % (
                     tag, alevel, tcfl.msgid_c.ident(),
                     reporter._report_prefix, delta
                 )
