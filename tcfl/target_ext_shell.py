@@ -271,6 +271,8 @@ class shell(tc.target_extension_c):
                 target.send(password, console = console)
 
         try:
+            if console == None:		# reset the default console
+                target.console.default = None
             original_timeout = testcase.tls.expect_timeout
             testcase.tls.expect_timeout = timeout
             if tempt:
