@@ -468,53 +468,6 @@ def _target_active(target_id):
     return flask.jsonify({})
 
 
-@app.route(API_PREFIX + 'targets/<string:target_id>/disable', methods = ['PUT'])
-@flask_login.login_required
-def _target_disable(target_id):
-    ticket = flask.request.form.get('ticket', "")
-    if target_id not in ttbl.config.targets.keys():
-        return flask.abort(404, "%s: can't find target" % target_id)
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    try:
-        if not current_user_is_admin():
-            raise ttbl.test_target_not_admin_e(target)
-        target.disable(who_make(ticket))
-        target.timestamp()
-    except ttbl.test_target_busy_e as e:
-        flask_log_abort(3, 400, "%s" % e, exc_info = False)
-    except ttbl.test_target_e as e:
-        # Not considered as errors, no traces printed -- as these are
-        # normal during operation.
-        flask_logd_abort(400, "%s" % e, exc_info = False)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({ })
-
-@app.route(API_PREFIX + 'targets/<string:target_id>/enable', methods = ['PUT'])
-@flask_login.login_required
-def _target_enable(target_id):
-    ticket = flask.request.form.get('ticket', "")
-    if target_id not in ttbl.config.targets.keys():
-        return flask.abort(404, "%s: can't find target" % target_id)
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    try:
-        if not current_user_is_admin():
-            raise ttbl.test_target_not_admin_e(target)
-        target.enable(who_make(ticket))
-        target.timestamp()
-    except ttbl.test_target_busy_e as e:
-        flask_log_abort(3, 400, "%s" % e, exc_info = False)
-    except ttbl.test_target_e as e:
-        # Not considered as errors, no traces printed -- as these are
-        # normal during operation.
-        flask_logd_abort(400, "%s" % e, exc_info = False)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({ })
-
-
 @app.route(API_PREFIX + 'targets/<string:target_id>/release', methods = ['PUT'])
 @flask_login.login_required
 def _target_release(target_id):
@@ -537,65 +490,6 @@ def _target_release(target_id):
     except Exception as e:
         flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
     return flask.jsonify({})
-
-
-@app.route(API_PREFIX + 'targets/<string:target_id>/property_set',
-           methods = ['PUT'])
-@flask_login.login_required
-def _property_set(target_id):	# COMPAT
-    # FIXME: we need a way to disable this command selectively
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    ticket = flask.request.form.get('ticket', "")
-    prop = flask.request.form.get('property', "")
-    user_is_admin = current_user_is_admin()
-    value = flask.request.form.get('value', None)
-    # See FIXME at file reader about diagnostics
-    iostr = StringIO.StringIO()
-    iostr_wrapper = codecs.StreamReaderWriter(
-        iostr, codec_utf8.streamreader, codec_utf8.streamwriter, errors = 'replace')
-    try:
-        info = ""
-        with log_to_str_too(target.log, iostr_wrapper):
-            _target_property_set_policy_check(target, [ prop ],
-                                              user_is_admin)
-            _target_property_set(target, prop, value, user_is_admin, ticket)
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({
-        'diagnostics': iostr.getvalue()
-    })
-
-
-@app.route(API_PREFIX + 'targets/<string:target_id>/property_get',
-           methods = [ 'GET', 'PUT' ])
-@flask_login.login_required
-def _property_get(target_id):	# COMPAT
-    # FIXME: we need a way to disable this command selectively
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
-    ticket = flask.request.form.get('ticket', "")
-    prop = flask.request.form.get('property', "")
-    user_is_admin = current_user_is_admin()
-    # See FIXME at file reader about diagnostics
-    iostr = StringIO.StringIO()
-    iostr_wrapper = codecs.StreamReaderWriter(
-        iostr, codec_utf8.streamreader, codec_utf8.streamwriter, errors = 'replace')
-    try:
-        info = ""
-        with log_to_str_too(target.log, iostr_wrapper):
-            # anyone can get properties
-            value = target.property_get(prop)
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({
-        'value' : value,
-        'diagnostics': iostr.getvalue()
-    })
 
 def tb_file_local_path_get(username, filepath):
     """
