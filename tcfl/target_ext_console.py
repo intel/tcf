@@ -490,6 +490,8 @@ class extension(tc.target_extension_c):
         assert new_console == None or new_console in console_list, \
             "new default console %s is not an existing console (%s)" \
             % (new_console, " ".join(console_list))
+        if new_console == None:
+            new_console = self.aliases['default']
         if self._default != new_console:
             self.target.report_info("default console changed from %s to %s"
                                     % (self._default, new_console))
