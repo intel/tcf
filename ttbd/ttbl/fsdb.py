@@ -16,7 +16,8 @@ import time
 import commonl
 
 class fsdb(object):
-    """This is a veeeery simple file-system based 'DB', atomic access
+    """
+    This is a veeeery simple file-system based 'DB', atomic access
 
     - Atomic access is implemented by storing values in the target of
       symlinks
@@ -27,6 +28,18 @@ class fsdb(object):
     Why? Because to create a symlink, there is only a system call
     needed and is atomic. Same to read it. Thus, for small values, it
     is very efficient.
+
+    NOTE: the key space is flat (no dictionaries) but we implement it
+    with naming, such as:
+
+      l['a.b.c'] = 3
+
+    is the equivalent to:
+
+      l['a']['b']['c'] = 3
+
+    it also makes it way faster and easier to filter for fields.
+
     """
     class exception(Exception):
         pass

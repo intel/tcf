@@ -989,6 +989,8 @@ class test_target(object):
         #
         # Note things such as 'disabled', and 'powered' come from
         # self.fsdb
+        # we are unfolding the flat field list l['a.b.c'] = 3 we get
+        # from fsdb to -> r['a']['b']['c'] = 3
         r.update(commonl.flat_slist_to_dict(
             self.fsdb.get_as_slist(*projections)))
 
