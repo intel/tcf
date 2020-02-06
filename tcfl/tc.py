@@ -1671,7 +1671,8 @@ class target_c(reporter_c):
             return False
 
     def expect(self, regex_or_str, timeout = None, console = None,
-               name = None, raise_on_timeout = failed_e):
+               name = None, raise_on_timeout = failed_e,
+               origin = None):
         """
         Wait for a particular regex/string to be received on a given
         console of this target before a given timeout.
@@ -1687,6 +1688,17 @@ class target_c(reporter_c):
         :param str console: (optional) name of console from which to
            receive the data
 
+        :param str origin: (optional) when reporting information about
+          this expectation, what origin shall it list, eg:
+
+          - *None* (default) to get the current caller
+          - *commonl.origin_get(2)* also to get the current caller
+          - *commonl.origin_get(1)* also to get the current function
+
+          or something as:
+
+          >>> "somefilename:43"
+
         :returns: Nothing, if the output is received.
 
         :raises: :py:exc:`tcfl.tc.blocked_e` on error,
@@ -1698,9 +1710,15 @@ class target_c(reporter_c):
         elif timeout == None:
             timeout = self.testcase.tls.expect_timeout
 
-        return self.testcase.expect(self.console.text(
-            regex_or_str, console = console, timeout = timeout, name = name,
-            raise_on_timeout = raise_on_timeout))
+        if origin == None:
+            origin = commonl.origin_get(2)
+        return self.testcase.expect(
+            self.console.text(
+                regex_or_str,
+                console = console, timeout = timeout, name = name,
+                raise_on_timeout = raise_on_timeout),
+            origin = origin,
+        )
 
     def stub_app_add(self, bsp, _app, app_src, app_src_options = ""):
         """\
@@ -2849,11 +2867,23 @@ class expectation_c(object):
 
       The exception's attachments will be updated with the dictionary
       of data returned by the expectation's :meth:`detect`.
+
+    :param str origin: (optional) when reporting information about
+      this expectation, what origin shall it list, eg:
+
+      - *None* (default) to get the current caller
+      - *commonl.origin_get(2)* also to get the current caller
+      - *commonl.origin_get(1)* also to get the current function
+
+      or something as:
+
+      >>> "somefilename:43"
+
     '''
 
     def __init__(self, target, poll_period, timeout = 0,
                  raise_on_timeout = error_e,
-                 raise_on_found = None):
+                 raise_on_found = None, origin = None):
         assert target == None or isinstance(target, target_c)
         assert issubclass(raise_on_timeout, exception), \
             'expected subclass of tcfl.tc.exception, got %s' \
@@ -2874,6 +2904,7 @@ class expectation_c(object):
         # this is a default, in case it is not overriden by the class
         # that implements this interface
         self.name = commonl.mkid('%s' % id(self), 4)
+        self.origin = origin
 
     def poll_context(self):
         """
@@ -3047,12 +3078,15 @@ class expectation_c(object):
         specified during the expectation's creation); can be overriden
         to offer a more specific message, etc.
         """
+        attachments = {
+            'origin': self.origin
+        }
         raise self.raise_on_timeout(
             "%s/%s: timed out finding expectation in "
             "'%s' @%.1f/%.1fs/%.1fs)"
             % (run_name, self.name, poll_context,
                ellapsed, timeout, self.timeout),
-            dict())
+            attachments)
 
 
 #
@@ -3579,6 +3613,17 @@ class tc_c(reporter_c):
         """
         Run a shell command in the local machine, substituting
         %(KEYWORD)[sd] with keywords defined by the testcase.
+
+        :param str origin: (optional) when reporting information about
+          this expectation, what origin shall it list, eg:
+
+          - *None* (default) to get the current caller
+          - *commonl.origin_get(2)* also to get the current caller
+          - *commonl.origin_get(1)* also to get the current function
+
+          or something as:
+
+          >>> "somefilename:43"
         """
         if origin == None:
             origin = tcfl.origin_get(2)
@@ -4829,6 +4874,8 @@ class tc_c(reporter_c):
         assert isinstance(exp, expectation_c), \
             'argument %s is not an instance of expectation_c but %s' \
             % (exp, type(exp).__name__)
+        if exp.origin == None:
+            exp.origin = commonl.origin_get(2)
         if exp.name in self._expectations_global_names:
             if skip_duplicate:
                 return
@@ -4860,6 +4907,8 @@ class tc_c(reporter_c):
         assert isinstance(exp, expectation_c), \
             'argument %s is not an instance of expectation_c but %s' \
             % (exp, type(exp).__name__)
+        if exp.origin == None:
+            exp.origin = commonl.origin_get(2)
         self.tls._expectations.append(exp)
 
     def expect_tls_remove(self, exp):
@@ -4964,7 +5013,20 @@ class tc_c(reporter_c):
 
           >>> name = "shell prompt received"
 
+        :param str origin: (optional) when reporting information about
+          this expectation, what origin shall it list, eg:
+
+          - *None* (default) to get the current caller
+          - *commonl.origin_get(2)* also to get the current caller
+          - *commonl.origin_get(1)* also to get the current function
+
+          or something as:
+
+          >>> "somefilename:43"
         """
+        origin = exps_kws.pop('origin', None)
+        if origin == None:
+            origin = commonl.origin_get(2)
         # where pollers store polled data, keyed by poller context
         buffers_poll = dict()
         # where detectors store detection data, keyed by expectation
@@ -5015,12 +5077,16 @@ class tc_c(reporter_c):
         # read in all the expectations without name from *exps_args, the
         # ones with names in **exps_kws
         for exp in exps_args:
+            if exp.origin == None:
+                exp.origin = origin
             self._expect_append(run_name, expectations_required, exps,
                                 poll_period, exp, None)
 
         # kws is at this point just a named list of expectations and
         # their implementation
         for exp_name, exp in exps_kws.iteritems():
+            if exp.origin == None:
+                exp.origin = origin
             self._expect_append(run_name, expectations_required, exps,
                                 poll_period, exp, exp_name)
 
@@ -5114,6 +5180,10 @@ class tc_c(reporter_c):
                                 expectations_required.remove(exp)
                             if exp.raise_on_found:	# attach context
                                 exp.raise_on_found.attachments_update(r)
+                                if exp.origin:
+                                    exp.raise_on_found.attachments_update({
+                                        'origin': exp.origin
+                                    })
                                 raise exp.raise_on_found
                         if exp.timeout > 0 and ellapsed > exp.timeout:
                             # timeout for this specific expectation

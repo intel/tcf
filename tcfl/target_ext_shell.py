@@ -45,6 +45,7 @@ import collections
 import re
 import time
 
+import commonl
 import tc
 
 from . import msgid_c
@@ -317,7 +318,7 @@ class shell(tc.target_extension_c):
 
     def _run(self, cmd = None, expect = None, prompt_regex = None,
              output = False, output_filter_crlf = True, trim = False,
-             console = None):
+             console = None, origin = None):
         if cmd:
             assert isinstance(cmd, basestring)
         assert expect == None \
@@ -327,6 +328,12 @@ class shell(tc.target_extension_c):
         assert prompt_regex == None \
             or isinstance(prompt_regex, basestring) \
             or isinstance(prompt_regex, re._pattern_type)
+
+        if origin == None:
+            origin = commonl.origin_get(3)
+        else:
+            assert isinstance(origin, basestring)
+
         target = self.target
 
         if output:
@@ -340,16 +347,16 @@ class shell(tc.target_extension_c):
                     assert isinstance(expectation, basestring) \
                         or isinstance(expectation, re._pattern_type)
                     target.expect(expectation, name = "command output",
-                                  console = console)
+                                  console = console, origin = origin)
             else:
                 target.expect(expect, name = "command output",
-                              console = console)
+                              console = console, origin = origin)
         if prompt_regex == None:
             self.target.expect(self.shell_prompt_regex, name = "shell prompt",
-                               console = console)
+                               console = console, origin = origin)
         else:
             self.target.expect(prompt_regex, name = "shell prompt",
-                               console = console)
+                               console = console, origin = origin)
         if output:
             output = self.target.console.read(offset = offset,
                                               console = console)
@@ -420,6 +427,16 @@ class shell(tc.target_extension_c):
           respectively (True)
         :param str console: (optional) on which console to run;
           (defaults to *None*, the default console).
+        :param str origin: (optional) when reporting information about
+          this expectation, what origin shall it list, eg:
+
+          - *None* (default) to get the current caller
+          - *commonl.origin_get(2)* also to get the current caller
+          - *commonl.origin_get(1)* also to get the current function
+
+          or something as:
+
+          >>> "somefilename:43"
         :returns str: if ``output`` is true, a string with the output
           of the command.
 

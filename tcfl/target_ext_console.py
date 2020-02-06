@@ -327,7 +327,9 @@ class expect_text_on_console_c(tc.expectation_c):
                        search_offset + match.end(),
                        target.fullid, self.console, of.name),
                     attachments = match_data, dlevel = 1, alevel = 0)
+                # make this match on_timeout()'s as much as possible
                 match_data["target"] = self.target
+                match_data["origin"] = self.origin
                 match_data["console"] = self.console
                 match_data["pattern"] = self.regex.pattern
                 match_data["offset"] = search_offset
@@ -352,10 +354,13 @@ class expect_text_on_console_c(tc.expectation_c):
                self.target.fullid, self.console,
                ellapsed, timeout, self.timeout),
             {
+                # make this match detect()'s as much as possible
                 "target": self.target,
+                "origin": self.origin,
                 "console": self.console,
-                "offset prev": search_offset_prev,
+                "pattern": self.regex.pattern,
                 "offset": search_offset,
+                "offset prev": search_offset_prev,
                 "console output": self.target.console.generator_factory(
                     self.console,
                     search_offset_prev, search_offset),

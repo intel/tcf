@@ -633,8 +633,8 @@ class extension(tc.target_extension_c):
                 try:
                     boot_to_pos_fn(target)
                     # POS prints this when it boots before login
-                    target.expect("TCF test node", timeout =
-                                  bios_boot_time + timeout)
+                    target.expect("TCF test node",
+                                  timeout = bios_boot_time + timeout)
                     target.shell.up(timeout = timeout)
                 except tc.error_e as e:
                     outputf = e.attachments_get().get('console output', None)
