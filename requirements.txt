@@ -1,11 +1,11 @@
-keyring
 Jinja2
 PyYAML
+functools32
 junit_xml
+keyring
 ply
+pykwalify
 pymongo
 python-Levenshtein
 requests
 setuptools
-pykwalify
-

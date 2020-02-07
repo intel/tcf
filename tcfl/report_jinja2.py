@@ -58,7 +58,14 @@ import sys
 import threading
 import time
 
-import functools32
+try:
+    import functools32
+except ImportError as e:
+    try:
+        import backports.functools_lru_cache as functools32
+    except ImportError as e:
+        logging.error("Can't import neither functools32 nor backports.functools_lru_cache")
+        raise
 import jinja2
 import jinja2.filters
 
