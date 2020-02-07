@@ -307,9 +307,9 @@ class shell(tc.target_extension_c):
 
         # same as target.console.select_preferred()
         if shell_setup == True:    	# passed as a parameter
-            target.shell.setup(console = console)
+            target.shell.setup(console)
         elif callable(shell_setup):
-            shell_setup(console = console)
+            shell_setup(console)
         # False, so we don't call shell setup
 
         # don't set a timeout here, leave it to whatever it was defaulted

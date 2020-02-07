@@ -577,9 +577,9 @@ class extension(tc.target_extension_c):
 
         # same as target.shell.up()
         if shell_setup == True:    	# passed as a parameter
-            target.shell.setup()
+            target.shell.setup(console)
         elif callable(shell_setup):
-            shell_setup()
+            shell_setup(console)
         # False, so we don't call shell setup
 
 
