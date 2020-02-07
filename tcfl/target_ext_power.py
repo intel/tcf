@@ -84,6 +84,8 @@ class extension(tc.target_extension_c):
         self.target.report_info("powering on", dlevel = 1)
         self.target.ttbd_iface_call("power", "on", component = component)
         self.target.report_info("powered on")
+        if hasattr(self.target, "console"):
+            self.target.console._set_default()
 
     def cycle(self, wait = None, component = None):
         """
@@ -99,6 +101,8 @@ class extension(tc.target_extension_c):
         self.target.ttbd_iface_call("power", "cycle",
                                     component = component, wait = wait)
         self.target.report_info("power cycled")
+        if hasattr(self.target, "console"):
+            self.target.console._set_default()
 
     def reset(self):
         """
@@ -111,6 +115,8 @@ class extension(tc.target_extension_c):
         # reset is deprecated at the server level
         self.target.ttbd_iface_call("power", "cycle")
         self.target.report_info("reset")
+        if hasattr(self.target, "console"):
+            self.target.console._set_default()
 
     def _healthcheck(self):
         target = self.target

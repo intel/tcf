@@ -447,7 +447,10 @@ class extension(tc.target_extension_c):
         # this becomes a ALIAS: REAL-NAME
         r = self.target.ttbd_iface_call("console", "list", method = "GET")
         self.aliases = r['aliases']
-        # Which is the default console that was set in runtime?
+        self._set_default()
+
+    def _set_default(self):
+        # Which is the default console that was set in the server?
         # call it only once from here, otherwise everytime we try to
         # get the console to use by default we do a call
         self.default_property = self.target.property_get("console-default",
@@ -458,7 +461,6 @@ class extension(tc.target_extension_c):
             self._default = self.aliases['default']
         else:
             self._default = self.console_list[0]
-
 
     def _console_get(self, console):
         #
