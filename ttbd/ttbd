@@ -605,6 +605,7 @@ def _do_cleanup_released(target, who):
                                     ttbl.config.target_max_idle)
     if idle_poweroff == 0:
         target.log.debug("skiping powering off, idle_poweroff is 0")
+        return
     # yeah, we do without acquiring; technically it is legal since it
     # does not modify state...almost (except for 'powered' property)
     any_powered_on = target.power._get_any(target)
