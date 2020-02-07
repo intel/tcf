@@ -96,7 +96,7 @@ running locally on your machine:
          python-flask-login \
          python-flask-principal \
          python-ldap \
-         python-pexpect \
+         pexpect \
          python-ply \
          python-requests \
          python-systemd \
@@ -110,8 +110,26 @@ running locally on your machine:
          qemu \
          socat \
          sshpass
-       $ pip install --user sdnotify python-prctl
+       $ pip2 install --user sdnotify python-prctl
 
+     - pure PIP2 dependencies::
+
+         $ pip2 install --user \
+            Flask              
+            Flask-Login        
+            Flask-Principal    
+            Jinja2             
+            Werkzeug           
+            keyring            
+            ply                
+            prctl              
+            pykwalify          
+            python-Levenshtein 
+            pyusb              
+            setuptools         
+            tornado            
+
+       
 1. Disable SELinux::
 
    # setenforce 0
