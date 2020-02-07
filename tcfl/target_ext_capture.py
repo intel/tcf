@@ -56,9 +56,13 @@ import tc
 from . import msgid_c
 
 
-import cv2
-import numpy
-import imutils
+try:
+    import cv2
+    import numpy
+    import imutils
+    image_expectation_works = True
+except ImportError as e:
+    image_expectation_works = False
 
 def _rest_tb_target_capture_list(rtb, rt, ticket = ''):
     return rtb.send_request("GET", "targets/%s/capture/list" % rt['id'],
@@ -167,6 +171,9 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
     def __init__(self, target, template_image_filename, capturer,
                  in_area, merge_similar, min_width, min_height,
                  poll_period, timeout, raise_on_timeout, raise_on_found):
+        if not image_expectation_works:
+            raise RuntimeError("Image matching won't work; need packages"
+                               " cv2, imutils, numpy")
         assert isinstance(target, tc.target_c)
         assert isinstance(capturer, basestring)
         assert in_area == None \
@@ -782,6 +789,9 @@ class extension(tc.target_extension_c):
         The rest of the arguments are described in
         :class:`tcfl.tc.expectation_c`.
         """
+        if not image_expectation_works:
+            raise RuntimeError("Image matching won't work; need packages"
+                               " cv2, imutils, numpy")
         return _expect_image_on_screenshot_c(
             self.target,
             template_image_filename, capturer,

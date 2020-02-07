@@ -1,8 +1,11 @@
 Jinja2
 PyYAML
+cv2
 functools32
+imutils
 junit_xml
 keyring
+numpy
 ply
 pykwalify
 pymongo
