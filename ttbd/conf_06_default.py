@@ -30,3 +30,12 @@ if ttbl.config.defaults_enabled:
                 ipv6_addr = 'fc00::%02x:%02x:%02x' % (x, y, v))
 
     index_start = 5
+
+ttbl.config.target_add(
+    ttbl.test_target('local'),
+    tags = {
+        "support.version": commonl.version_get(ttbl, "ttbd"),
+        "skip_cleanup": True,
+        "disabled": "meant only for describing the server",
+    }
+)
