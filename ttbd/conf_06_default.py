@@ -34,7 +34,7 @@ if ttbl.config.defaults_enabled:
 ttbl.config.target_add(
     ttbl.test_target('local'),
     tags = {
-        "support.version": commonl.version_get(ttbl, "ttbd"),
+        "versions.server": commonl.version_get(ttbl, "ttbd"),
         "skip_cleanup": True,
         "disabled": "meant only for describing the server",
     }
