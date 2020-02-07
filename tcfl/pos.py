@@ -636,17 +636,21 @@ class extension(tc.target_extension_c):
                     target.expect("TCF test node",
                                   timeout = bios_boot_time + timeout)
                     target.shell.up(timeout = timeout)
-                except tc.error_e as e:
-                    outputf = e.attachments_get().get('console output', None)
-                    if outputf:
-                        output = open(outputf.name).read()
-                    if output == None or output == "" or output == "\x00":
+                except ( tc.error_e, tc.failed_e ) as e:
+                    attachment = e.attachments_get().get('console output', None)
+                    output = ""
+                    for data in attachment.make_generator():
+                        output += data
+                        if len(output) > 20:
+                            # we don't need more
+                            break
+                    if output == "" or output == "\x00":
                         target.report_error("POS: no console output, retrying")
                         continue
                     # sometimes the BIOS has been set to boot local directly,
                     # so we might as well retry
                     target.report_error("POS: unexpected console output, retrying",
-                                        attachments = dict(output = output))
+                                        attachments = { "console output": attachment })
                     self._unexpected_console_output_try_fix(output, target)
                     continue
                 target.report_info("POS: got Provisioning OS shell")
