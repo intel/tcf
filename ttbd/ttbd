@@ -599,20 +599,25 @@ def target_acquired(target, who):
     target.release(who, False)
 
 def _do_cleanup_released(target, who):
-    if not hasattr(target, "power_off"):	# Only with power control
+    if not hasattr(target, "power"):	# Only with power control
         return
-    if not target.power_rail_get_any():		# Is it off? pass
+    idle_poweroff = target.tags.get('idle_poweroff',
+                                    ttbl.config.target_max_idle)
+    if idle_poweroff == 0:
+        target.log.debug("skiping powering off, idle_poweroff is 0")
+    # yeah, we do without acquiring; technically it is legal since it
+    # does not modify state...almost (except for 'powered' property)
+    any_powered_on = target.power._get_any(target)
+    if any_powered_on == False:		# Is it off? pass
         return
     with target_acquired(target, who):	# Acquire, check idleness
+        # calculate the idle time once we own the target, to be sure
+        # none came in the middle and we are killing it for them...
         idle_time = time.time() - target.timestamp_get()
-        idle_poweroff = target.tags.get('idle_poweroff',
-                                        ttbl.config.target_max_idle)
-        if idle_poweroff == 0:
-            target.log.debug("skiping powering off, idle_poweroff is 0")
-        elif target.power_rail_get_any and idle_time > idle_poweroff:
+        if idle_time > idle_poweroff:
             target.log.info("powering off, idle for %.2fs (max %s)",
                             idle_time, idle_poweroff)
-            target.power_off(who)
+            target.power.put_off(target, who, {}, {}, None)
 
 def _do_cleanup_acquired(target, owner, who):
         idle_time = time.time() - target.timestamp_get()
