@@ -199,9 +199,25 @@ class expect_text_on_console_c(tc.expectation_c):
             # Note we get the new_offset straight() from the read
             # call, which is the most accurate from the server standpoint
             of.flush()
-            _generation, new_offset, total_bytes = \
+            generation, new_offset, total_bytes = \
                 target.console.read_full(self.console, read_offset,
                                          self.max_size, of)
+            generation_prev = buffers_poll.get('generation', None)
+            if generation_prev == None:
+                buffers_poll['generation'] = generation
+            elif generation_prev < generation:
+                # ops, the console was restarted, so the offsets are
+                # no longer valid, retry with offset zero--this
+                # usually happens when the target power cycles or the
+                # console switches off/on
+                target.report_info(
+                    "%s/%s: console %s:%s restarted, re-reading from start"
+                    % (run_name, self.name, target.fullid, self.console),
+                    dlevel = 5)
+                generation, new_offset, total_bytes = \
+                    target.console.read_full(self.console, 0,
+                                             self.max_size, of)
+                buffers_poll['generation'] = generation
             ts_end = time.time()
             of.flush()
             os.fsync(ofd)
@@ -278,7 +294,9 @@ class expect_text_on_console_c(tc.expectation_c):
 
         context = self.poll_context()
         # last time we looked and found, we updated the search_offset,
-        # so search from there on
+        # so search from there on -- note this offset is on the
+        # capture file we save in the client, not from the server's
+        # capture POV.
         if context + 'search_offset' not in testcase.tls.buffers:
             testcase.tls.buffers[context + 'search_offset'] = 0
         search_offset = testcase.tls.buffers[context + 'search_offset']
@@ -695,7 +713,7 @@ class extension(tc.target_extension_c):
         target.report_info("%s: read %dB from console @%d"
                            % (console, l, offset), dlevel = 3)
         generation_s, offset_s = \
-            r.headers.get('X-stream-gen-offset', "0 0").split()
+            r.headers.get('X-Stream-Gen-Offset', "0 0").split()
         generation = int(generation_s)
         new_offset = \
             int(offset_s) \
