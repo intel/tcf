@@ -450,7 +450,6 @@ def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
 
       $ tcf list
       local/YK34567
-      local/YK34567-base
       local/YK34567-1
       local/YK34567-2
       local/YK34567-3
@@ -472,11 +471,6 @@ def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
      - A DLPWS7 URL (:py:class:`ttbl.pc.dlwps7`), if given, will create a
        target *YKNNNNN* to power on or off the whole hub and wait for it
        to connect to the system.
-
-       It will also create one called *YKNNNN-base* that allows to power
-       it off or on, but will not wait for the USB device to show up in
-       the system (useful for poking the power control to the hub when it
-       is failing to connect to the system)
 
      - If None, no power control targets for the whole hub will be
        created. It will just be expected the hub is connected permanently
@@ -523,23 +517,6 @@ def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
         assert isinstance(pc_url, basestring)
     if powered_on_start != None:
         assert isinstance(powered_on_start, bool)
-
-    # First add the base target, with no expectations in case it
-    # doesn't show in USB, so we can manipulate it to diagnose
-    if pc_url == None:
-        # although with no power control, it shall be there...
-        pc_base = ttbl.pc.delay_til_usb_device(serial = ykush_serial)
-    else:
-        pc_base = ttbl.pc.dlwps7(pc_url)
-
-    target = ttbl.test_target(ykush_serial + "-base")
-    target.interface_add("power", ttbl.power.interface(pc_base))
-    # Always keep them on, unless we decide otherwise--we need
-    # them to control other components
-    ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
-    target.disable("")
-    if powered_on_start:
-        target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
 
     # Now try to add the one that expects to find the USB device; this
     # can fail if the USB device doesn't show up for whichever reason
