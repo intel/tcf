@@ -122,8 +122,8 @@ def _target_enable(args):
             target.enable()
 
 def healthcheck(args):
-    tcfl.tc.report.report_c.driver_add(		# FIXME: hack console driver
-        tcfl.tc.report.report_console_c(0, None))
+    tcfl.tc.report_driver_c.add(		# FIXME: hack console driver
+        tcfl.report_console.driver(0, None))
 
         
     with tcfl.msgid_c("cmdline"):
