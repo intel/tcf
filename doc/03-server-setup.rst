@@ -816,10 +816,40 @@ been tested yet, shall be similar.
      # install -o ttbd -g ttbd -m 2775 -d \
          /home/ttbd \
          /home/ttbd/images/tcf-live/ \
-         /home/ttbd/images/tcf-live/x86_64 \
          /home/ttbd/public_html /home/ttbd/public_html/x86_64
 
-4. Disable the firewall (FIXME: do not require this)::
+4. Enable firewall access to all the services we will use; for the
+   server itself we'll use the range 5000-5500 and double-check SSH is
+   added::
+
+     # firewall-cmd --permanent --add-port=5000-5500/tcp
+     # firewall-cmd --permanent --add-service=ssh
+
+   For the Provisioning services::
+   
+     # firewall-cmd --permanent \
+        --add-service=dhcp \
+        --add-service=dhcpv6 \
+        --add-service=http \
+        --add-service=https \
+        --add-service=mountd \
+        --add-service=nfs \
+        --add-service=nfs3 \
+        --add-service=rpc-bind \
+        --add-service=rsyncd \
+        --add-service=tftp \
+        --add-service=tftp-client
+
+   For internal proxying from test networks to outside (if
+   configured)::
+     
+     # firewall-cmd --permanent --add-port=8888/tcp
+
+   Ensure it works::
+
+     # firewall-cmd --reload
+  
+   You can alternatively, disable the firewall::
 
      # systemctl stop firewalld
      # systemctl disable firewalld
@@ -950,7 +980,7 @@ c. Make the kernel and initrd for POS available via Apache for
                /home/ttbd/public_html/x86_64/initramfs-tcf-live
 
        .. warning:: ``--kver`` is needed to not default to the kernel
-                    version of the system running the co/mmand.
+                    version of the system running the command.
                     ``-H`` is needed to ensure a generic initrd that
                     works with multiple machines is created.
 
@@ -987,8 +1017,9 @@ d. Make the POS root image available over NFS as read-only (note we
      # tee /etc/exports.d/ttbd-pos.exports <<EOF
      /home/ttbd/images/tcf-live/x86_64 *(ro,no_root_squash)
      EOF
-     # systemctl reload nfs-server
+     # systemctl reload nfs-server	# use 'nfs' for RHEL / CentOS
 
+     
    Verify the directory is exported::
 
      $ showmount -e SERVERNAME

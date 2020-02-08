@@ -77,26 +77,45 @@ running locally on your machine:
 
 0. Install dependencies:
 
-   - Fedora / RHEL / CentOS::
+   - Fedora / RHEL / CentOS, client::
+     
+       # dnf install -y \
+         gvnc-tools \
+         make \
+         python-ply \
+         python2-pykwalify \
+         python-requests \
+         python2-Levenshtein \
+         python2-backports-functools_lru_cache \
+         python2-jinja2 \
+         python2-junit_xml \
+         python2-keyring \
+         python2-numpy \
+         python2-opencv \
+         python2-pyyaml
+
+     server::
 
        # dnf install -y \
          dfu-util \
          dosfstools \
          gcc \
          git \
+         httpd \
          ipmitool \
+         libcap-devel \
          livecd-tools \
          make \
          openocd \
          openssh-clients \
          parted \
+         pexpect \
          pyOpenSSL \
          pyserial \
          python-flask \
          python-flask-login \
          python-flask-principal \
          python-ldap \
-         pexpect \
          python-ply \
          python-requests \
          python-systemd \
@@ -109,7 +128,8 @@ running locally on your machine:
          pyusb \
          qemu \
          socat \
-         sshpass
+         sshpass \
+         tftp-server
        $ pip2 install --user sdnotify python-prctl
 
      - pure PIP2 dependencies::
@@ -136,7 +156,7 @@ running locally on your machine:
 
 2. Build what’s needed (*ttblc.so*)::
 
-     $ cd ~/z/tcf.git/ttbd
+     $ cd ~/tcf.git/ttbd
      $ python setup.py build
      $ ln -s build/lib.linux-x86_64-2.7/ttblc.so
 
@@ -160,10 +180,7 @@ running locally on your machine:
      
 5. link the following config files from your source tree::
 
-     $ cd /etc/ttbd-staging
-     $ ln -s ~/tcf.git/ttbd/conf_00_lib.py
-     $ ln -s ~/tcf.git/ttbd/conf_06_default.py
-     $ ln -s ~/tcf.git/ttbd/zephyr/conf_06_zephyr.py
+     $ ln -s ~/tcf.git/ttbd/conf_0*.py /etc/ttbd-staging
 
 6. Create a local configuration, so you can login without a password
    from the local machine to port 5001 (port 5000 we leave it for
@@ -200,7 +217,7 @@ running locally on your machine:
 9. (optionally) To start using *systemd* create a configuration for
    systemd to start the daemon::
 
-     # cp ~user/tcf.git/ttbd/ttbd@.service /etc/systemd/systemctl/ttbd@staging.service
+     # cp ~/tcf.git/ttbd/ttbd@.service /etc/systemd/system/ttbd@staging.service
 
    Edit said file and:
 
@@ -226,6 +243,56 @@ Start the daemon with::
 Make it always start automatically with::
 
   # systemctl enable ttbd@staging
+
+
+Manual installation of rsync server for Provisioning OS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To setup a system wide rsync server, along other services, instead of
+relying on ttbd starting a specific instance for each network, follow
+these instructions:
+
+a. Install rsync
+
+b. configure rsync to export */home/ttbd/images* as read only,
+   appending to */etc/rsyncd.conf*::
+
+     # TCF provisioning
+     # We run the daemon as root and need to run as root so we can access
+     # folders that have root-only weird permissions
+     [images]
+     path = /home/ttbd/images
+     read only = True
+     timeout = 300
+     # need root perms in this images so we can read all files and transfer
+     # them properly, even those that seem closed; that's how the oS images
+     # are
+     uid = root
+     gid = root
+
+   Ensure daemon is listening on the interfaces where the targets
+   will call from, like for example:
+
+     address = 0.0.0.0
+
+   Ensure port 873 (rsync) is open on the firewall::
+
+    # firewall-cmd --zone=public --add-port=873/tcp --permanent
+    # firewall-cmd --zone=public --add-service=rsyncd --permanent
+
+c. Enable and start the rsync service::
+
+     # systemctl enable rsyncd
+     # systemctl start rsyncd
+
+d. test::
+
+     $ rsync localhost::images/
+     $ rsync localhost::images/tcf-live/x86_64/
+
+   now lists what is in /home/ttbd/images and allows copying it
+
+
 
 Workflow for contributions
 --------------------------
