@@ -20,7 +20,10 @@ if ttbl.config.defaults_enabled:
 
         # Add QEMU UEFI POS capable targets with addresses
         v = 1
-        for v in range(2, 2 + ttbl.config.default_qemu_count):
+        for v in range(
+                ttbl.config.default_qemu_start,
+                ttbl.config.default_qemu_start
+                + ttbl.config.default_qemu_count):
             target_name = "qu-%02d" % v + letter
             target = target_qemu_pos_add(
                 target_name,

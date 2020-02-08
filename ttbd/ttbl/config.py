@@ -42,6 +42,12 @@ ssl_enabled_check_disregard = None
 #: are in truth different networks.
 defaults_enabled = True
 default_networks = [ 'a', 'b' ]
+#: Qemu target count start
+#:
+#: By default, qemu targets we create by default get
+#: assigned IP addresses in the 90 range, so we have plenty of space
+#: before for others
+default_qemu_start = 90
 default_qemu_count = 4
 
 #: Number of processes to start
