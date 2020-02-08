@@ -420,16 +420,28 @@ class pc(ttbl.power.daemon_c,
         # We first assign a port for GDB debugging, if someone takes
         # it before we do, start will fail and paranoid mode (see
         # above) will restart it.
+        base = ttbl.config.tcp_port_range[0]
+        top = ttbl.config.tcp_port_range[1]
+        if base < 5900:		# we need ports >= 5900 for VNC
+            base = 5900
         tcp_port_base = commonl.tcp_port_assigner(
-            2 , port_range = ttbl.config.tcp_port_range)
+            2 , port_range = ( base, top ))
         target.fsdb.set("qemu-gdb-tcp-port", "%s" % tcp_port_base)
         # This might not be used at all, but we allocate and declare
         # it in case the implementation will use it; allocating in a
         # higher layer makes it more complicated.
         # this one is the port number based on 5900 (VNC default 0)
-        target.fsdb.set("vnc-port", "%s" % (tcp_port_base + 1 - 5900))
-        # this one is the raw port number
-        target.fsdb.set("vnc-tcp-port", "%s" % (tcp_port_base + 1))
+        if top < 5900:
+            logging.warning(
+                "ttbl.config.tcp_port_range %s doesn't include ports "
+                "between above 5900, needed for VNC services. "
+                "QEMU targets needing VNC support will fail to start "
+                "complaining about 'vnc-port' not defined",
+                ttbl.config.tcp_port_range)
+        else:
+            target.fsdb.set("vnc-port", "%s" % (tcp_port_base + 1 - 5900))
+            # this one is the raw port number
+            target.fsdb.set("vnc-tcp-port", "%s" % (tcp_port_base + 1))
 
         self.cmdline_extra = []
         image_keys = target.fsdb.keys("qemu-image-*")

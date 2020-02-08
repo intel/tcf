@@ -206,4 +206,11 @@ cleanup_files_period = 60 # 60sec
 cleanup_files_maxage = 86400 #  1day, count is in seconds, 24x60x60 sec
 
 #: Which TCP port range we can use
+#:
+#: The server will take this into account when services that need port
+#: allocation look for a port; this allows to open a certain range in a
+#: firewall, for example.
+#:
+#: Note you want normally this in a range that allows ports that fit
+#: in some preallocated range (eg: VNC requires >= 5900).
 tcp_port_range = (1025, 65530)
