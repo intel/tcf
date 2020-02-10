@@ -162,7 +162,12 @@ def healthcheck(args):
             
             target.report_info(
                 "HEALTHCHECK for %s interface" % interface_name, level = 0)
-            interface._healthcheck()
+            try:
+                interface._healthcheck()
+            except Exception as e:
+                target.report_blck(
+                    "HEALTCHECK for %s: exception" % interface_name,
+                    dict(exception = e), alevel = 0)
             
         target.report_info("released")
         target.release()
