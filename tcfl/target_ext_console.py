@@ -364,7 +364,7 @@ class expect_text_on_console_c(tc.expectation_c):
         search_offset_prev = \
             testcase.tls.buffers.get(poll_context + 'search_offset_prev', 0)
         search_offset = \
-            testcase.tls.buffers[poll_context + 'search_offset']
+            testcase.tls.buffers.get(poll_context + 'search_offset', 0)
         raise self.raise_on_timeout(
             "%s/%s: timed out finding text '%s' in "
             "console '%s:%s' @%.1f/%.1fs/%.1fs)"
