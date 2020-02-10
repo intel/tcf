@@ -975,6 +975,7 @@ def _console_read_thread_fn(target, console, fd, offset):
             offset = 0
         generation = 0
         generation_prev = None
+        backoff_wait = 0.1
         while True:
             try:
                 # Instead of reading and sending directy to the
@@ -996,10 +997,15 @@ def _console_read_thread_fn(target, console, fd, offset):
                         f_write_retry_eagain(fd, line)
                         if '\n' in line:
                             f_write_retry_eagain(fd, "\r")
-                    time.sleep(0.1)
                     fd.flush()
-                else:			# no data, give the port some time
-                    time.sleep(0.5)
+
+                if len(data) == 0:
+                    backoff_wait *= 2
+                else:
+                    backoff_wait = 0.1
+                if backoff_wait >= 4:
+                    backoff_wait = 4
+                time.sleep(backoff_wait)	# no need to bombard the server..
             except Exception as e:	# pylint: disable = broad-except
                 logging.exception(e)
                 raise
@@ -1094,8 +1100,9 @@ def _cmdline_console_read(args):
         try:
             generation = 0
             generation_prev = None
+            backoff_wait = 0.1
             while True:
-                generation, offset, _ = \
+                generation, offset, data_len = \
                     target.console.read_full(console, offset, max_size, fd)
                 if generation_prev != None and generation_prev != generation:
                     sys.stderr.write(
@@ -1103,7 +1110,14 @@ def _cmdline_console_read(args):
                 generation_prev = generation
                 if not args.follow:
                     break
-                time.sleep(0.25)	# no need to bombard the server..
+                if data_len == 0:
+                    backoff_wait *= 2
+                else:
+                    backoff_wait = 0.1
+                if backoff_wait >= 4:
+                    backoff_wait = 4
+                    
+                time.sleep(backoff_wait)	# no need to bombard the server..
         finally:
             if fd != sys.stdout:
                 fd.close()
