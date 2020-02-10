@@ -166,6 +166,12 @@ class tunnel(tc.target_extension_c):
 
 
     def _healthcheck(self):
+        target= self.target
+        interconnects = target.rt.get('interconnects', {})
+        if interconnects == {}:
+            target.report_skip("skipping tunnel healthcheck,"
+                               " no IP connectivity in configuration, ")
+            return
         target = self.target
         tunnels = target.tunnel.list()
         for protocol, ip_address, target_port, server_port in tunnels:
