@@ -854,7 +854,8 @@ class target_c(reporter_c):
     #
     # Public API
     #
-    def __init__(self, rt, testcase, bsp_model, target_want_name):
+    def __init__(self, rt, testcase, bsp_model, target_want_name,
+                 extensions_only = None):
         assert isinstance(rt, dict)
         assert isinstance(testcase, tc_c)
         reporter_c.__init__(self, testcase = testcase)
@@ -968,6 +969,8 @@ class target_c(reporter_c):
             self._report_mk_prefix()
         # Fire up the extensions
         for name, extension in self.__extensions.iteritems():
+            if extensions_only != None and name not in extensions_only:
+                continue
             try:
                 self.report_info("%s: %s: initializing target extension"
                                  % (self.want_name, name),
@@ -1764,7 +1767,8 @@ class target_c(reporter_c):
 
 
     @staticmethod
-    def create_from_cmdline_args(args, target_name = None, iface = None):
+    def create_from_cmdline_args(args, target_name = None, iface = None,
+                                 extensions_only = None):
         """
         Create a :class:`tcfl.tc.target_c` object from command line
           arguments
@@ -1782,7 +1786,8 @@ class target_c(reporter_c):
                 raise RuntimeError("missing 'target' argument")
             target_name = getattr(args, 'target', None)
         _rtb, rt = ttb_client._rest_target_find_by_id(target_name)
-        target = target_c(rt, tc_global, None, "cmdline")
+        target = target_c(rt, tc_global, None, "cmdline",
+                          extensions_only = extensions_only)
         if iface != None and not iface in target.rt.get('interfaces', []):
             raise RuntimeError("%s: target does not support the %s interface"
                                % (target_name, iface))
