@@ -629,8 +629,9 @@ class extension(tc.target_extension_c):
                                    dict(exception = e))
 
             if capture_spec[capturer][0] == "stream":
-                state = target.capture.list()['capturer']
-                if state == "streaming":
+                states = target.capture.list()
+                state = states[capturer]
+                if state == "capturing":
                     target.report_pass(
                         "capturer %s is in expected streaming state" % capturer)
                 else:
