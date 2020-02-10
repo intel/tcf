@@ -242,9 +242,9 @@ capture_agptek_hdmi_astream = ttbl.capture.generic_stream(
         # device to be disconnected or connected to the
         # system. Writing 0 we soft-disconnect it, writing 1 we ask
         # for it to be connected.
-        "echo 0 > /sys/$(udevadm info /dev/video-%(id)s-0 -q path)/../../../authorized",
+        "echo 0 > /sys/$(udevadm info video-%(id)s-0 -q path)/../../../authorized",
         "sleep 0.5s",
-        "echo 1 > /sys/$(udevadm info /dev/video-%(id)s-0 -q path)/../../../authorized",
+        "echo 1 > /sys/$(udevadm info video-%(id)s-0 -q path)/../../../authorized",
         "sleep 1s",
         # vtop HW has "Digital In" for an input name
         # FIXME: we have issues with the spaces, somewhere it is being
