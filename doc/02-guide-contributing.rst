@@ -80,6 +80,7 @@ running locally on your machine:
    - Fedora / RHEL / CentOS, client::
      
        # dnf install -y \
+         android-tools \
          gvnc-tools \
          make \
          python-ply \
@@ -97,6 +98,8 @@ running locally on your machine:
      server::
 
        # dnf install -y \
+         alsa-utils \
+         android-tools \
          dfu-util \
          dosfstools \
          gcc \
@@ -129,10 +132,21 @@ running locally on your machine:
          qemu \
          socat \
          sshpass \
-         tftp-server
+         tftp-server \
+         v4l-utils
        $ pip2 install --user sdnotify python-prctl
 
-     - pure PIP2 dependencies::
+     If you will be isntrumenting targets with video capture, you
+     might need *ffmpeg* installed on your servers (see
+     https://rpmfusion.org/Configuration) and then::
+
+       # dnf install -y ffmpeg
+
+     or::
+
+       # yum install -y ffmpeg
+     
+   - pure PIP2 dependencies::
 
          $ pip2 install --user \
             Flask              
