@@ -767,8 +767,8 @@ class daemon_c(impl_c):
                         "env %s: [%s] %s", key, type(val).__name__, val)
             raise
         except OSError as e:
-            raise self.start_e("%s: %s failed to start: %s"
-                               % (component, self.name, e))
+            raise self.start_e("%s: %s failed to start [cmdline %s]: %s" % (
+                component, self.name, " ".join(_cmdline), e))
 
         if self.precheck_wait:
             time.sleep(self.precheck_wait)
