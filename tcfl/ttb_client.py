@@ -673,7 +673,7 @@ def _target_select_by_spec( rt, spec, _kws = None):
 
 
 
-def rest_target_list_table(args, spec):
+def rest_target_list_table(targetl):
     """
     List all the targets in a table format, appending * if powered
     up, ! if owned.
@@ -683,21 +683,15 @@ def rest_target_list_table(args, spec):
     # where suffix will be *! (* if powered, ! if owned)
 
     l = []
-    for rt_fullid, rt in sorted(rest_target_broker.rts_cache.iteritems(),
-                                key = lambda x: x[0]):
-        try:
-            if spec and not _target_select_by_spec(rt, spec):
-                continue
-            suffix = ""
-            if rt.get('owner', None):	# target might declare no owner
-                suffix += "@"
-            if 'powered' in rt:
-                # having that attribute means the target is powered;
-                # otherwise it is either off or has no power control
-                suffix += "!"
-            l.append((rt_fullid, suffix))
-        except requests.exceptions.ConnectionError as e:
-            logger.error("%s: can't use: %s", rt_fullid, e)
+    for rt in targetl:
+        suffix = ""
+        if rt.get('owner', None):	# target might declare no owner
+            suffix += "@"
+        if 'powered' in rt:
+            # having that attribute means the target is powered;
+            # otherwise it is either off or has no power control
+            suffix += "!"
+        l.append(( rt['fullid'], suffix ))
     if not l:
         return
 
@@ -730,40 +724,51 @@ def rest_target_list_table(args, spec):
                 fullid = i[0], suffix = i[1], column_width = maxlen))
         sys.stdout.write("\n")
 
-def rest_target_list(args):
+def cmdline_list(spec_strings, do_all = False):
+    """
+    Return a list of dictionaries representing targets that match the
+    specification strings
+
+    :param list(str) spec_strings: list of strings that put together
+      with a logical *and* bring the logical specification
+
+    :param bool do_all: (optional) include also disabled targets
+      (defaults to *False*)
+    """
     specs = []
     # Bring in disabled targets? (note the field is a text, not a
     # bool, if it has anything, the target is disabled
-    if args.all == False:
+    if do_all != True:
         specs.append("( not disabled )")
     # Bring in target specification from the command line (if any)
-    if args.target:
-        specs.append("(" + ") or (".join(args.target) +  ")")
+    if spec_strings:
+        specs.append("(" + ") or (".join(spec_strings) +  ")")
     spec = " and ".join(specs)
+
+    targetl = []
+    for _fullid, rt in sorted(rest_target_broker.rts_cache.iteritems(),
+                              key = lambda x: x[0]):
+        if spec and not _target_select_by_spec(rt, spec):
+            continue
+        targetl.append(rt)
+    return targetl
+
+
+def rest_target_list(args):
 
     if args.projection:
         rest_target_broker.projection = args.projection
 
+    targetl = cmdline_list(args.target, args.all)
     if args.verbosity < 1 and sys.stderr.isatty() and sys.stdout.isatty():
-        rest_target_list_table(args, spec)
+        rest_target_list_table(targetl)
         return
     else:
-        l = []
-        for rt_fullid, rt in sorted(rest_target_broker.rts_cache.iteritems(),
-                                    key = lambda x: x[0]):
-            rt.pop('rtb')	# can't json this
-            try:
-                if spec and not _target_select_by_spec(rt, spec):
-                    continue
-                l.append(rt)
-            except requests.exceptions.ConnectionError as e:
-                logger.error("%s: can't use: %s", rt_fullid, e)
-
         if  args.verbosity == 4:
             # print as a JSON dump
-            print json.dumps(l, skipkeys = True, indent = 4)
+            print json.dumps(targetl, skipkeys = True, indent = 4)
         else:
-            for rt in l:
+            for rt in targetl:
                 rest_target_print(rt, args.verbosity)
 
 
