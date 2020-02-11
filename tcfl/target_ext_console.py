@@ -12,6 +12,7 @@ This exposes APIs to interface with the target's serial consoles and
 the hookups for accessing them form the command line.
 """
 
+import collections
 import contextlib
 import curses.ascii
 import errno
@@ -19,6 +20,7 @@ import fcntl
 import getpass
 import io
 import logging
+import math
 import mmap
 import os
 import re
@@ -991,6 +993,7 @@ def _console_read_thread_fn(target, console, fd, offset):
                     sys.stderr.write(
                         "\n\r\r\nWARNING: target power cycled\r\r\n\n")
                 generation_prev = generation
+
                 if data:
                     # add CR, because the console is in raw mode
                     for line in data.splitlines(True):
@@ -1116,7 +1119,7 @@ def _cmdline_console_read(args):
                     backoff_wait = 0.1
                 if backoff_wait >= 4:
                     backoff_wait = 4
-                    
+
                 time.sleep(backoff_wait)	# no need to bombard the server..
         finally:
             if fd != sys.stdout:
@@ -1180,8 +1183,141 @@ def _cmdline_console_enable(args):
 
 def _cmdline_console_disable(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args)
+        target = tc.target_c.create_from_cmdline_args(
+            args,
+            extensions_only = "console")
         target.console.disable(args.console)
+
+def _cmdline_console_wall(args):
+    # for all the targets in args.targets, query the consoles they
+    # offer and display them in a grid in the current terminal using
+    # GNU screen to divide it in a mesh of sub-windows; then keep
+    # updating each window with the console's output
+
+    if args.name == None:
+        if args.target == []:
+            args.name = "TCF Wall"
+        else:
+            args.name = "TCF Wall: " + " ".join(args.target)
+
+    with msgid_c("cmdline"):
+        rtl = tc.ttb_client.cmdline_list(args.target, args.all)
+
+        # Collect information about which targets we want to display
+        # on the wall
+        #
+        # We create tc.target_c objects for each; instantiate target
+        # objects in parallel, much faster, since it has to query the
+        # servers for console info
+        def _mk_target(args, target_name):
+            with msgid_c("cmdline"):
+                return tc.target_c.create_from_cmdline_args(
+                    args, target_name, iface = "console",
+                    extensions_only = ['console'])
+
+        thread_pool = tc._multiprocessing_method_pool_c(processes = 10)
+        threads = {}
+        for rt in rtl:
+            if 'console' not in rt.get('interfaces', []):
+                continue
+            target_name = rt['fullid']
+            threads[target_name] = thread_pool.apply_async(
+                _mk_target,
+                ( args, target_name),
+            )
+        thread_pool.close()
+        thread_pool.join()
+
+        # for each target/console, create a console_descr_c object,
+        # which will keep the state of the console reading now.
+        class console_descr_c(object):
+            def __init__(self):
+                self.fd = None
+                self.write_name = None
+                self.generation = None
+                self.offset = 0
+                self.backoff_wait = 0.1
+                self.target = None
+                self.console = None
+
+        consolel = collections.defaultdict(console_descr_c)
+
+        for thread in threads.values():
+            target = thread.get()
+            for console in target.console.console_list:
+                if console in target.console.aliases:
+                    continue
+                name = target.fullid + "|" + console
+                consolel[name].target = target
+                consolel[name].console = console
+                print "Collected info for console " + name
+
+        if not consolel:
+            print "No targets supporting console interface found"
+            return
+
+        # Compute how many rows and columns we'll need to host all the
+        # consoles
+        rows = int(math.sqrt(len(consolel)))
+        columns = (len(consolel) + rows - 1) // rows
+
+        # Write the GNU screen config file that will divide the window
+        # in sub-windows (screens in GNU screen parlance and run the
+        # console-reading script on each.
+        #
+        # do not chdir somehwere else, as we rely on the
+        # configuration being here
+        cf_name = os.path.join(tc.tc_c.tmpdir, "screen.rc")
+
+        with open(cf_name, "w") as cf:
+            cf.write('# %d rows, %d columns\n'
+                     'hardstatus on\n'
+                     'hardstatus string "%%S"\n' % (rows, columns))
+            for _row in range(rows - 1):
+                cf.write('split\n')
+            cf.write('focus top\n')
+
+            console_names = sorted(consolel.keys())
+            item_iter = iter(console_names)
+            done = False
+            for _row in range(rows):
+                for col in range(columns):
+                    try:
+                        item = next(item_iter)
+                    except StopIteration:
+                        done = True
+                    descr = consolel[item]
+                    cf.write(
+                        'screen -c tcf console-read %s -c %s --follow\n'
+                        'title %s\n\n' % (
+                            descr.target.fullid, descr.console, item
+                        ))
+                    if done or item == console_names[-1]:
+                        break
+                    if col == columns - 1:
+                        cf.write("focus down\n")
+                    else:
+                        cf.write('split -v\n'
+                                 'focus right\n')
+                if done:
+                    break
+            cf.flush()
+
+        # exec screen
+        #
+        # So now this is a really dirty hack; FIXME; this needs to
+        # evolve to have screen either:
+        #
+        # - tail -f a file per target/console in the tmpdir
+        # - socat a pipe per target/console in the tmpdir (socat PTY,link=%s)
+        # and then have a bunch of threads in the tcf console-wall
+        # process update those
+        #
+        # but then it makes sense to leave the tcf process in the
+        # foreground so it is easy to Ctrl-C it and it removes the
+        # tmpdir; screen doesn't need control, but it doesn't like not
+        # being started in a controlly tty.
+        os.execvp("screen", [ "screen", "-c", cf.name, "-S", args.name ])
 
 
 def _cmdline_setup(arg_subparser):
@@ -1291,3 +1427,23 @@ def _cmdline_setup(arg_subparser):
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target name")
     ap.set_defaults(func = _cmdline_console_enable)
+
+
+    ap = arg_subparser.add_parser(
+        "console-wall",
+        help = "Display multiple serial consoles in a tiled terminal"
+        " window using GNU screen (type 'Ctrl-a : quit' to stop it)") 
+    ap.add_argument(
+        "-a", "--all", action = "store_true", default = False,
+        help = "List also disabled targets")
+    ap.add_argument("--name", "-n", metavar = "NAME",
+                    action = "store", default = None,
+                    help = "name to set for this wall (defaults to "
+                    "the target specification")
+    ap.add_argument(
+        "target", metavar = "TARGETSPEC", nargs = "*",
+        action = "store", default = [],
+        help = "Target's names or URLs or a general target specification "
+        "which might include values of tags, etc, in single quotes (eg: "
+        "'zephyr_board and not type:\"^qemu.*\"'")
+    ap.set_defaults(func = _cmdline_console_wall)
