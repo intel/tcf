@@ -923,6 +923,9 @@ def target_qemu_pos_add(target_name,
     ])
     # reinitialize also the EFI vars storage
     shutil.copy("/usr/share/OVMF/OVMF_VARS.fd", target.state_dir)
+    # this is a very ugly hack to be able to override the BIOS image
+    # used by QEMU
+    target.fsdb.set('qemu-image-bios', '/usr/share/edk2/ovmf/OVMF_CODE.fd')
 
     # QEMU object
     #
@@ -944,7 +947,7 @@ def target_qemu_pos_add(target_name,
         #   because QEMU removes the UNIX socket once closed.
         "-display", "vnc=localhost:%(vnc-port)s",
         # EFI BIOS
-        "-drive", "if=pflash,format=raw,readonly,file=/usr/share/edk2/ovmf/OVMF_CODE.fd",
+        "-drive", "if=pflash,format=raw,readonly,file=%(qemu-image-bios)s",
         "-drive", "if=pflash,format=raw,file=%(path)s/OVMF_VARS.fd",
         # Storage
         "-drive", "file=%%(path)s/hd.qcow2,if=%s,aio=threads" % sd_iftype,
