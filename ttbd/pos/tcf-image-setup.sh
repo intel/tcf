@@ -273,10 +273,25 @@ else
     lsblk $loop_dev
 fi
 
+#
+# PHASE: live OS mount
+#
+# Mount the live filesystem in $tmpdir/root so we can copy it verbatim
+# to $destdir/; maybe we have to mount some /boot directory on top of
+# $tmpdir/root/boot
+#
+# We have $loop_dev, $root_part and others to determine what
+
 root_fstype=ext4
 mkdir $tmpdir/root
 set -e
 if [ $image_type = debian ]; then
+
+    # Debian's ISO contains in partition1 a
+    # RELEASENAME/filesystem.squashfs which contains the rootfs; it
+    # does not have the kernel contents in boot/, which we have to
+    # lift later from the same place where the filesystem.squashfs
+    # file is.
     mkdir -p $tmpdir/iso $tmpdir/root
     sudo mount -o loop ${loop_dev}p1 $tmpdir/iso
     mounted_dirs="$tmpdir/iso ${mounted_dirs:-}"
@@ -344,7 +359,9 @@ elif [ $image_type == fedoralive -o $image_type == tcflive ]; then
         error "BUG! dunno how to mount the root file system (no rootfs.img or ext2fs.img)"
     fi
     mounted_dirs="$tmpdir/root ${mounted_dirs:-}"
+
 elif [ $image_type == qcow2 ]; then
+
     root_fstype=$(lsblk -n -o fstype ${root_part})
     if [ -z ${ROOT_MOUNTOPTS:-} ]; then
         # we are mounting readonly, guess how to so it doesn't complain
@@ -384,15 +401,6 @@ else
 
 fi
 
-# Need to copy the boot kernel to root/boot before we mount boot ontop
-# of root/boot
-if [ $image_type = debian ]; then
-    dir=$(dirname $squashfs_file)
-    kversion=$(file $dir/vmlinuz | sed  -e 's/^.* version //' -e 's/ .*//')
-    cp $dir/initrd $destdir/boot/initramfs-$kversion
-    cp $dir/vmlinuz $destdir/boot/vmlinuz-$kversion
-fi
-
 if ! [ -z "$boot_part" ]; then
     # clear does this
     # 'auto' is used this a placeholder for a default option that
@@ -402,10 +410,15 @@ if ! [ -z "$boot_part" ]; then
     info mounted ${loop_dev}${boot_part} in $tmpdir/root/boot
 fi
 
+#
+# PHASE: Copy the live filesystem to the $destdir
+#
 # This assumes we have mounted the boot partition on root/boot, to get
 # all the boot goodies
-if [ $image_type == android ]; then
 
+if [ $image_type == android ]; then
+    # Android is different, since it doesn't really do linux; so we
+    # copy all the Android stuff straight up to the destination    
     mkdir -p $destdir/android/data $destdir/boot/loader/entries
     cp \
         $tmpdir/iso/initrd.img \
@@ -439,14 +452,18 @@ EOF
 
 elif ! [ -d $destdir ]; then
 
+    # *Linux; copy $tmpdir/root to $destdir; be careful with extended
+    # labels and ACLs -- rsync has been seen to hang, so use tar and untar
+
     sudo install -m 0755 -d $destdir
     info created $destdir, transferring
     sudo tar c --selinux --acls --xattrs -C $tmpdir/root . \
         | sudo tar x --selinux --acls --xattrs -C $destdir/.
     info $destdir: diffing verification
-    sudo diff  --no-dereference -qrN $tmpdir/root/. $destdir/.
+    sudo diff  --no-dereference -qrN $tmpdir/root/. $destdir/. || true
     info $destdir: setting up
     if [ $image_type == clear_live_iso ]; then
+        # FIXME: move this out of here to the setup phase
         sudo mkdir $destdir/boot
         sudo cp -a $tmpdir/iso/EFI $tmpdir/iso/loader $destdir/boot
         # we need to remove the initrd activation, as that's what
@@ -462,11 +479,22 @@ else
 
 fi
 
+if [ $image_type = debian ]; then
+    # Need to copy the boot kernel to $destdir/boot, since *Debian
+    # doesn't put it in the Live CD's root/boot/
+    dir=$(dirname $squashfs_file)
+    kversion=$(file $dir/vmlinuz | sed  -e 's/^.* version //' -e 's/ .*//')
+    sudo install -o root -g root $dir/initrd $destdir/boot/initramfs-$kversion
+    sudo install -o root -g root $dir/vmlinuz $destdir/boot/vmlinuz-$kversion
+fi
+
+#
+# PHASE: Setup
+#
 
 # Remove the root password and unset the counters so you are not
 # forced to change it -- we want passwordless login on the serial
 # console or anywhere we access the test system.
-
 for shadow_file in \
     $destdir/usr/share/defaults/etc/shadow \
     $destdir/etc/shadow; do
@@ -491,48 +519,52 @@ done
 #
 tty_devs="ttyUSB0 ttyS6 ttyS0 ${TTY_DEVS_EXTRA:-}"
 
+# Harcode enable getty on certain devices
+#
 # On new distros, systemd enabled
-if [ -d $destdir/etc/systemd/system/getty.target.wants ] \
-   || [ -d $destdir/usr/lib/systemd/system/getty.target.wants ]; then
-    # Harcode enable getty on certain devices
-    #
-    # Disable serial-getty@.service's BindTo -- this is needed so
-    # we can have a common image that works in many platforms that
-    # may not have the device without waiting for ever for it as
-    # it won't show up. We caannot override BindTo with # drop in files.
-    #
-    # Why? Because somehow systemd is not being able to auto-detect
-    # all the serial ports given in the console statement to the Linux
-    # kernel command line so we have to hardcode a bunch of console
-    # devices for each platform.
-    #
-    #
-    # This is a workaround until we find out why the kernel consoles
-    # declared in /sys/class/tty/consoles/active are not all being
-    # started or why the kernel is missing to add ttyUSB0 when
-    # given.
-    #
-    # ALSO, force 115200 is the only BPS we support
-    #
-    info $image_type: systemd: hardcoding TTY console settings
-    for systemd_libdir in $destdir/lib $destdir/usr/lib; do
-        if ! [ -d $systemd_libdir/systemd ]; then
-            # some systems have systemd in /lib, others /usr/lib...
-            continue
-        fi
-        sudo sed -i \
-             -e 's|^ExecStart=-/sbin/agetty -o.*|ExecStart=-/sbin/agetty 115200 %I $TERM|' \
-             -e 's|^BindsTo=|# <commented out by tcf-image-setup.sh> BindsTo=|' \
-             $systemd_libdir/systemd/system/serial-getty@.service
-    done
+#
+# Disable serial-getty@.service's BindTo -- this is needed so
+# we can have a common image that works in many platforms that
+# may not have the device without waiting for ever for it as
+# it won't show up. We caannot override BindTo with # drop in files.
+#
+# Why? Because somehow systemd is not being able to auto-detect
+# all the serial ports given in the console statement to the Linux
+# kernel command line so we have to hardcode a bunch of console
+# devices for each platform.
+#
+#
+# This is a workaround until we find out why the kernel consoles
+# declared in /sys/class/tty/consoles/active are not all being
+# started or why the kernel is missing to add ttyUSB0 when
+# given.
+#
+# ALSO, force 115200 is the only BPS we support
+#
+systemd_enabled=0
+info $image_type: systemd: hardcoding TTY console settings
+# some systems have systemd in /etc ... /lib, others /usr/lib...
+for systemd_libdir in $destdir/etc \
+                          $destdir/lib \
+                          $destdir/usr/lib;
+do
+    [ -r $systemd_libdir/systemd/system/serial-getty@.service ] || continue
+    sudo sed -i \
+         -e 's|^ExecStart=-/sbin/agetty -o.*|ExecStart=-/sbin/agetty 115200 %I $TERM|' \
+         -e 's|^BindsTo=|# <commented out by tcf-image-setup.sh> BindsTo=|' \
+         $systemd_libdir/systemd/system/serial-getty@.service
+    info $image_type: systemd: always enabling serial-getty@.service
+    systemd_enabled=1
+done
+if [ $systemd_enabled = 1 ]; then
     for tty_dev in $tty_devs; do
-        info $image_type: force enabling of $tty_dev console
+        info $image_type: always enabling $tty_dev console
         sudo chroot $destdir systemctl enable serial-getty@$tty_dev
     done
 fi
 
-# Old yoctos
 if [ -r $destdir/etc/inittab ]; then
+    # Old yoctos
     for tty_dev in $tty_devs; do
         echo "U0:12345:respawn:/bin/start_getty 115200 $tty_dev vt102" |
             sudo tee -a $destdir/etc/inittab
