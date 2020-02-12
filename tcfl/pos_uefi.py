@@ -638,7 +638,7 @@ def boot_config_multiroot(target, boot_dev, image):
         target.report_info("WARNING! can't figure out Linux cmdline "
                            "options, taking defaults")
         # below we'll add more stuff
-        linux_options = "console=tty0 root=SOMEWHERE"
+        linux_options = "console=tty0 rw root=SOMEWHERE"
 
     # MULTIROOT: indicate which image has been flashed to this
     # partition
