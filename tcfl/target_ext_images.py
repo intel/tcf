@@ -128,7 +128,7 @@ class extension(tc.target_extension_c):
         # We don't do retries here, we leave it to the server
         target.report_info("flashing: " + images_str, dlevel = 2)
         target.ttbd_iface_call("images", "flash", images = _images)
-        target.report_info("flashed:" + images_str, dlevel = 1)
+        target.report_info("flashed: " + images_str, dlevel = 1)
 
 
 def _cmdline_images_list(args):
