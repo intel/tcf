@@ -28,8 +28,10 @@
 
                $ source ~/.bashrc
                
-   You can also run *tcf* from the :ref:`source directory
-   <tcf_run_from_source_tree>`.
+   Other installation options:
+
+   a. You can run *tcf* from the :ref:`source directory
+      <tcf_run_from_source_tree>`
      
    .. include:: doc/02-client-setup-LL-01.rst
 
