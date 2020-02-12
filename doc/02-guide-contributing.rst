@@ -29,7 +29,7 @@ For that, you can set the configuration::
 
   $ mkdir ~/.tcf
   $ cd ~/.tcf
-  $ ln -s ~/tcf.git/zephyr/conf_zephyr.py
+  $ ln -s ~/tcf.git/conf_*.py .
 
 If you have installed TCF systemwide, you might have to remove
 `/etc/tcf/conf_zephyr.py` or alternatively, pass ``--config-path
