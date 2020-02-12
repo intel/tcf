@@ -42,6 +42,7 @@ evertything:
 .. automodule:: examples.test_pos_boot
 .. automodule:: examples.test_deploy_files
 .. automodule:: examples.test_linux_kernel
+.. automodule:: examples.test_qemu_bios
 
 Common patterns
 ---------------
