@@ -4616,24 +4616,31 @@ class tc_c(reporter_c):
             p = subprocess.Popen([ cmd ], shell = True, close_fds = False,
                                  stdout = logf, stderr = subprocess.STDOUT)
             rc = p.wait()
-            del p
             logf.flush()
-            logf.seek(0,0)
-
+            generator_factory = commonl.generator_factory_c(
+                commonl.file_iterator, logf.name)
             if rc == 0:
-                reporter.report_pass("%spassed: '%s' @%s"
-                                     % (phase, cmd, origin),
-                                     { output_tag: logf })
+                reporter.report_pass(
+                    "%spassed: '%s' @%s" % (phase, cmd, origin),
+                    {
+                        output_tag: generator_factory
+                    })
                 logf.seek(0,0)
                 return logf.read()
             elif rc == 127:
-                raise blocked_e("exit code %d from '%s' @%s" \
-                                % (rc, cmd, origin),
-                                { output_tag: logf, "alevel": 0})
+                raise blocked_e(
+                    "exit code %d from '%s' @%s" % (rc, cmd, origin),
+                    {
+                        output_tag: generator_factory ,
+                        "alevel": 0
+                    })
             else:
-                raise nonzero_e("exit code %d from '%s' @%s" \
-                                % (rc, cmd, origin),
-                                { output_tag: logf, "alevel": 0})
+                raise nonzero_e(
+                    "exit code %d from '%s' @%s" % (rc, cmd, origin),
+                    {
+                        output_tag: generator_factory,
+                        "alevel": 0
+                    })
         except (failed_e, error_e, blocked_e):
             raise
         except Exception as e:

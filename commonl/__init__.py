@@ -1640,3 +1640,29 @@ class generator_factory_c(object):
         Create and return a generator
         """
         return self.fn(*self.args, **self.kwargs)
+
+def file_iterator(filename, chunk_size = 4096):
+    """
+    Iterate over a file's contents
+
+    Commonly used along with generator_factory_c to with the TCF
+    client API to report attachments:
+
+    :param int chunk_size: (optional) read blocks of this size (optional)
+
+    >>> import commonl
+    >>>
+    >>> class _test(tcfl.tc.tc_c):
+    >>>
+    >>>   def eval(self):
+    >>>     generator_f = commonl.generator_factory_c(commonl.file_iterator, FILENAME)
+    >>>     testcase.report_pass("some message", dict(content = generator_f))
+
+    """
+    assert chunk_size > 0
+    with io.open(filename, "rb") as f:
+        while True:
+            data = f.read(chunk_size)
+            if not data:
+                break
+            yield data
