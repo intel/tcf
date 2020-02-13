@@ -802,22 +802,22 @@ class extension(tc.target_extension_c):
 
 def _cmdline_capture_start(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args)
+        target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
         target.capture.start(args.capturer)
 
 def _cmdline_capture_stop_and_get(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args)
+        target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
         target.capture.stop_and_get(args.capturer, args.filename)
 
 def _cmdline_capture_stop(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args)
+        target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
         target.capture.stop_and_get(args.capturer, None)
 
 def _cmdline_capture_list(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args)
+        target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
         capturers = target.capture.list()
         capture_spec = {}
         for capture in target.rt['capture'].split():
