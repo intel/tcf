@@ -36,8 +36,10 @@
    .. include:: doc/02-client-setup-LL-01.rst
 
 2. :ref:`Configure it <tcf_guide_configuration>`, adding to
-   `~/.tcf/conf_servers.py` or `/etc/tcf/conf_servers.py`
+   `~/.tcf/conf_servers.py` or `/etc/tcf/conf_servers.py`::
 
+     $ mkdir -p ~/.tcf
+   
    .. include:: doc/02-client-setup-LL-03.rst
 
    You can also :ref:`install a server <ttbd_guide_deployment>`, in
