@@ -129,7 +129,7 @@ class interface(ttbl.tt_interface):
                 local_port = int(local_ports)
                 pid = int(pids)
                 if commonl.process_alive(pid, "/usr/bin/socat"):
-                    return local_port
+                    return dict(result = local_port)
 
             local_port = commonl.tcp_port_assigner(
                 port_range = ttbl.config.tcp_port_range)
