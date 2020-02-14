@@ -44,6 +44,7 @@ imaging on PC-class targets via DHCP / TFTP.
             'pos.conf'
         ]),
         ( '@prefix@/share/tcf/', [
+            'kickstart-install.sh',
             'tcf-image-setup.sh',
         ]),
     ],

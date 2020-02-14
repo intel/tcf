@@ -22,82 +22,17 @@ DIRECTORY: where to expand the image to
   PATH/DISTRO:SPIN:VERSION:SUBVERSION:ARCH.tar.xz to avoid scp erroring
   because it considers the : host separators. Likewise for tar.
 
-Clear Linux:
+IMAGEFILE: source ISO, qcow2 or rootfs image file
 
-  $ wget https://download.clearlinux.org/releases/29390/clear/clear-29390-live.img.xz
-  $ $progname clear:live:29390::x86_64 clear-29390-live.img.xz
+IMAGETYPE: force image detection
 
-Clear Linux Desktop:
+- fedora
 
-  $ wget https://download.clearlinux.org/releases/29400/clear/clear-29400-live-desktop.iso.xz
-  $ $progname clear:desktop:29400::x86_64 clear-29400-live.img.xz
+- debian|ubuntu
 
-Yocto:
+- clear
 
-  $ wget http://downloads.yoctoproject.org/releases/yocto/yocto-2.5.1/machines/genericx86-64/core-image-minimal-genericx86-64.wic
-  $ $progname yocto:core-image-minimal:2.5.1::x86_64 core-image-minimal-genericx86-64.wic
-
-Fedora:
-
-  $ https://mirrors.rit.edu/fedora/fedora/linux/releases/29/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-29-1.2.iso
-  $ $progname fedora:workstation:29::x86_64 Fedora-Workstation-Live-x86_64-29-1.2.iso
-
-RHEL guest image:
-
-  $ $progname rhel:guest:8.1::x86_64 rhel-guest-image-8.1-263.x86_64.qcow2 
-
-Ubuntu:
-
-  $ wget http://releases.ubuntu.com/18.10/ubuntu-18.10-desktop-amd64.iso
-  $ $progname ubuntu:live:18.10::x86_64 ubuntu-18.10-desktop-amd64.iso
-
-rootfsimage:
-
-  takes a whole image that is a single root filesystem
-
-Using QEMU (Any other distros, Ubuntu, SLES, etc...)
-
-1. create a 20G virtual disk:
-
-     $ qemu-img create -f qcow2 ubuntu-18.10.qcow2 20G
-     $ qemu-img create -f qcow2 Fedora-Workstation-29.qcow2 20G
-
-2. Install using QEMU all with default options (click next). Power
-   off the machine when done instead of power cycling
-
-     $ qemu-system-x86_64 --enable-kvm -m 2048 -hdah ubuntu-18.10.qcow2 -cdrom ubuntu-18.10-desktop-amd64.iso
-     $ qemu-system-x86_64 --enable-kvm -m 2048 -hda Fedora-Workstation-29.qcow2 -cdrom Fedora-Workstation-Live-x86_64-29-1.2.iso
-
-   Key thing here is to make sure everything is contained in a
-   single partition (first partition).
-
-   For Ubuntu 18.10:
-     - select install
-     - select any language and keyboard layout
-     - Normal installation
-     - Erase disk and install Ubuntu
-     - Create a user 'Test User', with any password
-     - when asked to restart, restart, but close QEMU before it
-       actually starts again
-
-   For Fedora 29:
-     - turn off networking
-     - select install to hard drive
-     - select english keyboard
-     - select installation destination, "CUSTOM" storage configuration
-       > DONE
-     - Select Standard partition
-     - Click on + to add a partition, mount it on /, 20G in size
-       (the system later will add boot and swap, we only want what goes
-       in the root partition).
-       Select DONE
-     - Click BEGIN INSTALLATION
-     - Click QUIT when done
-     - Power off the VM
-
-3. Create image:
-
-     $ $progname ubuntu:desktop:18.10::x86_64 ubuntu-18.10.qcow2
+- rootfsimage: takes a whole image that is a single root filesystem
 
 Forcing things (set environment variables)
 
@@ -109,6 +44,7 @@ ROOT_MOUNTOPTS   use these root mount options (default to ext*'s
 
 BOOT_MOUNTOPTS   use these boot mount options (default to empty)
 
+See more at https://inakypg.github.io/tcf/doc/04-HOWTOs.html#pos_image_creation
 EOF
 }
 
@@ -373,7 +309,9 @@ elif [ $image_type == qcow2 ]; then
             btrfs)
                 ROOT_MOUNTOPTS=noload;;
             *)
-                warning "can't guess know best options for read-only rootfs $root_fstype"
+                warning "can't guess best options for read-only rootfs $root_fstype"
+                warning "please export BOOT|ROOT_PARTITION"
+                warning "please export BOOT|ROOT_MOUNTOPTS"
                 ROOT_MOUNTOPTS=""
         esac
     fi
@@ -595,10 +533,19 @@ case $image_type in
 esac
 
 case $image_type in
+    # Remove the GDM initial config user, so we don't get stuck
+    # trying to configure the system
+    ubuntu|debian)
+        if [ -r "$destdir/etc/gdm3/custom.conf" ]; then
+            sudo tee $destdir/etc/gdm3/custom.conf <<EOF
+[daemon]
+InitialSetupEnable=false
+EOF
+            info $image_type: disabled GNOME initial setup
+        fi
+        ;;
     fedoralive|qcow2)
         if [ -r "$destdir/etc/gdm/custom.conf" ]; then
-            # Remove the GDM initial config user, so we don't get stuck
-            # trying to configure the system
             sudo tee $destdir/etc/gdm/custom.conf <<EOF
 [daemon]
 InitialSetupEnable=false
@@ -612,11 +559,14 @@ esac
 
 
 #
+# .tcf.metadata.yaml generation
+#
 # Now generate metadata, might not be needed, but we always did it just in case
 #
 md=$tmpdir/.tcf.metadata.yaml
 cat > $md <<EOF
-# this is metadata to help setup the image in a target system
+# this helps setup the image in a target system, created
+# by tcf-image-setup.sh on $(date), maybe hand adjusted later
 #
 # The TCF POS client will look for it in IMAGEDIR/.tcf-metadata.yaml
 # and (keep it) in the final image for reference.
@@ -699,7 +649,37 @@ EOF
       etc/fstab
 EOF
 fi
+    
+if grep -q "^UUID=.* /[ \t]" $destdir/etc/fstab; then
+    # rootfs on UUID; generate a command in the metdata file to
+    # runtime replace the UUID with the one of our rootfs
+    cat >> $md <<EOF
+  sed -i \\
+      -e "/^UUID=.* \/[ \t]/s|^UUID=[-0-9a-fA-F]\+|UUID=\$(lsblk -no uuid \$ROOTDEV)|g" \\
+      etc/fstab 
+EOF
+fi
+
 sudo mv $tmpdir/.tcf.metadata.yaml $destdir
+
+if grep -q UUID= $destdir/etc/fstab; then
+   # aah...UUID based filesystems need love
+   # - swap file systems, we know we'll create a swap partition labeled
+   #   tcf-swap, so just throw that in
+   # - we don't do /boot/efi, so comment it out; we put all boot stuff
+   #   in a single /boot partition that the image deployment code in
+   #   tcfl.pos manages
+   info fstab: replacing UUIDs
+   sudo sed -i \
+       -e "/^UUID=.*swap/s/^UUID=[-0-9a-fA-F]\+/LABEL=tcf-swap/g" \
+       -e 's|^UUID=.*/boot|# <commented out by tcf-image-setup.sh> \0|'  \
+       -e 's|^UUID=.*/boot/efi|# <commented out by tcf-image-setup.sh> \0|'  \
+       $destdir/etc/fstab
+   # /boot filesystem, we wouldn't even really want to mount it, but
+   # we do so test scripts can manipulate it; we always do partition
+   # one, but who knows...and this is done when the image is flashed
+   # so look above at ".tcf.metadata.yaml generation"
+fi
 
 for setup in ${setupl}; do
     $setup $destdir

@@ -2872,3 +2872,92 @@ Updating the FPGA image in Synopsys EMSK boards
    OFF   ON   ARC_EM11D
    ON    ON   Reserved
    ===== ==== =============
+
+.. _pos_image_creation:
+   
+Creating images for the Provisioning OS
+=======================================
+
+For provisioning using :mod:`Provisioning OS <tcfl.pos>`, images have
+to be extracted and installed in the server (or an rsync server as
+described in the :ref:`setup guide <ttbd_pos_deploying_images>`).
+
+The images for provisioning are a flat root filesystem that is
+rsync'ed by with :mod:`tcfl.pos`.
+
+Extracting them can be a little bit tricky, but there are different
+methodologies that allow automating the process.
+
+Linux Live images
+-----------------
+
+When images are Linux Live filesystems, they can usually be extracted
+easily, using the :download:`/usr/share/tcf/tcf-image-setup.sh
+<../ttbd/pos/tcf-image-setup.sh>` script, which understands most Live
+images.
+
+See the :ref:`examples <ttbd_pos_deploying_images>`.
+
+.. _kickstart_install:
+
+Linux Kickstart images using QEMU
+---------------------------------
+
+Linux distributions that can be installed via kickstart can use
+:download:`/usr/share/tcf/kickstart-install.sh
+<../ttbd/pos/kickstart-install.sh>`, which uses QEMU to run the
+installation with a built in kickstart, creating a qcow2 file image
+that then *tcf-image-setup.sh* can install.
+
+*kickstart-install.sh* creates a kickstart file in a drive that is
+passed to the virtual machine, so there is no need for PXE servers. It
+extracts the kernel and initrd from the ISO image as well.
+
+See the :ref:`examples <ttbd_pos_deploying_images>`.
+
+Manual image extraction using QEMU
+----------------------------------
+
+1. create a 20G virtual disk::
+
+     $ qemu-img create -f qcow2 ubuntu-18.10.qcow2 20G
+     $ qemu-img create -f qcow2 Fedora-Workstation-29.qcow2 20G
+
+2. Install using QEMU all with default options (click next). Power
+   off the machine when done instead of power cycling::
+
+     $ qemu-system-x86_64 --enable-kvm -m 2048 -hdah ubuntu-18.10.qcow2 -cdrom ubuntu-18.10-desktop-amd64.iso
+     $ qemu-system-x86_64 --enable-kvm -m 2048 -hda Fedora-Workstation-29.qcow2 -cdrom Fedora-Workstation-Live-x86_64-29-1.2.iso
+
+   Key thing here is to make sure everything is contained in a
+   single partition (first partition).
+
+   For Ubuntu 18.10:
+
+     - select install
+     - select any language and keyboard layout
+     - Normal installation
+     - Erase disk and install Ubuntu
+     - Create a user 'Test User', with any password
+     - when asked to restart, restart, but close QEMU before it
+       actually starts again
+
+   For Fedora:
+
+     - turn off networking
+     - select install to hard drive
+     - select english keyboard
+     - select installation destination, "CUSTOM" storage configuration
+       > DONE
+     - Select Standard partition
+     - Click on + to add a partition, mount it on /, 20G in size
+       (the system later will add boot and swap, we only want what goes
+       in the root partition).
+       Select DONE
+     - Click BEGIN INSTALLATION
+     - Click QUIT when done
+     - Power off the VM
+
+3. Create image::
+
+     $ /usr/share/tcf/tcf-iamge-setup.sh ubuntu:desktop:18.10::x86_64 ubuntu-18.10.qcow2

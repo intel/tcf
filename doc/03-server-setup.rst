@@ -1074,19 +1074,37 @@ The script ``/usr/share/tcf/tcf-image-setup.sh`` will take an image
 from different OSes and extract it so it can be used to be flashed via
 POS; for example:
 
+- CentOS::
+
+    $ wget http://isoredirect.centos.org/centos/8/isos/x86_64/CentOS-8.1.1911-x86_64-dvd1.iso
+    $ /usr/share/tcf/kickstart-install.sh centos.qcow2 CentOS-8.1.1911-x86_64-dvd1.iso 
+    $ BOOT_PARTITION=2 BOOT_MOUNTOPTS=noload ROOT_PARTITION=4 \
+        /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/centos::8.1:1911:x86_64 centos.qcow2
+        
 - Clearlinux::
 
-    $ wget https://download.clearlinux.org/releases/25930/clear/clear-25930-live.img.xz
-    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/clear:live:25930::x86_64 clear-25930-live.img.xz
+    $ wget https://cdn.download.clearlinux.org/releases/32310/clear/clear-32310-live-desktop.iso
+    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/clear:desktop:32310::x86_64 clear-32310-live-desktop.iso
 
+    $ wget https://cdn.download.clearlinux.org/releases/32310/clear/clear-32310-live-server.iso
+    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/clear:server:32310::x86_64 clear-32310-live-server.iso
+
+- Fedora::
+
+    $ https://mirrors.rit.edu/fedora/fedora/linux/releases/29/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-29-1.2.iso
+    $ /usr/share/tcf/tcf-image-setup.sh fedora:workstation:29::x86_64 Fedora-Workstation-Live-x86_64-29-1.2.iso
+
+- Ubuntu::
+
+    $ wget http://releases.ubuntu.com/18.04/ubuntu-18.04.3-desktop-amd64.iso
+    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/ubuntu:desktop:18.04:3:x86_64 ubuntu-18.04.3-desktop-amd64.iso 
+    
 - Yocto::
 
     $ wget http://downloads.yoctoproject.org/releases/yocto/yocto-2.5.1/machines/genericx86-64/core-image-minimal-genericx86-64.wic
     $ /usr/share/tcf/tcf-image-setup.sh yocto:core-image-minimal:2.5.1::x86_64 core-image-minimal-genericx86-64.wic
-
-- (others coming)
-
-Otherewise, an image can be extracted and or setup manually and it
+    
+Otherwise, an image can be extracted and or setup manually and it
 consists of:
 
 - the full root filesystem that shall be deployed
@@ -1105,6 +1123,9 @@ consists of:
   password would have to be in a test script so it can be entered, so
   it would make no sense).
 
+See mode details on how to :ref:`automate with kickstart
+<kickstart_install>` the creation of an image.
+  
 .. _ttbd_pos_network_config:
 
 POS: Configuring networks
