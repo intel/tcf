@@ -16,7 +16,7 @@ if ttbl.config.defaults_enabled:
         nw_name = "nw" + letter
 
         # Add the network target
-        nw_pos_add(letter, [ vlan_pci() ])
+        nw_pos_add(letter)
 
         # Add QEMU UEFI POS capable targets with addresses
         v = 1
