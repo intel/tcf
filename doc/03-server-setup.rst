@@ -1094,6 +1094,12 @@ POS; for example:
     $ https://mirrors.rit.edu/fedora/fedora/linux/releases/29/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-29-1.2.iso
     $ /usr/share/tcf/tcf-image-setup.sh fedora:workstation:29::x86_64 Fedora-Workstation-Live-x86_64-29-1.2.iso
 
+- RHEL::
+    
+    $ /usr/share/tcf/kickstart-install.sh rhel.qcow2 RHEL-8.1.0-x86_64-dvd1.iso 
+    $ BOOT_PARTITION=2 ROOT_PARTITION=4 \
+        /ust/share/tcf/tcf-image-setup.sh /home/ttbd/images/rhel::8.1.0::x86_64 rhel.qcow2 
+
 - Ubuntu::
 
     $ wget http://releases.ubuntu.com/18.04/ubuntu-18.04.3-desktop-amd64.iso
