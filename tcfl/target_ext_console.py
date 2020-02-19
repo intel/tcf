@@ -1223,7 +1223,7 @@ def _cmdline_console_wall(args):
             target_name = rt['fullid']
             threads[target_name] = thread_pool.apply_async(
                 _mk_target,
-                ( args, target_name),
+                ( args, target_name ),
             )
         thread_pool.close()
         thread_pool.join()
@@ -1246,6 +1246,8 @@ def _cmdline_console_wall(args):
             target = thread.get()
             for console in target.console.console_list:
                 if console in target.console.aliases:
+                    continue
+                if args.console and console not in args.console:
                     continue
                 name = target.fullid + "|" + console
                 consolel[name].target = target
@@ -1440,6 +1442,9 @@ def _cmdline_setup(arg_subparser):
                     action = "store", default = None,
                     help = "name to set for this wall (defaults to "
                     "the target specification")
+    ap.add_argument("--console", "-c", metavar = "CONSOLE",
+                    action = "append", default = None,
+                    help = "Read only from the named consoles (default: all)")
     ap.add_argument(
         "target", metavar = "TARGETSPEC", nargs = "*",
         action = "store", default = [],
