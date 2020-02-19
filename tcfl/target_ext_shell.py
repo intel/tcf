@@ -107,11 +107,7 @@ class shell(tc.target_extension_c):
     """
 
     def __init__(self, target):
-        for bsp in target.rt.get('bsps', []):
-            keys = target.rt['bsps'][bsp]
-            if 'linux' in keys:
-                break
-        else:
+        if 'console' not in target.rt['interfaces']:
             raise self.unneeded
         tc.target_extension_c.__init__(self, target)
 
