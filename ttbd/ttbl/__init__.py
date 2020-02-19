@@ -12,15 +12,18 @@ Note interfaces are added with :meth:`test_target.interface_add`, not
 by subclassing. See as examples :class:`ttbl.console.interface` or
 :class:`ttbl.power.interface`.
 """
+import bisect
 import collections
 import contextlib
 import errno
+import fnmatch
 import ipaddress
 import logging
 import os
 import pprint
 import random
 import re
+import shutil
 import signal
 import socket
 import string
@@ -38,7 +41,6 @@ import requests
 import usb.core
 
 import commonl
-import fsdb
 import user_control
 
 logger = logging.root.getChild("ttb")
@@ -122,6 +124,209 @@ def who_create(user_id, ticket = None):
         return user_id + ":" + ticket
     else:
         return user_id
+
+
+class fsdb_c(object):
+    """
+    This is a very simple key/value flat database
+
+    - sets are atomic and forcefully remove existing values
+    - values are just strings
+    - value are limited in size to 1K
+    - if a field does not exist, its value is *None*
+
+    The key space is flat, but with a convention of periods dividing
+    fields, so that:
+
+      l['a.b.c'] = 3
+
+    is the equivalent to:
+
+      l['a']['b']['c'] = 3
+
+    it also makes it way faster and easier to filter for fields.
+
+    This will be used to store data for each target; for implemntation
+    examples, look at :class:`ttbl.fsdb_symlink_c`.
+    """
+    class exception(Exception):
+        pass
+
+    def keys(self, pattern = None):
+        """
+        List the fields/keys available in the database
+
+        :param str pattern: (optional) pattern against the key names
+          must match, in the style of :mod:`fnmatch`. By default, all
+          keys are listed.
+
+        :returns list: list of keys
+        """
+        raise NotImplementedError
+
+    def get_as_slist(self, *patterns):
+        """
+        Return a sorted list of tuples *(KEY, VALUE)*s available in the
+        database.
+
+        :param list(str) patterns: (optional) list of patterns of fields
+          we must list in the style of :mod:`fnmatch`. By default, all
+          keys are listed.
+
+        :returns list(str, str): list of *(KEY, VALUE)* sorted by
+          *KEY* (so *a.b.c*, representing *['a']['b']['c']* goes
+          after *a.b*, representing *['a']['b']*).
+        """
+        raise NotImplementedError
+
+    def get_as_dict(self, *patterns):
+        """
+        Return a dictionary of *KEY/VALUE*s available in the
+        database.
+
+        :param str pattern: (optional) pattern against the key names
+          must match, in the style of :mod:`fnmatch`. By default, all
+          keys are listed.
+
+        :returns dict: keys and values in dictionary form
+        """
+        raise NotImplementedError
+
+    #: Regular expresion that determines the valid characters in a field
+    key_valid_regex = re.compile(r"^[-\.a-zA-Z0-9_]+$")
+
+    def set(self, key, value):
+        """
+        Set a value for a key in the database
+
+        :param str key: name of the key to set
+
+        :param str value: value to store; *None* to remove the
+        """
+        if not self.key_valid_regex.match(key):
+            raise ValueError("%s: invalid key name (valid: %s)" \
+                             % (key, self.key_valid_regex.pattern))
+        if value != None:
+            assert isinstance(value, basestring)
+            assert len(value) < 1024
+        raise NotImplementedError
+
+    def get(self, key, default = None):
+        """
+        Return the value stored for a given key
+
+        :param str key: name of the key to retrieve
+
+        :param str default: (optional) value to return if *key* is not
+          set; defaults to *None*.
+
+        :returns str: value associated to *key* if *key* exists;
+          otherwise *default*.
+        """
+        raise NotImplementedError
+
+
+
+class fsdb_symlink_c(fsdb_c):
+    """
+    This implements a database by storing data on the destination
+    argument of a Unix symbolic link
+
+    Creating a symlink, takes only one atomic system call, which fails
+    if the link already exists. Same to read it. Thus, for small
+    values, it is very efficient.
+    """
+    class exception(Exception):
+        pass
+
+    def __init__(self, location):
+        """
+        Initialize the database to be saved in the give location
+        directory
+
+        :param str location: Directory where the database will be kept
+        """
+        self.location = location
+        assert os.path.isdir(location) \
+            and os.access(location, os.R_OK | os.W_OK | os.X_OK)
+        self.uuid_seed = commonl.mkid(str(id(self)))
+
+    def keys(self, pattern = None):
+        l = []
+        for _rootname, _dirnames, filenames in os.walk(self.location):
+            if pattern:
+                filenames = fnmatch.filter(filenames, pattern)
+            for filename in filenames:
+                if os.path.islink(os.path.join(self.location, filename)):
+                    l.append(filename)
+        return l
+
+    def get_as_slist(self, *patterns):
+        fl = []
+        for _rootname, _dirnames, filenames in os.walk(self.location):
+            if patterns:	# that means no args given
+                use = []
+                for filename in filenames:
+                    if commonl.field_needed(filename, patterns):
+                        use.append(filename)
+            else:
+                use = filenames
+            for filename in use:
+                if os.path.islink(os.path.join(self.location, filename)):
+                    bisect.insort(fl, ( filename, self.get(filename) ))
+        return fl
+
+    def get_as_dict(self, *patterns):
+        d = {}
+        for _rootname, _dirnames, filenames in os.walk(self.location):
+            if patterns:	# that means no args given
+                use = []
+                for filename in filenames:
+                    if commonl.field_needed(filename, patterns):
+                        use.append(filename)
+            else:
+                use = filenames
+            for filename in use:
+                if os.path.islink(os.path.join(self.location, filename)):
+                    d[filename] = self.get(filename)
+        return d
+
+    def set(self, key, value):
+        if not self.key_valid_regex.match(key):
+            raise ValueError("%s: invalid key name (valid: %s)" \
+                             % (key, self.key_valid_regex.pattern))
+        if value != None:
+            assert isinstance(value, basestring)
+            assert len(value) < 1023
+        location = os.path.join(self.location, key)
+
+        if value == None:		# value == None -> remove key
+            try:
+                os.unlink(location)
+            except OSError as e:
+                if e.errno == errno.ENOENT:
+                    pass
+                else:
+                    raise
+        else:
+            # New location, add a unique thing to it so there is no
+            # collision if more than one process is trying to modify
+            # at the same time; they can override each other, that's
+            # ok--the last one wins.
+            location_new = location + "-%s-%s-%s" \
+                % (os.getpid(), self.uuid_seed, time.time())
+            commonl.rm_f(location_new)
+            os.symlink(value, location_new)	# POSIX: atomic
+            os.rename(location_new, location)	# POSIX: atomic
+
+    def get(self, key, default = None):
+        location = os.path.join(self.location, key)
+        try:
+            return os.readlink(location)
+        except OSError as e:
+            if e.errno == errno.ENOENT:
+                return default
+            raise
 
 
 class acquirer_c(object):
@@ -878,7 +1083,7 @@ class test_target(object):
     """
     A test target base class
     """
-    def __init__(self, __id, _tags = None, _type = None):
+    def __init__(self, __id, _tags = None, _type = None, fsdb = None):
         self.id = __id    #: Target name/identifier
         #: Target's tags
         #:
@@ -914,7 +1119,12 @@ class test_target(object):
         #: filesystem database of target state; the multiple daemon
         #: processes use this to store information that reflect's the
         #: target's state.
-        self.fsdb = fsdb.fsdb(self.state_dir)
+        if fsdb == None:
+            self.fsdb = fsdb_symlink_c(self.state_dir)
+        else:
+            assert isinstance(fsdb, fsdb_c), \
+                "fsdb %s must inherit ttbl.fsdb_c" % fsdb
+            self.fsdb = fsdb
 
         # Much as I HATE reentrant locks, there is no way around it
         # without major rearchitecting that is not going to happen.
