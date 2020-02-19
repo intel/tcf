@@ -59,7 +59,8 @@ class msgid_c(object):
 
         # Init from parent or first in the stack or defaults
         if parent:
-            assert isinstance(parent, msgid_c)
+            assert isinstance(parent, msgid_c), \
+                "parent must be type msgid_c; got %s" % type(parent)
             # inherited from the parent
             self._ident = parent._ident
             self._depth = parent._depth
