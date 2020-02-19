@@ -2555,8 +2555,11 @@ def _target_want_decorate_class(obj, cls_name,
     # ic0 ic1 target target1 target2
     #
     # Will need to remove hack `FIXME: reversed for decorator workaround`_
+
     if name != None:
         assert isinstance(name, basestring)
+        if '%d' in name:
+            name = name % next_index
         if name in obj._targets:
             raise blocked_e("%s name '%s' @%s already defined, "
                             "choose another"
@@ -2590,19 +2593,25 @@ def _target_want_add_check_key(obj, cls_name, target_want_name,
         valid = True
     return valid
 
-def _target_want_add(obj, cls_name, name, spec, origin, **kwargs):
-    target_want_name = _target_want_decorate_class(
-        obj, cls_name, name, "target", "target", obj._target_count, **kwargs)
-    obj._targets[target_want_name]['spec'] = spec
-    obj._targets[target_want_name]['origin'] = origin
-    for key, val in kwargs.iteritems():
-        valid = _target_want_add_check_key(obj, cls_name, target_want_name,
-                                           key, val)
-        if not valid:
-            raise blocked_e("%s: unknown key @%s" % (key, origin))
-    obj._target_count += 1
+def _target_want_add(obj, cls_name, name, spec, origin, count = 1, **kwargs):
+    if count > 1 and name != None:
+        # later a default will be given
+        name = name + "%d"
+    for _cnt in range(count):
+        target_want_name = _target_want_decorate_class(
+            obj, cls_name, name, "target", "target",
+            obj._target_count, **kwargs)
+        obj._targets[target_want_name]['spec'] = spec
+        obj._targets[target_want_name]['origin'] = origin
+        for key, val in kwargs.iteritems():
+            valid = _target_want_add_check_key(
+                obj, cls_name, target_want_name, key, val)
+            if not valid:
+                raise blocked_e("%s: unknown key @%s" % (key, origin))
+        obj._target_count += 1
 
-def target_want_add(_tc, target_want_name, spec, origin, **kwargs):
+def target_want_add(_tc, target_want_name, spec, origin,
+                    count = 1, **kwargs):
     """\
     Add a requirement for a target to a testcase instance
 
@@ -2626,9 +2635,9 @@ def target_want_add(_tc, target_want_name, spec, origin, **kwargs):
         _tc._target_count = cls._target_count
         _tc._interconnects = copy.deepcopy(cls._interconnects)
     _target_want_add(_tc, cls.__name__, target_want_name,
-                     spec, origin, **kwargs)
+                     spec, origin, count = count, **kwargs)
 
-def target(spec = None, name = None, **kwargs):
+def target(spec = None, name = None, count = 1, **kwargs):
     """\
     Add a requirement for a target to a testcase instance
 
@@ -2648,9 +2657,30 @@ def target(spec = None, name = None, **kwargs):
 
     :param str spec: :ref:`specification <target_specification>` to
       filter against the tags the remote target exposes.
+
     :param str name: name for the target (must not exist already). If
       none, first declared target is called *target*, the next
       *target1*, then *target2* and so on.
+
+    :param int count: (optional, default 1) number of targets to
+      allocate; if more than one, targets will be called *target*,
+      *target1*, *target2*, following the count of targets assigned to
+      the testcase.
+
+      Note in case of doubt, these can be discovered with (eg for an
+      example of an interconnect with one server and two clients):
+
+      >>> import tcfl.tc
+      >>> @tcfl.tc.interconnect()
+      >>> @tcfl.tc.target(name = "server")
+      >>> @tcfl.tc.target(name = "client", count = 2)
+      >>> @tcfl.tc.tags(build_only = True)
+      >>> class _test(tcfl.tc.tc_c):
+      >>>     def configure(self):
+      >>>         self.report_info("target names: "
+      >>>                          + " ".join(self.target_group.targets.keys()),
+      >>>                          level = 0)
+
     :param dict kwargs: extra keyword arguments are allowed, which
       might be used in different ways that are still TBD. Main ones
       recognized:
@@ -2733,7 +2763,8 @@ def target(spec = None, name = None, **kwargs):
             cls._targets = collections.OrderedDict(super(cls, cls)._targets)
 
         _target_want_add(cls, cls.__name__,
-                         name, spec, tcfl.origin_get(2), **kwargs)
+                         name, spec, tcfl.origin_get(2),
+                         count = count, **kwargs)
         return cls
 
     return decorate_class
