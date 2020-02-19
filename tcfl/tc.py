@@ -1339,7 +1339,7 @@ class target_c(reporter_c):
         return self._app_get_for_bsp(None, bsp = bsp, noraise = noraise)[0]
 
     def shcmd_local(self, cmd, origin = None, reporter = None,
-                    logfile = None):
+                    logfile = None, env = None):
         """
         Run a shell command in the local machine, substituting
         *%(KEYWORD)[sd]* with keywords defined by the target and testcase.
@@ -1347,7 +1347,8 @@ class target_c(reporter_c):
         if origin == None:
             origin = tcfl.origin_get(2)
         return self.testcase._shcmd_local(cmd % self.kws, origin = origin,
-                                          reporter = self, logfile = logfile)
+                                          reporter = self, logfile = logfile,
+                                          env = env)
     #
     # Actions that operate on the target
     #
@@ -3645,7 +3646,7 @@ class tc_c(reporter_c):
         return os.path.join(self.kws['srcdir_abs'], path)
 
     def shcmd_local(self, cmd, origin = None, reporter = None,
-                    logfile = None):
+                    logfile = None, env = None):
         """
         Run a shell command in the local machine, substituting
         %(KEYWORD)[sd] with keywords defined by the testcase.
@@ -3660,11 +3661,16 @@ class tc_c(reporter_c):
           or something as:
 
           >>> "somefilename:43"
+
+        :param dict env: (optional) dictionary of environment
+          variables to be passed to :func:`subprocess.check_output`
+          (same format as such).
         """
         if origin == None:
             origin = tcfl.origin_get(2)
         return self._shcmd_local(cmd % self.kws, origin = origin,
-                                 reporter = reporter, logfile = logfile)
+                                 reporter = reporter, logfile = logfile,
+                                 env = env)
 
 
     @classmethod
@@ -4604,13 +4610,16 @@ class tc_c(reporter_c):
     # Helpers for the public API
     #
     def _shcmd_local(self, cmd, origin = None, reporter = None,
-                     logfile = None, nonzero_e = error_e):
+                     logfile = None, nonzero_e = error_e, env = None):
         """
         Run a single shell command
 
         :param tc_c _tc: test case
         :param str cmd: shell command to run
         :param str origin: where the shell command was found
+        :param dict env: (optional) dictionary of environment
+          variables to be passed to :func:`subprocess.check_output`
+          (same format as such).
         :return: True if successful, False if failed, None if blocked
 
         """
@@ -4645,7 +4654,8 @@ class tc_c(reporter_c):
             logf = logfile
         try:
             p = subprocess.Popen([ cmd ], shell = True, close_fds = False,
-                                 stdout = logf, stderr = subprocess.STDOUT)
+                                 stdout = logf, stderr = subprocess.STDOUT,
+                                 env = env)
             rc = p.wait()
             logf.flush()
             generator_factory = commonl.generator_factory_c(
