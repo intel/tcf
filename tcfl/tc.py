@@ -4892,7 +4892,11 @@ class tc_c(reporter_c):
             exp.name = name
         elif not exp.name:
             exp.name = '%03d' % (len(exps) - 1)
-        exp.poll_name = run_name + '-' + exp.poll_context()
+        # note the poll name does not include the run name. Why?
+        # because we want to reuse the poll data from one run to the
+        # other insted of re-reading everything; the polling mechanism
+        # is supposed to know to append stuff
+        exp.poll_name = exp.poll_context()
         poll_period.setdefault(exp.poll_name, 3) # FIXME: default
         if exp.name in [ i.name for i in exps ]:
             raise AssertionError(
