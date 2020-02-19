@@ -65,4 +65,5 @@ xfsprogs
 nmap-ncat
 rsync
 socat
-
+# to ask the BIOS for settings and such when discovering HW
+dmidecode
