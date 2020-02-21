@@ -1531,6 +1531,9 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
             self.data = u""
         io.TextIOWrapper.write(self, unicode(substr.encode('unicode-escape')))
         io.TextIOWrapper.write(self, u"\n")
+        # flush after writing one line to avoid corruption from other
+        # threads/processes printing to the same FD
+        io.TextIOWrapper.flush(self)
         return pos + 1
 
     def _write(self, s, prefix, acc_offset = 0):
