@@ -158,6 +158,11 @@ class shell(tc.target_extension_c):
         """
         target = self.target
         testcase = target.testcase
+        # dereference which console we are using; we don't want to
+        # setup our trackers below to the "default" console and leave
+        # it floating because then it will get confused if we switch
+        # default consoles.
+        console = target.console._console_get(console)
         self.run('export PS1="TCF-%s:$PS1"' % self.target.kws['tc_hash'],
                  console = console)
         # disable line editing for proper recording of command line
@@ -171,10 +176,17 @@ class shell(tc.target_extension_c):
         self.run("trap 'echo ERROR''-IN-SHELL' ERR",
                  console = console)
         testcase.expect_global_append(
+            # add a detector for a shell error, make sure to name it
+            # after the target and console it will monitor so it
+            # doesn't override other targets/consoles we might be
+            # touching in parallel
             target.console.text(
-                "ERROR-IN-SHELL", name = "shell error", console = console,
-                timeout = 0, poll_period = 1,
+                "ERROR-IN-SHELL",
+                name = "%s:%s: shell error" % (target.want_name, console),
+                console = console, timeout = 0, poll_period = 1,
                 raise_on_found = tc.error_e("error detected in shell")),
+            # if we have already added detectors for this, that's
+            # fine, ignore them
             skip_duplicate = True
         )
 

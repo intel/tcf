@@ -5226,13 +5226,19 @@ class tc_c(reporter_c):
                             # happens, since it checks later and it
                             # works ok...
                             self.log.error(
-                                "BUG: exp %08x name %s context %"
+                                "BUG: exp %08x name %s context %s"
                                 " poll_name %s is MISSING"
-                                " from poll_period %s: %s" %  (
+                                " from poll_period %s: %s;"
+                                " this happens when multiple"
+                                " expectation that poll the same"
+                                " source had the same name"
+                                %  (
                                     id(exp), exp.name,
                                     exp.poll_context(), exp.poll_name,
                                     poll_period,
-                                    "".join(traceback.format_stack())))
+                                    "".join(traceback.format_stack())
+                                )
+                            )
                         else:
                             exp_poll_period = poll_period[exp.poll_name]
                             if poll_ellapsed == 0 \
