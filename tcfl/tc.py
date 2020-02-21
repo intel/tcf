@@ -2263,6 +2263,7 @@ class result_c():
         reporter = attachments.pop('target', _tc)
         _alevel = attachments.pop('alevel', 1)
         dlevel = attachments.pop('dlevel', 0)
+        level = attachments.pop('level', None)
 
         if isinstance(_tc, target_c):
             tc = _tc.testcase
@@ -2306,7 +2307,7 @@ class result_c():
         }
         _attachments.update(attachments)
         report_fn("%s%s: %s" % (phase, tag, _e), _attachments,
-                  dlevel = dlevel, alevel = trace_alevel)
+                  level = level, dlevel = dlevel, alevel = trace_alevel)
         return result
 
     @staticmethod
