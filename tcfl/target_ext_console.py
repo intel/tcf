@@ -4,12 +4,66 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-"""
-Raw access to the target's serial consoles
+"""Raw access to the target's serial consoles
 ------------------------------------------
 
 This exposes APIs to interface with the target's serial consoles and
 the hookups for accessing them form the command line.
+
+
+Text expectations
+^^^^^^^^^^^^^^^^^
+
+:class:`expect_text_on_console_c` implements an object that can poll
+consoles and look for text on them.
+
+
+.. _console_expectation_detect_context::
+
+Console Expectation: Detect context
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The detection context is a string which is used to help identify how
+to keep track of where we are looking for things (detecting)
+in a console's output.
+
+When we are, for example, running shell commands, we expect to send a
+command, see the response (echo) and then expect an output from the
+command and expect another prompt.
+
+Each time we *expect* we are actually, after reading, searching
+starting at a certain past offset (*offset0*) until the last data
+available for the text we are looking for (our expectation)--at the
+end of where we find this text is *offset1*.
+
+The next time we run the process, we don't need to look from
+*offset0*, but from *offset1*, since all the output from our command
+execution will be reported after that.
+
+These offsets are what is considered the *detect context*.
+
+It becomes important to have multiple because you might have multiple
+detectors looking for different things in the same console output,
+that is read only once from the remote target--each of these actors
+would need a different context:
+
+- one or more parallel flows in one or more threads running shell
+  commands (sequence above) on a serial console (in out case this are
+  :meth:`target.send <tcfl.tc.target_c.send>`/:meth:`target.expect
+  <tcfl.tc.target_c.expect>` and companions, which use the empty
+  (default) *detect_context*.
+
+- a global detector in the same number of threads as above looking for
+  signs of a shell command that caused an error in the console; this
+  also uses the *detect_context* and is done by
+  :meth:`target.shell.setup
+  <tcfl.tc.target_ext_shell.extension.setup>`.
+
+- another detector in any number of threads looking for telltale signs
+  of a Kernel Crash message; this would have its own context as it is
+  just looking for the right signs in the same serial console that
+  potentially is being used to execute commands (as above)
+
 """
 
 import collections
@@ -65,7 +119,8 @@ class expect_text_on_console_c(tc.expectation_c):
                  raise_on_timeout = tc.failed_e,
                  raise_on_found = None,
                  name = None,
-                 target = None):
+                 target = None,
+                 detect_context = ""):
         assert isinstance(target, tc.target_c)	# mandatory
         assert isinstance(text_or_regex, (basestring, re._pattern_type))
         assert console == None or isinstance(console, basestring)
@@ -78,8 +133,7 @@ class expect_text_on_console_c(tc.expectation_c):
         assert name == None or isinstance(name, basestring)
 
         if isinstance(text_or_regex, basestring):
-            self.regex = re.compile(re.escape(text_or_regex),
-                                    re.MULTILINE)
+            self.regex = re.compile(re.escape(text_or_regex), re.MULTILINE)
         elif isinstance(text_or_regex, re._pattern_type):
             self.regex = text_or_regex
         else:
@@ -95,6 +149,7 @@ class expect_text_on_console_c(tc.expectation_c):
 
         self._console = console
         self.previous_max = previous_max
+        self.detect_context = detect_context
 
     @property
     def console(self):
@@ -126,15 +181,14 @@ class expect_text_on_console_c(tc.expectation_c):
         # to start looking, so target.console.write() might call this
         # (thus, it needs to be static).
         #
-        # There will be only a single reader state per testcase, no
-        # matter how many expectations are pointed to a target's
-        # console--see poll() for how we get there.
+        # There will be only a single reader state per testcase and
+        # thread, no matter how many expectations are pointed to a
+        # target's console--see poll() for how we get there.
         #
         # so then, remove the existing collateral file, register it
         #
         testcase = target.testcase
         # Assumes _testcase.lock is taken
-        assert testcase.lock.locked()
         assert 'read_offset' not in buffers_poll, \
             "buffers_poll %08xd DOUBLE INIT" % id(buffers_poll)
         filename = target.console.capture_filename(console)
@@ -239,43 +293,34 @@ class expect_text_on_console_c(tc.expectation_c):
                    target.fullid, self.console, read_offset, e),
                 { "error trace": traceback.format_exc() })
 
-    def poll(self, testcase, run_name, _buffers_poll):
+    def poll(self, testcase, run_name, buffers_poll):
         # polling a console happens by reading the remote console into
         # a local file we keep as collateral
 
-        # We need to make this capture global to all threads in this
-        # testcase that might be reading from this target--only deal
-        # is that only one at the same time can write to it, shouldn't
-        # be a problem--so all the state has to be updated subject to
-        # a target specific lock -- which now we do not have--so this
-        # poll is not specific to the expect() all or to this
-        # expectation itself; it is global to the testcase--this is
-        # why it uses the testcase buffers, not the buffers provided
-        # in the call, to store.
+        # the polling is always call under the lock for this specific
+        # poll context (thus for all the threads and expectations, so
+        # we only poll once at the same time from each source, as
+        # given by the poll context)
 
         target = self.target
-        with testcase.lock:
-            buffers_poll = self._poll_buffers_get_global(
-                testcase, target, self.console)
-            if 'of' in buffers_poll:
-                filename = buffers_poll['of'].name
-                target.report_info(
-                    "%s/%s: existing console capture context %08x/%s" %
-                    (run_name, self.name, id(buffers_poll), filename),
-                    dlevel = 5)
-            else:
-                self._poll_context_init(buffers_poll, target,
-                                        self.console, self.previous_max)
-                filename = buffers_poll['of'].name
-                target.report_info(
-                    "%s/%s: new console capture context %08x/%s" %
-                    (run_name, self.name, id(buffers_poll), filename),
-                    dlevel = 5)
+        if 'of' in buffers_poll:
+            filename = buffers_poll['of'].name
+            target.report_info(
+                "%s/%s: existing console capture context %08x/%s" %
+                (run_name, self.name, id(buffers_poll), filename),
+                dlevel = 5)
+        else:
+            self._poll_context_init(buffers_poll, target,
+                                    self.console, self.previous_max)
+            filename = buffers_poll['of'].name
+            target.report_info(
+                "%s/%s: new console capture context %08x/%s" %
+                (run_name, self.name, id(buffers_poll), filename),
+                dlevel = 5)
 
-        with target.lock:
-            return self._poll(testcase, run_name, buffers_poll)
+        return self._poll(testcase, run_name, buffers_poll)
 
-    def detect(self, testcase, run_name, _buffers_poll, buffers):
+    def detect(self, testcase, run_name, buffers_poll, _buffers):
         """
         See :meth:`expectation_c.detect` for reference on the arguments
 
@@ -284,7 +329,7 @@ class expect_text_on_console_c(tc.expectation_c):
         """
 
         target = self.target
-        of = target.console.text_capture_file(self.console)
+        of = buffers_poll.get('of', None)
         if of == None:
             target.report_info('%s/%s: not detecting, no console data yet'
                                % (run_name, self.name))
@@ -294,14 +339,13 @@ class expect_text_on_console_c(tc.expectation_c):
         if stat_info.st_size == 0:	# Nothing to read
             return None
 
-        context = self.poll_context()
         # last time we looked and found, we updated the search_offset,
         # so search from there on -- note this offset is on the
         # capture file we save in the client, not from the server's
         # capture POV.
-        if context + 'search_offset' not in testcase.tls.buffers:
-            testcase.tls.buffers[context + 'search_offset'] = 0
-        search_offset = testcase.tls.buffers[context + 'search_offset']
+        if self.detect_context + 'search_offset' not in buffers_poll:
+            buffers_poll[self.detect_context + 'search_offset'] = 0
+        search_offset = buffers_poll[self.detect_context + 'search_offset']
 
         # we mmap because we don't want to (a) read a lot of a huger
         # file line by line and (b) share file pointers -- we'll look
@@ -310,18 +354,18 @@ class expect_text_on_console_c(tc.expectation_c):
         with contextlib.closing(
                 mmap.mmap(ofd, 0, mmap.MAP_PRIVATE, mmap.PROT_READ, 0)) \
                 as mapping:
-            target.report_info("%s/%s: looking for `%s` in console %s:%s @%d-%d [%s]"
-                               % (run_name, self.name, self.regex.pattern,
-                                  target.fullid, self.console,
-                                  search_offset, stat_info.st_size,
-                                  of.name), dlevel = 4)
+            target.report_info(
+                "%s/%s: looking for `%s` in console %s:%s @%d-%d [%s]"
+                % (run_name, self.name, self.regex.pattern,
+                   target.fullid, self.console,
+                   search_offset, stat_info.st_size, of.name), dlevel = 4)
             match = self.regex.search(mapping[search_offset:])
             if match:
                 # this allows us later to pick up stuff in report
                 # handlers without having to have context knowledge
-                testcase.tls.buffers[context + 'search_offset_prev'] = \
+                buffers_poll[self.detect_context + 'search_offset_prev'] = \
                     search_offset
-                testcase.tls.buffers[context + 'search_offset'] = \
+                buffers_poll[self.detect_context + 'search_offset'] = \
                     search_offset + match.end()
                 # take care of printing a meaningful message here, as
                 # this is one that many people rely on when doing
@@ -359,14 +403,14 @@ class expect_text_on_console_c(tc.expectation_c):
                 return match_data
         return None
 
-    def on_timeout(self, run_name,
-                   poll_context, ellapsed, timeout):
+    def on_timeout(self, run_name, poll_context, buffers_poll, buffers,
+                   ellapsed, timeout):
         testcase = self.target.testcase
         # If no previous search, that'd be the beginning...
         search_offset_prev = \
-            testcase.tls.buffers.get(poll_context + 'search_offset_prev', 0)
+            buffers_poll.get(self.detect_context + 'search_offset_prev', 0)
         search_offset = \
-            testcase.tls.buffers.get(poll_context + 'search_offset', 0)
+            buffers_poll.get(self.detect_context + 'search_offset', 0)
         raise self.raise_on_timeout(
             "%s/%s: timed out finding text '%s' in "
             "console '%s:%s' @%.1f/%.1fs/%.1fs)"
@@ -390,7 +434,7 @@ class expect_text_on_console_c(tc.expectation_c):
     def flush(self, testcase, run_name, buffers_poll, buffers,
               results):
         # we don't have to do anything, the collateral is already
-        # generated in buffers['filename'], flushed and synced.
+        # generated in buffers_poll['of'], flushed and synced.
         pass
 
 class extension(tc.target_extension_c):
@@ -821,18 +865,26 @@ class extension(tc.target_extension_c):
             self.target.testcase.report_file_prefix + "%s.txt"
             % _poll_context(self.target, console))
 
-    def text_capture_file(self, console = None):
+    def text_capture_file(self, console = None, context = None):
         """
         Return a descriptor to the file where this console is being
         captured to
+
+        :return: file descriptor to the open file where data is being
+          captured; might be empty if nothing has been captured yet or
+          *None* if capturing has not started.
         """
         # see poll() above for why we ignore the poll buffers given by
         # the expect system and take the global testcase buffers
-        context = self.text_poll_context(console)
+        if context == None:
+            context = self.text_poll_context(console)
         testcase = self.target.testcase
         with testcase.lock:
-            buffers_poll = testcase.buffers.get(context, {})
-            return buffers_poll.get('of', None)
+            poll_state = testcase._poll_state.get(context, None)
+        if poll_state == None:
+            return None
+        with poll_state.lock:
+            return poll_state.buffers.get('of', None)
 
     def text_poll_context(self, console = None):
         """
@@ -844,8 +896,7 @@ class extension(tc.target_extension_c):
         return _poll_context(self.target, console)
 
     def text(self, *args, **kwargs):
-        """
-        Return an object to expect a string or regex in this target's
+        """Return an object to expect a string or regex in this target's
         console. This can be fed to :meth:`tcfl.tc.tc_c.expect`:
 
         >>> self.expect(
@@ -868,12 +919,53 @@ class extension(tc.target_extension_c):
         :param str console: (optional) name of the target's console from
           which we are to read. Defaults to the default console.
 
+        :param str detect_context: (optional) the detection context is
+          a string which is used to help identify how to keep track of
+          where we are looking for things (detecting) in a console's
+          output. Further info :ref:`here
+          <console_expectation_detect_context>`
+
         (other parameters are the same as described in
         :class:`tcfl.tc.expectation_c`.)
 
         """
         return expect_text_on_console_c(*args, target = self.target, **kwargs)
 
+    def send_expect_sync(self, console, detect_context = ""):
+        """
+        Before executing a send/expect sequence, sync so that the
+        expect sequence starts looking after the data we are about to
+        send--otherwise the expect engine might be looking at data
+        returned way before back then.
+
+        :param str console: name of the target's console on which to sync.
+
+        :param str detect_context: (optional) the detection context is
+          a string which is used to help identify how to keep track of
+          where we are looking for things (detecting) in a console's
+          output. Further info :ref:`here
+          <console_expectation_detect_context>`
+
+        """
+        # If we are sending something, the next expect we want to
+        # start searching from the output of that something. So we set
+        # the output to the current size of the capture file so we
+        # start seaching only off what came next.
+        testcase = self.target.testcase
+        with testcase.lock:
+            context = self.text_poll_context(console)
+            if context not in testcase._poll_state:
+                testcase._poll_state[context] = testcase._poll_state_c()
+            poll_state = testcase._poll_state[context]
+        with poll_state.lock:
+            of = poll_state.buffers.get('of', None)
+            if of:
+                ofd = of.fileno()
+                stat_info = os.fstat(ofd)
+                search_offset = stat_info.st_size
+            else:
+                search_offset = 0
+            poll_state.buffers[detect_context + 'search_offset'] = search_offset
 
     def capture_iterator(self, console, offset_from = 0, offset_to = 0):
         """
@@ -1448,7 +1540,10 @@ def _cmdline_setup(arg_subparser):
     ap.add_argument(
         "target", metavar = "TARGETSPEC", nargs = "*",
         action = "store", default = [],
-        help = "Target's names or URLs or a general target specification "
-        "which might include values of tags, etc, in single quotes (eg: "
-        "'zephyr_board and not type:\"^qemu.*\"'")
+        help = "Target name or expressions to determine which target(s) "
+        "to list (like those given to 'tcf run -t'). For example: "
+        "'owner:\"john\"' would show the consoles of all the targets "
+        "owned by a user whose user id contains the word *john*; "
+        "'type:\"qemu\"' would show that of all the targets with "
+        "*qemu* on the type")
     ap.set_defaults(func = _cmdline_console_wall)
