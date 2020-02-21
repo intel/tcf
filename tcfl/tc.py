@@ -4972,7 +4972,7 @@ class tc_c(reporter_c):
             if skip_duplicate:
                 return
             else:
-                raise tcfl.tc.blocked(
+                raise tcfl.tc.blocked_e(
                     "expectation '%s' already exists in testcase "
                     "global list" % exp.name)
         self._expectations_global.append(exp)
