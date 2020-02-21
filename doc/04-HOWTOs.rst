@@ -30,7 +30,11 @@ evertything:
   <example_pos_deploy>`
 
 - to deploy multiple targets at the same time, for client/server
-  tests, see :ref:`here <example_pos_deploy_2>`
+  tests, see :ref:`here <example_pos_deploy_2>` and :ref:`here
+  <example_pos_deploy_N>`
+
+- BIOS can be built and flashed too! see :ref:`here
+  <example_qemu_bios>` and :ref:`here <example_qemu_bios_N>`
 
 - to copy other content to the image after deploying the OS, see
   :ref:`this example <example_deploy_files>`
@@ -39,7 +43,10 @@ evertything:
 .. automodule:: examples.test_pos0_base
 .. automodule:: examples.test_pos_deploy
 .. automodule:: examples.test_pos_deploy_2
+.. automodule:: examples.test_pos_deploy_N
 .. automodule:: examples.test_pos_boot
+.. automodule:: examples.test_qemu_bios
+.. automodule:: examples.test_qemu_bios_N
 .. automodule:: examples.test_deploy_files
 .. automodule:: examples.test_linux_kernel
 .. automodule:: examples.test_qemu_bios
