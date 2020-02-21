@@ -5373,6 +5373,152 @@ class tc_c(reporter_c):
 
         return results
 
+    def threaded(self, fn):
+        """
+        Decorate a testcase method so it can be used with
+        :meth:`run_for_each_target_threaded`.
+
+        Use in a test class as described in
+        :meth:`run_for_each_target_threaded`'s examples.
+        """
+        def _decorated_fn(*args, **kwargs):
+            try:
+                # the caller has added these extra parameters we use
+                # to initialize the TLS for the thread, inheriting
+                # values--we remove them from the args list, so the
+                # calling later doesn't complain about extra
+                # unexpected parameters.
+                # args[-1] is always kwargs
+                parent_msgid = kwargs.pop('parent_msgid', None)
+                parent_tls = kwargs.pop('parent_tls', None)
+                with tcfl.msgid_c(parent = parent_msgid, l = 2) as msgid:
+                    msgid._depth -= 1
+                    self.__thread_init__(parent_tls)
+                    result = fn(*args, **kwargs)
+                    return result, None
+            except:
+                return None, sys.exc_info()
+        _decorated_fn.func_dict['threaded_decorator'] = True
+        return _decorated_fn
+
+    def run_for_each_target_threaded(
+            self, function, args = None, kwargs = None,
+            targets = None, processes = None, re_raise_exceptions = True):
+        """
+        Executes a function in parallel for each listed target waiting
+        for them to finish
+
+        By default, all of the testcase target's are used; (eg) to power
+        cycle all targets in parallel (note the use of the
+        :meth:`self.threaded <threaded>` decorator):
+
+        >>> @tcfl.tc.target(count = 10)
+        >>> class _test(tcfl.tc.tc_c):
+        >>>
+        >>>     def start(self):
+        >>>         @self.threaded
+        >>>         def _target_start(target):
+        >>>             target.power.cycle()
+        >>>
+        >>>         self.run_for_each_target_threaded(_target_start)
+
+        if you have your own list of targets:
+
+        >>> @tcfl.tc.interconnect()
+        >>> @tcfl.tc.target(name = "server")
+        >>> @tcfl.tc.target(name = "client1")
+        >>> @tcfl.tc.target(name = "client2")
+        >>> @tcfl.tc.target(name = "client3")
+        >>> class _test(tcfl.tc.tc_c):
+        >>>
+        >>>     clients = [ "client1", "client2", "client3" ]
+        >>>
+        >>>     def start(self, ic):
+        >>>         ic.power.on()
+        >>>         server.power.cycle()
+        >>>         # do some server setup...
+        >>>         @self.threaded
+        >>>         def _client_start(client):
+        >>>             client.power.cycle()
+        >>>             client.shell.up(user = 'root')
+        >>>
+        >>>         self.run_for_each_target_threaded(_client_start,
+        >>>                                           targets = clients)
+
+        :param function: function to execute; this has to be a
+          function decorated with *@:func:`self.threaded
+          <tcfl.tc.tc_c.threaded>`*; it must take as first argument a
+          :class:`tcfl.tc.target_c` object, which will be the target
+          it is running for.
+
+          The rest of the arguments will be the ones supplied with
+          *args* and *kwargs*.
+
+        :param tuple args: (optional, default none) extra arguments to
+          pass to each function call
+
+        :param tuple kwargs: (optional, default none) extra keyword
+          arguments to pass to each function call
+
+        :param list(str) targets: (optional, default all testcase's
+          targets) list of targets on which to launch the function
+          (each on a thread); this is a list of the strings, each
+          being a target role (old *target want name*), the names
+          assigned to the targets on the *@tcfl.tc.interconnect* or
+          *@tcfl.tc.target* decorators.
+
+        :param int processes: (optional, default as many as targets)
+          how many threads to run in parallel
+
+        :param bool re_raise_exceptions: if any function raises an
+          exception, reraise when all are done.
+
+        :returns: dictionary keyed by target role of tuples containing
+          the *( result, exception )* function's return value and
+          information about exception raised (if it was raised, *None*
+          otherwise).
+
+          Exception information is a tuple as returned by
+          :func:`sys.exc_info`.
+
+        """
+        assert args == None or isinstance(args, tuple)
+        assert kwargs == None or isinstance(kwargs, dict)
+        assert targets == None or isinstance(targets, list)
+        assert processes == None or processes > 0
+        assert isinstance(re_raise_exceptions, bool)
+        assert hasattr(function, "func_dict") \
+            and function.func_dict.get("threaded_decorator", False) == True, \
+            "%s: function has to be decorated with @tcfl.tc.tc_c.threaded"
+
+        if targets == None:
+            targets = self.target_group.targets.keys()
+        if processes == None:
+            processes = len(targets)
+        threads = {}
+        if args == None:
+            args = ( )
+        if kwargs == None:
+            kwargs = {}
+
+        thread_pool = tcfl.tc._multiprocessing_method_pool_c(processes = processes)
+        for target_role in targets:
+            target = self.target_group.targets[target_role]
+            kwargs['parent_tls'] = tcfl.tc._simple_namespace(self.tls.__dict__)
+            kwargs['parent_msgid'] = tcfl.msgid_c(l = 2)
+            threads[target_role] = \
+                thread_pool.apply_async(function, (target, ) + args, kwargs, )
+
+        thread_pool.close()
+        thread_pool.join()
+        results = {}
+        for role, thread in threads.items():
+            result, exception = thread.get()
+            if exception and re_raise_exceptions:
+                raise exception[0], exception[1], exception[2]
+            results[role] = ( result, exception )
+        return results
+
 
     #
     # Helpers for private APIs
