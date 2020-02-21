@@ -30,6 +30,7 @@ The grammar for this language is as follows:
                  | symbol ">=" number
                  | symbol "<=" number
                  | symbol "in" list
+                 | constant "in" symbol
                  | symbol
 
     list ::= "[" list_contents "]"
@@ -105,12 +106,12 @@ tokens = [
 
 def t_HEX(t):
     r"0x[0-9a-fA-F]+"
-    t.value = str(int(t.value, 16))
+    t.value = int(t.value, 16)
     return t
 
 def t_INTEGER(t):
     r"\d+"
-    t.value = str(int(t.value))
+    t.value = int(t.value)
     return t
 
 def t_STR(t):
@@ -143,9 +144,14 @@ t_COMMA = r","
 
 t_COLON = ":"
 
+class _t_symbol_c(str):
+    def __init__(self, s):
+        str.__init__(s)
+
 def t_SYMBOL(t):
     r"[A-Za-z_][-/\.0-9A-Za-z_]*"
     t.type = reserved.get(t.value, "SYMBOL")
+    t.value = _t_symbol_c(t.value)
     return t
 
 t_ignore = " \t\n"
@@ -187,6 +193,9 @@ def p_expr_eval(p):
             | SYMBOL LTEQ number
             | SYMBOL IN list
             | SYMBOL IN SYMBOL
+            | STR IN SYMBOL
+            | HEX IN SYMBOL
+            | INTEGER IN SYMBOL
             | SYMBOL COLON STR"""
     p[0] = (p[2], p[1], p[3])
 
@@ -260,10 +269,12 @@ def ast_expr(ast, env):
     elif ast[0] == "<=":
         return ast_sym_int(ast[1], env) <= int(ast[2])
     elif ast[0] == "in":
-        if isinstance(ast[2], basestring) and ast[2] in env:
-            return ast_sym(ast[1], env) in ast_sym(ast[2], env)
-        else:
-            return ast_sym(ast[1], env) in ast[2]
+        def _val_get(val):
+            if isinstance(val, _t_symbol_c):
+                return ast_sym(val, env)
+            else:
+                return val
+        return _val_get(ast[1]) in _val_get(ast[2])
     elif ast[0] == "exists":
         return True if ast_sym(ast[1], env) else False
     elif ast[0] == ":":
@@ -296,27 +307,47 @@ if __name__ == "__main__":
         "D" : "20",
         "E" : 0x100,
         "F" : "baz",
+        "N5" : 5,
         "type" : "arduino101",
         "quark_se_stub" : "yes",
         "bsp_model" : "arc",
         "value_list" : [ "1", "2", "3" ],
-        "value_dict" : { "1": 1, "2": 2, "3": 3 }
+        "value_dict" : { "1": 1, "2": 2, "3": 3 },
+        "list_of_things" : [ 1, 2, 3, "string1", "string2" ],
     }
 
-    for line in [
-            "A.3 == 3 and type == \"arduino101\" and quark_se_stub == 'yes' and bsp_model == 'arc' ",
-            "A.3 in [ 1, 2, 3 ]",
-            "A.there in value_list",
-            "A.not_there in value_list",
-            "A.there in value_dict",
-            "A.not_there in value_dict",
+    for line, expected in [
+            (
+                "A.3 == 3 and type == \"arduino101\" and quark_se_stub == 'yes' and bsp_model == 'arc' ",
+                # shall fail because there is no A.3
+                False,
+            ),
+            (
+                "A.there == '3' and type == \"arduino101\" and quark_se_stub == 'yes' and bsp_model == 'arc' ",
+                True,
+            ),
+            # shall fail because there is no A.3
+            ( "A.3 in [ 1, 2, 3 ]", False ),
+            ( "A.there in value_list", True ),
+            ( "A.not_there in value_list", False ),
+            ( "not E in list_of_things", True ),
+            ( "A.there in value_dict", True ),
+            ( "A.not_there in value_dict",  False ),
+            ( '"string1" in list_of_things', True ),
+            ( '"string3" in list_of_things', False ),
+            ( '1 in list_of_things', True ),
+            ( '4 in list_of_things', False ),
+            ( 'N5 < 4', False ),
     ]:
         print "\n\nProcessing: ", line
         lex.input(line)
         for tok in iter(lex.token, None):
-            print(tok.type, tok.value)
-        print(parser.parse(line))
-        print(parse(line, local_env))
-
+            print "TOKEN", tok.type, tok.value
+        print "PARSE TREE", parser.parse(line)
+        result = parse(line, local_env)
+        if expected != result:
+            print "FAIL: expected %s, got %s" % (expected, result)
+        else:
+            print "OK"
 
 
