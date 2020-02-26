@@ -113,7 +113,8 @@ class _test(tcfl.pos.tc_pos_base):
         if not 'LK_BUILDDIR' in os.environ:
             raise tcfl.tc.skip_e(
                 "please export env LK_BUILDDIR pointing to path of "
-                "configured, built or ready-to-build linux kernel tree")
+                "configured, built or ready-to-build linux kernel tree",
+                dict(level = 0))
         builddir = os.environ["LK_BUILDDIR"]
         rootdir = os.environ.get("LK_ROOTDIR", self.tmpdir + "/root")
 
