@@ -7254,9 +7254,14 @@ class tc_c(reporter_c):
             else:
                 name = tc_name
             # testcase name, file where it came from, origin
-            tc = _cls(
-                name, path,
-                path + ":" + "%d" % inspect.getsourcelines(_cls)[1])
+            try:
+                # some forms of defining classes (like using type)
+                # might not find it funny and make it easy to find the
+                # line number
+                source_line = str(inspect.getsourcelines(_cls)[1])
+            except IOError as e:
+                source_line = "n/a"
+            tc = _cls(name, path, path + ":" + source_line)
             if subcase_name == "_driver":
                 # make a copy, as we might modify during execution
                 tc.subcases = list(subcases_cmdline)
