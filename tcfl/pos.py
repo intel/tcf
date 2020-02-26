@@ -575,8 +575,9 @@ class extension(tc.target_extension_c):
 
 
     # can't add $ at the end because sometimes there are spurious
-    # messages after it...
-    _regex_waiting_for_login = re.compile(r".*\blogin:\s+")
+    # messages after it...\b -> beginning end of a word maybe at
+    # beg/end of string
+    _regex_waiting_for_login = re.compile(r".*\blogin:\s+", re.MULTILINE)
 
     def _unexpected_console_output_try_fix(self, output, target):
         # so when trying to boot POS we got unexpected console output;
@@ -587,7 +588,8 @@ class extension(tc.target_extension_c):
 
         # looks like a login prompt? Maybe we can login and munge
         # things around
-        if self._regex_waiting_for_login.search(output):
+        m = self._regex_waiting_for_login.search(output)
+        if m:
             boot_config_fix_fn = target.pos.cap_fn_get('boot_config_fix',
                                                        'uefi')
             if boot_config_fix_fn:
@@ -641,8 +643,8 @@ class extension(tc.target_extension_c):
                     output = ""
                     for data in attachment.make_generator():
                         output += data
-                        if len(output) > 20:
-                            # we don't need more
+                        if len(output) > 4096:
+                            # we need enought to capture a local boot
                             break
                     if output == "" or output == "\x00":
                         target.report_error("POS: no console output, retrying")
