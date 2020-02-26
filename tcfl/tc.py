@@ -5730,8 +5730,8 @@ class tc_c(reporter_c):
                         if not self._targets_disabled_too:
                             # Refresh info
                             _rtb, _rt = tcfl.ttb_client._rest_target_find_by_id(_target.fullid)
-                            disabled = _rt.get('disabled', False)
-                            if disabled:
+                            disabled = _rt.get('disabled', None)
+                            if disabled != None:
                                 raise blocked_e(
                                     "%s: acquisition failed (target has "
                                     "been disabled)" % _target.fullid)
@@ -7706,6 +7706,9 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
         logger.error("WARNING! No targets available")
     for rt in rt_all_list:
         rt_all[rt['fullid']] = rt
+        if rt.get('disabled', None) != None \
+           and tc_c._targets_disabled_too == False:
+            continue            
         if 'interconnect_c' in rt.get('interfaces', []):
             ic_selected_all[rt['fullid']] = set(rt.get('bsp_models', {}).keys())
         else:
