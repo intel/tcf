@@ -6961,7 +6961,9 @@ class tc_c(reporter_c):
                     rt_permutations[(icgid, tgid)] = tg
             elif len(self._targets) == 0: # static TC
                 ic_permutations["localic"] = {}
-                rt_permutations = { ("localic", "localtg") : {} }
+                rt_permutations = {
+                    ( "localic", "localtg" ) : { 'interfaces': [] }
+                }
             elif len(target_want_list) == 0: # only ICs?
                 self.report_info("interconnect group %s: "
                                  "no targets needed" % (icgid),
