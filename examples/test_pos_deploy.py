@@ -64,7 +64,9 @@ import tcfl.tc
 import tcfl.tl
 import tcfl.pos
 
-@tcfl.tc.interconnect("ipv4_addr")
+MODE = os.environ.get('MODE', 'one-per-type')
+
+@tcfl.tc.interconnect("ipv4_addr", mode = MODE)
 @tcfl.tc.target("pos_capable")
 class _test(tcfl.tc.tc_c):
 
