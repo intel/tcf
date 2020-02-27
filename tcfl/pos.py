@@ -1021,10 +1021,14 @@ EOF""")
         if post_flash_script:
             target.report_info("POS: executing post flash script from "
                                "%s:.tcf.metadata.yaml" % image_final)
-            target.shell.run(
-                "export ROOTDEV=%s" % root_part_dev
-                + " ROOT=/mnt"
-                + " ")
+            export_vars = [
+                "ROOTDEV=" + root_part_dev,
+                "ROOT=/mnt"
+            ]
+            console = target.kws.get('linux_serial_console_default', None)
+            if console:
+                export_vars.append("BOOT_TTY=" + console)
+            target.shell.run("export " + " ".join(export_vars))
         line_acc = ""
         for line in post_flash_script.split('\n'):
             if not line:
