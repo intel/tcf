@@ -463,10 +463,14 @@ fi
 case $image_type in
     fedora*)
         # Disable SELinux -- can't figure out how to allow it to work
-        # properly in allowing ttyUSB0 access to agetty so we can have
+        # properly in allowing ttyS* access to agetty so we can have
         # a serial console.
+        # We get, upon boot, the error
+        ## [ 2.778202] systemd[1]: getty.target: Wants dropin
+        ##   /etc/systemd/system/getty.target.wants/serial-getty@ttyS0.service
+        ##   unreadable, ignoring: Permission denied
         if [ -r $destdir/etc/selinux/config ]; then
-            sudo sed -i 's/SELINUX=enforcing/SELINUX=disabled/' $destdir/etc/selinux/config
+            sudo sed -i 's/SELINUX=enforcing/SELINUX=permissive/' $destdir/etc/selinux/config
             info $image_type: disabled SELinux
         fi
         ;;
@@ -701,9 +705,17 @@ do
     systemd_enabled=1
 done
 
+# If there is no entry for the rootfs in /etc/fstab, bad things
+# happen; ensure the post-setup script will add it
+if test -r $destdir/etc/fstab && ! grep -q '[ \t]/[ \t]' $destdir/etc/fstab; then 
+    cat >> $md <<EOF
+  echo "\$ROOTDEV / auto defaults 1 1" >> \$ROOT/etc/fstab
+EOF
+fi
+
 # If SELinux is enabled in centos/rhel, we need to make sure the console is there
 if  test -r $destdir/etc/selinux/targeted/contexts/files/file_contexts \
-        && ( [ "${ID:-}" == centos ] || [ "${ID:-}" == rhel ] ); then
+        && grep -q "\(centos\|rhel\|fedora\)" <<< "${ID:-}"; then
     # Some distros tighten so much the /dev/ttyUSB0 permissions with
     # SELinux that we are not allowed to login, so as we know we are
     # login in in this BOOT_TTY, make it allowed.
