@@ -354,12 +354,9 @@ def _linux_boot_guess_from_boot(target, image):
         kver = kernel_versions.keys()[0]
         options = ""
         # image is atuple of (DISTRO, SPIN, VERSION, SUBVERSION, ARCH)
-        if distro in ("fedora", "debian", "ubuntu") and 'live' in image:
-            # Live distros needs this to boot, unknown exactly why;
-            # also add console=tty0 to ensure it is not lost
-            target.report_info("Linux Live hack: adding 'rw' to cmdline",
-                               dlevel = 2)
-            options = "console=tty0 rw"
+        options = "console=tty0 ro"
+        target.report_info("adding default kernel options: %s" % options,
+                           dlevel = 2)
         kernel = kernel_versions[kver]
         if kernel:
             kernel = "/boot/" + kernel
@@ -638,7 +635,7 @@ def boot_config_multiroot(target, boot_dev, image):
         target.report_info("WARNING! can't figure out Linux cmdline "
                            "options, taking defaults")
         # below we'll add more stuff
-        linux_options = "console=tty0 rw root=SOMEWHERE"
+        linux_options = "console=tty0 ro root=SOMEWHERE"
 
     # MULTIROOT: indicate which image has been flashed to this
     # partition
