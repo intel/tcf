@@ -452,64 +452,6 @@ for file in etc/pam.d/common-auth usr/share/pam.d/su; do
     sudo sed -i 's/pam_unix.so/pam_unix.so\tnullok /' $destdir/$file
 done
 
-#
-# Fixup / harcode serial login consoles
-#
-tty_devs="ttyUSB0 ttyS6 ttyS0 ${TTY_DEVS_EXTRA:-}"
-
-# Harcode enable getty on certain devices
-#
-# On new distros, systemd enabled
-#
-# Disable serial-getty@.service's BindTo -- this is needed so
-# we can have a common image that works in many platforms that
-# may not have the device without waiting for ever for it as
-# it won't show up. We caannot override BindTo with # drop in files.
-#
-# Why? Because somehow systemd is not being able to auto-detect
-# all the serial ports given in the console statement to the Linux
-# kernel command line so we have to hardcode a bunch of console
-# devices for each platform.
-#
-#
-# This is a workaround until we find out why the kernel consoles
-# declared in /sys/class/tty/consoles/active are not all being
-# started or why the kernel is missing to add ttyUSB0 when
-# given.
-#
-# ALSO, force 115200 is the only BPS we support
-#
-systemd_enabled=0
-info $image_type: systemd: hardcoding TTY console settings
-# some systems have systemd in /etc ... /lib, others /usr/lib...
-for systemd_libdir in $destdir/etc \
-                          $destdir/lib \
-                          $destdir/usr/lib;
-do
-    [ -r $systemd_libdir/systemd/system/serial-getty@.service ] || continue
-    sudo sed -i \
-         -e 's|^ExecStart=-/sbin/agetty -o.*|ExecStart=-/sbin/agetty 115200 %I $TERM|' \
-         -e 's|^BindsTo=|# <commented out by tcf-image-setup.sh> BindsTo=|' \
-         $systemd_libdir/systemd/system/serial-getty@.service
-    info $image_type: systemd: always enabling serial-getty@.service
-    systemd_enabled=1
-done
-if [ $systemd_enabled = 1 ]; then
-    for tty_dev in $tty_devs; do
-        info $image_type: always enabling $tty_dev console
-        sudo chroot $destdir systemctl enable serial-getty@$tty_dev
-    done
-fi
-
-if [ -r $destdir/etc/inittab ]; then
-    # Old yoctos
-    for tty_dev in $tty_devs; do
-        echo "U0:12345:respawn:/bin/start_getty 115200 $tty_dev vt102" |
-            sudo tee -a $destdir/etc/inittab
-        info $image_type: added $tty_dev to automatic console spawn
-    done
-fi
-
 if test -r $destdir/usr/share/defaults/etc/profile.d/50-prompt.sh; then
     # Hardcode: disable ANSI script sequences, as they make
     # scripting way harder
@@ -561,7 +503,10 @@ esac
 #
 # .tcf.metadata.yaml generation
 #
-# Now generate metadata, might not be needed, but we always did it just in case
+# Now generate metadata, including the setup script once the image is
+# flashed.
+#
+# Variables in the metadat script $ROOT $ROOTDEV $BOOT_TTY
 #
 md=$tmpdir/.tcf.metadata.yaml
 cat > $md <<EOF
@@ -604,9 +549,39 @@ EOF
 
 esac
 
+#
+# This file is
+#
+## NAME=Fedora
+## VERSION="29 (Workstation Edition)"
+## ID=fedora
+## VERSION_ID=29
+## VERSION_CODENAME=""
+## PLATFORM_ID="platform:f29"
+## PRETTY_NAME="Fedora 29 (Workstation Edition)"
+## ANSI_COLOR="0;34"
+## LOGO=fedora-logo-icon
+## CPE_NAME="cpe:/o:fedoraproject:fedora:29"
+## HOME_URL="https://fedoraproject.org/"
+## DOCUMENTATION_URL="https://docs.fedoraproject.org/en-US/fedora/f29/system-administrators-guide/"
+## SUPPORT_URL="https://fedoraproject.org/wiki/Communicating_and_getting_help"
+## BUG_REPORT_URL="https://bugzilla.redhat.com/"
+## REDHAT_BUGZILLA_PRODUCT="Fedora"
+## REDHAT_BUGZILLA_PRODUCT_VERSION=29
+## REDHAT_SUPPORT_PRODUCT="Fedora"
+## REDHAT_SUPPORT_PRODUCT_VERSION=29
+## PRIVACY_POLICY_URL="https://fedoraproject.org/wiki/Legal:PrivacyPolicy"
+## VARIANT="Workstation Edition"
+## VARIANT_ID=workstation
+##
+if [ -r $destdir/etc/os-release ]; then
+    source $destdir/etc/os-release
+fi
+
 cat >> $md <<EOF
 # \$ROOT    - location where rootfs is mounted
 # \$ROOTDEV - device which is mounted as root
+# \$BOOT_TTY - boot device without the /dev
 post_flash_script: |
   cd \$ROOT
 EOF
@@ -650,9 +625,10 @@ EOF
 EOF
 fi
     
-if grep -q "^UUID=.* /[ \t]" $destdir/etc/fstab; then
+if grep -q "^UUID=.*[ \t]\+/[ \t]" $destdir/etc/fstab; then
     # rootfs on UUID; generate a command in the metdata file to
     # runtime replace the UUID with the one of our rootfs
+    info "fstab: replacing UUIDs for / [ setup script will fixup ]"
     cat >> $md <<EOF
   sed -i \\
       -e "/^UUID=.* \/[ \t]/s|^UUID=[-0-9a-fA-F]\+|UUID=\$(lsblk -no uuid \$ROOTDEV)|g" \\
@@ -660,26 +636,96 @@ if grep -q "^UUID=.* /[ \t]" $destdir/etc/fstab; then
 EOF
 fi
 
-sudo mv $tmpdir/.tcf.metadata.yaml $destdir
-
 if grep -q UUID= $destdir/etc/fstab; then
-   # aah...UUID based filesystems need love
-   # - swap file systems, we know we'll create a swap partition labeled
-   #   tcf-swap, so just throw that in
-   # - we don't do /boot/efi, so comment it out; we put all boot stuff
-   #   in a single /boot partition that the image deployment code in
-   #   tcfl.pos manages
-   info fstab: replacing UUIDs
-   sudo sed -i \
+    # aah...UUID based filesystems need love
+    # - swap file systems, we know we'll create a swap partition labeled
+    #   tcf-swap, so just throw that in
+    # - we don't do /boot/efi, so comment it out; we put all boot stuff
+    #   in a single /boot partition that the image deployment code in
+    #   tcfl.pos manages
+    info fstab: replacing UUIDs for swap, /boot, /boot/efi
+    sudo sed -i \
        -e "/^UUID=.*swap/s/^UUID=[-0-9a-fA-F]\+/LABEL=tcf-swap/g" \
        -e 's|^UUID=.*/boot|# <commented out by tcf-image-setup.sh> \0|'  \
        -e 's|^UUID=.*/boot/efi|# <commented out by tcf-image-setup.sh> \0|'  \
        $destdir/etc/fstab
-   # /boot filesystem, we wouldn't even really want to mount it, but
-   # we do so test scripts can manipulate it; we always do partition
-   # one, but who knows...and this is done when the image is flashed
-   # so look above at ".tcf.metadata.yaml generation"
+    # /boot filesystem, we wouldn't even really want to mount it, but
+    # we do so test scripts can manipulate it; we always do partition
+    # one, but who knows...and this is done when the image is flashed
+    # so look above at ".tcf.metadata.yaml generation"
 fi
+
+
+#
+# Fixup / harcode serial login consoles
+#
+
+# Harcode enable getty on certain devices
+#
+# On new distros, systemd enabled
+#
+# Disable serial-getty@.service's BindTo -- this is needed so
+# we can have a common image that works in many platforms that
+# may not have the device without waiting for ever for it as
+# it won't show up. We caannot override BindTo with # drop in files.
+#
+# Why? Because somehow systemd is not being able to auto-detect
+# all the serial ports given in the console statement to the Linux
+# kernel command line so we have to hardcode a bunch of console
+# devices for each platform.
+#
+#
+# This is a workaround until we find out why the kernel consoles
+# declared in /sys/class/tty/consoles/active are not all being
+# started or why the kernel is missing to add ttyUSB0 when
+# given.
+#
+# ALSO, force 115200 is the only BPS we support
+#
+
+systemd_enabled=0
+info $image_type: systemd: hardcoding TTY console settings
+# some systems have systemd in /etc ... /lib, others /usr/lib...
+for systemd_libdir in $destdir/etc \
+                          $destdir/lib \
+                          $destdir/usr/lib;
+do
+    # Always enable agetty to $BOOT_TTY -- which the setup script will
+    # force start (see below)
+    [ -r $systemd_libdir/systemd/system/serial-getty@.service ] || continue
+    sudo sed -i \
+         -e 's|^ExecStart=-/sbin/agetty -o.*|ExecStart=-/sbin/agetty 115200 %I $TERM|' \
+         -e 's|^BindsTo=|# <commented out by tcf-image-setup.sh> BindsTo=|' \
+         $systemd_libdir/systemd/system/serial-getty@.service
+    info $image_type: systemd: always enabling serial-getty@.service
+    systemd_enabled=1
+done
+
+# If SELinux is enabled in centos/rhel, we need to make sure the console is there
+if  test -r $destdir/etc/selinux/targeted/contexts/files/file_contexts \
+        && ( [ "${ID:-}" == centos ] || [ "${ID:-}" == rhel ] ); then
+    # Some distros tighten so much the /dev/ttyUSB0 permissions with
+    # SELinux that we are not allowed to login, so as we know we are
+    # login in in this BOOT_TTY, make it allowed.
+    cat >> $md <<EOF
+  grep -q USB <<< \$BOOT_TTY && sed -i "/ttyUSB.*usbtty_device_t/i/dev/\$BOOT_TTY -c system_u:object_r:tty_device_t:s0" \\
+      \$ROOT/etc/selinux/targeted/contexts/files/file_contexts
+EOF
+fi
+
+if [ $systemd_enabled = 1 ]; then
+    info "systemd: forcing boot console to start (systemd not always picks up)"
+    cat >> $md <<EOF
+  chroot \$ROOT systemctl enable serial-getty@\$BOOT_TTY
+EOF
+elif [ -r $destdir/etc/inittab ]; then
+    # Old yoctos
+    cat >> $md <<EOF
+  echo "U0:12345:respawn:/bin/start_getty 115200 /dev/\$BOOT_TTY vt102" >> \ROOT/etc/inittab
+EOF
+fi
+
+sudo mv $tmpdir/.tcf.metadata.yaml $destdir
 
 for setup in ${setupl}; do
     $setup $destdir
