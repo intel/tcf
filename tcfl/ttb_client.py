@@ -808,5 +808,8 @@ def rest_target_release(args):
     """
     for target in args.target:
         rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_release(rt, force = args.force,
-                                   ticket = args.ticket)
+        try:
+            rtb.rest_tb_target_release(rt, force = args.force,
+                                       ticket = args.ticket)
+        except requests.HTTPError as e:
+            logging.warning("%s: error releasing: %s", target, e)
