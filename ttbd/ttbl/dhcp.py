@@ -550,7 +550,11 @@ pos_cmdline_opts = {
         # this needs an initrd
         "initrd=%(pos_http_url_prefix)sinitramfs-%(pos_image)s ",
         # needed by Fedora running as live FS hack
-        "rd.live.image", "selinux=0", "audit=0",
+        "rd.live.image",
+        # We need SELinux enabled but not enforcing; that way when we
+        # modify files that have SELinux attributes, they will be
+        # handled correctly.
+        "selinux=1", "enforcing=0", "audit=0",
         # ip=dhcp so we get always the same IP address and NFS root
         # info (in option root-path when writing the DHCP config file
         # a few lines above in _dhcp_conf_write()); thus nfsroot
