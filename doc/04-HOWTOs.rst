@@ -1774,6 +1774,60 @@ To bring up an instance (repeat these steps replacing *production* with
 Note that now, none can access the server yet because there is no way
 to authenticate with it :) Let's add some configuration.
 
+
+.. _ttbd_configuration:
+
+Where is the TCF server (TTBD) configuration taken from?
+--------------------------------------------------------
+
+*ttbd* reads configuration files from an invocation & installation
+specific set of paths.
+
+In most cases, the configuration comes from */etc/ttbd-production*
+(configuration for the system-wide production instance of *ttbd*).
+
+Other options:
+
+  - when multiple *ttbd* instances are to be executed side by side,
+    this can be controlled with the *-i INSTANCE* command line switch
+    to *ttbd* so configuration is loaded from */etc/ttbd-INSTANCE*.
+
+    When invoking with systemd, service *ttbd@INSTANCE* loads from
+    */etc/ttbd-INSTANCE*; see :ref:`starting multiple instances
+    <ttbd_config_multiple_instances>`.
+
+  - when running from source or manually, configuration and state
+    paths defaults to *~/.ttbd/*
+
+  - use the command line switch *--config-path* to force a different
+    configuration path.
+    
+Configuration files are called *conf_NN_WHATEVER.py* and imported in
+**alphabetical** order from each directory before proceeding to the
+next one. They are written in plain Python code, so you can do
+anything, even implement or add drivers from them. The naming
+convention establishes the following levels:
+
+- *conf_00_\*.py*: configuration libraries provided by the
+  distribution (documented :ref:`here <ttbd_conf_api>`)
+
+- *conf_01_\*.py*: configuration libraries specific to your deployment
+
+- *conf_04_\*.py*: configuration files specific to the :term:`herd`
+  (such as authentication, ports where the server listens, etc)
+
+- *conf_05_\*.py*: configuration of server-specific authentication
+
+- *conf_06_\*.py*: configuration of defaults, some come from the
+  source distribution, some might be specific to the site, etc.
+
+- *conf_09_\*.py*: configuration of :term:`site` specifics
+  
+- *conf_10_SERVERNAME.py*: configuration of the server's targets
+  
+The module :mod:`ttbl.config` provides access to the top functions to
+set TTBD's configuration.
+
 .. _ttbd_config_auth_local:
 
 Configure authentication for local users (optional)

@@ -399,6 +399,8 @@ Provisioning OS specific metadata
 
 .. include:: 09-api-http.rst
 
+.. _ttbd_conf_api::
+             
 *ttbd* Configuration API for targets
 ====================================
 
