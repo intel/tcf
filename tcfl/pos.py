@@ -603,7 +603,10 @@ class extension(tc.target_extension_c):
                     "but I don't know how to fix it; target does not "
                     "declare capability `boot_config_fix`",
                     attachments = dict(output = output))
-
+        else:
+            target.report_error(
+                "POS: didn't find a login prompt in output to try fixing",
+                attachments = dict(output = output, alevel = 0))
     def boot_to_pos(self, pos_prompt = None,
                     # plenty to boot to an nfsroot, hopefully
                     timeout = 60,
@@ -643,8 +646,10 @@ class extension(tc.target_extension_c):
                     output = ""
                     for data in attachment.make_generator():
                         output += data
-                        if len(output) > 4096:
+                        if len(output) > 32 * 1024:
                             # we need enought to capture a local boot
+                            # with log messages and all that add up to
+                            # a lot
                             break
                     if output == "" or output == "\x00":
                         target.report_error("POS: no console output, retrying")
@@ -998,7 +1003,12 @@ EOF""")
             # ensure we remove any possibly existing one
             "rm -f /tmp/tcf.metadata.yaml;"
             # rsync the metadata file to target's /tmp
-            " time -p rsync -cHaAX --numeric-ids --delete --inplace -L -vv"
+            # no need to do attributes here, so do not use -AX; this
+            # allows when running on SELinux combined systems (expect
+            # vs don't) to get errors such as:
+            #
+            ## rsync: rsync_xal_set: lremovexattr("/tmp/tcf.metadata.yaml","security.selinux") failed: Permission denied (13)
+            " time -p rsync -cHa --numeric-ids --delete --inplace -L -vv"
             # don't really complain if there is none
             " --ignore-missing-args"
             " %(rsync_server)s/%(image)s/.tcf.metadata.yaml"
