@@ -60,6 +60,10 @@ setupl=${SETUPL:-}
 destdir=$1
 if echo $destdir | grep -q ".tar.xz"; then
     tarname=$destdir
+    if ! [ -z "${TARDIR:-}" ]; then
+        tardit=$TARDIR
+        tarname=$TARDIR/$(basename $tarname)
+    fi
     destdir=${destdir%%.tar.xz}
 fi
 image_file=$2
@@ -119,7 +123,7 @@ if [ -z "$image_type" ]; then
             ;;
         *qcow2)
             image_type=qcow2
-            nbd_dev=/dev/nbd0
+            nbd_dev=${NBD_DEV:-/dev/nbd0}
             ;;
         tcf-live.iso)
             image_type=tcflive;;
@@ -430,6 +434,19 @@ fi
 # PHASE: Setup
 #
 
+# SELinux!!! -- keep track of what files need to be relabeled because
+# we will modify them. Relabelling will be done in the post-setup
+# script execution.
+#
+# This is needed because POS runs with SELinux disabled, so the
+# selinux attributes are not modified, just carried over as any
+# attribute. Different Linux distros, different SELinux policies.
+#
+# This is an associative array, just set to 1
+# (selinux_relabel["FILENAME"]=1; FILENAME is the absolute filename in
+# the final filesystem).
+declare -A selinux_relabel
+
 # Remove the root password and unset the counters so you are not
 # forced to change it -- we want passwordless login on the serial
 # console or anywhere we access the test system.
@@ -439,17 +456,19 @@ for shadow_file in \
     if sudo test -r $shadow_file; then
         sudo sed -i 's/root:.*$/root::::::::/' $shadow_file
         info $shadow_file: removed root password and reset counters
+        selinux_relabel["${shadow_file##$destdir}"]=1
     fi
 done
 
-for file in etc/pam.d/common-auth usr/share/pam.d/su; do
-    [ -r $destdir/$file ] || continue
-    grep -q "pam_unix.so.*nullok" $destdir/$file && continue
+for file in $destdir/etc/pam.d/* $destdir/usr/share/pam.d/*; do
+    [ -f $file ] || continue
+    grep -q "pam_unix.so.*nullok" $file && continue
     # Some distros configure PAM to disallow passwordless root; we
     # change that so automation doesn't have to work through so many
     # hoops
     info "$file: allowing login to accounts with no password (adding 'nullok')"
-    sudo sed -i 's/pam_unix.so/pam_unix.so\tnullok /' $destdir/$file
+    sudo sed -i 's/pam_unix.so/pam_unix.so\tnullok /' $file
+    selinux_relabel["${file##$destdir}"]=1
 done
 
 if test -r $destdir/usr/share/defaults/etc/profile.d/50-prompt.sh; then
@@ -457,26 +476,9 @@ if test -r $destdir/usr/share/defaults/etc/profile.d/50-prompt.sh; then
     # scripting way harder
     sudo sed -i 's/^export PS1=.*/export PS1="\\u@\\H \\w $endchar "/' \
          $destdir/usr/share/defaults/etc/profile.d/50-prompt.sh
+    selinux_relabel["usr/share/defaults/etc/profile.d/50-prompt.sh"]=1
     info $image_type: disable ANSI coloring in prompt, makes scripting harder
 fi
-
-case $image_type in
-    fedora*)
-        # Disable SELinux -- can't figure out how to allow it to work
-        # properly in allowing ttyS* access to agetty so we can have
-        # a serial console.
-        # We get, upon boot, the error
-        ## [ 2.778202] systemd[1]: getty.target: Wants dropin
-        ##   /etc/systemd/system/getty.target.wants/serial-getty@ttyS0.service
-        ##   unreadable, ignoring: Permission denied
-        if [ -r $destdir/etc/selinux/config ]; then
-            sudo sed -i 's/SELINUX=enforcing/SELINUX=permissive/' $destdir/etc/selinux/config
-            info $image_type: disabled SELinux
-        fi
-        ;;
-    *)
-        ;;
-esac
 
 case $image_type in
     # Remove the GDM initial config user, so we don't get stuck
@@ -488,6 +490,7 @@ case $image_type in
 InitialSetupEnable=false
 EOF
             info $image_type: disabled GNOME initial setup
+            selinux_relabel["/etc/gdm3/custom.conf"]=1
         fi
         ;;
     fedoralive|qcow2)
@@ -497,6 +500,7 @@ EOF
 InitialSetupEnable=false
 EOF
             info $image_type: disabled GNOME initial setup
+            selinux_relabe["/etc/gdm/custom.conf"]=1
         fi
         ;;
     *)
@@ -510,8 +514,12 @@ esac
 # Now generate metadata, including the setup script once the image is
 # flashed.
 #
-# Variables in the metadat script $ROOT $ROOTDEV $BOOT_TTY
+# Variables in the metadata script $ROOT $ROOTDEV $BOOT_TTY $SELINUX_RELABEL
 #
+# SELINUX_RELABEL are files we need to SELInux relabel when we are
+# done; every file you modify needs to be listed here
+# (SELINUX_RELABEl="${SELINUX_RELABEL:-} NEWFILE"; NEWFILE has to be
+# absolute to the target filesystem, not relative to /mnt)
 md=$tmpdir/.tcf.metadata.yaml
 cat > $md <<EOF
 # this helps setup the image in a target system, created
@@ -554,7 +562,8 @@ EOF
 esac
 
 #
-# This file is
+# Parse in the /etc/os-release file; this file is in general this
+# format and can be used to make decissions:
 #
 ## NAME=Fedora
 ## VERSION="29 (Workstation Edition)"
@@ -627,9 +636,10 @@ EOF
       $rename_commands \\
       etc/fstab
 EOF
+    selinux_relabel["etc/fstab"]=1
 fi
     
-if grep -q "^UUID=.*[ \t]\+/[ \t]" $destdir/etc/fstab; then
+if test -r $destdir/etc/fstab && grep -q "^UUID=.*[ \t]\+/[ \t]" $destdir/etc/fstab; then
     # rootfs on UUID; generate a command in the metdata file to
     # runtime replace the UUID with the one of our rootfs
     info "fstab: replacing UUIDs for / [ setup script will fixup ]"
@@ -638,9 +648,10 @@ if grep -q "^UUID=.*[ \t]\+/[ \t]" $destdir/etc/fstab; then
       -e "/^UUID=.* \/[ \t]/s|^UUID=[-0-9a-fA-F]\+|UUID=\$(lsblk -no uuid \$ROOTDEV)|g" \\
       etc/fstab 
 EOF
+    selinux_relabel["etc/fstab"]=1
 fi
 
-if grep -q UUID= $destdir/etc/fstab; then
+if test -r $destdir/etc/fstab && grep -q UUID= $destdir/etc/fstab; then
     # aah...UUID based filesystems need love
     # - swap file systems, we know we'll create a swap partition labeled
     #   tcf-swap, so just throw that in
@@ -653,6 +664,7 @@ if grep -q UUID= $destdir/etc/fstab; then
        -e 's|^UUID=.*/boot|# <commented out by tcf-image-setup.sh> \0|'  \
        -e 's|^UUID=.*/boot/efi|# <commented out by tcf-image-setup.sh> \0|'  \
        $destdir/etc/fstab
+    selinux_relabel["etc/fstab"]=1
     # /boot filesystem, we wouldn't even really want to mount it, but
     # we do so test scripts can manipulate it; we always do partition
     # one, but who knows...and this is done when the image is flashed
@@ -702,6 +714,7 @@ do
          -e 's|^BindsTo=|# <commented out by tcf-image-setup.sh> BindsTo=|' \
          $systemd_libdir/systemd/system/serial-getty@.service
     info $image_type: systemd: always enabling serial-getty@.service
+    selinux_relabel["${systemd_libdir##$destdir}/systemd/system/serial-getty@.service"]=1
     systemd_enabled=1
 done
 
@@ -711,29 +724,44 @@ if test -r $destdir/etc/fstab && ! grep -q '[ \t]/[ \t]' $destdir/etc/fstab; the
     cat >> $md <<EOF
   echo "\$ROOTDEV / auto defaults 1 1" >> \$ROOT/etc/fstab
 EOF
+    selinux_relabel["etc/fstab"]=1
 fi
 
 # If SELinux is enabled in centos/rhel, we need to make sure the console is there
 if  test -r $destdir/etc/selinux/targeted/contexts/files/file_contexts \
-        && grep -q "\(centos\|rhel\|fedora\)" <<< "${ID:-}"; then
-    # Some distros tighten so much the /dev/ttyUSB0 permissions with
+        && grep -qi "\(centos\|rhel\|fedora\)" <<< "${ID:-}"; then
+    # Some distros tighten so much the /dev/tty(USB|S0) permissions with
     # SELinux that we are not allowed to login, so as we know we are
     # login in in this BOOT_TTY, make it allowed.
     cat >> $md <<EOF
-  grep -q USB <<< \$BOOT_TTY && sed -i "/ttyUSB.*usbtty_device_t/i/dev/\$BOOT_TTY -c system_u:object_r:tty_device_t:s0" \\
+  sed -i "/ttyUSB.*usbtty_device_t/i/dev/\$BOOT_TTY -c system_u:object_r:tty_device_t:s0" \\
       \$ROOT/etc/selinux/targeted/contexts/files/file_contexts
 EOF
+    selinux_relabel["etc/selinux/targeted/contexts/files/file_contexts"]=1
 fi
 
 if [ $systemd_enabled = 1 ]; then
     info "systemd: forcing boot console to start (systemd not always picks up)"
+    # use the path to systemctl, some PATHs not right
     cat >> $md <<EOF
-  chroot \$ROOT systemctl enable serial-getty@\$BOOT_TTY
+  chroot \$ROOT /bin/systemctl enable serial-getty@\$BOOT_TTY
+  SELINUX_RELABEL="\${SELINUX_RELABEL:-} /etc/systemd/system/getty.target.wants/serial-getty@\$BOOT_TTY.service"
 EOF
 elif [ -r $destdir/etc/inittab ]; then
     # Old yoctos
     cat >> $md <<EOF
   echo "U0:12345:respawn:/bin/start_getty 115200 /dev/\$BOOT_TTY vt102" >> \ROOT/etc/inittab
+EOF
+    selinux_relabel["etc/inittab"]=1
+fi
+
+if [ -f $destdir/etc/selinux/config ]; then
+    # If this distro sports some sort of SELinux, ensure we relabel by
+    # hand all files we modified--why by hand? because restorecon
+    # doesn't seem to work under the POS environment [which it runs
+    # with SELinux disabled to avoid it mucking the SElinux contexts].
+    cat >> $md <<EOF
+  for file in ${!selinux_relabel[@]} \${SELINUX_RELABEL:-}; do chroot . setfattr -hn security.selinux -v \$(chroot . /sbin/matchpathcon -n \$file) \$file; done
 EOF
 fi
 
@@ -753,7 +781,10 @@ if ! [ -z "${tarname:-}" ]; then
     # --force-local: if name has :, it is still local
     # --selinux --acls --xattrs: keep all those attributes identical
     info $tarname: packing up
+    # pack it with a name that is not final, so another process
+    # doesn't try to pick it up until it is fully baked
     sudo XZ_OPT="--threads=0 -9e" \
-         tar cJf $tarname --numeric-owner --force-local --selinux --acls --xattrs $basename
+         tar cJf $tarname.tmp --numeric-owner --force-local --selinux --acls --xattrs $basename
+    mv $tarname.tmp $tarname
     sudo rm -rf $destdir
 fi
