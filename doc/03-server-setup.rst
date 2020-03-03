@@ -1098,7 +1098,7 @@ POS; for example:
     
     $ /usr/share/tcf/kickstart-install.sh rhel.qcow2 RHEL-8.1.0-x86_64-dvd1.iso 
     $ BOOT_PARTITION=2 ROOT_PARTITION=4 \
-        /ust/share/tcf/tcf-image-setup.sh /home/ttbd/images/rhel::8.1.0::x86_64 rhel.qcow2 
+        /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/rhel::8.1:0:x86_64 rhel.qcow2 
 
 - Ubuntu::
 
