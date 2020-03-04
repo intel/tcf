@@ -114,6 +114,14 @@ class impl_c(ttbl.tt_interface_impl_c):
             Exception.__init__(self)
             self.wait = wait
 
+    class error_e(Exception):
+        "generic power implementation error"
+        pass
+
+    class power_on_e(error_e):
+        "generic power-on implementation error"
+        pass
+
     def on(self, target, component):
         """
         Power on the component
@@ -194,14 +202,28 @@ class interface(ttbl.tt_interface):
 
         ts0 = ts = time.time()
         while ts - ts0 < impl.timeout:
-            impl.on(target, component)
-            target.log.info("%s: impl powered on +%.1fs", component, ts - ts0)
-            new_state = self._impl_get(impl, target, component)
-            if new_state == None \
-               or self._impl_get(impl, target, component) == True: # check
-                return
-            target.log.info("%s: ipmi didn't power on +%.1f retrying",
-                            component, ts - ts0)
+            try:
+                impl.on(target, component)
+            except impl.power_on_e as e:
+                target.log.warning("%s: impl failed powering on +%.1f;"
+                                   " powering off and retrying: %s",
+                                   component, ts - ts0, e)
+                try:
+                    self._impl_off(impl, target, component)
+                except impl.error_e as e:
+                    target.log.error(
+                        "%s: impl failed recovery power off +%.1f;"
+                        " ignoring for retry: %s",
+                        component, ts - ts0, e)
+            else:
+                target.log.info("%s: impl powered on +%.1fs",
+                                component, ts - ts0)
+                new_state = self._impl_get(impl, target, component)
+                if new_state == None \
+                   or self._impl_get(impl, target, component) == True: # check
+                    return
+                target.log.info("%s: impl didn't power on +%.1f retrying",
+                                component, ts - ts0)
             time.sleep(impl.wait)
             ts = time.time()
         raise RuntimeError("%s: impl power-on timed out after %.1fs"
@@ -622,7 +644,7 @@ class daemon_c(impl_c):
         #: >>>         daemon_c.on(self, target, component)
         #:
         #: vs using *self.cmdline_extra.append()*
-        
+
         self.cmdline_extra = []
         self.precheck_wait = precheck_wait
         if env_add:
@@ -654,13 +676,6 @@ class daemon_c(impl_c):
             self.pidfile = "%(path)s/%(component)s-%(name)s.pid"
         assert isinstance(mkpidfile, bool)
         self.mkpidfile = mkpidfile
-
-
-    class error_e(Exception):
-        pass
-
-    class start_e(error_e):
-        pass
 
 
     def verify(self, target, component, cmdline_expanded):
@@ -730,7 +745,7 @@ class daemon_c(impl_c):
             message = "configuration error? can't template command line #%d," \
                 " missing field or target property: %s" % (count, e)
             target.log.error(message)
-            raise self.start_e(message)
+            raise self.power_on_e(message)
         target.log.info("%s: command line: %s"
                         % (component, " ".join(_cmdline)))
         if self.env_add:
@@ -767,7 +782,7 @@ class daemon_c(impl_c):
                         "env %s: [%s] %s", key, type(val).__name__, val)
             raise
         except OSError as e:
-            raise self.start_e("%s: %s failed to start [cmdline %s]: %s" % (
+            raise self.power_on_e("%s: %s failed to start [cmdline %s]: %s" % (
                 component, self.name, " ".join(_cmdline), e))
 
         if self.precheck_wait:
@@ -778,8 +793,8 @@ class daemon_c(impl_c):
                                       ( target, component, _cmdline, ))
         if pid == None:
             self.log_stderr(target, component, stderrf)
-            raise self.start_e("%s: %s failed to start"
-                               % (component, self.name))
+            raise self.power_on_e("%s: %s failed to start"
+                                  % (component, self.name))
         ttbl.daemon_pid_add(pid)
 
 
