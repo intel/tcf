@@ -57,9 +57,10 @@ class qmp_c(object):
     Simple handler for the Qemu Monitor Protocol that allows us to run
     basic QMP commands and report on status.
     """
-    def __init__(self, sockfile):
+    def __init__(self, sockfile, logfile = None):
         self.sockfile = sockfile
         self.log = logging.root.getChild("qmp")
+        self.logfile = logfile
         self.sk = None
 
     class exception(RuntimeError):
@@ -94,15 +95,14 @@ class qmp_c(object):
         else:
             self.log.error("%s: cannot connect after %d tries"
                            % (self.sockfile, tries,))
-            logfilename = self.sockfile.replace(".pid.qmp", "-stderr.log")
-            if os.path.exists(logfilename):
-                with open(logfilename) as logfile:
+            if os.path.exists(self.logfile):
+                with open(self.logfile) as logfile:
                     for line in logfile:
                         self.log.error("%s: qemu log: %s"
                                        % (self.sockfile, line.strip()))
             else:
                 self.log.error("%s: (no qemu log at '%s')"
-                               % (self.sockfile, logfilename))
+                               % (self.sockfile, self.logfile))
             raise self.cant_connect_e("%s: cannot connect after %d "
                                       "tries; QEMU is off?"
                                       % (self.sockfile, tries))
@@ -335,7 +335,12 @@ class pc(ttbl.power.daemon_c,
             pidfile = "%(path)s/qemu.pid",
             # qemu makes its own PID files
             mkpidfile = False)
+        # set the power controller part to paranoid mode; this way if
+        # QEMU fails to start for a retryable reason (like port
+        # taken), it will be retried automatically
+        self.power_on_recovery = True
         self.paranoid_get_samples = 1
+        self.paranoid = True
         ttbl.images.impl_c.__init__(self)
         self.upid_set(
             "QEMU virtual machine",
@@ -396,8 +401,16 @@ class pc(ttbl.power.daemon_c,
         #
         # Returns *True* if the QEMU VM is running ok, *False* otherwise;
         # raises anything on errors
+
+        stderr_fname = os.path.join(target.state_dir,
+                                    component + "-" + self.name + ".stderr")
+        with open(stderr_fname) as stderrf:
+            if 'Address already in use' in stderrf:
+                stderrf.seek(0, 0)
+                return False
         try:
-            with qmp_c(os.path.join(target.state_dir, "qemu.qmp")) as qmp:
+            with qmp_c(os.path.join(target.state_dir, "qemu.qmp"),
+                       stderr_fname) as qmp:
                 r = qmp.command("query-status")
                 # prelaunch is what we get when we are waiting for GDB
                 return r['status'] == "running" or r['status'] == 'prelaunch'
