@@ -58,7 +58,6 @@ except ImportError as e:
     import flask.ext.login as flask_login
     import flask.ext.principal as flask_principal
 import StringIO
-import ttbl
 import traceback
 import argparse
 import re
@@ -66,7 +65,6 @@ import pprint
 import tempfile
 import time
 import commonl
-import ttbl.config
 import requests
 import shutil
 import sys
@@ -77,7 +75,9 @@ sys.setdefaultencoding('utf-8')
 import urlparse
 import glob
 
-#import prctl
+import ttbl
+import ttbl.config
+import ttbl.allocation
 
 try:
     import sdnotify
@@ -584,6 +584,139 @@ def _target_release(target_id):
     except Exception as e:
         flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
     return flask.jsonify({})
+
+
+@app.route(API_PREFIX + 'allocation', methods = [ 'PUT' ])
+@flask_login.login_required
+def _put_allocation():
+    # {
+    #    "obo": USERNAME,
+    #    "priority": int(PRIO),
+    #    "guests": [ "guest1", "guest2"... ]
+    #    "preempt": bool(PREEMPT),
+    #    "queue": bool(QUEUE),
+    #    "reason": string,
+    #    "groups": {
+    #        "group1" : [ target1, target2, target3 ... ],
+    #        "group2" : [ target3, target4, target1 ... ],
+    #        "group3" : [ target1, target2, target5, target6 ... ],
+    #    }
+    # }
+    #
+    # return {
+    #    "state": { 'busy', 'queued', 'allocated', 'rejected' },
+    #    "allocationid": ID,    # if queued; derived from OWNER's cookie
+    #    "message": {
+    #      "not allowed on TARGETNAMEs",	# when rejected
+    #      "targets TARGETNAMEs are busy",	# when not queued
+    #    }
+    # }
+    try:
+        data = flask.request.get_json()
+        if data == None:
+            # get from from encoding
+            data = {}
+            for key, value in flask.request.form.iteritems():
+                #logging.error("DEBUG args key %s value %s", key, value)
+                data[key] = json.loads(value)
+        assert isinstance(data, dict), \
+            "need a dictionary of data parameters to make a request;" \
+            " got %s (%s)" % (data, type(data))
+        obo_user = data.get('obo', None)
+        if obo_user == None:
+            obo_user = flask_login.current_user
+        else:
+            raise NotImplementedError("no way to specify OBO user yet")
+
+        #logging.error("DEBUG args: %s" % pprint.pformat(data))
+        result = ttbl.allocation.request(
+            data['groups'],
+            calling_user = flask_login.current_user._get_current_object(),
+            obo_user = data.get(
+                'obo_user',
+                flask_login.current_user._get_current_object().get_id()),
+            guests = data.get('guests', []),
+            priority = data.get('priority', None),
+            preempt = data.get('preempt', False),
+            queue = data.get('queue', False),
+            reason = data.get('reason', None),
+        )
+    except Exception as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    return flask.jsonify(result)
+
+
+@app.route(API_PREFIX + 'allocation/<string:allocationid>',
+           methods = [ 'GET' ])
+@flask_login.login_required
+def _get_allocation(allocationid):
+    try:
+        result = ttbl.allocation.get(
+            allocationid,
+            flask_login.current_user._get_current_object())
+        #logging.error("DEBUG get %s" % pprint.pformat(result))
+    except Exception as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    return flask.jsonify(result)
+
+@app.route(API_PREFIX + 'allocation/',
+           methods = [ 'GET' ])
+@flask_login.login_required
+def _query_allocation():
+    try:
+        result = ttbl.allocation.query(
+            flask_login.current_user._get_current_object())
+    except Exception as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    return flask.jsonify(result)
+
+
+@app.route(API_PREFIX + 'allocation/<string:allocationid>',
+           methods = [ 'DELETE' ])
+@flask_login.login_required	# release the allocation
+def _delete_allocation(allocationid):
+    try:
+        result = ttbl.allocation.delete(
+            allocationid,
+            flask_login.current_user._get_current_object())
+    except Exception as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    return flask.jsonify(result)
+
+
+@app.route(API_PREFIX + 'keepalive', methods = [ 'PUT' ])
+@flask_login.login_required
+def _put_keepalive():
+    try:
+        result = ttbl.allocation.keepalive()
+    except Exception as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    return flask.jsonify(result)
+
+
+@app.route(API_PREFIX + 'allocation/<string:allocationid>/<string:guestname>',
+           methods = [ 'PATCH' ])
+@flask_login.login_required
+def _patch_guest(allocationid, guestname):
+    try:
+        user = flask_login.current_user._get_current_object()
+        result = ttbl.allocation.guest_add(allocationid, user, guestname)
+    except Exception as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    return flask.jsonify(result)
+
+@app.route(API_PREFIX + 'allocation/<string:allocationid>/<string:guestname>',
+           methods = [ 'DELETE' ])
+@flask_login.login_required
+def _delete_guest(allocationid, guestname):
+    try:
+        user = flask_login.current_user._get_current_object()
+        result = ttbl.allocation.guest_remove(allocationid, user, guestname)
+    except Exception as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    return flask.jsonify(result)
+
+
 
 def tb_file_local_path_get(username, filepath):
     """
@@ -1183,6 +1316,9 @@ if __name__ == "__main__":
         os.chmod(cert_fn, 0o640)	# Make the cert g+w
     else:
         raise RuntimeError("can't give --no-ssl and --ssl* options")
+
+    ttbl.allocation.path = os.path.join(ttbl.config.state_path, "allocations")
+    ttbl.allocation.init()
 
     #
     # Make this process a reaper

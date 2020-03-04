@@ -1112,8 +1112,7 @@ class test_target(object):
 
         # Create the directory where we'll keep the target's state
         self.state_dir = os.path.join(self.state_path, self.id)
-        if not os.path.isdir(self.state_dir):
-            os.makedirs(self.state_dir, 0o2770)
+        commonl.makedirs_p(os.path.join(self.state_dir, "queue"), 0o2770)
         #: filesystem database of target state; the multiple daemon
         #: processes use this to store information that reflect's the
         #: target's state.
@@ -1265,6 +1264,21 @@ class test_target(object):
                     del r['owner']
                 except KeyError:
                     pass
+
+        waiters, preempt_in_queue = ttbl.allocation._queue_load(
+            os.path.join(self.state_dir, "queue"))
+        logging.error("DEBUG: waiters %s", waiters)
+        if waiters:
+            r['_queue'] = []
+            for prio, ts, flags, allocationid in sorted(waiters):
+                r['_queue'].append(dict(
+                    priority = prio,
+                    timestamp = int(ts),
+                    preempt = 'P' in flags,
+                    exclusive = 'E' in flags,
+                    allocationid = allocationid
+                ))
+            r['_queue_preemption'] = preempt_in_queue
 
         r['id'] = self.id
         return r
