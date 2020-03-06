@@ -52,11 +52,11 @@ class test_target_e(Exception):
     pass
 
 class test_target_busy_e(test_target_e):
-    def __init__(self, target):
+    def __init__(self, target, who, owner):
         test_target_e.__init__(
             self,
-            "%s: tried to use busy target (owned by '%s')"
-            % (target.id, target.owner_get()))
+            "%s: '%s' tried to use busy target (owned by '%s')"
+            % (target.id, who, owner))
 
 class test_target_not_acquired_e(test_target_e):
     def __init__(self, target):
@@ -1255,6 +1255,7 @@ class test_target(object):
 	# mandatory fields, override them all
         if commonl.field_needed('owner', projections):
             owner = self.owner_get()
+            #logging.error("DEBUG: owner %s", owner)
             if owner:
                 r['owner'] = owner
             else:
@@ -1264,23 +1265,37 @@ class test_target(object):
                     del r['owner']
                 except KeyError:
                     pass
+        if commonl.field_needed('allocationid', projections):
+            allocationid = self.allocationid_get()
+            if allocationid:
+                r['allocationid'] = allocationid
+            else:
+                # forcibly delete the key if it might have existed
+                # from the tags or fsdb
+                try:
+                    del r['allocationid']
+                except KeyError:
+                    pass
 
-        waiters, preempt_in_queue = ttbl.allocation._queue_load(
-            os.path.join(self.state_dir, "queue"))
-        logging.error("DEBUG: waiters %s", waiters)
-        if waiters:
-            r['_queue'] = []
-            for prio, ts, flags, allocationid in sorted(waiters):
-                r['_queue'].append(dict(
-                    priority = prio,
-                    timestamp = int(ts),
-                    preempt = 'P' in flags,
-                    exclusive = 'E' in flags,
-                    allocationid = allocationid
-                ))
-            r['_queue_preemption'] = preempt_in_queue
+        _queue_needed = commonl.field_needed('_queue', projections)
+        _queue_preemption_needed = commonl.field_needed('_queue_preemption', projections)
+        if _queue_needed or _queue_preemption_needed:
+            waiters, preempt_in_queue = ttbl.allocation._queue_load(
+                os.path.join(self.state_dir, "queue"))
+            if _queue_needed:
+                if waiters:
+                    r['_queue'] = []
+                    for prio, ts, flags, allocationid, _ in reversed(waiters):
+                        r['_queue'].append(dict(
+                            priority = prio,
+                            timestamp = int(ts),
+                            preempt = 'P' in flags,
+                            exclusive = 'E' in flags,
+                            allocationid = allocationid
+                        ))
+            if _queue_preemption_needed:
+                r['_queue_preemption'] = preempt_in_queue
 
-        r['id'] = self.id
         return r
 
 
@@ -1487,13 +1502,54 @@ class test_target(object):
             f.write(time.strftime("%c\n"))
             pass
 
+    def allocationid_get(self):
+        """
+        Return who the current owner of this target is
+
+        :returns: object describing the owner
+        """
+        owner_link = self.fsdb.get('owner')
+        if owner_link == None:
+            #logging.error("DEBUG: %s owner_link None", self.id)
+            return None
+        allocationid = ttbl.allocation._allocationid_link_validate(os.path.join(self.state_dir, owner_link))
+        if allocationid == None:
+            logging.error("DEBUG: %s owner_link %s allocationid None", self.id, owner_link)
+            return None
+        logging.error("DEBUG: %s owner_link %s allocationid %s",
+                      self.id, owner_link, allocationid)
+        return allocationid
+
+    def owner_get_v1(self):
+        """
+        Return who the current owner of this target is
+
+        :returns: object describing the owner
+        """
+        # OLD acquisition method
+        return self._acquirer.get()
+
     def owner_get(self):
         """
         Return who the current owner of this target is
 
         :returns: object describing the owner
         """
-        return self._acquirer.get()
+        # OLD acquisition method
+        acquirer_owner = self._acquirer.get()
+        if acquirer_owner:
+            return acquirer_owner
+        # NEW allocator
+        allocationid = self.allocationid_get()
+        if allocationid == None:
+            return None
+        try:
+            db = ttbl.allocation.allocation_c.get_from_cache(allocationid)
+            user = db.get('user')
+            return user
+        except ttbl.allocation.allocation_c.invalid_e:
+            return None
+
 
     def acquire(self, who, force):
         """
@@ -1508,7 +1564,7 @@ class test_target(object):
             if self._acquirer.acquire(who, force):
                 self._state_cleanup(True)
         except acquirer_c.busy_e:
-            raise test_target_busy_e(self)
+            raise test_target_busy_e(self, who, self.owner_get())
         # different operations in the system might require the user
         # storage area to exist, so ensure it is there when the user
         # acquires a target -- as he might need it.
@@ -1689,10 +1745,11 @@ class test_target(object):
             # this is the path for executing internal daemon processes
             yield
             return
-        if self.owner_get() == None:
+        owner = self.owner_get()
+        if owner == None:
             raise test_target_not_acquired_e(self)
-        if who != self.owner_get():
-            raise test_target_busy_e(self)
+        if who != owner:
+            raise test_target_busy_e(self, who, owner)
         yield
 
     def target_is_owned_and_locked(self, who):

@@ -8307,6 +8307,7 @@ import app_manual
 tcfl.app.driver_add(app_manual.app_manual)
 
 # Target API extensions
+import target_ext_alloc
 import target_ext_console
 target_c.extension_register(target_ext_console.extension, "console")
 import target_ext_input

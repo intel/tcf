@@ -39,6 +39,7 @@ import datetime
 import errno
 import fnmatch
 import json
+import numbers
 import signal
 import threading
 import ttblc
@@ -405,9 +406,15 @@ def _targets_gets():
     _list = []
     calling_user = flask_login.current_user._get_current_object()
     for target_name in ttbl.config.targets:
+        # maybe the user can't see that target because of permissions
         target = ttbl.test_target.get_for_user(target_name, calling_user)
         if target:
-            _list.append(target.to_dict(projections))
+            d = target.to_dict(projections)
+            if d:
+                # list it only if the projections yielded a non empty
+                # set of data
+                d['id'] = target.id
+                _list.append(d)
     return flask.jsonify({'targets': _list})
 
 @app.route(API_PREFIX + 'targets/<string:target_id>', methods = ['GET'])
@@ -688,10 +695,33 @@ def _delete_allocation(allocationid):
 @flask_login.login_required
 def _put_keepalive():
     try:
-        result = ttbl.allocation.keepalive()
+        data = flask.request.get_json()
+        if data == None:
+            # get from from encoding
+            data = {}
+            for key, value in flask.request.form.iteritems():
+                #logging.error("DEBUG args key %s value %s", key, value)
+                data[key] = json.loads(value)
+        assert isinstance(data, dict), \
+            "need a dictionary of data parameters to make a request;" \
+            " got %s (%s)" % (data, type(data))
+        if 'pressure' in data:
+            pressure = json.loads(data.pop('pressure'))
+            assert isinstance(pressure, numbers.Integral), \
+                "pressure needs to be an number" # FIXME: range?
+        else:
+            pressure = 0
+        result = {}
+        for allocationid, expected_state in data.iteritems():
+            r = ttbl.allocation.keepalive(
+                allocationid, expected_state, pressure,
+                flask_login.current_user._get_current_object())
+            if r['state'] == expected_state:
+                continue		# nothing to return
+            result[allocationid] = r
     except Exception as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
-    return flask.jsonify(result)
+    return flask.jsonify(dict(result = result))
 
 
 @app.route(API_PREFIX + 'allocation/<string:allocationid>/<string:guestname>',
@@ -880,10 +910,11 @@ def _systemd_keepalive(t):
     # We keepalive whenever we can
     sd_notify.notify("WATCHDOG=1")
 
+daemon_user = ttbl.user_control.User('local', roles = [ "admin" ])
+
 def _do_cleanup():
     """
     """
-    daemon_user = ttbl.user_control.User('local', roles = [ "admin" ])
     target_list = ttbl.config.targets.keys()
     who = who_make("cleanup", user = daemon_user)
     for target_id in target_list:
@@ -899,13 +930,13 @@ def _do_cleanup():
             owner = target.owner_get()
             if owner == None:
                 _do_cleanup_released(target, who)
-            else:
+            elif target.owner_get_v1():
+                # this gets replaced with ttbl.allocation.maintenance()
                 _do_cleanup_acquired(target, owner, who)
         except ttbl.test_target_e as e:
             loge("%s" % e)
         except Exception as e:
-            loge("%s: %s" % (target_id, e))
-            traceback.print_exc()
+            loge("%s: %s\n" % (target_id, e) + traceback.format_exc())
 
 # Another kludge: disable security warnings from request's urllib3
 # vendored version. We know, we know. And probably there is a way to
@@ -938,6 +969,7 @@ def cleanup_process_fn():
         logdl(8, "Scanning for idle targets")
         try:
             _systemd_keepalive(t)	# keepalive
+            ttbl.allocation.maintenance(t, daemon_user)
             if t - cleanup_targets_last > ttbl.config.target_max_idle:
                 _do_cleanup()
                 cleanup_targets_last = t
@@ -945,7 +977,8 @@ def cleanup_process_fn():
                 cleanup_files()
                 cleanup_files_last = t
         except Exception as e:
-            loge("Exception in clean thread: %s\n" % e)
+            loge("Exception in clean thread: %s\n"
+                 % e + traceback.format_exc())
 
 main_pid = os.getpid()
 

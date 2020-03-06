@@ -393,6 +393,7 @@ if __name__ == "__main__":
     tcfl.tc.argp_setup(arg_subparsers)
     # imported by tcfl.tc
     tcfl.tc.pos.cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_alloc._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_console._cmdline_setup(arg_subparsers)
