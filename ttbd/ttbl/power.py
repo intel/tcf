@@ -205,13 +205,13 @@ class interface(ttbl.tt_interface):
             try:
                 impl.on(target, component)
             except impl.power_on_e as e:
-                target.log.warning("%s: impl failed powering on +%.1f;"
-                                   " powering off and retrying: %s",
-                                   component, ts - ts0, e)
+                target.log.exception("%s: impl failed powering on +%.1f;"
+                                     " powering off and retrying: %s",
+                                     component, ts - ts0, e)
                 try:
                     self._impl_off(impl, target, component)
                 except impl.error_e as e:
-                    target.log.error(
+                    target.log.exception(
                         "%s: impl failed recovery power off +%.1f;"
                         " ignoring for retry: %s",
                         component, ts - ts0, e)
@@ -219,8 +219,7 @@ class interface(ttbl.tt_interface):
                 target.log.info("%s: impl powered on +%.1fs",
                                 component, ts - ts0)
                 new_state = self._impl_get(impl, target, component)
-                if new_state == None \
-                   or self._impl_get(impl, target, component) == True: # check
+                if new_state == None or new_state == True: # check
                     return
                 target.log.info("%s: impl didn't power on +%.1f retrying",
                                 component, ts - ts0)
@@ -242,8 +241,7 @@ class interface(ttbl.tt_interface):
             impl.off(target, component)
             target.log.info("%s: impl powered off +%.1fs", component, ts - ts0)
             new_state = self._impl_get(impl, target, component)
-            if new_state == None \
-               or self._impl_get(impl, target, component) == False: # check
+            if new_state == None or new_state == False: # check
                 return
             target.log.info("%s: ipmi didn't power off +%.1f retrying",
                             component, ts - ts0)
