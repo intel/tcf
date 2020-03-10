@@ -295,7 +295,7 @@ class impl_c(ttbl.tt_interface_impl_c):
                     wf.write(command)
                 if response:
                     if hasattr(response, "pattern"):
-                        response_str = "regex:" + response.pattern
+                        response_str = "(regex) " + response.pattern
                     else:
                         response_str = response
                     target.log.debug("%s: expecting response: %s"
