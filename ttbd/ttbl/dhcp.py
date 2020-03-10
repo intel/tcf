@@ -350,8 +350,9 @@ subnet6 %(if_net)s/%(if_len)s {
                                    % (target_id, boot_ic))
 
             if not 'bsp' in target.tags:
-                bsps = target.tags['bsps'].keys()
-                kws['bsp'] = sorted(bsps)[0]
+                bsps = target.tags.get('bsps', {}).keys()
+                if bsps:
+                    kws['bsp'] = sorted(bsps)[0]
             kws.update(dict(
                 ipv4_gateway = ic.tags.get('ipv4_gateway', ""),
                 ipv4_netmask = commonl.ipv4_len_to_netmask_ascii(
@@ -624,8 +625,9 @@ def power_on_pre_pos_setup(target):
         # The service
         kws = dict(target.tags)
         if not 'bsp' in target.tags:
-            bsps = target.tags['bsps'].keys()
-            kws['bsp'] = sorted(bsps)[0]
+            bsps = target.tags.get('bsps', {}).keys()
+            if bsps:
+                kws['bsp'] = sorted(bsps)[0]
         kws.update(dict(
             ipv4_addr = interconnect['ipv4_addr'],
             ipv4_gateway = interconnect.get('ipv4_gateway', ""),
