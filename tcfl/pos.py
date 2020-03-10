@@ -480,7 +480,7 @@ class extension(tc.target_extension_c):
             raise self.unneeded
         tc.target_extension_c.__init__(self, target)
 
-        pos_capable = target.kws.get('pos_capable', None)
+        pos_capable = target.rt.get('pos_capable', None)
         if pos_capable == None or pos_capable == False:
             raise self.unneeded("target is not POS capable",
                                 dict(target = target))
