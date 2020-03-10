@@ -14,6 +14,7 @@ target's power or serial console via IPMI.
 """
 
 import logging
+import numbers
 import os
 import pprint
 import subprocess
@@ -115,8 +116,17 @@ class pci_ipmitool(ttbl.power.impl_c):
     Same as :class:`pci`, but executing *ipmitool* in the shell
     instead of using a Python library.
 
+    :param str hostname: BMC location
+      *[USERNAME[:PASSWORD]]@hostname.com*; note *PASSWORD* can be the
+      bare password or a string that indicates how to get it; refer to
+      the argument *password* for :func:`commonl.password_get`.
+
+    :param int ipmi_timeout: seconds to wait for IPMI response (will be
+      passed to *ipmitool*'s *-N* option
+    :param int ipmi_retries: times to retry the IPMI operation (will be
+      passed to *ipmitool*'s *-R* option.
     """
-    def __init__(self, hostname):
+    def __init__(self, hostname, ipmi_timeout = 10, ipmi_retries = 3):
         ttbl.power.impl_c.__init__(self, paranoid = True)
         user, password, hostname = commonl.split_user_pwd_hostname(hostname)
         self.hostname = hostname
@@ -127,6 +137,8 @@ class pci_ipmitool(ttbl.power.impl_c):
         # password asked in the command line
         self.cmdline = [
             "ipmitool",
+            "-N", "%d" % ipmi_timeout,
+            "-R", "%d" % ipmi_retries,
             "-H", hostname
         ]
         if user:
@@ -210,14 +222,24 @@ class pos_mode_c(ttbl.power.impl_c):
     Note that for this to be succesful and remove the chance of race
     conditions, this has to be previous to the component that powers
     on the machine via the BMC.
+
+    :param str hostname: BMC location
+      *[USERNAME[:PASSWORD]]@hostname.com*; note *PASSWORD* can be the
+      bare password or a string that indicates how to get it; refer to
+      the argument *password* for :func:`commonl.password_get`.
+
+    :param int ipmi_timeout: seconds to wait for IPMI response (will be
+      passed to *ipmitool*'s *-N* option
+    :param int ipmi_retries: times to retry the IPMI operation (will be
+      passed to *ipmitool*'s *-R* option.
     """
-    def __init__(self, hostname, timeout = 2, retries = 3):
+    def __init__(self, hostname, ipmi_timeout = 10, ipmi_retries = 3):
         assert isinstance(hostname, basestring)
-        assert retries > 0
-        assert timeout > 0
+        assert isinstance(ipmi_timeout, numbers.Real)
+        assert isinstance(ipmi_retries, int)
         ttbl.power.impl_c.__init__(self, paranoid = True)
         self.power_on_recovery = True
-        self.paranoid_get_samples = 0
+        self.paranoid_get_samples = 1
         user, password, hostname = commonl.split_user_pwd_hostname(hostname)
         self.hostname = hostname
         self.user = user
@@ -228,8 +250,8 @@ class pos_mode_c(ttbl.power.impl_c):
         self.cmdline = [
             "ipmitool",
             "-v", "-v", "-v",
-            "-N", "%d" % timeout,
-            "-R", "%d" % retries,
+            "-N", "%d" % ipmi_timeout,
+            "-R", "%d" % ipmi_retries,
             "-H", hostname
         ]
         if user:
@@ -238,7 +260,8 @@ class pos_mode_c(ttbl.power.impl_c):
         if password:
             self.env['IPMI_PASSWORD'] = password
         self.timeout = 20
-        self.wait = 0.5
+        self.wait = 0.1
+        self.paranoid_get_samples = 1
 
     def _run(self, target, command):
         try:
@@ -326,18 +349,32 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
     >>>     )
     >>> )
 
+
+    :param str hostname: BMC location
+      *[USERNAME[:PASSWORD]]@hostname.com*; note *PASSWORD* can be the
+      bare password or a string that indicates how to get it; refer to
+      the argument *password* for :func:`commonl.password_get`.
+
+    :param int ipmi_timeout: seconds to wait for IPMI response (will be
+      passed to *ipmitool*'s *-N* option
+    :param int ipmi_retries: times to retry the IPMI operation (will be
+      passed to *ipmitool*'s *-R* option.
     """
     def __init__(self, hostname,
                  precheck_wait = 0.5,
-                 chunk_size = 5, interchunk_wait = 0.1):
+                 chunk_size = 5, interchunk_wait = 0.1,
+                 ipmi_timeout = 10, ipmi_retries = 3):
         assert isinstance(hostname, basestring)
+        assert isinstance(ipmi_timeout, numbers.Real)
+        assert isinstance(ipmi_retries, int)
         ttbl.console.generic_c.__init__(self, chunk_size = chunk_size,
                                         interchunk_wait = interchunk_wait)
         ttbl.power.socat_pc.__init__(
             self,
             "PTY,link=console-%(component)s.write,rawer"
             "!!CREATE:console-%(component)s.read",
-            "EXEC:'/usr/bin/ipmitool -H %(hostname)s -U %(username)s -E"
+            "EXEC:'/usr/bin/ipmitool -N %(ipmi_timeout)s -R %(ipmi_retries)s"
+            " -H %(hostname)s -U %(username)s -E"
             " -I lanplus sol activate',sighup,sigint,sigquit",
             precheck_wait = precheck_wait,
         )
@@ -346,6 +383,10 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
         self.kws['hostname'] = hostname
         self.kws['username'] = user
         self.kws['password'] = password
+        self.kws['ipmi_timeout'] = ipmi_timeout
+        self.kws['ipmi_retries'] = ipmi_retries
+        self.ipmi_timeout = ipmi_timeout
+        self.ipmi_retries = ipmi_retries
         if password:
             self.env_add['IPMITOOL_PASSWORD'] = password
 
@@ -356,7 +397,10 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
         env.update(self.env_add)
         subprocess.call(	# don't check, we don't really care
             [
-                "/usr/bin/ipmitool", "-H", self.kws['hostname'],
+                "/usr/bin/ipmitool",
+                "-N", str(self.ipmi_timeout),
+                "-R", str(self.ipmi_retries),
+                "-H", self.kws['hostname'],
                 "-U", self.kws['username'], "-E",
                 "-I", "lanplus", "sol", "deactivate",
                 #"-N", "10", "usesolkeepalive" # dies frequently
@@ -396,16 +440,31 @@ class sol_ssh_console_pc(ttbl.console.ssh_pc):
 
     :params str hostname: *USER[:PASSWORD]@HOSTNAME* of where the IPMI BMC is
       located
+
+    :param str hostname: BMC location
+      *[USERNAME[:PASSWORD]]@hostname.com*; note *PASSWORD* can be the
+      bare password or a string that indicates how to get it; refer to
+      the argument *password* for :func:`commonl.password_get`.
+
+    :param int ipmi_timeout: seconds to wait for IPMI response (will be
+      passed to *ipmitool*'s *-N* option
+    :param int ipmi_retries: times to retry the IPMI operation (will be
+      passed to *ipmitool*'s *-R* option.
     """
     def __init__(self, hostname, ssh_port = 22,
-                 chunk_size = 5, interchunk_wait = 0.1):
+                 chunk_size = 5, interchunk_wait = 0.1,
+                 ipmi_timeout = 10, ipmi_retries = 3):
+        assert isinstance(ipmi_timeout, numbers.Real)
+        assert isinstance(ipmi_retries, int)
         ttbl.console.ssh_pc.__init__(self, hostname,
                                      port = ssh_port, chunk_size = chunk_size,
                                      interchunk_wait = interchunk_wait)
         _user, password, _hostname = commonl.split_user_pwd_hostname(hostname)
+        self.ipmi_timeout = ipmi_timeout
+        self.ipmi_retries = ipmi_retries
         if password:
             self.env_add['IPMITOOL_PASSWORD'] = password
-
+        self.paranoid_get_samples = 1
 
     def on(self, target, component):
         # if there is someone leftover reading, kick them out, there can
@@ -414,7 +473,10 @@ class sol_ssh_console_pc(ttbl.console.ssh_pc):
         env.update(self.env_add)
         subprocess.call(	# don't check, we don't really care
             [
-                "/usr/bin/ipmitool", "-H", self.kws['hostname'],
+                "/usr/bin/ipmitool",
+                "-N", str(self.ipmi_timeout),
+                "-R", str(self.ipmi_retries),
+                "-H", self.kws['hostname'],
                 "-U", self.kws['username'], "-E",
                 "-I", "lanplus", "sol", "deactivate",
             ],

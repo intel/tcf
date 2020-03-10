@@ -802,6 +802,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
         # SSHPASS always has to be defined
         self.env_add['SSHPASS'] = password if password else ""
         self.extra_opts = extra_opts
+        self.paranoid_get_samples = 1
 
     def on(self, target, component):
         # generate configuration file from parameters
