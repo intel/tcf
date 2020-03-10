@@ -14,6 +14,7 @@
 # 
 """
 Driver to run Clear Linux BBT test suite
+----------------------------------------
 
 The main TCF testcase scanner walks files looking for automation
 scripts / testcase scripts and will call

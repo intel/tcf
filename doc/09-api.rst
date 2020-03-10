@@ -66,6 +66,7 @@ See :ref:`report reference <tcf_guide_report_driver>`.
 
 .. automodule:: tcfl.tc_zephyr_sanity
 .. automodule:: tcfl.tc_clear_bbt
+.. automodule:: tcfl.tc_jtreg
 
                 
 Target metadata
