@@ -112,7 +112,9 @@ mkpart primary fat32 0%% %(boot_size)s \
 set 1 boot on \
 name 1 %(boot_label_name)s \
 mkpart primary linux-swap %(boot_size)s %(swap_end)s \
+name 2 TCF-swap \
 mkpart primary ext4 %(swap_end)s %(scratch_end)s \
+name 3 TCF-scratch \
 """ % dict(
     boot_label_name = target._boot_label_name,
     device = device,
