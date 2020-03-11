@@ -1098,8 +1098,10 @@ def _console_read_thread_fn(target, console, fd, offset):
                     backoff_wait *= 2
                 else:
                     backoff_wait = 0.1
-                if backoff_wait >= 4:
-                    backoff_wait = 4
+                # in interactive mode we want to limit the backoff to
+                # one second so we have time to react
+                if backoff_wait >= 0.7:
+                    backoff_wait = 0.7
                 time.sleep(backoff_wait)	# no need to bombard the server..
             except Exception as e:	# pylint: disable = broad-except
                 logging.exception(e)
