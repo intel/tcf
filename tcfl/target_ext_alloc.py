@@ -39,10 +39,7 @@ class _model_c(object):
             r = rtb.send_request(
                 "GET", "targets/",
                 data = {
-                    'projection': json.dumps([
-                        "_queue",
-                        "_queue_preemption"
-                    ])
+                    'projection': json.dumps([ "_alloc*" ])
                 })
             #print >> sys.stderr, "DEBUG refreshed", rtb, r.get('targets', [])
             # update our knowledge of the target
@@ -62,7 +59,7 @@ class _model_c(object):
         count = 0
         for target in self.targets.values():
             row = [ target.id ]
-            ## "_queue": [
+            ## "_alloc_queue": [
             ##     {
             ##         "allocationid": "PMAbeM",
             ##         "exclusive": true,
@@ -80,7 +77,7 @@ class _model_c(object):
             ## ],
             waiter_count = 0
             #print >> sys.stderr, "DEBUG target %s" % target.id, target.rt
-            for waiter in target.rt.get('_queue', []):
+            for waiter in target.rt.get('_alloc_queue', []):
                 if waiter_count > self.max_waiters:
                     break
                 waiter_count += 1
@@ -308,6 +305,84 @@ def _cmdline_alloc_delete(args):
         tp.close()
         tp.join()
 
+def _rtb_allocationid_extract(allocationid):
+    rtb = None
+    if '/' in allocationid:
+        server_aka, allocationid = allocationid.split('/', 1)
+        for rtb in ttb_client.rest_target_brokers.values():
+            if rtb.aka == server_aka:
+                return rtb, allocationid
+        logging.error("%s: unknown server name", server_aka)
+        return None, allocationid
+    return None, allocationid
+
+def _guests_add(rtb, allocationid, guests):
+    for guest in guests:
+        try:
+            rtb.send_request("PATCH", "allocation/%s/%s"
+                             % (allocationid, guest))
+        except requests.HTTPError as e:
+            logging.warning("%s: can't add guest %s: %s",
+                            allocationid, guest, e)
+
+
+def _guests_list(rtb, allocationid):
+    r = rtb.send_request("GET", "allocation/%s" % allocationid)
+    print "\n".join(r.get('guests', []))
+
+def _guests_remove(rtb, allocationid, guests):
+    if not guests:
+        # no guests given, remove'em all -- so list them first
+        r = rtb.send_request("GET", "allocation/%s" % allocationid)
+        guests = r.get('guests', [])
+    for guest in guests:
+        try:
+            r = rtb.send_request("DELETE", "allocation/%s/%s"
+                                 % (allocationid, guest))
+        except requests.HTTPError as e:
+            logging.error("%s: can't remove guest %s: %s",
+                          allocationid, guest, e)
+
+
+def _cmdline_guest_add(args):
+    with msgid_c("cmdline"):
+        rtb, allocationid = _rtb_allocationid_extract(args.allocationid)
+        if rtb == None:
+            # Unknown server, so let's try them all ... yeah,
+            # collateral damage might happen--but then, you can
+            # only delete yours
+            for rtb in ttb_client.rest_target_brokers.values():
+                _guests_add(rtb, allocationid, args.guests)
+        else:
+            _guests_add(rtb, allocationid, args.guests)
+
+
+
+def _cmdline_guest_list(args):
+    with msgid_c("cmdline"):
+        rtb, allocationid = _rtb_allocationid_extract(args.allocationid)
+        if rtb == None:
+            # Unknown server, so let's try them all ... yeah,
+            # collateral damage might happen--but then, you can
+            # only delete yours
+            for rtb in ttb_client.rest_target_brokers.values():
+                _guests_list(rtb, allocationid)
+        else:
+            _guests_list(rtb, allocationid)
+
+
+
+def _cmdline_guest_remove(args):
+    with msgid_c("cmdline"):
+        rtb, allocationid = _rtb_allocationid_extract(args.allocationid)
+        if rtb == None:
+            # Unknown server, so let's try them all ... yeah,
+            # collateral damage might happen--but then, you can
+            # only delete yours
+            for rtb in ttb_client.rest_target_brokers.values():
+                _guests_remove(rtb, allocationid, args.guests)
+        else:
+            _guests_remove(rtb, allocationid, args.guests)
 
 
 def _cmdline_setup(arg_subparsers):
@@ -324,7 +399,7 @@ def _cmdline_setup(arg_subparsers):
         "which might include values of tags, etc, in single quotes (eg: "
         "'zephyr_board and not type:\"^qemu.*\"'")
     ap.set_defaults(func = _cmdline_alloc_monitor)
-    
+
     ap = arg_subparsers.add_parser(
         "alloc-ls",
         help = "List information about current allocations "
@@ -345,7 +420,7 @@ def _cmdline_setup(arg_subparsers):
         "which might include values of tags, etc, in single quotes (eg: "
         "'zephyr_board and not type:\"^qemu.*\"'")
     ap.set_defaults(func = _cmdline_alloc_ls)
-    
+
     ap = arg_subparsers.add_parser(
         "alloc-delete",
         help = "Delete an existing allocation (which might be "
@@ -356,3 +431,38 @@ def _cmdline_setup(arg_subparsers):
         action = "store", default = None,
         help = "Allocation IDs to remove")
     ap.set_defaults(func = _cmdline_alloc_delete)
+
+    ap = arg_subparsers.add_parser(
+        "guest-add",
+        help = "Add a guest to an allocation")
+    ap.add_argument(
+        "allocationid", metavar = "[SERVER/]ALLOCATIONID",
+        action = "store", default = None,
+        help = "Allocation IDs to which to add guest to")
+    ap.add_argument(
+        "guests", metavar = "USERNAME", nargs = "+",
+        action = "store", default = None,
+        help = "Name of guest to add")
+    ap.set_defaults(func = _cmdline_guest_add)
+
+    ap = arg_subparsers.add_parser(
+        "guest-list",
+        help = "list guests in an allocation")
+    ap.add_argument(
+        "allocationid", metavar = "[SERVER/]ALLOCATIONID",
+        action = "store", default = None,
+        help = "Allocation IDs to which to add guest to")
+    ap.set_defaults(func = _cmdline_guest_list)
+
+    ap = arg_subparsers.add_parser(
+        "guest-remove",
+        help = "Remove a guest from an allocation")
+    ap.add_argument(
+        "allocationid", metavar = "[SERVER/]ALLOCATIONID",
+        action = "store", default = None,
+        help = "Allocation IDs to which to add guest to")
+    ap.add_argument(
+        "guests", metavar = "USERNAME", nargs = "*",
+        action = "store", default = None,
+        help = "Name of guest to remove (all if none given)")
+    ap.set_defaults(func = _cmdline_guest_remove)
