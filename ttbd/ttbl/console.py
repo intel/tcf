@@ -61,13 +61,29 @@ class impl_c(ttbl.tt_interface_impl_c):
       >>> serial0_pc = ttbl.console.ssh_pc(
       >>>     "USER:PASSWORD@LANTRONIXHOSTNAME",
       >>>     command_sequence = [
-      >>>         ( "",
+      >>>       ## Welcome to the Lantronix SLSLP^M$
+      >>>       ## Firmware: version 030031, build 38120^M$
+      >>>       ## Last login: Thu Jan  1 00:04:20 1970 from 10.24.11.35^M$
+      >>>       ## Current time: Thu Jan  1 00:02:03 1970^M$
+      >>>       ## For a list of commands, type 'help'^M$
+
+      >>>       # command prompt, 'CR[USERNAME@IP]> '... or not, so just
+      >>>       # look for 'SOMETHING> '
+      >>>       # ^ will not match because we are getting a Carriage
+      >>>       # Return / New Line
+      >>>       (
+      >>>           # send a disconnect just in case it is connected
+      >>>           # and wait for the command prompt
+      >>>           "\x1bexit\r\n",
       >>>           # command prompt, 'CR[USERNAME@IP]> '... or not, so just
       >>>           # look for 'SOMETHING> '
       >>>           # ^ will not match because we are getting a CR
-      >>>           re.compile("[^>]+> ") ),
-      >>>         ( "connect serial\r\n",
-      >>>           "To exit serial port connection, type 'ESC exit'." ),
+      >>>           re.compile("[^>]+> ")
+      >>>       ),
+      >>>       (
+      >>>           "connect serial\r\n",
+      >>>           "To exit serial port connection, type 'ESC exit'."
+      >>>       ),
       >>>     ],
       >>>     extra_opts = {
       >>>         # old, but that's what the Lantronix server has :/
@@ -302,6 +318,10 @@ class impl_c(ttbl.tt_interface_impl_c):
                                      % (component, response_str))
                     self._response(target, component,
                                    expect, response, timeout, response_str)
+        # now that the handshake has been done, kill whatever has been
+        # read for it so we don't confuse it as console input
+        with codecs.open(read_file_name, "w", encoding = 'utf-8') as rf:
+            rf.truncate(0)
 
 class interface(ttbl.tt_interface):
     """Interface to access the target's consoles
