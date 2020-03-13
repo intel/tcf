@@ -70,6 +70,10 @@ firewall --enabled --http --ssh
 %packages --ignoremissing
 @core
 @base
+# Needed to manage SELinux attributes when SELinux itself is
+# deactivated (tcf-image-setup.sh generates the script for this)
+libselinux-utils
+attr
 %end
 EOF
 else
