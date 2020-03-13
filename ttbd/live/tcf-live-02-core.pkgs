@@ -65,5 +65,8 @@ xfsprogs
 nmap-ncat
 rsync
 socat
+# to manage SELinux stuff
+attr
+libselinux-utils
 # to ask the BIOS for settings and such when discovering HW
 dmidecode
