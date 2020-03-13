@@ -760,6 +760,8 @@ if [ -f $destdir/etc/selinux/config ]; then
     # hand all files we modified--why by hand? because restorecon
     # doesn't seem to work under the POS environment [which it runs
     # with SELinux disabled to avoid it mucking the SElinux contexts].
+    # ASSUMPTION: imgage has setfattr and matchpathcon from the attr
+    # and libselinux-utils packages installed.
     cat >> $md <<EOF
   for file in ${!selinux_relabel[@]} \${SELINUX_RELABEL:-}; do chroot . setfattr -hn security.selinux -v \$(chroot . /sbin/matchpathcon -n \$file) \$file; done
 EOF
