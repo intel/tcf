@@ -694,6 +694,13 @@ def _delete_allocation(allocationid):
 @app.route(API_PREFIX + 'keepalive', methods = [ 'PUT' ])
 @flask_login.login_required
 def _put_keepalive():
+    # {
+    #     'pressure': N,
+    #     'ALLOCID1': 'KNOWNSTATE1',
+    #     'ALLOCID2': 'KNOWNSTATE2',
+    #     ....
+    #     'ALLOCIDn': 'KNOWNSTATEn',
+    # }
     try:
         data = flask.request.get_json()
         if data == None:

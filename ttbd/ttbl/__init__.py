@@ -1638,6 +1638,9 @@ class test_target(object):
 
     def _allocationid_wipe(self):
         self.fsdb.set('_allocationid', None)
+        self.fsdb.set('_alloc.queue_preemption', None)
+        self.fsdb.set('_alloc.priority', None)
+        self.fsdb.set('_alloc.ts_start', None)
         self.fsdb.set('owner', None)
 
     def _allocationid_get(self):
@@ -1673,7 +1676,7 @@ class test_target(object):
     def _deallocate_simple(self, allocationid):
         # Siple deallocation -- if the owner points to the
         # allocationid, just remove it without validating the
-        # allocation
+        # allocation is valid
         #
         # This is to be used only when we have taken the target but
         # then have not used it, so there is no need for state clean
@@ -1694,8 +1697,13 @@ class test_target(object):
         # allocation
         #assert allocationid.state == active
         self._deallocate(allocationid)
-        # FIXME: _state_cleanup()
-        # FIXME: set owning allocationid to reset-needed
+        try:
+            allocdb = ttbl.allocation.get_from_cache(allocationid)
+            # FIXME: _state_cleanup()
+            allocdb.state_set('restart-needed')
+        except ttbl.allocation.allocation_c.invalid_e:
+            # ignore it if it does not exist
+            pass
 
     def allocationid_get(self):
         with self.lock:

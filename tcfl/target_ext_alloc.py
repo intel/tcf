@@ -10,11 +10,13 @@
 import bisect
 import collections
 import json
-import sys
-import pprint
 import logging
+import pprint
+import sys
+import time
 
 import requests
+import requests.exceptions
 import tabulate
 
 import commonl
@@ -26,6 +28,105 @@ import asciimatics.widgets
 import asciimatics.event
 import asciimatics.scene
 
+
+def _delete(rtb, allocationid):
+    try:
+        rtb.send_request("DELETE", "allocation/%s" % allocationid)
+    except requests.HTTPError as e:
+        if 'invalid allocation' not in str(e):
+            raise
+        # FIXME: HACK: this means invalid allocation,
+        # already wiped
+
+
+
+def _cmdline_alloc_targets(args):
+    with msgid_c("cmdline"):
+        targetl = ttb_client.cmdline_list(args.target, args.all)
+        targets = set()
+        rtbs = set()
+
+        # to use fullid, need to tweak the refresh code to add the aka part
+        for rt in sorted(targetl, key = lambda x: x['fullid']):
+            targets.add(rt['id'])
+            rtbs.add(rt['rtb'])
+
+        if len(rtbs) > 1:
+            logging.error("Targets span more than one server")
+            sys.exit(1)
+        rtb = list(rtbs)[0]
+
+        data = dict(
+            priority = args.priority,
+            preempt = args.preempt,
+            queue = args.queue,
+            groups = {},
+        )
+        if args.obo:
+            data['obo_user'] = args.obo
+        data['groups']['group'] = list(targets)
+        r = rtb.send_request("PUT", "allocation", json = data)
+
+        ts0 = time.time()
+        state = r['state']
+        if state not in ( 'queued', 'active'):
+            raise RuntimeError(
+                "allocation failed: %s: %s"
+                % (state, r.get('message', 'message n/a')))
+        allocid = r['allocationid']
+        data = { allocid: state }
+        if state == 'active':			# got it
+            print "allocation ID %s: allocated: %s" % (
+                allocid, r['allocated_group'])
+        else:					# queue, keepalive in there
+            while True:
+                time.sleep(5)
+                ts = time.time()
+                r = rtb.send_request("PUT", "keepalive", json = data)
+                print "allocation ID %s: [+%.1fs] keepalive while waiting: %s\r" % (
+                    allocid, ts - ts0, r),
+                sys.stdout.flush()
+                if allocid not in r['result']:
+                    continue # no news
+                alloc = r['result'][allocid]
+                new_state = alloc['state']
+                if new_state == 'active':
+                    print "\nallocation ID %s: [+%.1fs] allocated: %s" % (
+                        allocid, ts - ts0, alloc['allocated_group'])
+                    break
+                elif new_state == 'invalid':
+                    print "\nallocation ID %s: [+%.1fs] now invalid" % (
+                        allocid, ts - ts0)
+                    break
+                print "\nallocation ID %s: [+%.1fs] state transition %s -> %s" % (
+                    allocid, ts - ts0, state, new_state)
+                data[allocid] = new_state
+
+        if args.hold:
+            try:
+                while True:
+                    time.sleep(5)
+                    ts = time.time()
+                    r = rtb.send_request("PUT", "keepalive", json = data)
+                    print "allocation ID %s: [+%.1fs] keepalive while owned: %s\r" % (
+                        allocid, ts - ts0, r),
+                    sys.stdout.flush()
+                    alloc = r['result'].get(allocid, None)
+                    if alloc == None:
+                        continue			# no new info
+                    new_state = alloc['state']
+                    if new_state not in ( 'active', 'queued', 'reset-needed' ):
+                        break
+                    if new_state != data[allocid]:
+                        print "\nallocation ID %s: [+%.1fs] state transition %s -> %s" % (
+                            allocid, ts - ts0, state, new_state)
+                        data[allocid] = new_state
+            except KeyboardInterrupt:
+                print "\nallocation ID %s: [+%.1fs] releasing due to user interruption" % (
+                    allocid, ts - ts0)
+            finally:
+                _delete(rtb, allocid)
+
 class _model_c(object):
 
     def __init__(self, servers, targets):
@@ -36,25 +137,29 @@ class _model_c(object):
     def get_content(self):
 
         for rtb in self.servers:
-            # FIXME: list only for a given set of targets
-            r = rtb.send_request(
-                "GET", "targets/",
-                data = {
-                    'projection': json.dumps([ "_alloc*" ])
-                })
-            #print >> sys.stderr, "DEBUG refreshed", rtb, r.get('targets', [])
-            # update our knowledge of the target
-            for rt in r.get('targets', []):
-                target_name = rt.get('id', None)
-                if target_name == None:
-                    continue
-                if target_name not in self.targets:
-                    # FIXME: use fullid instead
-                    # FIXME: use rtb to compare too
-                    continue
-                #print >> sys.stderr, "DEBUG", target_name, rt
-                self.targets[target_name].rt = rt
-               
+            try:
+                # FIXME: list only for a given set of targets
+                r = rtb.send_request(
+                    "GET", "targets/",
+                    data = {
+                        'projection': json.dumps([ "_alloc*" ])
+                    })
+                #print >> sys.stderr, "DEBUG refreshed", rtb, pprint.pformat(r)
+                # update our knowledge of the target
+                for rt in r.get('targets', []):
+                    target_name = rt.get('id', None)
+                    if target_name == None:
+                        continue
+                    if target_name not in self.targets:
+                        # FIXME: use fullid instead
+                        # FIXME: use rtb to compare too
+                        continue
+                    #print >> sys.stderr, "DEBUG", target_name, rt
+                    self.targets[target_name].rt = rt
+            except requests.exceptions.RequestException as e:
+                print >> sys.stderr, "Error %s" % type(e)
+                continue
+
         # return the content per rows
         l = []
         count = 0
@@ -241,6 +346,7 @@ def _cmdline_alloc_ls(args):
                         allocationid,
                         rtb,
                         data['state'],
+                        data['timestamp'],
                         data['creator'],
                         data['user'],
                         "\n".join(data.get('guests', [])),
@@ -263,6 +369,7 @@ def _cmdline_alloc_ls(args):
                 "AllocationID",
                 "Server",
                 "State",
+                "Timestamp",
                 "Creator",
                 "User",
                 "Guests",
@@ -278,16 +385,6 @@ def _cmdline_alloc_delete(args):
         # it to all the servers
         def _allocationid_delete(allocationid):
 
-            def _delete(rtb, allocationid):
-                try:
-                    rtb.send_request("DELETE", "allocation/%s" % allocationid)
-                except requests.HTTPError as e:
-                    if 'invalid directory' not in str(e):
-                        raise
-                    # FIXME: HACK: this means invalid allocation,
-                    # already wiped
-                    pass
-                
             try:
                 rtb = None
                 if '/' in allocationid:
@@ -398,6 +495,36 @@ def _cmdline_guest_remove(args):
 
 
 def _cmdline_setup(arg_subparsers):
+    ap = arg_subparsers.add_parser(
+        "alloc-targets",
+        help = "FIXME")
+    ap.add_argument(
+        "-a", "--all", action = "store_true", default = False,
+        help = "Consider also disabled targets")
+    ap.add_argument(
+        "-d", "--hold", action = "store_true", dest = 'hold', default = False,
+        help = "Keepalive the reservation after is acquired")
+    ap.add_argument(
+        "-w", "--wait", action = "store_true", dest = 'queue', default = True,
+        help = "(default) Wait until targets are assigned")
+    ap.add_argument(
+        "-i", "--inmediate", action = "store_false", dest = 'queue',
+        help = "Fail if target's can't be allocated inmediately")
+    ap.add_argument(
+        "-p", "--priority", action = "store", type = int, default = 500,
+        help = "Priority (0 highest, 999 lowest)")
+    ap.add_argument(
+        "-o", "--obo", action = "store", default = None,
+        help = "User to alloc on behalf of")
+    ap.add_argument(
+        "--preempt", action = "store_true", default = False,
+        help = "Enable preemption (disabled by default)")
+    ap.add_argument(
+        "target", metavar = "TARGETSPEC", nargs = "+",
+        action = "store", default = None,
+        help = "Target's names, all in the same server")
+    ap.set_defaults(func = _cmdline_alloc_targets)
+
     ap = arg_subparsers.add_parser(
         "alloc-monitor",
         help = "FIXME")

@@ -206,12 +206,15 @@ class allocation_c(ttbl.fsdb_symlink_c):
                           self.allocationid, targets.keys())
             _run(targets.values(), False)
 
+    def set(self, key, value, force = True):
+        return ttbl.fsdb_symlink_c.set(self, key, value, force = force)
+
     def state_set(self, new_state):
         """
         :returns *True* if succesful, *False* if it was set by someone
           else
         """
-        self.set('state', new_state)
+        self.set('state', new_state, force = True)
 
     def state_get(self):
         return self.get('state')
@@ -279,8 +282,6 @@ class allocation_c(ttbl.fsdb_symlink_c):
                         targets_to_boost[target_name] = \
                             min(targets_to_boost[target_name], score)
                 else:
-                    logging.error("DEBUG: group %s complete",
-                                  group_name)
                     # This group is complete, so we don't need the
                     # other targets tentatively allocated, so return
                     # the list so they can be released
@@ -288,9 +289,12 @@ class allocation_c(ttbl.fsdb_symlink_c):
                     # allocated, let's then use it--if we set the "group"
                     # value, then we have it allocated
                     target_group = ",".join(group)
-                    self.set("group", target_group)
+                    self.set("allocated_group", target_group)
                     self.set("ts_start", time.time())
                     self.state_set("active")
+                    logging.error("DEBUG: %s: group %s complete, state %s",
+                                  self.allocationid, group_name,
+                                  self.state_get())
                     return {}, targets_allocated - group
 
             # no groups are complete, nothing else to do
@@ -375,14 +379,15 @@ class allocation_c(ttbl.fsdb_symlink_c):
         guests = self.guest_list()
         if guests:
             d['guests'] = guests
-        targets = self.get('targets')
+        targets = self.get('allocated_group', [])
         if targets:
-            d['targets'] = targets
+            d['allocated_group'] = targets
 
         d['targets_all'] = list(self.targets_all.keys())
         d['target_group'] = {}
         for group_name, group in self.groups.iteritems():
             d['target_group'][group_name] = list(group)
+        d['timestamp'] = self.get("timestamp")
         return d
     
 lru_aged_cache_allocation_c = lru_aged_c(
@@ -576,7 +581,7 @@ def _target_allocate_locked(target, current_allocationid, waiters, preempt):
         logging.error("DEBUG: %s: preempting %s over current owner %s",
                       target.id, allocationdb.allocationid,
                       current_allocationid)
-        target._deallocate(current_allocationid)
+        target._deallocate_forced(current_allocationid)
         # FIXME: set owning allocationid to reset-needed
         # fallthrough
 
@@ -842,18 +847,21 @@ def request(groups, calling_user, obo_user, guests,
         "message": states[state],
     }
     if queue == False:
-        if result == 'active':
-            result['targets'] = db.get("group")	# set in calculate_stuff()
-        elif state == 'queued':
+        if state == 'active':		# we got it
+            pass
+        elif state == 'queued':		# busy but we wanted it now
             db.delete(None)
             return  {
                 "state": "busy",
                 "message": states['busy']
             }
-        else:
-            # something else didn't work, just pass it along
+        else:			     	# something wong
             db.delete(None)
+    if state == 'active':
+        # allocated_group set in calculate_stuff()
+        result['allocated_group'] = db.get("allocated_group")
     return result
+
 
 def query(calling_user):
     assert isinstance(calling_user, ttbl.user_control.User)
@@ -883,7 +891,6 @@ def get(allocationid, calling_user):
 
 def keepalive(allocationid, expected_state, _pressure, calling_user):
     """
-
     :param int pressure: how my system is doing so I might be able or
       not to take the extra job of the next allocation, so up and down
       my prio based on N -- this might move my allocations to lower
@@ -905,7 +912,8 @@ def keepalive(allocationid, expected_state, _pressure, calling_user):
     state = db.state_get()
     r = dict(state = state)
     if state == "active" and expected_state != 'active':
-        r['targets'] = db.get("group")	# set in calculate_stuff()
+        # set in calculate_stuff()
+        r['allocated_group'] = db.get("allocated_group")
     return r
 
 
