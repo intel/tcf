@@ -19,6 +19,7 @@
 """
 Dynamic preemptable queue multi-resource allocator
 
+Highest priority is 0, lowest priority is > 0
 
 Preemption use cases
 ^^^^^^^^^^^^^^^^^^^^
@@ -512,7 +513,7 @@ def _target_allocate_locked(target, current_allocationid, waiters, preempt):
     # have been removed while we were getting here)
     waiter = None
     allocationdb = None
-    for waiter in reversed(waiters):
+    for waiter in waiters:
         try:
             allocationdb = get_from_cache(waiter[3])
             # valid highest prio waiter!
@@ -554,7 +555,7 @@ def _target_allocate_locked(target, current_allocationid, waiters, preempt):
         logging.error(
             "DEBUG: %s: current allocationid %s, prios target %s waiter %s",
             target.id, current_allocationid, priority_target, priority_waiter)
-        if priority_waiter <= priority_target:
+        if priority_target <= priority_waiter:
             # a higher or equal prio owner has the target
             logging.error("DEBUG: %s: busy w %s higher/equal prio owner"
                           " (owner %d >=  waiter %d)",
@@ -564,8 +565,8 @@ def _target_allocate_locked(target, current_allocationid, waiters, preempt):
         # a lower prio owner has the target with a higher prio target waiting
         if not preempt:
             # preemption is not enabled, so the higher prio waiter waits
-            logging.error("DEBUG: %s: busy w %s lower prio owner"
-                          " (owner %d  < waiter  %d)",
+            logging.error("DEBUG: %s: busy w %s lower prio owner w/o preemption"
+                          " (owner %d > waiter  %d)",
                           target.id, current_allocationid,
                           priority_target, priority_waiter)
             return None
