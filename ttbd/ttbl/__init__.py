@@ -1413,17 +1413,16 @@ class test_target(object):
                 if waiters:
                     r.setdefault('_alloc', {})
                     # override with this format
-                    r['_alloc']['queue'] = []
+                    r['_alloc']['queue'] = {}
                     for prio, ts, flags, allocationid, _ in reversed(waiters):
                         # FIXME: change to dict based on allocid /
                         # update monitor
-                        r['_alloc']['queue'].append(dict(
+                        r['_alloc']['queue'][allocationid] = dict(
                             priority = prio,
                             timestamp = int(ts),
                             preempt = 'P' in flags,
                             exclusive = 'E' in flags,
-                            allocationid = allocationid
-                        ))
+                        )
             if _queue_preemption_needed:
                 r.setdefault('_alloc', {})
                 r['_alloc']['queue_preemption'] = preempt_in_queue

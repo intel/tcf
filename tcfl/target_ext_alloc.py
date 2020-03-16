@@ -7,6 +7,7 @@
 """
 
 """
+import bisect
 import collections
 import json
 import sys
@@ -58,7 +59,6 @@ class _model_c(object):
         l = []
         count = 0
         for target in self.targets.values():
-            row = [ target.id ]
             ## "_alloc_queue": [
             ##     {
             ##         "allocationid": "PMAbeM",
@@ -77,11 +77,23 @@ class _model_c(object):
             ## ],
             waiter_count = 0
             #print >> sys.stderr, "DEBUG target %s" % target.id, target.rt
-            for waiter in target.rt.get('_alloc_queue', []):
+            # ( prio, timestamp, allocationid, preempt, exclusive)
+            waiterl = []
+            queue = target.rt.get('_alloc', {}).get('queue', {})
+            for allocid, waiter in queue.iteritems():
                 if waiter_count > self.max_waiters:
                     break
                 waiter_count += 1
-                row.append("%(priority)06d:%(allocationid)s" % waiter)
+                bisect.insort(waiterl, (
+                    waiter['priority'],
+                    waiter['timestamp'],
+                    allocid,
+                    waiter['preempt'],
+                    waiter['exclusive'],
+                ))
+            row = [ target.id ]
+            for waiter in waiterl:
+                row.append("%06d:%s" % (waiter[0], waiter[2]))
             l.append(( row, count ))
             count += 1
         return l
