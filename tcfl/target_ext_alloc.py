@@ -102,11 +102,15 @@ def _cmdline_alloc_targets(args):
                     allocid, ts - ts0, state, new_state)
                 data[allocid] = new_state
 
-        if args.hold:
+        if args.hold != None:
             try:
+                ts_active = time.time()
                 while True:
                     time.sleep(5)
                     ts = time.time()
+                    if args.hold > 0 and ts - ts_active > args.hold:
+                        # maximum hold time reached, release it
+                        break
                     r = rtb.send_request("PUT", "keepalive", json = data)
                     print "allocation ID %s: [+%.1fs] keepalive while owned: %s\r" % (
                         allocid, ts - ts0, r),
@@ -115,7 +119,8 @@ def _cmdline_alloc_targets(args):
                     if alloc == None:
                         continue			# no new info
                     new_state = alloc['state']
-                    if new_state not in ( 'active', 'queued', 'reset-needed' ):
+                    if new_state not in ( 'active', 'queued', 'restart-needed' ):
+                        print
                         break
                     if new_state != data[allocid]:
                         print "\nallocation ID %s: [+%.1fs] state transition %s -> %s" % (
@@ -502,8 +507,14 @@ def _cmdline_setup(arg_subparsers):
         "-a", "--all", action = "store_true", default = False,
         help = "Consider also disabled targets")
     ap.add_argument(
-        "-d", "--hold", action = "store_true", dest = 'hold', default = False,
-        help = "Keepalive the reservation after is acquired")
+        "-d", "--hold", action = "store",
+        nargs = "?", type = int, const = 0, default = None,
+        help = "Keep the reservation alive for this many seconds"
+        " (default for ever)")
+    ap.add_argument(
+        "-u", "--duration", action = "store", type = int, default = 0,
+        help = "Keep the reservation alive for this seconds,"
+        " then release it")
     ap.add_argument(
         "-w", "--wait", action = "store_true", dest = 'queue', default = True,
         help = "(default) Wait until targets are assigned")
