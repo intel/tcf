@@ -237,7 +237,8 @@ class ykush(ttbl.power.impl_c, ttbl.things.impl_c):
             # dump ourselves into not releasing, then other processes
             # can't attempt recovery.
             target.log.info("ykush %s: releasing" % ykush_target_name)
-            ykush_target.release(owner)
+            ykush_target.release_v1(owner)
+            # FIXME: replace with lockfile?
             ykush_target.fsdb.set("recovery-in-process", None)
 
     def _command(self, target, cmd):

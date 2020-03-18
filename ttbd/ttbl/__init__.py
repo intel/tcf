@@ -604,7 +604,6 @@ class symlink_acquirer_c(acquirer_c):
                 raise self.busy_e()
             raise
 
-
     def release(self, who, force):
         if force:
             try:
@@ -815,6 +814,7 @@ class tt_interface(object):
 
     def _release_hook(self, target, force):
         # FIXME: move to public interface
+        # FIXME: remove force, unuused
         """
         Called when the target is released
         """
@@ -1685,11 +1685,27 @@ class test_target(object):
         current_allocationid = self.fsdb.get("_allocationid")
         if current_allocationid and current_allocationid == allocationid:
             self._allocationid_wipe()
+            return True
+        return False
 
+    # FIXME: move to _deallocate(allocdb), needs changes to use
+    # allocdb in
+    #  - _target_allocate_locked(): current_allocationid -> current_allocdb
+    #    - _run_target(): current_allocationid -> current_allocdb
+    #  - _deallocate
+    #  - _deallocate_forced
+    #  - release()
+    #
+    # fold _deallocate_forced() to have a state argument that if set,
+    # sets the reservation's state to that one
     def _deallocate(self, allocationid):
         # deallocate verifying the current allocation is valid
-        self._deallocate_simple(allocationid)
-        # FIXME: _state_cleanup()
+        if self._deallocate_simple(allocationid):
+            self._state_cleanup(False)
+            # we leave the reservation as is; if someone is using it
+            # they are keepaliving and they'll notice the state
+            # change and act; otherwise it will timeout and be removed
+            # FIXME: if all targets released, release reservation?
 
     def _deallocate_forced(self, allocationid):
         # deallocate forced, set the allocationid to reset-needed,
@@ -1699,7 +1715,6 @@ class test_target(object):
         self._deallocate(allocationid)
         try:
             allocdb = ttbl.allocation.get_from_cache(allocationid)
-            # FIXME: _state_cleanup()
             allocdb.state_set('restart-needed')
         except ttbl.allocation.allocation_c.invalid_e:
             # ignore it if it does not exist
@@ -1886,7 +1901,7 @@ class test_target(object):
             if self.property_is_user(prop) and not self.property_keep_value(prop):
                 self.fsdb.set(prop, None)
 
-    def release(self, who, force):
+    def release_v1(self, who, force):
         """
         Release the ownership of this target.
 
@@ -1895,6 +1910,7 @@ class test_target(object):
         :param str who: User that is releasing the target (must be the owner)
         :param bool force: force release of a target owned by
           someone else (requires admin privilege)
+
         :raises: :class:`test_target_not_acquired_e` if not taken
         """
         assert isinstance(who, basestring)
@@ -1902,6 +1918,53 @@ class test_target(object):
             if self.target_is_owned_and_locked(who):
                 self._state_cleanup(force)
             self._acquirer.release(who, force)
+        except acquirer_c.cant_release_not_owner_e:
+            raise test_target_release_denied_e(self)
+        except acquirer_c.cant_release_not_acquired_e:
+            raise test_target_not_acquired_e(self)
+
+    def release(self, user, force, ticket = None):
+        """
+        Release the ownership of this target.
+
+        If the target is not owned by anyone, it does nothing.
+
+        :param ttbl.user_control.User user: User that is releasing the
+          target (must be the owner, guest, creator of the reservation
+          or admin)
+
+        :param bool force: force release of a target owned by
+          someone else (requires admin privilege)
+
+        :raises: :class:`test_target_not_acquired_e` if not taken
+        """
+        assert isinstance(user, ttbl.user_control.User)
+        userid = user.get_id()
+        try:
+            if self.owner_get_v1():
+                if self.target_is_owned_and_locked(userid):
+                    self._state_cleanup(force)
+                self._acquirer.release(who_create(userid, ticket), force)
+                return
+            allocid = self.allocationid_get_bare()
+            if not allocid:
+                raise test_target_not_acquired_e(self)
+            with self.lock:
+                allocdb = self._allocationdb_get()
+                if allocdb == None:	# allocation was removed...
+                    raise test_target_not_acquired_e(self)
+                # validate WHO has rights
+                if allocdb.check_user_is_user_creator(user):
+                    # user or creator can release it
+                    self._deallocate(allocid)
+                elif force and allocdb.check_user_is_admin(user):
+                    # if admin and force,
+                    self._deallocate_forced(allocid)
+                elif allocdb.check_user_is_guest(user):
+                    # if guest, just remove it as guest
+                    allocdb.guest_remove(user.get_id())
+                else:
+                    raise test_target_release_denied_e(self)
         except acquirer_c.cant_release_not_owner_e:
             raise test_target_release_denied_e(self)
         except acquirer_c.cant_release_not_acquired_e:

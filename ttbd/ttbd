@@ -584,8 +584,10 @@ def _target_release(target_id):
     try:
         who = who_make(ticket)
         if force and not current_user_is_admin():
+            # FIXME: this won't be needed later on
             raise ttbl.test_target_not_admin_e(target)
-        target.release(who, force)
+        target.release(flask_login.current_user._get_current_object(), force,
+                       ticket = ticket)
     except ttbl.test_target_e as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
     except Exception as e:
@@ -860,9 +862,9 @@ def target_acquired(target, who):
         yield
     except:
         # do not force releasing it if we don't own it
-        target.release(who, False)
+        target.release_v1(who, False)
         raise
-    target.release(who, False)
+    target.release_v1(who, False)
 
 def _do_cleanup_released(target, who):
     if not hasattr(target, "power"):	# Only with power control
@@ -886,12 +888,13 @@ def _do_cleanup_released(target, who):
                             idle_time, idle_poweroff)
             target.power.put_off(target, who, {}, {}, None)
 
-def _do_cleanup_acquired(target, owner, who):
+def _do_cleanup_acquired_v1(target, owner, who):
     idle_time = time.time() - target.timestamp_get()
     if idle_time > ttbl.config.target_owned_max_idle:
         target.log.warning("releasing from %s, idle for %.2fs (max %s)",
-                           owner, idle_time, ttbl.config.target_owned_max_idle)
-        target.release(who, True)
+                           owner, idle_time,
+                           ttbl.config.target_owned_max_idle)
+        target.release_v1(who, True)
 
 def cleanup_files():
     for f in glob.iglob(app.config['files_path'] + "/*/*"):
@@ -939,7 +942,7 @@ def _do_cleanup():
                 _do_cleanup_released(target, who)
             elif target.owner_get_v1():
                 # this gets replaced with ttbl.allocation.maintenance()
-                _do_cleanup_acquired(target, owner, who)
+                _do_cleanup_acquired_v1(target, owner, who)
         except ttbl.test_target_e as e:
             loge("%s" % e)
         except Exception as e:

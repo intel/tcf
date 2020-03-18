@@ -6,6 +6,7 @@
 #
 # FIXME:
 #
+#  - allocted_group -> group_allocated
 #  - allocationid / allocationdb -> allocid / allocd
 #  - _alloc* fields to _alloc.
 #  - alloc-monitor broken
@@ -288,8 +289,8 @@ class allocation_c(ttbl.fsdb_symlink_c):
                     # all targets needed for this group have been
                     # allocated, let's then use it--if we set the "group"
                     # value, then we have it allocated
-                    target_group = ",".join(group)
-                    self.set("allocated_group", target_group)
+                    # Sort here because everywhere else we need a set
+                    self.set("allocated_group", ",".join(sorted(group)))
                     self.set("ts_start", time.time())
                     self.state_set("active")
                     logging.error("DEBUG: %s: group %s complete, state %s",
@@ -308,11 +309,30 @@ class allocation_c(ttbl.fsdb_symlink_c):
             return True
         return False
 
+    def check_user_is_admin(self, user):
+        assert isinstance(user, ttbl.user_control.User)
+        return user.is_admin()
+
+    def check_user_is_user_creator(self, user):
+        assert isinstance(user, ttbl.user_control.User)
+        userid = user.get_id()
+        if userid == self.get("user") or userid == self.get("creator"):
+            return True
+        return False
+
     def check_userid_is_user_creator_guest(self, userid):
         assert isinstance(userid, basestring)
         guestid = commonl.mkid(userid, l = 4)
         if userid == self.get("user") or userid == self.get("creator") \
            or userid == self.get("guest." + guestid):
+            return True
+        return False
+
+    def check_user_is_guest(self, user):
+        assert isinstance(user, ttbl.user_control.User)
+        userid = user.get_id()
+        guestid = commonl.mkid(userid, l = 4)
+        if self.get("guest." + guestid) == userid:
             return True
         return False
 
