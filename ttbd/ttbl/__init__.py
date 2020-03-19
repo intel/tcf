@@ -1209,6 +1209,8 @@ class test_target(object):
         if user.has_role('admin'):	# admins are always in
             return True
 
+        # Note we get it only from the tags, so it cannot be overriden
+        # by fsdb
         roles_required = self.tags.get('_roles_required', [])
         roles_excluded = self.tags.get('_roles_excluded', [])
         for role in roles_excluded:	# users to be excluded
@@ -1748,7 +1750,10 @@ class authenticator_c(object):
 
     Upone calling the constructor, it defines a set of roles that will
     be returned by the :func:`login` if the tokens to be authenticated
-    are valid
+    are valid.
+
+    The roles are used to determine which targets the user has access
+    to.
     """
 
     @staticmethod
@@ -1761,11 +1766,8 @@ class authenticator_c(object):
         and which with category (as determined by the role mapping)
 
         :returns: None if user is not allowed to log in, otherwise a
-          dictionary with user's information::
-
-          - roles: set of strings describing roles the user has
-
-          FIXME: left as a dictionary so we can add more information later
+          dictionary with user's information; see :ref:`access control
+          <target_access_control>`.
 
         """
         assert isinstance(token, basestring)

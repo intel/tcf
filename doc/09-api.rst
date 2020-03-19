@@ -381,14 +381,15 @@ Provisioning OS specific metadata
 
   In order to be able to see or use this targer, a user must have
   been granted one of the roles in the list by the authentication
-  module.
-  
+  module. See :ref:`access control <target_access_control>`.
+
 .. __roles_excluded:
 
 - *_roles_excluded*: list of strings describing roles.
 
   In order to be able to see or use this targer, a user must have
-  *not* been granted one of the roles in the list.
+  *not* been granted one of the roles in the list. See :ref:`access
+  control <target_access_control>`.
   
 .. _uefi_boot_manager_ipv4_regex:
 
@@ -452,9 +453,46 @@ Provisioning OS specific metadata
 .. automodule:: ttbl
 .. automodule:: ttbl.fsdb
 
+.. _target_control:
 
 User access control and authentication
 --------------------------------------
+
+TTBD provides for means for users to authenticate themselves to the
+system and to decide which users can see and use what targets.
+
+TTBD, however, does not implement the authentication; that is
+delegated to :ref:`*authentication drivers* <ttbl.authenticator_c>`
+which can authenticate a user agains LDAP, a local database, any
+remote service, etc.
+
+When a user succesfully *logs in*, the authentication drivers, based
+on their configuration, provide a list of roles the user has, each
+represented by a string, which minimally are defined as:
+
+- *user*: standard label for all users; if an authentication system
+   doesn't grant access to the *user* role, the user has no access to
+   the system.
+
+- *admin*: super users with access to everything; note *amdins* can
+  always see/use all target, disregarding any exclude rules.
+
+any other roles are deployment specific and can be used to control
+access to targets, since the targets can define tags
+:ref:`_roles_required` and :ref:`_roles_excluded` to require users
+have a role or to exclude users with a certain role. For example, a
+target defined such as:
+
+>>> ttbl.config.target_add(
+>>>     ttbl.test_target(TARGETNAME),
+>>>     tags = dict(
+>>>         ...
+>>>         _roles_required = [ 'lab7', 'wizard' ],
+>>>         _roles_excluded = [ 'guest' ],
+>>>  ))
+
+would allow any user with is given the *lab7* or *wizard* role by the
+authentication system and would exclude anyone with the role *guest*.
 
 .. automodule:: ttbl.user_control
 .. automodule:: ttbl.auth_ldap
