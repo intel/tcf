@@ -1894,9 +1894,8 @@ class target_c(reporter_c):
           taken from the stack
 
         """
-        # FIXME: override kws __setitem__ to fill it out automagically?
         assert isinstance(kw, basestring)
-        assert isinstance(value, basestring)
+        assert isinstance(value, (basestring, int))
         if origin == None:
             o = inspect.stack()[1]
             origin = "%s:%s" % (o[1], o[2])
@@ -5574,7 +5573,7 @@ class tc_c(reporter_c):
           taken from the stack
         """
         assert isinstance(kw, basestring)
-        assert isinstance(value, basestring)
+        assert isinstance(value, (basestring, int))
         if origin == None:
             o = inspect.stack()[1]
             origin = "%s:%s" % (o[1], o[2])
