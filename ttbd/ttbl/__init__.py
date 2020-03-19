@@ -1391,18 +1391,9 @@ class test_target(object):
                     del r['owner']
                 except KeyError:
                     pass
-        if commonl.field_needed('_allocid', projections):
-            allocid = self.allocid_get()
-            if allocid:
-                r['_allocid'] = allocid
-            else:
-                # forcibly delete the key if it might have existed
-                # from the tags or fsdb
-                try:
-                    del r['allocid']
-                except KeyError:
-                    pass
 
+        # these two fields are synthetic, they don't exist on fsdb, we
+        # create them from the allocator information
         _queue_needed = commonl.field_needed('_alloc.queue', projections)
         _queue_preemption_needed = \
             commonl.field_needed('_alloc.queue_preemption', projections)
@@ -1634,10 +1625,10 @@ class test_target(object):
             pass
 
     def allocid_get_bare(self):
-        return self.fsdb.get('_allocid')
+        return self.fsdb.get('_alloc.id')
 
     def _allocid_wipe(self):
-        self.fsdb.set('_allocid', None)
+        self.fsdb.set('_alloc.id', None)
         self.fsdb.set('_alloc.queue_preemption', None)
         self.fsdb.set('_alloc.priority', None)
         self.fsdb.set('_alloc.ts_start', None)
@@ -1646,7 +1637,7 @@ class test_target(object):
     def _allocid_get(self):
         # needs to be called with self.lock taken!
         assert self.lock.locked()
-        _allocid = self.fsdb.get('_allocid')
+        _allocid = self.fsdb.get('_alloc.id')
         if _allocid == None:
             return None
         allocationdb = allocation._allocid_validate(_allocid)
@@ -1661,7 +1652,7 @@ class test_target(object):
     def _allocationdb_get(self):
         # needs to be called with self.lock taken!
         assert self.lock.locked()
-        _allocid = self.fsdb.get('_allocid')
+        _allocid = self.fsdb.get('_alloc.id')
         if _allocid == None:
             return None
         try:
@@ -1682,7 +1673,7 @@ class test_target(object):
         # then have not used it, so there is no need for state clean
         # up.
         assert self.lock.locked()	    # Must have target.lock taken!
-        current_allocid = self.fsdb.get("_allocid")
+        current_allocid = self.fsdb.get("_alloc.id")
         if current_allocid and current_allocid == allocid:
             self._allocid_wipe()
             return True

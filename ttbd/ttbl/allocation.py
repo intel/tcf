@@ -6,8 +6,6 @@
 #
 # FIXME:
 #
-#  - _alloc* fields to _alloc.
-#  - alloc-monitor broken
 #  - reject messages to carry a 40x code?
 #  - each target allocation carries a max TTL per policy
 #  - starvation control missing
@@ -618,7 +616,7 @@ def _target_allocate_locked(target, current_allocid, waiters, preempt):
     # we leave it for the next run
     target.fsdb.set("_alloc.priority", priority_waiter)
     target.fsdb.set("owner", allocdb.get('user'))
-    target.fsdb.set("_allocid", allocdb.allocid)
+    target.fsdb.set("_alloc.id", allocdb.allocid)
     target.fsdb.set("_alloc.ts_start", time.strftime("%Y%m%d%H%M%S"))
     # remove the waiter from the queue
     target.fsdb.set(waiter[4], None)
