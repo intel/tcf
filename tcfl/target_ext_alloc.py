@@ -43,6 +43,9 @@ def _delete(rtb, allocationid):
 def _cmdline_alloc_targets(args):
     with msgid_c("cmdline"):
         targetl = ttb_client.cmdline_list(args.target, args.all)
+        if not targetl:
+            logging.error("No targets could be used")
+            return
         targets = set()
         rtbs = set()
 
@@ -82,9 +85,10 @@ def _cmdline_alloc_targets(args):
             while True:
                 time.sleep(5)
                 ts = time.time()
+                state = data[allocid]
                 r = rtb.send_request("PUT", "keepalive", json = data)
-                print "allocation ID %s: [+%.1fs] keepalive while waiting: %s\r" % (
-                    allocid, ts - ts0, r),
+                print "allocation ID %s: [+%.1fs] keepalive while %s: %s\r" % (
+                    allocid, ts - ts0, state, r),
                 sys.stdout.flush()
                 if allocid not in r['result']:
                     continue # no news
@@ -111,9 +115,10 @@ def _cmdline_alloc_targets(args):
                     if args.hold > 0 and ts - ts_active > args.hold:
                         # maximum hold time reached, release it
                         break
+                    state = data[allocid]
                     r = rtb.send_request("PUT", "keepalive", json = data)
-                    print "allocation ID %s: [+%.1fs] keepalive while owned: %s\r" % (
-                        allocid, ts - ts0, r),
+                    print "allocation ID %s: [+%.1fs] keepalive while %s: %s\r" % (
+                        allocid, ts - ts0, state, r),
                     sys.stdout.flush()
                     alloc = r['result'].get(allocid, None)
                     if alloc == None:
@@ -299,6 +304,78 @@ def _cmdline_alloc_monitor(args):
                 last_scene = e.scene
 
 
+def _allocs_get(rtb):
+    return rtb.send_request("GET", "allocation/")
+
+
+def _alloc_ls(verbosity):
+    allocs = {}
+    tp = ttb_client._multiprocessing_pool_c(
+        processes = len(ttb_client.rest_target_brokers))
+    threads = {}
+    for rtb in sorted(ttb_client.rest_target_brokers.itervalues()):
+        threads[rtb] = tp.apply_async(_allocs_get, (rtb,))
+    tp.close()
+    tp.join()
+    for rtb, thread in threads.iteritems():
+        allocs[rtb.aka] = thread.get()
+    if verbosity == 3:
+        pprint.pprint(allocs)
+        return
+    elif verbosity == 4:
+        print json.dumps(allocs, skipkeys = True, indent = 4)
+        return
+
+    table = []
+    for rtb, r in allocs.iteritems():
+        for allocationid, data in r.iteritems():
+            if verbosity == 0:
+                table.append([
+                    allocationid,
+                    data['state'],
+                    data['creator'],
+                    data['user'],
+                    len(data.get('guests', [])),
+                    len(data.get('target_group', []))
+                ])
+            elif verbosity == 1:
+                tgs = []
+                for name, group in data.get('target_group', {}).iteritems():
+                    tgs.append( name + ": " + ",".join(group))
+                table.append([
+                    allocationid,
+                    rtb,
+                    data['state'],
+                    data['timestamp'],
+                    data['creator'],
+                    data['user'],
+                    "\n".join(data.get('guests', [])),
+                    "\n".join(tgs),
+                ])
+            elif verbosity == 2:
+                commonl.data_dump_recursive(data, allocationid,)
+    if verbosity == 0:
+        headers0 = [
+            "AllocationID",
+            "State",
+            "Creator",
+            "User",
+            "#Guests",
+            "#Groups"
+        ]
+        print(tabulate.tabulate(table, headers = headers0))
+    if verbosity == 1:
+        headers1 = [
+            "AllocationID",
+            "Server",
+            "State",
+            "Timestamp",
+            "Creator",
+            "User",
+            "Guests",
+            "Groups"
+        ]
+        print(tabulate.tabulate(table, headers = headers1))
 
 def _cmdline_alloc_ls(args):
     with msgid_c("cmdline"):
@@ -311,77 +388,18 @@ def _cmdline_alloc_ls(args):
             targets[target_name] = \
                 tc.target_c.create_from_cmdline_args(args, target_name)
 
-        def _allocs_get(rtb):
-            return rtb.send_request("GET", "allocation/")
-
-        allocs = {}
-        tp = ttb_client._multiprocessing_pool_c(
-            processes = len(ttb_client.rest_target_brokers))
-        threads = {}
-        for rtb in sorted(ttb_client.rest_target_brokers.itervalues()):
-            threads[rtb] = tp.apply_async(_allocs_get, (rtb,))
-        tp.close()
-        tp.join()
-        for rtb, thread in threads.iteritems():
-            allocs[rtb.aka] = thread.get()
-        if args.verbosity == 3:
-            pprint.pprint(allocs)
-            return
-        elif args.verbosity == 4:
-            print json.dumps(allocs, skipkeys = True, indent = 4)
-            return
-
-        table = []
-        for rtb, r in allocs.iteritems():
-            for allocationid, data in r.iteritems():
-                if args.verbosity == 0:
-                    table.append([
-                        allocationid,
-                        data['state'],
-                        data['creator'],
-                        data['user'],
-                        len(data.get('guests', [])),
-                        len(data.get('target_group', []))
-                    ])
-                elif args.verbosity == 1:
-                    tgs = []
-                    for name, group in data.get('target_group', {}).iteritems():
-                        tgs.append( name + ": " + ",".join(group))
-                    table.append([
-                        allocationid,
-                        rtb,
-                        data['state'],
-                        data['timestamp'],
-                        data['creator'],
-                        data['user'],
-                        "\n".join(data.get('guests', [])),
-                        "\n".join(tgs),
-                    ])
-                elif args.verbosity == 2:
-                    commonl.data_dump_recursive(data, allocationid,)
-        if args.verbosity == 0:
-            headers0 = [
-                "AllocationID",
-                "State",
-                "Creator",
-                "User",
-                "#Guests",
-                "#Groups"
-            ]
-            print(tabulate.tabulate(table, headers = headers0))
-        if args.verbosity == 1:
-            headers1 = [
-                "AllocationID",
-                "Server",
-                "State",
-                "Timestamp",
-                "Creator",
-                "User",
-                "Guests",
-                "Groups"
-            ]
-            print(tabulate.tabulate(table, headers = headers1))
-
+        if args.refresh:
+            print "\x1b[2J"	# clean all screen
+            sys.stdout.flush()
+            while True:
+                _alloc_ls(args.verbosity)
+                print "\x1b[0J"	# clean what is ledt
+                sys.stdout.flush()
+                time.sleep(args.refresh)
+                print "\x1b[1;1H"	# move to column 1,1
+                sys.stdout.flush()
+        else:
+                _alloc_ls(args.verbosity)
 
 def _cmdline_alloc_delete(args):
     with msgid_c("cmdline"):
@@ -563,6 +581,10 @@ def _cmdline_setup(arg_subparsers):
     ap.add_argument(
         "-a", "--all", action = "store_true", default = False,
         help = "Consider also disabled targets")
+    ap.add_argument(
+        "-r", "--refresh", action = "store",
+        type = float, nargs = "?", const = 1, default = 0,
+        help = "Repeat every int seconds (by default, only once)")
     ap.add_argument(
         "target", metavar = "TARGETSPEC", nargs = "*",
         action = "store", default = None,
