@@ -375,6 +375,21 @@ Provisioning OS specific metadata
     $ tcf property-set TARGET pos_reinitialize True
     $ tcf run -t TARGETs <something that deploys>
 
+.. __roles_required:
+
+- *_roles_required*: list of strings describing roles.
+
+  In order to be able to see or use this targer, a user must have
+  been granted one of the roles in the list by the authentication
+  module.
+  
+.. __roles_excluded:
+
+- *_roles_excluded*: list of strings describing roles.
+
+  In order to be able to see or use this targer, a user must have
+  *not* been granted one of the roles in the list.
+  
 .. _uefi_boot_manager_ipv4_regex:
 
 - *uefi_boot_manager_ipv4_regex*: allows specifying a Python regular
