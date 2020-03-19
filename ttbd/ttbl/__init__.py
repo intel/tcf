@@ -346,7 +346,7 @@ class fsdb_symlink_c(fsdb_c):
                     value = "s:" + value
             else:
                 raise ValueError("can't store value of type %s" % type(value))
-            assert len(value) < 1023
+            assert len(value) < 4096
         if value == None:
             try:
                 os.unlink(location)

@@ -80,7 +80,7 @@ def _cmdline_alloc_targets(args):
         data = { allocid: state }
         if state == 'active':			# got it
             print "allocation ID %s: allocated: %s" % (
-                allocid, r['allocated_group'])
+                allocid, r['group_allocated'])
         else:					# queue, keepalive in there
             while True:
                 time.sleep(5)
@@ -96,7 +96,7 @@ def _cmdline_alloc_targets(args):
                 new_state = alloc['state']
                 if new_state == 'active':
                     print "\nallocation ID %s: [+%.1fs] allocated: %s" % (
-                        allocid, ts - ts0, alloc['allocated_group'])
+                        allocid, ts - ts0, alloc['group_allocated'])
                     break
                 elif new_state == 'invalid':
                     print "\nallocation ID %s: [+%.1fs] now invalid" % (

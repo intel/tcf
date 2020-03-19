@@ -290,7 +290,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
                     # allocated, let's then use it--if we set the "group"
                     # value, then we have it allocated
                     # Sort here because everywhere else we need a set
-                    self.set("allocated_group", ",".join(sorted(group)))
+                    self.set("group_allocated", ",".join(sorted(group)))
                     self.set("ts_start", time.time())
                     self.state_set("active")
                     logging.error("DEBUG: %s: group %s complete, state %s",
@@ -399,9 +399,9 @@ class allocation_c(ttbl.fsdb_symlink_c):
         guests = self.guest_list()
         if guests:
             d['guests'] = guests
-        targets = self.get('allocated_group', [])
+        targets = self.get('group_allocated', [])
         if targets:
-            d['allocated_group'] = targets
+            d['group_allocated'] = targets
 
         d['targets_all'] = list(self.targets_all.keys())
         d['target_group'] = {}
@@ -878,8 +878,8 @@ def request(groups, calling_user, obo_user, guests,
         else:			     	# something wong
             db.delete(None)
     if state == 'active':
-        # allocated_group set in calculate_stuff()
-        result['allocated_group'] = db.get("allocated_group")
+        # group_allocated set in calculate_stuff()
+        result['group_allocated'] = db.get("group_allocated")
     return result
 
 
@@ -933,7 +933,7 @@ def keepalive(allocationid, expected_state, _pressure, calling_user):
     r = dict(state = state)
     if state == "active" and expected_state != 'active':
         # set in calculate_stuff()
-        r['allocated_group'] = db.get("allocated_group")
+        r['group_allocated'] = db.get("group_allocated")
     return r
 
 
