@@ -614,7 +614,7 @@ def _put_allocation():
     #
     # return {
     #    "state": { 'busy', 'queued', 'allocated', 'rejected' },
-    #    "allocationid": ID,    # if queued; derived from OWNER's cookie
+    #    "allocid": ID,    # if queued; derived from OWNER's cookie
     #    "message": {
     #      "not allowed on TARGETNAMEs",	# when rejected
     #      "targets TARGETNAMEs are busy",	# when not queued
@@ -655,13 +655,13 @@ def _put_allocation():
     return flask.jsonify(result)
 
 
-@app.route(API_PREFIX + 'allocation/<string:allocationid>',
+@app.route(API_PREFIX + 'allocation/<string:allocid>',
            methods = [ 'GET' ])
 @flask_login.login_required
-def _get_allocation(allocationid):
+def _get_allocation(allocid):
     try:
         result = ttbl.allocation.get(
-            allocationid,
+            allocid,
             flask_login.current_user._get_current_object())
         #logging.error("DEBUG get %s" % pprint.pformat(result))
     except Exception as e:
@@ -680,13 +680,13 @@ def _query_allocation():
     return flask.jsonify(result)
 
 
-@app.route(API_PREFIX + 'allocation/<string:allocationid>',
+@app.route(API_PREFIX + 'allocation/<string:allocid>',
            methods = [ 'DELETE' ])
 @flask_login.login_required	# release the allocation
-def _delete_allocation(allocationid):
+def _delete_allocation(allocid):
     try:
         result = ttbl.allocation.delete(
-            allocationid,
+            allocid,
             flask_login.current_user._get_current_object())
     except Exception as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
@@ -721,36 +721,36 @@ def _put_keepalive():
         else:
             pressure = 0
         result = {}
-        for allocationid, expected_state in data.iteritems():
+        for allocid, expected_state in data.iteritems():
             r = ttbl.allocation.keepalive(
-                allocationid, expected_state, pressure,
+                allocid, expected_state, pressure,
                 flask_login.current_user._get_current_object())
             if r['state'] == expected_state:
                 continue		# nothing to return
-            result[allocationid] = r
+            result[allocid] = r
     except Exception as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
     return flask.jsonify(dict(result = result))
 
 
-@app.route(API_PREFIX + 'allocation/<string:allocationid>/<string:guestname>',
+@app.route(API_PREFIX + 'allocation/<string:allocid>/<string:guestname>',
            methods = [ 'PATCH' ])
 @flask_login.login_required
-def _patch_guest(allocationid, guestname):
+def _patch_guest(allocid, guestname):
     try:
         user = flask_login.current_user._get_current_object()
-        result = ttbl.allocation.guest_add(allocationid, user, guestname)
+        result = ttbl.allocation.guest_add(allocid, user, guestname)
     except Exception as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
     return flask.jsonify(result)
 
-@app.route(API_PREFIX + 'allocation/<string:allocationid>/<string:guestname>',
+@app.route(API_PREFIX + 'allocation/<string:allocid>/<string:guestname>',
            methods = [ 'DELETE' ])
 @flask_login.login_required
-def _delete_guest(allocationid, guestname):
+def _delete_guest(allocid, guestname):
     try:
         user = flask_login.current_user._get_current_object()
-        result = ttbl.allocation.guest_remove(allocationid, user, guestname)
+        result = ttbl.allocation.guest_remove(allocid, user, guestname)
     except Exception as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
     return flask.jsonify(result)

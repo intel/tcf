@@ -7,14 +7,14 @@
 # FIXME:
 #
 #  - allocted_group -> group_allocated
-#  - allocationid / allocationdb -> allocid / allocd
+#  - allocid / allocationdb -> allocid / allocd
 #  - _alloc* fields to _alloc.
 #  - alloc-monitor broken
 #  - reject messages to carry a 40x code?
 #  - each target allocation carries a max TTL per policy
 #  - starvation control missing
 #  - forbid fsdb writing to alloc fields
-#  - check lock order taking, always target or allocationid,target
+#  - check lock order taking, always target or allocid,target
 #  * LRU caches needs being able to invalidate to avoid data
 #    contamination, consider https://pastebin.com/LDwMwtp8
 """
@@ -74,9 +74,9 @@ import ttbl.user_control
 
 path = None
 
-_allocationid_valid_regex = re.compile(r"^[_a-zA-Z0-9]+$")
+_allocid_valid_regex = re.compile(r"^[_a-zA-Z0-9]+$")
 # note this matches the valid characters that tmpfile.mkdtemp() will use
-_allocationid_valid = set("_0123456789"
+_allocid_valid = set("_0123456789"
                           "abcdefghijklmnopqrstuvwxyz"
                           "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 _queue_number_valid = set("0123456789")
@@ -146,10 +146,10 @@ class allocation_c(ttbl.fsdb_symlink_c):
     Move backend symlink_set_c -> impl so it can be transitioned to a
     Mongo or whatever
     """
-    def __init__(self, allocationid):
-        dirname = os.path.join(path, allocationid)
-        ttbl.fsdb_symlink_c.__init__(self, dirname, concept = "allocationid")
-        self.allocationid = allocationid
+    def __init__(self, allocid):
+        dirname = os.path.join(path, allocid)
+        ttbl.fsdb_symlink_c.__init__(self, dirname, concept = "allocid")
+        self.allocid = allocid
         # protects writing to most fields
         # - group
         # - state
@@ -162,10 +162,10 @@ class allocation_c(ttbl.fsdb_symlink_c):
         self.target_info_reload()
 
     @staticmethod
-    def __init_from_cache__(allocationid):
+    def __init_from_cache__(allocid):
         # yeah, yeah, I could make lru_aged_c be smarter and know how
         # to call methods, but it's late        
-        return allocation_c(allocationid)
+        return allocation_c(allocid)
 
     def target_info_reload(self):
         # Note the information about the targets and groups doesn't
@@ -179,7 +179,11 @@ class allocation_c(ttbl.fsdb_symlink_c):
             self.groups[group_name[6:]] = target_names_group
             target_names_all |= target_names_group
         for target_name in target_names_all:
-            self.targets_all[target_name] = ttbl.config.targets[target_name]
+            try:
+                self.targets_all[target_name] = ttbl.config.targets[target_name]
+            except KeyError:
+                raise self.invalid_e(
+                    "%s: target no longer available" % target_name)
 
     def delete(self, _state = "removed"):
         targets_all = []
@@ -197,14 +201,14 @@ class allocation_c(ttbl.fsdb_symlink_c):
             # to it invalid and the next _run() call will clean them
             logging.error("DEBUG:ALLOC: rmtree %s", self.location)
             shutil.rmtree(self.location, True)
-            lru_aged_cache_allocation_c.invalidate(self.allocationid)
+            lru_aged_cache_allocation_c.invalidate(self.allocid)
         # FIXME: implement a DB of recently deleted reservations so anyone
         # trying to use it gets a state invalid/timedout/overtime/removed
         # release all queueing/owning targets to it
         # FIXME: remove from get_from_cache cache
         if targets:
             logging.error("DEBUG:ALLOC: %s delete runs scheduler on %s",
-                          self.allocationid, targets.keys())
+                          self.allocid, targets.keys())
             _run(targets.values(), False)
 
     def set(self, key, value, force = True):
@@ -230,13 +234,13 @@ class allocation_c(ttbl.fsdb_symlink_c):
         return self.get('timestamp', "00000000000000")	# follow %Y%m%d%H%M%S
 
     def maintenance(self, ts_now):
-        logging.error("DEBUG: %s: maint %s", self.allocationid, ts_now)
+        logging.error("DEBUG: %s: maint %s", self.allocid, ts_now)
 
         # Check if it has been idle for too long
         ts_last_keepalive = int(self.timestamp_get())
         if ts_now - ts_last_keepalive > ttbl.config.target_max_idle:
             logging.error("DEBUG: %d: allocation %s timedout, deleting",
-                          ts_now, self.allocationid)
+                          ts_now, self.allocid)
             self.delete('timedout')
             return
 
@@ -247,7 +251,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
             ts_start = int(self.get('_alloc.ts_start'))
             if ts_now - ts_start > ttl:
                 logging.error("DEBUG: %s: allocation expired",
-                              self.allocationid)
+                              self.allocid)
                 self.delete('overtime')
                 return
 
@@ -258,13 +262,13 @@ class allocation_c(ttbl.fsdb_symlink_c):
         with self.lock:
             # We need to know if we have completely allocated all of
             # the targets of any of the groups of targets this
-            # allocationid requested
+            # allocid requested
 
-            # Lookup all the targets this allocationid has allocated
+            # Lookup all the targets this allocid has allocated
             targets_allocated = set()
             for target_name, target in self.targets_all.iteritems():
-                allocationid = target.allocationid_get_bare()
-                if allocationid == self.allocationid:
+                allocid = target.allocid_get_bare()
+                if allocid == self.allocid:
                     targets_allocated.add(target_name)
 
             # Iterate all the groups, see which are incomplete; for
@@ -294,7 +298,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
                     self.set("ts_start", time.time())
                     self.state_set("active")
                     logging.error("DEBUG: %s: group %s complete, state %s",
-                                  self.allocationid, group_name,
+                                  self.allocid, group_name,
                                   self.state_get())
                     return {}, targets_allocated - group
 
@@ -414,18 +418,18 @@ lru_aged_cache_allocation_c = lru_aged_c(
     allocation_c.__init_from_cache__,
     120, 256)
 
-def get_from_cache(allocationid):
+def get_from_cache(allocid):
     # get an *existing* allocation, if possible from the cache
     global path
-    alloc_path = os.path.join(path, allocationid)
-    #logging.error("DEBUG:CACHE: cache loading allocationid %s", allocationid)
+    alloc_path = os.path.join(path, allocid)
+    #logging.error("DEBUG:CACHE: cache loading allocid %s", allocid)
     if not os.path.isdir(alloc_path):
-        # if we are given an allocationid that exists in the cache but
+        # if we are given an allocid that exists in the cache but
         # has no corresponding entry in the database, wipe it from the
         # cache and return invalid
-        lru_aged_cache_allocation_c.invalidate(allocationid)
-        raise allocation_c.invalid_e("%s: invalid allocation" % allocationid)
-    return lru_aged_cache_allocation_c(allocationid)
+        lru_aged_cache_allocation_c.invalidate(allocid)
+        raise allocation_c.invalid_e("%s: invalid allocation" % allocid)
+    return lru_aged_cache_allocation_c(allocid)
 
 def target_is_valid(target_name):
     # FIXME: validate with the inventory
@@ -437,17 +441,17 @@ def init():
     commonl.makedirs_p(path)
 
 
-def _allocationid_validate(allocationid):
+def _allocid_validate(allocid):
     # FIXME: move to allocation_c? or deprecate and move all users to
     # use the returned object
     try:
-        return get_from_cache(allocationid)
+        return get_from_cache(allocid)
     except allocation_c.invalid_e:
         return None
 
 def _waiter_validate(target, waiter_string, value):
     # waiter_string: _alloc.queue.PRIO-TIMESTAMP-FLAGS
-    # value: ALLOCATIONID
+    # value: ALLOCID
     while True:
         prefix1, prefix2, rest = waiter_string.split('.', 2)
         if ( prefix1, prefix2 ) != ( "_alloc", "queue" ):
@@ -478,11 +482,11 @@ def _waiter_validate(target, waiter_string, value):
            or flags[1] not in [ 'S', 'E' ]:
             logging.info("ALLOC: %s: invalid flags %s", waiter_string, flags)
             break
-        if len(value) != 6 or set(value) - _allocationid_valid:
+        if len(value) != 6 or set(value) - _allocid_valid:
             logging.info("ALLOC: %s: invalid value to queue entry: %s",
                          waiter_string, value)
             break
-        # no need verify allocationid, since _target_allocate_locked()
+        # no need verify allocid, since _target_allocate_locked()
         # will try to create an entry out of it and remove it if invalid
         return int(prio), ts, flags, value
 
@@ -499,21 +503,21 @@ def _target_queue_load(target):
         # time.
         # could use a regex to validate this, but the fields are
         # so simple...
-        prio, ts, flags, allocationid = \
+        prio, ts, flags, allocid = \
             _waiter_validate(target, waiter_string, value)
         if prio == None:	# bad entry, killed
             continue
         if 'P' in flags:
             preempt = True
-        bisect.insort(waiters, ( prio, ts, flags, allocationid,
+        bisect.insort(waiters, ( prio, ts, flags, allocid,
                                  waiter_string ))
     return waiters, preempt
 
 def _target_starvation_recalculate(allocationdb, target, score):
     logging.error("FIXME: %s: %s: %s",
-                  allocationdb.allocationid, target.id, score)
+                  allocationdb.allocid, target.id, score)
 
-def _target_allocate_locked(target, current_allocationid, waiters, preempt):
+def _target_allocate_locked(target, current_allocid, waiters, preempt):
     # return: allocationdb from waiter that succesfully took it
     #         None if the allocation was not changed
     # FIXME: move to test_target
@@ -546,7 +550,7 @@ def _target_allocate_locked(target, current_allocationid, waiters, preempt):
             # let's change the whole prio system to be 0 highest, 1000
             # max. 
             logging.error("DEBUG:ALLOC: %s: higuest prio waiter is %s",
-                          target.id, allocationdb.allocationid)
+                          target.id, allocationdb.allocid)
             break
         except allocation_c.invalid_e as e:
             logging.error("DEBUG:ALLOC: %s: waiter %s: invalid: %s",
@@ -561,15 +565,15 @@ def _target_allocate_locked(target, current_allocationid, waiters, preempt):
     # #0: priority of this waiter for this target
     # #1: timestamp when the waiter started waiting
     # #2: flags
-    # #3: allocationid
+    # #3: allocid
     # #4: name of original queue file
 
     priority_waiter = waiter[0]	# get prio, maybe boosted
 
-    if current_allocationid:
+    if current_allocid:
         # FIXME
         # Ok, it is owned by a valid allocation (if it wasn't,
-        # target._allocationid_get()) has cleaned it up.
+        # target._allocid_get()) has cleaned it up.
 
         # Let's verify if we need to boot the current owner due to a
         # preemption request.
@@ -578,13 +582,13 @@ def _target_allocate_locked(target, current_allocationid, waiters, preempt):
             logging.error("%s: BUG: ALLOC: no priority recorded", target.id)
             priority_target = 500
         logging.error(
-            "DEBUG: %s: current allocationid %s, prios target %s waiter %s",
-            target.id, current_allocationid, priority_target, priority_waiter)
+            "DEBUG: %s: current allocid %s, prios target %s waiter %s",
+            target.id, current_allocid, priority_target, priority_waiter)
         if priority_target <= priority_waiter:
             # a higher or equal prio owner has the target
             logging.error("DEBUG: %s: busy w %s higher/equal prio owner"
                           " (owner %d >=  waiter %d)",
-                          target.id, current_allocationid,
+                          target.id, current_allocid,
                           priority_target, priority_waiter)
             return None
         # a lower prio owner has the target with a higher prio target waiting
@@ -592,17 +596,17 @@ def _target_allocate_locked(target, current_allocationid, waiters, preempt):
             # preemption is not enabled, so the higher prio waiter waits
             logging.error("DEBUG: %s: busy w %s lower prio owner w/o preemption"
                           " (owner %d > waiter  %d)",
-                          target.id, current_allocationid,
+                          target.id, current_allocid,
                           priority_target, priority_waiter)
             return None
         # A lower priority owner has the target, a higher priority one
         # is waiting and preemption is enabled; the lower prio holder
         # gets booted out.
         logging.error("DEBUG: %s: preempting %s over current owner %s",
-                      target.id, allocationdb.allocationid,
-                      current_allocationid)
-        target._deallocate_forced(current_allocationid)
-        # FIXME: set owning allocationid to reset-needed
+                      target.id, allocationdb.allocid,
+                      current_allocid)
+        target._deallocate_forced(current_allocid)
+        # FIXME: set owning allocid to reset-needed
         # fallthrough
 
     # The target is not allocated either because it was free, the
@@ -616,13 +620,13 @@ def _target_allocate_locked(target, current_allocationid, waiters, preempt):
     # we leave it for the next run
     target.fsdb.set("_alloc.priority", priority_waiter)
     target.fsdb.set("owner", allocationdb.get('user'))
-    target.fsdb.set("_allocationid", allocationdb.allocationid)
+    target.fsdb.set("_allocid", allocationdb.allocid)
     target.fsdb.set("_alloc.ts_start", time.strftime("%Y%m%d%H%M%S"))
     # remove the waiter from the queue
     target.fsdb.set(waiter[4], None)
     # ** This waiter is the owner now **
     logging.error("DEBUG: %s: target allocated to %s",
-                  target.id, allocationdb.allocationid)
+                  target.id, allocationdb.allocid)
     return allocationdb
 
 
@@ -649,17 +653,17 @@ def _run_target(target, preempt):
             # get and validate the current owner -- if invalid owner
             # (allocation removed, it'll be wiped)
             logging.error("DEBUG:ALLOC: %s: getting current owner", target.id)
-            current_allocationid =  target._allocationid_get()
+            current_allocid =  target._allocid_get()
             logging.error("DEBUG:ALLOC: %s: current owner %s",
-                          target.id, current_allocationid)
+                          target.id, current_allocid)
             allocationdb = _target_allocate_locked(
-                target, current_allocationid, waiters, preempt_in_queue)
+                target, current_allocid, waiters, preempt_in_queue)
         if allocationdb:
             logging.error("DEBUG: ALLOC: %s: new owner %s",
-                          target.id, allocationdb.allocationid)
-            # the target was allocated to allocationid
+                          target.id, allocationdb.allocid)
+            # the target was allocated to allocid
             # now we need to compute if this makes all the targets
-            # needed for any of the groups in the allocationid
+            # needed for any of the groups in the allocid
 
             # FIXME: adjust the priority of waiters for other target
             # in the allocation
@@ -669,7 +673,7 @@ def _run_target(target, preempt):
             for target_name in targets_to_release:
                 target = ttbl.config.targets[target_name]
                 with target.lock:
-                    target._deallocate_simple(allocationdb.allocationid)
+                    target._deallocate_simple(allocationdb.allocid)
             for target_name, score in targets_to_boost.iteritems():
                 _target_starvation_recalculate(allocationdb, target, score)
         else:
@@ -789,10 +793,10 @@ def request(groups, calling_user, obo_user, guests,
 
     # Create an allocation record and from there, get the ID -- we
     # abuse python's tempdir making abilities for it
-    allocationid_path = tempfile.mkdtemp(dir = path, prefix = "")
-    allocationid = os.path.basename(allocationid_path)
+    allocid_path = tempfile.mkdtemp(dir = path, prefix = "")
+    allocid = os.path.basename(allocid_path)
 
-    db = get_from_cache(allocationid)
+    db = get_from_cache(allocid)
 
     db.set("priority", priority)
     db.set("user", obo_user)
@@ -832,8 +836,8 @@ def request(groups, calling_user, obo_user, guests,
         # allocation increases (calculated from the TIMESTAMP in
         # the name)
         #
-        # TIMESTAMP is the time when the allocationid was created
-        # (vs the ALLOCATIONID/timestamp field which we use to
+        # TIMESTAMP is the time when the allocid was created
+        # (vs the ALLOCID/timestamp field which we use to
         # mark keepalives); allows to:
         #
         #   (a) first-come-first-serve sort two allocations with
@@ -856,14 +860,14 @@ def request(groups, calling_user, obo_user, guests,
         # same allocation are trying to allocate the same target,
         # we want to share that position in the queue
         target.fsdb.set("_alloc.queue.%06d-%s-%s" % (priority, ts, flags),
-                        allocationid)
+                        allocid)
 
     _run(targets_all.values(), preempt)
 
     state = db.state_get()
     result = {
         "state": state,
-        "allocationid": allocationid,
+        "allocid": allocid,
         "message": states[state],
     }
     if queue == False:
@@ -886,21 +890,21 @@ def request(groups, calling_user, obo_user, guests,
 def query(calling_user):
     assert isinstance(calling_user, ttbl.user_control.User)
     result = {}
-    for _rootname, allocationids, _filenames in os.walk(path):
-        for allocationid in allocationids:
+    for _rootname, allocids, _filenames in os.walk(path):
+        for allocid in allocids:
             try:
-                db = get_from_cache(allocationid)
+                db = get_from_cache(allocid)
                 if not db.check_query_permission(calling_user):
                     continue
-                result[allocationid] = db.to_dict()
+                result[allocid] = db.to_dict()
             except allocation_c.invalid_e:
-                result[allocationid] = { "status" : "invalid" }
+                result[allocid] = { "state" : "invalid" }
         return result	# only want the toplevel, thanks
 
 
-def get(allocationid, calling_user):
+def get(allocid, calling_user):
     assert isinstance(calling_user, ttbl.user_control.User)
-    db = get_from_cache(allocationid)
+    db = get_from_cache(allocid)
     if not db.check_query_permission(calling_user):
         return {
             # could also just return invalid
@@ -909,7 +913,7 @@ def get(allocationid, calling_user):
     return db.to_dict()
 
 
-def keepalive(allocationid, expected_state, _pressure, calling_user):
+def keepalive(allocid, expected_state, _pressure, calling_user):
     """
     :param int pressure: how my system is doing so I might be able or
       not to take the extra job of the next allocation, so up and down
@@ -921,7 +925,7 @@ def keepalive(allocationid, expected_state, _pressure, calling_user):
         "calling_user is unexpected type %s" % type(calling_user)
     db = None
     try:
-        db = get_from_cache(allocationid)
+        db = get_from_cache(allocid)
     except allocation_c.invalid_e:
         return dict(state = "invalid", message = states['invalid'])
     if not db.check_user_is_creator_admin(calling_user):
@@ -953,10 +957,10 @@ def maintenance(t, calling_user):
     assert isinstance(calling_user, ttbl.user_control.User)
 
     # allocations: run maintenance (expire, check overtimes)
-    for _rootname, allocationids, _filenames in os.walk(path):
-        for allocationid in allocationids:
+    for _rootname, allocids, _filenames in os.walk(path):
+        for allocid in allocids:
             try:
-                db = get_from_cache(allocationid)
+                db = get_from_cache(allocid)
                 db.maintenance(ts_now)
             except allocation_c.invalid_e:
                 continue
@@ -978,15 +982,13 @@ def maintenance(t, calling_user):
     _run(ttbl.config.targets.values(), False)
 
 
-def delete(allocationid, calling_user):
-    assert isinstance(allocationid, basestring)
+def delete(allocid, calling_user):
+    assert isinstance(allocid, basestring)
     assert isinstance(calling_user, ttbl.user_control.User)
-    db = get_from_cache(allocationid)
+    db = get_from_cache(allocid)
     userid = calling_user.get_id()
     if db.check_user_is_creator_admin(calling_user):
-        logging.error("DEBUG:ALLOC: %s removing" % allocationid)
         db.delete("removed")
-        logging.error("DEBUG:ALLOC: %s removed" % allocationid)
         return {
             "state": "removed",
             "message": states['removed']
@@ -999,7 +1001,7 @@ def delete(allocationid, calling_user):
     return { "message": "no permission to remove other's allocation" }
 
 
-def guest_add(allocationid, calling_user, guest):
+def guest_add(allocid, calling_user, guest):
     assert isinstance(calling_user, ttbl.user_control.User)
     if not isinstance(guest, basestring):
         return {
@@ -1007,8 +1009,8 @@ def guest_add(allocationid, calling_user, guest):
             "message": "guest must be described by a string; got %s" \
             % type(guest).__name__
         }
-    assert isinstance(allocationid, basestring)
-    db = get_from_cache(allocationid)
+    assert isinstance(allocid, basestring)
+    db = get_from_cache(allocid)
     # verify user is owner/creator
     if not db.check_user_is_creator_admin(calling_user):
         return { "message": "guests not allowed to set guests in allocation" }
@@ -1016,7 +1018,7 @@ def guest_add(allocationid, calling_user, guest):
     return {}
 
 
-def guest_remove(allocationid, calling_user, guest):
+def guest_remove(allocid, calling_user, guest):
     assert isinstance(calling_user, ttbl.user_control.User)
     if not isinstance(guest, basestring):
         return {
@@ -1024,8 +1026,8 @@ def guest_remove(allocationid, calling_user, guest):
             "message": "guest must be described by a string;"
                        " got %s" % type(guest)
         }
-    assert isinstance(allocationid, basestring)
-    db = get_from_cache(allocationid)
+    assert isinstance(allocid, basestring)
+    db = get_from_cache(allocid)
     guestid = commonl.mkid(guest, l = 4)
     if calling_user.get_id() != guest \
        and not db.check_user_is_creator_admin(calling_user):

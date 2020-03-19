@@ -29,9 +29,9 @@ import asciimatics.event
 import asciimatics.scene
 
 
-def _delete(rtb, allocationid):
+def _delete(rtb, allocid):
     try:
-        rtb.send_request("DELETE", "allocation/%s" % allocationid)
+        rtb.send_request("DELETE", "allocation/%s" % allocid)
     except requests.HTTPError as e:
         if 'invalid allocation' not in str(e):
             raise
@@ -76,7 +76,7 @@ def _cmdline_alloc_targets(args):
             raise RuntimeError(
                 "allocation failed: %s: %s"
                 % (state, r.get('message', 'message n/a')))
-        allocid = r['allocationid']
+        allocid = r['allocid']
         data = { allocid: state }
         if state == 'active':			# got it
             print "allocation ID %s: allocated: %s" % (
@@ -176,14 +176,14 @@ class _model_c(object):
         for target in self.targets.values():
             ## "_alloc_queue": [
             ##     {
-            ##         "allocationid": "PMAbeM",
+            ##         "allocid": "PMAbeM",
             ##         "exclusive": true,
             ##         "preempt": false,
             ##         "priority": 50000,
             ##         "timestamp": 20200305204652
             ##     },
             ##     {
-            ##         "allocationid": "1KeyqK",
+            ##         "allocid": "1KeyqK",
             ##         "exclusive": true,
             ##         "preempt": false,
             ##         "priority": 50000,
@@ -192,7 +192,7 @@ class _model_c(object):
             ## ],
             waiter_count = 0
             #print >> sys.stderr, "DEBUG target %s" % target.id, target.rt
-            # ( prio, timestamp, allocationid, preempt, exclusive)
+            # ( prio, timestamp, allocid, preempt, exclusive)
             waiterl = []
             queue = target.rt.get('_alloc', {}).get('queue', {})
             for allocid, waiter in queue.iteritems():
@@ -328,13 +328,13 @@ def _alloc_ls(verbosity):
 
     table = []
     for rtb, r in allocs.iteritems():
-        for allocationid, data in r.iteritems():
+        for allocid, data in r.iteritems():
             if verbosity == 0:
                 table.append([
-                    allocationid,
+                    allocid,
                     data['state'],
-                    data['creator'],
-                    data['user'],
+                    data.get('creator', 'n/a'),
+                    data.get('user', 'n/a'),
                     len(data.get('guests', [])),
                     len(data.get('target_group', []))
                 ])
@@ -343,17 +343,17 @@ def _alloc_ls(verbosity):
                 for name, group in data.get('target_group', {}).iteritems():
                     tgs.append( name + ": " + ",".join(group))
                 table.append([
-                    allocationid,
+                    allocid,
                     rtb,
                     data['state'],
-                    data['timestamp'],
-                    data['creator'],
-                    data['user'],
+                    data.get('timestamp', 'n/a'),
+                    data.get('creator', 'n/a'),
+                    data.get('user', 'n/a'),
                     "\n".join(data.get('guests', [])),
                     "\n".join(tgs),
                 ])
             elif verbosity == 2:
-                commonl.data_dump_recursive(data, allocationid,)
+                commonl.data_dump_recursive(data, allocid,)
     if verbosity == 0:
         headers0 = [
             "AllocationID",
@@ -406,16 +406,16 @@ def _cmdline_alloc_delete(args):
 
         # we don't know which request is on which server, so we send
         # it to all the servers
-        def _allocationid_delete(allocationid):
+        def _allocid_delete(allocid):
 
             try:
                 rtb = None
-                if '/' in allocationid:
-                    server_aka, allocationid = allocationid.split('/', 1)
+                if '/' in allocid:
+                    server_aka, allocid = allocid.split('/', 1)
                     for rtb in ttb_client.rest_target_brokers.values():
                         if rtb.aka == server_aka:
                             rtb = rtb
-                            _delete(rtb, allocationid)
+                            _delete(rtb, allocid)
                             return
                     else:
                         logging.error("%s: unknown server name", server_aka)
@@ -424,97 +424,97 @@ def _cmdline_alloc_delete(args):
                 # collateral damage might happen--but then, you can
                 # only delete yours
                 for rtb in ttb_client.rest_target_brokers.values():
-                    _delete(rtb, allocationid)
+                    _delete(rtb, allocid)
             except Exception as e:
                 logging.exception("Exception: %s", e)
 
         tp = ttb_client._multiprocessing_pool_c(
-            processes = len(args.allocationid))
+            processes = len(args.allocid))
         threads = {}
-        for allocationid in args.allocationid:
-            threads[allocationid] = tp.apply_async(_allocationid_delete,
-                                                   (allocationid,))
+        for allocid in args.allocid:
+            threads[allocid] = tp.apply_async(_allocid_delete,
+                                                   (allocid,))
         tp.close()
         tp.join()
 
-def _rtb_allocationid_extract(allocationid):
+def _rtb_allocid_extract(allocid):
     rtb = None
-    if '/' in allocationid:
-        server_aka, allocationid = allocationid.split('/', 1)
+    if '/' in allocid:
+        server_aka, allocid = allocid.split('/', 1)
         for rtb in ttb_client.rest_target_brokers.values():
             if rtb.aka == server_aka:
-                return rtb, allocationid
+                return rtb, allocid
         logging.error("%s: unknown server name", server_aka)
-        return None, allocationid
-    return None, allocationid
+        return None, allocid
+    return None, allocid
 
-def _guests_add(rtb, allocationid, guests):
+def _guests_add(rtb, allocid, guests):
     for guest in guests:
         try:
             rtb.send_request("PATCH", "allocation/%s/%s"
-                             % (allocationid, guest))
+                             % (allocid, guest))
         except requests.HTTPError as e:
             logging.warning("%s: can't add guest %s: %s",
-                            allocationid, guest, e)
+                            allocid, guest, e)
 
 
-def _guests_list(rtb, allocationid):
-    r = rtb.send_request("GET", "allocation/%s" % allocationid)
+def _guests_list(rtb, allocid):
+    r = rtb.send_request("GET", "allocation/%s" % allocid)
     print "\n".join(r.get('guests', []))
 
-def _guests_remove(rtb, allocationid, guests):
+def _guests_remove(rtb, allocid, guests):
     if not guests:
         # no guests given, remove'em all -- so list them first
-        r = rtb.send_request("GET", "allocation/%s" % allocationid)
+        r = rtb.send_request("GET", "allocation/%s" % allocid)
         guests = r.get('guests', [])
     for guest in guests:
         try:
             r = rtb.send_request("DELETE", "allocation/%s/%s"
-                                 % (allocationid, guest))
+                                 % (allocid, guest))
         except requests.HTTPError as e:
             logging.error("%s: can't remove guest %s: %s",
-                          allocationid, guest, e)
+                          allocid, guest, e)
 
 
 def _cmdline_guest_add(args):
     with msgid_c("cmdline"):
-        rtb, allocationid = _rtb_allocationid_extract(args.allocationid)
+        rtb, allocid = _rtb_allocid_extract(args.allocid)
         if rtb == None:
             # Unknown server, so let's try them all ... yeah,
             # collateral damage might happen--but then, you can
             # only delete yours
             for rtb in ttb_client.rest_target_brokers.values():
-                _guests_add(rtb, allocationid, args.guests)
+                _guests_add(rtb, allocid, args.guests)
         else:
-            _guests_add(rtb, allocationid, args.guests)
+            _guests_add(rtb, allocid, args.guests)
 
 
 
 def _cmdline_guest_list(args):
     with msgid_c("cmdline"):
-        rtb, allocationid = _rtb_allocationid_extract(args.allocationid)
+        rtb, allocid = _rtb_allocid_extract(args.allocid)
         if rtb == None:
             # Unknown server, so let's try them all ... yeah,
             # collateral damage might happen--but then, you can
             # only delete yours
             for rtb in ttb_client.rest_target_brokers.values():
-                _guests_list(rtb, allocationid)
+                _guests_list(rtb, allocid)
         else:
-            _guests_list(rtb, allocationid)
+            _guests_list(rtb, allocid)
 
 
 
 def _cmdline_guest_remove(args):
     with msgid_c("cmdline"):
-        rtb, allocationid = _rtb_allocationid_extract(args.allocationid)
+        rtb, allocid = _rtb_allocid_extract(args.allocid)
         if rtb == None:
             # Unknown server, so let's try them all ... yeah,
             # collateral damage might happen--but then, you can
             # only delete yours
             for rtb in ttb_client.rest_target_brokers.values():
-                _guests_remove(rtb, allocationid, args.guests)
+                _guests_remove(rtb, allocid, args.guests)
         else:
-            _guests_remove(rtb, allocationid, args.guests)
+            _guests_remove(rtb, allocid, args.guests)
 
 
 def _cmdline_setup(arg_subparsers):
@@ -599,7 +599,7 @@ def _cmdline_setup(arg_subparsers):
         "in any state; any targets allocated to said allocation "
         "will be released")
     ap.add_argument(
-        "allocationid", metavar = "[SERVER/]ALLOCATIONID", nargs = "+",
+        "allocid", metavar = "[SERVER/]ALLOCATIONID", nargs = "+",
         action = "store", default = None,
         help = "Allocation IDs to remove")
     ap.set_defaults(func = _cmdline_alloc_delete)
@@ -608,7 +608,7 @@ def _cmdline_setup(arg_subparsers):
         "guest-add",
         help = "Add a guest to an allocation")
     ap.add_argument(
-        "allocationid", metavar = "[SERVER/]ALLOCATIONID",
+        "allocid", metavar = "[SERVER/]ALLOCATIONID",
         action = "store", default = None,
         help = "Allocation IDs to which to add guest to")
     ap.add_argument(
@@ -621,7 +621,7 @@ def _cmdline_setup(arg_subparsers):
         "guest-list",
         help = "list guests in an allocation")
     ap.add_argument(
-        "allocationid", metavar = "[SERVER/]ALLOCATIONID",
+        "allocid", metavar = "[SERVER/]ALLOCATIONID",
         action = "store", default = None,
         help = "Allocation IDs to which to add guest to")
     ap.set_defaults(func = _cmdline_guest_list)
@@ -630,7 +630,7 @@ def _cmdline_setup(arg_subparsers):
         "guest-remove",
         help = "Remove a guest from an allocation")
     ap.add_argument(
-        "allocationid", metavar = "[SERVER/]ALLOCATIONID",
+        "allocid", metavar = "[SERVER/]ALLOCATIONID",
         action = "store", default = None,
         help = "Allocation IDs to which to add guest to")
     ap.add_argument(

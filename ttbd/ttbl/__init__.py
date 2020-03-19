@@ -1391,15 +1391,15 @@ class test_target(object):
                     del r['owner']
                 except KeyError:
                     pass
-        if commonl.field_needed('_allocationid', projections):
-            allocationid = self.allocationid_get()
-            if allocationid:
-                r['_allocationid'] = allocationid
+        if commonl.field_needed('_allocid', projections):
+            allocid = self.allocid_get()
+            if allocid:
+                r['_allocid'] = allocid
             else:
                 # forcibly delete the key if it might have existed
                 # from the tags or fsdb
                 try:
-                    del r['allocationid']
+                    del r['allocid']
                 except KeyError:
                     pass
 
@@ -1414,10 +1414,10 @@ class test_target(object):
                     r.setdefault('_alloc', {})
                     # override with this format
                     r['_alloc']['queue'] = {}
-                    for prio, ts, flags, allocationid, _ in reversed(waiters):
+                    for prio, ts, flags, allocid, _ in reversed(waiters):
                         # FIXME: change to dict based on allocid /
                         # update monitor
-                        r['_alloc']['queue'][allocationid] = dict(
+                        r['_alloc']['queue'][allocid] = dict(
                             priority = prio,
                             timestamp = int(ts),
                             preempt = 'P' in flags,
@@ -1633,96 +1633,96 @@ class test_target(object):
             f.write(time.strftime("%c\n"))
             pass
 
-    def allocationid_get_bare(self):
-        return self.fsdb.get('_allocationid')
+    def allocid_get_bare(self):
+        return self.fsdb.get('_allocid')
 
-    def _allocationid_wipe(self):
-        self.fsdb.set('_allocationid', None)
+    def _allocid_wipe(self):
+        self.fsdb.set('_allocid', None)
         self.fsdb.set('_alloc.queue_preemption', None)
         self.fsdb.set('_alloc.priority', None)
         self.fsdb.set('_alloc.ts_start', None)
         self.fsdb.set('owner', None)
 
-    def _allocationid_get(self):
+    def _allocid_get(self):
         # needs to be called with self.lock taken!
         assert self.lock.locked()
-        _allocationid = self.fsdb.get('_allocationid')
-        if _allocationid == None:
+        _allocid = self.fsdb.get('_allocid')
+        if _allocid == None:
             return None
-        allocationdb = allocation._allocationid_validate(_allocationid)
+        allocationdb = allocation._allocid_validate(_allocid)
         if allocationdb == None:
             logging.error("%s: wiping ownership by invalid allocation %s",
-                          self.id, _allocationid)
-            self._allocationid_wipe()
+                          self.id, _allocid)
+            self._allocid_wipe()
             return None
-        return _allocationid
+        return _allocid
 
 
     def _allocationdb_get(self):
         # needs to be called with self.lock taken!
         assert self.lock.locked()
-        _allocationid = self.fsdb.get('_allocationid')
-        if _allocationid == None:
+        _allocid = self.fsdb.get('_allocid')
+        if _allocid == None:
             return None
         try:
-            return allocation.get_from_cache(_allocationid)
+            return allocation.get_from_cache(_allocid)
         except allocation.allocation_c.invalid_e:
             logging.error("%s: wiping ownership by invalid allocation %s",
-                          self.id, _allocationid)
-            self._allocationid_wipe()
+                          self.id, _allocid)
+            self._allocid_wipe()
             return None
 
 
-    def _deallocate_simple(self, allocationid):
+    def _deallocate_simple(self, allocid):
         # Siple deallocation -- if the owner points to the
-        # allocationid, just remove it without validating the
+        # allocid, just remove it without validating the
         # allocation is valid
         #
         # This is to be used only when we have taken the target but
         # then have not used it, so there is no need for state clean
         # up.
         assert self.lock.locked()	    # Must have target.lock taken!
-        current_allocationid = self.fsdb.get("_allocationid")
-        if current_allocationid and current_allocationid == allocationid:
-            self._allocationid_wipe()
+        current_allocid = self.fsdb.get("_allocid")
+        if current_allocid and current_allocid == allocid:
+            self._allocid_wipe()
             return True
         return False
 
     # FIXME: move to _deallocate(allocdb), needs changes to use
     # allocdb in
-    #  - _target_allocate_locked(): current_allocationid -> current_allocdb
-    #    - _run_target(): current_allocationid -> current_allocdb
+    #  - _target_allocate_locked(): current_allocid -> current_allocdb
+    #    - _run_target(): current_allocid -> current_allocdb
     #  - _deallocate
     #  - _deallocate_forced
     #  - release()
     #
     # fold _deallocate_forced() to have a state argument that if set,
     # sets the reservation's state to that one
-    def _deallocate(self, allocationid):
+    def _deallocate(self, allocid):
         # deallocate verifying the current allocation is valid
-        if self._deallocate_simple(allocationid):
+        if self._deallocate_simple(allocid):
             self._state_cleanup(False)
             # we leave the reservation as is; if someone is using it
             # they are keepaliving and they'll notice the state
             # change and act; otherwise it will timeout and be removed
             # FIXME: if all targets released, release reservation?
 
-    def _deallocate_forced(self, allocationid):
-        # deallocate forced, set the allocationid to reset-needed,
+    def _deallocate_forced(self, allocid):
+        # deallocate forced, set the allocid to reset-needed,
         # since a target was forcibly removed from an active
         # allocation
-        #assert allocationid.state == active
-        self._deallocate(allocationid)
+        #assert allocid.state == active
+        self._deallocate(allocid)
         try:
-            allocdb = ttbl.allocation.get_from_cache(allocationid)
+            allocdb = ttbl.allocation.get_from_cache(allocid)
             allocdb.state_set('restart-needed')
         except ttbl.allocation.allocation_c.invalid_e:
             # ignore it if it does not exist
             pass
 
-    def allocationid_get(self):
+    def allocid_get(self):
         with self.lock:
-            return self._allocationid_get()
+            return self._allocid_get()
 
     def owner_get_v1(self):
         """
@@ -1946,7 +1946,7 @@ class test_target(object):
                     self._state_cleanup(force)
                 self._acquirer.release(who_create(userid, ticket), force)
                 return
-            allocid = self.allocationid_get_bare()
+            allocid = self.allocid_get_bare()
             if not allocid:
                 raise test_target_not_acquired_e(self)
             with self.lock:
