@@ -1175,6 +1175,53 @@ class test_target(object):
         self.power_off_pre_fns = []
         self.power_off_post_fns = []
 
+    @staticmethod
+    def get_for_user(target_name, calling_user):
+        """
+        If *calling_user* has permission to see & user *target_name*,
+        return the target descriptor
+
+        :param str target_name: target's name
+        :param ttbl.user_control.User calling_user: descriptor of user
+          who is trying to access the target.
+
+        :return ttbl.test_target: if target exists and the user is
+          allowed to see and use it, descriptor to it, *None*
+          otherwise.        
+        """
+        assert isinstance(target_name, basestring)
+        assert isinstance(calling_user, ttbl.user_control.User)
+        target = ttbl.config.targets.get(target_name, None)
+        if not target:
+            return None
+        if not target.check_user_allowed(calling_user):
+            return None
+        return target
+
+    def check_user_allowed(self, user):
+        """
+        Return if *user* is allowed to see/use this target
+
+        :param ttbl.user_control.User user: descriptor of user
+          who is trying to access the target.
+        """
+        assert isinstance(user, ttbl.user_control.User)
+        roles_required = self.tags.get('_roles_required', [])
+        roles_excluded = self.tags.get('_roles_excluded', [])
+
+        for role in roles_excluded:	# users to be excluded
+            if user.has_role(role):
+                return False
+        if roles_required:		# do you require a role?
+            for role in roles_required:
+                if user.has_role(role):
+                    return True		# it has the role, good
+            return False		# does not have it, out
+
+        # If there are no requirements and no exclusions, by default
+        # you can come in
+        return True
+
     def to_dict(self, projections = None):
         """
         Return all of the target's data as a dictionary
@@ -1327,6 +1374,28 @@ class test_target(object):
             assert self.tags['idle_poweroff'] >= 0
         for name, data in  self.tags['interconnects'].iteritems():
             self._tags_verify_interconnect(name, data)
+        roles_required = self.tags.get('_roles_required', None)
+        if roles_required:
+            assert isinstance(roles_required, list), \
+                "tag '_roles_required' has to be a list of strings; " \
+                "got %s" % type(roles_required)
+            count = 0
+            for role in roles_required:
+                assert isinstance(role, basestring), \
+                    "role #%d in '_roles_required' has to be a string; " \
+                    "got %s" % (count, type(role))
+                count += 1
+        roles_excluded = self.tags.get('_roles_excluded', None)
+        if roles_excluded:
+            assert isinstance(roles_excluded, list), \
+                "tag '_roles_excluded' has to be a list of strings; " \
+                "got %s" % type(roles_excluded)
+            count = 0
+            for role in roles_excluded:
+                assert isinstance(role, basestring), \
+                    "role #%d in '_roles_excluded' has to be a string; " \
+                    "got %s" % (count, type(role))
+                count += 1
 
     def add_to_interconnect(self, ic_id, ic_tags = None):
         """Add a target to an interconnect

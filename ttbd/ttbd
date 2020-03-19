@@ -276,7 +276,8 @@ def login():
             identity = flask_principal.Identity(user.get_id()))
     elif 'admin' in token_roles:
         user.set_role('admin')
-
+    for role in token_roles:
+        user.set_role(role)
     logi("user %s: authenticated with roles: %s",
          username, " ".join(token_roles))
     return flask.jsonify({
@@ -318,15 +319,19 @@ def _flask_arg_projections():
 def _targets_gets():
     projections = _flask_arg_projections()
     _list = []
-    for target in ttbl.config.targets.values():
-        _list.append(target.to_dict(projections))
+    calling_user = flask_login.current_user._get_current_object()
+    for target_name in ttbl.config.targets:
+        target = ttbl.test_target.get_for_user(target_name, calling_user)
+        if target:
+            _list.append(target.to_dict(projections))
     return flask.jsonify({'targets': _list})
 
 @app.route(API_PREFIX + 'targets/<string:target_id>', methods = ['GET'])
 @flask_login.login_required
 def _target_get(target_id):
     projections = _flask_arg_projections()
-    target = ttbl.config.targets.get(target_id, None)
+    calling_user = flask_login.current_user._get_current_object()
+    target = ttbl.test_target.get_for_user(target_id, calling_user)
     if target == None:
         flask.abort(404, "%s: unknown target" % target_id)
     return flask.jsonify(target.to_dict(projections))
@@ -375,7 +380,8 @@ def _target_property_set(target, prop, value, user_is_admin, ticket):
            methods = [ 'PATCH', 'PUT' ])
 @flask_login.login_required
 def _target_patch(target_id):
-    target = ttbl.config.targets.get(target_id, None)
+    calling_user = flask_login.current_user._get_current_object()
+    target = ttbl.test_target.get_for_user(target_id, calling_user)
     if target == None:
         flask.abort(404, "%s: unknown target" % target_id)
     ticket = flask.request.form.get('ticket', "")
@@ -430,10 +436,10 @@ def _target_acquire(target_id):
     else:
         force = False
 
-    if target_id not in ttbl.config.targets.keys():
-        return flask.abort(404, "%s: can't find target" % target_id)
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
+    calling_user = flask_login.current_user._get_current_object()
+    target = ttbl.test_target.get_for_user(target_id, calling_user)
+    if target == None:
+        flask.abort(404, "%s: unknown target" % target_id)
     try:
         target.acquire(who_make(ticket), force)
         target.timestamp()
@@ -454,8 +460,10 @@ def _target_active(target_id):
     """
     If this target is owned by the caller, mark it as active
     """
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
+    calling_user = flask_login.current_user._get_current_object()
+    target = ttbl.test_target.get_for_user(target_id, calling_user)
+    if target == None:
+        flask.abort(404, "%s: unknown target" % target_id)
     ticket = flask.request.form.get('ticket', "")
     try:
         if who_make(ticket) == target.owner_get():
@@ -471,8 +479,10 @@ def _target_active(target_id):
 @app.route(API_PREFIX + 'targets/<string:target_id>/release', methods = ['PUT'])
 @flask_login.login_required
 def _target_release(target_id):
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
+    calling_user = flask_login.current_user._get_current_object()
+    target = ttbl.test_target.get_for_user(target_id, calling_user)
+    if target == None:
+        flask.abort(404, "%s: unknown target" % target_id)
     if flask.request.form.get('force', 'false').lower() == 'true':
         force = True
     else:
@@ -509,8 +519,10 @@ def tb_file_local_path_get(username, filepath):
            methods = [ 'PUT', 'POST', 'DELETE', 'GET' ])
 @flask_login.login_required
 def _target_interface(target_id, interface, call):
-    with ttbl.config.targets_lock:
-        target = ttbl.config.targets[target_id]
+    calling_user = flask_login.current_user._get_current_object()
+    target = ttbl.test_target.get_for_user(target_id, calling_user)
+    if target == None:
+        flask.abort(404, "%s: unknown target" % target_id)
     ticket = flask.request.form.get('ticket', "")
     iostr = StringIO.StringIO()
     iostr_wrapper = codecs.StreamReaderWriter(
