@@ -167,7 +167,7 @@ class _model_c(object):
                     #print >> sys.stderr, "DEBUG", target_name, rt
                     self.targets[target_name].rt = rt
             except requests.exceptions.RequestException as e:
-                print >> sys.stderr, "Error %s" % type(e)
+                # FIXME: set status bar "LOST CONNECTION"
                 continue
 
         # return the content per rows
@@ -389,15 +389,27 @@ def _cmdline_alloc_ls(args):
                 tc.target_c.create_from_cmdline_args(args, target_name)
 
         if args.refresh:
-            print "\x1b[2J"	# clean all screen
+            print "\x1b[2J"	# clear whole screen
+            print "\x1b[1;1H"	# move to column 1,1
             sys.stdout.flush()
+            clear = True
+            ts0 = time.time()
             while True:
-                _alloc_ls(args.verbosity)
-                print "\x1b[0J"	# clean what is ledt
-                sys.stdout.flush()
-                time.sleep(args.refresh)
+                try:
+                    if clear:
+                        print "\x1b[2J"	# clear whole screen
+                        clear = False
+                    _alloc_ls(args.verbosity)
+                    ts0 = time.time()
+                except requests.exceptions.RequestException as e:
+                    ts = time.time()
+                    print "[LOST CONNECTION +%ds]: %s" % (ts - ts0, e)
+                    clear = True
+
+                print "\x1b[0J"	# clean what is left
                 print "\x1b[1;1H"	# move to column 1,1
                 sys.stdout.flush()
+                time.sleep(args.refresh)
         else:
                 _alloc_ls(args.verbosity)
 
