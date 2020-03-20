@@ -1646,7 +1646,7 @@ class test_target(object):
             self._allocid_wipe()
             return None
 
-    def _allocationdb_get(self):
+    def _allocdb_get(self):
         # needs to be called with self.lock taken!
         assert self.lock.locked()
         _allocid = self.fsdb.get('_alloc.id')
@@ -1686,27 +1686,16 @@ class test_target(object):
     #
     # fold _deallocate_forced() to have a state argument that if set,
     # sets the reservation's state to that one
-    def _deallocate(self, allocid):
+    def _deallocate(self, allocdb, new_state = None):
         # deallocate verifying the current allocation is valid
-        if self._deallocate_simple(allocid):
+        if self._deallocate_simple(allocdb.allocid):
             self._state_cleanup(False)
             # we leave the reservation as is; if someone is using it
             # they are keepaliving and they'll notice the state
             # change and act; otherwise it will timeout and be removed
             # FIXME: if all targets released, release reservation?
-
-    def _deallocate_forced(self, allocid):
-        # deallocate forced, set the allocid to reset-needed,
-        # since a target was forcibly removed from an active
-        # allocation
-        #assert allocid.state == active
-        self._deallocate(allocid)
-        try:
-            allocdb = ttbl.allocation.get_from_cache(allocid)
-            allocdb.state_set('restart-needed')
-        except ttbl.allocation.allocation_c.invalid_e:
-            # ignore it if it does not exist
-            pass
+            if new_state:
+                allocdb.state_set('restart-needed')
 
     def allocid_get(self):
         with self.lock:
@@ -1938,16 +1927,18 @@ class test_target(object):
             if not allocid:
                 raise test_target_not_acquired_e(self)
             with self.lock:
-                allocdb = self._allocationdb_get()
-                if allocdb == None:	# allocation was removed...
-                    raise test_target_not_acquired_e(self)
+                # get the DB, we do this only if alloc.id is defined,
+                # since it is a heavier op
+                allocdb = self._allocdb_get()
+                if allocdb == None:	# allocation was removed...shrug
+                    return
                 # validate WHO has rights
                 if allocdb.check_user_is_user_creator(user):
                     # user or creator can release it
-                    self._deallocate(allocid)
+                    self._deallocate(allocdb, 'restart-needed')
                 elif force and allocdb.check_user_is_admin(user):
                     # if admin and force,
-                    self._deallocate_forced(allocid)
+                    self._deallocate(allocdb, 'restart-needed')
                 elif allocdb.check_user_is_guest(user):
                     # if guest, just remove it as guest
                     allocdb.guest_remove(user.get_id())
@@ -1977,13 +1968,13 @@ class test_target(object):
             yield
             return
         with self.lock:
-            allocationdb = self._allocationdb_get()
-        if allocationdb:
+            allocdb = self._allocdb_get()
+        if allocdb:
             # New style, allocation based
-            state = allocationdb.state_get()
-            if allocationdb.state_get() != requested_state:
+            state = allocdb.state_get()
+            if allocdb.state_get() != requested_state:
                 raise test_target_wrong_state_e(self, state, requested_state)
-            if not allocationdb.check_userid_is_user_creator_guest(who):
+            if not allocdb.check_userid_is_user_creator_guest(who):
                 raise test_target_busy_e(self, who, self.owner_get())
         else:
             # Old style
@@ -2007,12 +1998,12 @@ class test_target(object):
         # ttbl.user_control.User so we can do admin checks here too?
         assert isinstance(who, basestring)
         with self.lock:
-            allocationdb = self._allocationdb_get()
-        if allocationdb:
+            allocdb = self._allocdb_get()
+        if allocdb:
             # New style, allocation based
-            if allocationdb.state_get() != requested_state:
+            if allocdb.state_get() != requested_state:
                 return False
-            if not allocationdb.check_userid_is_user_creator_guest(who):
+            if not allocdb.check_userid_is_user_creator_guest(who):
                 return False
             return True
         # Old style
