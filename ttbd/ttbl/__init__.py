@@ -1174,9 +1174,7 @@ class tt_interface(object):
 import allocation
 import ttbl.config
 
-# FIXME: generate a unique ID; has to be stable across reboots, so it
-#        needs to be generated from whichever path we are connecting
-#        it to
+
 class test_target(object):
 
     #! Path where the runtime state is stored
@@ -1406,8 +1404,6 @@ class test_target(object):
                     # override with this format
                     r['_alloc']['queue'] = {}
                     for prio, ts, flags, allocid, _ in reversed(waiters):
-                        # FIXME: change to dict based on allocid /
-                        # update monitor
                         r['_alloc']['queue'][allocid] = dict(
                             priority = prio,
                             timestamp = int(ts),
@@ -1635,19 +1631,20 @@ class test_target(object):
         self.fsdb.set('owner', None)
 
     def _allocid_get(self):
+        # return the allocid, if valid, None otherwise
         # needs to be called with self.lock taken!
         assert self.lock.locked()
         _allocid = self.fsdb.get('_alloc.id')
         if _allocid == None:
             return None
-        allocationdb = allocation._allocid_validate(_allocid)
-        if allocationdb == None:
+        try:
+            allocdb = ttbl.allocation.get_from_cache(_allocid)
+            return _allocid	# alloc-ID is valid, return it
+        except ttbl.allocation.allocation_c.invalid_e:
             logging.error("%s: wiping ownership by invalid allocation %s",
                           self.id, _allocid)
             self._allocid_wipe()
             return None
-        return _allocid
-
 
     def _allocationdb_get(self):
         # needs to be called with self.lock taken!
@@ -2092,7 +2089,7 @@ class authenticator_c(object):
         and which with category (as determined by the role mapping)
 
         :returns: None if user is not allowed to log in, otherwise a
-          dictionary with user's information; see :ref:`access control
+          list with user's information; see :ref:`access control
           <target_access_control>`.
 
         """

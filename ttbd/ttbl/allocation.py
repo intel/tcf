@@ -151,8 +151,6 @@ class allocation_c(ttbl.fsdb_symlink_c):
         # - state
         self.lock = ttbl.process_posix_file_lock_c(
             os.path.join(dirname, "lockfile"))
-        # FIXME: load state object from STATEDIR/allocations/ALLOCATIONID
-        # loaded by target_info_reload()
         self.targets_all = None
         self.groups = None
         self.target_info_reload()
@@ -195,16 +193,12 @@ class allocation_c(ttbl.fsdb_symlink_c):
         finally:
             # wipe the whole tree--this will render all the records that point
             # to it invalid and the next _run() call will clean them
-            logging.error("DEBUG:ALLOC: rmtree %s", self.location)
             shutil.rmtree(self.location, True)
             lru_aged_cache_allocation_c.invalidate(self.allocid)
         # FIXME: implement a DB of recently deleted reservations so anyone
         # trying to use it gets a state invalid/timedout/overtime/removed
         # release all queueing/owning targets to it
-        # FIXME: remove from get_from_cache cache
         if targets:
-            logging.error("DEBUG:ALLOC: %s delete runs scheduler on %s",
-                          self.allocid, targets.keys())
             _run(targets.values(), False)
 
     def set(self, key, value, force = True):
@@ -243,7 +237,6 @@ class allocation_c(ttbl.fsdb_symlink_c):
         # Check if it has been alive too long
         ttl = self.get("ttl", 0)
         if ttl > 0:
-            # FIXME: we need to record ts_start
             ts_start = int(self.get('_alloc.ts_start'))
             if ts_now - ts_start > ttl:
                 logging.error("DEBUG: %s: allocation expired",
@@ -436,15 +429,6 @@ def target_is_valid(target_name):
 def init():
     commonl.makedirs_p(path)
 
-
-def _allocid_validate(allocid):
-    # FIXME: move to allocation_c? or deprecate and move all users to
-    # use the returned object
-    try:
-        return get_from_cache(allocid)
-    except allocation_c.invalid_e:
-        return None
-
 def _waiter_validate(target, waiter_string, value):
     # waiter_string: _alloc.queue.PRIO-TIMESTAMP-FLAGS
     # value: ALLOCID
@@ -542,9 +526,6 @@ def _target_allocate_locked(target, current_allocid, waiters, preempt):
         try:
             allocdb = get_from_cache(waiter[3])
             # valid highest prio waiter!
-            # FIXME: ops -- timestamps have to be sorted low to high,
-            # let's change the whole prio system to be 0 highest, 1000
-            # max. 
             logging.error("DEBUG:ALLOC: %s: higuest prio waiter is %s",
                           target.id, allocdb.allocid)
             break
@@ -567,7 +548,6 @@ def _target_allocate_locked(target, current_allocid, waiters, preempt):
     priority_waiter = waiter[0]	# get prio, maybe boosted
 
     if current_allocid:
-        # FIXME
         # Ok, it is owned by a valid allocation (if it wasn't,
         # target._allocid_get()) has cleaned it up.
 
@@ -601,19 +581,14 @@ def _target_allocate_locked(target, current_allocid, waiters, preempt):
         logging.error("DEBUG: %s: preempting %s over current owner %s",
                       target.id, allocdb.allocid,
                       current_allocid)
+        # FIXME: when _deallocate changes to take state, use that to
+        # restart-needed
         target._deallocate_forced(current_allocid)
-        # FIXME: set owning allocid to reset-needed
         # fallthrough
 
     # The target is not allocated either because it was free, the
     # allocation was invalid and got cleaned up or it got preempted;
-    # let's latch it
-    # FIXME: cleanup status? target._status_cleanup?
-    # if invalid, just ignore it and move on
-    # try to assign the first waiter as owner; if the target is
-    # owned by someone (the owner field already exist) it
-    # will fail to update and just return False...so then
-    # we leave it for the next run
+    # let's latch on it
     target.fsdb.set("_alloc.priority", priority_waiter)
     target.fsdb.set("owner", allocdb.get('user'))
     target.fsdb.set("_alloc.id", allocdb.allocid)
@@ -661,15 +636,16 @@ def _run_target(target, preempt):
             # now we need to compute if this makes all the targets
             # needed for any of the groups in the allocid
 
-            # FIXME: adjust the priority of waiters for other target
-            # in the allocation
             targets_to_boost, targets_to_release = \
                 allocdb.calculate_stuff()
 
+            # we have all the targets we need, deallocate those we
+            # got that we don't need
             for target_name in targets_to_release:
                 target = ttbl.config.targets[target_name]
                 with target.lock:
                     target._deallocate_simple(allocdb.allocid)
+            # we still need to allocate targets, maybe boost them
             for target_name, score in targets_to_boost.iteritems():
                 _target_starvation_recalculate(allocdb, target, score)
         else:
@@ -813,48 +789,50 @@ def request(groups, calling_user, obo_user, guests,
     # see it yet, so there is no danger the _run() method will see it
 
     # Add waiting record to each target; maybe we add
+    #
+    #
+    # on each target, enter in the queue a link to the timestamp file;
+    # name it PRIORITY-TIMESTAMP-FLAGS-ALLOCID
+    #
+    # PRIORITY is what help us short who will get it first; highest
+    # (0) wins, always 6 characters -- 0-999 * 1000 is the user given
+    # priority; the extra three are to add a subpriority to avoid
+    # starvation; we modify the priority every T seconds with the
+    # allocation's prio speed value, which gets modified from the
+    # keepalive's pressure argument and it also increases as the age
+    # of the allocation increases (calculated from the TIMESTAMP in
+    # the name)
+    #
+    # TIMESTAMP is the time when the allocid was created (vs the
+    # ALLOCID/timestamp field which we use to mark keepalives); allows
+    # to:
+    #
+    #   (a) first-come-first-serve sort two allocations with the same
+    #       priority
+    #
+    #   (b) calculate the age of an allocation to increase the prio
+    #       speed to avoid starvation
+    #
+    #   (c) adjust the priority up or down based on pressure feedback
+    #       during keepalive
+    #
+    # FLAGS are a sequence of ONE letters
+    #
+    #  - P or N: Preemption or no preemtion
+    #
+    #  - S or E: Shared or Exclusive; currently only Exclusive
+    #    supported
+    #
+    # We don't use the GROUPNAME--if multiple groups of the same
+    # allocation are trying to allocate the same target, we want to
+    # share that position in the queue
     flags = "P" if preempt else "N"
     flags += "S" if shared else "E"
     for target in targets_all.values():
         # FIXME: policy: can we queue on this target? otherwise append to
         # rejected targets and cleanup
-
-        # on each target, enter in the queue a link to the
-        # timestamp file; name it PRIORITY-TIMESTAMP-FLAGS-ALLOCID
-        #
-        # PRIORITY is what help us short who will get it first;
-        # highest wins, always 6 characters -- 0-999 * 1000 is the
-        # user given priority; the extra three are to add a
-        # subpriority to avoid starvation; we modify the priority
-        # every T seconds with the allocation's prio speed value,
-        # which gets modified from the keepalive's pressure
-        # argument and it also increases as the age of the
-        # allocation increases (calculated from the TIMESTAMP in
-        # the name)
-        #
-        # TIMESTAMP is the time when the allocid was created
-        # (vs the ALLOCID/timestamp field which we use to
-        # mark keepalives); allows to:
-        #
-        #   (a) first-come-first-serve sort two allocations with
-        #       the same priority
-        #
-        #   (b) calculate the age of an allocation to increase the
-        #       prio speed to avoid starvation
-        #
-        #   (c) adjust the priority up or down based on pressure
-        #       feedback during keepalive
-        #
-        # FLAGS are a sequence of ONE letters
-        #
-        #  - P or N: Preemption or no preemtion
-        #
-        #  - S or E: Shared or Exclusive; currently only Exclusive
-        #    supported
-        #
-        # We don't use the GROUPNAME--if multiple groups of the
-        # same allocation are trying to allocate the same target,
-        # we want to share that position in the queue
+        # target.check_user_is_allowed(calling_user)
+        # target.check_user_is_allowed(obo_user)
         target.fsdb.set("_alloc.queue.%06d-%s-%s" % (priority, ts, flags),
                         allocid)
 
@@ -966,11 +944,9 @@ def maintenance(t, calling_user):
     for target_name, target in ttbl.config.targets.iteritems():
         owner = target.owner_get()
         if owner:	# if queue entries
-            pass
-            #logging.error("FIXME: starvation control %s: %s",
-            #              target_name, owner)
-            #_target_starvation_recalculate()
+            _target_starvation_recalculate(allocdb, target, 0) # FIXME: 0
 	else:
+            # FIXME: this has to be moved off from ttbd/cleanup
             pass
             #logging.error("FIXME: idle-power-off control %s: %s", target_name, owner)
 
