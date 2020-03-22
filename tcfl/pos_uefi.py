@@ -339,7 +339,7 @@ def _linux_boot_guess_from_boot(target, image):
         if kver and ("rescue" in kver or "kdump" in kver):
             # these are usually found on Fedora
             continue
-        elif file_name in ( "initramfs", "initrd" ):
+        elif file_name in ( "initramfs", "initrd", "initrd.img"  ):
             if kver.endswith(".img"):
                 # remove .img extension that has been pegged to the version
                 kver = os.path.splitext(kver)[0]
