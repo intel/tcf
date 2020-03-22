@@ -766,6 +766,9 @@ def rest_target_list(args):
     else:
         if  args.verbosity == 4:
             # print as a JSON dump
+            for rt in targetl:
+                rtb = rt.pop('rtb')
+                rt['rtb'] = str(rtb)
             print json.dumps(targetl, skipkeys = True, indent = 4)
         else:
             for rt in targetl:
