@@ -96,6 +96,13 @@ class User():
             roles = list(self.roles)
         )
 
+    def wipe(self):
+        """
+        Remove the knowledge of the user in the daemon, effectively
+        logging it out.
+        """
+        os.unlink(self.filename)
+
     @staticmethod
     def is_authenticated():
         return True

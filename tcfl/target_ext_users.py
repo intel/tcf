@@ -76,6 +76,13 @@ def _cmdline_user_list(args):
         print json.dumps(result, skipkeys = True, indent = 4)
 
 
+def _cmdline_logout(args):
+    """
+    Logout user from all the servers
+    """
+    for rtb in ttb_client.rest_target_brokers.itervalues():
+        rtb.logout(args.username)
+
 def _cmdline_setup(arg_subparsers):
     ap = arg_subparsers.add_parser(
         "user-list",
@@ -90,3 +97,12 @@ def _cmdline_setup(arg_subparsers):
         "(none is a table, -v table with more details, "
         "-vv hierarchical, -vvv Python format, -vvvv JSON format)")
     ap.set_defaults(func = _cmdline_user_list)
+
+    ap = arg_subparsers.add_parser(
+        "logout",
+        help = "Log user out of the servers brokers")
+    ap.add_argument(
+        "username", nargs = '?', action = "store", default = None,
+        help = "User to logout (defaults to current); to logout outhers "
+        "*admin* role is needed")
+    ap.set_defaults(func = _cmdline_logout)

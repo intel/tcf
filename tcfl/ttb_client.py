@@ -353,8 +353,12 @@ class rest_target_broker(object):
             return False
         return True
 
-    def logout(self):
-        self.send_request('GET', "logout")
+    def logout(self, username = None):
+        if username:
+            self.send_request('DELETE', "users/" + username)
+        else:
+            # backwards compath
+            self.send_request('PUT', "logout")
 
     def validate_session(self, validate = False):
         if self.valid_session is None or validate:
@@ -556,13 +560,6 @@ def rest_login(args):
         logger.error("Could not login to any server, "
                      "please check your config")
         exit(1)
-
-def rest_logout(args):
-    for rtb in rest_target_brokers.itervalues():
-        logger.info("%s: checking for a valid session", rtb._url)
-        rtb.tb_state_trash()
-        if rtb.valid_session:
-            rtb.logout()
 
 def rest_target_print(rt, verbosity = 0):
     """

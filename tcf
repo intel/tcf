@@ -280,16 +280,12 @@ if __name__ == "__main__":
                     help = "User's login ID")
     ap.set_defaults(func = ttb_client.rest_login)
 
-    ap = arg_subparsers.add_parser("logout", help = "Logout from the different brokers")
-    ap.set_defaults(func = ttb_client.rest_logout)
-
     ap = arg_subparsers.add_parser("cookies",
                                    help = "Show logging cookies (to feed"
                                    " into curl, etc) maybe only for one server")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = [], help = "Target name")
     ap.set_defaults(func = _cookies)
-
 
     arg_parser_target_list = arg_subparsers.add_parser(
         "list", help = "List the targets; by default, in a terminal, it will "

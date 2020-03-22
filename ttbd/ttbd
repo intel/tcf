@@ -349,6 +349,28 @@ def _users(userid = None):
             logging.warning("user '%s' does not exist: %s", userid, e)
     return flask.jsonify(r)
 
+@app.route(API_PREFIX + 'users/', methods = [ 'DELETE' ])
+@app.route(API_PREFIX + 'users/<userid>', methods = [ 'DELETE' ])
+@flask_login.login_required
+def _user_delete(userid = None):
+    if userid == None:	# remove current user
+        user = flask_login.current_user._get_current_object()
+    elif userid == flask_login.current_user.get_id():
+        # if specified and it is the current user, proceed
+        user = flask_login.current_user._get_current_object()
+    elif flask_login.current_user.is_admin():
+        # if it is admin, can remove any existing user ID
+        try:
+            user = ttbl.user_control.User(userid, fail_if_new = True)
+        except ttbl.user_control.User.user_not_existant_e as e:
+            logging.warning("user '%s' does not exist: %s", userid, e)
+    else:
+        flask_logi_abort(
+            403, "not enough privilege to remove user %s" % userid)
+    user.wipe()
+    return flask.jsonify({'result': "session closed"})
+
+
 @app.route(API_PREFIX + 'targets/', methods = ['GET'])
 @flask_login.login_required
 def _targets_gets():
@@ -806,7 +828,7 @@ def unauthorized():
     Called by the login manager when a user is no authorized to
     do an operation
     """
-    flask_logi_abort(400, "User unauthorized")
+    flask_logi_abort(400, "User unauthorized; please login")
 
 def auth_init(app):
     principals = flask_principal.Principal()
