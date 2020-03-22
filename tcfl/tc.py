@@ -8270,6 +8270,7 @@ import target_ext_debug
 target_c.extension_register(target_ext_debug.extension, "debug")
 import target_ext_tunnel
 target_c.extension_register(target_ext_tunnel.tunnel)
+import target_ext_users
 import target_ext_shell
 target_c.extension_register(target_ext_shell.shell)
 import target_ext_ssh

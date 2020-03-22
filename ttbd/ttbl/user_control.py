@@ -4,14 +4,33 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-import errno
-import os
 import cPickle
+import errno
+import glob
 import logging
+import os
 import shutil
 import threading
 
 import commonl
+
+def known_user_list():
+    # this now is a HACK, FIXME, repeats a lot of code, but when
+    # the user database is moved to fsdb it will be cleaned up
+    user_path = os.path.join(User.state_dir, "_user_*")
+    l = []
+    for filename in glob.glob(user_path):
+        try:
+            with open(filename, 'rb') as f:
+                data = cPickle.load(f)
+                l.append(data['userid'])
+        except (IOError, ValueError, KeyError) as e:
+            logging.warning("cannot load user file '%s': %d %s",
+                            filename, e.errno, e)
+            # Wipe the file, it might have errors--it might be not
+            # a file, so wipe hard
+            shutil.rmtree(filename, ignore_errors = True)
+    return l
 
 
 class User():
@@ -70,6 +89,12 @@ class User():
                 logging.warning("%s: cannot load user file '%s': %s %s",
                                 userid, self.filename, type(e).__name__, e)
                 self._save_data()
+
+    def to_dict(self):
+        return dict(
+            state = os.path.basename(self.filename),
+            roles = list(self.roles)
+        )
 
     @staticmethod
     def is_authenticated():

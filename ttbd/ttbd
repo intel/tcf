@@ -314,6 +314,41 @@ def _flask_arg_projections():
     else:
         return []
 
+@app.route(API_PREFIX + 'users/', methods = [ 'GET' ])
+@app.route(API_PREFIX + 'users/<userid>', methods = [ 'GET' ])
+@flask_login.login_required
+def _users(userid = None):
+    r = {}
+    calling_user = flask_login.current_user._get_current_object()
+    # FIXME: move to ttbl.check_user_is_admin(calling_user), no ifs,
+    # it raises exceptions on its own?
+    if calling_user.is_admin():
+        if userid == None:
+            userl = ttbl.user_control.known_user_list()
+        else:
+            userl = [ userid ]
+    else:
+        if userid == None:
+            userl = [ calling_user.userid ]
+        elif userid != calling_user.userid:
+            # admins can list'em all FIXME: check user-elevate
+            r[userid]  = {
+                "error": "user '%s' needs admin role to query"
+                " users other than themselves" %
+                calling_user.userid
+            }
+            userl = []
+        else:
+            userl = [ calling_user.userid ]
+
+    for userid in userl:
+        try:
+            user = ttbl.user_control.User(userid, fail_if_new = True)
+            r[user.userid] = user.to_dict()
+        except ttbl.user_control.User.user_not_existant_e as e:
+            logging.warning("user '%s' does not exist: %s", userid, e)
+    return flask.jsonify(r)
+
 @app.route(API_PREFIX + 'targets/', methods = ['GET'])
 @flask_login.login_required
 def _targets_gets():
