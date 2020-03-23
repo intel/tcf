@@ -1,6 +1,6 @@
 Jinja2
 PyYAML
-cv2
+python-cv
 functools32
 imutils
 junit_xml
@@ -12,3 +12,4 @@ pymongo
 python-Levenshtein
 requests
 setuptools
+tabulate
