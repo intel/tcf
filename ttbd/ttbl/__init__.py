@@ -206,7 +206,7 @@ class fsdb_c(object):
     #: Regular expresion that determines the valid characters in a field
     key_valid_regex = re.compile(r"^[-\.a-zA-Z0-9_]+$")
 
-    def set(self, key, value, force = False):
+    def set(self, key, value, force = True):
         """
         Set a value for a key in the database unless *key* already exists
 
@@ -216,7 +216,7 @@ class fsdb_c(object):
           only *string*, *integer*, *float* and *boolean* types,
           limited to a max of 1024
 
-        :parm bool force: (optional; default *False*) if *key* exists,
+        :parm bool force: (optional; default *True*) if *key* exists,
           force the new value
 
         :return bool: *True* if the new value was set correctly;
@@ -322,21 +322,22 @@ class fsdb_symlink_c(fsdb_c):
                     d[filename] = self.get(filename)
         return d
 
-    def set(self, key, value, force = False):
+    def set(self, key, value, force = True):
         location = os.path.join(self.location, key)
         if value != None:
             # the storage is always a string, so encode what is not as
             # string as T:REPR, where T is type (b boolean, n number,
             # s string) and REPR is the textual repr, json valid
-            if isinstance(value, numbers.Integral):
+            if isinstance(value, bool):
+                # do first, otherwise it will test as int
+                value = "b:" + str(value)
+            elif isinstance(value, numbers.Integral):
                 # sadly, this looses precission in floats. A lot
                 value = "i:%d" % value
             elif isinstance(value, numbers.Real):
                 # sadly, this can loose precission in floats--FIXME:
                 # better solution needed
                 value = "f:%.10f" % value
-            elif isinstance(value, bool):
-                value = "b:" + str(value)
             elif isinstance(value, basestring):
                 if value.startswith("i:") \
                    or value.startswith("f:") \
@@ -385,7 +386,13 @@ class fsdb_symlink_c(fsdb_c):
             if value.startswith("f:"):
                 return json.loads(value.split(":", 1)[1])
             if value.startswith("b:"):
-                return bool(value.split(":", 1)[1])
+                val = value.split(":", 1)[1]
+                if val == "True":
+                    return True
+                elif val == "False":
+                    return False
+                raise ValueError("fsdb %s: key %s bad boolean '%s'"
+                                 % (self.location, key, value))
             if value.startswith("s:"):
                 # string that might start with s: or empty
                 return value.split(":", 1)[1]
@@ -1379,7 +1386,6 @@ class test_target(object):
 	# mandatory fields, override them all
         if commonl.field_needed('owner', projections):
             owner = self.owner_get()
-            #logging.error("DEBUG: owner %s", owner)
             if owner:
                 r['owner'] = owner
             else:
