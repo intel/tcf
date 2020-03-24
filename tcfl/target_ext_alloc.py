@@ -39,6 +39,74 @@ def _delete(rtb, allocid):
         # already wiped
 
 
+# FIXME: what happens if the target is disabled / removed while we wait
+# FIXME: what happens if the conn
+def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
+                   queue_timeout = None, priority = 700, preempt = False,
+                   queue = True):
+    assert isinstance(groups, dict)
+
+    data = dict(
+        priority = priority,
+        preempt = preempt,
+        queue = queue,
+        groups = {},
+    )
+    if obo:
+        data['obo_user'] = obo
+    data['groups'] = groups
+    r = rtb.send_request("PUT", "allocation", json = data)
+
+    ts0 = time.time()
+    state = r['state']
+    if state not in ( 'queued', 'active'):
+        raise RuntimeError(
+            "allocation failed: %s: %s"
+            % (state, r.get('message', 'message n/a')))
+    allocid = r['allocid']
+    data = { allocid: state }
+    if state == 'active':			# got it
+        print "allocation ID %s: allocated: %s" % (
+            allocid, r['group_allocated'])
+        return allocid, state, r['group_allocated'].split(',')
+    ts0 = time.time()
+    ts = ts0
+    group_allocated = None
+    while True:
+        if queue_timeout and ts - ts0 > queue_timeout:
+            raise tc.blocked_e(
+                "can't acquire targets, still busy after %ds"
+                % oqueue_timeout, dict(targets = groups))
+        time.sleep(keepalive_period)
+        ts = time.time()
+        state = data[allocid]
+        try:
+            r = rtb.send_request("PUT", "keepalive", json = data)
+        except requests.exceptions.RequestException:
+            # FIXME: tolerate N failures before giving up
+            pass
+        print "allocation ID %s: [+%.1fs] keepalive while %s: %s\r" % (
+            allocid, ts - ts0, state, r),
+        sys.stdout.flush()
+        if allocid not in r['result']:
+            continue # no news
+        alloc = r['result'][allocid]
+        new_state = alloc['state']
+        if new_state == 'active':
+            print "\nallocation ID %s: [+%.1fs] allocated: %s" % (
+                allocid, ts - ts0, alloc['group_allocated'])
+            r = rtb.send_request("GET", "allocation/%s" % allocid)
+            group_allocated = r['group_allocated'].split(',')
+            break
+        elif new_state == 'invalid':
+            print "\nallocation ID %s: [+%.1fs] now invalid" % (
+                allocid, ts - ts0)
+            break
+        print "\nallocation ID %s: [+%.1fs] state transition %s -> %s" % (
+            allocid, ts - ts0, state, new_state)
+        data[allocid] = new_state
+    return allocid, new_state, group_allocated
+
 
 def _cmdline_alloc_targets(args):
     with msgid_c("cmdline"):
@@ -58,53 +126,10 @@ def _cmdline_alloc_targets(args):
             logging.error("Targets span more than one server")
             sys.exit(1)
         rtb = list(rtbs)[0]
-
-        data = dict(
-            priority = args.priority,
-            preempt = args.preempt,
-            queue = args.queue,
-            groups = {},
-        )
-        if args.obo:
-            data['obo_user'] = args.obo
-        data['groups']['group'] = list(targets)
-        r = rtb.send_request("PUT", "allocation", json = data)
-
-        ts0 = time.time()
-        state = r['state']
-        if state not in ( 'queued', 'active'):
-            raise RuntimeError(
-                "allocation failed: %s: %s"
-                % (state, r.get('message', 'message n/a')))
-        allocid = r['allocid']
-        data = { allocid: state }
-        if state == 'active':			# got it
-            print "allocation ID %s: allocated: %s" % (
-                allocid, r['group_allocated'])
-        else:					# queue, keepalive in there
-            while True:
-                time.sleep(5)
-                ts = time.time()
-                state = data[allocid]
-                r = rtb.send_request("PUT", "keepalive", json = data)
-                print "allocation ID %s: [+%.1fs] keepalive while %s: %s\r" % (
-                    allocid, ts - ts0, state, r),
-                sys.stdout.flush()
-                if allocid not in r['result']:
-                    continue # no news
-                alloc = r['result'][allocid]
-                new_state = alloc['state']
-                if new_state == 'active':
-                    print "\nallocation ID %s: [+%.1fs] allocated: %s" % (
-                        allocid, ts - ts0, alloc['group_allocated'])
-                    break
-                elif new_state == 'invalid':
-                    print "\nallocation ID %s: [+%.1fs] now invalid" % (
-                        allocid, ts - ts0)
-                    break
-                print "\nallocation ID %s: [+%.1fs] state transition %s -> %s" % (
-                    allocid, ts - ts0, state, new_state)
-                data[allocid] = new_state
+        groups = { "group": targets }
+        allocid =  _alloc_targets(rtb, groups, obo = args.obo,
+                                  queue = args.queue,
+                                  priority = args.priority)
 
         if args.hold != None:
             try:

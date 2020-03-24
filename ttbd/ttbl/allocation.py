@@ -95,8 +95,6 @@ states = {
     "timedout": "allocation was idle for too long",
 }
 
-'Foundation for rolling your own LRU cache variants'
-
 import collections
 import time
 
@@ -180,14 +178,14 @@ class allocation_c(ttbl.fsdb_symlink_c):
                     "%s: target no longer available" % target_name)
 
     def delete(self, _state = "removed"):
-        targets_all = []
         try:
             # if the reservation DB is messed up, this might fail --
             # it is fine, we will then just wipe it
             with self.lock:
                 if self.state_get == 'active':
-                    # FIXME: only need to run on currently acquired targets
-                    targets = self.targets_all
+                    targets = {}
+                    for target_name in self.get("group_allocated").split(","):
+                        targets[target_name] = ttbl.config.targets[target_name]
                 else:
                     targets = self.targets_all
         finally:
@@ -209,6 +207,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
         :returns *True* if succesful, *False* if it was set by someone
           else
         """
+        assert new_state in states
         self.set('state', new_state, force = True)
 
     def state_get(self):
@@ -497,7 +496,7 @@ def _target_starvation_recalculate(allocdb, target, score):
     logging.error("FIXME: %s: %s: %s",
                   allocdb.allocid, target.id, score)
 
-def _target_allocate_locked(target, current_allocid, waiters, preempt):
+def _target_allocate_locked(target, current_allocdb, waiters, preempt):
     # return: allocdb from waiter that succesfully took it
     #         None if the allocation was not changed
     # FIXME: move to test_target
@@ -546,10 +545,10 @@ def _target_allocate_locked(target, current_allocid, waiters, preempt):
     # #4: name of original queue file
 
     priority_waiter = waiter[0]	# get prio, maybe boosted
-
-    if current_allocid:
+    if current_allocdb:
         # Ok, it is owned by a valid allocation (if it wasn't,
         # target._allocid_get()) has cleaned it up.
+        current_allocid = current_allocdb.allocid
 
         # Let's verify if we need to boot the current owner due to a
         # preemption request.
@@ -581,9 +580,7 @@ def _target_allocate_locked(target, current_allocid, waiters, preempt):
         logging.error("DEBUG: %s: preempting %s over current owner %s",
                       target.id, allocdb.allocid,
                       current_allocid)
-        # FIXME: when _deallocate changes to take state, use that to
-        # restart-needed
-        target._deallocate_forced(current_allocid)
+        target._deallocate(current_allocdb, 'restart-needed')
         # fallthrough
 
     # The target is not allocated either because it was free, the
@@ -624,11 +621,13 @@ def _run_target(target, preempt):
             # get and validate the current owner -- if invalid owner
             # (allocation removed, it'll be wiped)
             logging.error("DEBUG:ALLOC: %s: getting current owner", target.id)
-            current_allocid =  target._allocid_get()
+            current_allocdb = target._allocdb_get()
+            current_allocid = current_allocdb.allocid if current_allocdb \
+                else None
             logging.error("DEBUG:ALLOC: %s: current owner %s",
                           target.id, current_allocid)
             allocdb = _target_allocate_locked(
-                target, current_allocid, waiters, preempt_in_queue)
+                target, current_allocdb, waiters, preempt_in_queue)
         if allocdb:
             logging.error("DEBUG: ALLOC: %s: new owner %s",
                           target.id, allocdb.allocid)

@@ -5642,60 +5642,6 @@ class tc_c(reporter_c):
     # Remote target acquisition
     #
 
-    _busy_regex = re.compile(r"tried to use busy target "
-                             r"\(owned by '(?P<owner>[^']+)'\)")
-
-    @classmethod
-    def _busy_msg_get_owner(cls, msg):
-        m = cls._busy_regex.search(msg)
-        if m:
-            owner = m.groupdict()['owner']
-            if owner == "":
-                owner = "n/a"
-        else:
-            owner = "n/a"
-        return owner
-
-    # When a target is released, this event is set so anyone who is
-    # waiting can check if the target they were waiting for was
-    # released.
-    # LAME, need a better way for all this, see comments in _targets_assign()
-    target_event = threading.Event()
-
-    def _target_acquire_robust(self, _target, timeout, wait):
-        # calls shielding from some temporary conditions (eg: doing a
-        # few simple retries) related to a server restaring or network
-        # glitches
-        #
-        # Need this soft retry loop here as we want to do it before we
-        # attempt to release any target we have already acquired
-        t0 = time.time()
-        t = t0
-        while t - t0 < timeout:
-            try:
-                _target.rtb.rest_tb_target_acquire(
-                    _target.rt, ticket = self.ticket)
-                break
-            except Exception as e:
-                # If read timesout or the server power cycles
-                # in between/resets, treat it as a soft retry
-                t = time.time()
-                if t - t0 > timeout:
-                    _target.report_info("retry timeout (%.2fs) exceeded"
-                                        % timeout)
-                    raise
-                message = str(e.message)	# easier matching for stuff
-                if "Read timed out" in message \
-                   or 'ECONNRESET' in message \
-                   or 'Connection refused' in message:
-                    _target.report_info(
-                        "acquisition failed (connection condition) "
-                        "@%.2f/%.2fs, waiting for %.2fs and retrying"
-                        % (t - t0, timeout, wait), dlevel = 4)
-                    time.sleep(wait)
-                    continue
-                raise
-
     #: Maximum time (seconds) to wait to succesfully acquire a set of targets
     #:
     #: In heavily contented scenarios or large executions, this
@@ -5733,9 +5679,21 @@ class tc_c(reporter_c):
         if not pending:
             yield
             return
-        # FIXME: lame method to avoid deadlocks; always
-        #        lock/unlock in the same alphabetical order, by fullid
-        pending.sort(key = lambda _target: _target.fullid)
+
+        # to use fullid, need to tweak the refresh code to add the aka part
+        rtbs = set()
+        for target in pending:
+            rtbs.add(target.rtb)
+
+        # FIXME: move to a multiple server model
+        if len(rtbs) > 1:
+            raise tcfl.tc.blocked_e(
+                "Targets span more than one server",
+                dict(
+                    targets = [ target.fullid for target in pending ],
+                    servers = [ str(rtb) for rtb in rtbs ],
+                ))
+        rtb = list(rtbs)[0]
 
         # If any of the targets declare it takes it a long time to
         # power up, consider that.
@@ -5749,90 +5707,24 @@ class tc_c(reporter_c):
         # need a better fix
         timeout *= 1 + tc_c._tcs_total / 3.0
 
-        ts0 = time.time()
-        ts = time.time()
-        ts_reported = { target.fullid : ts for target in pending }
-        try:
-            while ts - ts0 < timeout and pending:
-                _period = period * (1 + random.random())
-                # Note this loop is kinda weird.
-                #
-                # We will progress in the for loop only if we are
-                # succesful in locking the first target in the list --
-                # that's because we have to acquire all the targets in
-                # the same order, to avoid deadlocks -- and we choose
-                # alphabetical order of the target's fullid, so it is
-                # valid across servers FIXME: this will have to change
-                # to some sort of UUID.
-                #
-                # Why do we also re-acquire the acquired ones? To tell
-                # the server we are still using them, otherwise they
-                # might be marked as idle and released if the process
-                # with the other ones is taking a long time.
-                for _target in list(acquired) + list(pending):
-                    try:
-                        if not self._targets_disabled_too:
-                            # Refresh info
-                            _rtb, _rt = tcfl.ttb_client._rest_target_find_by_id(_target.fullid)
-                            disabled = _rt.get('disabled', None)
-                            if disabled != None:
-                                raise blocked_e(
-                                    "%s: acquisition failed (target has "
-                                    "been disabled)" % _target.fullid)
-                        _target.report_info(
-                            "acquiring with tix '%s'" % self.ticket,
-                            dlevel = 6)
-                        # acquire a single target, soft retrying half as
-                        # much as we have of timeout left
-                        self._target_acquire_robust(
-                            _target, (ts0 + timeout - time.time()) / 2, period)
-                        # Clear progress information we might have printed
-                        commonl.progress("")
-                        _target.report_info("acquired", dlevel = 5)
-                        if _target in pending:
-                            pending.remove(_target)
-                            acquired.append(_target)
-                        # Stays in the for loop to acquire the next
-                    except requests.exceptions.HTTPError as e:
-                        # FIXME: this is DIRTY, need a more
-                        # programatical way to do it
-                        if not "tried to use busy target" in e.message:
-                            raise
-                        owner = self._busy_msg_get_owner(e.message)
-                        _target.report_info(
-                            "acquisition failed (busy, owned by '%s') "
-                            "@%.2f/%.2fs, waiting for %.2fs and retrying"
-                            % (owner, ts - ts0, timeout, _period),
-                            dlevel = 5)
-                        if ts - ts_reported[_target.fullid] > 2:
-                            ts_reported[_target.fullid] = ts
-                            commonl.progress(
-                                "[%s: waiting to acquire %s from %s, "
-                                "%ds so far]" % (
-                                    self.ticket, _target.fullid,
-                                    owner, ts - ts0)
-                            )
-                        break	# Exit for, wait
-
-                self.target_event.wait(_period)
-                ts = time.time()
-            if pending != []:
-                msg = "can't acquire %s, still busy after %.2fs" \
-                      % (",".join([i.fullid for i in pending]), timeout)
-                self.log.error("%s: " % self.name + msg)
-                raise blocked_e(msg)
-        except:
-            if tc_c.release:
-                for _target in reversed(acquired):
-                    _target.report_info("releasing", dlevel = 6)
-                    _target.rtb.rest_tb_target_release(_target.rt,
-                                                       force = False,
-                                                       ticket = self.ticket)
-                    _target.report_info("released", dlevel = 5)
-            else:
-                self.report_info("WARNING!! not releasing targets",
-                                 dlevel = -10)
-            raise
+        # FIXME: use commonl.progress("")
+        allocid, state, targetids = target_ext_alloc._alloc_targets(
+            rtb,
+            { "group": [ target.id for target in pending ] },
+            # FIXME: do we want to do OBO here? how?
+            obo = None,
+            queue_timeout = timeout)
+        if state != 'active':
+            # FIXME: this need sto carry more data, we've lost a lot
+            # on the way here
+            raise tcfl.tc.blocked_e("allocation failed, state %s" % state)
+        self.report_info(
+            "acquired %s" % allocid,
+            dict(
+                targets = targetids,
+                servers = [ str(rtb) for rtb in rtbs ],
+            ),
+            dlevel = 5)
 
         self._prefix_update()
         try:
@@ -5840,20 +5732,25 @@ class tc_c(reporter_c):
         finally:
             self._prefix_update()
             if tc_c.release:
-                for _target in reversed(acquired):
-                    _target.report_info("releasing", dlevel = 6)
-                    try:
-                        _target.rtb.rest_tb_target_release(
-                            _target.rt, force = False, ticket = self.ticket)
-                    except requests.HTTPError as e:
-                        # the script has released the target itself
-                        if 'tried to use non-acquired target' in e:
-                            pass
-                    _target.report_info("released", dlevel = 5)
+                target_ext_alloc._delete(rtb, allocid)
+                self.report_info(
+                    "acquired",
+                    dict(
+                        targets = targetids,
+                        servers = [ str(rtb) for rtb in rtbs ],
+                    ),
+                    dlevel = 5)
             else:
                 self.report_info("WARNING!! not releasing targets",
                                  dlevel = -10)
-            self.target_event.set()
+                self.report_info(
+                    "acquired",
+                    dict(
+                        targets = targetids,
+                        servers = [ str(rtb) for rtb in rtbs ],
+                    ),
+                    dlevel = 5)
+
 
     def targets_active(self, *skip_targets):
         """

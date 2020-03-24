@@ -1934,8 +1934,14 @@ class test_target(object):
                     return
                 # validate WHO has rights
                 if allocdb.check_user_is_user_creator(user):
-                    # user or creator can release it
-                    self._deallocate(allocdb, 'restart-needed')
+                    # user or creator can release it; don't change the
+                    # state because if the user releases it it means
+                    # is because they don't need it, so the allocation
+                    # can still proceed working
+                    logging.error(
+                        "FIXME: delete the allocation if "
+                        "there are no more targets")
+                    self._deallocate(allocdb)
                 elif force and allocdb.check_user_is_admin(user):
                     # if admin and force,
                     self._deallocate(allocdb, 'restart-needed')
@@ -1967,6 +1973,7 @@ class test_target(object):
             # this is the path for executing internal daemon processes
             yield
             return
+        userid, ticket = who_split(who)
         with self.lock:
             allocdb = self._allocdb_get()
         if allocdb:
@@ -1974,8 +1981,8 @@ class test_target(object):
             state = allocdb.state_get()
             if allocdb.state_get() != requested_state:
                 raise test_target_wrong_state_e(self, state, requested_state)
-            if not allocdb.check_userid_is_user_creator_guest(who):
-                raise test_target_busy_e(self, who, self.owner_get())
+            if not allocdb.check_userid_is_user_creator_guest(userid):
+                raise test_target_busy_e(self, userid, self.owner_get())
         else:
             # Old style
             owner = self.owner_get()
@@ -1997,13 +2004,14 @@ class test_target(object):
         # FIXME: need to overload who to be string or
         # ttbl.user_control.User so we can do admin checks here too?
         assert isinstance(who, basestring)
+        userid, ticket = who_split(who)
         with self.lock:
             allocdb = self._allocdb_get()
         if allocdb:
             # New style, allocation based
             if allocdb.state_get() != requested_state:
                 return False
-            if not allocdb.check_userid_is_user_creator_guest(who):
+            if not allocdb.check_userid_is_user_creator_guest(userid):
                 return False
             return True
         # Old style
