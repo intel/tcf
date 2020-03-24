@@ -799,10 +799,12 @@ _local_addresses = set()
 # Anonymous user, if the connection comes from one of the local ones,
 # we just create an special anonymous user that has full privilege.
 def _create_anonymous_user():
-    if flask.request.remote_addr in _local_addresses:
-        return ttbl.user_control.local_user()
-    else:
-        return flask_login.AnonymousUserMixin()
+    local_auth_disabled_runtime = os.path.exists(
+        os.path.join(ttbl.config.lib_path, "local_auth_disabled"))
+    if not local_auth_disabled_runtime \
+       and flask.request.remote_addr in _local_addresses:
+        return ttbl.user_control.User('local', roles = [ "admin" ])
+    return flask_login.AnonymousUserMixin()
 
 login_manager.anonymous_user = _create_anonymous_user
 
