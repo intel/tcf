@@ -1206,7 +1206,7 @@ class test_target(object):
           who is trying to access the target.
         """
         assert isinstance(user, ttbl.user_control.User)
-        if user.has_role('admin'):	# admins are always in
+        if user.role_get('admin'):	# admins are always in
             return True
 
         # Note we get it only from the tags, so it cannot be overriden
@@ -1214,11 +1214,11 @@ class test_target(object):
         roles_required = self.tags.get('_roles_required', [])
         roles_excluded = self.tags.get('_roles_excluded', [])
         for role in roles_excluded:	# users to be excluded
-            if user.has_role(role):
+            if user.role_get(role):
                 return False
         if roles_required:		# do you require a role?
             for role in roles_required:
-                if user.has_role(role):
+                if user.role_get(role):
                     return True		# it has the role, good
             return False		# does not have it, out
 

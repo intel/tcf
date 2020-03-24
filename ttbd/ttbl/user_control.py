@@ -4,7 +4,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-import cPickle
 import errno
 import glob
 import logging
@@ -22,21 +21,23 @@ def known_user_list():
     # the user database is moved to fsdb it will be cleaned up
     user_path = os.path.join(User.state_dir, "_user_*")
     l = []
-    for filename in glob.glob(user_path):
+    for path in glob.glob(user_path):
         try:
-            with open(filename, 'rb') as f:
-                data = cPickle.load(f)
-                l.append(data['userid'])
-        except (IOError, ValueError, KeyError) as e:
-            logging.warning("cannot load user file '%s': %d %s",
-                            filename, e.errno, e)
+            # FIXME: ugly hack, fix when we have the cache
+            fsdb = ttbl.fsdb_symlink_c(path)
+            userid = fsdb.get('userid', None)
+            if userid:
+                l.append(userid)
+        except Exception as e:	# FIXME: move to invalid_e
+            logging.warning("cannot load user DB '%s': %s",
+                            path, e)
             # Wipe the file, it might have errors--it might be not
             # a file, so wipe hard
-            shutil.rmtree(filename, ignore_errors = True)
+            commonl.rm_f(path)
     return l
 
 
-class User():
+class User(object):
     """
     Implement a database of users that are allowed to use this system
 
@@ -44,15 +45,24 @@ class User():
     systems and just stored locally for caching--it's mainly to set
     roles for users.
 
+    Roles are labels which can be used to describe which privileges a
+    user has. An :class:`authentication driver
+    <ttbl.authenticator_c>`, via it's :meth:`login method
+    <ttbl.authenticator_c.login>` has provided a list of roles the
+    user shall have.
+
+    Each role can be *gained* or *dropped*; a role can be moved from
+    one state to the other by the user themselves or by anyone with
+    the *admin* role.
+
+    This allows, for example, a user with the *admin* role to drop it
+    for normal use and only gain it when necessary (akin to using
+    *sudo*, for example).
     """
-    # Must access the user data files only under this lock, to avoid
-    # one process writing while one is reading.
-    file_access_lock = threading.Lock()
+    class exception(Exception):
+        pass
 
-    # FIXME: this should be more atomic -- we might have multiple
-    # threads writing and reading to the disk--need file locks.
-
-    class user_not_existant_e(IndexError):
+    class user_not_existant_e(exception):
         """
         Exception raised when information about a user cannot be
         located
@@ -62,49 +72,34 @@ class User():
     # Where we save user data so users don't have to re-login
     state_dir = None
 
-    def __init__(self, userid, fail_if_new = False):
+    def __init__(self, userid, fail_if_new = False, roles = None):
+        path = self.create_filename(userid)
         self.userid = userid
-
-        self.roles = set(('user',))
-
-        # Try to load the pickled file with the user's cached roles
-        self.filename = User.create_filename(userid)
-        with self.file_access_lock:
-            try:
-                with open(self.filename, 'rb') as file:
-                    data = cPickle.load(file)
-                    self.roles.update(data['roles'])
-                    logging.log(3, "%s: new user object created from %s",
-                                userid, self.filename)
-            except IOError as e:
-                if e.errno != errno.ENOENT:
-                    logging.warning("%s: cannot load user file '%s': %d %s",
-                                    userid, self.filename, e.errno, e)
-                    # Wipe the file, it might have errors--it might be not
-                    # a file, so wipe hard
-                    shutil.rmtree(self.filename, ignore_errors = True)
-                elif fail_if_new == True:
-                    raise self.user_not_existant_e("%s: no such user" % userid)
-                else:
-                    logging.log(9, "%s: new user object created", userid)
-                    self._save_data()
-            except Exception as e:
-                logging.warning("%s: cannot load user file '%s': %s %s",
-                                userid, self.filename, type(e).__name__, e)
-                self._save_data()
+        if not os.path.isdir(path) and fail_if_new == False:
+            commonl.rm_f(path)	# cleanup, just in case
+            commonl.makedirs_p(path)
+        try:
+            self.fsdb = ttbl.fsdb_symlink_c(path)
+        except AssertionError:	# FIXME: replace with invalid_e
+            if fail_if_new:
+                raise self.user_not_existant_e("%s: no such user" % userid)
+        self.fsdb.set('userid', userid)
+        if roles:
+            assert isinstance(roles, list)
+            for role in roles:
+                self.role_add(role)
 
     def to_dict(self):
-        return dict(
-            state = os.path.basename(self.filename),
-            roles = list(self.roles)
-        )
+        r = commonl.flat_keys_to_dict(self.fsdb.get_as_dict())
+        r['name'] = os.path.basename(self.fsdb.location)
+        return r
 
     def wipe(self):
         """
         Remove the knowledge of the user in the daemon, effectively
         logging it out.
         """
-        os.unlink(self.filename)
+        shutil.rmtree(self.fsdb.location, ignore_errors = True)
 
     @staticmethod
     def is_authenticated():
@@ -118,31 +113,74 @@ class User():
     def is_anonymous():
         return False
 
-    def is_admin(self):
-        return 'admin' in self.roles
-
     def get_id(self):
         return unicode(self.userid)
 
-    # handle roles
-    def set_role(self, role):
-        self.roles.add(role)
-        self.save_data()
+    def role_add(self, role):
+        """
+        Add a given role
 
-    def has_role(self, role):
-        return role in self.roles
+        :param str role: name of role to add; if it starts with *!*,
+          indicates leave the role dropped.
+        """
+        assert isinstance(role, basestring)
+        if role.startswith("!"):
+            role = role[1:]
+            self.role_drop(role)
+        else:
+            self.role_gain(role)
 
-    def _save_data(self):
-        data = {
-            'userid': self.userid,
-            'roles': self.roles
-        }
-        with open(self.filename, "w+b") as f:
-            cPickle.dump(data, f, protocol = 2)
+    def role_drop(self, role):
+        """
+        Drop a given role
 
-    def save_data(self):
-        with self.file_access_lock:
-            self._save_data()
+        :param str role: name of role to drop
+
+        Note user can only drop a role they have been given access to
+        before with :meth:`role_add`.
+        """
+        assert isinstance(role, basestring)
+        # FIXME: convert to normal booleans
+        self.fsdb.set('roles.' + role, "False")
+
+    def role_gain(self, role):
+        """
+        Gain an existing role
+        :param str role: name of role to gain
+
+        Note user can only gain a role they have been given access to
+        before with :meth:`role_add`.
+        """
+        assert isinstance(role, basestring)
+        # FIXME: convert to normal booleans
+        self.fsdb.set('roles.' + role, "True")
+
+    def role_get(self, role):
+        """
+        Return if the user has a role, gained or dropped
+
+        :return: *True* if the user has the role gained, *False* if
+          dropped, *None* if the user does not have the role.
+        """
+        val = self.fsdb.get('roles.' + role, None)
+        if val == "True":
+            return True
+        if val == "False":
+            return False
+        return None
+
+    def role_present(self, role):
+        """
+        Return *True* if the user has the role (gained or dropped),
+        *False* otherwise
+        """
+        return self.fsdb.get('roles.' + role, None) != None
+
+    def is_admin(self):
+        """
+        Return *True* if the user has the *admin* role gained.
+        """
+        return self.role_present('admin')
 
     @staticmethod
     def load_user(userid):
@@ -162,34 +200,3 @@ class User():
             return User(userid, fail_if_new = True)
         except:
             return None
-
-
-class local_user(User):
-    """Define a local anonymous user that we can use to skip
-    authentication on certain situations (when the user starts the
-    daemon as such, for example).
-
-    See https://flask-login.readthedocs.org/en/latest/#anonymous-users for
-    the Flask details.
-
-    """
-    def __init__(self, **kwargs):
-        self.userid = 'local'
-        self.roles = set(('user', 'admin'))
-
-    def save_data(self):
-        pass
-
-    def is_authenticated(self):
-        # For local user, we consider it authenticated
-        return True
-
-    def is_anonymous(self):
-        # For local user, we consider it not anonymous
-        return False
-
-    def is_active(self):
-        return True
-
-    def is_admin(self):
-        return True

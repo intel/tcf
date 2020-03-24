@@ -260,16 +260,12 @@ def login():
     # Flask understands
     if not user or not isinstance(user, ttbl.user_control.User):
         user = ttbl.user_control.User(username)
-        if 'admin' in token_roles:
-            user.set_role('admin')
         flask_login.login_user(user, remember = True)
         flask_principal.identity_changed.send(
             flask.current_app._get_current_object(),
             identity = flask_principal.Identity(user.get_id()))
-    elif 'admin' in token_roles:
-        user.set_role('admin')
     for role in token_roles:
-        user.set_role(role)
+        user.role_add(role)
     logi("user %s: authenticated with roles: %s",
          username, " ".join(token_roles))
     return flask.jsonify({
@@ -364,6 +360,43 @@ def _user_delete(userid = None):
     user.wipe()
     return flask.jsonify({'result': "session closed"})
 
+@app.route(
+    API_PREFIX + 'users/<userid>/<any("drop","gain"):action>/<string:role>',
+    methods = [ 'PUT' ])
+@flask_login.login_required
+def _user_role(userid, action, role):
+    if userid == "self":
+        # if specified and it is the current user, proceed
+        user = flask_login.current_user._get_current_object()
+    elif userid == flask_login.current_user.get_id():
+        # if specified and it is the current user, proceed
+        user = flask_login.current_user._get_current_object()
+    elif flask_login.current_user.is_admin():
+        # if it is admin, can toggle roles for any existing user ID
+        try:
+            user = ttbl.user_control.User(userid, fail_if_new = True)
+        except ttbl.user_control.User.user_not_existant_e as e:
+            flask_logi_abort(
+                403, "user '%s' does not exist: %s" % (userid, e))
+    else:
+        flask_logi_abort(
+            403, "not enough privilege to remove user %s" % userid)
+    if action == "drop":
+        if not user.role_present(role):
+            flask_logi_abort(
+                403, "user '%s' has no access to role %s" % (userid, role))
+        user.role_drop(role)
+        r = { "result": "user '%s' dropped role '%s'" % (userid, role) }
+    elif action == "gain":
+        if not user.role_present(role):
+            flask_logi_abort(
+                403, "user '%s' has no access to role %s" % (userid, role))
+        user.role_gain(role)
+        r = { "result": "user '%s' gained role '%s'" % (userid, role) }
+    else:
+        r = { "result": "user '%s' role '%s' invalid action %s"
+                        % (userid, role, action) }
+    return flask.jsonify(r)
 
 @app.route(API_PREFIX + 'targets/', methods = ['GET'])
 @flask_login.login_required
@@ -717,7 +750,7 @@ def _systemd_keepalive(t):
 def _do_cleanup():
     """
     """
-    daemon_user = ttbl.user_control.local_user()
+    daemon_user = ttbl.user_control.User('local', roles = [ "admin" ])
     target_list = ttbl.config.targets.keys()
     who = who_make("cleanup", user = daemon_user)
     for target_id in target_list:
@@ -1100,8 +1133,8 @@ if __name__ == "__main__":
                 _local_addresses.add(remote)
         # Allow any local login/password to work, so we won't worry
         # about passwords when calling 'login'
-        ttbl.config._authenticators.insert(0, ttbl.auth_party.authenticator_party_c(
-            [ 'user', 'admin' ], local_addresses = _local_addresses))
+        ##ttbl.config._authenticators.insert(0, ttbl.auth_party.authenticator_party_c(
+        ##    [ 'user', 'admin' ], local_addresses = _local_addresses))
 
     files_path = os.path.expanduser(args.files_path)
     ttbl.test_target.files_path = files_path
