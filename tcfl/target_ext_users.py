@@ -66,7 +66,7 @@ def _cmdline_user_list(args):
             for userid, data in r.iteritems():
                 rolel = []
                 for role, state in data['roles'].items():
-                    if state == "False":
+                    if state == False:
                         rolel.append(role + " (dropped)")
                     else:
                         rolel.append(role)
