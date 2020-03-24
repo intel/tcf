@@ -3681,6 +3681,8 @@ class tc_c(reporter_c):
 
           >>> "somefilename:43"
 
+        See also :meth:`run_local`.
+
         :param dict env: (optional) dictionary of environment
           variables to be passed to :func:`subprocess.check_output`
           (same format as such).
@@ -3690,6 +3692,49 @@ class tc_c(reporter_c):
         return self._shcmd_local(cmd % self.kws, origin = origin,
                                  reporter = reporter, logfile = logfile,
                                  env = env)
+
+    def run_local(self, command, expect = None, cwd = None):
+        """
+        Run a command on the local system with an interface similar to
+        :meth:`target.shell.run <tcfl.target_ext_shell.extension.run>`.
+
+        This is similar to :meth:`shcmd_local`.
+
+        :param str command: command line to run (will be run a shell command)
+
+        :param str,re._pattern_type expect: (optional) if defined, a
+          string or regular expression that shall be found in the output
+          of the command, raising :exc:`tcfl.tc.failed_e` otherwise.
+
+        :param str cwd: (optional) change into this directory before
+          starting
+
+        :raises: :exc:`subprocess.CalledProcessError` if the command fails
+
+        """
+        if cwd == None:
+            cwd = self.tmpdir
+
+        output = subprocess.check_output(command, cwd = cwd, shell = True,
+                                         stderr = subprocess.STDOUT)
+        if expect:
+            if isinstance(expect, basestring):
+                if expect not in output:
+                    raise tcfl.tc.failed_e(
+                        "can't find '%s' in output" % expect,
+                        dict(output = output))
+            elif isinstance(expect, re._pattern_type):
+                if not expect.search(output):
+                    raise tcfl.tc.failed_e(
+                        "can't find '%s' in output" % expect.pattern,
+                        dict(output = output))
+            else:
+                raise tcfl.tc.blocked_e(
+                    "can't handle expect of type %s;"
+                    " can do strings or compiled regex" % expect)
+        self.report_info("command ran: " + command,
+                         dict(output = output), alevel = 1)
+        return output
 
 
     @classmethod
