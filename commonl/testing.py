@@ -533,7 +533,7 @@ class test_ttbd(object):
     def __init__(self, config_text = None, config_files = None,
                  use_ssl = False, tmpdir = None, keep_temp = True,
                  errors_ignore = None, warnings_ignore = None,
-                 aka = None):
+                 aka = None, local_auth = True):
 
         # Force all assertions, when running like this, to fail the TC
         tcfl.tc.tc_c.exception_to_result[AssertionError] = tcfl.tc.failed_e
@@ -590,22 +590,25 @@ host = '127.0.0.1'
             if config_text:
                 cfgf.write(config_text)
 
-        srcdir = os.path.realpath(
+        self.srcdir = os.path.realpath(
             os.path.join(os.path.dirname(__file__), ".."))
         self.cmdline = [
             # This allows us to default to the source location,when
             # running from source, or the installed when running from
             # the system
-            os.environ.get("TTBD_PATH", srcdir + "/ttbd/ttbd"),
+            os.environ.get("TTBD_PATH", self.srcdir + "/ttbd/ttbd"),
             "--port", "%d" % self.port,
             ssl_context,
-            "--local-auth", "-vvvvv",
+            "-vvvvv",
             "--files-path", self.files_dir,
             "--state-path", self.state_dir,
             "--var-lib-path", self.lib_dir,
             "--config-path", "", # This empty one is to clear them all
             "--config-path", self.etc_dir
         ]
+        self.local_auth = local_auth
+        if local_auth:
+            self.cmdline.append("--local-auth")
         self.p = None
         #: Exclude these regexes / strings from triggering an error
         #: message check
