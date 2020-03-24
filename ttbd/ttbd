@@ -113,14 +113,6 @@ API_PREFIX = API_PATH + str(API_VERSION) + "/"
 
 codec_utf8 = codecs.lookup("utf8")
 
-# FIXME: these three likely doesn't need to be global -- we can move
-# to init_app()
-#  We are not really using these decorators...yet.
-#admin_permission = flask_principal.Permission(
-#    flask_principal.RoleNeed('admin'))
-#user_permission = flask_principal.Permission(
-#    flask_principal.RoleNeed('user'))
-
 def flask_loge_abort(http_code, *args, **kwargs):
     loge(*args, **kwargs)
     flask.abort(http_code, *args)
@@ -334,8 +326,8 @@ def _users(userid = None):
             # admins can list'em all FIXME: check user-elevate
             r[userid]  = {
                 "error": "user '%s' needs admin role to query"
-                " users other than themselves" %
-                calling_user.userid
+                         " users other than themselves" %
+                         calling_user.userid
             }
             userl = []
         else:
@@ -690,11 +682,11 @@ def _do_cleanup_released(target, who):
             target.power.put_off(target, who, {}, {}, None)
 
 def _do_cleanup_acquired(target, owner, who):
-        idle_time = time.time() - target.timestamp_get()
-        if idle_time > ttbl.config.target_owned_max_idle:
-            target.log.warning("releasing from %s, idle for %.2fs (max %s)",
-                               owner, idle_time, ttbl.config.target_owned_max_idle)
-            target.release(who, True)
+    idle_time = time.time() - target.timestamp_get()
+    if idle_time > ttbl.config.target_owned_max_idle:
+        target.log.warning("releasing from %s, idle for %.2fs (max %s)",
+                           owner, idle_time, ttbl.config.target_owned_max_idle)
+        target.release(who, True)
 
 def cleanup_files():
     for f in glob.iglob(app.config['files_path'] + "/*/*"):
