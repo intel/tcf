@@ -920,7 +920,8 @@ def _systemd_keepalive(t):
     # We keepalive whenever we can
     sd_notify.notify("WATCHDOG=1")
 
-daemon_user = ttbl.user_control.User('local', roles = [ "admin" ])
+# initialized later, when we have other parts up and running
+daemon_user = None
 
 def _do_cleanup():
     """
@@ -1417,6 +1418,7 @@ if __name__ == "__main__":
             raise
         # It is already a session leader...can ignore
 
+    daemon_user = ttbl.user_control.User('local', roles = [ "admin" ])
     # Cleanup process...now this is quite very ugly...see _cleanup()
     cleanup_process = multiprocessing.Process(target = cleanup_process_fn)
     cleanup_process.daemon = True
