@@ -1406,10 +1406,20 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
                                 separator = separator, of = of,
                                 depth_limit = depth_limit - 1)
             count += 1
-    elif isinstance(d, generator_factory_c):
+    # HACK: until we move functions to a helper or something, when
+    # someone calls the generatory factory as
+    # commonl.generator_factory_c, this can't pick it up, so fallback
+    # to use the name
+    elif isinstance(d, generator_factory_c) \
+         or type(d).__name__ == "generator_factory_c":
         of.write(prefix)
         of.writelines(d.make_generator())
     elif isinstance(d, types.GeneratorType):
+        of.write(prefix)
+        of.writelines(d)
+    elif isinstance(d, file):
+        # not recommended, prefer generator_factory_c so it reopens the file
+        d.seek(0, 0)
         of.write(prefix)
         of.writelines(d)
     else:
@@ -1456,8 +1466,17 @@ def data_dump_recursive_tls(d, tls, separator = u".", of = sys.stdout,
                                         separator = separator, of = of,
                                         depth_limit = depth_limit - 1)
             count += 1
-    elif isinstance(d, generator_factory_c):
+    # HACK: until we move functions to a helper or something, when
+    # someone calls the generatory factory as
+    # commonl.generator_factory_c, this can't pick it up, so fallback
+    # to use the name
+    elif isinstance(d, generator_factory_c) \
+         or type(d).__name__ == "generator_factory_c":
         of.writelines(d.make_generator())
+    elif isinstance(d, file):
+        # not recommended, prefer generator_factory_c so it reopens the file
+        d.seek(0, 0)
+        of.writelines(d)
     elif isinstance(d, types.GeneratorType):
         of.writelines(d)
     else:
