@@ -735,7 +735,7 @@ host = '127.0.0.1'
             for line in fd:
                 print >> sys.stderr, "  %d: %s" % (count, line),
                 count += 1
-                
+
     def check_log_for_issues(self, testcase = None):
         """
         Read the current log file from the TTBD daemon and raise an
@@ -754,7 +754,7 @@ host = '127.0.0.1'
                     cnt += 1
                 if issues:
                     self._log_report(stdout, "stdout", issues, testcase)
-                            
+
             issues = []
             with open(self.stderr) as stderr:
                 cnt = 0
@@ -815,3 +815,68 @@ host = '127.0.0.1'
 
     def __del__(self):
         self.terminate()
+
+
+class shell_client_base(tcfl.tc.tc_c):
+    """
+    Base template for a testcase that uses the *tcf* command line client
+
+    This is basically for running things such as:
+
+    - *tcf do-this ...*
+    - *tcf do-that ...*
+
+    Makes it easy to generate the TCF client configuration and the
+    command line to run it with :meth:`mk_tcf_config` and
+    :meth:`tcf_cmdline`. e.g.:
+
+    .. code-block:: python
+
+       import commonl.testing
+
+       class _test(commonl.testing.shell_client_base):
+
+           def eval_00(self):
+               self.ttbd = ttbd
+               self.mk_tcf_config()
+
+               self.run_local(self.tcf_cmdline() +
+                              " login -p bad_password user1 || true",
+                              "user user1: not allowed")
+               self.report_pass("user1 can't login with a bad password")
+
+    Tricks
+
+    - to serialize access to a resource, use a target to run on as a
+      decorator to a class:
+
+      >>> @tcfl.tc.target(ttbd.aka + '/tg_req_c1')
+
+    """
+
+    #: instance of the test server to run against; must be set in some
+    #: test method before calling :meth:`mk_tcf_config` or
+    #: :meth:`tcf_cmdline`.
+    ttbd = None	# NEEDs to be set once instantiated
+
+    def mk_tcf_config(self, conf_file_name = "conf.py"):
+        """
+        Generate a configuration file that points to the test server
+        """
+        with open(os.path.join(self.tmpdir, conf_file_name), "w") as cf:
+            cf.write(
+                'tcfl.config.url_add("%s", aka = "local", ssl_ignore = True)'
+                % self.ttbd.url)
+
+    def tcf_cmdline(self):
+        """
+        Generate the basic command line that will run against the test
+        server.
+        """
+        return self.ttbd.srcdir + "/tcf --state-path . -p: -c conf.py"
+
+    def teardown_90_scb(self):
+        """
+        Check the server's log for errors
+        """
+        self.ttbd.check_log_for_issues(self)
