@@ -108,7 +108,7 @@ setattr(logging, "logdl", logging.root.log)
 from logging import logc, loge, logx, logw, logi, logd, logdl
 
 app = flask.Flask(__name__)
-API_VERSION = 1
+API_VERSION = 2
 API_PATH = "/ttb-v"
 API_PREFIX = API_PATH + str(API_VERSION) + "/"
 
@@ -187,6 +187,18 @@ def current_user_is_admin():
     if user:
         return user.is_admin()
     return False
+
+@app.route(API_PATH + "<int:version>/<path:any_route>",
+           methods = [ 'GET', 'POST', 'PUT', 'PATCH', 'DELETE' ])
+def _bad_version(version, any_route):
+    if version < API_VERSION:
+        action = "upgrade"
+    else:
+        action = "downgrade"
+    return flask.abort(404,
+                       "your client is asking for protocol v%s to call %s;"
+                       " this server supports %d; please %s"
+                       % (version, any_route, API_VERSION, action))
 
 @app.route(API_PREFIX + 'login', methods = ['PUT'])
 def login():

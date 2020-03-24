@@ -123,7 +123,7 @@ class rest_target_broker(object):
     # up.
     projection = None
 
-    API_VERSION = 1
+    API_VERSION = 2
     API_PREFIX = "/ttb-v" + str(API_VERSION) + "/"
 
     def __init__(self, state_path, url, ignore_ssl = False, aka = None,
