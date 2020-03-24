@@ -806,9 +806,14 @@ host = '127.0.0.1'
                 os.kill(-self.p.pid, signal.SIGKILL)
             except OSError:	# Most cases, already dead
                 pass
-        self.check_log_for_issues()
+        try:
+            self.check_log_for_issues()
+        except IOError as e:
+            if e.errno != errno.ENOENT:
+                # tmpdir has been removed, ignore
+                raise
         if not self.keep_temp:
-            shutil.rmtree(self.tmpdir, True)
+            shutil.rmtree(self.tmpdir, ignore_errors = True)
         else:
             logging.warning("keeping TTBD #%s temporary directory @ %s\n",
                             self.port, self.tmpdir)
