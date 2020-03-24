@@ -556,13 +556,15 @@ class test_ttbd(object):
         else:
             self.url = "http://localhost:%d" % self.port
             ssl_context = "--no-ssl"
-        self.url_spec = "url:'^%s'" % self.url
+        self.url_spec = "fullid:'^%s'" % self.aka
         if tmpdir:
             self.tmpdir = tmpdir
         else:
-            # Don't use colon on the name, or it'll thing it is a path
-            self.tmpdir = tempfile.mkdtemp(prefix = "test-ttbd-%d."
-                                           % self.port)
+            # default to place the server's dir in the tempdir for
+            # testcases
+            self.tmpdir = os.path.join(tcfl.tc.tc_c.tmpdir, "server", self.aka)
+        shutil.rmtree(self.tmpdir, ignore_errors = True)
+        commonl.makedirs_p(self.tmpdir)
 
         self.etc_dir = os.path.join(self.tmpdir, "etc")
         self.files_dir = os.path.join(self.tmpdir, "files")
@@ -638,8 +640,10 @@ host = '127.0.0.1'
         self.p = subprocess.Popen(
             self.cmdline, shell = False, cwd = self.tmpdir,
             close_fds = True, preexec_fn = _preexec_fn)
-        self._check_if_alive()
-        self.check_log_for_issues()
+        try:
+            self._check_if_alive()
+        finally:
+            self.check_log_for_issues()
         #atexit.register(self.terminate)
 
     def _check_if_alive(self):
@@ -660,63 +664,133 @@ host = '127.0.0.1'
                 rtb = tcfl.ttb_client.rest_init(self.state_dir,
                                                 self.url, not self.use_ssl,
                                                 self.aka)
-                rtb.rest_tb_target_list(all_targets = True)
+                # let's see if we get a
+                #
+                ## 404: missing user ID 'username' field
+                #
+                # meaning the server is up and running
+                try:
+                    r = rtb.send_request("PUT", "login")
+                except requests.HTTPError as e:
+                    if 'missing user ID' in str(e):
+                        # expecting something like
+                        ## {"message":"missing user ID 'username' ## field"}
+                        # if the server is running
+                        break
+                    else:
+                        raise
                 break
-            except requests.ConnectionError as e:
+            except (requests.ConnectionError, ValueError) as e:
                 # FIXME: need to use logger, but it is still not initialized?
                 logging.warning("ttbd:%d: retrying connection because %s",
                                 self.port, e)
                 time.sleep(0.25)
 
+    # Don't make these too generic or they will bounce all the time
+    bad_strings = [
+        # marker for an exception
+        r"Traceback (most recent call last):",
+        r"DEBUG",
+        r"FIXME",
+    ]
     error_regex = re.compile(r"(E\[|error|Error)")
     warning_regex = re.compile(r"(W\[|warning|Warning)")
-    def _check_log_line_for_issues(self, cnt, line):
+    def _check_log_line_for_issues(self, line):
         line = line.strip()
+        for bad_string in self.bad_strings:
+            if bad_string in line:
+                return True
         if self.error_regex.search(line):
             for exclude in self.errors_ignore:
                 if isinstance(exclude, re._pattern_type) \
                    and exclude.search(line):
-                    return
+                    return False
                 elif exclude in line:
-                    return
-            raise tcfl.tc.failed_e(
-                "ttbd[%s]: errors found #%d: %s" % (self.port, cnt, line),
-                { 'stdout': open(self.stdout), 'stderr': open(self.stderr) })
+                    return False
+            return True
         if self.warning_regex.search(line):
             for exclude in self.warnings_ignore:
                 if isinstance(exclude, re._pattern_type) \
                    and exclude.search(line):
-                    return
+                    return False
                 elif exclude in line:
-                    return
-                raise tcfl.tc.failed_e(
-                    "ttbd[%s]: error found #%d: %s" % (self.port, cnt, line),
-                    { 'stdout': self.stdout, 'stderr': self.stderr })
+                    return False
+                return True
 
-    def check_log_for_issues(self):
+    def _log_report(self, fd, fd_name, issues, testcase):
+        if testcase:
+            raise tcfl.tc.error_e(
+                "issues found on server's " + fd_name,
+                {
+                    "lines": " ".join(issues),
+                    "server-" + fd_name :
+                        commonl.generator_factory_c(open, fd.name)
+                })
+        else:
+            print >> sys.stderr, \
+                "issues found on server's %s: %s" \
+                % (fd_name, " ".join(issues))
+            fd.seek(0, 0)
+            count = 0
+            for line in fd:
+                print >> sys.stderr, "  %d: %s" % (count, line),
+                count += 1
+                
+    def check_log_for_issues(self, testcase = None):
         """
         Read the current log file from the TTBD daemon and raise an
-        exception if any line repots a warning or error.
+        exception if any line reports a warning or error.
 
         Note any line that matches :attr:`warnings_ignore` or
         :attr:`errors_ignore` won't trigger said exception.
         """
         try:
+            issues = []
             with open(self.stdout) as stdout:
                 cnt = 0
                 for line in stdout:
-                    self._check_log_line_for_issues(cnt, line)
+                    if self._check_log_line_for_issues(line):
+                        issues.append(str(cnt))
                     cnt += 1
+                if issues:
+                    self._log_report(stdout, "stdout", issues, testcase)
+                            
+            issues = []
             with open(self.stderr) as stderr:
                 cnt = 0
                 for line in stderr:
-                    self._check_log_line_for_issues(cnt, line)
+                    if self._check_log_line_for_issues(line):
+                        issues.append(str(cnt))
                     cnt += 1
+                if issues:
+                    self._log_report(stderr, "stderr", issues, testcase)
         except OSError as e:
             if e.errno != errno.ENOENT:
                 raise
             # ignore otherwise, this means we deleted the directory
             # already, the daemon had been already terminated
+
+    def local_auth_disable(self):
+        """
+        Disable local authentication, to be able to test
+        authentication
+
+        The server is normally configured with local authentication
+        enabled, so we can query and interact with it without having
+        to login first.
+
+        But then this makes it impossible to test login/logout, as
+        there is always a valid local user.
+
+        Call this at the beginning of a testcase that deals with
+        authentication after the core has been able to query
+        targets, etc to switch that off.
+
+        .. warning:: THIS WILL AFFECT all uses of this test daemon instance
+        """
+        with open(os.path.join(self.lib_dir,
+                               "local_auth_disabled"), "w") as wf:
+            wf.write("")
 
 
     def terminate(self):
