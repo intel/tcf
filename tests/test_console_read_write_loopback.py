@@ -40,9 +40,5 @@ class _test_00(tcfl.tc.tc_c):
             assert r == s, \
                 "read data (%s) doesn't equal written data (%s)" % (r, s)
 
-    @classmethod
-    def class_teardown(cls):
-        assert cls.class_result == tcfl.tc.result_c(1, 0, 0, 0, 0), \
-            "%s: expected 1 testcase passed, got %s instead" \
-            % (cls.__name__, cls.class_result)
-        return tcfl.tc.result_c(0, 0, 0, 0, 0)
+    def teardown_90_scb(self):
+        ttbd.check_log_for_issues(self)
