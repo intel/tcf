@@ -21,6 +21,7 @@ import time
 
 import commonl
 import ttbl
+import ttbl.power
 
 import pexpect
 try:
