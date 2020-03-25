@@ -108,7 +108,7 @@ def _template_find(image_filename, image_rgb,
     template_width, _template_height = template.shape[::-1]
 
     #for scale in numpy.linspace(0.2, 1.0, 20)[::-1]:
-    squares = []
+    squares = {}
 
     # Scale down the image to find smaller hits of the icon
     for scale in numpy.linspace(0.2, 1.0, 20)[::-1]:
@@ -137,7 +137,8 @@ def _template_find(image_filename, image_rgb,
                 int(square[2] * image_width),
                 int(square[3] * image_height),
             )
-            squares.append((scale, square, square_original))
+            squares[scale] = dict(relative = square,
+                                  absolute = square_original)
 
     # scale down the template to find smaller hits of the template
     for scale in numpy.linspace(0.2, 1.0, 20)[::-1]:
@@ -161,7 +162,8 @@ def _template_find(image_filename, image_rgb,
                 int(square[2] * image_width),
                 int(square[3] * image_height),
             )
-            squares.append((1/scale, square, square_original))
+            squares[1/scale] = dict(relative = square,
+                                    absolute = square_original)
 
     return squares
 
@@ -358,14 +360,17 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
             ay0 = self.in_area[1]
             ax1 = self.in_area[2]
             ay1 = self.in_area[3]
-            for scale, area_rel, area_abs in r:
+            for scale, data in r.items():
+                area_rel = data['relative']
+                area_abs = data['absolute']
                 x0 = area_rel[0]
                 y0 = area_rel[1]
                 x1 = area_rel[2]
                 y1 = area_rel[3]
                 if x0 >= ax0 and y0 >= ay0 \
                    and x1 <= ax1 and y1 <= ax1:
-                    r_in_area.append((scale, area_rel, area_abs))
+                    r_in_area[scale] = dict(relative = area_rel,
+                                            absolute = area_abs)
                     target.report_info(
                         "%s/%s: taking match %.1fs@%.2f,%.2f-%.2f,%.2f "
                         "(in area %.2f,%.2f-%.2f,%.2f)"
@@ -385,13 +390,15 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
         if r and self.merge_similar:	# merge similar detections
             start_idx = 0
             while start_idx < len(r):
-                r0 = r[start_idx]
-                for rx in list(r[start_idx+1:]):
-                    measure, _, _ = self._squares_overlap(r0[1], rx[1])
+                squarel = r.keys()
+                r0 = r[squarel[0]]['relative']
+                for r_name in squarel[start_idx+1:]:
+                    rx = r[r_name]['relative']
+                    measure, _, _ = self._squares_overlap(r0, rx)
                     if measure >= self.merge_similar:
                         # if more than the threshold we consider it is
                         # the same and ignore it
-                        r.remove(rx)
+                        del r[r_name]
                 start_idx += 1
         if r:
             # make sure there is a collateral image in the
@@ -404,7 +411,8 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
                 collateral_img = cv2.imread(most_recent)
                 buffers_poll['collateral'] = collateral_img
             # draw boxes for the squares detected
-            for _scale_factor, _normalized_rect, rect in r:
+            for data in r.values():
+                rect = data['absolute']
                 cv2.rectangle(
                     collateral_img,
                     # note rect are the absolute coordinates
