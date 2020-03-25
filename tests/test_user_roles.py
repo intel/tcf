@@ -15,7 +15,10 @@ import tcfl.tc
 
 srcdir = os.path.dirname(__file__)
 ttbd = commonl.testing.test_ttbd(config_files = [
-    os.path.join(srcdir, "conf_test_user_roles.py") ])
+    # strip to remove the compiled/optimized version -> get source
+    os.path.join(srcdir, "conf_%s" % os.path.basename(__file__.rstrip('cd')))
+])
+
 
 class _test_roles_login(commonl.testing.shell_client_base):
     """

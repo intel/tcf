@@ -17,7 +17,8 @@ import tcfl.tc
 srcdir = os.path.dirname(__file__)
 
 ttbd = commonl.testing.test_ttbd(config_files = [
-    os.path.join(srcdir, "conf_%s" % os.path.basename(__file__))
+    # strip to remove the compiled/optimized version -> get source
+    os.path.join(srcdir, "conf_%s" % os.path.basename(__file__.rstrip('cd')))
 ])
 
 @tcfl.tc.target(ttbd.url_spec)
