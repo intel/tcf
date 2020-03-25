@@ -21,7 +21,7 @@ class interface(ttbl.tt_interface):
     An instance of this gets added as an object to the main target
     with something like:
 
-    >>> ttbl.config.targets['targetname'].interface_add(
+    >>> ttbl.test_target.get('targetname').interface_add(
     >>>     "fastboot",
     >>>     ttbl.fastboot.interface("R1J56L1006ba8b"),
     >>>     {
@@ -176,7 +176,7 @@ class interface(ttbl.tt_interface):
     #:
     #: or for an specific instance
     #:
-    #: >>> ttbl.config.targets['TARGETNAME'].fastboot.path = "/some/other/fastboot"
+    #: >>> ttbl.test_target.get('TARGETNAME').fastboot.path = "/some/other/fastboot"
     #:
     path = "/usr/bin/fastboot"
 

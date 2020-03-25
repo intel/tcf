@@ -7,5 +7,5 @@
 
 ttbl.config.target_add(tt_qemu_zephyr("bad-qemu-01", [ "x86" ]),
                        target_type = "qemu-x86")
-ttbl.config.targets["bad-qemu-01"]._qemu_cmdlines['x86'] \
+ttbl.test_target.get("bad-qemu-01")._qemu_cmdlines['x86'] \
     +=  " __somethingwrong__ "

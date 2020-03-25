@@ -116,7 +116,7 @@ class interface(ttbl.tt_interface):
     An instance of this gets added as an object to the target object
     with:
 
-    >>> ttbl.config.targets['qu05a'].interface_add(
+    >>> ttbl.test_target.get('qu05a').interface_add(
     >>>     "capture",
     >>>     ttbl.capture.interface(
     >>>         vnc0 = ttbl.capture.vnc(PORTNUMBER)
@@ -312,7 +312,7 @@ class generic_snapshot(impl_c):
 
     Then attach the capture interface to the target with:
 
-    >>> ttbl.config.targets['TARGETNAME'].interface_add(
+    >>> ttbl.test_target.get('TARGETNAME').interface_add(
     >>>     "capture",
     >>>     ttbl.capture.interface(
     >>>         vnc0 = capture_screenshot_vnc,
@@ -464,7 +464,7 @@ class generic_stream(impl_c):
 
     Then attach the capture interface to the target with:
 
-    >>> ttbl.config.targets['TARGETNAME'].interface_add(
+    >>> ttbl.test_target.get('TARGETNAME').interface_add(
     >>>     "capture",
     >>>     ttbl.capture.interface(
     >>>         hdmi0_vstream = capture_vstream_ffmpeg_v4l,

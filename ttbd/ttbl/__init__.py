@@ -1303,8 +1303,25 @@ class test_target(object):
         self.power_off_pre_fns = []
         self.power_off_post_fns = []
 
-    @staticmethod
-    def get_for_user(target_name, calling_user):
+    @classmethod
+    def known_targets(cls):
+        """
+        Return list of known targets descriptors
+        """
+        return ttbl.config.targets.values()
+
+    @classmethod
+    def get(cls, target_name):
+        """
+        Return an object descripting an existing target name
+
+        :param str: name of target (which shall be available in
+          configuration)
+        """
+        return ttbl.config.targets.get(target_name, None)
+
+    @classmethod
+    def get_for_user(cls, target_name, calling_user):
         """
         If *calling_user* has permission to see & user *target_name*,
         return the target descriptor
@@ -1319,7 +1336,7 @@ class test_target(object):
         """
         assert isinstance(target_name, basestring)
         assert isinstance(calling_user, ttbl.user_control.User)
-        target = ttbl.config.targets.get(target_name, None)
+        target = cls.get(target_name)
         if not target:
             return None
         if not target.check_user_allowed(calling_user):
@@ -1465,7 +1482,7 @@ class test_target(object):
             real_name, _instance = name.split("#", 1)
         else:
             real_name = name
-        ic = ttbl.config.targets.get(real_name, None)
+        ic = self.get(real_name)
         if ic == None:
             self.log.warning("target declares connectivity to interconnect "
                              "'%s' that is not local, cannot verify; "

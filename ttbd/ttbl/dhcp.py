@@ -173,7 +173,7 @@ class pci(ttbl.power.impl_c):
 
       import ttbl.dhcp
 
-      ttbl.config.targets['nwa'].pc_impl.append(
+      ttbl.test_target.get('nwa').pc_impl.append(
           ttbl.dhcp.pci("fc00::61:1", "fc00::61:0", 112,
                         "fc00::61:2", "fc00::61:fe", ip_mode = 6)
       )
@@ -327,14 +327,14 @@ subnet6 %(if_net)s/%(if_len)s {
         #
         # FIXME: This leaves a gap, as targets in other servers could
         # be connected to this network. Sigh.
-        for target_id, target in ttbl.config.targets.iteritems():
+        for target in ttbl.test_target.known_targets():
             interconnects = target.tags.get('interconnects', {})
             ic = self.target
 
             boot_ic = target.tags.get('pos_boot_interconnect', None)
             if boot_ic == None:
                 ic.log.info('%s: target has no "pos_boot_interconnect" '
-                            'tag/property defined, ignoring' % target_id)
+                            'tag/property defined, ignoring' % target.id)
                 continue
             # FIXME: these two checks shall be consistency done when
             # the target is being added
@@ -342,12 +342,13 @@ subnet6 %(if_net)s/%(if_len)s {
                 raise RuntimeError('%s: target does not belong to the '
                                    'boot interconnect "%s" defined in tag '
                                    '"pos_boot_interconnect"'
-                                   % (target_id, boot_ic))
-            if not boot_ic in ttbl.config.targets:
+                                   % (target.id, boot_ic))
+            boot_ic_target = ttbl.test_target(boot_ic)
+            if boot_ic_target == None:
                 raise RuntimeError('%s: this target\'s boot interconnect %s '
                                    'defined in "pos_boot_interconnect" tag '
                                    'is not available in this server'
-                                   % (target_id, boot_ic))
+                                   % (target.id, boot_ic))
 
             if not 'bsp' in target.tags:
                 bsps = target.tags.get('bsps', {}).keys()
@@ -620,7 +621,7 @@ def power_on_pre_pos_setup(target):
     if pos_mode == "pxe":
         # now this is dirty -- we kinda hacking here but otherwise, how do
         # we get to the pos_* kws?
-        ic = ttbl.config.targets[boot_ic]
+        ic = ttbl.test_target.get(boot_ic)
 
         # The service
         kws = dict(target.tags)

@@ -329,7 +329,7 @@ class interface(ttbl.tt_interface):
     An instance of this gets added as an object to the target object
     with:
 
-    >>> ttbl.config.targets['qu05a'].interface_add(
+    >>> ttbl.test_target.get('qu05a').interface_add(
     >>>     "console",
     >>>     ttbl.console.interface(
     >>>         ttyS0 = ttbl.console.serial_device("/dev/ttyS5")
@@ -670,14 +670,14 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
 
     >>> serial0_pc = ttbl.console.serial_pc(console_file_name)
     >>>
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "power",
     >>>     ttbl.power.interface(
     >>>         ...
     >>>         serial0_pc,
     >>>         ...
     >>>     )
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "console",
     >>>     ttbl.console.interface(
     >>>         serial0 = serial0_pc,
@@ -764,14 +764,14 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
 
     >>> ssh0_pc = ttbl.console.ssh_pc("USERNAME:PASSWORD@HOSTNAME")
     >>>
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "power",
     >>>     ttbl.power.interface(
     >>>         ...
     >>>         ssh0_pc,
     >>>         ...
     >>>     )
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "console",
     >>>     ttbl.console.interface(
     >>>         ssh0 = ssh0_pc,

@@ -167,7 +167,7 @@ There might be multiple causes for this, but here are the most common:
   Thus, the target's MAC address listed in the configuration has to
   match the one the target actually uses on the network:
 
-  >>> ttbl.config.targets['TARGETNAME'].add_to_interconnect(
+  >>> ttbl.test_target.get('TARGETNAME').add_to_interconnect(
   >>>   NETWORKNAME, dict(
   >>>       mac_addr = "00:07:32:4b:36:87",
   >>>       ipv4_addr = '192.168.98.160', ipv4_prefix_len = 24,

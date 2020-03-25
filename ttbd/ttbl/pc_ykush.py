@@ -158,7 +158,7 @@ class ykush(ttbl.power.impl_c, ttbl.things.impl_c):
         happening in another process).
         """
         ykush_target_name = self.ykush_serial
-        ykush_target = ttbl.config.targets.get(ykush_target_name, None)
+        ykush_target = ttbl.test_target.get(ykush_target_name)
         if not ykush_target:
             target.log.error("can't find a target named %s to try "
                              "to power cycle missing %s hub"

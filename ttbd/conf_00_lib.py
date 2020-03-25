@@ -188,7 +188,7 @@ class vlan_pci(ttbl.power.impl_c):
       .. code-block:: python
 
          # eth dongle mac 00:e0:4c:36:40:b8 is assigned to NWA
-         ttbl.config.targets['nwa'].tags_update(dict(mac_addr = '00:e0:4c:36:40:b8'))
+         ttbl.test_target.get('nwa').tags_update(dict(mac_addr = '00:e0:4c:36:40:b8'))
 
       Furthermore, default networks *nwa*, *nwb* and *nwc* are defined
       to have a power control rail (versus an individual power
@@ -197,7 +197,7 @@ class vlan_pci(ttbl.power.impl_c):
 
       .. code-block:: python
 
-         ttbl.config.targets['nwa'].pc_impl.append(
+         ttbl.test_target.get('nwa').pc_impl.append(
              ttbl.pc.dlwps7("http://USER:PASSWORD@sp5/8"))
 
       This creates a power controller to switch on or off plug #8 on
@@ -229,7 +229,7 @@ class vlan_pci(ttbl.power.impl_c):
 
       .. code-block:: python
 
-         ttbl.config.targets['TARGETNAME-NN'].tags_update(
+         ttbl.test_target.get('TARGETNAME-NN').tags_update(
              {
                'ipv4_addr': "192.168.10.30",
                'ipv4_prefix_len': 24,

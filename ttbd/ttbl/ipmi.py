@@ -334,14 +334,14 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
 
     >>> sol0_pc = ttbl.console.serial_pc(console_file_name)
     >>>
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "power",
     >>>     ttbl.power.interface(
     >>>         ...
     >>>         sol0_pc,
     >>>         ...
     >>>     )
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "console",
     >>>     ttbl.console.interface(
     >>>         sol0 = sol0_pc,

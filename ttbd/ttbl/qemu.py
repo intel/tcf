@@ -665,7 +665,7 @@ class plugger_c(ttbl.things.impl_c):
     >>>     tags = { },
     >>>     target_type = "usb_disk")
     >>>
-    >>> ttbl.config.targets['qu04a'].interface_add(
+    >>> ttbl.test_target.get('qu04a').interface_add(
     >>>     "things",
     >>>     ttbl.things.interface(
     >>>         drive_34 = ttbl.qemu.plugger_c(

@@ -13,7 +13,7 @@ components that compose the power rail of a target.
 The interface is implemented by :class:`ttbl.power.interface` needs to
 be attached to a target with :meth:`ttbl.test_target.interface_add`::
 
->>> ttbl.config.targets[NAME].interface_add(
+>>> ttbl.test_target.get(NAME).interface_add(
 >>>     "INTERFACENAME",
 >>>     ttbl.power.interface(
 >>>         component0,
@@ -841,7 +841,7 @@ class socat_pc(daemon_c):
     This object (or what is derived from it) can be passed to a power
     interface for implementation, eg:
 
-    >>> ttbl.config.targets['TARGETNAME'].interface_add(
+    >>> ttbl.test_target.get('TARGETNAME').interface_add(
     >>>     "power",
     >>>     ttbl.power.interface(
     >>>         ttbl.power.socat_pc(ADDR1, ADDR2)

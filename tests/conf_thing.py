@@ -58,6 +58,6 @@ ttbl.config.target_add(
     }
 )
 
-ttbl.config.targets['t0'].thing_add('thing1', thing_plugger_c('p1'))
-ttbl.config.targets['t0'].thing_add('thing2', thing_plugger_c('p2'))
-ttbl.config.targets['t0'].thing_add('thing3', thing_plugger_c('p3'))
+ttbl.test_target.get('t0').thing_add('thing1', thing_plugger_c('p1'))
+ttbl.test_target.get('t0').thing_add('thing2', thing_plugger_c('p2'))
+ttbl.test_target.get('t0').thing_add('thing3', thing_plugger_c('p3'))

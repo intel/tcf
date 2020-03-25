@@ -417,16 +417,15 @@ def _targets_gets():
     projections = _flask_arg_projections()
     _list = []
     calling_user = flask_login.current_user._get_current_object()
-    for target_name in ttbl.config.targets:
-        # maybe the user can't see that target because of permissions
-        target = ttbl.test_target.get_for_user(target_name, calling_user)
-        if target:
-            d = target.to_dict(projections)
-            if d:
-                # list it only if the projections yielded a non empty
-                # set of data
-                d['id'] = target.id
-                _list.append(d)
+    for target in ttbl.test_target.known_targets():
+        if not target.check_user_allowed(calling_user):
+            continue
+        d = target.to_dict(projections)
+        if d:
+            # list it only if the projections yielded a non empty
+            # set of data
+            d['id'] = target.id
+            _list.append(d)
     return flask.jsonify({'targets': _list})
 
 @app.route(API_PREFIX + 'targets/<string:target_id>', methods = ['GET'])
@@ -938,11 +937,8 @@ daemon_user = None
 def _do_cleanup():
     """
     """
-    target_list = ttbl.config.targets.keys()
     who = who_make("cleanup", user = daemon_user)
-    for target_id in target_list:
-        with ttbl.config.targets_lock:
-            target = ttbl.config.targets[target_id]
+    for target in ttbl.test_target.known_targets():
         try:
             now = time.time()
             if target.tags.get('skip_cleanup', False) == True:

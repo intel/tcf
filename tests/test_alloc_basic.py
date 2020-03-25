@@ -26,4 +26,4 @@ class _test(commonl.testing.shell_client_base):
         self.mk_tcf_config()
 
         self.run_local("SERVER=%s %s/../ttbd/allocation-raw-test.sh" %
-                       (ttbd.url, srcdir))
+                       (ttbd.url, os.path.abspath(srcdir)))

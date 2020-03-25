@@ -26,7 +26,7 @@ class interface(ttbl.tt_interface):
     with:
 
 
-    >>> ttbl.config.targets['TARGETNAME'].interface_add(
+    >>> ttbl.test_target.get('TARGETNAME').interface_add(
     >>>     "ioc_flash_server_app",
     >>>     ttbl.ioc_flash_server_app.interface("/dev/tty-TARGETNAME-FW")
     >>> )
@@ -62,7 +62,7 @@ class interface(ttbl.tt_interface):
     #:
     #: or for an specific instance
     #:
-    #: >>> ttbl.config.targets['TARGETNAME'].ioc_flash_server_app._path = "/some/other/ioc_flash_server_app"
+    #: >>> ttbl.test_target.get('TARGETNAME').ioc_flash_server_app._path = "/some/other/ioc_flash_server_app"
     #:
     path = "/opt/intel/platformflashtool/bin/ioc_flash_server_app"
 

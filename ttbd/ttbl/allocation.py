@@ -172,7 +172,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
             target_names_all |= target_names_group
         for target_name in target_names_all:
             try:
-                self.targets_all[target_name] = ttbl.config.targets[target_name]
+                self.targets_all[target_name] = ttbl.test_target(target_name)
             except KeyError:
                 raise self.invalid_e(
                     "%s: target no longer available" % target_name)
@@ -185,7 +185,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
                 if self.state_get == 'active':
                     targets = {}
                     for target_name in self.get("group_allocated").split(","):
-                        targets[target_name] = ttbl.config.targets[target_name]
+                        targets[target_name] = ttbl.test_target.get(target_name)
                 else:
                     targets = self.targets_all
         finally:
@@ -419,11 +419,6 @@ def get_from_cache(allocid):
         raise allocation_c.invalid_e("%s: invalid allocation" % allocid)
     return lru_aged_cache_allocation_c(allocid)
 
-def target_is_valid(target_name):
-    # FIXME: validate with the inventory
-    # FIXME: move to a target inventory service
-    return ttbl.config.targets.get(target_name, None)
-
 
 def init():
     commonl.makedirs_p(path)
@@ -641,7 +636,7 @@ def _run_target(target, preempt):
             # we have all the targets we need, deallocate those we
             # got that we don't need
             for target_name in targets_to_release:
-                target = ttbl.config.targets[target_name]
+                target = ttbl.test_target.get(target_name)
                 with target.lock:
                     target._deallocate_simple(allocdb.allocid)
             # we still need to allocate targets, maybe boost them
@@ -656,10 +651,6 @@ def _run_target(target, preempt):
 
 def _run(targets, preempt):
     # Main scheduler run
-    if targets == None:
-        logging.error("FIXME: not sure this is really needed")
-        targets = ttbl.config.targets.values()
-
     for target in targets:
         _run_target(target, preempt)
 
@@ -687,7 +678,7 @@ def request(groups, calling_user, obo_user, guests,
         assert isinstance(target_list, list)		# target list...
         for target_name in target_list:			# ... of valid ones
             assert isinstance(target_name, basestring)
-            target = target_is_valid(target_name)
+            target = ttbl.test_target.get(target_name)
             if not target:
                 return {
                     "state": "rejected",
@@ -940,7 +931,7 @@ def maintenance(t, calling_user):
         break	# only want the toplevel, thanks
 
     # targets: starvation control, check overtimes
-    for target_name, target in ttbl.config.targets.iteritems():
+    for target in ttbl.test_target.known_targets():
         owner = target.owner_get()
         if owner:	# if queue entries
             _target_starvation_recalculate(allocdb, target, 0) # FIXME: 0
@@ -950,7 +941,7 @@ def maintenance(t, calling_user):
             #logging.error("FIXME: idle-power-off control %s: %s", target_name, owner)
 
     # Finally, do an schedule run on all the targets, see what has to move
-    _run(ttbl.config.targets.values(), False)
+    _run(ttbl.test_target.known_targets(), False)
 
 
 def delete(allocid, calling_user):

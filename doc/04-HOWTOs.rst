@@ -752,7 +752,7 @@ For example, when adding the target:
 which can also be done once the target is added with
 :meth:`tags_update <ttbl.test_target.tags_update>`::
 
->>> ttbl.config.targets['TARGETNAME'].tags_update({
+>>> ttbl.test_target.get('TARGETNAME').tags_update({
 >>>         ...
 >>>         'linux_serial_console_default': 'ttyS2',
 >>>         'linux_options_append': 'rw foo=bar',
@@ -2213,7 +2213,7 @@ How do I disable a target by default?
 When a target has to be disabled by default, add this to the
 configuration file::
 
-  ttbl.config.targets['TARGETNAME'].disable("")
+  ttbl.test_target.get('TARGETNAME').disable("")
 
 the target will be loaded and the configuration will be accesible,
 however, *tcf* clients that select targets automatically (*list*,

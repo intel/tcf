@@ -184,7 +184,7 @@ More networks can be added by creating configuration files
            ipv4_prefix_len = 24,
        )
    )
-   ttbl.config.targets['NAME'].tags['interfaces'].append('interconnect_c')
+   ttbl.test_target.get('NAME').tags['interfaces'].append('interconnect_c')
 
 Be sure to not assign conflicting IP blocks, or IP blocks that route
 to the public internet or intranet--in the example the convention is
@@ -220,7 +220,7 @@ it basically consists on:
              ipv4_prefix_len = 24,
          )
      )
-     ttbl.config.targets['NAME'].tags['interfaces'].append('interconnect_c')
+     ttbl.test_target.get('NAME').tags['interfaces'].append('interconnect_c')
 
   or for an existing network (such as the configuration's default
   *nwa*):
@@ -228,15 +228,15 @@ it basically consists on:
   .. code-block:: python
 
      # eth dongle mac 00:e0:4c:36:40:b8 is assigned to NWA
-     ttbl.config.targets['nwa'].tags_update(dict(mac_addr = '00:e0:4c:36:40:b8'))
+     ttbl.test_target.get('nwa').tags_update(dict(mac_addr = '00:e0:4c:36:40:b8'))
 
 - for each target that is connected to said network, report it as part
   of the network *nwc*:
 
   .. code-block:: python
 
-     ttbl.config.targets['TARGETNAME-NN'].tags_update({ 'ipv4_addr': "192.168.10.130" },
-                                                      ic = 'nwc')
+     ttbl.test_target.get('TARGETNAME-NN').tags_update({ 'ipv4_addr': "192.168.10.130" },
+                                                       ic = 'nwc')
 
 - the network switch itself can be also power switched; if you
   connect it, for example to a Digital Loggers Web Power Switch 7
@@ -244,7 +244,7 @@ it basically consists on:
 
   .. code-block:: python
 
-     ttbl.config.targets['nwc'].pc_impl.append(
+     ttbl.test_target.get('nwc').pc_impl.append(
          ttbl.pc.dlwps7("http://admin:1234@spX/M"))
 
   thus, when powering up the network *nwc*, the last step will be to
@@ -498,7 +498,7 @@ properly configured; if you are coonecting a *THINGNAME* using method
 .. code-block:: python
 
    sometarget_add('TARGETNAME' ...)
-   ttbl.config.targets['TARGETNAME'].thing_add(
+   ttbl.test_target.get('TARGETNAME').thing_add(
        'THINGNAME', someplugger(ARG1, ARG2...))
 
 A plugger, such as :class:`ttbl.usbrly08b.plugger` and its
@@ -532,11 +532,11 @@ unplugging it, in the ``conf_10_target.py`` file, we would add:
        ic_type = 'usb__host__device')
 
    SOMETARGET_add('TARGET0'...)
-   ttbl.config.targets['TARGET0'].add_to_interconnect('usb__TARGET1__TARGET0')
+   ttbl.test_target.get('TARGET0').add_to_interconnect('usb__TARGET1__TARGET0')
 
    SOMETARGET_add('TARGET1'...)
-   ttbl.config.targets['TARGET1'].add_to_interconnect('usb__TARGET1__TARGET0')
-   ttbl.config.targets['TARGET1'].add_thing(
+   ttbl.test_target.get('TARGET1').add_to_interconnect('usb__TARGET1__TARGET0')
+   ttbl.test_target.get('TARGET1').add_thing(
        'TARGET0', ttbl.usbrly08b.plugger("SERIALNUMBER", 0))
 
 
@@ -1542,7 +1542,7 @@ All together, it shall look like:
 
    # Delete existing definition of the 'nwa' target created by the
    # default initialization
-   del ttbl.config.targets['nwa']
+   del ttbl.test_target.get('nwa')
 
    ttbl.config.interconnect_add(
        ttbl.tt.tt_power(

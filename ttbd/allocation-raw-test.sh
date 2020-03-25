@@ -1,6 +1,6 @@
 #! /bin/sh -xe
 server=${SERVER:-https://localhost:5002}
-prefix=$server/ttb-v1
+prefix=$server/ttb-v2
 
 curl -c cookies.txt -k -X PUT $prefix/login \
      -d password=none -d username=local
@@ -29,7 +29,7 @@ curl -b cookies.txt -k -X PUT $prefix/allocation  \
     | python -m json.tool | tee out
 allocid=$(python -c "import sys,json; print json.loads(sys.stdin.read())['allocid']" < out)
 # good: delete it
-curl -b cookies.txt -k -X DELETE $server/ttb-v1/allocation/$allocid
+curl -b cookies.txt -k -X DELETE $prefix/allocation/$allocid
 
 # good: create for another user
 curl -b cookies.txt -k -X PUT $prefix/allocation \
@@ -38,16 +38,16 @@ curl -b cookies.txt -k -X PUT $prefix/allocation \
      -d 'groups={"dd1":["qu-90a", "nwa", "qu-91a"],"dd2":["nwa", "qu-91a", "qu-92a"]}' \
     | python -m json.tool | tee out
 allocid=$(python -c "import sys,json; print json.loads(sys.stdin.read())['allocid']" < out)
-curl -b cookies.txt -k -X GET $server/ttb-v1/allocation/$allocid > out
+curl -b cookies.txt -k -X GET $prefix/allocation/$allocid > out
 python -m json.tool < out
 
 # add guests
-curl -b cookies.txt -k -X PATCH $server/ttb-v1/allocation/$allocid/guest1
-curl -b cookies.txt -k -X PATCH $server/ttb-v1/allocation/$allocid/guest2
-curl -b cookies.txt -k -X PATCH $server/ttb-v1/allocation/$allocid/guest3
-curl -b cookies.txt -k -X PATCH $server/ttb-v1/allocation/$allocid/guest4
+curl -b cookies.txt -k -X PATCH $prefix/allocation/$allocid/guest1
+curl -b cookies.txt -k -X PATCH $prefix/allocation/$allocid/guest2
+curl -b cookies.txt -k -X PATCH $prefix/allocation/$allocid/guest3
+curl -b cookies.txt -k -X PATCH $prefix/allocation/$allocid/guest4
 # list guests
-curl -b cookies.txt -k -X GET $server/ttb-v1/allocation/$allocid \
+curl -b cookies.txt -k -X GET $prefix/allocation/$allocid \
     | python -c "import sys,json; print ' '.join(sorted(json.loads(sys.stdin.read())['guests']))" > guests
 if [ "$(< guests)" != "guest1 guest2 guest3 guest4" ]; then
     echo "ERROR: not four guests as expected" 1>&2
@@ -55,9 +55,9 @@ if [ "$(< guests)" != "guest1 guest2 guest3 guest4" ]; then
 fi
 
 # delete one
-curl -b cookies.txt -k -X DELETE $server/ttb-v1/allocation/$allocid/guest4
+curl -b cookies.txt -k -X DELETE $prefix/allocation/$allocid/guest4
 # list guests
-curl -b cookies.txt -k -X GET $server/ttb-v1/allocation/$allocid \
+curl -b cookies.txt -k -X GET $prefix/allocation/$allocid \
     | python -c "import sys,json; print ' '.join(sorted(json.loads(sys.stdin.read())['guests']))" > guests
 if grep guest4 guests; then
     echo "ERROR: guest4 was removed, shan't be there" 1>&2
@@ -69,11 +69,11 @@ if [ "$(< guests)" != "guest1 guest2 guest3" ]; then
 fi
 
 # deleting the same multiple times has no effect
-curl -b cookies.txt -k -X DELETE $server/ttb-v1/allocation/$allocid/guest4
-curl -b cookies.txt -k -X DELETE $server/ttb-v1/allocation/$allocid/guest4
+curl -b cookies.txt -k -X DELETE $prefix/allocation/$allocid/guest4
+curl -b cookies.txt -k -X DELETE $prefix/allocation/$allocid/guest4
 # list guests
-curl -b cookies.txt -k -X GET $server/ttb-v1/allocation/$allocid | python -m json.tool
-curl -b cookies.txt -k -X GET $server/ttb-v1/allocation/$allocid \
+curl -b cookies.txt -k -X GET $prefix/allocation/$allocid | python -m json.tool
+curl -b cookies.txt -k -X GET $prefix/allocation/$allocid \
     | python -c "import sys,json; print ' '.join(sorted(json.loads(sys.stdin.read())['guests']))" > guests
 if [ "$(< guests)" != "guest1 guest2 guest3" ]; then
     echo "ERROR: not just three guests as expected" 1>&2

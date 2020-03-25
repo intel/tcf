@@ -17,7 +17,7 @@ interface can be added with:
 
 .. code-block:: python
 
-   ttbl.config.targets['TARGETNAME'].interface_add(
+   ttbl.test_target.get('TARGETNAME').interface_add(
        "capture",
        ttbl.capture.interface(
            screen = "hdmi0_screenshot",
@@ -88,7 +88,7 @@ import ttbl.capture
 #:
 #:  - add the configuration snippet::
 #:
-#:      ttbl.config.targets[TARGETNAME].interface_add(
+#:      ttbl.test_target.get(TARGETNAME).interface_add(
 #:          "capture",
 #:          ttbl.capture.interface(
 #:              screen = "hdmi0_screenshot",
