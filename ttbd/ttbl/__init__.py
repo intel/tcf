@@ -1070,8 +1070,6 @@ class test_target(object):
     properties_user = set([
         # provisioning OS mode
         'pos_mode',
-        'pos_reinitialize',
-        'pos_repartition', 	# deprecated for pos_reinitialize
         re.compile('^pos_root_[_a-z0-9A-Z]+$'),
     ])
     #: Properties that should not be cleared on target release
