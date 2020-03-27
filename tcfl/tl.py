@@ -215,19 +215,63 @@ def tcpdump_collect(ic, filename = None):
     ic.store.dnload(ic.kws['tc_hash'] + ".cap", filename)
     ic.report_info("tcpdump available in file %s" % filename)
 
+
+_os_release_regex = re.compile("^[_A-Z]+=.*$")
+
 def linux_os_release_get(target, prefix = ""):
     """
-    Return in a dictionary the contents of a file /etc/os-release (if
-    it exists)
+    Get the os-release file from a Linux target and return its
+    contents as a dictionary.
+
+    /etc/os-release is documented in
+    https://www.freedesktop.org/software/systemd/man/os-release.html
+
+    :param tcfl.tc.target_c target: target on which to run (must be
+      started and running a Linux OS)
+    :returns: dictionary with the */etc/os-release* values, such as:
+
+      >>> os_release = tcfl.tl.linux_os_release_get(target)
+      >>> print os_release
+      >>> { ...
+      >>>     'ID': 'fedora',
+      >>>     'VERSION_ID': '29',
+      >>>   ....
+      >>> }
     """
-    output = target.shell.run(
-        "cat %s/etc/os-release || true" % prefix, output = True)
-    matches = re.findall(r"^(?P<field>\S+)=(?P<valur>\S+)$", output,
-                         re.MULTILINE)
     os_release = {}
-    for match in matches:
-        os_release[match[0]] = match[1]
+    output = target.shell.run("cat %s/etc/os-release || true" % prefix,
+                              output = True, trim = True)
+    # parse painfully line by line, this way it might be better at
+    # catching corruption in case we had output from kernel or
+    # whatever messed up in the output of the command
+    for line in output.split("\n"):
+        line = line.strip()
+        if not _os_release_regex.search(line):
+            continue
+        field, value = line.strip().split("=", 1)
+        # remove leading and ending quotes
+        os_release[field] = value.strip('"')
     return os_release
+
+
+def linux_mount_scratchfs(target):
+    """
+    Mount in the target the TCF-scratch filesystem in */scratch*
+
+    The default partitioning schemas define a partition with a label
+    TCF-scratch that is available to be reformated and reused at will
+    by any automation. This is made during deployment.
+
+    This function creates an ext4 filesystem on it and mounts it in
+    */scratch* if not already mounted.
+    """
+    output = target.shell.run("cat /proc/mounts", output = True, trim = True)
+    if ' /scratch ' not in output:
+        # not mounted already
+        target.shell.run("mkfs.ext4 -F /dev/disk/by-partlabel/TCF-scratch")
+        target.shell.run("mkdir -p /scratch" % target.kws)
+        target.shell.run("mount /dev/disk/by-partlabel/TCF-scratch /scratch")
+
 
 def linux_ssh_root_nopwd(target, prefix = ""):
     """
@@ -238,10 +282,11 @@ def linux_ssh_root_nopwd(target, prefix = ""):
     In a script:
 
     >>> tcfl.tl.linux_ssh_root_nopwd(target)
+    >>> tcfl.tl.linux_sshd_restart(ic, target)
+
+    or if doing it by hand, wait for *sshd* to be fully ready; it is a hack:
+
     >>> target.shell.run("systemctl restart sshd")
-
-    wait for *sshd* to be fully ready; it is a hack
-
     >>> target.shell.run(           # wait for sshd to fully restart
     >>>     # this assumes BASH
     >>>     "while ! exec 3<>/dev/tcp/localhost/22; do"
@@ -288,6 +333,21 @@ EOF""" % (prefix, prefix))
 
 def deploy_linux_ssh_root_nopwd(_ic, target, _kws):
     linux_ssh_root_nopwd(target, "/mnt")
+
+def linux_sshd_restart(ic, target):
+    """
+    Restart SSHD in a linux/systemctl system
+
+    Use with :func:`linux_ssh_root_nopwd`
+    """
+    target.tunnel.ip_addr = target.addr_get(ic, "ipv4")
+    target.shell.run("systemctl restart sshd")
+    target.shell.run(		# wait for sshd to fully restart
+        # this assumes BASH
+        "while ! exec 3<>/dev/tcp/localhost/22; do"
+        " sleep 1s; done", timeout = 15)
+    time.sleep(2)	# SSH settle
+    target.ssh.check_call("echo Checking SSH tunnel is up")
 
 def linux_ipv4_addr_get_from_console(target, ifname):
     """
@@ -371,6 +431,48 @@ def sh_export_proxy(ic, target):
             "%(ipv6_addr)s/%(ipv6_prefix_len)d,localhost"
         target.shell.run("export " + proxy_cmd % ic.kws)
 
+def sh_proxy_environment(ic, target):
+    """
+    If the interconnect *ic* defines a proxy environment, issue
+    commands to write the proxy configuration to the target's
+    */etc/environment*.
+
+    As well, if the directory */etc/apt/apt.conf.d* exists in the
+    target, an APT proxy configuration file is created there with the
+    same values.
+
+    See :func:`tcfl.tl.sh_export_proxy`
+    """
+    apt_proxy_conf = []
+    if 'ftp_proxy' in ic.kws:
+        target.shell.run(
+            "echo -e 'ftp_proxy=%(ftp_proxy)s\nFTP_PROXY=%(ftp_proxy)s'"
+            " >> /etc/environment"
+            % ic.kws)
+        apt_proxy_conf.append('FTP::proxy "%(ftp_proxy)s";' % ic.kws)
+    if 'http_proxy' in ic.kws:
+        target.shell.run(
+            "echo -e 'http_proxy=%(http_proxy)s\nHTTP_PROXY=%(http_proxy)s'"
+            " >> /etc/environment"
+            % ic.kws)
+        apt_proxy_conf.append('HTTP::proxy "%(http_proxy)s";' % ic.kws)
+    if 'https_proxy' in ic.kws:
+        target.shell.run(
+            "echo -e 'https_proxy=%(https_proxy)s\nHTTPS_PROXY=%(https_proxy)s'"
+            " >> /etc/environment"
+            % ic.kws)
+        apt_proxy_conf.append('HTTPS::proxy "%(https_proxy)s";' % ic.kws)
+    if 'no_proxy' in ic.kws:
+        target.shell.run("echo 'export NO_PROXY=%(no_proxy)s"
+                         " no_proxy=%(no_proxy)s' >> ~/.bashrc" % ic.kws)
+    target.shell.run(
+        "test -d /etc/apt/apt.conf.d"
+        " && cat > /etc/apt/apt.conf.d/tcf-proxy.conf <<EOF\n"
+        "Acquire {\n"
+        + "\n".join(apt_proxy_conf) +
+        "}\n"
+        "EOF")
+
 def linux_wait_online(ic, target, loops = 20, wait_s = 0.5):
     """
     Wait on the serial console until the system is assigned an IP
@@ -448,7 +550,7 @@ def linux_rsync_cache_lru_cleanup(target, path, max_kbytes):
         # easily).
         #
         # Then start iterating newest first until the total
-        # accumulated size exceeds what we have been 
+        # accumulated size exceeds what we have been
         # asked to free and from there on, wipe all files.
         #
         # Note we list directories after the files; since
@@ -811,3 +913,91 @@ def swupd_bundle_add(ic, target, bundle_list,
                            bundle, int(count))
         target.report_data("swupd bundle-add duration (seconds)",
                            bundle, float(m.groupdict()['seconds']))
+
+
+def linux_package_add(ic, target, *packages, **kws):
+    """Ask target to install Linux packages in distro-generic way
+
+    This function checks the target to see what it has installed and
+    then uses the right tool to install the list of packages; distro
+    specific package lists can be given:
+
+    >>> tcfl.tl.linux_package_add(
+    >>>      ic, target, [ 'git', 'make' ],
+    >>>      centos = [ 'cmake' ],
+    >>>      ubuntu = [ 'cmake' ])
+
+    :param tcfl.tc.target_c ic: interconnect that provides *target*
+      with network connectivity
+
+    :param tcfl.tc.target_c target: target where to install
+
+    :param list(str) packages: (optional) list of packages to install
+
+    :param list(str) DISTROID: (optonal) list of packages to install,
+      in addition to *packages* specific to a distro:
+
+       - CentOS: use *centos*
+       - Clear Linux OS: use *clear*
+       - Fedora: use *fedora*
+       - RHEL: use *rhel*
+       - Ubuntu: use *ubuntu*
+
+
+    FIXME:
+
+     - missing support for older distros and to specify packages
+       for specific distro version
+
+     - most of the goodes in swupd_bundle_add have to be moved here,
+       like su/sudo support, ability to setup proxy, fix date and pass
+       distro-specific setups (like URLs, etc)
+    """
+    assert isinstance(ic, tcfl.tc.target_c)
+    assert isinstance(target, tcfl.tc.target_c)
+    assert all(isinstance(package, basestring) for package in packages), \
+            "package list must be a list of strings;" \
+            " some items in the list are not"
+    for key, packagel in kws.iteritems():
+        assert isinstance(packagel, list), \
+            "value %s must be a list of strings; found %s" \
+            % (key, type(packagel))
+        assert all(isinstance(package, basestring) for package in packages), \
+            "value %s must be a list of strings;" \
+            " some items in the list are not" % key
+
+    os_release = linux_os_release_get(target)
+    distro = os_release['ID']
+    distro_version = os_release['VERSION_ID']
+
+    packages = list(packages)
+    if distro.startswith('clear'):
+        tcfl.tl.swupd_bundle_add(
+            ic, target, packages + kws.get("any", []) + kws.get("clear", []),
+            fix_time = True, set_proxy = True)
+    elif distro == 'centos':
+        _packages = packages + kws.get("any", []) + kws.get("centos", [])
+        target.shell.run(
+            "dnf install -qy " +  " ".join(_packages))
+    elif distro == 'fedora':
+        _packages = packages + kws.get("any", []) + kws.get("fedora", [])
+        target.shell.run(
+            "dnf install -qy " +  " ".join(_packages))
+    elif distro == 'rhel':
+        _packages = packages + kws.get("any", []) + kws.get("rhel", [])
+        target.shell.run(
+            "dnf install -qy " +  " ".join(_packages))
+    elif distro == 'ubuntu':
+        # FIXME: add needed repos [ubuntu|debian]_extra_repos
+        target.shell.run(
+            "sed -i 's/main restricted/main restricted universe multiverse/'"
+            " /etc/apt/sources.list")
+        target.shell.run("apt-get -qy update", timeout = 200)
+        _packages = packages + kws.get("any", []) + kws.get("ubuntu", [])
+        target.shell.run(
+            "DEBIAN_FRONTEND=noninteractive"
+            " apt-get install -qy " +  " ".join(_packages))
+    else:
+        raise tcfl.tc.error_e("unknown OS: %s %s (from /etc/os-release)"
+                              % (distro, distro_version))
+    return distro, distro_version
