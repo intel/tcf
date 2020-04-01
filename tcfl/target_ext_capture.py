@@ -310,33 +310,28 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
         """
         See :meth:`expectation_c.detect` for reference on the arguments
 
-        :returns: list of squares detected at different scales in
+        :returns: dictionary of squares detected at different scales in
           relative and absolute coordinates, e.g:
 
-          >>> [
-          >>>     (
-          >>>         1.0,
-          >>>         ( 0.949, 0.005, 0.968, 0.0312 ),
-          >>>         # relative (X0, Y0) to (X1, Y1)
-          >>>         ( 972, 4, 992, 24)
-          >>>         # absolute (X0, Y0) to (X1, Y1)
-          >>>     ),
-          >>>     (
-          >>>         0.957,
-          >>>         ( 0.948, 0.004, 0.969, 0.031 ),
-          >>>         ( 971, 3, 992, 24)
-          >>>     ),
-          >>>     (
-          >>>         0.957,
-          >>>         (0.948, 0.005, 0.969, 0.032 ),
-          >>>         (971, 4, 992, 25)
-          >>>     ),
-          >>>     (
-          >>>         0.915,
-          >>>         (0.948, 0.004, 0.970, 0.032 ),
-          >>>         (971, 3, 993, 25)
-          >>>     )
-          >>> ]
+          >>> {
+          >>>     1.0 : {
+          >>>         # relative|absolute: (X0, Y0) to (X1, Y1)
+          >>>         'relative': ( 0.949, 0.005, 0.968, 0.0312 ),
+          >>>         'absolute': ( 972, 4, 992, 24)
+          >>>     },
+          >>>     0.957 : {
+          >>>         'relative': ( 0.948, 0.004, 0.969, 0.031 ),
+          >>>         'absolute': ( 971, 3, 992, 24)
+          >>>     },
+          >>>     0.957 : {
+          >>>         'relative': (0.948, 0.005, 0.969, 0.032 ),
+          >>>         'absolute': (971, 4, 992, 25)
+          >>>     },
+          >>>     0.915 : {
+          >>>         'relative': ( 0.948, 0.004, 0.970, 0.032 ),
+          >>>         'absolute': (971, 3, 993, 25)
+          >>>     }
+          >>> }
 
         """
         target = self.target
