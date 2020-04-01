@@ -28,6 +28,7 @@ Other target interfaces
 .. automodule:: tcfl.target_ext_debug
 .. automodule:: tcfl.target_ext_fastboot
 .. automodule:: tcfl.target_ext_images
+.. automodule:: tcfl.target_ext_input
 .. automodule:: tcfl.target_ext_ioc_flash_server_app
 .. automodule:: tcfl.target_ext_power
 .. automodule:: tcfl.target_ext_shell

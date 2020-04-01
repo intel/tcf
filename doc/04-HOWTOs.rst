@@ -51,6 +51,24 @@ evertything:
 .. automodule:: examples.test_linux_kernel
 .. automodule:: examples.test_qemu_bios
 
+Finding stuff in the desktop and injecting input
+------------------------------------------------
+
+TCF has a flexible expect engine, to which you can ask: wait for
+something to come back on the console, has to be this; however, this
+is an expandable pattern that can be extended to:
+
+ - a regular expression of text on console output
+ - wait for a pattern to show up in an image capture
+ - a sound to be heard on some sound output
+ - a network packet to appear in a network link
+ - ... anything that can be measure capture and analyzed
+
+These examples show case some of those use cases:
+
+.. automodule:: examples.test_desktop_gedit
+.. automodule:: examples.test_desktop_firefox_wikipedia
+                
 Common patterns
 ---------------
 

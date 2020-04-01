@@ -816,6 +816,7 @@ been tested yet, shall be similar.
      # install -o ttbd -g ttbd -m 2775 -d \
          /home/ttbd \
          /home/ttbd/images/tcf-live/ \
+         /home/ttbd/images/misc/ \
          /home/ttbd/public_html /home/ttbd/public_html/x86_64
 
 4. Enable firewall access to all the services we will use; for the
@@ -873,7 +874,12 @@ been tested yet, shall be similar.
 
        # setsebool -P httpd_enable_homedirs true
        # chcon -R -t httpd_sys_content_t /home/ttbd/public_html
+       # chcon -R -t httpd_sys_content_t /home/ttbd/images/misc
 
+     .. warning:: do not tag */home/ttbd/images*; files in there will
+                  have their own SELinux contexts based on what the
+                  Linux distribution they represent needs.
+       
      Test this is working::
 
        # systemctl restart httpd
@@ -1052,6 +1058,11 @@ e. Perform final image setup:
             PermitEmptyPasswords yes
             EOF
 
+f. Deploy content to the server that test content can / will use::
+
+     $ mkdir -p /home/ttbd/images/tcf-live/misc
+
+     $ cp /usr/share/tcf/content/evemu.bin.tar.gz /home/ttbd/images/tcf-live/misc
      
 .. _ttbd_pos_deploying_images:
 

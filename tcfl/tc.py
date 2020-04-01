@@ -1,6 +1,6 @@
 #! /usr/bin/python2
 #
-# Copyright (c) 2017 Intel Corporation
+# Copyright (c) 2017-20 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -8309,6 +8309,8 @@ tcfl.app.driver_add(app_manual.app_manual)
 # Target API extensions
 import target_ext_console
 target_c.extension_register(target_ext_console.extension, "console")
+import target_ext_input
+target_c.extension_register(target_ext_input.extension, "input")
 import target_ext_power
 target_c.extension_register(target_ext_power.extension, "power")
 import target_ext_debug
