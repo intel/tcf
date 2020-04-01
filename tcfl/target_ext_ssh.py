@@ -133,6 +133,16 @@ class ssh(tc.target_extension_c):
         self._ssh_host = target.rtb.parsed_url.hostname
         self._ssh_port = target.tunnel.add(self.port)
 
+    def tunnel_up(self):
+        """
+        Return *True* if the SSH tunneling information is set and we
+        can run SSH commands to the target.
+
+        This assumes the user has previously setup and started the SSH
+        daemon and authentication in the target.
+        """
+        return self._ssh_host != None and self._ssh_port != None
+
     def _returncode_eval(self, returncode):
         if returncode == 0:
             return
