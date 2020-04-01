@@ -533,6 +533,47 @@ class shell(tc.target_extension_c):
             ' < /tmp/file.b64 > %s' % remote_filename)
         # FIXME: checksum and verify :/
 
+    def string_copy_to_file(self, s, remote_filename):
+        """\
+        Store a string in a target's file via the console (if the target supports it)
+
+        Encodes the file to base64 and sends it via the console in chunks
+        of 64 bytes (some consoles are kinda...unreliable) to a file in
+        the target called /tmp/file.b64, which then we decode back to
+        normal.
+
+        Assumes the target has python3; permissions are not maintained
+
+        See :meth:`copy_to_file`
+
+        .. note:: it is *slow*. The limits are not well defined; how
+                  big a file can be sent/received will depend on local
+                  and remote memory capacity, as things are read
+                  whole. This could be optimized to stream instead of
+                  just read all, but still sending a way big file over
+                  a cheap ASCII protocol is not a good idea. Warned
+                  you are.
+
+        """
+        assert isinstance(s, basestring)
+        assert isinstance(remote_filename, basestring)
+        self.files_remove(remote_filename, "/tmp/file.b64")
+        s = binascii.b2a_base64(s)
+        for i in range(0, len(s), 64):
+            # increase the log level to report each chunk of the
+            # file we are transmitting
+            self.run("echo -n %s  >> /tmp/file.b64"
+                     % s[i:i+64].decode('utf-8').strip())
+
+        # Now we do a python3 command in there (as cloud
+        # versions don't include python2. good) to regenerate
+        # it from base64 to bin
+        self.run(
+            'python3 -c "import sys, binascii; '
+            'sys.stdout.buffer.write(binascii.a2b_base64(sys.stdin.buffer.read()))"'
+            ' < /tmp/file.b64 > %s' % remote_filename)
+        # FIXME: checksum and verify :/
+
     def file_copy_from(self, local_filename, remote_filename):
         """\
         Send a file to the target via the console (if the target supports it)
@@ -547,7 +588,7 @@ class shell(tc.target_extension_c):
         .. note:: it is *slow*. The limits are not well defined; how
                   big a file can be sent/received will depend on local
                   and remote memory capacity, as things are read
-                  hole. This could be optimized to stream instead of
+                  whole. This could be optimized to stream instead of
                   just read all, but still sending a way big file over
                   a cheap ASCII protocol is not a good idea. Warned
                   you are.
