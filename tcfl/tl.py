@@ -326,10 +326,10 @@ def linux_ssh_root_nopwd(target, prefix = ""):
     """
     target.shell.run("""\
 mkdir -p %s/etc/ssh
-cat <<EOF >> %s/etc/ssh/sshd_config
+cat >> %s/etc/ssh/sshd_config
 PermitRootLogin yes
 PermitEmptyPasswords yes
-EOF""" % (prefix, prefix))
+\x04""" % (prefix, prefix))
 
 def deploy_linux_ssh_root_nopwd(_ic, target, _kws):
     linux_ssh_root_nopwd(target, "/mnt")
