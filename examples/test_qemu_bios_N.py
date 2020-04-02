@@ -248,10 +248,10 @@ class _test(tcfl.tc.tc_c):
             target.images.flash({ "bios" : rtb_data.remote_file },
                                 upload = False)
 
-        self.report_info("flashing BIOS", dlevel = 1)
+        self.report_info("flashing BIOS", dlevel = -1)
         self.run_for_each_target_threaded(
             _target_bios_flash, (self, local_file, ), targets = self.roles)
-        self.report_pass("flashed BIOS")
+        self.report_pass("flashed BIOS", dlevel = -1)
 
 
     def start_00(self, ic):
@@ -270,7 +270,7 @@ class _test(tcfl.tc.tc_c):
         @self.threaded
         def _target_eval(target):
             target.shell.run("dmidecode -t bios",
-                             re.compile("Vendor:.*Irving"))
+                             re.compile("Vendor:.*I am the vendor now"))
 
         self.run_for_each_target_threaded(
             _target_eval, targets = self.roles)
