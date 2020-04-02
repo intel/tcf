@@ -223,7 +223,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
         return self.get('timestamp', "00000000000000")	# follow %Y%m%d%H%M%S
 
     def maintenance(self, ts_now):
-        logging.error("DEBUG: %s: maint %s", self.allocid, ts_now)
+        #logging.error("DEBUG: %s: maint %s", self.allocid, ts_now)
 
         # Check if it has been idle for too long
         ts_last_keepalive = int(self.timestamp_get())
@@ -234,6 +234,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
             return
 
         # Check if it has been alive too long
+        # FIXME: define well how are we going to define the TTL
         ttl = self.get("ttl", 0)
         if ttl > 0:
             ts_start = int(self.get('_alloc.ts_start'))
@@ -268,9 +269,9 @@ class allocation_c(ttbl.fsdb_symlink_c):
                     # this group has still targets not allocated, will
                     # have to do starvation recalculation later
                     score = float(len(targets_allocated)) / len(group)
-                    logging.error(
-                        "DEBUG: group %s incomplete, score %f [%d/%d]",
-                        group_name, score, len(targets_allocated), len(group))
+                    #logging.error(
+                    #    "DEBUG: group %s incomplete, score %f [%d/%d]",
+                    #    group_name, score, len(targets_allocated), len(group))
                     for target_name in not_yet_allocated:
                         targets_to_boost[target_name] = \
                             min(targets_to_boost[target_name], score)
@@ -285,9 +286,9 @@ class allocation_c(ttbl.fsdb_symlink_c):
                     self.set("group_allocated", ",".join(sorted(group)))
                     self.set("ts_start", time.time())
                     self.state_set("active")
-                    logging.error("DEBUG: %s: group %s complete, state %s",
-                                  self.allocid, group_name,
-                                  self.state_get())
+                    #logging.error("DEBUG: %s: group %s complete, state %s",
+                    #              self.allocid, group_name,
+                    #              self.state_get())
                     return {}, targets_allocated - group
 
             # no groups are complete, nothing else to do
@@ -520,15 +521,15 @@ def _target_allocate_locked(target, current_allocdb, waiters, preempt):
         try:
             allocdb = get_from_cache(waiter[3])
             # valid highest prio waiter!
-            logging.error("DEBUG:ALLOC: %s: higuest prio waiter is %s",
-                          target.id, allocdb.allocid)
+            #logging.error("DEBUG:ALLOC: %s: higuest prio waiter is %s",
+            #              target.id, allocdb.allocid)
             break
         except allocation_c.invalid_e as e:
-            logging.error("DEBUG:ALLOC: %s: waiter %s: invalid: %s",
-                          target.id, waiter, e)
+            #logging.error("DEBUG:ALLOC: %s: waiter %s: invalid: %s",
+            #              target.id, waiter, e)
             target.fsdb.set(waiter[4], None)	# invalid, remove it, try next
     else:
-        logging.error("DEBUG:ALLOC: %s: no waiters", target.id)
+        #logging.error("DEBUG:ALLOC: %s: no waiters", target.id)
         return None	        # no valid waiter, nothing to dox
 
     # waiter at this point is
@@ -551,30 +552,30 @@ def _target_allocate_locked(target, current_allocdb, waiters, preempt):
         if priority_target == None:
             logging.error("%s: BUG: ALLOC: no priority recorded", target.id)
             priority_target = 500
-        logging.error(
-            "DEBUG: %s: current allocid %s, prios target %s waiter %s",
-            target.id, current_allocid, priority_target, priority_waiter)
+        #logging.error(
+        #    "DEBUG: %s: current allocid %s, prios target %s waiter %s",
+        #    target.id, current_allocid, priority_target, priority_waiter)
         if priority_target <= priority_waiter:
             # a higher or equal prio owner has the target
-            logging.error("DEBUG: %s: busy w %s higher/equal prio owner"
-                          " (owner %d >=  waiter %d)",
-                          target.id, current_allocid,
-                          priority_target, priority_waiter)
+            #logging.error("DEBUG: %s: busy w %s higher/equal prio owner"
+            #              " (owner %d >=  waiter %d)",
+            #              target.id, current_allocid,
+            #              priority_target, priority_waiter)
             return None
         # a lower prio owner has the target with a higher prio target waiting
         if not preempt:
             # preemption is not enabled, so the higher prio waiter waits
-            logging.error("DEBUG: %s: busy w %s lower prio owner w/o preemption"
-                          " (owner %d > waiter  %d)",
-                          target.id, current_allocid,
-                          priority_target, priority_waiter)
+            #logging.error("DEBUG: %s: busy w %s lower prio owner w/o preemption"
+            #              " (owner %d > waiter  %d)",
+            #              target.id, current_allocid,
+            #              priority_target, priority_waiter)
             return None
         # A lower priority owner has the target, a higher priority one
         # is waiting and preemption is enabled; the lower prio holder
         # gets booted out.
-        logging.error("DEBUG: %s: preempting %s over current owner %s",
-                      target.id, allocdb.allocid,
-                      current_allocid)
+        #logging.error("DEBUG: %s: preempting %s over current owner %s",
+        #              target.id, allocdb.allocid,
+        #              current_allocid)
         target._deallocate(current_allocdb, 'restart-needed')
         # fallthrough
 
@@ -588,8 +589,8 @@ def _target_allocate_locked(target, current_allocdb, waiters, preempt):
     # remove the waiter from the queue
     target.fsdb.set(waiter[4], None)
     # ** This waiter is the owner now **
-    logging.error("DEBUG: %s: target allocated to %s",
-                  target.id, allocdb.allocid)
+    #logging.error("DEBUG: %s: target allocated to %s",
+    #              target.id, allocdb.allocid)
     return allocdb
 
 
@@ -608,24 +609,24 @@ def _run_target(target, preempt):
     #
     while True:
         waiters, preempt_in_queue = _target_queue_load(target)
-        logging.error("DEBUG: ALLOC: %s: waiters %s", target.id, len(waiters))
+        #logging.error("DEBUG: ALLOC: %s: waiters %s", target.id, len(waiters))
         # always run, even if there are no waiters, since we might
         # need to change the target's allocation (release it)
         preempt = preempt_in_queue or preempt
         with target.lock:
             # get and validate the current owner -- if invalid owner
             # (allocation removed, it'll be wiped)
-            logging.error("DEBUG:ALLOC: %s: getting current owner", target.id)
+            #logging.error("DEBUG:ALLOC: %s: getting current owner", target.id)
             current_allocdb = target._allocdb_get()
             current_allocid = current_allocdb.allocid if current_allocdb \
                 else None
-            logging.error("DEBUG:ALLOC: %s: current owner %s",
-                          target.id, current_allocid)
+            #logging.error("DEBUG:ALLOC: %s: current owner %s",
+            #              target.id, current_allocid)
             allocdb = _target_allocate_locked(
                 target, current_allocdb, waiters, preempt_in_queue)
         if allocdb:
-            logging.error("DEBUG: ALLOC: %s: new owner %s",
-                          target.id, allocdb.allocid)
+            #logging.error("DEBUG: ALLOC: %s: new owner %s",
+            #              target.id, allocdb.allocid)
             # the target was allocated to allocid
             # now we need to compute if this makes all the targets
             # needed for any of the groups in the allocid
@@ -643,8 +644,9 @@ def _run_target(target, preempt):
             for target_name, score in targets_to_boost.iteritems():
                 _target_starvation_recalculate(allocdb, target, score)
         else:
-            logging.error("DEBUG: ALLOC: %s: ownership didn't change",
-                          target.id)
+            #logging.error("DEBUG: ALLOC: %s: ownership didn't change",
+            #              target.id)
+            pass
         return
 
     assert True, "I should not be here"
@@ -917,7 +919,7 @@ def maintenance(t, calling_user):
     # - when priorities change, maybe reassign ownerships if
     #   preemption
     ts_now = int(time.strftime("%Y%m%d%H%M%S", time.localtime(t)))
-    logging.error("DEBUG: maint %s", ts_now)
+    #logging.error("DEBUG: maint %s", ts_now)
     assert isinstance(calling_user, ttbl.user_control.User)
 
     # allocations: run maintenance (expire, check overtimes)
