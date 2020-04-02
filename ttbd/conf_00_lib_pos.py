@@ -18,6 +18,7 @@ import subprocess
 
 import ttbl
 import ttbl.qemu
+import ttbl.dnsmasq
 
 def nw_indexes(nw_name):
     """Return the network indexes that correspond to a one or two letter
@@ -211,7 +212,8 @@ def nw_pos_add(nw_name, power_rail = None,
                                          "fc00::%02x:%02x:1d" % (x, y),
                                          ip_mode = 6) ),
                 ( "rsync", ttbl.rsync.pci("192.%d.%d.1" % (x, y), 'images',
-                                          '/home/ttbd/images') )
+                                          '/home/ttbd/images') ),
+                ( "dnsmasq", ttbl.dnsmasq.pc() ),
             ]))
 
     tags = dict(

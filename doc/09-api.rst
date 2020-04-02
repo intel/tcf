@@ -524,6 +524,7 @@ Power Control Interface
 Daemons that can be started in the server as part of a power rail:
 
 .. automodule:: ttbl.dhcp
+.. automodule:: ttbl.dnsmasq
 .. automodule:: ttbl.qemu
 .. automodule:: ttbl.openocd
 .. automodule:: ttbl.rsync
