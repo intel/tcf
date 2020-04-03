@@ -865,48 +865,6 @@ def _target_interface(target_id, interface, call):
     else:
         return flask.jsonify(result)
 
-
-@contextlib.contextmanager
-def target_acquired(target, who):
-    try:
-        target.acquire(who, False)
-        yield
-    except:
-        # do not force releasing it if we don't own it
-        target.release_v1(who, False)
-        raise
-    target.release_v1(who, False)
-
-def _do_cleanup_released(target, who):
-    if not hasattr(target, "power"):	# Only with power control
-        return
-    idle_poweroff = target.tags.get('idle_poweroff',
-                                    ttbl.config.target_max_idle)
-    if idle_poweroff == 0:
-        target.log.debug("skiping powering off, idle_poweroff is 0")
-        return
-    # yeah, we do without acquiring; technically it is legal since it
-    # does not modify state...almost (except for 'powered' property)
-    any_powered_on = target.power._get_any(target)
-    if any_powered_on == False:		# Is it off? pass
-        return
-    with target_acquired(target, who):	# Acquire, check idleness
-        # calculate the idle time once we own the target, to be sure
-        # none came in the middle and we are killing it for them...
-        idle_time = time.time() - target.timestamp_get()
-        if idle_time > idle_poweroff:
-            target.log.info("powering off, idle for %.2fs (max %s)",
-                            idle_time, idle_poweroff)
-            target.power.put_off(target, who, {}, {}, None)
-
-def _do_cleanup_acquired_v1(target, owner, who):
-    idle_time = time.time() - target.timestamp_get()
-    if idle_time > ttbl.config.target_owned_max_idle:
-        target.log.warning("releasing from %s, idle for %.2fs (max %s)",
-                           owner, idle_time,
-                           ttbl.config.target_owned_max_idle)
-        target.release_v1(who, True)
-
 def cleanup_files():
     for f in glob.iglob(app.config['files_path'] + "/*/*"):
        if (time.time() - os.stat(f).st_mtime ) > ttbl.config.cleanup_files_maxage:
@@ -924,7 +882,7 @@ def cleanup_files():
 
 _systemd_watchdog_period = None
 
-def _systemd_keepalive(t):
+def _systemd_keepalive():
     global _systemd_watchdog_period
     if _systemd_watchdog_period == None:
         return
@@ -933,29 +891,6 @@ def _systemd_keepalive(t):
 
 # initialized later, when we have other parts up and running
 daemon_user = None
-
-def _do_cleanup():
-    """
-    """
-    who = who_make("cleanup", user = daemon_user)
-    for target in ttbl.test_target.known_targets():
-        try:
-            now = time.time()
-            if target.tags.get('skip_cleanup', False) == True:
-                # Some targets are used for manual power control of
-                # infrastructure
-                continue
-            _systemd_keepalive(now)	# keepalive, this loop takes time
-            owner = target.owner_get()
-            if owner == None:
-                _do_cleanup_released(target, who)
-            elif target.owner_get_v1():
-                # this gets replaced with ttbl.allocation.maintenance()
-                _do_cleanup_acquired_v1(target, owner, who)
-        except ttbl.test_target_e as e:
-            loge("%s" % e)
-        except Exception as e:
-            loge("%s: %s\n" % (target_id, e) + traceback.format_exc())
 
 # Another kludge: disable security warnings from request's urllib3
 # vendored version. We know, we know. And probably there is a way to
@@ -980,23 +915,21 @@ def cleanup_process_fn():
         _systemd_watchdog_period =  None
         sleep_period = ttbl.config.target_max_idle / 2
     logi("Clean up process [period %.2fs]" % sleep_period)
-    cleanup_files_last = time.time()
-    cleanup_targets_last = time.time()
+    ts_now = datetime.datetime.now()
+    cleanup_files_last = ts_now
     while True:
         time.sleep(sleep_period)
-        t = time.time()
+        ts_now = datetime.datetime.now()
         logdl(8, "Scanning for idle targets")
         try:
-            _systemd_keepalive(t)	# keepalive
-            ttbl.allocation.maintenance(t, daemon_user)
-            if t - cleanup_targets_last > ttbl.config.target_max_idle:
-                _do_cleanup()
-                cleanup_targets_last = t
-            if t - cleanup_files_last > ttbl.config.cleanup_files_period:
+            ttbl.allocation.maintenance(ts_now, daemon_user,
+                                        _systemd_keepalive)
+            cleanup_elapsed = (ts_now - cleanup_files_last).seconds
+            if cleanup_elapsed > ttbl.config.cleanup_files_period:
                 cleanup_files()
-                cleanup_files_last = t
+                cleanup_files_last = ts_now
         except Exception as e:
-            loge("Exception in clean thread: %s\n"
+            loge("Exception in cleanup thread: %s\n"
                  % e + traceback.format_exc())
 
 main_pid = os.getpid()

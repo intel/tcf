@@ -1254,23 +1254,6 @@ class test_target(object):
                 "fsdb %s must inherit ttbl.fsdb_c" % fsdb
             self.fsdb = fsdb
 
-        # Much as I HATE reentrant locks, there is no way around it
-        # without major rearchitecting that is not going to happen.
-        #
-        # The ownership lock has to be re-entrant (eg: once locked it
-        # can be locked again N times by the same thread, but then it
-        # has to be unlocked N times).
-        #
-        # Why? because things like the image setting procedure
-        # (that has to be called with the target locked) might to call
-        # the power off routine, that also requires locking the
-        # target.
-        #
-        # At this point, adding locked and unlocked interfaces would
-        # make it very complicated -- so we go with a reentrant lock.
-        self.ownership_lock = threading.RLock()
-        self.timestamp()
-
         #: Keywords that can be used to substitute values in commands,
         #: messages. Target's tags are translated to keywords
         #: here. :func:`ttbl.config.target_add` will update this with
@@ -1631,17 +1614,37 @@ class test_target(object):
         commonl.kws_update_from_rt(self.kws, self.tags)
 
     def timestamp_get(self):
-        return os.path.getmtime(os.path.join(self.state_dir, "timestamp"))
+        """
+        Return an integer with the timestamp of the last activity on
+        the target.
+
+        See :meth:timestamp.
+
+        :return int: timestamp in the format YYYYMMDDHHSS
+        """
+        # if no target-specific timestamp is set, just do zero; we
+        # cache it instead of using the allocation's since the target
+        # might have not been allocated yet
+        with self.lock:
+            allocdb = self._allocdb_get()
+            if allocdb:
+                ts = allocdb.timestamp_get()
+                self.fsdb.set('timestamp', ts)
+                return ts
+            return self.fsdb.get('timestamp', 0)
 
     def timestamp(self):
         """
-        Update the timestamp on the target to record last activity tme
+        Indicate this target is being used
+
+        The activity is deemed as the user is using the target for
+        something actively; most accesses to the target when it is
+        acquired are considered activity.
         """
-        # Just open the file and truncate it, so if it does not exist,
-        # it will be created.
-        with open(os.path.join(self.state_dir, "timestamp"), "w") as f:
-            f.write(time.strftime("%c\n"))
-            pass
+        with self.lock:
+            allocdb = self._allocdb_get()
+            if allocdb:
+                self.fsdb.set('timestamp', allocdb.timestamp())
 
     def allocid_get_bare(self):
         return self.fsdb.get('_alloc.id')

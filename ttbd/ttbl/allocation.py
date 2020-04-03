@@ -41,6 +41,7 @@ Preemption use cases
 
 import bisect
 import collections
+import datetime
 import errno
 import json
 import logging
@@ -214,22 +215,27 @@ class allocation_c(ttbl.fsdb_symlink_c):
         return self.get('state')
 
     def timestamp(self):
+        # 20200323113030 is more readable than seconds since the epoch
+        # and we still can do easy arithmentic with it.
         ts = time.strftime("%Y%m%d%H%M%S")
         self.set('timestamp', ts, force = True)
         return ts
 
     def timestamp_get(self):
-        # if there is no timestamp, forge the beginning of time
-        return self.get('timestamp', "00000000000000")	# follow %Y%m%d%H%M%S
+        # if there is no timestamp, forge the Epoch
+        return self.get('timestamp', "19700101000000")
 
     def maintenance(self, ts_now):
         #logging.error("DEBUG: %s: maint %s", self.allocid, ts_now)
 
         # Check if it has been idle for too long
-        ts_last_keepalive = int(self.timestamp_get())
-        if ts_now - ts_last_keepalive > ttbl.config.target_max_idle:
-            logging.error("DEBUG: %d: allocation %s timedout, deleting",
-                          ts_now, self.allocid)
+        ts_last_keepalive = datetime.datetime.strptime(self.timestamp_get(),
+                                                       "%Y%m%d%H%M%S")
+        seconds_idle = (ts_now - ts_last_keepalive).seconds
+        if seconds_idle > ttbl.config.target_max_idle:
+            logging.error(
+                "ALLOC: allocation %s timedout (idle %s/%s), deleting",
+                self.allocid, seconds_idle, ttbl.config.target_max_idle)
             self.delete('timedout')
             return
 
@@ -906,8 +912,53 @@ def keepalive(allocid, expected_state, _pressure, calling_user):
         r['group_allocated'] = allocdb.get("group_allocated")
     return r
 
+def _maintain_released_target(target, calling_user):
+    # a target that is released is not being used, so we power it all
+    # off...unless it is configured to be left on
+    if not hasattr(target, "power"):	# does it have power control?
+        return
 
-def maintenance(t, calling_user):
+    # configured to be left on? okie
+    skip_cleanup = target.tags.get('skip_cleanup', False)
+    if skip_cleanup:
+        target.log.debug("ALLOC: skiping powering off, skip_cleanup defined")
+    idle_poweroff = target.tags.get('idle_poweroff',
+                                    ttbl.config.target_max_idle)
+    if idle_poweroff == 0:
+        target.log.debug("ALLOC: skiping powering off, idle_poweroff is 0")
+        return
+
+    # get the target's timestamp before allocating it, since
+    # allocating it will update the timestamp; then allocate it and
+    # get its power state; turn it off it it has been on for too
+    # long
+    ts = target.timestamp_get()
+    # by default the allocation is inmediate, not queued
+    r = request({ "target": [ target.id ] },
+                calling_user, calling_user.get_id(), [],
+                reason = "powering off because it is idle")
+    if r['state'] != "active":
+        # someone else got it, that's fine, means they are using it
+        return
+    allocdb = get_from_cache(r['allocid'])
+    try:
+        # the power interface is defined in ttbl.power
+        any_powered_on = target.power._get_any(target)
+        if any_powered_on == False:		# Is it off? pass
+            return
+
+        # calculate the idle time once we own the target, to be sure
+        # none came in the middle and we are killing it for them...
+        ts_now = datetime.datetime.now()
+        idle_time = ts_now - datetime.datetime.strptime(ts, "%Y%m%d%H%M%S")
+        if idle_time.seconds > idle_poweroff:
+            target.log.info("powering off, idle for %ss (max %ss)",
+                            idle_time, idle_poweroff)
+            target.power.put_off(target, calling_user.get_id(), {}, {}, None)
+    finally:
+        allocdb.delete("removed")
+
+def maintenance(ts_now, calling_user, keepalive_fn = None):
     # this will be called by a parallel thread / process to run
     # cleanup activities, such as:
     #
@@ -918,9 +969,9 @@ def maintenance(t, calling_user):
     # - increase effective priorities to avoid starvation
     # - when priorities change, maybe reassign ownerships if
     #   preemption
-    ts_now = int(time.strftime("%Y%m%d%H%M%S", time.localtime(t)))
     #logging.error("DEBUG: maint %s", ts_now)
     assert isinstance(calling_user, ttbl.user_control.User)
+    assert keepalive_fn == None or callable(keepalive_fn)
 
     # allocations: run maintenance (expire, check overtimes)
     for _rootname, allocids, _filenames in os.walk(path):
@@ -934,14 +985,14 @@ def maintenance(t, calling_user):
 
     # targets: starvation control, check overtimes
     for target in ttbl.test_target.known_targets():
+        # FIXME: paralellize
         owner = target.owner_get()
-        if owner:	# if queue entries
-            _target_starvation_recalculate(allocdb, target, 0) # FIXME: 0
+        if owner:
+            _target_starvation_recalculate(allocdb, target, 0)
 	else:
-            # FIXME: this has to be moved off from ttbd/cleanup
-            pass
-            #logging.error("FIXME: idle-power-off control %s: %s", target_name, owner)
-
+            _maintain_released_target(target, calling_user)
+        if keepalive_fn:   	# run keepalives in between targets..
+            keepalive_fn()	# ... some targets might take a long time
     # Finally, do an schedule run on all the targets, see what has to move
     _run(ttbl.test_target.known_targets(), False)
 
