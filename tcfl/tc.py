@@ -105,6 +105,7 @@ import random
 import re
 import shutil
 import signal
+import socket
 import string
 import subprocess
 import sys
@@ -3333,6 +3334,7 @@ class tc_c(reporter_c):
 
         self.__init_shallow__(None)
         self.name = name
+        self.kw_set('host_name', socket.getfqdn())
         self.kw_set('tc_name', self.name)
         # top level testcase name is that of the toplevel testcase,
         # with any subcases removed (anything after ##), so
