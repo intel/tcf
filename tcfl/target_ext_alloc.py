@@ -126,7 +126,7 @@ def _cmdline_alloc_targets(args):
             logging.error("Targets span more than one server")
             sys.exit(1)
         rtb = list(rtbs)[0]
-        groups = { "group": targets }
+        groups = { "group": list(targets) }
         allocid =  _alloc_targets(rtb, groups, obo = args.obo,
                                   queue = args.queue,
                                   priority = args.priority)
