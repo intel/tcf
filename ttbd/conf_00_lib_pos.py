@@ -794,7 +794,7 @@ def target_qemu_pos_add(target_name,
                         # generic kernels
                         sd_iftype = 'ide',
                         extra_cmdline = "",
-                        ram_megs = 2048):
+                        ram_megs = 3072):
     """Add a QEMU virtual machine capable of booting over Provisioning OS.
 
     This target supports one or more serial consoles, a graphics
@@ -936,7 +936,7 @@ def target_qemu_pos_add(target_name,
     cmdline = [
         "/usr/bin/qemu-system-x86_64",
         "-enable-kvm",
-        "-cpu", "host",
+        "-cpu", "host", "-smp", "cpus=2",
         "-m", str(ram_megs),
         # FIXME: do VNC tunneling so clients can access
         #
