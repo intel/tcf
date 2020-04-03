@@ -200,13 +200,19 @@ class interface(ttbl.tt_interface):
                 # doesn't need starting
                 return { 'result' : 'capture start not needed'}
             capturing = target.property_get("capturer-%s-started" % capturer)
+            impl.user_path = self.user_path
             if not capturing:
-                impl.user_path = self.user_path
-                impl.start(target, capturer)
                 target.property_set("capturer-%s-started" % capturer, "True")
                 return { 'result' : 'capture started'}
             else:
-                return { 'result' : 'already capturing'}
+                # if we were already capturing, restart it--maybe
+                # someone left it capturing by mistake or who
+                # knows--but what matters is what the current user wants.
+                target.property_set("capturer-%s-started" % capturer, None)
+                impl.stop_and_get(target, capturer)
+                impl.start(target, capturer)
+                target.property_set("capturer-%s-started" % capturer, "True")
+                return { 'result' : 'capture started'}
 
 
     def stop_and_get(self, who, target, capturer):
