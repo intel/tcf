@@ -424,14 +424,18 @@ class interface(ttbl.tt_interface):
         impl, component = self.arg_impl_get(args, "component")
         with target.target_owned_and_locked(who):
             target.timestamp()
-            impl.enable(target, component)
+            state = impl.state(target, component)
+            if not state:
+                impl.enable(target, component)
             return dict()
 
     def put_disable(self, target, who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         with target.target_owned_and_locked(who):
             target.timestamp()
-            impl.disable(target, component)
+            state = impl.state(target, component)
+            if state:
+                impl.disable(target, component)
             return dict()
     
     def get_state(self, target, _who, args, _files, _user_path):
