@@ -118,11 +118,11 @@ class _test(tcfl.pos.tc_pos_base):
         # So we need to replace all in the Vendor string until the \0,
         # but we need to escape that \\ for both python and the
         # shell. bleh.
-        #self.shcmd_local(
-        #    r"sed -i"
-        #    " '/Vendor/s|.*\\\\0\"|\"I am the vendor now\\\\0\"|'"
-        #    " '%s/OvmfPkg/SmbiosPlatformDxe/SmbiosPlatformDxe.c'"
-        #    % self.builddir)
+        self.shcmd_local(
+            r"sed -i"
+            " '/Vendor/s|.*\\\\0\"|\"I am the vendor now\\\\0\"|'"
+            " '%s/OvmfPkg/SmbiosPlatformDxe/SmbiosPlatformDxe.c'"
+            % self.builddir)
 
         #
         # Build the new BIOS
@@ -187,5 +187,6 @@ class _test(tcfl.pos.tc_pos_base):
 
     def eval(self, target):
         # power cycle to the new kernel
-        target.shell.run("dmidecode -t bios", re.compile("Vendor:.*Irving"))
+        target.shell.run("/sbin/dmidecode -t bios",
+                         re.compile("Vendor:.*I am the vendor now"))
         target.report_pass("New BIOS is reporting via DMI/bios Vendor field")
