@@ -496,7 +496,7 @@ def _target_queue_load(target):
 
 def _target_starvation_recalculate(allocdb, target, score):
     logging.error("FIXME: %s: %s: %s",
-                  allocdb.allocid, target.id, score)
+                  allocdb, target.id, score)
 
 def _target_allocate_locked(target, current_allocdb, waiters, preempt):
     # return: allocdb from waiter that succesfully took it
@@ -990,7 +990,7 @@ def maintenance(ts_now, calling_user, keepalive_fn = None):
         # FIXME: paralellize
         owner = target.owner_get()
         if owner:
-            _target_starvation_recalculate(allocdb, target, 0)
+            _target_starvation_recalculate(None, target, 0)
 	else:
             _maintain_released_target(target, calling_user)
         if keepalive_fn:   	# run keepalives in between targets..
