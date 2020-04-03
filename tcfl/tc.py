@@ -3321,6 +3321,19 @@ class tc_c(reporter_c):
     # Public testcase API/interface
     #
 
+    #: Reason why this testcase is being executed
+    #:
+    #: This is a string that will be sent to the servers when asking
+    #: for targets, as information for other users to know what is the
+    #: target used for.
+    #:
+    #: Note there are no size limits, but the server might crop it
+    #:
+    #: The fields are in the format *%(FIELD)s* and these are the
+    #: :ref:`keywords <finding_testcase_metadata>` the testcase
+    #: exports.
+    reason = None
+
     #: List of places where we declared this testcase is build only
     build_only = []
 
@@ -5715,7 +5728,8 @@ class tc_c(reporter_c):
             { "group": [ target.id for target in pending ] },
             # FIXME: do we want to do OBO here? how?
             obo = None,
-            queue_timeout = timeout)
+            queue_timeout = timeout,
+            reason = self.reason % commonl.dict_missing_c(self.kws))
         if state != 'active':
             # FIXME: this need sto carry more data, we've lost a lot
             # on the way here
@@ -7849,6 +7863,7 @@ def _run(args):
     report_driver_c.add(report_file_impl)
 
     # Setup defaults in the base testcase class
+    tc_c.reason = args.reason
     global ticket
     if args.ticket == '':	# default for tcf run means generate a ticket
         ticket = None
@@ -8168,6 +8183,15 @@ def argp_setup(arg_subparsers):
     ap.add_argument(
         "-a", "--all", action = "store_true", default = False,
         help = "Consider also disabled targets")
+    ap.add_argument(
+        "--reason", action = "store",
+        default = "%(runid)s %(tc_name)s @ %(host_name)s",
+        help = "Reason template. This is a string that be sent to"
+        " the server when allocating the targets to display as a"
+        " reason for allocation so other users can see what the"
+        " target is being used for; any keyword in the testcase"
+        " can be put in here; defaults to '%(default)s'"
+    )
     ap.add_argument("-m", "--manifest", metavar = "MANIFESTFILEs",
                     action = "append", default = [],
                     help = "Specify one or more manifest files containing "

@@ -43,7 +43,7 @@ def _delete(rtb, allocid):
 # FIXME: what happens if the conn
 def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
                    queue_timeout = None, priority = 700, preempt = False,
-                   queue = True):
+                   queue = True, reason = None):
     assert isinstance(groups, dict)
 
     data = dict(
@@ -51,6 +51,7 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
         preempt = preempt,
         queue = queue,
         groups = {},
+        reason = reason,
     )
     if obo:
         data['obo_user'] = obo
@@ -358,10 +359,10 @@ def _alloc_ls(verbosity):
                 table.append([
                     allocid,
                     data['state'],
-                    data.get('creator', 'n/a'),
                     data.get('user', 'n/a'),
                     len(data.get('guests', [])),
-                    len(data.get('target_group', []))
+                    len(data.get('target_group', [])),
+                    data.get('reason', "n/a"),
                 ])
             elif verbosity == 1:
                 tgs = []
@@ -376,29 +377,31 @@ def _alloc_ls(verbosity):
                     data.get('user', 'n/a'),
                     "\n".join(data.get('guests', [])),
                     "\n".join(tgs),
+                    data.get('reason', "n/a"),
                 ])
             elif verbosity == 2:
                 commonl.data_dump_recursive(data, allocid,)
     if verbosity == 0:
         headers0 = [
-            "AllocationID",
+            "AllocID",
             "State",
-            "Creator",
             "User",
             "#Guests",
-            "#Groups"
+            "#Groups",
+            "Reason"
         ]
         print(tabulate.tabulate(table, headers = headers0))
     if verbosity == 1:
         headers1 = [
-            "AllocationID",
+            "AllocID",
             "Server",
             "State",
             "Timestamp",
             "Creator",
             "User",
             "Guests",
-            "Groups"
+            "Groups",
+            "Reason",
         ]
         print(tabulate.tabulate(table, headers = headers1))
 

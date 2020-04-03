@@ -394,7 +394,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
         }
         reason = self.get("reason", None)
         if reason:
-            d[reason] = reason
+            d['reason'] = reason
         guests = self.guest_list()
         if guests:
             d['guests'] = guests
@@ -771,6 +771,8 @@ def request(groups, calling_user, obo_user, guests,
     allocdb.set("priority", priority)
     allocdb.set("user", obo_user)
     allocdb.set("creator", calling_user.get_id())
+    if reason:
+        allocdb.set("reason", reason)
     for guest in guests:
         allocdb.guest_add(guest)
 
