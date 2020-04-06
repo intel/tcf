@@ -70,6 +70,8 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
         print "allocation ID %s: allocated: %s" % (
             allocid, r['group_allocated'])
         return allocid, state, r['group_allocated'].split(',')
+    if queue_timeout == 0:
+        return allocid, state, {}
     ts0 = time.time()
     ts = ts0
     group_allocated = None

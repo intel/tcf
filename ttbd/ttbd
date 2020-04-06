@@ -714,6 +714,16 @@ def _put_keepalive():
     #     ....
     #     'ALLOCIDn': 'KNOWNSTATEn',
     # }
+    #
+    # Return only ALLOCIDs that changed state
+    #
+    # {
+    #     ...
+    #     'ALLOCID1': { 'state': 'NEWSTATE1' },
+    #     'ALLOCID2': { 'state': 'NEWSTATE2', 'message' : '...this happened' },
+    #     ....
+    # }
+    #
     try:
         data = flask.request.get_json()
         if data == None:

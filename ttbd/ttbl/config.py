@@ -74,6 +74,8 @@ instance = ""
 #: *-INSTANCE* (unless INSTANCE is empty).
 instance_suffix = ""
 
+#: Maximum length of the reason given to an allocation
+reason_len_max = 128
 
 def _nested_list_flatten(l):
     for e in l:

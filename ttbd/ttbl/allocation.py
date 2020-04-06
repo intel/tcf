@@ -6,6 +6,9 @@
 #
 # FIXME:
 #
+#  - if I release targets from a reservation, they need to be removed
+#    from the group list, so it is not confusing in the listing when I
+#    get/alloc-ls
 #  - reject messages to carry a 40x code?
 #  - each target allocation carries a max TTL per policy
 #  - starvation control missing
@@ -772,6 +775,8 @@ def request(groups, calling_user, obo_user, guests,
     allocdb.set("user", obo_user)
     allocdb.set("creator", calling_user.get_id())
     if reason:
+        if len(reason) > ttbl.config.reason_len_max:
+            reason = reason[:ttbl.config.reason_len_max]
         allocdb.set("reason", reason)
     for guest in guests:
         allocdb.guest_add(guest)
