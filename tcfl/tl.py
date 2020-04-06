@@ -406,7 +406,7 @@ def sh_export_proxy(ic, target):
 
        $ export  http_proxy=http://192.168.98.1:8888 \
           https_proxy=http://192.168.98.1:8888 \
-          no_proxy=127.0.0.1,192.168.98.1/24,fc00::62:1/112 \
+          no_proxy=127.0.0.1,192.168.98.1/24,fd:00:62::1/104 \
           HTTP_PROXY=$http_proxy \
           HTTPS_PROXY=$https_proxy \
           NO_PROXY=$no_proxy

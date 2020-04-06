@@ -171,7 +171,7 @@ There might be multiple causes for this, but here are the most common:
   >>>   NETWORKNAME, dict(
   >>>       mac_addr = "00:07:32:4b:36:87",
   >>>       ipv4_addr = '192.168.98.160', ipv4_prefix_len = 24,
-  >>>       ipv6_addr = 'fc00::62:a0', ipv6_prefix_len = 112)
+  >>>       ipv6_addr = 'fd:00:62::a0', ipv6_prefix_len = 104)
   >>>   )
 
   ensure the *mac_addr* value is the MAC address of the network

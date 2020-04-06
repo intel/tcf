@@ -82,8 +82,8 @@ class vlan_pci(ttbl.power.impl_c):
     >>>     tags = {
     >>>         'ipv4_addr': '192.168.97.1',
     >>>         'ipv4_prefix_len': 24,
-    >>>         'ipv6_addr': 'fc00::61:1',
-    >>>         'ipv6_prefix_len': 112,
+    >>>         'ipv6_addr': 'fd:99:61::1',
+    >>>         'ipv6_prefix_len': 104,
     >>>         'mac_addr': '02:61:00:00:00:01:',
     >>>     })
 
@@ -118,7 +118,7 @@ class vlan_pci(ttbl.power.impl_c):
       - targetname: pc-04
       - ic_index: 04
       - ipv4_addr: 192.168.1.4
-      - ipv6_addr: fc00::1:4
+      - ipv6_addr: fd:00:01:::4
       - mac_addr: 02:01:00:00:00:04
 
     If a tag named *mac_addr* is given, containing the MAC address
@@ -177,8 +177,8 @@ class vlan_pci(ttbl.power.impl_c):
       >>>     tags = {
       >>>         'ipv4_addr': '192.168.97.1',
       >>>         'ipv4_prefix_len': 24,
-      >>>         'ipv6_addr': 'fc00::61:1',
-      >>>         'ipv6_prefix_len': 112,
+      >>>         'ipv6_addr': 'fd:00:61::1',
+      >>>         'ipv6_prefix_len': 104,
       >>>         'mac_addr': "a0:ce:c8:00:18:73",
       >>>     })
 
@@ -215,8 +215,8 @@ class vlan_pci(ttbl.power.impl_c):
       >>>     tags = {
       >>>         'ipv4_addr': '192.168.97.1',
       >>>         'ipv4_prefix_len': 24,
-      >>>         'ipv6_addr': 'fc00::61:1',
-      >>>         'ipv6_prefix_len': 112,
+      >>>         'ipv6_addr': 'fd:00:61::1',
+      >>>         'ipv6_prefix_len': 104,
       >>>         'mac_addr': "a0:ce:c8:00:18:73",
       >>>         'vlan': 30,
       >>>     })
@@ -233,8 +233,8 @@ class vlan_pci(ttbl.power.impl_c):
              {
                'ipv4_addr': "192.168.10.30",
                'ipv4_prefix_len': 24,
-               'ipv6_addr': "fc00::10:30",
-               'ipv4_prefix_len': 112,
+               'ipv6_addr': "fd:00:10::30",
+               'ipv6_prefix_len': 104,
              },
              ic = 'nwc')
 

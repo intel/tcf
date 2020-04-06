@@ -1815,8 +1815,8 @@ def target_qemu_zephyr_add(
       >>>         mac_addr = "02:%02x:00:00:%02x:%02x" % (x, y, index),
       >>>         ipv4_addr = '192.%d.%d.%d' % (x, y, index),
       >>>         ipv4_prefix_len = 24,
-      >>>         ipv6_addr = 'fc00::%02x:%02x:%02x' % (x, y, index),
-      >>>         ipv6_prefix_len = 112)
+      >>>         ipv6_addr = 'fd:%02x:%02x::%02x' % (x, y, index),
+      >>>         ipv6_prefix_len = 104)
       >>> )
 
     :param str target_type: (optional) what type the target shall

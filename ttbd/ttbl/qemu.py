@@ -285,7 +285,7 @@ class pc(ttbl.power.daemon_c,
     >>>     'nwa', dict(
     >>>         mac_addr = "02:61:00:00:00:05",
     >>>         ipv4_addr = "192.168.97.5",
-    >>>         ipv6_addr = "fc00::61:05")
+    >>>         ipv6_addr = "fd:00:61::05")
     >>> qemu_pc = ttbl.qemu.pc([ "/usr/bin/qemu-system-x86_64", ... ])
     >>> target.interface_add("power", ttbl.power.interface(
     >>>     ( "tuntap-nwa", ttbl.qemu.network_tap_pc() ),
@@ -734,8 +734,8 @@ class network_tap_pc(ttbl.power.impl_c):
       $ tcf list -vv TARGETNAME | grep -i nwka
         interconnects.nwka.ipv4_addr: 192.168.120.101
         interconnects.nwka.ipv4_prefix_len: 24
-        interconnects.nwka.ipv6_addr: fc00::a8:78:65
-        interconnects.nwka.ipv6_prefix_len: 112
+        interconnects.nwka.ipv6_addr: fd:a8:78::65
+        interconnects.nwka.ipv6_prefix_len: 104
         interconnects.nwka.mac_addr: 94:c6:91:1c:9e:d9
 
     Upon powering on the target, the *on()* method will create a

@@ -174,12 +174,12 @@ class pci(ttbl.power.impl_c):
       import ttbl.dhcp
 
       ttbl.test_target.get('nwa').pc_impl.append(
-          ttbl.dhcp.pci("fc00::61:1", "fc00::61:0", 112,
-                        "fc00::61:2", "fc00::61:fe", ip_mode = 6)
+          ttbl.dhcp.pci("fd:00:61::1", "fd:00:61::0", 24,
+                        "fd:00:61::2", "fd:00:61::fe", ip_mode = 6)
       )
 
-    It would start a DHCP IPv6 server on fc00::61:1, network
-    fc0)::61:0/112 serving IPv6 address from :2 to :fe.
+    It would start a DHCP IPv6 server on fd:00:61::1, network
+    fc:00:61::0/24 serving IPv6 address from :2 to :fe.
     """
 
     def __init__(self,
