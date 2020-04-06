@@ -127,40 +127,46 @@ def _cmdline_alloc_targets(args):
             logging.error("Targets span more than one server")
             sys.exit(1)
         rtb = list(rtbs)[0]
-        groups = { "group": list(targets) }
-        allocid =  _alloc_targets(rtb, groups, obo = args.obo,
-                                  queue = args.queue,
-                                  priority = args.priority)
-
-        if args.hold != None:
-            try:
-                ts_active = time.time()
-                while True:
-                    time.sleep(5)
-                    ts = time.time()
-                    if args.hold > 0 and ts - ts_active > args.hold:
-                        # maximum hold time reached, release it
-                        break
-                    state = data[allocid]
-                    r = rtb.send_request("PUT", "keepalive", json = data)
-                    print "allocation ID %s: [+%.1fs] keepalive while %s: %s\r" % (
-                        allocid, ts - ts0, state, r),
-                    sys.stdout.flush()
-                    alloc = r['result'].get(allocid, None)
-                    if alloc == None:
-                        continue			# no new info
-                    new_state = alloc['state']
-                    if new_state not in ( 'active', 'queued', 'restart-needed' ):
-                        print
-                        break
-                    if new_state != data[allocid]:
-                        print "\nallocation ID %s: [+%.1fs] state transition %s -> %s" % (
-                            allocid, ts - ts0, state, new_state)
-                        data[allocid] = new_state
-            except KeyboardInterrupt:
+        allocid = None
+        try:
+            groups = { "group": list(targets) }
+            allocid, state, _group_allocated = \
+                _alloc_targets(rtb, groups, obo = args.obo,
+                               preempt = args.preempt,
+                               queue = args.queue, priority = args.priority)
+            if args.hold == None:	# user doesn't want us to ...
+                return			# ... keepalive while active
+            ts0 = time.time()
+            while True:
+                time.sleep(5)
+                ts = time.time()
+                if args.hold > 0 and ts - ts0 > args.hold:
+                    # maximum hold time reached, release it
+                    break
+                data = { allocid: state }
+                r = rtb.send_request("PUT", "keepalive", json = data)
+                print "allocation ID %s: [+%.1fs] keepalive while %s: %s\r" % (
+                    allocid, ts - ts0, state, r),
+                sys.stdout.flush()
+                # r is a dict, with a dict in 'result' that has a
+                # list of allocids that changed state of the ones
+                # we told it in 'data'
+                ## { ALLOCID1: STATE1, ALLOCID2: STATE2 .. }
+                new_data = r['result'].get(allocid, None)
+                if new_data == None:
+                    continue			# no new info
+                new_state = new_data['state']
+                if new_state not in ( 'active', 'queued', 'restart-needed' ):
+                    print	# to get a newline in
+                    break
+                if new_state != data[allocid]:
+                    print "\nallocation ID %s: [+%.1fs] state transition %s -> %s" % (
+                        allocid, ts - ts0, state, new_state)
+                state = new_state
+        except KeyboardInterrupt:
+            if allocid:
                 print "\nallocation ID %s: [+%.1fs] releasing due to user interruption" % (
                     allocid, ts - ts0)
-            finally:
                 _delete(rtb, allocid)
 
 class _model_c(object):
@@ -305,7 +311,9 @@ def _cmdline_alloc_monitor(args):
         for rt in sorted(targetl, key = lambda x: x['id']):
             target_name = rt['id']
             targets[target_name] = \
-                tc.target_c.create_from_cmdline_args(args, target_name)
+                tc.target_c.create_from_cmdline_args(
+                    # load no extensions, not needed, plus faster
+                    args, target_name, extensions_only = [])
             servers.add(targets[target_name].rtb)
         model = _model_c(servers, targets)
 
@@ -414,7 +422,9 @@ def _cmdline_alloc_ls(args):
         for rt in sorted(targetl, key = lambda x: x['fullid']):
             target_name = rt['fullid']
             targets[target_name] = \
-                tc.target_c.create_from_cmdline_args(args, target_name)
+                tc.target_c.create_from_cmdline_args(
+                    # load no extensions, not needed, plus faster
+                    args, target_name, extensions_only = [])
 
         if args.refresh:
             print "\x1b[2J"	# clear whole screen
