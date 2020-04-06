@@ -200,20 +200,9 @@ def nw_pos_add(nw_name, power_rail = None,
             + power_rail
             # the rest of the components we need
             + [
-                ( "dhcp4", ttbl.dhcp.pci("192.%d.%d.1" % (x, y),
-                                         "192.%d.%d.0" % (x, y),
-                                         ipv4_prefix_len,
-                                         "192.%d.%d.10" % (x, y),
-                                         "192.%d.%d.20" % (x, y)) ),
-                ( "dhcp6", ttbl.dhcp.pci("fd:%02x:%02x::1" % (x, y),
-                                         "fd:%02x:%02x::0" % (x, y),
-                                         ipv6_prefix_len,
-                                         "fd:%02x:%02x::0a" % (x, y),
-                                         "fd:%02x:%02x::1d" % (x, y),
-                                         ip_mode = 6) ),
-               ( "rsync", ttbl.rsync.pci("192.%d.%d.1" % (x, y), 'images',
+                ( "rsync", ttbl.rsync.pci("192.%d.%d.1" % (x, y), 'images',
                                           '/home/ttbd/images') ),
-#                ( "dnsmasq", ttbl.dnsmasq.pc() ),
+                ( "dnsmasq", ttbl.dnsmasq.pc() ),
             ]))
 
     tags = dict(

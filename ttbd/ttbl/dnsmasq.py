@@ -7,18 +7,27 @@ A DNSMASQ daemon is created that can be attached to a network
 interface to:
 
 - resolve DNS requests for all the targets attached to a test network 
-- serve DHCP requests
+- serves DHCP requests to hosts in the interconnect's network
+- serves TFTP files from TARGETDIR/tftp.root
+
+Note this will conflict with other DHCP or TFTP servers running in the
+same hosts, but it will *only* serve in the interface it is associated
+to the interconnect target it is made a power rail of.
 
 Pending:
 - IPv6 support not very tested.
 - allow to switch which functionalities are needed
+  - tftp on/off
+  - default route on/off
 - allowing adding more names/IP-addresses to the database at will
 """
 import collections
+import ipaddress
 import os
 import shutil
 
 import commonl
+import ttbl.pxe
 import ttbl.power
 
 class pc(ttbl.power.daemon_c):
@@ -96,12 +105,15 @@ class pc(ttbl.power.daemon_c):
     def on(self, target, _component):
         ic = target	# Note the rename (target -> ic)
 
-
         # Create records for each target that we know will connect to
         # this interconnect, place them in the directory TARGET/dnsmasq.hosts
         dirname = os.path.join(ic.state_dir, "dnsmasq.hosts")
         shutil.rmtree(dirname, ignore_errors = True)
         commonl.makedirs_p(dirname)
+        tftp_dirname = os.path.join(ic.state_dir, "tftp.root")
+        shutil.rmtree(tftp_dirname, ignore_errors = True)
+        commonl.makedirs_p(tftp_dirname, 0o0775)
+        ttbl.pxe.setup_tftp_root(tftp_dirname)	# creates the dir
 
         # Find the targets that connect to this interconnect and
         # collect their IPv4/6/MAC addresses to create the record and
@@ -118,14 +130,14 @@ class pc(ttbl.power.daemon_c):
                 addrs = []
                 mac_addr = interconnect.get('mac_addr', None)
                 if mac_addr:
-                    dhcp_hosts[target.id]['mac_addr'] = mac_addr
+                    dhcp_hosts[target]['mac_addr'] = mac_addr
                 ipv4_addr = interconnect.get('ipv4_addr', None)
                 if ipv4_addr:
-                    dhcp_hosts[target.id]['ipv4_addr'] = ipv4_addr
+                    dhcp_hosts[target]['ipv4_addr'] = ipv4_addr
                     addrs.append(ipv4_addr)
                 ipv6_addr = interconnect.get('ipv6_addr', None)
                 if ipv6_addr:
-                    dhcp_hosts[target.id]['ipv6_addr'] = ipv6_addr
+                    dhcp_hosts[target]['ipv6_addr'] = ipv6_addr
                     addrs.append(ipv6_addr)
                 if addrs:
                     # Create a file for each target that will connect to
@@ -168,6 +180,12 @@ class pc(ttbl.power.daemon_c):
                 # auth-server=%(id)s,b%(id)s",
                 "auth-zone=%(id)s,b%(id)s",
                 "dhcp-authoritative",
+                # Enable TFTP server to STATEDIR/tftp.root
+                "enable-tftp",
+                "tftp-root=%(path)s/tftp.root",
+                # all files TFTP is to send have to be owned by the
+                # user running it (the same one running this daemon)
+                "tftp-secure",
             ]
 
             # Add stuff based on having ipv4/6 support
@@ -192,7 +210,13 @@ class pc(ttbl.power.daemon_c):
                 addrs.append(ipv6_addr)
                 # IPv6 server address so we can do auth-server
                 configl.append("host-record=%(id)s,[%(ipv6_addr)s]")
-                configl.append("dhcp-range=::,constructor:b%(id)s")
+                # FIXME: while this is working, it is still not giving
+                # the IPv6 address we hardcoded in the doc :/
+                ipv6_prefix_len = ic.kws['ipv6_prefix_len']
+                network = ipaddress.IPv6Network(unicode(
+                    ipv6_addr + "/" + str(ipv6_prefix_len)), strict = False)
+                configl.append("dhcp-range=%s,%s,%s" % (
+                    ipv6_addr, network.broadcast_address, ipv6_prefix_len))
 
             # Create A record for the server/ domain
             # this is a separat file in DIRNAME/dnsmasq.hosts/NAME
@@ -207,8 +231,11 @@ class pc(ttbl.power.daemon_c):
                 f.write(config % ic.kws + "\n")
 
             # For each target we know can connect, create a dhcp-host entry
-            for host_name, data in dhcp_hosts.iteritems():
+            for target, data in dhcp_hosts.iteritems():
                 infol = [
+                    # we set a tag after the host name to match a
+                    # host-specific dhcp-option line to it
+                    "set:" + target.id,
                     data['mac_addr']
                 ]
                 if 'ipv4_addr' in data:
@@ -216,8 +243,45 @@ class pc(ttbl.power.daemon_c):
                 if 'ipv6_addr' in data:
                     # IPv6 addr in [ADDR] format, per man page
                     infol.append("[" + data['ipv6_addr'] + "]")
-                infol.append(host_name)
-                f.write("dhcp-host=" + ",".join(infol) + ",infinite\n")
+                infol.append(target.id)
+                infol.append("infinite")
+                f.write("dhcp-host=" + ",".join(infol) + "\n")
+                # next fields can be in the target or fall back to the
+                # values from the interconnect
+                kws = target.kws
+                bsps = target.tags.get('bsps', {}).keys()
+                if bsps:
+                    # take the first BSP in sort order...yeah, not a
+                    # good plan
+                    bsp = sorted(bsps)[0]
+                    kws['bsp'] = bsp
+                ttbl.pxe.tag_get_from_ic_target(kws, 'pos_http_url_prefix', ic, target)
+                ttbl.pxe.tag_get_from_ic_target(kws, 'pos_nfs_server', ic, target)
+                ttbl.pxe.tag_get_from_ic_target(kws, 'pos_nfs_path', ic, target)
+
+                f.write(
+                    "dhcp-option=tag:%(id)s,option:root-path,%(pos_nfs_server)s:%(pos_nfs_path)s,udp,soft,nfsvers=3\n"
+                    % kws)
+
+                # If the target declares a BSP (at this point of the
+                # game, it should), figure out which architecture is
+                # so we can point it to the right file.
+                if bsp:
+                    # try ARCH or efi-ARCH
+                    arch = None
+                    if bsp in ttbl.pxe.architectures:
+                        arch = ttbl.pxe.architectures[bsp]
+                        arch_name = bsp
+                    elif "efi-" + bsp in ttbl.pxe.architectures:
+                        arch_name = "efi-" + bsp
+                        arch = ttbl.pxe.architectures[arch_name]
+                    if arch:
+                        boot_filename = arch.get('boot_filename', None)
+                        if boot_filename:
+                            boot_filename = arch_name + "/" + boot_filename
+                            f.write(
+                                "dhcp-option=tag:%(id)s," % kws
+                                + "option:bootfile-name," + boot_filename + "\n")
 
         # note the rename we did target -> ic
         ttbl.power.daemon_c.on(self, ic, _component)

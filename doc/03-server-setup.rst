@@ -831,6 +831,7 @@ been tested yet, shall be similar.
      # firewall-cmd --permanent \
         --add-service=dhcp \
         --add-service=dhcpv6 \
+        --add-services=dns \
         --add-service=http \
         --add-service=https \
         --add-service=mountd \
