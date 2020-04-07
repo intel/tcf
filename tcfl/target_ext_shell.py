@@ -201,6 +201,9 @@ class shell(tc.target_extension_c):
         error happens, it will print an error message and raise a
         block exception. Optionally login as a user and password.
 
+        Note this resets any shell prompt set by the script to what is
+        assumed to be the original one after a power up.
+
         >>> target.shell.up(user = 'root', password = '123456')
 
         :param str tempt: (optional) string to send before waiting for
@@ -264,6 +267,8 @@ class shell(tc.target_extension_c):
         testcase = target.testcase
         if timeout == None:
             timeout = 60 + int(target.kws.get("bios_boot_time", 0))
+        # Set the original shell prompt
+        self.shell_prompt_regex = _shell_prompt_regex
         
         def _login(target):
             # If we have login info, login to get a shell prompt
