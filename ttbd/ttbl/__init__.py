@@ -1620,7 +1620,7 @@ class test_target(object):
 
         See :meth:timestamp.
 
-        :return int: timestamp in the format YYYYMMDDHHSS
+        :return str: timestamp in the format YYYYMMDDHHSS
         """
         # if no target-specific timestamp is set, just do zero; we
         # cache it instead of using the allocation's since the target
@@ -1631,7 +1631,8 @@ class test_target(object):
                 ts = allocdb.timestamp_get()
                 self.fsdb.set('timestamp', ts)
                 return ts
-            return self.fsdb.get('timestamp', 0)
+            # if there is no timestamp, forge the Epoch
+            return self.fsdb.get('timestamp', "19700101000000")
 
     def timestamp(self):
         """
