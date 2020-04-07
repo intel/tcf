@@ -79,7 +79,7 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
         if queue_timeout and ts - ts0 > queue_timeout:
             raise tc.blocked_e(
                 "can't acquire targets, still busy after %ds"
-                % oqueue_timeout, dict(targets = groups))
+                % queue_timeout, dict(targets = groups))
         time.sleep(keepalive_period)
         ts = time.time()
         state = data[allocid]
