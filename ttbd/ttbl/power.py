@@ -204,10 +204,10 @@ class interface(ttbl.tt_interface):
         while ts - ts0 < impl.timeout:
             try:
                 impl.on(target, component)
-            except impl.power_on_e as e:
-                target.log.exception("%s: impl failed powering on +%.1f;"
-                                     " powering off and retrying: %s",
-                                     component, ts - ts0, e)
+            except impl.error_e as e:
+                target.log.error("%s: impl failed powering on +%.1f;"
+                                 " powering off and retrying: %s",
+                                 component, ts - ts0, e)
                 try:
                     self._impl_off(impl, target, component)
                 except impl.error_e as e:
@@ -218,11 +218,13 @@ class interface(ttbl.tt_interface):
             else:
                 target.log.info("%s: impl powered on +%.1fs",
                                 component, ts - ts0)
-                new_state = self._impl_get(impl, target, component)
-                if new_state == None or new_state == True: # check
-                    return
-                target.log.info("%s: impl didn't power on +%.1f retrying",
-                                component, ts - ts0)
+            # let's check the status, because sometimes with
+            # transitions on its own
+            new_state = self._impl_get(impl, target, component)
+            if new_state == None or new_state == True: # check
+                return
+            target.log.info("%s: impl didn't power on +%.1f retrying",
+                            component, ts - ts0)
             time.sleep(impl.wait)
             ts = time.time()
         raise RuntimeError("%s: impl power-on timed out after %.1fs"
@@ -238,13 +240,20 @@ class interface(ttbl.tt_interface):
 
         ts0 = ts = time.time()
         while ts - ts0 < impl.timeout:
-            impl.off(target, component)
-            target.log.info("%s: impl powered off +%.1fs", component, ts - ts0)
+            try:
+                impl.off(target, component)
+            except impl.error_e as e:
+                target.log.error("%s: impl failed powering off +%.1f;"
+                                 " retrying: %s", component, ts - ts0, e)
+            else:
+                target.log.info("%s: impl powered off +%.1fs",
+                                component, ts - ts0)
+            # maybe it worked, let's checked
             new_state = self._impl_get(impl, target, component)
             if new_state == None or new_state == False: # check
                 return
             target.log.info("%s: ipmi didn't power off +%.1f retrying",
-                            component, ts - ts0)
+                                component, ts - ts0)
             time.sleep(impl.wait)
             ts = time.time()
         raise RuntimeError("%s: impl power-off timed out after %.1fs"
@@ -284,7 +293,7 @@ class interface(ttbl.tt_interface):
             ts = time.time()
         raise RuntimeError(
             "%s: power-get timed out for an stable result (+%.2fs): %s"
-            % (component, impl.timeout, " ".join(results)))
+            % (component, impl.timeout, " ".join(str(r) for r in results)))
 
 
     def _get(self, target, impls = None):

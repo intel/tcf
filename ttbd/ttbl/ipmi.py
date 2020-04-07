@@ -146,8 +146,9 @@ class pci_ipmitool(ttbl.power.impl_c):
         self.cmdline += [ "-E", "-I", "lanplus" ]
         if password:
             self.env['IPMI_PASSWORD'] = password
-        self.timeout = 20
-        self.wait = 0.5
+        self.paranoid_get_samples = 3
+        self.timeout = 30
+        self.wait = 2
 
     def _run(self, target, command):
         try:
@@ -155,9 +156,10 @@ class pci_ipmitool(ttbl.power.impl_c):
                 self.cmdline + command, env = self.env, shell = False,
                 stderr = subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
-            target.log.error("ipmitool %s failed: %s",
-                             " ".join(command), e.output)
-            raise
+            msg = "ipmitool %s failed: %s" % (
+                " ".join(command), e.output)
+            target.log.error(msg)
+            raise self.error_e(msg)
         return result.rstrip()	# remove trailing NLs
 
 
