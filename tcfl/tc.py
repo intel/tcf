@@ -3351,6 +3351,8 @@ class tc_c(reporter_c):
 
         self.__init_shallow__(None)
         self.name = name
+        self.kw_set('pid', str(os.getpid()))
+        self.kw_set('tid', "%x" % threading.current_thread().ident)
         self.kw_set('host_name', socket.getfqdn())
         self.kw_set('tc_name', self.name)
         # top level testcase name is that of the toplevel testcase,
@@ -8189,7 +8191,7 @@ def argp_setup(arg_subparsers):
         help = "Consider also disabled targets")
     ap.add_argument(
         "--reason", action = "store",
-        default = "%(runid)s %(tc_name)s @ %(host_name)s",
+        default = "%(runid)s %(tc_name)s @ %(host_name)s:%(pid)s/%(tid)s",
         help = "Reason template. This is a string that be sent to"
         " the server when allocating the targets to display as a"
         " reason for allocation so other users can see what the"
