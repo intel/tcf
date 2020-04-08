@@ -9,10 +9,13 @@
 """
 import bisect
 import collections
+import getpass
 import json
 import logging
+import os
 import pprint
 import sys
+import socket
 import time
 
 import requests
@@ -135,7 +138,8 @@ def _cmdline_alloc_targets(args):
             allocid, state, _group_allocated = \
                 _alloc_targets(rtb, groups, obo = args.obo,
                                preempt = args.preempt,
-                               queue = args.queue, priority = args.priority)
+                               queue = args.queue, priority = args.priority,
+                               reason = args.reason)
             if args.hold == None:	# user doesn't want us to ...
                 return			# ... keepalive while active
             ts0 = time.time()
@@ -576,6 +580,12 @@ def _cmdline_setup(arg_subparsers):
     ap.add_argument(
         "-a", "--all", action = "store_true", default = False,
         help = "Consider also disabled targets")
+    ap.add_argument(
+        "-r", "--reason", action = "store",
+        default = "cmdline %s@%s:%d" % (
+            getpass.getuser(), socket.getfqdn(), os.getppid()),
+        help = "Reason to pass to the server (default: %(default)s)"
+        " [LOGNAME:HOSTNAME:PARENTPID]")
     ap.add_argument(
         "-d", "--hold", action = "store",
         nargs = "?", type = int, const = 0, default = None,
