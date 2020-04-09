@@ -1805,7 +1805,7 @@ class target_c(reporter_c):
 
     def ttbd_iface_call(self, interface, call, method = "PUT",
                         component = None, stream = False, raw = False,
-                        files = None,
+                        files = None, timeout = 30,
                         **kwargs):
         """
         Execute a general interface call to TTBD, the TCF remoting server
@@ -1859,7 +1859,7 @@ class target_c(reporter_c):
         return self.rtb.send_request(
             method,
             "targets/%s/%s/%s" % (self.id, interface, call),
-            stream = stream, raw = raw, files = files,
+            stream = stream, raw = raw, files = files, timeout = timeout,
             data = kwargs if kwargs else None)
 
 
