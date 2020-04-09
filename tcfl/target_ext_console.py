@@ -1384,8 +1384,9 @@ def _cmdline_console_wall(args):
                         done = True
                     descr = consolel[item]
                     cf.write(
-                        'screen -c tcf console-read %s -c %s --follow\n'
+                        'screen -c %s console-read %s -c %s --follow\n'
                         'title %s\n\n' % (
+                            sys.argv[0],
                             descr.target.fullid, descr.console, item
                         ))
                     if done or item == console_names[-1]:
