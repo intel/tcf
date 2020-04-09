@@ -1225,12 +1225,24 @@ EOF""")
             # we try to keep the downloaded content across
             # re-flashings, so we don't have to re-download it.
             '/var/lib/swupd',
+            '/var/lib/containers',
+
         ],
         'fedora': [
             "/var/lib/rpm",
+            '/var/lib/containers',
         ],
         'rhel': [
             "/var/lib/rpm",
+            '/var/lib/containers',
+        ],
+        'centos': [
+            "/var/lib/rpm",
+            '/var/lib/containers',
+        ],
+        'ubuntu': [
+            '/var/cache/apt/archives',
+            '/var/lib/containers',
         ],
     }
 
