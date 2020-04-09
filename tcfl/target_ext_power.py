@@ -45,7 +45,10 @@ class extension(tc.target_extension_c):
         components are on; fake power components report power state as
         *None* and those are not taken into account.
         """
-        r = self.target.ttbd_iface_call("power", "get", method = "GET")
+        r = self.target.ttbd_iface_call(
+            "power", "get", method = "GET",
+            # extra time, since power ops can take long
+            timeout = 60)
         return r['result']
 
     def list(self):
@@ -57,7 +60,10 @@ class extension(tc.target_extension_c):
           applicable, for fake power controls)
         """
         self.target.report_info("listing", dlevel = 1)
-        r = self.target.ttbd_iface_call("power", "list", method = "GET")
+        r = self.target.ttbd_iface_call(
+            "power", "list", method = "GET",
+            # extra time, since power ops can take long
+            timeout = 60)
         self.target.report_info("listed")
         return r.get('power', [])
 
@@ -70,7 +76,10 @@ class extension(tc.target_extension_c):
         """
         assert component == None or isinstance(component, basestring)
         self.target.report_info("powering off", dlevel = 1)
-        self.target.ttbd_iface_call("power", "off", component = component)
+        self.target.ttbd_iface_call(
+            "power", "off", component = component,
+            # extra time, since power ops can take long
+            timeout = 60)
         self.target.report_info("powered off")
 
     def on(self, component = None):
@@ -82,7 +91,10 @@ class extension(tc.target_extension_c):
         """
         assert component == None or isinstance(component, basestring)
         self.target.report_info("powering on", dlevel = 1)
-        self.target.ttbd_iface_call("power", "on", component = component)
+        self.target.ttbd_iface_call(
+            "power", "on", component = component,
+            # extra time, since power ops can take long
+            timeout = 60)
         self.target.report_info("powered on")
         if hasattr(self.target, "console"):
             self.target.console._set_default()
@@ -98,8 +110,11 @@ class extension(tc.target_extension_c):
         assert wait == None or wait >= 0
         assert component == None or isinstance(component, basestring)
         self.target.report_info("power cycling", dlevel = 1)
-        self.target.ttbd_iface_call("power", "cycle",
-                                    component = component, wait = wait)
+        self.target.ttbd_iface_call(
+            "power", "cycle",
+            component = component, wait = wait,
+            # extra time, since power ops can take long
+            timeout = 60)
         self.target.report_info("power cycled")
         if hasattr(self.target, "console"):
             self.target.console._set_default()
@@ -113,7 +128,10 @@ class extension(tc.target_extension_c):
         self.target.report_info("resetting", dlevel = 1)
         self.target.report_info("DEPRECATED: reset()", level = 0)
         # reset is deprecated at the server level
-        self.target.ttbd_iface_call("power", "cycle")
+        self.target.ttbd_iface_call(
+            "power", "cycle",
+            # extra time, since power ops can take long
+            timeout = 60)
         self.target.report_info("reset")
         if hasattr(self.target, "console"):
             self.target.console._set_default()
