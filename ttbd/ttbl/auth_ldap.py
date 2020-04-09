@@ -45,6 +45,10 @@ class authenticator_ldap_c(ttbl.authenticator_c):
     Likewise for *anthony*, *mcclay* and any user who is a member of
     either the group *Administrators* or the group *Knights who say
     ni*, they are given role *role2*
+
+    If *'groups'* is a *None*, it means give that role to anyone, they
+    don't have to be part of any group. This allows to permit the role
+    to anyone that can authenticate with LDAP.
     """
     def __init__(self, url, roles = None):
         """
@@ -68,14 +72,16 @@ class authenticator_ldap_c(ttbl.authenticator_c):
                 if not tag in ('users', 'groups'):
                     raise ValueError(
                         "subfield for role must be 'users' or 'groups'")
-                if not isinstance(roles[role][tag], list):
-                    raise ValueError("value of role[%s][%s] must be a "
-                                     "list of strings" % (role, tag))
-                for value in roles[role][tag]:
-                    if not isinstance(value, basestring):
-                        raise ValueError("members of role[%s][%s] must "
-                                         "be  strings; '%s' is not" %
-                                         (role, tag, value))
+                if roles[role][tag] != None:
+                    if not isinstance(roles[role][tag], list):
+                        raise ValueError(
+                            "value of role[%s][%s] must be a "
+                            "list of strings or None" % (role, tag))
+                    for value in roles[role][tag]:
+                        if not isinstance(value, basestring):
+                            raise ValueError("members of role[%s][%s] must "
+                                             "be  strings; '%s' is not" %
+                                             (role, tag, value))
         self.conn = None
         self.roles = roles
         if ttbl.config.ssl_enabled_check_disregard == False \
@@ -169,7 +175,11 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         # need to add based on group membership
         for group in groups:
             for role_name, role in self.roles.iteritems():
-                if group in role.get('groups', []):
+                ldap_groups = role.get('groups', [])
+                if ldap_groups == None:
+                    # anyone, not  necessarily member of any group
+                    token_roles.add(role_name)
+                elif group in ldap_groups:
                     token_roles.add(role_name)
         return token_roles
 
