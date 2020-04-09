@@ -27,10 +27,14 @@ import tc
 import ttb_client
 from . import msgid_c
 
-import asciimatics.widgets
-import asciimatics.event
-import asciimatics.scene
-
+asciimatics_support = True
+try:
+    import asciimatics.widgets
+    import asciimatics.event
+    import asciimatics.scene
+except ImportError as e:
+    asciimatics_support = False
+    
 
 def _delete(rtb, allocid):
     try:
@@ -255,59 +259,63 @@ class _model_c(object):
         return [ 14 ] * self.max_waiters
 
 
-class _view_c(asciimatics.widgets.Frame):
-    # cannibalized top.py and contact_list.py from asciimatics's
-    # samples to make this -- very helpful
-    def __init__(self, screen, model):
-        asciimatics.widgets.Frame.__init__(
-            self, screen, screen.height, screen.width,
-            hover_focus = True, has_border = True,
-            can_scroll = True)
-        self.model = model
-        self.last_frame = 0
+if asciimatics_support:
+    class _view_c(asciimatics.widgets.Frame):
+        # cannibalized top.py and contact_list.py from asciimatics's
+        # samples to make this -- very helpful
+        def __init__(self, screen, model):
+            asciimatics.widgets.Frame.__init__(
+                self, screen, screen.height, screen.width,
+                hover_focus = True, has_border = True,
+                can_scroll = True)
+            self.model = model
+            self.last_frame = 0
 
-        layout = asciimatics.widgets.Layout([100], fill_frame=True)
-        self.add_layout(layout)
-        # Create the form for displaying the list of contacts.
-        self.list_box = asciimatics.widgets.MultiColumnListBox(
-            asciimatics.widgets.Widget.FILL_FRAME,
-            model.get_column_widths(),
-            model.get_content(),
-            name = "Targets",
-            add_scroll_bar = True)        
-        layout.add_widget(self.list_box)
-        self.fix()
+            layout = asciimatics.widgets.Layout([100], fill_frame=True)
+            self.add_layout(layout)
+            # Create the form for displaying the list of contacts.
+            self.list_box = asciimatics.widgets.MultiColumnListBox(
+                asciimatics.widgets.Widget.FILL_FRAME,
+                model.get_column_widths(),
+                model.get_content(),
+                name = "Targets",
+                add_scroll_bar = True)        
+            layout.add_widget(self.list_box)
+            self.fix()
 
-    def process_event(self, event):
-        if isinstance(event, asciimatics.event.KeyboardEvent):
-            # key handling for this: Ctrl-C, q/Q to quit, r refresh
-            if event.key_code in [
-                    ord('q'),
-                    ord('Q'),
-                    asciimatics.screen.Screen.KEY_ESCAPE,
-                    asciimatics.screen.Screen.ctrl("c")
-            ]:
-                raise asciimatics.exceptions.StopApplication("User quit")
-            elif event.key_code in [ ord("r"), ord("R") ]:
-                pass
-            self.last_frame = 0	# force a refresh
-        return asciimatics.widgets.Frame.process_event(self, event)
-        
-    @property
-    def frame_update_count(self):
-        return 10	        # Refresh once every .5 seconds by default.
+        def process_event(self, event):
+            if isinstance(event, asciimatics.event.KeyboardEvent):
+                # key handling for this: Ctrl-C, q/Q to quit, r refresh
+                if event.key_code in [
+                        ord('q'),
+                        ord('Q'),
+                        asciimatics.screen.Screen.KEY_ESCAPE,
+                        asciimatics.screen.Screen.ctrl("c")
+                ]:
+                    raise asciimatics.exceptions.StopApplication("User quit")
+                elif event.key_code in [ ord("r"), ord("R") ]:
+                    pass
+                self.last_frame = 0	# force a refresh
+            return asciimatics.widgets.Frame.process_event(self, event)
 
-    def _update(self, frame_no):
-        if self.last_frame == 0 \
-           or frame_no - self.last_frame >= self.frame_update_count:
-            self.list_box.options = self.model.get_content()
-            self.list_box.value = frame_no
-            self.last_frame = frame_no
-        asciimatics.widgets.Frame._update(self, frame_no)
+        @property
+        def frame_update_count(self):
+            return 10	        # Refresh once every .5 seconds by default.
 
+        def _update(self, frame_no):
+            if self.last_frame == 0 \
+               or frame_no - self.last_frame >= self.frame_update_count:
+                self.list_box.options = self.model.get_content()
+                self.list_box.value = frame_no
+                self.last_frame = frame_no
+            asciimatics.widgets.Frame._update(self, frame_no)
 
 
 def _cmdline_alloc_monitor(args):
+    if asciimatics_support == False:
+        raise RuntimeError(
+            "asciimatics package needs to be installed for this feature; "
+            "run 'pip install --user asciimatics' or equivalent")
     with msgid_c("cmdline"):
         servers = set()
         targetl = ttb_client.cmdline_list(args.target, args.all)

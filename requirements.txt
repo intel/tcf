@@ -1,3 +1,4 @@
+asciimatics
 Jinja2
 PyYAML
 python-cv
