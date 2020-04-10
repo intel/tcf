@@ -1083,7 +1083,7 @@ def _console_read_thread_fn(target, console, fd, offset):
                     target.console.read_full(console, offset, 4096)
                 if generation_prev != None and generation_prev != generation:
                     sys.stderr.write(
-                        "\n\r\r\nWARNING: target power cycled\r\r\n\n")
+                        "\n\r\r\nWARNING: console was restarted\r\r\n\n")
                 generation_prev = generation
 
                 if data:

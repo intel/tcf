@@ -391,6 +391,7 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
         self.ipmi_retries = ipmi_retries
         if password:
             self.env_add['IPMITOOL_PASSWORD'] = password
+        self.re_enable = True
 
     def on(self, target, component):
         # if there is someone leftover reading, kick them out, there can
@@ -467,6 +468,7 @@ class sol_ssh_console_pc(ttbl.console.ssh_pc):
         if password:
             self.env_add['IPMITOOL_PASSWORD'] = password
         self.paranoid_get_samples = 1
+        self.re_enable = True
 
     def on(self, target, component):
         # if there is someone leftover reading, kick them out, there can

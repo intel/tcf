@@ -123,6 +123,16 @@ class impl_c(ttbl.tt_interface_impl_c):
         self.command_timeout = command_timeout
         self.parameters = {}
         ttbl.tt_interface_impl_c.__init__(self)
+        #: Check if the implementation's link died and it has to be
+        #: re-enabled
+        #:
+        #: Some implementations of console die because their
+        #: connections get killed outside of the implementation's
+        #: control. Setting this to True allows the console code to
+        #: periodically when reading so that if the implementation
+        #: reports is disabled because the link died but it should be
+        #: enabled, it will be automatically re-enabled.
+        self.re_enable_if_dead = False
 
     class exception(Exception):
         """
@@ -446,12 +456,44 @@ class interface(ttbl.tt_interface):
                                 component, "console.state")
         return dict(result = state)
 
+    @staticmethod
+    def _maybe_re_enable(target, component, impl):
+        # Some implementations have the bad habit of dying for no good
+        # reason:
+        #
+        #  - IPMIs SOLs close the connections
+        #  - ssh tunnels get killed without timing out
+        #  - dog eat the homework
+        #
+        # and there is nothing we can do about it but just try to
+        # restart it if it reports disabled (because the link is dead)
+        # but we recorded it shall be enabled (because the property
+        # console-COMPONENT.state is True)
+        if impl.re_enable_if_dead == False:
+            return False
+        shall_be_enabled = target.property_get("console-" + component + ".state", None)
+        is_enabled = impl.state(target, component)
+        if shall_be_enabled and is_enabled == False:
+            # so it died, let's re-enable and retry
+            target.log.warning("%s: console disabled on its own, re-enabling"
+                               % component)
+            impl.enable(target, component)
+            return True
+        return False
+
     def get_read(self, target, who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         offset = int(args.get('offset', 0))
         if target.target_is_owned_and_locked(who):
             target.timestamp()	# only if the reader owns it
-        r =  impl.read(target, component, offset)
+        last_enable_check = target.property_get("console-" + component + ".check_ts", 0)
+        ts_now = time.time()
+        if ts_now - last_enable_check > 5:
+            # every five secs check if the implementation's link has
+            # been closed and renable it if so
+            self._maybe_re_enable(target, component, impl)
+            target.property_set("console-" + component + ".check_ts", ts_now)
+        r = impl.read(target, component, offset)
         stream_file = r.get('stream_file', None)
         if stream_file and not os.path.exists(stream_file):
             # no file yet, no console output
@@ -473,8 +515,19 @@ class interface(ttbl.tt_interface):
         impl, component = self.arg_impl_get(args, "component")
         with target.target_owned_and_locked(who):
             target.timestamp()
-            impl.write(target, component,
-                       self._arg_get(args, 'data'))
+            while True:
+                try:
+                    impl.write(target, component,
+                               self._arg_get(args, 'data'))
+                    break
+                except OSError:
+                    # sometimes many of these errors happen because the
+                    # implementation dies -- for IPMIs SOL, for example,
+                    # the other end closes the connection, so we try to
+                    # restart it
+                    if self._maybe_re_enable(target, component, impl):
+                        continue
+                    raise
             return {}    
 
 def generation_set(target, console):
