@@ -266,7 +266,7 @@ class rest_target_broker(object):
     # for the target to flash, which we know from the tags
     def send_request(self, method, url,
                      data = None, json = None, files = None,
-                     stream = False, raw = False, timeout = 10):
+                     stream = False, raw = False, timeout = 60):
         """
         Send request to server using url and data, save the cookies
         generated from request, search for issues on connection and
@@ -396,7 +396,9 @@ class rest_target_broker(object):
             if not 'targets' in r:
                 r['targets'] = [ r ]
         else:
-            r = self.send_request("GET", "targets/", data = data)
+            # force a short timeout to get rid of failing servers quick
+            r = self.send_request("GET", "targets/",
+                                  data = data, timeout = 20)
         _targets = []
         for rt in r['targets']:
             # Skip disabled targets
