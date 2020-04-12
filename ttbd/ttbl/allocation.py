@@ -1018,9 +1018,15 @@ def delete(allocid, calling_user):
 
     if allocdb.check_userid_is_guest(userid):
         allocdb.guest_remove(userid)
-        return { "message": "%s: guest removed from allocation" % userid }
+        return {
+            "state": "removed",
+            "message": "%s: guest removed from allocation" % userid
+        }
 
-    return { "message": "no permission to remove other's allocation" }
+    return {
+        "state": "rejected",
+        "message": "no permission to remove other's allocation"
+    }
 
 
 def guest_add(allocid, calling_user, guest):
