@@ -364,7 +364,9 @@ class interface(ttbl.tt_interface):
       - *ssh\**     SSH session (may require setup before enabling)
 
     A *default* console is set by declaring an alias as in the example
-    above; however, a preferred console
+    above; otherwise the first one listed in
+    target.console.impls.keys() is considered the default. A
+    *preferred* console is the one that has *preferred* as an alias.
 
     This interface:
 
@@ -411,6 +413,42 @@ class interface(ttbl.tt_interface):
         parameters['real_name'] = component
         return dict(result = parameters)
 
+    def get_default_name(self, target):
+        """
+        Returns the name of the default console
+
+        The default console is defined as:
+
+        - the name of an existing console in a tag called
+          *console-default*
+
+        - the name of a console called *default*
+
+        - the first console defined
+
+        :param ttbl.test_target target: target on which to find the
+          default console's name
+
+        :returns str: the name of the default console
+        :raises RuntimeError: if there are no consoles
+        """
+        console_default = target.property_get("console-default", None)
+        try:
+            _impl, name = self.impl_get_by_name(console_default, "console")
+            return default
+        except IndexError:
+            # invalid default, reset it
+            console_default = target.property_set("console-default", None)
+            # fallthrough
+        _impl, name = self.arg_impl_get("default", "console", True)
+        if name:
+            return name
+        consoles = self.impls.keys()
+        if not consoles:
+            raise RuntimeError("%s: there are no consoles, can't find default"
+                               % target.id)
+        return consoles[0]
+
     def put_setup(self, target, who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         parameters = dict()
@@ -448,7 +486,7 @@ class interface(ttbl.tt_interface):
             if state:
                 impl.disable(target, component)
             return dict()
-    
+
     def get_state(self, target, _who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         state = impl.state(target, component)
@@ -528,7 +566,7 @@ class interface(ttbl.tt_interface):
                     if self._maybe_re_enable(target, component, impl):
                         continue
                     raise
-            return {}    
+            return {}
 
 def generation_set(target, console):
     target.fsdb.set("console-" + console + ".generation",
@@ -638,7 +676,7 @@ class generic_c(impl_c):
         return _data
 
 
-    
+
     def _write(self, fd, data):
         if self.escape_chars:
             data = self._escape(data)
@@ -660,7 +698,7 @@ class generic_c(impl_c):
                 left -= _chunk_size
         else:
             os.write(fd, data)
-    
+
     def write(self, target, component, data):
         file_name = os.path.join(target.state_dir,
                                  "console-%s.write" % component)
