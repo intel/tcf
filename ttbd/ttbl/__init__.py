@@ -730,7 +730,7 @@ class tt_interface(object):
     create methods in the subclass called *METHOD_NAME* with the
     signature:
 
-    >>>     def METHOD_NAME(self, target, who, args, user_path):
+    >>>     def METHOD_NAME(self, target, who, args, files, user_path):
     >>>         impl, component = self.arg_impl_get(args, "component")
     >>>         arg1 = args.get('arg1', None)
     >>>         arg2 = args.get('arg2', None)
@@ -748,6 +748,9 @@ class tt_interface(object):
 
     - *args* is a dictionary of arguments passed by the client for the
       HTTP call keyed by name (a string)
+
+    - *files* dictionrary of files passed to the HTTP request (FIXME:
+       doc properly)
 
     - *user_path* is a string describing the space in the filesystem
       where files for this user are stored
@@ -1082,7 +1085,9 @@ class tt_interface(object):
         prefix = "instrumentation." + index
         target.property_set(prefix + ".name", instrument_name)
         for key, val in upid.iteritems():
-            target.property_set(prefix + "." + key, val % kws)
+            if val:
+                # there might be empty values, as defaults, so we ignore them
+                target.property_set(prefix + "." + key, val % kws)
         if components:
             target.property_set(prefix + ".functions." + iface_name,
                                 ":".join(components))
