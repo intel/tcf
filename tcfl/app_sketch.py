@@ -42,23 +42,31 @@ class app_sketch(tcfl.app.app_c):
 
     @staticmethod
     def configure(testcase, target, app_src):
-        target.kws_required_verify([ 'sketch_fqbn' ])
+        target.kws_required_verify([
+            'sketch_extension',
+            'sketch_fqbn',
+        ])
         # Adds Arduino Sketch sketch_* vars to the target's keywords
-        srcpath = _get_real_srcpath(testcase, app_src)
-        srcdir, srcfile = os.path.split(srcpath)
+        # if relative to the testcase_file, get us an abs dir to it
+        testcase_file = inspect.getfile(type(testcase))
+        src = tcfl.app.get_real_srcdir(testcase_file, app_src[0])
+        src = os.path.relpath(src)
+        if os.path.isdir(src):
+            srcdir = src
+            srcfile = None
+        else:
+            srcdir = os.path.dirname(src)
+            srcfile = os.path.basename(src)
         # Place the output in the CWD -- not really like much, but
         # beats the source
         outdir = os.path.join(
             testcase.tmpdir,
-            "outdir-%(tc_hash)s-%(tg_hash)s-"  % target.kws + srcfile)
+            "sketch-%(tc_hash)s-%(tg_hash)s"  % target.kws)
         target.kws_set(dict(
             sketch_outdir = os.path.abspath(outdir),
-            arduino_bindir = tcfl.config.arduino_bindir,
-            arduino_libdir = tcfl.config.arduino_libdir,
-            arduino_extra_libdir = tcfl.config.arduino_extra_libdir,
             sketch_srcfile = srcfile,
             sketch_srcdir = srcdir,
-            sketch_srcpath = srcpath
+            sketch_src = src
         ), bsp = target.bsp)
 
     @staticmethod
@@ -80,22 +88,17 @@ class app_sketch(tcfl.app.app_c):
 
         # Build
         target.shcmd_local(
-            "%(arduino_bindir)s/arduino-builder"
-            " -debug-level 10"
-            " -build-path %(sketch_outdir)s"
-            " -hardware %(arduino_libdir)s/hardware"
-            " -tools %(arduino_libdir)s/tools"
-            " -tools %(arduino_libdir)s/tools-builder"
-            " -fqbn %(sketch_fqbn)s"
-            " -built-in-libraries=%(arduino_libdir)s/libraries"
-            " -hardware %(arduino_extra_libdir)s/packages/arduino/hardware"
-            " -tools %(arduino_extra_libdir)s/packages/arduino/tools"
-            " %(sketch_srcpath)s")
+            "arduino-cli"
+            " compile"
+            " --build-path %(sketch_outdir)s"
+            " --build-cache-path %(sketch_outdir)s"
+            " --fqbn %(sketch_fqbn)s"
+            " %(sketch_src)s")
 
     @staticmethod
     def deploy(images, testcase, target, app_src):
         images['kernel-%(bsp)s' % target.kws] = \
-            '%(sketch_outdir)s/%(sketch_srcfile)s.bin' % target.kws
+            '%(sketch_outdir)s/%(sketch_srcfile)s.%(sketch_extension)s' % target.kws
 
     @staticmethod
     def clean(testcase, target, app_src):
