@@ -460,45 +460,73 @@ def a101_dfu_add(name,
     )
 
 
+arduino_fqbns = {
+    # $ arduino-cli core update-index
+    # $ arduino-cli core install arduino:avr
+    "arduino:avr:mega": 'hex',
+    # $ arduino-cli core install arduino:sam
+    "arduino:sam:arduino_due_x_dbg": "bin",
+}
 
-def arduino2_add(name,
-                 usb_serial_number,
-                 serial_port = None,
-                 ykush_serial = None,
-                 ykush_port_board = None,):
-    """**Configure an Arduino Due board for the fixture described below**
+def arduino_add(name, usb_serial_number, fqbn,
+                power_rail = None, serial_port = None):
+    """**Configure an Arduino board that can be flashed with Arduino-CLI**
 
-    The Arduino Due an ARM-based development board. Includes a builtin
-    flasher that requires the bossac tool. Single wire is used for
-    flashing, serial console and power.
+    The Arduinos are boards that include builtin flashers which the
+    :ref:`*arduino-cli* tool <installing>` can use.
 
-    Add to a server configuration file:
+    This configuration allows to add multiple models of Arduino (for
+    which a FQBN mapping is known) with:
+
+    - basic power control
+    - console interface
+    - image flashing
+
+    For example, to power-control using a ykush power-switching hub,
+    add to a server configuration file:
 
     .. code-block:: python
 
-       arduino2_add(name = "arduino2-NN",
-                    usb_serial_number = "SERIALNUMBER",
-                    serial_port = "/dev/tty-arduino2-NN",
-                    ykush_serial = "YKXXXXX",
-                    ykush_port_board = N)
+       arduino_add(name = "arduino-mega-NN", "mega",
+                   usb_serial_number = "SERIALNUMBER",
+                   power_rail = [ ttbl.pc_ykush.pc("YKXXXXX", 2) ])
 
     restart the server and it yields::
 
       $ tcf list
-      local/arduino2-NN
+      local/arduino-mega-NN
 
     :param str name: name of the target
 
     :param str serial_number: USB serial number for the board
 
+    :param str fqbn: model of the board. This is a string listed in
+      :data:`conf_00_lib_mcu.arduino_fqbns` which indicates a few
+      needed parameters.
+
+      - Arduino Due: arduino:sam:arduino_due_x_dbg
+      - Arduino Mega: arduino:avr:mega
+
+      To find your board's FQBN, plug to your machine and run::
+
+        $ arduino-cli board list
+        Port         Type              Board Name                     FQBN                          Core
+        /dev/ttyACM0 Serial Port (USB) Arduino Mega or Mega 2560      arduino:avr:mega              arduino:avr
+        /dev/ttyACM1 Serial Port (USB) Arduino Due (Programming Port) arduino:sam:arduino_due_x_dbg arduino:sam
+
+      And you will need to install the Core support with::
+
+        $ arduino-cli core update-index
+        $ arduino-cli core install COREPACKAGE
+
+      for the user running the daemon as well as for any user building
+      with the client.
+
     :param str serial_port: name of the serial port (defaults to
       /dev/tty-TARGETNAME).
 
-    :param str ykush_serial: :ref:`USB serial number
-      <ykush_serial_number>` of the YKUSH hub
-
-    :param int ykush_port_board: number of the YKUSH downstream port
-      where the board power is connected.
+    :param list power_rail: power rail to power on/off the board,
+      which will be passed to :class:`ttbl.power.interface`.
 
     **Overview**
 
@@ -508,25 +536,41 @@ def arduino2_add(name,
 
     **Bill of materials**
 
-    - an Arduino Due board
-    - a USB A-Male to micro-B male cable (for board power, flashing
-      and console)
-    - one available port on an YKUSH power switching hub (serial *YKNNNNN*)
+    - an Arduino Mega board
+
+    - a USB A-Male to B male cable (for board power, flashing and
+      console)
+
+    - (for full on power control) one available port on an YKUSH power
+      switching hub (serial *YKNNNNN*) or other control
+
+      None connecting the barrel power supply and the USB cable would
+      still require a way to shut off power to the USB power supply,
+      otherwise the board will not reset.
 
     **Connecting the test target fixture**
 
-    1. connect the Arduino Due's OpenSDA (?) port with the USB A-male
-       to B-micro to YKUSH downstream port *N*
+    Using a YKUSH:
+
+    1. connect the Arduino USB B to the YKUSH downstream port *N*
 
     2. connect the YKUSH to the server system and to power as
        described in :py:func:`conf_00_lib_pdu.ykush_targets_add`
 
+    Without a YKUSH:
+
+    1. connect the Arduino USB B to a server's USB port
+
     **Configuring the system for the fixture**
 
-    1. Choose a name for the target: *arduino2-NN* (where NN is a number)
+    Ensure the steps to setup an :ref:`*Arduino CLI*
+    <arduino_cli_setup>` flasher have been run.
 
-    2. (if needed) Find the YKUSH's serial number *YKNNNNN* [plug it and
-       run *dmesg* for a quick find], see :py:func:`conf_00_lib_pdu.ykush_targets_add`.
+    1. Choose a name for the target: *arduino-mega-NN* (where NN is a number)
+
+    2. (if needed) Find the YKUSH's serial number *YKNNNNN* [plug it
+       and run *dmesg* for a quick find], see
+       :py:func:`conf_00_lib_pdu.ykush_targets_add`.
 
     3. Find the board's :ref:`serial number <find_usb_info>`
 
@@ -534,15 +578,20 @@ def arduino2_add(name,
        board's serial console so it can be easily found at
        ``/dev/tty-TARGETNAME``. Follow :ref:`these instructions
        <usb_tty_serial>` using the boards' *serial number*.
+
     """
-    if usb_serial_number == None:
-        usb_serial_number = name
-    if serial_port == None:
-        serial_port = "/dev/tty-" + name
-    if ykush_serial and ykush_port_board:
-        power_rail = ttbl.pc_ykush.ykush(ykush_serial, ykush_port_board)
+    assert isinstance(name, basestring)
+    assert fqbn in arduino_fqbns, \
+        "FQBN %s not known in conf_00_lib_mcu.arduino_fqbns" % fqbn
+
+    if usb_serial_number:
+        assert isinstance(usb_serial_number, basestring)
     else:
-        power_rail = []
+        serial_port = name
+    if serial_port:
+        assert isinstance(serial_port, basestring)
+    else:
+        serial_port = "/dev/tty-" + name
 
     target = ttbl.test_target(name)
     ttbl.config.target_add(
@@ -553,31 +602,34 @@ def arduino2_add(name,
             ),
             bsps = dict(
                 arm = dict(
-                    zephyr_board = "arduino_due",
-                    zephyr_kernelname = 'zephyr.bin',
-                    sketch_fqbn = "sam:1.6.9:arduino_due_x_dbg",
-                    sketch_kernelname = "sketch.ino.bin",
-                    console = ""
+                    sketch_fqbn = fqbn,
+                    sketch_extension = arduino_fqbns[fqbn],
                 ),
             ),
         ),
-        target_type = "arduino2")
+        target_type = commonl.name_make_safe(fqbn))
 
     console_file_name = "/dev/tty-%s" % name
     serial0_pc = ttbl.console.serial_pc(console_file_name)
 
+    if power_rail == None:
+        power_rail = []
     target.interface_add(
         "power",
         ttbl.power.interface(
             *
             power_rail +
             [
-                ( "USB device present",
-                  ttbl.pc.delay_til_usb_device(usb_serial_number) ),
-                ( "TTY file present",
-                  ttbl.pc.delay_til_file_appears(
-                      console_file_name, poll_period = 1, timeout = 25,
-                  )),
+                (
+                    "USB device present",
+                    ttbl.pc.delay_til_usb_device(usb_serial_number)
+                ),
+                (
+                    "TTY file present",
+                    ttbl.pc.delay_til_file_appears(
+                        console_file_name, poll_period = 1, timeout = 25,
+                    )
+                ),
                 ( "serial0", serial0_pc )
             ]
         )
@@ -594,10 +646,13 @@ def arduino2_add(name,
     target.interface_add(
         "images",
         ttbl.images.interface(**{
-            "kernel": ttbl.images.bossac_c(),
-            "kernel-arm": "kernel"
+            # The ARM BSP refers to an arduino_cli_c
+            "kernel-arm": ttbl.images.arduino_cli_c(),
+            "kernel": "kernel-arm"
         })
     )
+
+    return target
 
 
 def emsk_add(name = None,

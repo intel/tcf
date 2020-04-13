@@ -24,6 +24,7 @@ import time
 
 import serial
 
+import commonl
 import ttbl
 
 
@@ -136,6 +137,186 @@ class interface(ttbl.tt_interface):
             result = self.aliases.keys() + self.impls.keys())
 
 
+class arduino_cli_c(impl_c):
+    """Flash with the `Arduino CLI <https://www.arduino.cc/pro/cli>`
+
+    For example:
+
+    >>> target.interface_add(
+    >>>     "images",
+    >>>     ttbl.images.interface(**{
+    >>>         "kernel-arm": ttbl.images.arduino_cli_c(),
+    >>>         "kernel": "kernel-arm",
+    >>>     })
+    >>> )
+
+    :param str serial_port: (optional) File name of the device node
+       representing the serial port this device is connected
+       to. Defaults to */dev/tty-TARGETNAME*.
+
+    :param str console: (optional) name of the target's console tied
+       to the serial port; this is needed to disable it so this can
+       flash. Defaults to the default console.
+
+    :param str sketch_fqbn: (optional) name of FQBN to be used to
+      program the board (will be passed on the *--fqbn* arg to
+      *arduino-cli upload*).
+
+    *Requirements*
+
+    - Needs a connection to the USB programming port, represented as a
+      serial port (TTY)
+
+    .. _arduino_cli_setup::
+
+    - *arduino-cli* has to be available in the path variable :data:`path`.
+
+      To install Arduino-CLI::
+
+        $ wget https://downloads.arduino.cc/arduino-cli/arduino-cli_0.9.0_Linux_64bit.tar.gz
+        # tar xf arduino-cli_0.9.0_Linux_64bit.tar.gz  -C /usr/local/bin
+
+      The boards that are going to be used need to be pre-downloaded;
+      thus, if the board FQBN *XYZ* will be used and the daemon will
+      be running as user *ttbd*::
+
+        # sudo -u ttbd arduino-cli core update-index
+        # sudo -u ttbd arduino-cli core install XYZ
+
+      Each user that will compile for such board needs to do the same
+
+    - target declares *sketch_fqbn* in the tags/properties for the BSP
+      corresponding to the image. Eg; for *kernel-arm*::
+
+        $ ~/t/alloc-tcf.git/tcf get arduino-mega-01 -p bsps
+        {
+            "bsps": {
+                "arm": {
+                    "sketch_fqbn": "arduino:avr:mega:cpu=atmega2560"
+                }
+            }
+        }
+
+      Corresponds to a configuration in the:
+
+      .. code-block:: python
+
+         target.tags_update(dict(
+             bsps = dict(
+                 arm = dict(
+                     sketch_fqbn = "arduino:avr:mega:cpu=atmega2560",
+                 ),
+             ),
+         ))
+
+    - TTY devices need to be properly configured permission wise for
+      the flasher to work; it will tell the *console* subsystem to
+      disable the console so it can have exclusive access to the
+      console to use it for flashing.
+
+        SUBSYSTEM == "tty", ENV{ID_SERIAL_SHORT} == "95730333937351308131", \
+          SYMLINK += "tty-arduino-mega-01"
+
+    """
+    def __init__(self, serial_port = None, console = None, sketch_fqbn = None):
+        assert serial_port == None or isinstance(serial_port, basestring)
+        assert console == None or isinstance(console, basestring)
+        assert sketch_fqbn == None or isinstance(sketch_fqbn, basestring)
+        impl_c.__init__(self)
+        self.serial_port = serial_port
+        self.console = console
+        self.sketch_fqbn = sketch_fqbn
+        self.upid_set("Arduino CLI Flasher", serial_port = serial_port)
+
+    #: Path to *arduino-cli*
+    #:
+    #: Change with
+    #:
+    #: >>> ttbl.images.arduino_cli_c.path = "/usr/local/bin/arduino-cli"
+    #:
+    #: or for a single instance that then will be added to config:
+    #:
+    #: >>> imager = ttbl.images.arduino_cli_c.path(SERIAL)
+    #: >>> imager.path =  "/usr/local/bin/arduino-cli"
+    path = "/usr/local/bin/arduino-cli"
+
+    def flash(self, target, images):
+        assert len(images) == 1, \
+            "only one image suported, got %d: %s" \
+            % (len(images), " ".join("%s:%s" % (k, v)
+                                     for k, v in images.items()))
+        image_name = images.values()[0]
+
+        if self.serial_port == None:
+            serial_port = "/dev/tty-%s" % target.id
+        else:
+            serial_port = self.serial_port
+
+        if not hasattr(target, "console"):
+            raise RuntimeError(
+                "%s: configuration error, there is no console "
+                " interface in this target" % target.id)
+        console_name = target.console.get_default_name(target)
+        if console_name == None:
+            raise RuntimeError(
+                "%s: configuration error, flasher is looking for"
+                " console '%s', which does not exist (target lists: %s)"
+                % (target.id, self.console,
+                   " ".join(target.console.impls.keys())))
+
+        target.power.put_cycle(target, ttbl.who_daemon(), {}, None, None)
+        # give up the serial port, we need it to flash
+        # we don't care it is off because then we are switching off
+        # the whole thing and then someone else will power it on
+        target.log.info("%s: disabling console %s to allow flasher to work"
+                        % (target.id, console_name))
+        target.console.put_disable(target, ttbl.who_daemon(),
+                                   dict(component = console_name), None, None)
+        # remember this only handles one image type
+        bsp = images.keys()[0].replace("kernel-", "")
+        sketch_fqbn = self.sketch_fqbn
+        if sketch_fqbn == None:
+            # get the Sketch FQBN from the tags for the BSP
+            sketch_fqbn = target.tags.get('bsps', {}).get(bsp, {}).get('sketch_fqbn', None)
+            if sketch_fqbn == None:
+                raise RuntimeError(
+                    "%s: configuration error, needs to declare a tag"
+                    " bsps.BSP.sketch_fqbn for BSP %s or a sketch_fqbn "
+                    "to the constructor"
+                    % (target.id, bsp))
+
+        # Arduino Dues and others might need a flash erase
+        if sketch_fqbn in [ "arduino:sam:arduino_due_x_dbg" ]:
+            # erase the flash by opening the serial port at 1200bps
+            target.log.debug("erasing the flash")
+            with serial.Serial(port = serial_port, baudrate = 1200):
+                time.sleep(0.25)
+            target.log.info("erased the flash")
+
+        # now write it
+        cmdline = [
+            self.path,
+            "upload",
+            "--port", serial_port,
+            "--fqbn", sketch_fqbn,
+            "--verbose",
+            "--input", image_name
+        ]
+        target.log.info("flashing image with: %s" % " ".join(cmdline))
+        try:
+            subprocess.check_output(
+                cmdline, stdin = None, cwd = "/tmp",
+                stderr = subprocess.STDOUT)
+            target.log.info("ran %s" % (" ".join(cmdline)))
+        except subprocess.CalledProcessError as e:
+            target.log.error("flashing with %s failed: (%d) %s"
+                             % (" ".join(cmdline),
+                                e.returncode, e.output))
+            raise
+        target.power.put_off(target, ttbl.who_daemon(), {}, None, None)
+        target.log.info("flashed image")
+
+
 
 
 class bossac_c(impl_c):
@@ -233,12 +414,12 @@ class bossac_c(impl_c):
         else:
             console = self.console
 
-        target.power.put_cycle(target, ttbl.who_daemon(), {}, None)
+        target.power.put_cycle(target, ttbl.who_daemon(), {}, None, None)
         # give up the serial port, we need it to flash
         # we don't care it is off because then we are switching off
         # the whole thing and then someone else will power it on
         target.console.put_disable(target, ttbl.who_daemon(),
-                                   dict(component = console), None)
+                                   dict(component = console), None, None)
         # erase the flash by opening the serial port at 1200bps
         target.log.debug("erasing the flash")
         with serial.Serial(port = serial_port, baudrate = 1200):
@@ -266,7 +447,7 @@ class bossac_c(impl_c):
                              % (" ".join(cmdline),
                                 e.returncode, e.output))
             raise
-        target.power.put_off(target, ttbl.who_daemon(), {}, None)
+        target.power.put_off(target, ttbl.who_daemon(), {}, None, None)
         target.log.info("flashed image")
 
 
@@ -446,7 +627,7 @@ class dfu_c(impl_c):
 
         # Power cycle the board so it goes into DFU mode; it then
         # stays there for five seconds (FIXME: all of them?)
-        target.power.put_cycle(target, ttbl.who_daemon(), {}, None)
+        target.power.put_cycle(target, ttbl.who_daemon(), {}, None, None)
 
         # let's do this
         try:
@@ -458,7 +639,7 @@ class dfu_c(impl_c):
             target.log.error("flashing with %s failed: (%d) %s" %
                              (" ".join(cmdline), e.returncode, e.output))
             raise
-        target.power.put_off(target, ttbl.who_daemon(), {}, None)
+        target.power.put_off(target, ttbl.who_daemon(), {}, None, None)
         target.log.info("flashed image")
 
 
@@ -582,12 +763,12 @@ class esptool_c(impl_c):
                                 e.returncode, e.output))
             raise
 
-        target.power.put_cycle(target, ttbl.who_daemon(), {}, None)
+        target.power.put_cycle(target, ttbl.who_daemon(), {}, None, None)
         # give up the serial port, we need it to flash
         # we don't care it is off because then we are switching off
         # the whole thing and then someone else will power it on
         target.console.put_disable(target, ttbl.who_daemon(),
-                                   dict(component = console), None)
+                                   dict(component = console), None, None)
         try:
             cmdline = cmdline_flash + [ image_name_bin ]
             target.log.info("%s: flashing with %s"
@@ -601,5 +782,5 @@ class esptool_c(impl_c):
                              % (image_type, " ".join(cmdline),
                                 e.returncode, e.output))
             raise
-        target.power.put_off(target, ttbl.who_daemon(), {}, None)
+        target.power.put_off(target, ttbl.who_daemon(), {}, None, None)
         target.log.info("%s: flashing succeeded" % image_type)
