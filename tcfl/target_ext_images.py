@@ -117,8 +117,8 @@ class extension(tc.target_extension_c):
                 # collide
                 digest = commonl.hash_file(hashlib.sha256(), img_name)
                 img_name_remote = \
-                    commonl.file_name_make_safe(os.path.abspath(img_name)) \
-                    + "-" + digest.hexdigest()[:10]
+                    digest.hexdigest()[:10] \
+                    + "-" + commonl.file_name_make_safe(os.path.abspath(img_name))
                 target.store.upload(img_name_remote, img_name)
                 _images[img_type] = img_name_remote
                 target.report_info("uploaded: " + images_str, dlevel = 1)
