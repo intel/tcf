@@ -432,6 +432,10 @@ def _cmdline_alloc_ls(args):
         targetl = ttb_client.cmdline_list(args.target, args.all)
         targets = collections.OrderedDict()
 
+        if not ttb_client.rest_target_brokers:
+            logging.error("E: no servers available, did you configure?")
+            return
+
         # to use fullid, need to tweak the refresh code to add the aka part
         for rt in sorted(targetl, key = lambda x: x['fullid']):
             target_name = rt['fullid']

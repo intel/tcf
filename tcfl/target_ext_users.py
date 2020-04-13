@@ -36,6 +36,9 @@ def _cmdline_user_list(args):
         threads = {}
         tp = ttb_client._multiprocessing_pool_c(
             processes = len(ttb_client.rest_target_brokers))
+        if not ttb_client.rest_target_brokers:
+            logging.error("E: no servers available, did you configure?")
+            return
         for rtb in sorted(ttb_client.rest_target_brokers.itervalues()):
             threads[rtb] = tp.apply_async(_user_list, (rtb, args.userid))
         tp.close()
