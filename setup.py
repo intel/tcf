@@ -93,8 +93,9 @@ This is the client and meta-testcase runner for the TCF test case framework.
          + glob.glob("tests/*.sh")
          + glob.glob("tests/*.txt")
          # These map to symlinked files in tests/
-         + [ 'ttbd/conf_00_lib.py',
-             'sketch/conf_sketch.py' ]
+         + [
+             'ttbd/conf_00_lib.py',
+         ]
         ),
         ('@prefix@/share/tcf/lint',
          setupl.glob_no_symlinks(".lint.*.py")

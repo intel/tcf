@@ -1,7 +1,7 @@
 asciimatics
 Jinja2
 PyYAML
-python-cv
+opencv-python
 functools32
 imutils
 junit_xml
