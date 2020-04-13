@@ -1204,6 +1204,9 @@ def field_needed(field, projections):
         for projection in projections:
             if fnmatch.fnmatch(field, projection):
                 return True	# we need this field
+            # match projection a to fields a.[x.[y.[...]]]
+            if field.startswith(projection + "."):
+                return True
         return False		# we do not need this field
     else:
         return True	# no list, have it
@@ -1237,13 +1240,14 @@ def dict_to_flat(d, projections = None):
         # change it like that and maybe the evaluation can be done before
         # the assignment.
 
-        if field_needed(field_flat, projections):
+        if isinstance(val, dict):
+            if depth_limit > 0:	# dict to dig in
+                for key, value in val.iteritems():
+                    __update_recursive(value, key, field_flat + "." + str(key),
+                                       projections, depth_limit - 1,
+                                       prefix = prefix + "    ")
+        elif field_needed(field_flat, projections):
             bisect.insort(fl, ( field_flat, val ))
-        elif isinstance(val, dict) and depth_limit > 0:	# dict to dig in
-            for key, value in val.iteritems():
-                __update_recursive(value, key, field_flat + "." + str(key),
-                                   projections, depth_limit - 1,
-                                   prefix = prefix + "    ")
 
     for key, _val in d.iteritems():
         __update_recursive(d[key], key, key, projections, 10)

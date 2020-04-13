@@ -1390,18 +1390,30 @@ class target_c(reporter_c):
 
         :param str property_name: Name of the property to read
         :returns str: value of the property (if set) or None
+
+        Note that getting a property named *a.b.c* expects the target
+        to have a property *a* that contains a field *b* that is also
+        a dictionary and this will return its value *c*.
         """
         self.report_info("reading property '%s'" % property_name, dlevel = 3)
-        data = { "projections": json.dumps([ property_name ]) }
+        data = { "projection": json.dumps([ property_name ]) }
         if self.ticket:
             data['ticket'] = self.ticket
         r = self.rtb.send_request("GET", "targets/" + self.id, data = data)
-        r = r.get(property_name, None)
+        # unfold a.b.c.d which returns { a: { b: { c: { d: value } } } }
+        propertyl = property_name.split(".")
+        for prop_name in propertyl:
+            r = r.get(prop_name, None)
+            if r == None:
+                val = None
+                break
+        else:
+            val = r
         self.report_info("read property '%s': '%s' [%s]"
-                         % (property_name, r, default), dlevel = 2)
-        if r == None and default != None:
+                         % (property_name, val, default), dlevel = 2)
+        if val == None and default != None:
             return default
-        return r
+        return val
 
     def property_set(self, property_name, value = None):
         """
@@ -1421,6 +1433,20 @@ class target_c(reporter_c):
                               json = data)
         self.report_info("set property '%s' to '%s'" % (property_name, value),
                          dlevel = 2)
+
+    def properties_set(self, d):
+        """
+        Set a recursive dictionary tree of properties
+
+        :param dict d: Dictionary of properties and values
+        """
+        assert isinstance(d, dict)
+        self.report_info("setting %d properties" % (len(d)), dlevel = 3)
+        if self.ticket:
+            d['ticket'] = self.ticket
+        self.rtb.send_request("PATCH", "targets/" + self.id,
+                              json = d)
+        self.report_info("set %d properties" % (len(d)), dlevel = 2)
 
     def disable(self, reason = 'disabled by the administrator'):
         """
