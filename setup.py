@@ -108,6 +108,9 @@ This is the client and meta-testcase runner for the TCF test case framework.
              "junit-base.j2.xml",
              "junit.j2.xml",
          ]
-        )
+        ),
+        ( '@prefix@/share/tcf/content', [
+            'tcfl/evemu.bin.tar.gz',
+        ]),
     ],
 )

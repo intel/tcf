@@ -5,16 +5,19 @@ install_data = /
 release = 1
 packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
 # FIXME: document why each somewhere
+# CentOS has just syslinux
 requires =
-         dhcp-server
+         @@Fedora@@dhcp-server
+         @@CentOS|RHEL@@dhcp
+         dnsmasq 
          httpd
          nfs-utils
          rsync
          syslinux
-         syslinux-efi64
+         @@Fedora@@syslinux-efi64
          syslinux-extlinux
-         syslinux-extlinux-nonlinux
-         syslinux-nonlinux
+         @@Fedora@@syslinux-nonlinux
+         @@Fedora@@syslinux-extlinux-nonlinux
          syslinux-tftpboot
          tftp-server
          ttbd == %{version}-%{release}

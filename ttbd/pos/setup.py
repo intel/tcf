@@ -50,8 +50,5 @@ imaging on PC-class targets via DHCP / TFTP.
             'kickstart-install.sh',
             'tcf-image-setup.sh',
         ]),
-        ( '@prefix@/share/tcf/content', [
-            'evemu.bin.tar.gz',
-        ]),
     ],
 )

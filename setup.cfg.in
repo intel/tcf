@@ -10,13 +10,16 @@ requires =
          make
          python-ply
          python-requests
-         python2-Levenshtein
+         @@Fedora@@python2-Levenshtein
+         @@CentOS|RHEL@@python-Levenshtein
+         python2-pykwalify
          python2-backports-functools_lru_cache
          python2-jinja2
          python2-junit_xml
          python2-keyring
          python2-numpy
-         python2-opencv
+         @@Fedora@@python2-opencv
+         @@CentOS|RHEL@@opencv-python
          python2-pyyaml
          python2-tabulate
 
