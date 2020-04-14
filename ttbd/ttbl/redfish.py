@@ -31,7 +31,7 @@ class pos_mode_c(ttbl.power.impl_c):
     This can be used in the power rail of a machine that can be
     provisioned with :ref:`Provisioning OS <provisioning_os>`, instead
     of using pre power-on hooks (such as
-    :meth:`pci_ipmitool.pre_power_pos_setup`).
+    :meth:`pci.pre_power_pos_setup`).
 
     When the target is being powered on, this will be called, and
     based if the value of the *pos_mode* property is *pxe*, the RedFish

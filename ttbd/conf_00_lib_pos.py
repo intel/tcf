@@ -600,7 +600,6 @@ def pos_target_add(
 
       - :func:`ttbl.dhcp.power_on_pre_pos_setup`
       - :meth:`ttbl.ipmi.pci.pre_power_pos_setup`
-      - :meth:`ttbl.ipmi.pci_ipmitool.pre_power_pos_setup`
 
       Default is :func:`ttbl.dhcp.power_on_pre_pos_setup`.
 
