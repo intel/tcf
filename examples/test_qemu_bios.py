@@ -95,7 +95,9 @@ import tcfl.tc
 import tcfl.tl
 import tcfl.pos
 
-class _test(tcfl.pos.tc_pos_base):
+@tcfl.tc.interconnect("ipv4_addr")
+@tcfl.tc.target('pos_capable')
+class _test(tcfl.tc.tc_c):
 
     def configure_00(self):
         if not 'EDK2_DIR' in os.environ:
@@ -185,8 +187,10 @@ class _test(tcfl.pos.tc_pos_base):
             },
             upload = True)
 
-    def eval(self, target):
+    def eval(self, ic, target):
         # power cycle to the new kernel
-        target.shell.run("/sbin/dmidecode -t bios",
+        ic.power.on()		# need the network to boot POS
+        target.pos.boot_to_pos()
+        target.shell.run("dmidecode -t bios",
                          re.compile("Vendor:.*I am the vendor now"))
         target.report_pass("New BIOS is reporting via DMI/bios Vendor field")
