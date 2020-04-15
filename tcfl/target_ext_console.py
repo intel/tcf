@@ -484,7 +484,6 @@ class extension(tc.target_extension_c):
     """
 
     def __init__(self, target):
-        interfaces = target.rt.get('interfaces', [])
         if 'console' not in target.rt.get('interfaces', []):
             raise self.unneeded
         self.target = target
