@@ -12,3 +12,4 @@ MANIFEST
 repo/
 _doc/
 ttbd/ttbl/version.py
+setup.cfg
