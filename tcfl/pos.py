@@ -607,6 +607,7 @@ class extension(tc.target_extension_c):
             target.report_error(
                 "POS: didn't find a login prompt in output to try fixing",
                 attachments = dict(output = output, alevel = 0))
+
     def boot_to_pos(self, pos_prompt = None,
                     # plenty to boot to an nfsroot, hopefully
                     timeout = 60,

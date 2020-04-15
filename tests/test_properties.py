@@ -6,6 +6,8 @@
 #
 # pylint: disable = missing-docstring
 
+import collections
+import json
 import os
 
 import commonl.testing
@@ -73,6 +75,65 @@ class _test(tcfl.tc.tc_c):
             raise tcfl.tc.failed_e(
                 "unexistant property '%s' returns value: %s" % (prop, val))
         self.report_pass("unexistant property '%s' returns None" % prop)
+
+    def teardown_90_scb(self):
+        ttbd.check_log_for_issues(self)
+
+def field_get_verify(r, property_name, do_raise = False):
+    # unfold a.b.c.d which returns { a: { b: { c: { d: value } } } }
+    propertyl = property_name.split(".")
+    acc = []
+    for prop_name in propertyl:
+        r = r.get(prop_name, None)
+        acc.append(prop_name)
+        if r == None:
+            if do_raise:
+                raise tcfl.tc.failed_e(
+                    'field %s is non-existing' % ".".join(acc), dict(r))
+            val = None
+            break
+    else:
+        val = r
+    return val
+
+
+@tcfl.tc.target(ttbd.url_spec)
+class _test_sorted(tcfl.tc.tc_c):
+    """The power components listed by the properties need to be sorted
+    according to their declaration order in the configuration
+
+    """
+
+    power_rail = [
+        "IOC/YK23406-2",
+        "ADB/YK23406-3",
+        "main/sp7/8",
+        "wait /dev/tty-gp-64b-soc",
+        "serial0_soc",
+        "wait /dev/tty-gp-64b-ioc",
+        "serial1_ioc",
+    ]
+
+    def eval(self, target):
+        r = target.rtb.send_request(
+            "GET", "targets/" + target.id,
+            data = { "projection": json.dumps(["interfaces.power" ]) },
+            raw = True)
+        # Even though JSON and python dicts are unordered, the server
+        # provides the resposnes in the right order
+        rt = json.loads(r.text, object_pairs_hook = collections.OrderedDict)
+        power_impls = field_get_verify(rt, "interfaces.power")
+        if power_impls.keys() != self.power_rail:
+            raise tcfl.tc.failed_e("server didn't keep the power-rail order",
+                                   dict(
+                                       reported_rail = power_impls.keys(),
+                                       sorted_rail = self.power_rail,
+                                   ))
+        self.report_pass("server kept power-rail order",
+                         dict(
+                             reported_rail = power_impls.keys(),
+                             sorted_rail = self.power_rail,
+                         ))
 
     def teardown_90_scb(self):
         ttbd.check_log_for_issues(self)

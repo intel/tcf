@@ -437,7 +437,8 @@ def _target_get(target_id):
     target = ttbl.test_target.get_for_user(target_id, calling_user)
     if target == None:
         flask.abort(404, "%s: unknown target" % target_id)
-    return flask.jsonify(target.to_dict(projections))
+    d = target.to_dict(projections)
+    return json.dumps(d, sort_keys = False)
 
 _admin_required = [
     'disabled',

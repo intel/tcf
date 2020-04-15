@@ -73,7 +73,12 @@ def _target_get(args):
     else:
         data = None
     rtb, _rt = ttb_client._rest_target_find_by_id(args.target)
-    rt = rtb.send_request("GET", "targets/" + args.target, data = data)
+    r = rtb.send_request("GET", "targets/" + args.target, data = data,
+                         raw = True)
+    # Keep the order -- even if json spec doesn't contemplate it, we
+    # use it so the client can tell (if they want) the order in which
+    # for example, power rail components are defined in interfaces.power
+    rt = json.loads(r.text, object_pairs_hook = collections.OrderedDict)
     print json.dumps(rt, skipkeys = True, indent = 4)
 
 def _target_patch(args):

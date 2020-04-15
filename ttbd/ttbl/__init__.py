@@ -1378,7 +1378,8 @@ class test_target(object):
         # what has to be there and what not. And the performance at
         # the end might not be much more or less...
         r = commonl.flat_slist_to_dict(
-            commonl.dict_to_flat(self.tags, projections))
+            commonl.dict_to_flat(self.tags, projections, sort = False))
+
         # Override with changeable stuff set by users
         #
         # Note things such as 'disabled', and 'powered' come from
