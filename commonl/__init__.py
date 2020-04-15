@@ -1212,7 +1212,7 @@ def field_needed(field, projections):
     else:
         return True	# no list, have it
 
-def dict_to_flat(d, projections = None, sort = True):
+def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
     """
     Convert a nested dictionary to a sorted list of tuples *( KEY, VALUE )*
 
@@ -1229,10 +1229,22 @@ def dict_to_flat(d, projections = None, sort = True):
     :returns list: sorted list of tuples *KEY, VAL*
 
     """
+    assert isinstance(d, collections.Mapping)
     fl = []
 
+    def _add(field_flat, val):
+        # empty dict, insert it if we want them
+        if sort:
+            bisect.insort(fl, ( field_flat, val ))
+        else:
+            fl.append(( field_flat, val ))
+
+    # test dictionary emptiness with 'len(d) == 0' vs 'd == {}', since they
+    # could be ordereddicts and stuff
+    
     def __update_recursive(val, field, field_flat, projections = None,
-                           depth_limit = 10, prefix = "  ", sort = True):
+                           depth_limit = 10, prefix = "  ", sort = True,
+                           empty_dict = False):
         # Merge d into dictionary od with a twist
         #
         # projections is a list of fields to include, if empty, means all
@@ -1244,21 +1256,24 @@ def dict_to_flat(d, projections = None, sort = True):
         # change it like that and maybe the evaluation can be done before
         # the assignment.
 
-        if isinstance(val, dict):
-            if depth_limit > 0:	# dict to dig in
+        if isinstance(val, collections.Mapping):
+            if len(val) == 0 and empty_dict == True:
+                _add(field_flat, val)
+            elif depth_limit > 0:	# dict to dig in
                 for key, value in val.iteritems():
                     __update_recursive(value, key, field_flat + "." + str(key),
                                        projections, depth_limit - 1,
                                        prefix = prefix + "    ",
-                                       sort = sort)
+                                       sort = sort, empty_dict = empty_dict)
         elif field_needed(field_flat, projections):
-            if sort:
-                bisect.insort(fl, ( field_flat, val ))
-            else:
-                fl.append(( field_flat, val ))
+            _add(field_flat, val)
 
+    if len(d) == 0 and empty_dict == True:
+        # empty dict, insert it if we want them
+        _add(field_flat, val)
     for key, _val in d.iteritems():
-        __update_recursive(d[key], key, key, projections, 10, sort = sort)
+        __update_recursive(d[key], key, key, projections, 10, sort = sort,
+                           empty_dict = empty_dict)
 
     return fl
 
@@ -1702,3 +1717,4 @@ def file_iterator(filename, chunk_size = 4096):
             if not data:
                 break
             yield data
+
