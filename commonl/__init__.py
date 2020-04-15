@@ -1211,7 +1211,7 @@ def field_needed(field, projections):
     else:
         return True	# no list, have it
 
-def dict_to_flat(d, projections = None):
+def dict_to_flat(d, projections = None, sort = True):
     """
     Convert a nested dictionary to a sorted list of tuples *( KEY, VALUE )*
 
@@ -1221,14 +1221,17 @@ def dict_to_flat(d, projections = None):
     :param dict d: dictionary to convert
     :param list(str) projections: (optional) list of :mod:`fnmatch`
       patterns of flay keys to bring in (default: all)
+    :param bool sort: (optional, default *True*) sort according to KEY
+      name or leave the natural order (needed to keep the order of the
+      dictionaries) -- requires the underlying dict to be a
+      collections.OrderedDict() in older python versions.
     :returns list: sorted list of tuples *KEY, VAL*
 
     """
-
     fl = []
 
     def __update_recursive(val, field, field_flat, projections = None,
-                           depth_limit = 10, prefix = "  "):
+                           depth_limit = 10, prefix = "  ", sort = True):
         # Merge d into dictionary od with a twist
         #
         # projections is a list of fields to include, if empty, means all
@@ -1245,12 +1248,16 @@ def dict_to_flat(d, projections = None):
                 for key, value in val.iteritems():
                     __update_recursive(value, key, field_flat + "." + str(key),
                                        projections, depth_limit - 1,
-                                       prefix = prefix + "    ")
+                                       prefix = prefix + "    ",
+                                       sort = sort)
         elif field_needed(field_flat, projections):
-            bisect.insort(fl, ( field_flat, val ))
+            if sort:
+                bisect.insort(fl, ( field_flat, val ))
+            else:
+                fl.append(( field_flat, val ))
 
     for key, _val in d.iteritems():
-        __update_recursive(d[key], key, key, projections, 10)
+        __update_recursive(d[key], key, key, projections, 10, sort = sort)
 
     return fl
 
