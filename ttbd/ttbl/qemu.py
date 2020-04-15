@@ -95,7 +95,7 @@ class qmp_c(object):
         else:
             self.log.error("%s: cannot connect after %d tries"
                            % (self.sockfile, tries,))
-            if os.path.exists(self.logfile):
+            if self.logfile and os.path.exists(self.logfile):
                 with open(self.logfile) as logfile:
                     for line in logfile:
                         self.log.error("%s: qemu log: %s"
@@ -676,17 +676,18 @@ class plugger_c(ttbl.things.impl_c):
 
 
     """
-    def __init__(self, name, **kwargs):
+    def __init__(self, name, *args, **kwargs):
+        self.args = args
         self.kwargs = kwargs
         self.name = name
         ttbl.things.impl_c.__init__(self)
 
     def plug(self, target, thing):
         assert isinstance(target, ttbl.test_target)
-
+        qmpfile = os.path.join(target.state_dir, "qemu.qmp")
         # Now with QMP, we add the device
-        with qmp_c(target.pidfile + ".qmp") as qmp:
-            r = qmp.command("device_add", id = self.name, **self.kwargs)
+        with qmp_c(qmpfile) as qmp:
+            r = qmp.command("device_add", *self.args, **self.kwargs)
             # prelaunch is what we get when we are waiting for GDB
             if r == {}:
                 return
@@ -695,10 +696,10 @@ class plugger_c(ttbl.things.impl_c):
 
     def unplug(self, target, thing):
         assert isinstance(target, ttbl.test_target)
-
+        qmpfile = os.path.join(target.state_dir, "qemu.qmp")
         # Now with QMP, we add the device
-        with qmp_c(target.pidfile + ".qmp") as qmp:
-            r = qmp.command("device_del", **self.kwargs)
+        with qmp_c(qmpfile) as qmp:
+            r = qmp.command("device_del", *self.args, **self.kwargs)
             # prelaunch is what we get when we are waiting for GDB
             if r == {}:
                 return
