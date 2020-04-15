@@ -20,6 +20,7 @@ Command line and logging helpers
 import argparse
 import base64
 import bisect
+import collections
 import contextlib
 import errno
 import fcntl
@@ -1268,9 +1269,9 @@ def _key_rep(r, key, key_flat, val):
         # this key has sublevels, iterate over them
         lhs, rhs = key.split('.', 1)
         if lhs not in r:
-            r[lhs] = {}
+            r[lhs] = collections.OrderedDict()
         elif not isinstance(r[lhs], dict):
-            r[lhs] = {}
+            r[lhs] = collections.OrderedDict()
 
         _key_rep(r[lhs], rhs, key_flat, val)
     else:
@@ -1288,7 +1289,9 @@ def flat_slist_to_dict(fl):
     :return dict: nested dictionary as described by the flat space of
       keys and values
     """
-    tr = {}
+    # maintain the order in which we add things, we depend on this for
+    # multiple things later on
+    tr = collections.OrderedDict()
     for key, val in fl:
         _key_rep(tr, key, key, val)
     return tr
