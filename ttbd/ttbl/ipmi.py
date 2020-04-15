@@ -25,8 +25,6 @@ import commonl.requirements
 import ttbl.power
 import ttbl.console
 
-pci_ipmitool = pci_ipmitool
-
 class pci(ttbl.power.impl_c):
     """
     Power controller to turn on/off a server via IPMI
@@ -118,6 +116,7 @@ class pci(ttbl.power.impl_c):
             self._run(target, [ "chassis", "bootparam",
                                 "set", "bootflag", "force_disk" ])
 
+pci_ipmitool = pci
 
 class pos_mode_c(ttbl.power.impl_c):
     """
