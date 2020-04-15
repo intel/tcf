@@ -49,6 +49,7 @@ class extension(tc.target_extension_c):
     def __init__(self, target):
         if not 'buttons' in target.rt.get('interfaces', []):
             raise self.unneeded
+        tc.target_extension_c.__init__(self, target)
 
     def _sequence(self, sequence):
         self.target.ttbd_iface_call("buttons", "sequence", method = "PUT",
