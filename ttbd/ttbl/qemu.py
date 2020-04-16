@@ -709,7 +709,7 @@ class plugger_c(ttbl.things.impl_c):
     def get(self, target, thing):
         # FIXME: this should query QEMU for the devices plugged, but
         # need to do more research on how
-        return target.fsdb.get("thing-" + thing.id) ==  'True'
+        return target.fsdb.get("interfaces.things." + thing.id + ".plugged", False)
 
 
 class network_tap_pc(ttbl.power.impl_c):

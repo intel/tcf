@@ -168,20 +168,20 @@ class interface(ttbl.tt_interface):
         # call
         self.user_path = None
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         """
         Called when the interface is added to a target to initialize
         the needed target aspect (such as adding tags/metadata)
         """
         capturers = []
+        publish_dict = target.tags['interfaces'][iface_name]
         for capturer, impl in self.impls.iteritems():
             ctype = "stream" if impl.stream else "snapshot"
+            publish_dict[capturer]['type'] = ctype
             descr = capturer + ":" + ctype
             if impl.mimetype:
                 descr += ":" + impl.mimetype
-            capturers.append(descr)
-        target.tags_update(dict(capture = " ".join(capturers)))
-        self.instrumentation_publish(target, "capture")
+                publish_dict[capturer]['mimetype'] = impl.mimetype
 
     def start(self, who, target, capturer):
         """

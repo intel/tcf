@@ -184,7 +184,7 @@ More networks can be added by creating configuration files
            ipv4_prefix_len = 24,
        )
    )
-   ttbl.test_target.get('NAME').tags['interfaces'].append('interconnect_c')
+   ttbl.test_target.get('NAME').tags['interfaces']['interconnect_c'] = {}
 
 Be sure to not assign conflicting IP blocks, or IP blocks that route
 to the public internet or intranet--in the example the convention is
@@ -220,7 +220,7 @@ it basically consists on:
              ipv4_prefix_len = 24,
          )
      )
-     ttbl.test_target.get('NAME').tags['interfaces'].append('interconnect_c')
+     ttbl.test_target.get('NAME').tags['interfaces']['interconnect_c'] = {}
 
   or for an existing network (such as the configuration's default
   *nwa*):

@@ -179,11 +179,10 @@ class interface(ttbl.tt_interface):
         # each rail component matters.
         self.impls_set(impls, kwimpls, impl_c)
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         # Called when the interface is added to a target to initialize
         # the needed target aspect (such as adding tags/metadata)
-        target.tags_update(dict(power_rail = self.impls.keys()))
-        self.instrumentation_publish(target, "power")
+        pass
 
 
     def _release_hook(self, target, _force):
@@ -420,7 +419,7 @@ class interface(ttbl.tt_interface):
             # since we are powering on, let's have whoever does this
             # select the right default console, but we wipe whatver
             # was set before
-            target.property_set('console-default', None)
+            target.property_set('interfaces.console.default', None)
             target.log.debug(
                 "power pre-on%s; fns %s"
                 % (why, " ".join(str(f) for f in target.power_on_pre_fns)))

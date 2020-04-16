@@ -87,9 +87,10 @@ class interface(ttbl.tt_interface):
         ttbl.tt_interface.__init__(self)
         self.impls_set(impls, kwimpls, impl_c)
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         # Called when the interface is added to a target to initialize
         # the needed target aspect (such as adding tags/metadata)
+        publish_dict = target.tags['interfaces'][iface_name]
         for name, _impl in self.impls.iteritems():
             # for each thing we added, we are going to tell them they
             # are a thing to this target, so they can unplug
@@ -99,8 +100,8 @@ class interface(ttbl.tt_interface):
                 "%s: thing '%s' for target '%s' has to be an" \
                 " existing target" % (target.id, name, target.id)
             thing.thing_to.add(target)
-        target.tags_update(dict(things = self.impls.keys()))
-        self.instrumentation_publish(target, "things")
+            publish_dict[name] = thing.type
+
 
     def _release_hook(self, target, _force):
         # unplug all the things plugged to this target
@@ -157,7 +158,7 @@ class interface(ttbl.tt_interface):
              thing.target_owned_and_locked(who):
             if not impl.get(target, thing):
                 impl.plug(target, thing)
-                target.fsdb.set("thing-" + thing.id, 'True')
+                target.fsdb.set("interfaces.things." + thing.id + ".plugged", True)
                 target.timestamp()	# If this works, it is acquired and locked
         return {}
 
@@ -178,6 +179,6 @@ class interface(ttbl.tt_interface):
              thing.target_owned_and_locked(who):
             if impl.get(target, thing):
                 impl.unplug(target, thing)
-                target.fsdb.set("thing-" + thing.id, None)
+                target.fsdb.set("interfaces.things." + thing.id + ".plugged", False)
                 target.timestamp()	# If this works, it is acquired and locked
         return {}

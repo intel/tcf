@@ -157,11 +157,13 @@ class interface(ttbl.tt_interface):
         self.usb_serial_number = usb_serial_number
 
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
+        instr_id = commonl.mkid(self.usb_serial_number, l = 4)
         self.instrumentation_publish_component(
             target, "fastboot",
-            commonl.mkid(self.usb_serial_number, l = 4), "ADB bridge",
+            instr_id, "ADB bridge",
             { 'usb_serial_number': self.usb_serial_number })
+        target.tags['interfaces'][iface_name]['instrument'] = instr_id
 
 
     def _release_hook(self, target, _force):

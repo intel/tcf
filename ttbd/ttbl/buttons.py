@@ -137,7 +137,7 @@ class interface(ttbl.tt_interface):
         ttbl.tt_interface.__init__(self)
         self.impls_set(impls, kwimpls, impl_c)
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         target.tags_update(dict(buttons = self.impls.keys()))
         
     def _release_hook(self, target, _force):

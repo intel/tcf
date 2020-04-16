@@ -160,7 +160,7 @@ class impl_c(ttbl.tt_interface_impl_c):
                                 " for enabling failed" % component)
                 self.disable(target, component)
                 raise
-        target.property_set("console-" + component + ".state", "enabled")
+        target.property_set("interfaces.console." + component + ".state", True)
 
     def disable(self, target, component):
         """
@@ -169,7 +169,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         :param str console: (optional) console to disable; if missing,
           the default one.
         """
-        target.property_set("console-" + component + ".state", None)
+        target.property_set("interfaces.console." + component + ".state", False)
 
     def state(self, target, component):
         """
@@ -392,13 +392,11 @@ class interface(ttbl.tt_interface):
         self.impls_set(impls, kwimpls, impl_c)
 
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         # Called when the interface is added to a target to initialize
         # the needed target aspect (such as adding tags/metadata)
-        target.tags_update(dict(consoles = self.impls.keys()))
-        target.properties_user.add("console-default")
-        target.properties_keep_on_release.add("console-default")
-        self.instrumentation_publish(target, "console")
+        target.properties_user.add("interfaces.console.default")
+        target.properties_keep_on_release.add("interfaces.console.default")
 
     def _release_hook(self, target, _force):
         # nothing to do on target release
@@ -432,13 +430,13 @@ class interface(ttbl.tt_interface):
         :returns str: the name of the default console
         :raises RuntimeError: if there are no consoles
         """
-        console_default = target.property_get("console-default", None)
+        console_default = target.property_get("interfaces.console.default", None)
         try:
             _impl, name = self.impl_get_by_name(console_default, "console")
             return default
         except IndexError:
             # invalid default, reset it
-            console_default = target.property_set("console-default", None)
+            console_default = target.property_set("interfaces.console.default", None)
             # fallthrough
         _impl, name = self.arg_impl_get("default", "console", True)
         if name:
@@ -509,7 +507,7 @@ class interface(ttbl.tt_interface):
         # console-COMPONENT.state is True)
         if impl.re_enable_if_dead == False:
             return False
-        shall_be_enabled = target.property_get("console-" + component + ".state", None)
+        shall_be_enabled = target.property_get("interfaces.console." + component + ".state", None)
         is_enabled = impl.state(target, component)
         if shall_be_enabled and is_enabled == False:
             # so it died, let's re-enable and retry
@@ -524,13 +522,13 @@ class interface(ttbl.tt_interface):
         offset = int(args.get('offset', 0))
         if target.target_is_owned_and_locked(who):
             target.timestamp()	# only if the reader owns it
-        last_enable_check = target.property_get("console-" + component + ".check_ts", 0)
+        last_enable_check = target.property_get("interfaces.console." + component + ".check_ts", 0)
         ts_now = time.time()
         if ts_now - last_enable_check > 5:
             # every five secs check if the implementation's link has
             # been closed and renable it if so
             self._maybe_re_enable(target, component, impl)
-            target.property_set("console-" + component + ".check_ts", ts_now)
+            target.property_set("interfaces.console." + component + ".check_ts", ts_now)
         r = impl.read(target, component, offset)
         stream_file = r.get('stream_file', None)
         if stream_file and not os.path.exists(stream_file):
@@ -569,7 +567,7 @@ class interface(ttbl.tt_interface):
             return {}
 
 def generation_set(target, console):
-    target.fsdb.set("console-" + console + ".generation",
+    target.fsdb.set("interfaces.console." + console + ".generation",
                     # trunc the time and make it a string
                     str(int(time.time())))
 
@@ -647,7 +645,7 @@ class generic_c(impl_c):
             stream_file = os.path.join(target.state_dir,
                                        "console-%s.read" % component),
             stream_generation = target.fsdb.get(
-                "console-%s.generation" % component, 0),
+                "interfaces.console." + component + ".generation", 0),
             stream_offset = offset
         )
 

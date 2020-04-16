@@ -813,7 +813,7 @@ class tt_interface(object):
         #: on [set by the initial call to :meth:`impls_set`]
         self.cls = None
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         # FIXME: move to public interface
         """
         Called when the interface is added to a target to initialize
@@ -1104,6 +1104,7 @@ class tt_interface(object):
         assert isinstance(target, ttbl.test_target)
         assert isinstance(iface_name, basestring)
 
+        tags_interface = collections.OrderedDict()
         components_by_index = collections.defaultdict(list)
         name_by_index = {}
         upid_by_index = {}
@@ -1116,18 +1117,21 @@ class tt_interface(object):
             impl, _ = self.impl_get_by_name(component, "component")
             instrument_name, index = \
                 self.instrument_mkindex(impl.name, impl.upid, kws)
+            tags_interface[component] = {
+                "instrument": index
+            }
             # FIXME: there must be a more efficient way than using
             # pprint.pformat
             components_by_index[index].append(component)
             name_by_index[index] = instrument_name
             upid_by_index[index] = impl.upid
-
         for index, components in components_by_index.iteritems():
             self.instrumentation_publish_component(
                 target, iface_name, index,
                 name_by_index.get(index, None), upid_by_index[index],
                 components,
                 kws = kws)
+        target.tags['interfaces'][iface_name] = tags_interface
 
 
     def request_process(self, target, who, method, call,
@@ -1242,7 +1246,7 @@ class test_target(object):
         self.log.propagate = False
         # List of interfaces that this target supports; updated by
         # interface_add().
-        self.tags['interfaces'] = []
+        self.tags['interfaces'] = {}
 
         # Create the directory where we'll keep the target's state
         self.state_dir = os.path.join(self.state_path, self.id)
@@ -1377,8 +1381,8 @@ class test_target(object):
         # because it is way easier to filter on flat triyng to keep
         # what has to be there and what not. And the performance at
         # the end might not be much more or less...
-        r = commonl.flat_slist_to_dict(
-            commonl.dict_to_flat(self.tags, projections, sort = False))
+        l = commonl.dict_to_flat(self.tags, projections,
+                                 sort = False, empty_dict = True)
 
         # Override with changeable stuff set by users
         #
@@ -1386,8 +1390,8 @@ class test_target(object):
         # self.fsdb
         # we are unfolding the flat field list l['a.b.c'] = 3 we get
         # from fsdb to -> r['a']['b']['c'] = 3
-        r.update(commonl.flat_slist_to_dict(
-            self.fsdb.get_as_slist(*projections)))
+        l += self.fsdb.get_as_slist(*projections)
+        r = commonl.flat_slist_to_dict(l)
 
 	# mandatory fields, override them all
         if commonl.field_needed('owner', projections):
@@ -2076,8 +2080,10 @@ class test_target(object):
                 "An interface of type %s has been already "
                 "registered for target %s at %s" %
                 (name, self.id, self.interface_origin[name]))
-        obj._target_setup(self)
-        self.tags['interfaces'].append(name)
+        # call this before so it creates the placeholder where driver
+        # called by _target_setup() can store stuff
+        obj.instrumentation_publish(self, name)
+        obj._target_setup(self, name)
         self.interface_origin[name] = commonl.origin_get(2)
         setattr(self, name, obj)
         self.release_hooks.add(obj._release_hook)

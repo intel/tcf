@@ -180,7 +180,7 @@ def interconnect_add(ic, _id = None, tags = None, ic_type = None,
     """
     target_add(ic, _id, tags = tags, target_type = ic_type,
                acquirer = acquirer)
-    ttbl.test_target.get(ic.id).tags['interfaces'].append('interconnect_c')
+    ic.tags['interfaces']['interconnect_c'] = { }
 
 _authenticators = []
 def add_authenticator(a):

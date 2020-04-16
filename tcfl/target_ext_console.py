@@ -498,8 +498,8 @@ class extension(tc.target_extension_c):
         # Which is the default console that was set in the server?
         # call it only once from here, otherwise everytime we try to
         # get the console to use by default we do a call
-        self.default_property = self.target.property_get("console-default",
-                                                         None)
+        self.default_property = self.target.property_get(
+            "interfaces.console.default", None)
         if self.default_property:
             self._default = self.default_property
         elif 'default' in self.aliases:
@@ -564,7 +564,7 @@ class extension(tc.target_extension_c):
                                     % (self._default, new_console))
             self._default = new_console
             self.default_property = new_console
-            self.target.property_set("console-default", new_console)
+            self.target.property_set("interfaces.console.default", new_console)
         return new_console
 
     def select_preferred(self, console = None, shell_setup = True,
@@ -850,9 +850,6 @@ class extension(tc.target_extension_c):
                                     component = console, data = data)
         self.target.report_info("%s: wrote %dB (%s) to console"
                                 % (console, len(data), data_report))
-
-    def list(self):
-        return self.target.rt.get('consoles', [])
 
     def capture_filename(self, console = None):
         """

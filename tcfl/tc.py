@@ -7703,7 +7703,7 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
         if rt.get('disabled', None) != None \
            and tc_c._targets_disabled_too == False:
             continue            
-        if 'interconnect_c' in rt.get('interfaces', []):
+        if 'interconnect_c' in rt.get('interfaces', {}):
             ic_selected_all[rt['fullid']] = set(rt.get('bsp_models', {}).keys())
         else:
             rt_selected_all[rt['fullid']] = set(rt.get('bsp_models', {}).keys())

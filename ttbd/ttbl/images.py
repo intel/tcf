@@ -102,9 +102,8 @@ class interface(ttbl.tt_interface):
         ttbl.tt_interface.__init__(self)
         self.impls_set(impls, kwimpls, impl_c)
 
-    def _target_setup(self, target):
-        target.tags_update(dict(images = self.impls.keys()))
-        self.instrumentation_publish(target, "images")
+    def _target_setup(self, target, iface_name):
+        pass
 
     def _release_hook(self, target, _force):
         pass
