@@ -1904,7 +1904,11 @@ class target_c(reporter_c):
         self.kws_origin.update(self.testcase.kws_origin)
         self.kws.update(self._kws)
         self.kws_origin.update(self._kws_origin)
+        # we publish both the flattened rt and the nested one
         commonl.kws_update_from_rt(self.kws, self.rt)
+        for key, val in commonl.dict_to_flat(self.rt,
+                                             sort = False, empty_dict = True):
+            self._kws[key] = val
         kws_bsp = dict()
         if 'bsps' in self.rt.keys() and bsp and bsp in self.rt['bsps']:
             commonl.kws_update_type_string(kws_bsp, self.rt['bsps'][bsp])
@@ -5981,7 +5985,11 @@ class tc_c(reporter_c):
             kws['bsp_model'] = ""
         kws['bsp_count'] = len(bsps)
         kws_bsp = dict()
+        # we use to evaluate the spec both the flattened rt and the nested one
         commonl.kws_update_from_rt(kws, rt)
+        for key, val in commonl.dict_to_flat(rt,
+                                             sort = False, empty_dict = True):
+            kws[key] = val
         rt_full_id = rt['fullid']
         rt_type = rt['type']
 

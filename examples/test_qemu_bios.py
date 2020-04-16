@@ -96,7 +96,7 @@ import tcfl.tl
 import tcfl.pos
 
 @tcfl.tc.interconnect("ipv4_addr")
-@tcfl.tc.target('pos_capable')
+@tcfl.tc.target('pos_capable and interfaces.images.bios.instrument')
 class _test(tcfl.tc.tc_c):
 
     def configure_00(self):
@@ -169,14 +169,6 @@ class _test(tcfl.tc.tc_c):
         self.report_pass("built BIOS")
 
 
-    def deploy_50(self, ic, target):
-        # remove "disabled_" to override the method from the
-        # tcfl.pos.tc_pos_base that flashes the OS--this makes the
-        # scrip to only build, flash the bios, powercycle into the
-        # installed OS and run the eval* steps--which works if you
-        # know
-        pass
-
     def deploy_90(self, target):
         # Flash the new BIOS before power cycling
         target.images.flash(
@@ -188,8 +180,7 @@ class _test(tcfl.tc.tc_c):
             upload = True)
 
     def eval(self, ic, target):
-        # power cycle to the new kernel
-        ic.power.on()		# need the network to boot POS
+        ic.power.cycle()		# need the network to boot POS
         target.pos.boot_to_pos()
         target.shell.run("dmidecode -t bios",
                          re.compile("Vendor:.*I am the vendor now"))

@@ -590,7 +590,7 @@ def rest_target_print(rt, verbosity = 0):
         print "%s %s%s" % (rt['fullid'], owner_s, power)
     elif verbosity == 2:
         print rt['fullid']
-        commonl.data_dump_recursive(rt, prefix = "  ")
+        commonl.data_dump_recursive(rt, prefix = rt['fullid'])
     elif verbosity == 3:
         pprint.pprint(rt)
     else:
@@ -747,7 +747,13 @@ def cmdline_list(spec_strings, do_all = False):
     targetl = []
     for _fullid, rt in sorted(rest_target_broker.rts_cache.iteritems(),
                               key = lambda x: x[0]):
-        if spec and not _target_select_by_spec(rt, spec):
+        # add the remote target info as a dictionary and ...
+        kws = dict(rt)
+        #  ... as a flattened dictionary 
+        for key, val in commonl.dict_to_flat(rt,
+                                             sort = False, empty_dict = True):
+            kws[key] = val
+        if spec and not _target_select_by_spec(kws, spec):
             continue
         targetl.append(rt)
     return targetl

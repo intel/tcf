@@ -134,7 +134,7 @@ TARGETS = int(os.environ.get('TARGETS', 4))
 MODE = os.environ.get('MODE', 'one-per-type')
 
 @tcfl.tc.interconnect("ipv4_addr", mode = MODE)
-@tcfl.tc.target('pos_capable and "bios" in images', count = TARGETS)
+@tcfl.tc.target('pos_capable and interfaces.images.bios.instrument', count = TARGETS)
 class _test(tcfl.tc.tc_c):
 
     def configure_00(self):
