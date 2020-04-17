@@ -42,7 +42,7 @@ import urlparse
 
 import __main__
 import requests
-import usb.core
+import usb.util
 
 import commonl
 import user_control
@@ -2155,3 +2155,16 @@ def daemon_pid_check(pid):
 # This is usually called by the SIGCHLD signal handler
 def daemon_pid_rm(pid):
     _daemon_pids.remove(pid)
+
+
+# util
+
+def usb_serial_number(d):
+    #depending on the library version, get the USB string one way or another
+    if hasattr(d, 'iSerialNumber'):
+        serial_number = usb.util.get_string(d, 1000, d.iSerialNumber)
+    elif hasattr(d, 'serial_number'):
+        serial_number = d.serial_number
+    else:
+        raise AssertionError("%s: don't know how to find USB device serial number" % d)
+    return serial_number

@@ -92,7 +92,7 @@ class ykush(ttbl.power.impl_c, ttbl.things.impl_c):
             ykush_dev = usb.core.find(
                 idVendor = 0x04d8,
                 backend = type(self).backend,
-                custom_match = lambda d: d.serial_number == self.ykush_serial,
+                custom_match = lambda d: ttbl.usb_serial_number(d) == self.ykush_serial,
             )
         except Exception as e:
             target.log.info("[retryable] Can't find USB devices: %s" % e)
