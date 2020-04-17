@@ -494,7 +494,7 @@ class extension(tc.target_extension_c):
 
     You can find available capturers with :meth:`list` or::
 
-      $ tcf capture-list TARGETNAME
+      $ tcf capture-ls TARGETNAME
       vnc0:ready
       screen:ready
       video1:not-capturing
@@ -749,7 +749,7 @@ class extension(tc.target_extension_c):
           the screenshot from; this has to be a capture output that supports
           screenshots in a graphical formatr (PNG, JPEG, etc), eg::
 
-            $ tcf capture-list nuc-01A
+            $ tcf capture-ls nuc-01A
             ...
             hdmi0_screenshot:snapshot:image/png:ready
             screen:snapshot:image/png:ready
@@ -867,7 +867,7 @@ def cmdline_setup(argsp):
                     type = str, help = "Name of capturer that should stop")
     ap.set_defaults(func = _cmdline_capture_stop)
 
-    ap = argsp.add_parser("capture-list", help = "List available capturers")
+    ap = argsp.add_parser("capture-ls", help = "List available capturers")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
     ap.set_defaults(func = _cmdline_capture_list)

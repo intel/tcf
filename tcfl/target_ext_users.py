@@ -105,7 +105,7 @@ def _cmdline_role_drop(args):
 
 def _cmdline_setup(arg_subparsers):
     ap = arg_subparsers.add_parser(
-        "user-list",
+        "user-ls",
         help = "List users known to the server (note you need "
         "admin role privilege to list users others than your own)")
     ap.add_argument("userid", action = "store",

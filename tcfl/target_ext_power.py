@@ -277,7 +277,7 @@ def _cmdline_setup(arg_subparser):
                     help = "Target names")
     ap.set_defaults(func = _cmdline_power_cycle)
 
-    ap = arg_subparser.add_parser("power-list",
+    ap = arg_subparser.add_parser("power-ls",
                                   help = "List power rail components and "
                                   "their state")
     ap.add_argument("target", metavar = "TARGET", action = "store",

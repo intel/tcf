@@ -1900,7 +1900,7 @@ def cmdline_pos_capability_list(args):
                     target, " ".join(unknown_caps))
 
 def cmdline_setup(argsp):
-    ap = argsp.add_parser("pos-capability-list", help = "List available "
+    ap = argsp.add_parser("pos-capability-ls", help = "List available "
                           "POS capabilities or those each target exports")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     nargs = "*", default = None, help = "Target's name")

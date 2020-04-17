@@ -1441,7 +1441,7 @@ def _cmdline_setup(arg_subparser):
     ap.set_defaults(func = _cmdline_console_read, offset = 0)
 
     ap = arg_subparser.add_parser(
-        "console-list",
+        "console-ls",
         help = "List consoles")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target name")

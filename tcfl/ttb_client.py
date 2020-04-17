@@ -796,18 +796,6 @@ def rest_target_find_all(all_targets = False):
         targets.append(rt)
     return targets
 
-def rest_target_acquire(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :returns: dictionary of tags
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_acquire(
-            rt, ticket = args.ticket, force = args.force)
-
 def rest_target_release(args):
     """
     :param argparse.Namespace args: object containing the processed

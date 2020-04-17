@@ -79,7 +79,7 @@ class extension(tc.target_extension_c):
 
           The types if images supported are determined by the target's
           configuration and can be reported with :meth:`list` (or
-          command line *tcf images-list TARGETNAME*).
+          command line *tcf images-ls TARGETNAME*).
 
         :param bool upload: (optional) the image names are local files
           that need to be uploaded first to the server (this function
@@ -156,8 +156,9 @@ def _cmdline_images_flash(args):
 
 def _cmdline_setup(arg_subparser):
     ap = arg_subparser.add_parser(
-        "images-list",
+        "images-ls",
         help = "List supported image types")
+    commonl.argparser_add_aka(arg_subparser, "images-ls", "images-list")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target name")
     ap.set_defaults(func = _cmdline_images_list)
