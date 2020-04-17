@@ -179,6 +179,7 @@ def _cmdline_alloc_targets(args):
                     allocid, ts - ts0)
                 _delete(rtb, allocid)
 
+
 class _model_c(object):
 
     def __init__(self, servers, targets):
@@ -584,11 +585,11 @@ def _cmdline_guest_remove(args):
         else:
             _guests_remove(rtb, allocid, args.guests)
 
-
 def _cmdline_setup(arg_subparsers):
     ap = arg_subparsers.add_parser(
         "alloc-targets",
-        help = "FIXME")
+        help = "Allocate targets for exclusive use")
+    commonl.argparser_add_aka(arg_subparsers, "alloc-targets", "acquire")
     ap.add_argument(
         "-a", "--all", action = "store_true", default = False,
         help = "Consider also disabled targets")
@@ -630,7 +631,7 @@ def _cmdline_setup(arg_subparsers):
 
     ap = arg_subparsers.add_parser(
         "alloc-monitor",
-        help = "FIXME")
+        help = "Monitor the allocations current in the system")
     ap.add_argument(
         "-a", "--all", action = "store_true", default = False,
         help = "Consider also disabled targets")
@@ -647,6 +648,7 @@ def _cmdline_setup(arg_subparsers):
         help = "List information about current allocations "
         "in all the servers or the servers where the named "
         "targets are")
+    commonl.argparser_add_aka(arg_subparsers, "alloc-ls", "alloc-list")
     ap.add_argument(
         "-v", dest = "verbosity", action = "count", default = 0,
         help = "Increase verbosity of information to display "
@@ -668,10 +670,12 @@ def _cmdline_setup(arg_subparsers):
     ap.set_defaults(func = _cmdline_alloc_ls)
 
     ap = arg_subparsers.add_parser(
-        "alloc-delete",
+        "alloc-rm",
         help = "Delete an existing allocation (which might be "
         "in any state; any targets allocated to said allocation "
         "will be released")
+    commonl.argparser_add_aka(arg_subparsers, "alloc-rm", "alloc-del")
+    commonl.argparser_add_aka(arg_subparsers, "alloc-rm", "alloc-delete")
     ap.add_argument(
         "allocid", metavar = "[SERVER/]ALLOCATIONID", nargs = "+",
         action = "store", default = None,
@@ -692,7 +696,7 @@ def _cmdline_setup(arg_subparsers):
     ap.set_defaults(func = _cmdline_guest_add)
 
     ap = arg_subparsers.add_parser(
-        "guest-list",
+        "guest-ls",
         help = "list guests in an allocation")
     ap.add_argument(
         "allocid", metavar = "[SERVER/]ALLOCATIONID",
@@ -701,8 +705,9 @@ def _cmdline_setup(arg_subparsers):
     ap.set_defaults(func = _cmdline_guest_list)
 
     ap = arg_subparsers.add_parser(
-        "guest-remove",
+        "guest-rm",
         help = "Remove a guest from an allocation")
+    commonl.argparser_add_aka(arg_subparsers, "guest-rm", "guest-remove")
     ap.add_argument(
         "allocid", metavar = "[SERVER/]ALLOCATIONID",
         action = "store", default = None,

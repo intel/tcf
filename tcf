@@ -293,9 +293,10 @@ if __name__ == "__main__":
     ap.set_defaults(func = _cookies)
 
     arg_parser_target_list = arg_subparsers.add_parser(
-        "list", help = "List the targets; by default, in a terminal, it will "
+        "ls", help = "List the targets; by default, in a terminal, it will "
         "print a multi-column display with '!' next to powered-on targets, "
         "and @ next to owned targets; -v adds more detail)")
+    commonl.argparser_add_aka(arg_subparsers, "ls", "list")
     arg_parser_target_list.add_argument(
         "-v", dest = "verbosity", action = "count", default = 0,
         help = "Increase information to display about the targets (-v "
@@ -336,17 +337,6 @@ if __name__ == "__main__":
                     default = None, help = "Data items to store; if"
                     " none, specify a JSON dictionary over stdin")
     ap.set_defaults(func = _target_patch)
-
-    ap = arg_subparsers.add_parser(
-        "acquire", help = "Acquire ownership of a target")
-    ap.add_argument(
-        "target", metavar = "TARGET", action = "store",
-        nargs = "+", default = None,
-        help = "Target's name or URL")
-    ap.add_argument("-f", "--force", action = "store_true", default = False,
-                    help = "Force the acquisition, removing the target "
-                    "from its current owner (requires admin rights)")
-    ap.set_defaults(func = ttb_client.rest_target_acquire)
 
     ap = arg_subparsers.add_parser("enable",
                                    help = "Enable a disabled target")

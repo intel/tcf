@@ -191,6 +191,10 @@ def logfile_open(tag, cls = None, delete = True, bufsize = 0,
         + clstag + who + "-" + tag,
         suffix = suffix, delete = delete, bufsize = bufsize, dir = directory)
 
+def argparser_add_aka(ap, name, aka):
+    # UGLY, but...
+    ap._name_parser_map[aka] = ap._name_parser_map[name]
+
 class _Action_increase_level(argparse.Action):
     def __init__(self, option_strings, dest, default = None, required = False,
                  nargs = None, **kwargs):
