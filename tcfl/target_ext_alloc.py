@@ -595,8 +595,10 @@ def _cmdline_setup(arg_subparsers):
         help = "Consider also disabled targets")
     ap.add_argument(
         "-r", "--reason", action = "store",
+        # use instead of getfqdn(), since it does a DNS lookup and can
+        # slow things a lot
         default = "cmdline %s@%s:%d" % (
-            getpass.getuser(), socket.getfqdn(), os.getppid()),
+            getpass.getuser(), socket.gethostname(), os.getppid()),
         help = "Reason to pass to the server (default: %(default)s)"
         " [LOGNAME:HOSTNAME:PARENTPID]")
     ap.add_argument(

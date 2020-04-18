@@ -3383,7 +3383,9 @@ class tc_c(reporter_c):
         self.name = name
         self.kw_set('pid', str(os.getpid()))
         self.kw_set('tid', "%x" % threading.current_thread().ident)
-        self.kw_set('host_name', socket.getfqdn())
+        # use instead of getfqdn(), since it does a DNS lookup and can
+        # slow things a lot
+        self.kw_set('host_name', socket.gethostname())
         self.kw_set('tc_name', self.name)
         # top level testcase name is that of the toplevel testcase,
         # with any subcases removed (anything after ##), so
