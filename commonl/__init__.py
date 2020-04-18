@@ -1261,7 +1261,7 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
         # the assignment.
 
         if isinstance(val, collections.Mapping):
-            if len(val) == 0 and empty_dict == True:
+            if len(val) == 0 and empty_dict == True and field_needed(field_flat, projections):
                 _add(field_flat, val)
             elif depth_limit > 0:	# dict to dig in
                 for key, value in val.iteritems():
