@@ -12,6 +12,7 @@ Some parts of the system use PXE and this contains the
 implementations.
 """
 
+import logging
 import os
 import subprocess
 
@@ -156,14 +157,27 @@ def setup_tftp_root(tftp_rootdir):
 
     It will wipe anything in some parts of there with 'rsync --delete'
     """
+
+    def _rsync_files(dest, files):
+        try:
+            commonl.makedirs_p(dest, 0o0775)
+            cmdline = [ "rsync", "-a", "--delete" ] + files + [ dest ]
+            subprocess.check_output(cmdline, shell = False, stderr = subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
+            logging.error("PXE setup: root::%s: can't copy files %s "
+                          " (do they exist?)\n%s" % (
+                              dest, " ".join(files), e.output))
+            raise
     # TFTP setup
     commonl.makedirs_p(os.path.join(tftp_rootdir, "pxelinux.cfg"), 0o0775)
+    if 'root' in architectures:
+        arch_data = architectures['root']
+        _rsync_files(tftp_rootdir, arch_data['copy_files'])
     for arch_name, arch_data in architectures.iteritems():
+        if arch_name == 'root':		# skip, we handled it ...
+            continue			# ... differently
         tftp_arch_dir = os.path.join(tftp_rootdir, arch_name)
-        commonl.makedirs_p(tftp_arch_dir, 0o0775)
-        cmdline = [ "rsync", "-a", "--delete" ] \
-            + arch_data['copy_files'] + [ tftp_arch_dir ]
-        subprocess.call(cmdline, shell = False, stderr = subprocess.STDOUT)
+        _rsync_files(tftp_arch_dir, arch_data['copy_files'])
         # We use always the same configurations; because the rsync
         # above might remove the symlink, we re-create it
         # We use a relative symlink so in.tftpd doesn't nix it
@@ -194,6 +208,9 @@ pos_cmdline_opts = {
         # and can syslog/nfsmount, etc Note we know the fields from the
         # target's configuration, as they are pre-assigned
         "ip=dhcp",
+        # The path to this is obtained if not given here (which we
+        # also can) from the DHCP root-path option given by the DHCP
+        # server -- look into dnsmasq.py or dhcp.py for root-path.
         "root=/dev/nfs",		# we are NFS rooted
         # no exotic storage options
         "rd.luks=0", "rd.lvm=0", "rd.md=0", "rd.dm=0", "rd.multipath=0",
