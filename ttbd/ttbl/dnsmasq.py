@@ -195,9 +195,9 @@ class pc(ttbl.power.daemon_c):
             # represents the domain zone; but not sure it is working
             # all right.
             addrs = []
-            ipv4_addr = ic.kws.get('ipv4_addr', None)
-            if ipv4_addr:
-                addrs.append(ipv4_addr)
+            ic_ipv4_addr = ic.kws.get('ipv4_addr', None)
+            if ic_ipv4_addr:
+                addrs.append(ic_ipv4_addr)
                 # IPv4 server address so we can do auth-server
                 configl.append("host-record=%(id)s,%(ipv4_addr)s")
                 # we let DNSMASQ figure out the range from the
@@ -205,18 +205,18 @@ class pc(ttbl.power.daemon_c):
                 # allow (static) the ones set below with dhcp-host
                 configl.append("dhcp-range=%(ipv4_addr)s,static")
 
-            ipv6_addr = ic.kws.get('ipv6_addr', None)
-            if ipv6_addr:
-                addrs.append(ipv6_addr)
+            ic_ipv6_addr = ic.kws.get('ipv6_addr', None)
+            if ic_ipv6_addr:
+                addrs.append(ic_ipv6_addr)
                 # IPv6 server address so we can do auth-server
                 configl.append("host-record=%(id)s,[%(ipv6_addr)s]")
                 # FIXME: while this is working, it is still not giving
                 # the IPv6 address we hardcoded in the doc :/
                 ipv6_prefix_len = ic.kws['ipv6_prefix_len']
                 network = ipaddress.IPv6Network(unicode(
-                    ipv6_addr + "/" + str(ipv6_prefix_len)), strict = False)
+                    ic_ipv6_addr + "/" + str(ipv6_prefix_len)), strict = False)
                 configl.append("dhcp-range=%s,%s,%s" % (
-                    ipv6_addr, network.broadcast_address, ipv6_prefix_len))
+                    ic_ipv6_addr, network.broadcast_address, ipv6_prefix_len))
 
             # Create A record for the server/ domain
             # this is a separat file in DIRNAME/dnsmasq.hosts/NAME
@@ -268,20 +268,37 @@ class pc(ttbl.power.daemon_c):
                 # so we can point it to the right file.
                 if bsp:
                     # try ARCH or efi-ARCH
+                    # override with anything the target declares in config
                     arch = None
-                    if bsp in ttbl.pxe.architectures:
+                    boot_filename = None
+                    if 'pos_tftp_boot_filename' in target.tags:
+                        boot_filename = target.tags['pos_tftp_boot_filename']
+                    elif bsp in ttbl.pxe.architectures:
                         arch = ttbl.pxe.architectures[bsp]
                         arch_name = bsp
+                        boot_filename = arch_name + "/" + arch.get('boot_filename', None)
                     elif "efi-" + bsp in ttbl.pxe.architectures:
                         arch_name = "efi-" + bsp
                         arch = ttbl.pxe.architectures[arch_name]
-                    if arch:
-                        boot_filename = arch.get('boot_filename', None)
-                        if boot_filename:
-                            boot_filename = arch_name + "/" + boot_filename
-                            f.write(
-                                "dhcp-option=tag:%(id)s," % kws
-                                + "option:bootfile-name," + boot_filename + "\n")
+                        boot_filename = arch_name + "/" + arch.get('boot_filename', None)                        
+                    if boot_filename:
+                        f.write(
+                            "dhcp-option=tag:%(id)s," % kws
+                            + "option:bootfile-name," + boot_filename + "\n")
+                    if ic_ipv4_addr:
+                        f.write(
+                            "dhcp-option=tag:%(id)s," % kws
+                            + "option:tftp-server," + ic_ipv4_addr + "\n")
+                    if ic_ipv6_addr:
+                        f.write(
+                            "dhcp-option=tag:%(id)s," % kws
+                            + "option:tftp-server," + ic_ipv4_addr + "\n")
+                    else:
+                        raise RuntimeError(
+                            "%s: TFTP/PXE boot mode selected, but no boot"
+                            " filename can be guessed for arch/BSP %s/%s;"
+                            " declare tag pos_tftp_boot_filename?"
+                            % (target.id, arch_name, bsp))
 
         # note the rename we did target -> ic
         ttbl.power.daemon_c.on(self, ic, _component)
