@@ -823,9 +823,9 @@ def _cmdline_capture_list(args):
         target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
         capturers = target.capture.list()
         capture_spec = {}
-        for capture in target.rt['capture'].split():
-            capturer, streaming, mimetype = capture.split(":", 2)
-            capture_spec[capturer] = (streaming, mimetype)
+        for capturer, data \
+            in target.rt.get('interfaces', {}).get('capture', {}).items():
+            capture_spec[capturer] = (data['type'], data['mimetype'])
         for name, state in capturers.iteritems():
             print "%s:%s:%s:%s" % (
                 name, capture_spec[name][0], capture_spec[name][1], state)
