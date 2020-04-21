@@ -582,9 +582,15 @@ def rest_target_print(rt, verbosity = 0):
             power = " ON"
         else:
             power = ""
+        allocid = rt.get('_alloc', {}).get('id', None)
         owner = rt.get('owner', None)
-        if owner != None:
-            owner_s = "[" + owner + "]"
+        if allocid or owner:
+            ownerl = []
+            if owner:
+                ownerl.append(owner)
+            if allocid:
+                ownerl.append(allocid)
+            owner_s = "[" + ":".join(ownerl) + "]"
         else:
             owner_s = ""
         print "%s %s%s" % (rt['fullid'], owner_s, power)
