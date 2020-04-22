@@ -394,12 +394,20 @@ def _alloc_ls(verbosity):
     table = []
     for rtb, r in allocs.iteritems():
         for allocid, data in r.iteritems():
+            userl = []
+            user = data.get('user', None)
+            creator = data['creator']
+            guests = data.get('guests', [])
+            userl = [ user ]
+            if user != creator:
+                userl.append(creator + " (creator)")
+            for guest in guests:
+                userl.append(guest + " (guest)")
             if verbosity == 0:
                 table.append([
                     allocid,
                     data['state'],
-                    data.get('user', 'n/a'),
-                    len(data.get('guests', [])),
+                    "\n".join(userl),
                     len(data.get('target_group', [])),
                     data.get('reason', "n/a"),
                 ])
@@ -412,9 +420,7 @@ def _alloc_ls(verbosity):
                     rtb,
                     data['state'],
                     data.get('timestamp', 'n/a'),
-                    data.get('creator', 'n/a'),
-                    data.get('user', 'n/a'),
-                    "\n".join(data.get('guests', [])),
+                    "\n".join(userl),
                     "\n".join(tgs),
                     data.get('reason', "n/a"),
                 ])
@@ -424,8 +430,7 @@ def _alloc_ls(verbosity):
         headers0 = [
             "AllocID",
             "State",
-            "User",
-            "#Guests",
+            "Users",
             "#Groups",
             "Reason"
         ]
@@ -436,9 +441,7 @@ def _alloc_ls(verbosity):
             "Server",
             "State",
             "Timestamp",
-            "Creator",
-            "User",
-            "Guests",
+            "Users",
             "Groups",
             "Reason",
         ]
