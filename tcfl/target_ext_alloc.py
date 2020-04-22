@@ -74,14 +74,14 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
     allocid = r['allocid']
     data = { allocid: state }
     if state == 'active':			# got it
-        print "allocation ID %s: allocated: %s" % (
-            allocid, r['group_allocated'])
         return allocid, state, r['group_allocated'].split(',')
     if queue_timeout == 0:
         return allocid, state, {}
-    ts0 = time.time()
-    ts = ts0
+    ts = time.time()
     group_allocated = None
+    commonl.progress(
+        "allocation ID %s: [+%.1fs] keeping alive during state '%s'" % (
+            allocid, ts - ts0, state))
     while True:
         if queue_timeout and ts - ts0 > queue_timeout:
             raise tc.blocked_e(
@@ -95,16 +95,20 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
         except requests.exceptions.RequestException:
             # FIXME: tolerate N failures before giving up
             pass
-        print "allocation ID %s: [+%.1fs] keepalive while %s: %s\r" % (
-            allocid, ts - ts0, state, r),
-        sys.stdout.flush()
+        if r.get('result', {}):
+            commonl.progress(
+                "allocation ID %s: [+%.1fs] keeping alive during state '%s': %s"
+                % (allocid, ts - ts0, state, r))
+        else:
+            commonl.progress(
+                "allocation ID %s: [+%.1fs] keeping alive during state '%s'"
+                % (allocid, ts - ts0, state))
+
         if allocid not in r['result']:
             continue # no news
         alloc = r['result'][allocid]
         new_state = alloc['state']
         if new_state == 'active':
-            print "\nallocation ID %s: [+%.1fs] allocated: %s" % (
-                allocid, ts - ts0, alloc['group_allocated'])
             r = rtb.send_request("GET", "allocation/%s" % allocid)
             group_allocated = r['group_allocated'].split(',')
             break
@@ -118,11 +122,44 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
     return allocid, new_state, group_allocated
 
 
+def _alloc_hold(rtb, allocid, state, ts0, max_hold_time):
+    while True:
+        time.sleep(5)
+        ts = time.time()
+        if max_hold_time > 0 and ts - ts0 > max_hold_time:
+            # maximum hold time reached, release it
+            break
+        data = { allocid: state }
+        r = rtb.send_request("PUT", "keepalive", json = data)
+        if r.get('result', {}):
+            commonl.progress(
+                "allocation ID %s: [+%.1fs] keeping alive during state '%s': %s"
+                % (allocid, ts - ts0, state, r))
+        else:
+            commonl.progress(
+                "allocation ID %s: [+%.1fs] keeping alive during state '%s'"
+                % (allocid, ts - ts0, state))
+        # r is a dict, with a dict in 'result' that has a
+        # list of allocids that changed state of the ones
+        # we told it in 'data'
+        ## { ALLOCID1: STATE1, ALLOCID2: STATE2 .. }
+        new_data = r['result'].get(allocid, None)
+        if new_data == None:
+            continue			# no new info
+        new_state = new_data['state']
+        if new_state not in ( 'active', 'queued', 'restart-needed' ):
+            print	# to get a newline in
+            break
+        if new_state != data[allocid]:
+            print "\nallocation ID %s: [+%.1fs] state transition %s -> %s" % (
+                allocid, ts - ts0, state, new_state)
+        state = new_state
+
 def _cmdline_alloc_targets(args):
     with msgid_c("cmdline"):
         targetl = ttb_client.cmdline_list(args.target, args.all)
         if not targetl:
-            logging.error("No targets could be used")
+            logging.error("No targets could be used (missing? disabled?)")
             return
         targets = set()
         rtbs = set()
@@ -139,41 +176,20 @@ def _cmdline_alloc_targets(args):
         allocid = None
         try:
             groups = { "group": list(targets) }
-            allocid, state, _group_allocated = \
+            ts0 = time.time()
+            allocid, state, group_allocated = \
                 _alloc_targets(rtb, groups, obo = args.obo,
                                preempt = args.preempt,
                                queue = args.queue, priority = args.priority,
                                reason = args.reason)
+            ts = time.time()
+            print "allocation ID %s: [+%.1fs] allocated: %s" % (
+                allocid, ts - ts0, " ".join(group_allocated))
             if args.hold == None:	# user doesn't want us to ...
                 return			# ... keepalive while active
-            ts0 = time.time()
-            while True:
-                time.sleep(5)
-                ts = time.time()
-                if args.hold > 0 and ts - ts0 > args.hold:
-                    # maximum hold time reached, release it
-                    break
-                data = { allocid: state }
-                r = rtb.send_request("PUT", "keepalive", json = data)
-                print "allocation ID %s: [+%.1fs] keepalive while %s: %s\r" % (
-                    allocid, ts - ts0, state, r),
-                sys.stdout.flush()
-                # r is a dict, with a dict in 'result' that has a
-                # list of allocids that changed state of the ones
-                # we told it in 'data'
-                ## { ALLOCID1: STATE1, ALLOCID2: STATE2 .. }
-                new_data = r['result'].get(allocid, None)
-                if new_data == None:
-                    continue			# no new info
-                new_state = new_data['state']
-                if new_state not in ( 'active', 'queued', 'restart-needed' ):
-                    print	# to get a newline in
-                    break
-                if new_state != data[allocid]:
-                    print "\nallocation ID %s: [+%.1fs] state transition %s -> %s" % (
-                        allocid, ts - ts0, state, new_state)
-                state = new_state
+            _alloc_hold(rtb, allocid, state, ts0, args.hold)
         except KeyboardInterrupt:
+            ts = time.time()
             if allocid:
                 print "\nallocation ID %s: [+%.1fs] releasing due to user interruption" % (
                     allocid, ts - ts0)
