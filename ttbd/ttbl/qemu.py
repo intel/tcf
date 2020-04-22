@@ -452,6 +452,9 @@ class pc(ttbl.power.daemon_c,
                 "complaining about 'vnc-port' not defined",
                 ttbl.config.tcp_port_range)
         else:
+            # set this for general information; the VNC screenshotter
+            # also uses it
+            target.fsdb.set("vnc-host", "localhost")
             target.fsdb.set("vnc-port", "%s" % (tcp_port_base + 1 - 5900))
             # this one is the raw port number
             target.fsdb.set("vnc-tcp-port", "%s" % (tcp_port_base + 1))
