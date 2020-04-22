@@ -2161,10 +2161,10 @@ def daemon_pid_rm(pid):
 
 def usb_serial_number(d):
     #depending on the library version, get the USB string one way or another
-    if hasattr(d, 'iSerialNumber'):
-        serial_number = usb.util.get_string(d, 1000, d.iSerialNumber)
-    elif hasattr(d, 'serial_number'):
+    if hasattr(d, 'serial_number'):
         serial_number = d.serial_number
+    elif hasattr(d, 'iSerialNumber'):
+        serial_number = usb.util.get_string(d, 1000, d.iSerialNumber)
     else:
         raise AssertionError("%s: don't know how to find USB device serial number" % d)
     return serial_number
