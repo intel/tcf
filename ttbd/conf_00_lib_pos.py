@@ -446,7 +446,9 @@ def pos_target_add(
         pos_http_url_prefix = None,
         pos_image = None,
         ipv4_prefix_len = 24,
-        ipv6_prefix_len = 104):
+        ipv6_prefix_len = 104,
+        serial_console_name = "serial0",
+        tags = None):
     """
     Add a PC-class target that can be provisioned using Provisioning
     OS.
@@ -679,16 +681,19 @@ def pos_target_add(
     x, y, _ = nw_indexes(network)
 
     target = ttbl.test_target(name)		# create the target object
-    tags = {				# bake in base tags
-        'linux': True,
-        'bsp_models': { 'x86_64': None },
-        'bsps': {
-            'x86_64': {
-                'linux': True,
-                'console': 'x86_64',
-            }
-        },
-    }
+    if tags == None:
+        tags = {				# bake in base tags
+            'linux': True,
+            'bsp_models': { 'x86_64': None },
+            'bsps': {
+                'x86_64': {
+                    'linux': True,
+                    'console': 'x86_64',
+                }
+            },
+        }
+    else:
+        assert isinstance(tags, dict)
     if target_type_long:
         tags['type_long'] = target_type_long
     else:
@@ -700,17 +705,21 @@ def pos_target_add(
     #
     # serial_pc defaults to open /dev/tty-TARGETNAME; we need to
     # create the object because we'll need to start it upon power on
-    serial0 = ttbl.console.serial_pc()
-    target.interface_add("console", ttbl.console.interface(
-        serial0 = serial0,
+    pcl = [ ]
+    consoles = dict(
         ssh0 = ttbl.console.ssh_pc("root@" + '192.%d.%d.%d' % (x, y, index)),
-        default = "serial0",
-        #preferred = "ssh0",
-    ))
+        default = "ssh0"
+    )
+    if serial_console_name:
+        serial_console = ttbl.console.serial_pc()
+        consoles[serial_console_name] = serial_console
+        consoles['default'] = serial_console_name
+        pcl.append(( serial_console_name, serial_console ))
+    target.interface_add("console", ttbl.console.interface(**consoles))
+
 
     # Power Rail
     #
-    pcl = [ ( "serial0", serial0 ) ]
     if isinstance(power_rail, basestring):
         # legacy support for URLs for dlwps7
         # remove user/pasword
