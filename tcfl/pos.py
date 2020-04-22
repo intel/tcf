@@ -236,6 +236,109 @@ def image_select_best(image, available_images, target):
     # weren't specified, so pick one
     return random.choice(subversion_images)
 
+
+def mkfs(target, dev, fstype, mkfs_opts):
+    """
+    Format a filesystem in the target
+    """
+    target.report_info("POS: formatting %s (mkfs.%s %s)"
+                       % (dev, fstype, mkfs_opts), dlevel = 1)
+    target.shell.run("mkfs.%s %s %s" % (fstype, mkfs_opts, dev))
+    target.report_info("POS: formatted rootfs %s as %s" % (dev, fstype))
+
+
+def mount_root_part(target, root_part_dev, repartition):
+    """
+    Mount a root partition on target's */mnt*, maybe repartitioning
+    """
+    assert isinstance(target, tc.target_c)
+    assert isinstance(root_part_dev, basestring)
+    assert callable(repartition)
+    root_part_dev_base = os.path.basename(root_part_dev)
+    # save for other functions called later
+    # FIXME: ugly hack
+    target.root_part_dev = root_part_dev
+
+    # fsinfo looks like described in target.pos.fsinfo_read()
+    dev_info = None
+    for blockdevice in target.pos.fsinfo.get('blockdevices', []):
+        for child in blockdevice.get('children', []):
+            if child['name'] == root_part_dev_base:
+                dev_info = child
+    if dev_info == None:
+        # it cannot be we might have to repartition because at this
+        # point *we* have partitioned.
+        raise tc.error_e(
+            "Can't find information for root device %s in FSinfo array"
+            % root_part_dev_base,
+            dict(fsinfo = target.pos.fsinfo))
+
+    # what format does it currently have?
+    current_fstype = dev_info.get('fstype', 'ext4')
+
+    # What format does it have to have?
+    #
+    # Ok, here we need to note that we can't have multiple root
+    # filesystems with the same UUID or LABEL, so the image can't rely
+    # on UUIDs
+    #
+    img_fss = target.pos.metadata.get('filesystems', {})
+    if '/' in img_fss:
+        # a common origin is ok because the YAML schema forces both
+        # fstype and mkfs_opts to be specified
+        origin = "image's /.tcf.metadata.yaml"
+        fsdata = img_fss.get('/', {})
+    else:
+        origin = "defaults @" + commonl.origin_get(0)
+        fsdata = {}
+    fstype = fsdata.get('fstype', 'ext4')
+    mkfs_opts = fsdata.get('mkfs_opts', '-Fj')
+
+    # do they match?
+    if fstype != current_fstype:
+        target.report_info(
+            "POS: reformatting %s because current format is '%s' and "
+            "'%s' is needed (per %s)"
+            % (root_part_dev, current_fstype, fstype, origin))
+        mkfs(target, root_part_dev, fstype, mkfs_opts)
+    else:
+        target.report_info(
+            "POS: no need to reformat %s because current format is '%s' and "
+            "'%s' is needed (per %s)"
+            % (root_part_dev, current_fstype, fstype, origin), dlevel = 1)
+
+    for try_count in range(3):
+        target.report_info("POS: mounting root partition %s onto /mnt "
+                           "to image [%d/3]" % (root_part_dev, try_count))
+
+        # don't let it fail or it will raise an exception, so we
+        # print FAILED in that case to look for stuff; note the
+        # double apostrophe trick so the regex finder doens't trip
+        # on the command
+        output = target.shell.run(
+            "mount %s /mnt || echo FAI''LED" % root_part_dev,
+            output = True)
+        # What did we get?
+        if 'FAILED' in output:
+            if 'special device ' + root_part_dev \
+               + ' does not exist.' in output:
+                repartition(target)
+                target.pos.fsinfo_read(target._boot_label_name)
+            else:
+                # ok, this probably means probably the partitions are not
+                # formatted; so let's just reformat and retry
+                mkfs(target, root_part_dev, fstype, mkfs_opts)
+        else:
+            target.report_info("POS: mounted %s onto /mnt to image"
+                               % root_part_dev)
+            return root_part_dev	# it worked, we are done
+        # fall through, retry
+
+    raise tc.blocked_e(
+        "POS: Tried to mount too many times and failed",
+        dict(target = target))
+
+
 # FIXME: what I don't like about this is that we have no info on the
 # interconnect -- this must require it?
 def target_power_cycle_to_pos_pxe(target):
@@ -635,30 +738,71 @@ class extension(tc.target_extension_c):
                 target.report_info("POS: rebooting into Provisioning OS [%d/3]"
                                    % tries)
 
-                # Sequence for TCF-live based on Fedora
+                # The POS is configured to print "TCF test node" in
+                # /etc/issue and /etc/motd, so if we get a serial
+                # console prompt or we have a console over SSH that
+                # logs in, we will see it
                 try:
                     boot_to_pos_fn(target)
-                    # POS prints this when it boots before login
-                    target.expect("TCF test node",
-                                  timeout = bios_boot_time + timeout)
+                    ts0 = time.time()
+                    # Try a few times to enable the console and expect
+                    # the *TCF test node* banner
+                    inner_timeout = (bios_boot_time + timeout) / 20
+                    for _ in range(20):
+                        # if this was an SSH console that was left
+                        # enabled, it will die and auto-disable when
+                        # the machine power cycles, so make sure it is enabled
+                        try:
+                            target.console.enable()
+                        except ( tc.error_e, tc.failed_e ) as e:
+                            ts = time.time()
+                            target.report_info(
+                                "POS: can't enable console after +%.1fs"
+                                % (ts - ts0),
+                                dict(target = target, exception = e),
+                                dlevel = 2)
+                            time.sleep(inner_timeout)
+                            continue
+                        try:
+                            # POS prints this when it boots before
+                            # login (/etc/issue) or when we login
+                            # (/etc/motd) so that when we enable an
+                            # SSH console it also pops out
+                            target.expect("TCF test node",
+                                          timeout = inner_timeout)
+                            break	# made it here, got it!
+                        except ( tc.error_e, tc.failed_e ) as e:
+                            ts = time.time()
+                            target.report_info(
+                                "POS: no signs of prompt after +%.1fs"
+                                % (ts - ts0),
+                                dict(target = target, exception = e),
+                                dlevel = 2)
+                            # no wait here, since expect did for us already
+                            continue
+                    # Ok, we have a console that seems to be
+                    # ready...so setup the shell.
                     target.shell.up(timeout = timeout)
                 except ( tc.error_e, tc.failed_e ) as e:
+                    tc.result_c.report_from_exception(target.testcase, e)
                     attachment = e.attachments_get().get('console output', None)
                     output = ""
-                    for data in attachment.make_generator():
-                        output += data
-                        if len(output) > 32 * 1024:
-                            # we need enought to capture a local boot
-                            # with log messages and all that add up to
-                            # a lot
-                            break
+                    if attachment:
+                        for data in attachment.make_generator():
+                            output += data
+                            if len(output) > 32 * 1024:
+                                # we need enought to capture a local boot
+                                # with log messages and all that add up to
+                                # a lot
+                                break
                     if output == "" or output == "\x00":
                         target.report_error("POS: no console output, retrying")
                         continue
                     # sometimes the BIOS has been set to boot local directly,
                     # so we might as well retry
-                    target.report_error("POS: unexpected console output, retrying",
-                                        attachments = { "console output": attachment })
+                    target.report_error(
+                        "POS: unexpected console output, retrying",
+                        attachments = { "console output": attachment })
                     self._unexpected_console_output_try_fix(output, target)
                     continue
                 target.report_info("POS: got Provisioning OS shell")
@@ -708,8 +852,14 @@ class extension(tc.target_extension_c):
         assert isinstance(boot_dev, basestring)
 
         mount_fs_fn = self.cap_fn_get("mount_fs")
-        return mount_fs_fn(self.target, image, boot_dev)
+        root_part_dev = mount_fs_fn(self.target, image, boot_dev)
+        assert isinstance(root_part_dev, basestring), \
+            "cap 'mount_fs' by %s:%s(): did not return a string with the" \
+            " name of the root partition device, but %s" % (
+                inspect.getsourcefile(mount_fs_fn), mount_fs_fn.__name__,
+                type(root_part_dev))
 
+        return root_part_dev
 
     def rsyncd_start(self, ic):
         """
@@ -1069,15 +1219,22 @@ EOF""")
                     return child
         return None
 
-    def fsinfo_get_child_by_partlabel(self, blkdev, partlabel):
+    def _fsinfo_get_child_by(self, blkdev, key, value):
         target = self.target
         for blockdevice in target.pos.fsinfo.get('blockdevices', []):
             if blockdevice['name'] != blkdev:
                 continue
             for child in blockdevice.get('children', []):
-                if child['partlabel'] == partlabel:
+                if child[key] == value:
                     return child
         return None
+
+
+    def fsinfo_get_child_by_partlabel(self, blkdev, partlabel):
+        return self._fsinfo_get_child_by(blkdev, "partlabel", partlabel)
+
+    def fsinfo_get_child_by_label(self, blkdev, label):
+        return self._fsinfo_get_child_by(blkdev, "label", label)
 
     def _fsinfo_load(self):
         # Query filesystem information -> self.fsinfo
@@ -1094,6 +1251,9 @@ EOF""")
             " sleep 3s; "
             " lsblk --json -bni -o NAME,SIZE,TYPE,FSTYPE,UUID,PARTLABEL,LABEL,MOUNTPOINT 2> /dev/null",
             output = True, trim = True)
+        if not output.strip():
+            self.fsinfo = {}
+            return None
         # this output will be
         #
         ## {
@@ -1122,8 +1282,9 @@ EOF""")
                                     trace = traceback.format_exc()))
 
 
-    def fsinfo_read(self, boot_partlabel = None,
-                    raise_on_not_found = True, timeout = None):
+    def fsinfo_read(self, p1_value = None,
+                    raise_on_not_found = True, timeout = None,
+                    p1_key = 'partlabel'):
         """
         Re-read the target's partition tables, load the information
 
@@ -1160,21 +1321,21 @@ EOF""")
         while ts - ts0 < timeout:
             ts = time.time()
             target.pos._fsinfo_load()
-            boot_part = target.pos.fsinfo_get_child(
+            part1 = target.pos.fsinfo_get_child(
                 # lookup partition one; if found properly, the info has loaded
                 device_basename + target.kws['p_prefix'] + "1")
-            if boot_part == None:
+            if part1 == None:
                 target.report_info(
-                    "POS/multiroot: boot partition still not found by lsblk "
+                    "POS/multiroot: partition #1 still not found by lsblk "
                     "after %.1fs/%.1fs; retrying after 3s"
                     % (ts - ts0, timeout))
                 time.sleep(3)
                 continue
-            if boot_partlabel and boot_part['partlabel'] != boot_partlabel:
+            if p1_value and p1_key in part1 and part1[p1_key] != p1_value:
                 target.report_info(
-                    "POS/multiroot: boot partition with label %s still "
+                    "POS/multiroot: partition #1 with %s:%s still "
                     "not found by lsblk after %.1fs/%.1fs; retrying after 3s"
-                    % (target._boot_label_name, ts - ts0, timeout))
+                    % (p1_key, p1_value, ts - ts0, timeout))
                 time.sleep(3)
                 continue
             break
@@ -1409,8 +1570,6 @@ EOF""")
             original_prompt = target.shell.shell_prompt_regex
             original_console_default = target.console.default
             try:
-                # ensure we use the POS prompt
-                target.shell.shell_prompt_regex = _pos_prompt
                 # FIXME: this is a hack because now the expecter has a
                 # maximum timeout set that can't be overriden--the
                 # re-design of the expect sequences will fix this, but
@@ -1429,10 +1588,12 @@ EOF""")
                     # Adopt a harder to false positive prompt regex;
                     # the TCF-HASHID is set by target.shell.up() after
                     # we logged in; so if no prompt was specified, use
-                    # this.
                     target.shell.shell_prompt_regex = \
-                        _pos_prompt = re.compile(r'TCF-%s: [0-9]+ \$ '
-                                                 % testcase.kws['tc_hash'])
+                        re.compile("TCF-%(tc_hash)s:POS%% " % testcase.kws)
+                    target.shell.run(
+                        "export PS1='TCF-%(tc_hash)s:POS%% '  "
+                        "# a simple prompt is harder to confuse"
+                        " with general output" % testcase.kws)
 
                 testcase.targets_active()
                 kws = dict(
