@@ -1882,12 +1882,22 @@ class target_c(reporter_c):
             kwargs['component'] = component
         if self.ticket:
             kwargs['ticket'] = self.ticket
-        return self.rtb.send_request(
-            method,
-            "targets/%s/%s/%s" % (self.id, interface, call),
-            stream = stream, raw = raw, files = files, timeout = timeout,
-            data = kwargs if kwargs else None)
-
+        try:
+            return self.rtb.send_request(
+                method,
+                "targets/%s/%s/%s" % (self.id, interface, call),
+                stream = stream, raw = raw, files = files, timeout = timeout,
+                data = kwargs if kwargs else None)
+        except requests.HTTPError as e:
+            commonl.raise_from(
+                error_e("%s: %s/%s: remote call failed: %s"
+                        % (self.id, interface, call, e),
+                        dict(
+                            target = self,
+                            server = str(self.rtb),
+                            error = str(e)
+                        )),
+                e)
 
     #
     # Private API
