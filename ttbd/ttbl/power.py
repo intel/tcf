@@ -911,15 +911,19 @@ class socat_pc(daemon_c):
     """
 
     def __init__(self, address1, address2, env_add = None,
-                 precheck_wait = 0.2):
+                 precheck_wait = 0.2, extra_cmdline = None):
         assert isinstance(address1, basestring)
         assert isinstance(address2, basestring)
-
+        if extra_cmdline == None:
+            extra_cmdline = []
+        # extra_cmdline has to be before the address pair otherwise
+        # it'll fail
         daemon_c.__init__(
             self,
             cmdline = [
                 "/usr/bin/socat",
-                "-lf", "%(path)s/%(component)s-%(name)s.log",
+                "-lf", "%(path)s/%(component)s-%(name)s.log"
+            ] + extra_cmdline + [
                 # more than three -d's is a lot of verbosity, will
                 # fill up the drive soon
                 # FIXME: allow individual control/configure strace debug
