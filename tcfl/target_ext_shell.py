@@ -289,32 +289,61 @@ class shell(tc.target_extension_c):
                 target.console.default = None
             original_timeout = testcase.tls.expect_timeout
             testcase.tls.expect_timeout = timeout
-            if tempt:
-                tries = 3
-                while tries > 0:
-                    try:
-                        target.send(tempt, console = console)
+            ts0 = time.time()
+            ts = ts0
+            inner_timeout = 3 * timeout / 20
+            while ts - ts0 < 3 * timeout:
+                # if this was an SSH console that was left
+                # enabled, it will die and auto-disable when
+                # the machine power cycles, so make sure it is enabled
+                action = "n/a"
+                try:
+                    if target.console.default.startswith("ssh"):
+                        action = "enable SSH console"
+                        target.console.setup(target.console.default,
+                                             user = user)
+                        target.console.enable()
+                        ts = time.time()
+                        target.report_info(
+                            "shell-up: %s: success at +%.1fs"
+                            % (action, ts - ts0), dlevel = 2)
+                    if tempt:
+                        action = "tempt the console"
+                        target.send(tempt)
+                        ts = time.time()
+                        target.report_info(
+                            "shell-up: %s: success at +%.1fs"
+                            % (action, ts - ts0), dlevel = 2)
+                    if not target.console.default.startswith("ssh"):
                         if user:
+                            action = "login in via the console"
                             _login(self.target)
-                        target.expect(self.shell_prompt_regex,
-                                      console = console, timeout = 3,
-                                      name = "early shell prompt")
-                        break
-                    except tc.error_e as _e:
-                        if tries == 0:
-                            raise tc.error_e(
-                                "Waited too long (%ds) for shell to come up "
-                                "(did not receive '%s')" %
-                                (self.target.testcase.tls.expect_timeout,
-                                 self.shell_prompt_regex.pattern))
-                        continue
-                    finally:
-                        tries -= 1
+                            ts = time.time()
+                            target.report_info(
+                                "shell-up: %s: success at +%.1fs"
+                                % (action, ts - ts0), dlevel = 2)
+                    action = "wait for shell prompt"
+                    target.expect(self.shell_prompt_regex, console = console,
+                                  name = "early shell prompt",
+                                  timeout = inner_timeout)
+                    break
+                except ( tc.error_e, tc.failed_e ) as e:
+                    ts = time.time()
+                    target.report_info(
+                        "shell-up: action '%s' failed at +%.1fs; retrying: %s"
+                        % (action, ts - ts0, e),
+                        dict(target = target, exception = e),
+                        dlevel = 2)
+                    time.sleep(inner_timeout)
+                    ts = time.time()
+                    if target.console.default.startswith("ssh"):
+                        target.console.disable()
+                    continue
             else:
-                if user:
-                    _login(self.target)
-                target.expect(self.shell_prompt_regex, console = console,
-                              name = "early shell prompt")
+                raise tc.error_e(
+                    "Waited too long (%ds) for shell to come up "
+                    "(did not receive '%s')" % (
+                        3* timeout, self.shell_prompt_regex.pattern))
         finally:
             testcase.tls.expect_timeout = original_timeout
 
