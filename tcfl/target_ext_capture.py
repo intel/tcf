@@ -105,7 +105,7 @@ def _template_find(image_filename, image_rgb,
     image_gray = cv2.cvtColor(image_rgb, cv2.COLOR_BGR2GRAY)
     image_width, image_height = image_gray.shape[::-1]
     template = cv2.imread(template_filename, 0)
-    template_width, _template_height = template.shape[::-1]
+    template_width, template_height = template.shape[::-1]
 
     #for scale in numpy.linspace(0.2, 1.0, 20)[::-1]:
     squares = {}
@@ -120,7 +120,7 @@ def _template_find(image_filename, image_rgb,
         #print "DEBUG scaling image to %d %d" % (w, h)
 
         # stop if the image is smaller than the template
-        if w < template_width:
+        if w < template_width or h < template_height:
             logging.warning("%s: stopping at scale %.2f: smaller than "
                             "template", image_filename, scale)
             break
