@@ -991,3 +991,95 @@ EscapeChar = none
 
     def disable(self, target, component):
         return self.off(target, component)
+
+
+class netconsole_pc(ttbl.power.socat_pc, generic_c):
+    """Receive Linux's netconsole data over a console
+
+    The linux kernel can forward kernel messages over IP as soon as
+    the network is initialized, which this driver can pick up and
+    register. The target's kernel needs to be configured to output its
+    netconsole to the server's IP, matching the port given to this
+    driver; for example, the kernel command line::
+
+      netconsole=@/,6666@192.168.98.1
+
+    or as a module (see other methods `here
+    <https://www.kernel.org/doc/Documentation/networking/netconsole.txt>`_)::
+
+      # modprobe netconsole netconsole=@/,6666@192.168.98.1
+
+    will send netconsole output to *UDP:192.168.98.1:666*
+
+    The driver implements two interfaces:
+
+    - power interface: to start a console record as soon as the target
+      is powered on. Anything read from the console is written to file
+      *console-NAME.read* file.
+
+      The power interface is implemented by subclassing
+      :class:`ttbl.power.socat_pc`, which starts *socat* as daemon to
+      serve as a data recorder.
+
+    - console interface: interacts with the console interface by
+      exposing the data recorded in the file *console-NAME.read* file.
+      Writing is not supported, since *netconsole* is read only.
+
+    :params str ip_addr: (optional) IP address or hostname of the
+      target.
+
+    :params int port: (optional) port number to which to receive;
+      defaults to *6666* (netconsole's default).
+
+    For example, create a serial port recoder power control / console
+    driver and insert it into the power rail and the console of a
+    target:
+
+    target.console.impl_add("netconsole0", netconsole_pc())
+    >>> netconsole_pc = ttbl.console.netconsole_c("192.168.98.2")
+    >>>
+    >>> ttbl.test_target.get(name).interface_add(
+    >>>     "power",
+    >>>     ttbl.power.interface(
+    >>>         ...
+    >>>         ( "netconsole", netconsole_pc, )
+    >>>         ...
+    >>>     )
+    >>> ttbl.test_target.get(name).interface_add(
+    >>>     "console",
+    >>>     ttbl.console.interface(
+    >>>         ...
+    >>>         netconsole = netconsole_pc,
+    >>>         ...
+    >>>     )
+    >>> )
+
+    """
+    def __init__(self, ip_addr, port = 6666):
+        assert isinstance(port, numbers.Integer)
+        generic_c.__init__(self)
+        ttbl.power.socat_pc.__init__(
+            self,
+            # fork?
+            "UDP-LISTEN:%d,range=%s" % (port, ip_addr),
+            "CREATE:console-%(component)s.read",
+            extra_cmdline = [ "-u" ])	# unidirectional, UDP:6666 -> file
+
+    # console interface; state() is implemented by generic_c
+    def on(self, target, component):
+        ttbl.power.socat_pc.on(self, target, component)
+        generation_set(target, component)
+        generic_c.enable(self, target, component)
+
+    def off(self, target, component):
+        generic_c.disable(self, target, component)
+        ttbl.power.socat_pc.off(self, target, component)
+
+    def write(self, target, component, data):
+        raise RuntimeError("%s: (net)console is read only" % component)
+
+    def enable(self, target, component):
+        self.on(target, component)
+
+    def disable(self, target, component):
+        return self.off(target, component)
