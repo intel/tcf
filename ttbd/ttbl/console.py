@@ -391,12 +391,22 @@ class interface(ttbl.tt_interface):
         # the implementations for the console need to be of type impl_c
         self.impls_set(impls, kwimpls, impl_c)
 
+    def _pre_off_disable_all(self, target):
+        for console, impl in self.impls.iteritems():
+            target.log.info("%s: disabling console before powering off",
+                            console)
+            impl.disable(target, console)
 
     def _target_setup(self, target, iface_name):
         # Called when the interface is added to a target to initialize
         # the needed target aspect (such as adding tags/metadata)
         target.properties_user.add("interfaces.console.default")
         target.properties_keep_on_release.add("interfaces.console.default")
+        # When the target is powered off, disable the consoles -- why?
+        # because things like consoles over SSH will stop working, no
+        # matter what, and we want it to fail early and not seem there
+        # is something odd.
+        target.power_off_pre_fns.append(self._pre_off_disable_all)
 
     def _release_hook(self, target, _force):
         # nothing to do on target release
@@ -838,7 +848,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
 
       Note they all have to be strings; e.g.:
 
-      >>> serial0_pc = ttbl.console.ssh_pc(
+      >>> ssh0_pc = ttbl.console.ssh_pc(
       >>>     "USER:PASSWORD@HOSTNAME",
       >>>     extra_opts = {
       >>>         "Ciphers": "aes128-cbc,3des-cbc",
