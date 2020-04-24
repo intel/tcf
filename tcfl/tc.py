@@ -105,6 +105,7 @@ import random
 import re
 import shutil
 import signal
+import socket
 import string
 import subprocess
 import sys
@@ -1386,18 +1387,30 @@ class target_c(reporter_c):
 
         :param str property_name: Name of the property to read
         :returns str: value of the property (if set) or None
+
+        Note that getting a property named *a.b.c* expects the target
+        to have a property *a* that contains a field *b* that is also
+        a dictionary and this will return its value *c*.
         """
         self.report_info("reading property '%s'" % property_name, dlevel = 3)
-        data = { "projections": json.dumps([ property_name ]) }
+        data = { "projection": json.dumps([ property_name ]) }
         if self.ticket:
             data['ticket'] = self.ticket
         r = self.rtb.send_request("GET", "targets/" + self.id, data = data)
-        r = r.get(property_name, None)
+        # unfold a.b.c.d which returns { a: { b: { c: { d: value } } } }
+        propertyl = property_name.split(".")
+        for prop_name in propertyl:
+            r = r.get(prop_name, None)
+            if r == None:
+                val = None
+                break
+        else:
+            val = r
         self.report_info("read property '%s': '%s' [%s]"
-                         % (property_name, r, default), dlevel = 2)
-        if r == None and default != None:
+                         % (property_name, val, default), dlevel = 2)
+        if val == None and default != None:
             return default
-        return r
+        return val
 
     def property_set(self, property_name, value = None):
         """
@@ -1417,6 +1430,20 @@ class target_c(reporter_c):
                               json = data)
         self.report_info("set property '%s' to '%s'" % (property_name, value),
                          dlevel = 2)
+
+    def properties_set(self, d):
+        """
+        Set a recursive dictionary tree of properties
+
+        :param dict d: Dictionary of properties and values
+        """
+        assert isinstance(d, dict)
+        self.report_info("setting %d properties" % (len(d)), dlevel = 3)
+        if self.ticket:
+            d['ticket'] = self.ticket
+        self.rtb.send_request("PATCH", "targets/" + self.id,
+                              json = d)
+        self.report_info("set %d properties" % (len(d)), dlevel = 2)
 
     def disable(self, reason = 'disabled by the administrator'):
         """
@@ -1774,6 +1801,10 @@ class target_c(reporter_c):
           default is taken from *args.target*.
         :param str iface: (optional) target must support the given
           interface, otherwise an exception is raised.
+        :param list extensions_only: (optional) list of extensions to
+          load; if *[]*, load no extensions, if *None* load all
+          extensions available/needed; otherwise, load only the
+          extensions listed by name.
         :returns: instance of :class:`tcfl.tc.target_c` representing
           said target, if it is available.
         """
@@ -1795,7 +1826,7 @@ class target_c(reporter_c):
 
     def ttbd_iface_call(self, interface, call, method = "PUT",
                         component = None, stream = False, raw = False,
-                        files = None,
+                        files = None, timeout = 60,
                         **kwargs):
         """
         Execute a general interface call to TTBD, the TCF remoting server
@@ -1846,12 +1877,22 @@ class target_c(reporter_c):
             kwargs['component'] = component
         if self.ticket:
             kwargs['ticket'] = self.ticket
-        return self.rtb.send_request(
-            method,
-            "targets/%s/%s/%s" % (self.id, interface, call),
-            stream = stream, raw = raw, files = files,
-            data = kwargs if kwargs else None)
-
+        try:
+            return self.rtb.send_request(
+                method,
+                "targets/%s/%s/%s" % (self.id, interface, call),
+                stream = stream, raw = raw, files = files, timeout = timeout,
+                data = kwargs if kwargs else None)
+        except requests.HTTPError as e:
+            commonl.raise_from(
+                error_e("%s: %s/%s: remote call failed: %s"
+                        % (self.id, interface, call, e),
+                        dict(
+                            target = self,
+                            server = str(self.rtb),
+                            error = str(e)
+                        )),
+                e)
 
     #
     # Private API
@@ -1868,7 +1909,11 @@ class target_c(reporter_c):
         self.kws_origin.update(self.testcase.kws_origin)
         self.kws.update(self._kws)
         self.kws_origin.update(self._kws_origin)
+        # we publish both the flattened rt and the nested one
         commonl.kws_update_from_rt(self.kws, self.rt)
+        for key, val in commonl.dict_to_flat(self.rt,
+                                             sort = False, empty_dict = True):
+            self._kws[key] = val
         kws_bsp = dict()
         if 'bsps' in list(self.rt.keys()) and bsp and bsp in self.rt['bsps']:
             commonl.kws_update_type_string(kws_bsp, self.rt['bsps'][bsp])
@@ -3328,6 +3373,19 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     # Public testcase API/interface
     #
 
+    #: Reason why this testcase is being executed
+    #:
+    #: This is a string that will be sent to the servers when asking
+    #: for targets, as information for other users to know what is the
+    #: target used for.
+    #:
+    #: Note there are no size limits, but the server might crop it
+    #:
+    #: The fields are in the format *%(FIELD)s* and these are the
+    #: :ref:`keywords <finding_testcase_metadata>` the testcase
+    #: exports.
+    reason = None
+
     #: List of places where we declared this testcase is build only
     build_only = []
 
@@ -3341,6 +3399,11 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
         self.__init_shallow__(None)
         self.name = name
+        self.kw_set('pid', str(os.getpid()))
+        self.kw_set('tid', "%x" % threading.current_thread().ident)
+        # use instead of getfqdn(), since it does a DNS lookup and can
+        # slow things a lot
+        self.kw_set('host_name', socket.gethostname())
         self.kw_set('tc_name', self.name)
         # top level testcase name is that of the toplevel testcase,
         # with any subcases removed (anything after ##), so
@@ -5645,60 +5708,6 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     # Remote target acquisition
     #
 
-    _busy_regex = re.compile(r"tried to use busy target "
-                             r"\(owned by '(?P<owner>[^']+)'\)")
-
-    @classmethod
-    def _busy_msg_get_owner(cls, msg):
-        m = cls._busy_regex.search(msg)
-        if m:
-            owner = m.groupdict()['owner']
-            if owner == "":
-                owner = "n/a"
-        else:
-            owner = "n/a"
-        return owner
-
-    # When a target is released, this event is set so anyone who is
-    # waiting can check if the target they were waiting for was
-    # released.
-    # LAME, need a better way for all this, see comments in _targets_assign()
-    target_event = threading.Event()
-
-    def _target_acquire_robust(self, _target, timeout, wait):
-        # calls shielding from some temporary conditions (eg: doing a
-        # few simple retries) related to a server restaring or network
-        # glitches
-        #
-        # Need this soft retry loop here as we want to do it before we
-        # attempt to release any target we have already acquired
-        t0 = time.time()
-        t = t0
-        while t - t0 < timeout:
-            try:
-                _target.rtb.rest_tb_target_acquire(
-                    _target.rt, ticket = self.ticket)
-                break
-            except Exception as e:
-                # If read timesout or the server power cycles
-                # in between/resets, treat it as a soft retry
-                t = time.time()
-                if t - t0 > timeout:
-                    _target.report_info("retry timeout (%.2fs) exceeded"
-                                        % timeout)
-                    raise
-                message = str(e.message)	# easier matching for stuff
-                if "Read timed out" in message \
-                   or 'ECONNRESET' in message \
-                   or 'Connection refused' in message:
-                    _target.report_info(
-                        "acquisition failed (connection condition) "
-                        "@%.2f/%.2fs, waiting for %.2fs and retrying"
-                        % (t - t0, timeout, wait), dlevel = 4)
-                    time.sleep(wait)
-                    continue
-                raise
-
     #: Maximum time (seconds) to wait to succesfully acquire a set of targets
     #:
     #: In heavily contented scenarios or large executions, this
@@ -5736,9 +5745,21 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         if not pending:
             yield
             return
-        # FIXME: lame method to avoid deadlocks; always
-        #        lock/unlock in the same alphabetical order, by fullid
-        pending.sort(key = lambda _target: _target.fullid)
+
+        # to use fullid, need to tweak the refresh code to add the aka part
+        rtbs = set()
+        for target in pending:
+            rtbs.add(target.rtb)
+
+        # FIXME: move to a multiple server model
+        if len(rtbs) > 1:
+            raise tcfl.tc.blocked_e(
+                "Targets span more than one server",
+                dict(
+                    targets = [ target.fullid for target in pending ],
+                    servers = [ str(rtb) for rtb in rtbs ],
+                ))
+        rtb = list(rtbs)[0]
 
         # If any of the targets declare it takes it a long time to
         # power up, consider that.
@@ -5752,90 +5773,25 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         # need a better fix
         timeout *= 1 + tc_c._tcs_total / 3.0
 
-        ts0 = time.time()
-        ts = time.time()
-        ts_reported = { target.fullid : ts for target in pending }
-        try:
-            while ts - ts0 < timeout and pending:
-                _period = period * (1 + random.random())
-                # Note this loop is kinda weird.
-                #
-                # We will progress in the for loop only if we are
-                # succesful in locking the first target in the list --
-                # that's because we have to acquire all the targets in
-                # the same order, to avoid deadlocks -- and we choose
-                # alphabetical order of the target's fullid, so it is
-                # valid across servers FIXME: this will have to change
-                # to some sort of UUID.
-                #
-                # Why do we also re-acquire the acquired ones? To tell
-                # the server we are still using them, otherwise they
-                # might be marked as idle and released if the process
-                # with the other ones is taking a long time.
-                for _target in list(acquired) + list(pending):
-                    try:
-                        if not self._targets_disabled_too:
-                            # Refresh info
-                            _rtb, _rt = tcfl.ttb_client._rest_target_find_by_id(_target.fullid)
-                            disabled = _rt.get('disabled', None)
-                            if disabled != None:
-                                raise blocked_e(
-                                    "%s: acquisition failed (target has "
-                                    "been disabled)" % _target.fullid)
-                        _target.report_info(
-                            "acquiring with tix '%s'" % self.ticket,
-                            dlevel = 6)
-                        # acquire a single target, soft retrying half as
-                        # much as we have of timeout left
-                        self._target_acquire_robust(
-                            _target, (ts0 + timeout - time.time()) / 2, period)
-                        # Clear progress information we might have printed
-                        commonl.progress("")
-                        _target.report_info("acquired", dlevel = 5)
-                        if _target in pending:
-                            pending.remove(_target)
-                            acquired.append(_target)
-                        # Stays in the for loop to acquire the next
-                    except requests.exceptions.HTTPError as e:
-                        # FIXME: this is DIRTY, need a more
-                        # programatical way to do it
-                        if not "tried to use busy target" in e.message:
-                            raise
-                        owner = self._busy_msg_get_owner(e.message)
-                        _target.report_info(
-                            "acquisition failed (busy, owned by '%s') "
-                            "@%.2f/%.2fs, waiting for %.2fs and retrying"
-                            % (owner, ts - ts0, timeout, _period),
-                            dlevel = 5)
-                        if ts - ts_reported[_target.fullid] > 2:
-                            ts_reported[_target.fullid] = ts
-                            commonl.progress(
-                                "[%s: waiting to acquire %s from %s, "
-                                "%ds so far]" % (
-                                    self.ticket, _target.fullid,
-                                    owner, ts - ts0)
-                            )
-                        break	# Exit for, wait
-
-                self.target_event.wait(_period)
-                ts = time.time()
-            if pending != []:
-                msg = "can't acquire %s, still busy after %.2fs" \
-                      % (",".join([i.fullid for i in pending]), timeout)
-                self.log.error("%s: " % self.name + msg)
-                raise blocked_e(msg)
-        except:
-            if tc_c.release:
-                for _target in reversed(acquired):
-                    _target.report_info("releasing", dlevel = 6)
-                    _target.rtb.rest_tb_target_release(_target.rt,
-                                                       force = False,
-                                                       ticket = self.ticket)
-                    _target.report_info("released", dlevel = 5)
-            else:
-                self.report_info("WARNING!! not releasing targets",
-                                 dlevel = -10)
-            raise
+        # FIXME: use commonl.progress("")
+        allocid, state, targetids = target_ext_alloc._alloc_targets(
+            rtb,
+            { "group": [ target.id for target in pending ] },
+            # FIXME: do we want to do OBO here? how?
+            obo = None,
+            queue_timeout = timeout,
+            reason = self.reason % commonl.dict_missing_c(self.kws))
+        if state != 'active':
+            # FIXME: this need sto carry more data, we've lost a lot
+            # on the way here
+            raise tcfl.tc.blocked_e("allocation failed, state %s" % state)
+        self.report_info(
+            "acquired %s" % allocid,
+            dict(
+                targets = targetids,
+                servers = [ str(rtb) for rtb in rtbs ],
+            ),
+            dlevel = 5)
 
         self._prefix_update()
         try:
@@ -5843,20 +5799,25 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         finally:
             self._prefix_update()
             if tc_c.release:
-                for _target in reversed(acquired):
-                    _target.report_info("releasing", dlevel = 6)
-                    try:
-                        _target.rtb.rest_tb_target_release(
-                            _target.rt, force = False, ticket = self.ticket)
-                    except requests.HTTPError as e:
-                        # the script has released the target itself
-                        if 'tried to use non-acquired target' in e.message:
-                            pass
-                    _target.report_info("released", dlevel = 5)
+                target_ext_alloc._delete(rtb, allocid)
+                self.report_info(
+                    "acquired",
+                    dict(
+                        targets = targetids,
+                        servers = [ str(rtb) for rtb in rtbs ],
+                    ),
+                    dlevel = 5)
             else:
                 self.report_info("WARNING!! not releasing targets",
                                  dlevel = -10)
-            self.target_event.set()
+                self.report_info(
+                    "acquired",
+                    dict(
+                        targets = targetids,
+                        servers = [ str(rtb) for rtb in rtbs ],
+                    ),
+                    dlevel = 5)
+
 
     def targets_active(self, *skip_targets):
         """
@@ -6039,7 +6000,11 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             kws['bsp_model'] = ""
         kws['bsp_count'] = len(bsps)
         kws_bsp = dict()
+        # we use to evaluate the spec both the flattened rt and the nested one
         commonl.kws_update_from_rt(kws, rt)
+        for key, val in commonl.dict_to_flat(rt,
+                                             sort = False, empty_dict = True):
+            kws[key] = val
         rt_full_id = rt['fullid']
         rt_type = rt['type']
 
@@ -7760,7 +7725,7 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
         if rt.get('disabled', None) != None \
            and tc_c._targets_disabled_too == False:
             continue            
-        if 'interconnect_c' in rt.get('interfaces', []):
+        if 'interconnect_c' in rt.get('interfaces', {}):
             ic_selected_all[rt['fullid']] = set(rt.get('bsp_models', {}).keys())
         else:
             rt_selected_all[rt['fullid']] = set(rt.get('bsp_models', {}).keys())
@@ -7952,6 +7917,7 @@ def _run(args):
     report_driver_c.add(report_file_impl)
 
     # Setup defaults in the base testcase class
+    tc_c.reason = args.reason
     global ticket
     if args.ticket == '':	# default for tcf run means generate a ticket
         ticket = None
@@ -8271,6 +8237,15 @@ def argp_setup(arg_subparsers):
     ap.add_argument(
         "-a", "--all", action = "store_true", default = False,
         help = "Consider also disabled targets")
+    ap.add_argument(
+        "--reason", action = "store",
+        default = "%(runid)s %(tc_name)s @ %(host_name)s:%(pid)s/%(tid)s",
+        help = "Reason template. This is a string that be sent to"
+        " the server when allocating the targets to display as a"
+        " reason for allocation so other users can see what the"
+        " target is being used for; any keyword in the testcase"
+        " can be put in here; defaults to '%(default)s'"
+    )
     ap.add_argument("-m", "--manifest", metavar = "MANIFESTFILEs",
                     action = "append", default = [],
                     help = "Specify one or more manifest files containing "
@@ -8309,6 +8284,8 @@ from . import app_manual
 app.driver_add(app_manual.app_manual)
 
 # Target API extensions
+from . import target_ext_alloc
+
 from . import target_ext_buttons
 target_c.extension_register(target_ext_buttons.extension, "button")
 

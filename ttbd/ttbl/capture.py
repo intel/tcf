@@ -116,7 +116,7 @@ class interface(ttbl.tt_interface):
     An instance of this gets added as an object to the target object
     with:
 
-    >>> ttbl.config.targets['qu05a'].interface_add(
+    >>> ttbl.test_target.get('qu05a').interface_add(
     >>>     "capture",
     >>>     ttbl.capture.interface(
     >>>         vnc0 = ttbl.capture.vnc(PORTNUMBER)
@@ -168,20 +168,20 @@ class interface(ttbl.tt_interface):
         # call
         self.user_path = None
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         """
         Called when the interface is added to a target to initialize
         the needed target aspect (such as adding tags/metadata)
         """
         capturers = []
-        for capturer, impl in list(self.impls.items()):
+        publish_dict = target.tags['interfaces'][iface_name]
+        for capturer, impl in self.impls.items():
             ctype = "stream" if impl.stream else "snapshot"
+            publish_dict[capturer]['type'] = ctype
             descr = capturer + ":" + ctype
             if impl.mimetype:
                 descr += ":" + impl.mimetype
-            capturers.append(descr)
-        target.tags_update(dict(capture = " ".join(capturers)))
-        self.instrumentation_publish(target, "capture")
+                publish_dict[capturer]['mimetype'] = impl.mimetype
 
     def start(self, who, target, capturer):
         """
@@ -312,7 +312,7 @@ class generic_snapshot(impl_c):
 
     Then attach the capture interface to the target with:
 
-    >>> ttbl.config.targets['TARGETNAME'].interface_add(
+    >>> ttbl.test_target.get('TARGETNAME').interface_add(
     >>>     "capture",
     >>>     ttbl.capture.interface(
     >>>         vnc0 = capture_screenshot_vnc,
@@ -464,7 +464,7 @@ class generic_stream(impl_c):
 
     Then attach the capture interface to the target with:
 
-    >>> ttbl.config.targets['TARGETNAME'].interface_add(
+    >>> ttbl.test_target.get('TARGETNAME').interface_add(
     >>>     "capture",
     >>>     ttbl.capture.interface(
     >>>         hdmi0_vstream = capture_vstream_ffmpeg_v4l,

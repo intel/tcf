@@ -20,6 +20,7 @@ Command line and logging helpers
 import argparse
 import base64
 import bisect
+import collections
 import contextlib
 import errno
 import fcntl
@@ -188,6 +189,10 @@ def logfile_open(tag, cls = None, delete = True, bufsize = 0,
         prefix = os.path.basename(sys.argv[0]) + ":"
         + clstag + who + "-" + tag,
         suffix = suffix, delete = delete, buffering = bufsize, dir = directory)
+
+def argparser_add_aka(ap, name, aka):
+    # UGLY, but...
+    ap._name_parser_map[aka] = ap._name_parser_map[name]
 
 class _Action_increase_level(argparse.Action):
     def __init__(self, option_strings, dest, default = None, required = False,
@@ -1215,11 +1220,14 @@ def field_needed(field, projections):
         for projection in projections:
             if fnmatch.fnmatch(field, projection):
                 return True	# we need this field
+            # match projection a to fields a.[x.[y.[...]]]
+            if field.startswith(projection + "."):
+                return True
         return False		# we do not need this field
     else:
         return True	# no list, have it
 
-def dict_to_flat(d, projections = None):
+def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
     """
     Convert a nested dictionary to a sorted list of tuples *( KEY, VALUE )*
 
@@ -1229,14 +1237,29 @@ def dict_to_flat(d, projections = None):
     :param dict d: dictionary to convert
     :param list(str) projections: (optional) list of :mod:`fnmatch`
       patterns of flay keys to bring in (default: all)
+    :param bool sort: (optional, default *True*) sort according to KEY
+      name or leave the natural order (needed to keep the order of the
+      dictionaries) -- requires the underlying dict to be a
+      collections.OrderedDict() in older python versions.
     :returns list: sorted list of tuples *KEY, VAL*
 
     """
-
+    assert isinstance(d, collections.Mapping)
     fl = []
 
+    def _add(field_flat, val):
+        # empty dict, insert it if we want them
+        if sort:
+            bisect.insort(fl, ( field_flat, val ))
+        else:
+            fl.append(( field_flat, val ))
+
+    # test dictionary emptiness with 'len(d) == 0' vs 'd == {}', since they
+    # could be ordereddicts and stuff
+    
     def __update_recursive(val, field, field_flat, projections = None,
-                           depth_limit = 10, prefix = "  "):
+                           depth_limit = 10, prefix = "  ", sort = True,
+                           empty_dict = False):
         # Merge d into dictionary od with a twist
         #
         # projections is a list of fields to include, if empty, means all
@@ -1248,16 +1271,24 @@ def dict_to_flat(d, projections = None):
         # change it like that and maybe the evaluation can be done before
         # the assignment.
 
-        if field_needed(field_flat, projections):
-            bisect.insort(fl, ( field_flat, val ))
-        elif isinstance(val, dict) and depth_limit > 0:	# dict to dig in
-            for key, value in val.items():
-                __update_recursive(value, key, field_flat + "." + str(key),
-                                   projections, depth_limit - 1,
-                                   prefix = prefix + "    ")
+        if isinstance(val, collections.Mapping):
+            if len(val) == 0 and empty_dict == True and field_needed(field_flat, projections):
+                _add(field_flat, val)
+            elif depth_limit > 0:	# dict to dig in
+                for key, value in val.items():
+                    __update_recursive(value, key, field_flat + "." + str(key),
+                                       projections, depth_limit - 1,
+                                       prefix = prefix + "    ",
+                                       sort = sort, empty_dict = empty_dict)
+        elif field_needed(field_flat, projections):
+            _add(field_flat, val)
 
+    if len(d) == 0 and empty_dict == True:
+        # empty dict, insert it if we want them
+        _add(field_flat, val)
     for key, _val in d.items():
-        __update_recursive(d[key], key, key, projections, 10)
+        __update_recursive(d[key], key, key, projections, 10, sort = sort,
+                           empty_dict = empty_dict)
 
     return fl
 
@@ -1268,9 +1299,9 @@ def _key_rep(r, key, key_flat, val):
         # this key has sublevels, iterate over them
         lhs, rhs = key.split('.', 1)
         if lhs not in r:
-            r[lhs] = {}
+            r[lhs] = collections.OrderedDict()
         elif not isinstance(r[lhs], dict):
-            r[lhs] = {}
+            r[lhs] = collections.OrderedDict()
 
         _key_rep(r[lhs], rhs, key_flat, val)
     else:
@@ -1288,7 +1319,9 @@ def flat_slist_to_dict(fl):
     :return dict: nested dictionary as described by the flat space of
       keys and values
     """
-    tr = {}
+    # maintain the order in which we add things, we depend on this for
+    # multiple things later on
+    tr = collections.OrderedDict()
     for key, val in fl:
         _key_rep(tr, key, key, val)
     return tr
@@ -1699,3 +1732,4 @@ def file_iterator(filename, chunk_size = 4096):
             if not data:
                 break
             yield data
+

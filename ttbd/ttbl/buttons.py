@@ -80,7 +80,7 @@ class interface(ttbl.tt_interface):
     An instance of this gets added as an object to the main target
     with:
 
-    >>> ttbl.config.targets['android_tablet'].interface_add(
+    >>> ttbl.test_target.get('android_tablet').interface_add(
     >>>     "buttons",
     >>>     ttbl.buttons.interface(
     >>>         power = ttbl.usbrly08b.button("00023456", 4),
@@ -117,7 +117,7 @@ class interface(ttbl.tt_interface):
     >>>     ttbl.adb.pci(4036, target_serial_number = "SERIALNUMBER"),
     >>> ))
     >>> 
-    >>> ttbl.config.targets['android_tablet'].interface_add(
+    >>> ttbl.test_target.get('android_tablet').interface_add(
     >>>     "buttons",
     >>>     ttbl.buttons.interface(
     >>>         power = ttbl.usbrly08b.button("00023456", 4),
@@ -137,9 +137,9 @@ class interface(ttbl.tt_interface):
         ttbl.tt_interface.__init__(self)
         self.impls_set(impls, kwimpls, impl_c)
 
-    def _target_setup(self, target):
-        target.tags_update(dict(buttons = list(self.impls.keys())))
-        
+    def _target_setup(self, target, iface_name):
+        pass
+
     def _release_hook(self, target, _force):
         for button, impl in self.impls.items():
             impl.release(target, button)

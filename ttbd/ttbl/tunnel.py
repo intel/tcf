@@ -38,7 +38,7 @@ class interface(ttbl.tt_interface):
     def __init__(self):
         ttbl.tt_interface.__init__(self)
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         pass
 
 

@@ -86,7 +86,7 @@ cat > /usr/sbin/cfg-vmifs.py <<EOF
 #
 # TCF VMs always get mac address 02:xx:00:00:00:yy; where xx will be
 # the network in hex and yy the index in said network -- which we'll
-# feed to IP addresses 192.168.xx.yy/24 and fc00::xx:yy/112 (in dec
+# feed to IP addresses 192.xxx.yyy.iii/24 and fd:XX:YY::II/104 (in dec
 # and hex for v4 and v6)
 #
 import glob
@@ -112,7 +112,7 @@ MACAddress = %(mac_addr)s
 [Network]
 DHCP = no
 Address = 192.168.%(network)d.%(index)d/24
-Address = fc00::%(network)02x:%(index)02x/112
+Address = fd:00:%(network)02x:%(index)02x/104
 """ % data)
 EOF
 chmod a+x /usr/sbin/cfg-vmifs.py

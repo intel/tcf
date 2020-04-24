@@ -334,6 +334,20 @@ PermitEmptyPasswords yes
 def deploy_linux_ssh_root_nopwd(_ic, target, _kws):
     linux_ssh_root_nopwd(target, "/mnt")
 
+def linux_hostname_set(target, prefix = ""):
+    """
+    Set the target's OS hostname to the target's name
+
+    :param tcfl.tc.target_c target: target where to run
+
+    :param str prefix: (optional) directory where the root partition
+      is mounted.
+    """
+    target.shell.run("echo %s > %s/etc/hostname" % (target.id, prefix))
+
+def deploy_linux_hostname_set(_ic, target, _kws):
+    linux_hostname_set(target, "/mnt")
+
 def linux_sshd_restart(ic, target):
     """
     Restart SSHD in a linux/systemctl system
@@ -406,7 +420,7 @@ def sh_export_proxy(ic, target):
 
        $ export  http_proxy=http://192.168.98.1:8888 \
           https_proxy=http://192.168.98.1:8888 \
-          no_proxy=127.0.0.1,192.168.98.1/24,fc00::62:1/112 \
+          no_proxy=127.0.0.1,192.168.98.1/24,fd:00:62::1/104 \
           HTTP_PROXY=$http_proxy \
           HTTPS_PROXY=$https_proxy \
           NO_PROXY=$no_proxy
@@ -579,15 +593,18 @@ import os, errno, stat
 fsbsize = os.statvfs('%(path)s').f_bsize
 l = []
 dirs = []
-for r, dl, fl in os.walk('%(path)s', topdown = False):
-    for fn in fl + dl:
-        fp = os.path.join(r, fn)
-        try:
-            s = os.stat(fp)
-            sd = fsbsize * ((s.st_size + fsbsize - 1) / fsbsize)
-            l.append((s.st_mtime, sd, fp, stat.S_ISDIR(s.st_mode)))
-        except (OSError, FileNotFoundError) as x:
-            pass
+try:
+    for r, dl, fl in os.walk('%(path)s', topdown = False):
+        for fn in fl + dl:
+            fp = os.path.join(r, fn)
+            try:
+                s = os.stat(fp)
+                sd = fsbsize * ((s.st_size + fsbsize - 1) / fsbsize)
+                l.append((s.st_mtime, sd, fp, stat.S_ISDIR(s.st_mode)))
+            except (OSError, FileNotFoundError) as x:
+                pass
+except (OSError, FileNotFoundError) as x:
+    pass
 
 
 acc = 0

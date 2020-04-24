@@ -11,14 +11,18 @@ Internal API for *ttbd*
 Note interfaces are added with :meth:`test_target.interface_add`, not
 by subclassing. See as examples :class:`ttbl.console.interface` or
 :class:`ttbl.power.interface`.
+
 """
 import bisect
 import collections
 import contextlib
 import errno
+import fcntl
 import fnmatch
 import ipaddress
+import json
 import logging
+import numbers
 import os
 import pprint
 import random
@@ -40,7 +44,7 @@ from typing import Pattern
 
 import __main__
 import requests
-import usb.core
+import usb.util
 
 import commonl
 import ttbl.user_control
@@ -54,11 +58,18 @@ class test_target_e(Exception):
     pass
 
 class test_target_busy_e(test_target_e):
-    def __init__(self, target):
+    def __init__(self, target, who, owner):
         test_target_e.__init__(
             self,
-            "%s: tried to use busy target (owned by '%s')"
-            % (target.id, target.owner_get()))
+            "%s: '%s' tried to use busy target (owned by '%s')"
+            % (target.id, who, owner))
+
+class test_target_wrong_state_e(test_target_e):
+    def __init__(self, target, state, expected_state):
+        test_target_e.__init__(
+            self,
+            "%s: tried to use target in state '%s' but needs '%s')"
+            % (target.id, state, expected_state))
 
 class test_target_not_acquired_e(test_target_e):
     def __init__(self, target):
@@ -197,20 +208,26 @@ class fsdb_c(object):
     #: Regular expresion that determines the valid characters in a field
     key_valid_regex = re.compile(r"^[-\.a-zA-Z0-9_]+$")
 
-    def set(self, key, value):
+    def set(self, key, value, force = True):
         """
-        Set a value for a key in the database
+        Set a value for a key in the database unless *key* already exists
 
         :param str key: name of the key to set
 
-        :param str value: value to store; *None* to remove the
+        :param str value: value to store; *None* to remove the field;
+          only *string*, *integer*, *float* and *boolean* types
+
+        :parm bool force: (optional; default *True*) if *key* exists,
+          force the new value
+
+        :return bool: *True* if the new value was set correctly;
+          *False* if *key* already exists and *force* is *False*.
         """
         if not self.key_valid_regex.match(key):
             raise ValueError("%s: invalid key name (valid: %s)" \
                              % (key, self.key_valid_regex.pattern))
         if value != None:
-            assert isinstance(value, str)
-            assert len(value) < 1024
+            assert isinstance(value, (str, int, float, bool))
         raise NotImplementedError
 
     def get(self, key, default = None):
@@ -241,17 +258,30 @@ class fsdb_symlink_c(fsdb_c):
     class exception(Exception):
         pass
 
-    def __init__(self, location):
+    class invalid_e(exception):
+        pass
+
+    def __init__(self, dirname, use_uuid = None, concept = "directory"):
         """
         Initialize the database to be saved in the give location
         directory
 
         :param str location: Directory where the database will be kept
         """
-        self.location = location
-        assert os.path.isdir(location) \
-            and os.access(location, os.R_OK | os.W_OK | os.X_OK)
-        self.uuid_seed = commonl.mkid(str(id(self)))
+        if not os.path.isdir(dirname):
+            raise self.invalid_e("%s: invalid %s"
+                                 % (os.path.basename(dirname), concept))
+        if not os.access(dirname, os.R_OK | os.W_OK | os.X_OK):
+            raise self.invalid_e("%s: cannot access %s"
+                                 % (os.path.basename(dirname), concept))
+
+        if use_uuid == None:
+            self.uuid = commonl.mkid(str(id(self)) + str(os.getpid()))
+        else:
+            self.uuid = use_uuid
+
+        self.location = dirname
+
 
     def keys(self, pattern = None):
         l = []
@@ -293,42 +323,145 @@ class fsdb_symlink_c(fsdb_c):
                     d[filename] = self.get(filename)
         return d
 
-    def set(self, key, value):
+    def set(self, key, value, force = True):
+        location = os.path.join(self.location, key)
         if not self.key_valid_regex.match(key):
             raise ValueError("%s: invalid key name (valid: %s)" \
                              % (key, self.key_valid_regex.pattern))
         if value != None:
-            assert isinstance(value, str)
-            assert len(value) < 1023
-        location = os.path.join(self.location, key)
-
-        if value == None:		# value == None -> remove key
+            # the storage is always a string, so encode what is not as
+            # string as T:REPR, where T is type (b boolean, n number,
+            # s string) and REPR is the textual repr, json valid
+            if isinstance(value, bool):
+                # do first, otherwise it will test as int
+                value = "b:" + str(value)
+            elif isinstance(value, numbers.Integral):
+                # sadly, this looses precission in floats. A lot
+                value = "i:%d" % value
+            elif isinstance(value, numbers.Real):
+                # sadly, this can loose precission in floats--FIXME:
+                # better solution needed
+                value = "f:%.10f" % value
+            elif isinstance(value, str):
+                if value.startswith("i:") \
+                   or value.startswith("f:") \
+                   or value.startswith("b:") \
+                   or value.startswith("s:") \
+                   or value == "":
+                    value = "s:" + value
+            else:
+                raise ValueError("can't store value of type %s" % type(value))
+            assert len(value) < 4096
+        if value == None:
             try:
                 os.unlink(location)
             except OSError as e:
-                if e.errno == errno.ENOENT:
-                    pass
-                else:
+                if e.errno != errno.ENOENT:
                     raise
-        else:
-            # New location, add a unique thing to it so there is no
-            # collision if more than one process is trying to modify
-            # at the same time; they can override each other, that's
-            # ok--the last one wins.
-            location_new = location + "-%s-%s-%s" \
-                % (os.getpid(), self.uuid_seed, time.time())
-            commonl.rm_f(location_new)
-            os.symlink(value, location_new)	# POSIX: atomic
-            os.rename(location_new, location)	# POSIX: atomic
+            return True	# already wiped by someone else
+        if force == False:
+            try:
+                os.symlink(value, location)
+            except OSError as e:
+                if e.errno != errno.EEXIST:
+                    raise
+                # ignore if it already exists
+                return False
+            return True
+
+        # New location, add a unique thing to it so there is no
+        # collision if more than one process is trying to modify
+        # at the same time; they can override each other, that's
+        # ok--the last one wins.
+        location_new = location + "-" + str(os.getpid())
+        commonl.rm_f(location_new)
+        os.symlink(value, location_new)
+        os.rename(location_new, location)
+        return True
 
     def get(self, key, default = None):
         location = os.path.join(self.location, key)
         try:
-            return os.readlink(location)
+            value = os.readlink(location)
+            # if the value was type encoded (see set()), decode it;
+            # otherwise, it is a string
+            if value.startswith("i:"):
+                return json.loads(value.split(":", 1)[1])
+            if value.startswith("f:"):
+                return json.loads(value.split(":", 1)[1])
+            if value.startswith("b:"):
+                val = value.split(":", 1)[1]
+                if val == "True":
+                    return True
+                elif val == "False":
+                    return False
+                raise ValueError("fsdb %s: key %s bad boolean '%s'"
+                                 % (self.location, key, value))
+            if value.startswith("s:"):
+                # string that might start with s: or empty
+                return value.split(":", 1)[1]
+            return value	# other string
         except OSError as e:
             if e.errno == errno.ENOENT:
                 return default
             raise
+
+
+class process_posix_file_lock_c(object):
+    """
+    Very simple interprocess file-based spinning lock
+
+    .. warnings::
+
+       - Won't work between threads of a process
+
+       - If a process dies, the next process can acquire it but there
+         will be no warning about the previous process having died,
+         thus state protected by the lock might be inconsistent
+    """
+
+    class timeout_e(Exception):
+        pass
+
+    def __init__(self, lockfile, timeout = 20, wait = 0.3):
+        self.lockfile = lockfile
+        self.timeout = timeout
+        self.wait = wait
+        self.fd = None
+        # ensure the file is created
+        with open(self.lockfile, "w+") as f:
+            f.write("")
+
+    def acquire(self):
+        ts0 = time.time()
+        self.fd = os.open(self.lockfile, os.O_RDWR | os.O_EXCL)
+        while True:
+            try:
+                fcntl.flock(self.fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except IOError as e:
+                if e.errno != errno.EAGAIN:
+                    raise
+                time.sleep(self.wait)
+                ts = time.time()
+                if ts - ts0 > self.timeout:
+                    raise self.timeout_e
+
+    def release(self):
+        os.close(self.fd)
+        self.fd = None
+
+    def locked(self):
+        return self.fd != None
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, _a, _b, _c):
+        self.release()
+
+
 
 
 class acquirer_c(object):
@@ -343,7 +476,7 @@ class acquirer_c(object):
     This can however, use any other resource manager.
 
     The operations in here can raise any exception, but mostly the
-    ones derived from :class:`ttbl.acquirer_c.exception`: 
+    ones derived from :class:`ttbl.acquirer_c.exception`:
 
     - :class:`ttbl.acquirer_c.timeout_e`
     - :class:`ttbl.acquirer_c.busy_e`
@@ -465,7 +598,6 @@ class symlink_acquirer_c(acquirer_c):
         self.location = os.path.join(target.state_dir, "mutex")
         self.wait_period = wait_period
 
-
     def acquire(self, who, force):
         """
         Acquire the mutex, blocking until acquired
@@ -482,7 +614,6 @@ class symlink_acquirer_c(acquirer_c):
             if e.errno == errno.EEXIST:
                 raise self.busy_e()
             raise
-
 
     def release(self, who, force):
         if force:
@@ -603,7 +734,7 @@ class tt_interface(object):
     create methods in the subclass called *METHOD_NAME* with the
     signature:
 
-    >>>     def METHOD_NAME(self, target, who, args, user_path):
+    >>>     def METHOD_NAME(self, target, who, args, files, user_path):
     >>>         impl, component = self.arg_impl_get(args, "component")
     >>>         arg1 = args.get('arg1', None)
     >>>         arg2 = args.get('arg2', None)
@@ -621,6 +752,9 @@ class tt_interface(object):
 
     - *args* is a dictionary of arguments passed by the client for the
       HTTP call keyed by name (a string)
+
+    - *files* dictionrary of files passed to the HTTP request (FIXME:
+       doc properly)
 
     - *user_path* is a string describing the space in the filesystem
       where files for this user are stored
@@ -683,7 +817,7 @@ class tt_interface(object):
         #: on [set by the initial call to :meth:`impls_set`]
         self.cls = None
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         # FIXME: move to public interface
         """
         Called when the interface is added to a target to initialize
@@ -694,6 +828,7 @@ class tt_interface(object):
 
     def _release_hook(self, target, force):
         # FIXME: move to public interface
+        # FIXME: remove force, unuused
         """
         Called when the target is released
         """
@@ -770,7 +905,7 @@ class tt_interface(object):
         >>>     def __init__(*impls, **kwimpls):
         >>>         ttbl.tt_interface(self)
         >>>         self.impls_set(impls, kwimplws, my_base_implc_c)
-        
+
         and it allows to specify the interface implementations in
         multiple ways:
 
@@ -798,7 +933,7 @@ class tt_interface(object):
           >>>     ( something, an_impl(args) ),
           >>>     ( someotherthing, another_impl(args) ),
           >>> ))
-        
+
         all forms can be combined; as well, if the implementation is
         the name of an existing component, then it becomes an alias.
         """
@@ -954,7 +1089,9 @@ class tt_interface(object):
         prefix = "instrumentation." + index
         target.property_set(prefix + ".name", instrument_name)
         for key, val in upid.items():
-            target.property_set(prefix + "." + key, val % kws)
+            if val:
+                # there might be empty values, as defaults, so we ignore them
+                target.property_set(prefix + "." + key, val % kws)
         if components:
             target.property_set(prefix + ".functions." + iface_name,
                                 ":".join(components))
@@ -971,6 +1108,7 @@ class tt_interface(object):
         assert isinstance(target, ttbl.test_target)
         assert isinstance(iface_name, str)
 
+        tags_interface = collections.OrderedDict()
         components_by_index = collections.defaultdict(list)
         name_by_index = {}
         upid_by_index = {}
@@ -983,6 +1121,9 @@ class tt_interface(object):
             impl, _ = self.impl_get_by_name(component, "component")
             instrument_name, index = \
                 self.instrument_mkindex(impl.name, impl.upid, kws)
+            tags_interface[component] = {
+                "instrument": index
+            }
             # FIXME: there must be a more efficient way than using
             # pprint.pformat
             components_by_index[index].append(component)
@@ -995,6 +1136,7 @@ class tt_interface(object):
                 name_by_index.get(index, None), upid_by_index[index],
                 components,
                 kws = kws)
+        target.tags['interfaces'][iface_name] = tags_interface
 
 
     def request_process(self, target, who, method, call,
@@ -1050,11 +1192,10 @@ class tt_interface(object):
 
 
 # FIXME: yeah, ugly, but import dependency hell
+from . import allocation
 import ttbl.config
 
-# FIXME: generate a unique ID; has to be stable across reboots, so it
-#        needs to be generated from whichever path we are connecting
-#        it to
+
 class test_target(object):
 
     #! Path where the runtime state is stored
@@ -1110,12 +1251,13 @@ class test_target(object):
         self.log.propagate = False
         # List of interfaces that this target supports; updated by
         # interface_add().
-        self.tags['interfaces'] = []
+        self.tags['interfaces'] = {}
 
         # Create the directory where we'll keep the target's state
         self.state_dir = os.path.join(self.state_path, self.id)
-        if not os.path.isdir(self.state_dir):
-            os.makedirs(self.state_dir, 0o2770)
+        self.lock = process_posix_file_lock_c(
+            os.path.join(self.state_path, "lockfile"))
+        commonl.makedirs_p(os.path.join(self.state_dir, "queue"), 0o2770)
         #: filesystem database of target state; the multiple daemon
         #: processes use this to store information that reflect's the
         #: target's state.
@@ -1125,23 +1267,6 @@ class test_target(object):
             assert isinstance(fsdb, fsdb_c), \
                 "fsdb %s must inherit ttbl.fsdb_c" % fsdb
             self.fsdb = fsdb
-
-        # Much as I HATE reentrant locks, there is no way around it
-        # without major rearchitecting that is not going to happen.
-        #
-        # The ownership lock has to be re-entrant (eg: once locked it
-        # can be locked again N times by the same thread, but then it
-        # has to be unlocked N times).
-        #
-        # Why? because things like the image setting procedure
-        # (that has to be called with the target locked) might to call
-        # the power off routine, that also requires locking the
-        # target.
-        #
-        # At this point, adding locked and unlocked interfaces would
-        # make it very complicated -- so we go with a reentrant lock.
-        self.ownership_lock = threading.RLock()
-        self.timestamp()
 
         #: Keywords that can be used to substitute values in commands,
         #: messages. Target's tags are translated to keywords
@@ -1175,8 +1300,25 @@ class test_target(object):
         self.power_off_pre_fns = []
         self.power_off_post_fns = []
 
-    @staticmethod
-    def get_for_user(target_name, calling_user):
+    @classmethod
+    def known_targets(cls):
+        """
+        Return list of known targets descriptors
+        """
+        return ttbl.config.targets.values()
+
+    @classmethod
+    def get(cls, target_name):
+        """
+        Return an object descripting an existing target name
+
+        :param str: name of target (which shall be available in
+          configuration)
+        """
+        return ttbl.config.targets.get(target_name, None)
+
+    @classmethod
+    def get_for_user(cls, target_name, calling_user):
         """
         If *calling_user* has permission to see & user *target_name*,
         return the target descriptor
@@ -1191,7 +1333,7 @@ class test_target(object):
         """
         assert isinstance(target_name, str)
         assert isinstance(calling_user, ttbl.user_control.User)
-        target = ttbl.config.targets.get(target_name, None)
+        target = cls.get(target_name)
         if not target:
             return None
         if not target.check_user_allowed(calling_user):
@@ -1244,16 +1386,17 @@ class test_target(object):
         # because it is way easier to filter on flat triyng to keep
         # what has to be there and what not. And the performance at
         # the end might not be much more or less...
-        r = commonl.flat_slist_to_dict(
-            commonl.dict_to_flat(self.tags, projections))
+        l = commonl.dict_to_flat(self.tags, projections,
+                                 sort = False, empty_dict = True)
+
         # Override with changeable stuff set by users
         #
         # Note things such as 'disabled', and 'powered' come from
         # self.fsdb
         # we are unfolding the flat field list l['a.b.c'] = 3 we get
         # from fsdb to -> r['a']['b']['c'] = 3
-        r.update(commonl.flat_slist_to_dict(
-            self.fsdb.get_as_slist(*projections)))
+        l += self.fsdb.get_as_slist(*projections)
+        r = commonl.flat_slist_to_dict(l)
 
 	# mandatory fields, override them all
         if commonl.field_needed('owner', projections):
@@ -1268,7 +1411,30 @@ class test_target(object):
                 except KeyError:
                     pass
 
-        r['id'] = self.id
+        # these two fields are synthetic, they don't exist on fsdb, we
+        # create them from the allocator information
+        _queue_needed = commonl.field_needed('_alloc.queue', projections)
+        _queue_preemption_needed = \
+            commonl.field_needed('_alloc.queue_preemption', projections)
+        if _queue_needed or _queue_preemption_needed:
+            waiters, preempt_in_queue = \
+                allocation._target_queue_load(self)
+            if _queue_needed:
+                if waiters:
+                    r.setdefault('_alloc', {})
+                    # override with this format
+                    r['_alloc']['queue'] = {}
+                    for prio, ts, flags, allocid, _ in reversed(waiters):
+                        r['_alloc']['queue'][allocid] = dict(
+                            priority = prio,
+                            timestamp = int(ts),
+                            preempt = 'P' in flags,
+                            exclusive = 'E' in flags,
+                        )
+            if _queue_preemption_needed:
+                r.setdefault('_alloc', {})
+                r['_alloc']['queue_preemption'] = preempt_in_queue
+
         return r
 
 
@@ -1314,7 +1480,7 @@ class test_target(object):
             real_name, _instance = name.split("#", 1)
         else:
             real_name = name
-        ic = ttbl.config.targets.get(real_name, None)
+        ic = self.get(real_name)
         if ic == None:
             self.log.warning("target declares connectivity to interconnect "
                              "'%s' that is not local, cannot verify; "
@@ -1463,17 +1629,128 @@ class test_target(object):
         commonl.kws_update_from_rt(self.kws, self.tags)
 
     def timestamp_get(self):
-        return os.path.getmtime(os.path.join(self.state_dir, "timestamp"))
+        """
+        Return an integer with the timestamp of the last activity on
+        the target.
+
+        See :meth:timestamp.
+
+        :return str: timestamp in the format YYYYMMDDHHSS
+        """
+        # if no target-specific timestamp is set, just do zero; we
+        # cache it instead of using the allocation's since the target
+        # might have not been allocated yet
+        with self.lock:
+            allocdb = self._allocdb_get()
+            if allocdb:
+                ts = allocdb.timestamp_get()
+                self.fsdb.set('timestamp', ts)
+                return ts
+            # if there is no timestamp, forge the Epoch
+            return self.fsdb.get('timestamp', "19700101000000")
 
     def timestamp(self):
         """
-        Update the timestamp on the target to record last activity tme
+        Indicate this target is being used
+
+        The activity is deemed as the user is using the target for
+        something actively; most accesses to the target when it is
+        acquired are considered activity.
         """
-        # Just open the file and truncate it, so if it does not exist,
-        # it will be created.
-        with open(os.path.join(self.state_dir, "timestamp"), "w") as f:
-            f.write(time.strftime("%c\n"))
-            pass
+        with self.lock:
+            allocdb = self._allocdb_get()
+            if allocdb:
+                self.fsdb.set('timestamp', allocdb.timestamp())
+
+    def allocid_get_bare(self):
+        return self.fsdb.get('_alloc.id')
+
+    def _allocid_wipe(self):
+        self.fsdb.set('_alloc.id', None)
+        self.fsdb.set('_alloc.queue_preemption', None)
+        self.fsdb.set('_alloc.priority', None)
+        self.fsdb.set('_alloc.ts_start', None)
+        self.fsdb.set('owner', None)
+
+    def _allocid_get(self):
+        # return the allocid, if valid, None otherwise
+        # needs to be called with self.lock taken!
+        assert self.lock.locked()
+        _allocid = self.fsdb.get('_alloc.id')
+        if _allocid == None:
+            return None
+        try:
+            allocdb = ttbl.allocation.get_from_cache(_allocid)
+            return _allocid	# alloc-ID is valid, return it
+        except ttbl.allocation.allocation_c.invalid_e:
+            logging.error("%s: wiping ownership by invalid allocation %s",
+                          self.id, _allocid)
+            self._allocid_wipe()
+            return None
+
+    def _allocdb_get(self):
+        # needs to be called with self.lock taken!
+        assert self.lock.locked()
+        _allocid = self.fsdb.get('_alloc.id')
+        if _allocid == None:
+            return None
+        try:
+            return allocation.get_from_cache(_allocid)
+        except allocation.allocation_c.invalid_e:
+            logging.error("%s: wiping ownership by invalid allocation %s",
+                          self.id, _allocid)
+            self._allocid_wipe()
+            return None
+
+
+    def _deallocate_simple(self, allocid):
+        # Siple deallocation -- if the owner points to the
+        # allocid, just remove it without validating the
+        # allocation is valid
+        #
+        # This is to be used only when we have taken the target but
+        # then have not used it, so there is no need for state clean
+        # up.
+        assert self.lock.locked()	    # Must have target.lock taken!
+        current_allocid = self.fsdb.get("_alloc.id")
+        if current_allocid and current_allocid == allocid:
+            self._allocid_wipe()
+            return True
+        return False
+
+    # FIXME: move to _deallocate(allocdb), needs changes to use
+    # allocdb in
+    #  - _target_allocate_locked(): current_allocid -> current_allocdb
+    #    - _run_target(): current_allocid -> current_allocdb
+    #  - _deallocate
+    #  - _deallocate_forced
+    #  - release()
+    #
+    # fold _deallocate_forced() to have a state argument that if set,
+    # sets the reservation's state to that one
+    def _deallocate(self, allocdb, new_state = None):
+        # deallocate verifying the current allocation is valid
+        if self._deallocate_simple(allocdb.allocid):
+            self._state_cleanup(False)
+            # we leave the reservation as is; if someone is using it
+            # they are keepaliving and they'll notice the state
+            # change and act; otherwise it will timeout and be removed
+            # FIXME: if all targets released, release reservation?
+            if new_state:
+                allocdb.state_set('restart-needed')
+
+    def allocid_get(self):
+        with self.lock:
+            return self._allocid_get()
+
+    def owner_get_v1(self):
+        """
+        Return who the current owner of this target is
+
+        :returns: object describing the owner
+        """
+        # OLD acquisition method
+        return self._acquirer.get()
 
     def owner_get(self):
         """
@@ -1481,7 +1758,12 @@ class test_target(object):
 
         :returns: object describing the owner
         """
-        return self._acquirer.get()
+        # OLD acquisition method
+        acquirer_owner = self._acquirer.get()
+        if acquirer_owner:
+            return acquirer_owner
+        # NEW allocator
+        return self.fsdb.get('owner')
 
     def acquire(self, who, force):
         """
@@ -1496,7 +1778,7 @@ class test_target(object):
             if self._acquirer.acquire(who, force):
                 self._state_cleanup(True)
         except acquirer_c.busy_e:
-            raise test_target_busy_e(self)
+            raise test_target_busy_e(self, who, self.owner_get())
         # different operations in the system might require the user
         # storage area to exist, so ensure it is there when the user
         # acquires a target -- as he might need it.
@@ -1636,7 +1918,7 @@ class test_target(object):
             if self.property_is_user(prop) and not self.property_keep_value(prop):
                 self.fsdb.set(prop, None)
 
-    def release(self, who, force):
+    def release_v1(self, who, force):
         """
         Release the ownership of this target.
 
@@ -1645,6 +1927,7 @@ class test_target(object):
         :param str who: User that is releasing the target (must be the owner)
         :param bool force: force release of a target owned by
           someone else (requires admin privilege)
+
         :raises: :class:`test_target_not_acquired_e` if not taken
         """
         assert isinstance(who, str)
@@ -1657,8 +1940,63 @@ class test_target(object):
         except acquirer_c.cant_release_not_acquired_e:
             raise test_target_not_acquired_e(self)
 
+    def release(self, user, force, ticket = None):
+        """
+        Release the ownership of this target.
+
+        If the target is not owned by anyone, it does nothing.
+
+        :param ttbl.user_control.User user: User that is releasing the
+          target (must be the owner, guest, creator of the reservation
+          or admin)
+
+        :param bool force: force release of a target owned by
+          someone else (requires admin privilege)
+
+        :raises: :class:`test_target_not_acquired_e` if not taken
+        """
+        assert isinstance(user, ttbl.user_control.User)
+        userid = user.get_id()
+        try:
+            if self.owner_get_v1():
+                if self.target_is_owned_and_locked(userid):
+                    self._state_cleanup(force)
+                self._acquirer.release(who_create(userid, ticket), force)
+                return
+            allocid = self.allocid_get_bare()
+            if not allocid:
+                raise test_target_not_acquired_e(self)
+            with self.lock:
+                # get the DB, we do this only if alloc.id is defined,
+                # since it is a heavier op
+                allocdb = self._allocdb_get()
+                if allocdb == None:	# allocation was removed...shrug
+                    return
+                # validate WHO has rights
+                if allocdb.check_user_is_user_creator(user):
+                    # user or creator can release it; don't change the
+                    # state because if the user releases it it means
+                    # is because they don't need it, so the allocation
+                    # can still proceed working
+                    logging.error(
+                        "FIXME: delete the allocation if "
+                        "there are no more targets")
+                    self._deallocate(allocdb)
+                elif force and allocdb.check_user_is_admin(user):
+                    # if admin and force,
+                    self._deallocate(allocdb, 'restart-needed')
+                elif allocdb.check_user_is_guest(user):
+                    # if guest, just remove it as guest
+                    allocdb.guest_remove(user.get_id())
+                else:
+                    raise test_target_release_denied_e(self)
+        except acquirer_c.cant_release_not_owner_e:
+            raise test_target_release_denied_e(self)
+        except acquirer_c.cant_release_not_acquired_e:
+            raise test_target_not_acquired_e(self)
+
     @contextlib.contextmanager
-    def target_owned_and_locked(self, who):
+    def target_owned_and_locked(self, who, requested_state = "active"):
         """
         Ensure the target is locked and owned for an operation that
         requires exclusivity
@@ -1675,13 +2013,26 @@ class test_target(object):
             # this is the path for executing internal daemon processes
             yield
             return
-        if self.owner_get() == None:
-            raise test_target_not_acquired_e(self)
-        if who != self.owner_get():
-            raise test_target_busy_e(self)
+        userid, ticket = who_split(who)
+        with self.lock:
+            allocdb = self._allocdb_get()
+        if allocdb:
+            # New style, allocation based
+            state = allocdb.state_get()
+            if allocdb.state_get() != requested_state:
+                raise test_target_wrong_state_e(self, state, requested_state)
+            if not allocdb.check_userid_is_user_creator_guest(userid):
+                raise test_target_busy_e(self, userid, self.owner_get())
+        else:
+            # Old style
+            owner = self.owner_get()
+            if owner == None:
+                raise test_target_not_acquired_e(self)
+            if who != owner:
+                raise test_target_busy_e(self, who, owner)
         yield
 
-    def target_is_owned_and_locked(self, who):
+    def target_is_owned_and_locked(self, who, requested_state = "active"):
         """
         Returns if a target is locked and owned for an operation that
         requires exclusivity
@@ -1690,7 +2041,20 @@ class test_target(object):
         :returns: True if @who owns the target or is admin, False
           otherwise or if the target is not owned
         """
+        # FIXME: need to overload who to be string or
+        # ttbl.user_control.User so we can do admin checks here too?
         assert isinstance(who, str)
+        userid, ticket = who_split(who)
+        with self.lock:
+            allocdb = self._allocdb_get()
+        if allocdb:
+            # New style, allocation based
+            if allocdb.state_get() != requested_state:
+                return False
+            if not allocdb.check_userid_is_user_creator_guest(userid):
+                return False
+            return True
+        # Old style
         if self.owner_get() == None:
             return False
         if who != self.owner_get():
@@ -1719,8 +2083,10 @@ class test_target(object):
                 "An interface of type %s has been already "
                 "registered for target %s at %s" %
                 (name, self.id, self.interface_origin[name]))
-        obj._target_setup(self)
-        self.tags['interfaces'].append(name)
+        # call this before so it creates the placeholder where driver
+        # called by _target_setup() can store stuff
+        obj.instrumentation_publish(self, name)
+        obj._target_setup(self, name)
         self.interface_origin[name] = commonl.origin_get(2)
         setattr(self, name, obj)
         self.release_hooks.add(obj._release_hook)
@@ -1764,7 +2130,7 @@ class authenticator_c(object):
         and which with category (as determined by the role mapping)
 
         :returns: None if user is not allowed to log in, otherwise a
-          dictionary with user's information; see :ref:`access control
+          list with user's information; see :ref:`access control
           <target_access_control>`.
 
         """
@@ -1792,3 +2158,16 @@ def daemon_pid_check(pid):
 # This is usually called by the SIGCHLD signal handler
 def daemon_pid_rm(pid):
     _daemon_pids.remove(pid)
+
+
+# util
+
+def usb_serial_number(d):
+    #depending on the library version, get the USB string one way or another
+    if hasattr(d, 'serial_number'):
+        serial_number = d.serial_number
+    elif hasattr(d, 'iSerialNumber'):
+        serial_number = usb.util.get_string(d, 1000, d.iSerialNumber)
+    else:
+        raise AssertionError("%s: don't know how to find USB device serial number" % d)
+    return serial_number

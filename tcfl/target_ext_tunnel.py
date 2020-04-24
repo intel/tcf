@@ -13,9 +13,8 @@ Create and remove network tunnels to the target via the server
 import pprint
 
 from . import msgid_c
+import commonl
 from . import tc
-from . import ttb_client
-
 
 class tunnel(tc.target_extension_c):
     """
@@ -273,8 +272,10 @@ def cmdline_setup(argsp):
                     "(default is the first IP address the target declares)")
     ap.set_defaults(func = _cmdline_tunnel_add)
 
-    ap = argsp.add_parser("tunnel-remove",
+    ap = argsp.add_parser("tunnel-rm",
                           help = "remove an existing IP tunnel")
+    commonl.argparser_add_aka(argsp, "tunnel-rm", "tunnel-remove")
+    commonl.argparser_add_aka(argsp, "tunnel-rm", "tunnel-delete")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
     ap.add_argument("port", metavar = "PORT", action = "store",
@@ -289,7 +290,7 @@ def cmdline_setup(argsp):
                     "(default is the first IP address the target declares)")
     ap.set_defaults(func = _cmdline_tunnel_remove)
 
-    ap = argsp.add_parser("tunnel-list", help = "List existing IP tunnels")
+    ap = argsp.add_parser("tunnel-ls", help = "List existing IP tunnels")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
     ap.set_defaults(func = _cmdline_tunnel_list)

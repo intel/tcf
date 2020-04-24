@@ -41,7 +41,7 @@ class extension(tc.target_extension_c):
     buttons interface and expose said buttons (list them). You can use
     the command line::
 
-      $ tcf button-list TARGETNAME
+      $ tcf button-ls TARGETNAME
 
     to find the buttons available to a targert and use
     ``button-press``, ``button-release`` and ``button-click`` to
@@ -51,6 +51,7 @@ class extension(tc.target_extension_c):
     def __init__(self, target):
         if not 'buttons' in target.rt.get('interfaces', []):
             raise self.unneeded
+        tc.target_extension_c.__init__(self, target)
 
     def _sequence(self, sequence):
         self.target.ttbd_iface_call("buttons", "sequence", method = "PUT",
@@ -179,7 +180,7 @@ def _cmdline_setup(argsp):
                     help = "Seconds to wait between clicks (%(default).2fs)")
     ap.set_defaults(func = _cmdline_button_double_click)
 
-    ap = argsp.add_parser("button-list", help = "List available buttons")
+    ap = argsp.add_parser("button-ls", help = "List available buttons")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
     ap.set_defaults(func = _cmdline_button_list)

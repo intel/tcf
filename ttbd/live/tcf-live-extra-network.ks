@@ -15,5 +15,5 @@
 #[Network]
 #DHCP = no
 #Address = 192.168.254.101/24
-#Address = fc00::fe:fe/112
+#Address = fd:00:fe::fe/104
 #EOF

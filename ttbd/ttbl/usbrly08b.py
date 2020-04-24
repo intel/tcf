@@ -364,10 +364,10 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
 
       ttbl.config.interconnect_add(ttbl.test_target("usb__nuc-02__a101-04"),
                                   ic_type = "usb__host__device")
-      ttbl.config.targets['nuc-02'].add_to_interconnect('usb__nuc-02__a101-04')
-      ttbl.config.targets['a101-04'].add_to_interconnect('usb__nuc-02__a101-04')
-      ttbl.config.targets['nuc-02'].thing_add('a101-04',
-                                              ttbl.usbrly08b.plugger("00033085", 1))
+      ttbl.test_target.get('nuc-02').add_to_interconnect('usb__nuc-02__a101-04')
+      ttbl.test_target.get('a101-04').add_to_interconnect('usb__nuc-02__a101-04')
+      ttbl.test_target.get('nuc-02').thing_add('a101-04',
+                                               ttbl.usbrly08b.plugger("00033085", 1))
 
     Where *00033085* is the serial number for the USB-RLY8b which
     implements the USB plugging/unplugging (in this case we use bank 1

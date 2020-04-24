@@ -76,7 +76,8 @@ import tcfl.tc
 import tcfl.pos
 
 @tcfl.tc.interconnect('ipv4_addr')
-@tcfl.tc.target('pos_capable and capture:"screen:snapshot"')
+@tcfl.tc.target('pos_capable'
+                ' and interfaces.capture.screen.type == "snapshot"')
 class _test(tcfl.pos.tc_pos0_base):
 
     def eval(self, ic, target):

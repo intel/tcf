@@ -9,36 +9,44 @@ packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
 requires =
          alsa-utils
          android-tools
-         dfu-util
+         dnsmasq
          dosfstools
          ipmitool
          livecd-tools
-         openocd >= 0.10
+         openocd
+         openssh-clients
          parted
          pyOpenSSL
          pyserial
+         python3-ldap
+         python3-ply
+         python3-pyghmi
+         python3-requests
+         python3-systemd
+         python3-tornado
+         python3-werkzeug
          python3-flask
          python3-flask-login
-         python3-flask-principal
          python3-keyring
-         python3-pysnmp
          python3-ldap
          python3-pexpect
-         python-ply
-         python-requests
-         python-systemd
-         python3-tornado
-         python-werkzeug
-         python-pyghmi
          python3-pyusb
+         python3-tornado
+         python3-pyusb
+         @@CentOS|RHEL@@OVMF
+         @@Fedora@@edk2-ovmf
+         @@Fedora@@python3-pexpect
+         @@CentOS|RHEL@@pexpect
+         @@Fedora@@python3-systemd
+         @@CentOS|RHEL@@systemd-python
+         @@Fedora@@python3-flask-principal
+         @@Fedora@@python3-pysnmp
+         @@CentOS|RHEL@@pysnmp
          qemu
          sdnotify
-         openssh-clients
-         sshpass
          socat
-         tcf == %%{version}-%%{release}
-         ((grub2-efi-x64-cdboot and grub2-efi-x64-modules and grub2-pc-modules)
-          or (grub2 and grub2-efi and grub2-efi-modules))
+         sshpass
+         tcf == %{version}-%{release}
          v4l-utils
 
 build_requires =

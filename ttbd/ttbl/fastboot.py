@@ -22,7 +22,7 @@ class interface(ttbl.tt_interface):
     An instance of this gets added as an object to the main target
     with something like:
 
-    >>> ttbl.config.targets['targetname'].interface_add(
+    >>> ttbl.test_target.get('targetname').interface_add(
     >>>     "fastboot",
     >>>     ttbl.fastboot.interface("R1J56L1006ba8b"),
     >>>     {
@@ -158,11 +158,13 @@ class interface(ttbl.tt_interface):
         self.usb_serial_number = usb_serial_number
 
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
+        instr_id = commonl.mkid(self.usb_serial_number, l = 4)
         self.instrumentation_publish_component(
             target, "fastboot",
-            commonl.mkid(self.usb_serial_number, l = 4), "ADB bridge",
+            instr_id, "ADB bridge",
             { 'usb_serial_number': self.usb_serial_number })
+        target.tags['interfaces'][iface_name]['instrument'] = instr_id
 
 
     def _release_hook(self, target, _force):
@@ -177,7 +179,7 @@ class interface(ttbl.tt_interface):
     #:
     #: or for an specific instance
     #:
-    #: >>> ttbl.config.targets['TARGETNAME'].fastboot.path = "/some/other/fastboot"
+    #: >>> ttbl.test_target.get('TARGETNAME').fastboot.path = "/some/other/fastboot"
     #:
     path = "/usr/bin/fastboot"
 

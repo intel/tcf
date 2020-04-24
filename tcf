@@ -65,7 +65,12 @@ def _target_get(args):
     else:
         data = None
     rtb, _rt = ttb_client._rest_target_find_by_id(args.target)
-    rt = rtb.send_request("GET", "targets/" + args.target, data = data)
+    r = rtb.send_request("GET", "targets/" + args.target, data = data,
+                         raw = True)
+    # Keep the order -- even if json spec doesn't contemplate it, we
+    # use it so the client can tell (if they want) the order in which
+    # for example, power rail components are defined in interfaces.power
+    rt = json.loads(r.text, object_pairs_hook = collections.OrderedDict)
     print(json.dumps(rt, skipkeys = True, indent = 4))
 
 def _target_patch(args):
@@ -172,7 +177,7 @@ def _cookies(args):
         # cache is by full id
         rtb = ttb_client.rest_target_broker.rts_cache[args.target]['rtb']
     else:
-        for rt_fullid, rt in ttb_client.rest_target_broker.rts_cache.iteritems():
+        for rt_fullid, rt in ttb_client.rest_target_broker.rts_cache.items():
             if rt['id'] == args.target:
                 rtb = rt['rtb']
                 break
@@ -280,9 +285,10 @@ if __name__ == "__main__":
     ap.set_defaults(func = _cookies)
 
     arg_parser_target_list = arg_subparsers.add_parser(
-        "list", help = "List the targets; by default, in a terminal, it will "
+        "ls", help = "List the targets; by default, in a terminal, it will "
         "print a multi-column display with '!' next to powered-on targets, "
         "and @ next to owned targets; -v adds more detail)")
+    commonl.argparser_add_aka(arg_subparsers, "ls", "list")
     arg_parser_target_list.add_argument(
         "-v", dest = "verbosity", action = "count", default = 0,
         help = "Increase information to display about the targets (-v "
@@ -323,17 +329,6 @@ if __name__ == "__main__":
                     default = None, help = "Data items to store; if"
                     " none, specify a JSON dictionary over stdin")
     ap.set_defaults(func = _target_patch)
-
-    ap = arg_subparsers.add_parser(
-        "acquire", help = "Acquire ownership of a target")
-    ap.add_argument(
-        "target", metavar = "TARGET", action = "store",
-        nargs = "+", default = None,
-        help = "Target's name or URL")
-    ap.add_argument("-f", "--force", action = "store_true", default = False,
-                    help = "Force the acquisition, removing the target "
-                    "from its current owner (requires admin rights)")
-    ap.set_defaults(func = ttb_client.rest_target_acquire)
 
     ap = arg_subparsers.add_parser("enable",
                                    help = "Enable a disabled target")
@@ -385,6 +380,7 @@ if __name__ == "__main__":
     tcfl.tc.argp_setup(arg_subparsers)
     # imported by tcfl.tc
     tcfl.tc.pos.cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_alloc._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_console._cmdline_setup(arg_subparsers)

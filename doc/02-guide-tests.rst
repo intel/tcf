@@ -261,7 +261,7 @@ With the test concluded, we power down all the targets in reverse
 order:
 
 >>>     def teardown(self):
->>>         for _n, target in reversed(self.targets.iteritems()):
+>>>         for _n, target in reversed(self.targets.items()):
 >>>             target.power.off()
 
 Or not, it can also be left to *ttbd* to decide if they have to be

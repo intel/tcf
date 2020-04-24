@@ -222,12 +222,6 @@ def _rootfs_guess_by_image(target, image, boot_dev):
                            % (root_part_dev, seed, score, seed), dlevel = 2)
     return root_part_dev
 
-def _mkfs(target, dev, fstype, mkfs_opts):
-    target.report_info("POS: formatting %s (mkfs.%s %s)"
-                       % (dev, fstype, mkfs_opts), dlevel = 1)
-    target.shell.run("mkfs.%s %s %s" % (fstype, mkfs_opts, dev))
-    target.report_info("POS: formatted rootfs %s as %s" % (dev, fstype))
-
 def _rootfs_guess(target, image, boot_dev):
     reason = "unknown issue"
     for tries in range(3):
@@ -312,81 +306,5 @@ def mount_fs(target, image, boot_dev):
     target.report_info("POS: will use %s for root partition (had %s before)"
                        % (root_part_dev, image_prev))
 
-    # fsinfo looks like described in target.pos.fsinfo_read()
-    dev_info = None
-    for blockdevice in target.pos.fsinfo.get('blockdevices', []):
-        for child in blockdevice.get('children', []):
-            if child['name'] == root_part_dev_base:
-                dev_info = child
-    if dev_info == None:
-        # it cannot be we might have to repartition because at this
-        # point *we* have partitioned.
-        raise tc.error_e(
-            "Can't find information for root device %s in FSinfo array"
-            % root_part_dev_base,
-            dict(fsinfo = target.pos.fsinfo))
-
-    # what format does it currently have?
-    current_fstype = dev_info.get('fstype', 'ext4')
-
-    # What format does it have to have?
-    #
-    # Ok, here we need to note that we can't have multiple root
-    # filesystems with the same UUID or LABEL, so the image can't rely
-    # on UUIDs
-    #
-    img_fss = target.pos.metadata.get('filesystems', {})
-    if '/' in img_fss:
-        # a common origin is ok because the YAML schema forces both
-        # fstype and mkfs_opts to be specified
-        origin = "image's /.tcf.metadata.yaml"
-        fsdata = img_fss.get('/', {})
-    else:
-        origin = "defaults @" + commonl.origin_get(0)
-        fsdata = {}
-    fstype = fsdata.get('fstype', 'ext4')
-    mkfs_opts = fsdata.get('mkfs_opts', '-Fj')
-
-    # do they match?
-    if fstype != current_fstype:
-        target.report_info(
-            "POS: reformatting %s because current format is '%s' and "
-            "'%s' is needed (per %s)"
-            % (root_part_dev, current_fstype, fstype, origin))
-        _mkfs(target, root_part_dev, fstype, mkfs_opts)
-    else:
-        target.report_info(
-            "POS: no need to reformat %s because current format is '%s' and "
-            "'%s' is needed (per %s)"
-            % (root_part_dev, current_fstype, fstype, origin), dlevel = 1)
-
-    for try_count in range(3):
-        target.report_info("POS: mounting root partition %s onto /mnt "
-                           "to image [%d/3]" % (root_part_dev, try_count))
-
-        # don't let it fail or it will raise an exception, so we
-        # print FAILED in that case to look for stuff; note the
-        # double apostrophe trick so the regex finder doens't trip
-        # on the command
-        output = target.shell.run(
-            "mount %s /mnt || echo FAI''LED" % root_part_dev,
-            output = True)
-        # What did we get?
-        if 'FAILED' in output:
-            if 'special device ' + root_part_dev \
-               + ' does not exist.' in output:
-                _disk_partition(target)
-                target.pos.fsinfo_read(target._boot_label_name)
-            else:
-                # ok, this probably means probably the partitions are not
-                # formatted; so let's just reformat and retry 
-                _mkfs(target, root_part_dev, fstype, mkfs_opts)
-        else:
-            target.report_info("POS: mounted %s onto /mnt to image"
-                               % root_part_dev)
-            return root_part_dev	# it worked, we are done
-        # fall through, retry
-    else:
-        raise tc.blocked_e(
-            "POS: Tried to mount too many times and failed",
-            dict(target = target))
+    pos.mount_root_part(target, root_part_dev, _disk_partition)
+    return root_part_dev

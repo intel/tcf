@@ -198,15 +198,17 @@ def _cmdline_setup(arg_subparsers):
                     help = "Path to where to store the file locally")
     ap.set_defaults(func = _cmdline_store_dnload)
 
-    ap = arg_subparsers.add_parser("store-delete",
+    ap = arg_subparsers.add_parser("store-rm",
                                    help = "Delete a file from the server")
+    commonl.argparser_add_aka(arg_subparsers, "store-rm", "store-del")
+    commonl.argparser_add_aka(arg_subparsers, "store-rm", "store-delete")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target name")
     ap.add_argument("remote_filename", action = "store",
                     help = "Path to remote file to delete")
     ap.set_defaults(func = _cmdline_store_delete)
 
-    ap = arg_subparsers.add_parser("store-list",
+    ap = arg_subparsers.add_parser("store-ls",
                                    help = "List files stored in the server")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target name")

@@ -210,7 +210,7 @@ def _cmdline_setup(arg_subparsers):
     ap.set_defaults(func = _cmdline_debug_gdb)
 
     ap = arg_subparsers.add_parser(
-        "debug-list",
+        "debug-ls",
         help = "Report debug information on target")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target's name")

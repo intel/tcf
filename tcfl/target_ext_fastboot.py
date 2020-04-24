@@ -40,7 +40,7 @@ class extension(tc.target_extension_c):
 
     You can list allowed fastboot commands with (from the example above)::
 
-      $ tcf fastboot-list TARGETNAME
+      $ tcf fastboot-ls TARGETNAME
       flash: flash partition_boot ^(.+)$
       flash_pos: flash_pos partition_boot /home/ttbd/partition_boot.pos.img
 
@@ -98,7 +98,7 @@ def _cmdline_setup(argsp):
                     help = "Parameters to the fastboot command")
     ap.set_defaults(func = _cmdline_fastboot)
 
-    ap = argsp.add_parser("fastboot-list", help = "List allowed fastboot "
+    ap = argsp.add_parser("fastboot-ls", help = "List allowed fastboot "
                           "commands")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")

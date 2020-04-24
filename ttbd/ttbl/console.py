@@ -21,6 +21,7 @@ import time
 
 import commonl
 import ttbl
+import ttbl.power
 
 import pexpect
 try:
@@ -122,6 +123,16 @@ class impl_c(ttbl.tt_interface_impl_c):
         self.command_timeout = command_timeout
         self.parameters = {}
         ttbl.tt_interface_impl_c.__init__(self)
+        #: Check if the implementation's link died and it has to be
+        #: re-enabled
+        #:
+        #: Some implementations of console die because their
+        #: connections get killed outside of the implementation's
+        #: control. Setting this to True allows the console code to
+        #: periodically when reading so that if the implementation
+        #: reports is disabled because the link died but it should be
+        #: enabled, it will be automatically re-enabled.
+        self.re_enable_if_dead = False
 
     class exception(Exception):
         """
@@ -149,7 +160,7 @@ class impl_c(ttbl.tt_interface_impl_c):
                                 " for enabling failed" % component)
                 self.disable(target, component)
                 raise
-        target.property_set("console-" + component + ".state", "enabled")
+        target.property_set("interfaces.console." + component + ".state", True)
 
     def disable(self, target, component):
         """
@@ -158,7 +169,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         :param str console: (optional) console to disable; if missing,
           the default one.
         """
-        target.property_set("console-" + component + ".state", None)
+        target.property_set("interfaces.console." + component + ".state", False)
 
     def state(self, target, component):
         """
@@ -329,7 +340,7 @@ class interface(ttbl.tt_interface):
     An instance of this gets added as an object to the target object
     with:
 
-    >>> ttbl.config.targets['qu05a'].interface_add(
+    >>> ttbl.test_target.get('qu05a').interface_add(
     >>>     "console",
     >>>     ttbl.console.interface(
     >>>         ttyS0 = ttbl.console.serial_device("/dev/ttyS5")
@@ -353,7 +364,9 @@ class interface(ttbl.tt_interface):
       - *ssh\**     SSH session (may require setup before enabling)
 
     A *default* console is set by declaring an alias as in the example
-    above; however, a preferred console
+    above; otherwise the first one listed in
+    target.console.impls.keys() is considered the default. A
+    *preferred* console is the one that has *preferred* as an alias.
 
     This interface:
 
@@ -378,14 +391,22 @@ class interface(ttbl.tt_interface):
         # the implementations for the console need to be of type impl_c
         self.impls_set(impls, kwimpls, impl_c)
 
+    def _pre_off_disable_all(self, target):
+        for console, impl in self.impls.items():
+            target.log.info("%s: disabling console before powering off",
+                            console)
+            impl.disable(target, console)
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         # Called when the interface is added to a target to initialize
         # the needed target aspect (such as adding tags/metadata)
-        target.tags_update(dict(consoles = list(self.impls.keys())))
-        target.properties_user.add("console-default")
-        target.properties_keep_on_release.add("console-default")
-        self.instrumentation_publish(target, "console")
+        target.properties_user.add("interfaces.console.default")
+        target.properties_keep_on_release.add("interfaces.console.default")
+        # When the target is powered off, disable the consoles -- why?
+        # because things like consoles over SSH will stop working, no
+        # matter what, and we want it to fail early and not seem there
+        # is something odd.
+        target.power_off_pre_fns.append(self._pre_off_disable_all)
 
     def _release_hook(self, target, _force):
         # nothing to do on target release
@@ -399,6 +420,42 @@ class interface(ttbl.tt_interface):
         parameters = dict(impl.parameters)
         parameters['real_name'] = component
         return dict(result = parameters)
+
+    def get_default_name(self, target):
+        """
+        Returns the name of the default console
+
+        The default console is defined as:
+
+        - the name of an existing console in a tag called
+          *console-default*
+
+        - the name of a console called *default*
+
+        - the first console defined
+
+        :param ttbl.test_target target: target on which to find the
+          default console's name
+
+        :returns str: the name of the default console
+        :raises RuntimeError: if there are no consoles
+        """
+        console_default = target.property_get("interfaces.console.default", None)
+        try:
+            _impl, name = self.impl_get_by_name(console_default, "console")
+            return default
+        except IndexError:
+            # invalid default, reset it
+            console_default = target.property_set("interfaces.console.default", None)
+            # fallthrough
+        _impl, name = self.arg_impl_get("default", "console", True)
+        if name:
+            return name
+        consoles = self.impls.keys()
+        if not consoles:
+            raise RuntimeError("%s: there are no consoles, can't find default"
+                               % target.id)
+        return consoles[0]
 
     def put_setup(self, target, who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
@@ -437,7 +494,7 @@ class interface(ttbl.tt_interface):
             if state:
                 impl.disable(target, component)
             return dict()
-    
+
     def get_state(self, target, _who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         state = impl.state(target, component)
@@ -445,12 +502,44 @@ class interface(ttbl.tt_interface):
                                 component, "console.state")
         return dict(result = state)
 
+    @staticmethod
+    def _maybe_re_enable(target, component, impl):
+        # Some implementations have the bad habit of dying for no good
+        # reason:
+        #
+        #  - IPMIs SOLs close the connections
+        #  - ssh tunnels get killed without timing out
+        #  - dog eat the homework
+        #
+        # and there is nothing we can do about it but just try to
+        # restart it if it reports disabled (because the link is dead)
+        # but we recorded it shall be enabled (because the property
+        # console-COMPONENT.state is True)
+        if impl.re_enable_if_dead == False:
+            return False
+        shall_be_enabled = target.property_get("interfaces.console." + component + ".state", None)
+        is_enabled = impl.state(target, component)
+        if shall_be_enabled and is_enabled == False:
+            # so it died, let's re-enable and retry
+            target.log.warning("%s: console disabled on its own, re-enabling"
+                               % component)
+            impl.enable(target, component)
+            return True
+        return False
+
     def get_read(self, target, who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         offset = int(args.get('offset', 0))
         if target.target_is_owned_and_locked(who):
             target.timestamp()	# only if the reader owns it
-        r =  impl.read(target, component, offset)
+        last_enable_check = target.property_get("interfaces.console." + component + ".check_ts", 0)
+        ts_now = time.time()
+        if ts_now - last_enable_check > 5:
+            # every five secs check if the implementation's link has
+            # been closed and renable it if so
+            self._maybe_re_enable(target, component, impl)
+            target.property_set("interfaces.console." + component + ".check_ts", ts_now)
+        r = impl.read(target, component, offset)
         stream_file = r.get('stream_file', None)
         if stream_file and not os.path.exists(stream_file):
             # no file yet, no console output
@@ -472,12 +561,23 @@ class interface(ttbl.tt_interface):
         impl, component = self.arg_impl_get(args, "component")
         with target.target_owned_and_locked(who):
             target.timestamp()
-            impl.write(target, component,
-                       self._arg_get(args, 'data'))
-            return {}    
+            while True:
+                try:
+                    impl.write(target, component,
+                               self._arg_get(args, 'data'))
+                    break
+                except OSError:
+                    # sometimes many of these errors happen because the
+                    # implementation dies -- for IPMIs SOL, for example,
+                    # the other end closes the connection, so we try to
+                    # restart it
+                    if self._maybe_re_enable(target, component, impl):
+                        continue
+                    raise
+            return {}
 
 def generation_set(target, console):
-    target.fsdb.set("console-" + console + ".generation",
+    target.fsdb.set("interfaces.console." + console + ".generation",
                     # trunc the time and make it a string
                     str(int(time.time())))
 
@@ -555,7 +655,7 @@ class generic_c(impl_c):
             stream_file = os.path.join(target.state_dir,
                                        "console-%s.read" % component),
             stream_generation = target.fsdb.get(
-                "console-%s.generation" % component, 0),
+                "interfaces.console." + component + ".generation", 0),
             stream_offset = offset
         )
 
@@ -584,7 +684,7 @@ class generic_c(impl_c):
         return _data
 
 
-    
+
     def _write(self, fd, data):
         if self.escape_chars:
             data = self._escape(data)
@@ -606,7 +706,7 @@ class generic_c(impl_c):
                 left -= _chunk_size
         else:
             os.write(fd, data)
-    
+
     def write(self, target, component, data):
         file_name = os.path.join(target.state_dir,
                                  "console-%s.write" % component)
@@ -670,14 +770,14 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
 
     >>> serial0_pc = ttbl.console.serial_pc(console_file_name)
     >>>
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "power",
     >>>     ttbl.power.interface(
     >>>         ...
     >>>         serial0_pc,
     >>>         ...
     >>>     )
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "console",
     >>>     ttbl.console.interface(
     >>>         serial0 = serial0_pc,
@@ -748,7 +848,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
 
       Note they all have to be strings; e.g.:
 
-      >>> serial0_pc = ttbl.console.ssh_pc(
+      >>> ssh0_pc = ttbl.console.ssh_pc(
       >>>     "USER:PASSWORD@HOSTNAME",
       >>>     extra_opts = {
       >>>         "Ciphers": "aes128-cbc,3des-cbc",
@@ -764,14 +864,14 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
 
     >>> ssh0_pc = ttbl.console.ssh_pc("USERNAME:PASSWORD@HOSTNAME")
     >>>
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "power",
     >>>     ttbl.power.interface(
     >>>         ...
     >>>         ssh0_pc,
     >>>         ...
     >>>     )
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "console",
     >>>     ttbl.console.interface(
     >>>         ssh0 = ssh0_pc,
@@ -885,6 +985,98 @@ EscapeChar = none
             else:
                 self.parameters[key] = value
         return dict(result = self.parameters)
+
+    def enable(self, target, component):
+        self.on(target, component)
+
+    def disable(self, target, component):
+        return self.off(target, component)
+
+
+class netconsole_pc(ttbl.power.socat_pc, generic_c):
+    """Receive Linux's netconsole data over a console
+
+    The linux kernel can forward kernel messages over IP as soon as
+    the network is initialized, which this driver can pick up and
+    register. The target's kernel needs to be configured to output its
+    netconsole to the server's IP, matching the port given to this
+    driver; for example, the kernel command line::
+
+      netconsole=@/,6666@192.168.98.1
+
+    or as a module (see other methods `here
+    <https://www.kernel.org/doc/Documentation/networking/netconsole.txt>`_)::
+
+      # modprobe netconsole netconsole=@/,6666@192.168.98.1
+
+    will send netconsole output to *UDP:192.168.98.1:666*
+
+    The driver implements two interfaces:
+
+    - power interface: to start a console record as soon as the target
+      is powered on. Anything read from the console is written to file
+      *console-NAME.read* file.
+
+      The power interface is implemented by subclassing
+      :class:`ttbl.power.socat_pc`, which starts *socat* as daemon to
+      serve as a data recorder.
+
+    - console interface: interacts with the console interface by
+      exposing the data recorded in the file *console-NAME.read* file.
+      Writing is not supported, since *netconsole* is read only.
+
+    :params str ip_addr: (optional) IP address or hostname of the
+      target.
+
+    :params int port: (optional) port number to which to receive;
+      defaults to *6666* (netconsole's default).
+
+    For example, create a serial port recoder power control / console
+    driver and insert it into the power rail and the console of a
+    target:
+
+    target.console.impl_add("netconsole0", netconsole_pc())
+    >>> netconsole_pc = ttbl.console.netconsole_c("192.168.98.2")
+    >>>
+    >>> ttbl.test_target.get(name).interface_add(
+    >>>     "power",
+    >>>     ttbl.power.interface(
+    >>>         ...
+    >>>         ( "netconsole", netconsole_pc, )
+    >>>         ...
+    >>>     )
+    >>> ttbl.test_target.get(name).interface_add(
+    >>>     "console",
+    >>>     ttbl.console.interface(
+    >>>         ...
+    >>>         netconsole = netconsole_pc,
+    >>>         ...
+    >>>     )
+    >>> )
+
+    """
+    def __init__(self, ip_addr, port = 6666):
+        assert isinstance(port, numbers.Integer)
+        generic_c.__init__(self)
+        ttbl.power.socat_pc.__init__(
+            self,
+            # fork?
+            "UDP-LISTEN:%d,range=%s" % (port, ip_addr),
+            "CREATE:console-%(component)s.read",
+            extra_cmdline = [ "-u" ])	# unidirectional, UDP:6666 -> file
+
+    # console interface; state() is implemented by generic_c
+    def on(self, target, component):
+        ttbl.power.socat_pc.on(self, target, component)
+        generation_set(target, component)
+        generic_c.enable(self, target, component)
+
+    def off(self, target, component):
+        generic_c.disable(self, target, component)
+        ttbl.power.socat_pc.off(self, target, component)
+
+    def write(self, target, component, data):
+        raise RuntimeError("%s: (net)console is read only" % component)
 
     def enable(self, target, component):
         self.on(target, component)

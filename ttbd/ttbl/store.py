@@ -38,7 +38,7 @@ class interface(ttbl.tt_interface):
     def __init__(self):
         ttbl.tt_interface.__init__(self)
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         pass
 
     def _release_hook(self, target, _force):
@@ -70,6 +70,7 @@ class interface(ttbl.tt_interface):
         file_path = self._arg_get(args, 'file_path')
         file_object = files['file']
         file_path_final = self._validate_file_path(file_path, user_path)
+        commonl.makedirs_p(user_path)
         file_object.save(file_path_final)
         target.log.debug("%s: saved" % file_path_final)
         return dict()

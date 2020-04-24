@@ -33,6 +33,7 @@ import datetime
 import errno
 import fnmatch
 import json
+import numbers
 import signal
 import threading
 import ttbl.user_control
@@ -58,7 +59,6 @@ import pprint
 import tempfile
 import time
 import commonl
-import ttbl.config
 import requests
 import shutil
 import sys
@@ -66,7 +66,9 @@ import sys
 import urllib.parse
 import glob
 
-#import prctl
+import ttbl
+import ttbl.config
+import ttbl.allocation
 
 try:
     import sdnotify
@@ -96,7 +98,7 @@ setattr(logging, "logdl", logging.root.log)
 from logging import logc, loge, logx, logw, logi, logd, logdl
 
 app = flask.Flask(__name__)
-API_VERSION = 1
+API_VERSION = 2
 API_PATH = "/ttb-v"
 API_PREFIX = API_PATH + str(API_VERSION) + "/"
 
@@ -175,6 +177,18 @@ def current_user_is_admin():
     if user:
         return user.is_admin()
     return False
+
+@app.route(API_PATH + "<int:version>/<path:any_route>",
+           methods = [ 'GET', 'POST', 'PUT', 'PATCH', 'DELETE' ])
+def _bad_version(version, any_route):
+    if version < API_VERSION:
+        action = "upgrade"
+    else:
+        action = "downgrade"
+    return flask.abort(404,
+                       "your client is asking for protocol v%s to call %s;"
+                       " this server supports %d; please %s"
+                       % (version, any_route, API_VERSION, action))
 
 @app.route(API_PREFIX + 'login', methods = ['PUT'])
 def login():
@@ -306,9 +320,10 @@ def _users(userid = None):
         else:
             userl = [ userid ]
     else:
+        calling_id = calling_user.get_id()
         if userid == None:
-            userl = [ calling_user.userid ]
-        elif userid != calling_user.userid:
+            userl = [ calling_id ]
+        elif userid != calling_id:
             # admins can list'em all FIXME: check user-elevate
             r[userid]  = {
                 "error": "user '%s' needs admin role to query"
@@ -369,7 +384,7 @@ def _user_role(userid, action, role):
                 403, "user '%s' does not exist: %s" % (userid, e))
     else:
         flask_logi_abort(
-            403, "not enough privilege to remove user %s" % userid)
+            403, "not enough privilege to change roles for user %s" % userid)
     if action == "drop":
         if not user.role_present(role):
             flask_logi_abort(
@@ -393,10 +408,15 @@ def _targets_gets():
     projections = _flask_arg_projections()
     _list = []
     calling_user = flask_login.current_user._get_current_object()
-    for target_name in ttbl.config.targets:
-        target = ttbl.test_target.get_for_user(target_name, calling_user)
-        if target:
-            _list.append(target.to_dict(projections))
+    for target in ttbl.test_target.known_targets():
+        if not target.check_user_allowed(calling_user):
+            continue
+        d = target.to_dict(projections)
+        if d:
+            # list it only if the projections yielded a non empty
+            # set of data
+            d['id'] = target.id
+            _list.append(d)
     return flask.jsonify({'targets': _list})
 
 @app.route(API_PREFIX + 'targets/<string:target_id>', methods = ['GET'])
@@ -407,7 +427,8 @@ def _target_get(target_id):
     target = ttbl.test_target.get_for_user(target_id, calling_user)
     if target == None:
         flask.abort(404, "%s: unknown target" % target_id)
-    return flask.jsonify(target.to_dict(projections))
+    d = target.to_dict(projections)
+    return json.dumps(d, sort_keys = False)
 
 _admin_required = [
     'disabled',
@@ -566,13 +587,188 @@ def _target_release(target_id):
     try:
         who = who_make(ticket)
         if force and not current_user_is_admin():
+            # FIXME: this won't be needed later on
             raise ttbl.test_target_not_admin_e(target)
-        target.release(who, force)
+        target.release(flask_login.current_user._get_current_object(), force,
+                       ticket = ticket)
     except ttbl.test_target_e as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
     except Exception as e:
         flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
     return flask.jsonify({})
+
+
+@app.route(API_PREFIX + 'allocation', methods = [ 'PUT' ])
+@flask_login.login_required
+def _put_allocation():
+    # {
+    #    "obo": USERNAME,
+    #    "priority": int(PRIO),
+    #    "guests": [ "guest1", "guest2"... ]
+    #    "preempt": bool(PREEMPT),
+    #    "queue": bool(QUEUE),
+    #    "reason": string,
+    #    "groups": {
+    #        "group1" : [ target1, target2, target3 ... ],
+    #        "group2" : [ target3, target4, target1 ... ],
+    #        "group3" : [ target1, target2, target5, target6 ... ],
+    #    }
+    # }
+    #
+    # return {
+    #    "state": { 'busy', 'queued', 'allocated', 'rejected' },
+    #    "allocid": ID,    # if queued; derived from OWNER's cookie
+    #    "message": {
+    #      "not allowed on TARGETNAMEs",	# when rejected
+    #      "targets TARGETNAMEs are busy",	# when not queued
+    #    }
+    # }
+    try:
+        data = flask.request.get_json()
+        if data == None:
+            # get from from encoding
+            data = {}
+            for key, value in flask.request.form.items():
+                #logging.error("DEBUG args key %s value %s", key, value)
+                data[key] = json.loads(value)
+        assert isinstance(data, dict), \
+            "need a dictionary of data parameters to make a request;" \
+            " got %s (%s)" % (data, type(data))
+        obo_user = data.get('obo', None)
+        if obo_user == None:
+            obo_user = flask_login.current_user
+        else:
+            raise NotImplementedError("no way to specify OBO user yet")
+
+        #logging.error("DEBUG args: %s" % pprint.pformat(data))
+        result = ttbl.allocation.request(
+            data['groups'],
+            calling_user = flask_login.current_user._get_current_object(),
+            obo_user = data.get(
+                'obo_user',
+                flask_login.current_user._get_current_object().get_id()),
+            guests = data.get('guests', []),
+            priority = data.get('priority', None),
+            preempt = data.get('preempt', False),
+            queue = data.get('queue', False),
+            reason = data.get('reason', None),
+        )
+    except Exception as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    return flask.jsonify(result)
+
+
+@app.route(API_PREFIX + 'allocation/<string:allocid>',
+           methods = [ 'GET' ])
+@flask_login.login_required
+def _get_allocation(allocid):
+    try:
+        result = ttbl.allocation.get(
+            allocid,
+            flask_login.current_user._get_current_object())
+        #logging.error("DEBUG get %s" % pprint.pformat(result))
+    except Exception as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    return flask.jsonify(result)
+
+@app.route(API_PREFIX + 'allocation/',
+           methods = [ 'GET' ])
+@flask_login.login_required
+def _query_allocation():
+    try:
+        result = ttbl.allocation.query(
+            flask_login.current_user._get_current_object())
+    except Exception as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    return flask.jsonify(result)
+
+
+@app.route(API_PREFIX + 'allocation/<string:allocid>',
+           methods = [ 'DELETE' ])
+@flask_login.login_required	# release the allocation
+def _delete_allocation(allocid):
+    try:
+        result = ttbl.allocation.delete(
+            allocid,
+            flask_login.current_user._get_current_object())
+    except Exception as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    return flask.jsonify(result)
+
+
+@app.route(API_PREFIX + 'keepalive', methods = [ 'PUT' ])
+@flask_login.login_required
+def _put_keepalive():
+    # {
+    #     'pressure': N,
+    #     'ALLOCID1': 'KNOWNSTATE1',
+    #     'ALLOCID2': 'KNOWNSTATE2',
+    #     ....
+    #     'ALLOCIDn': 'KNOWNSTATEn',
+    # }
+    #
+    # Return only ALLOCIDs that changed state
+    #
+    # {
+    #     ...
+    #     'ALLOCID1': { 'state': 'NEWSTATE1' },
+    #     'ALLOCID2': { 'state': 'NEWSTATE2', 'message' : '...this happened' },
+    #     ....
+    # }
+    #
+    try:
+        data = flask.request.get_json()
+        if data == None:
+            # get from from encoding
+            data = {}
+            for key, value in flask.request.form.items():
+                #logging.error("DEBUG args key %s value %s", key, value)
+                data[key] = json.loads(value)
+        assert isinstance(data, dict), \
+            "need a dictionary of data parameters to make a request;" \
+            " got %s (%s)" % (data, type(data))
+        if 'pressure' in data:
+            pressure = json.loads(data.pop('pressure'))
+            assert isinstance(pressure, numbers.Integral), \
+                "pressure needs to be an number" # FIXME: range?
+        else:
+            pressure = 0
+        result = {}
+        for allocid, expected_state in data.items():
+            r = ttbl.allocation.keepalive(
+                allocid, expected_state, pressure,
+                flask_login.current_user._get_current_object())
+            if r['state'] == expected_state:
+                continue		# nothing to return
+            result[allocid] = r
+    except Exception as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    return flask.jsonify(dict(result = result))
+
+
+@app.route(API_PREFIX + 'allocation/<string:allocid>/<string:guestname>',
+           methods = [ 'PATCH' ])
+@flask_login.login_required
+def _patch_guest(allocid, guestname):
+    try:
+        user = flask_login.current_user._get_current_object()
+        result = ttbl.allocation.guest_add(allocid, user, guestname)
+    except Exception as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    return flask.jsonify(result)
+
+@app.route(API_PREFIX + 'allocation/<string:allocid>/<string:guestname>',
+           methods = [ 'DELETE' ])
+@flask_login.login_required
+def _delete_guest(allocid, guestname):
+    try:
+        user = flask_login.current_user._get_current_object()
+        result = ttbl.allocation.guest_remove(allocid, user, guestname)
+    except Exception as e:
+        flask_logi_abort(400, "%s" % e, exc_info = True)
+    return flask.jsonify(result)
+
+
 
 def tb_file_local_path_get(username, filepath):
     """
@@ -669,47 +865,6 @@ def _target_interface(target_id, interface, call):
     else:
         return flask.jsonify(result)
 
-
-@contextlib.contextmanager
-def target_acquired(target, who):
-    try:
-        target.acquire(who, False)
-        yield
-    except:
-        # do not force releasing it if we don't own it
-        target.release(who, False)
-        raise
-    target.release(who, False)
-
-def _do_cleanup_released(target, who):
-    if not hasattr(target, "power"):	# Only with power control
-        return
-    idle_poweroff = target.tags.get('idle_poweroff',
-                                    ttbl.config.target_max_idle)
-    if idle_poweroff == 0:
-        target.log.debug("skiping powering off, idle_poweroff is 0")
-        return
-    # yeah, we do without acquiring; technically it is legal since it
-    # does not modify state...almost (except for 'powered' property)
-    any_powered_on = target.power._get_any(target)
-    if any_powered_on == False:		# Is it off? pass
-        return
-    with target_acquired(target, who):	# Acquire, check idleness
-        # calculate the idle time once we own the target, to be sure
-        # none came in the middle and we are killing it for them...
-        idle_time = time.time() - target.timestamp_get()
-        if idle_time > idle_poweroff:
-            target.log.info("powering off, idle for %.2fs (max %s)",
-                            idle_time, idle_poweroff)
-            target.power.put_off(target, who, {}, {}, None)
-
-def _do_cleanup_acquired(target, owner, who):
-    idle_time = time.time() - target.timestamp_get()
-    if idle_time > ttbl.config.target_owned_max_idle:
-        target.log.warning("releasing from %s, idle for %.2fs (max %s)",
-                           owner, idle_time, ttbl.config.target_owned_max_idle)
-        target.release(who, True)
-
 def cleanup_files():
     for f in glob.iglob(app.config['files_path'] + "/*/*"):
        if (time.time() - os.stat(f).st_mtime ) > ttbl.config.cleanup_files_maxage:
@@ -727,39 +882,15 @@ def cleanup_files():
 
 _systemd_watchdog_period = None
 
-def _systemd_keepalive(t):
+def _systemd_keepalive():
     global _systemd_watchdog_period
     if _systemd_watchdog_period == None:
         return
     # We keepalive whenever we can
     sd_notify.notify("WATCHDOG=1")
 
-def _do_cleanup():
-    """
-    """
-    daemon_user = ttbl.user_control.User('local', roles = [ "admin" ])
-    target_list = list(ttbl.config.targets.keys())
-    who = who_make("cleanup", user = daemon_user)
-    for target_id in target_list:
-        with ttbl.config.targets_lock:
-            target = ttbl.config.targets[target_id]
-        try:
-            now = time.time()
-            if target.tags.get('skip_cleanup', False) == True:
-                # Some targets are used for manual power control of
-                # infrastructure
-                continue
-            _systemd_keepalive(now)	# keepalive, this loop takes time
-            owner = target.owner_get()
-            if owner == None:
-                _do_cleanup_released(target, who)
-            else:
-                _do_cleanup_acquired(target, owner, who)
-        except ttbl.test_target_e as e:
-            loge("%s" % e)
-        except Exception as e:
-            loge("%s: %s" % (target_id, e))
-            traceback.print_exc()
+# initialized later, when we have other parts up and running
+daemon_user = None
 
 # Another kludge: disable security warnings from request's urllib3
 # vendored version. We know, we know. And probably there is a way to
@@ -784,22 +915,22 @@ def cleanup_process_fn():
         _systemd_watchdog_period =  None
         sleep_period = ttbl.config.target_max_idle / 2
     logi("Clean up process [period %.2fs]" % sleep_period)
-    cleanup_files_last = time.time()
-    cleanup_targets_last = time.time()
+    ts_now = datetime.datetime.now()
+    cleanup_files_last = ts_now
     while True:
         time.sleep(sleep_period)
-        t = time.time()
+        ts_now = datetime.datetime.now()
         logdl(8, "Scanning for idle targets")
         try:
-            _systemd_keepalive(t)	# keepalive
-            if t - cleanup_targets_last > ttbl.config.target_max_idle:
-                _do_cleanup()
-                cleanup_targets_last = t
-            if t - cleanup_files_last > ttbl.config.cleanup_files_period:
+            ttbl.allocation.maintenance(ts_now, daemon_user,
+                                        _systemd_keepalive)
+            cleanup_elapsed = (ts_now - cleanup_files_last).seconds
+            if cleanup_elapsed > ttbl.config.cleanup_files_period:
                 cleanup_files()
-                cleanup_files_last = t
+                cleanup_files_last = ts_now
         except Exception as e:
-            loge("Exception in clean thread: %s\n" % e)
+            loge("Exception in cleanup thread: %s\n"
+                 % e + traceback.format_exc())
 
 main_pid = os.getpid()
 
@@ -1171,6 +1302,9 @@ if __name__ == "__main__":
     else:
         raise RuntimeError("can't give --no-ssl and --ssl* options")
 
+    ttbl.allocation.path = os.path.join(ttbl.config.state_path, "allocations")
+    ttbl.allocation.init()
+
     #
     # Make this process a reaper
     #
@@ -1228,6 +1362,7 @@ if __name__ == "__main__":
             raise
         # It is already a session leader...can ignore
 
+    daemon_user = ttbl.user_control.User('local', roles = [ "admin" ])
     # Cleanup process...now this is quite very ugly...see _cleanup()
     cleanup_process = multiprocessing.Process(target = cleanup_process_fn)
     cleanup_process.daemon = True

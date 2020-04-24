@@ -136,7 +136,7 @@ def _cmdline_setup(arg_subparsers):
                     help = "Name of thing to query state about")
     ap.set_defaults(func = _cmdline_things_unplug)
 
-    ap = arg_subparsers.add_parser("thing-list",
+    ap = arg_subparsers.add_parser("thing-ls",
                                    help = "List plugged and unplugged things")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target's name")

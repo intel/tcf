@@ -163,7 +163,7 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
     # up.
     projection = None
 
-    API_VERSION = 1
+    API_VERSION = 2
     API_PREFIX = "/ttb-v" + str(API_VERSION) + "/"
 
     def __init__(self, state_path, url, ignore_ssl = False, aka = None,
@@ -306,7 +306,7 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
     # for the target to flash, which we know from the tags
     def send_request(self, method, url,
                      data = None, json = None, files = None,
-                     stream = False, raw = False, timeout = 480):
+                     stream = False, raw = False, timeout = 60):
         """
         Send request to server using url and data, save the cookies
         generated from request, search for issues on connection and
@@ -436,7 +436,9 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
             if not 'targets' in r:
                 r['targets'] = [ r ]
         else:
-            r = self.send_request("GET", "targets/", data = data)
+            # force a short timeout to get rid of failing servers quick
+            r = self.send_request("GET", "targets/",
+                                  data = data, timeout = 20)
         _targets = []
         for rt in r['targets']:
             # Skip disabled targets
@@ -621,15 +623,21 @@ def rest_target_print(rt, verbosity = 0):
             power = " ON"
         else:
             power = ""
+        allocid = rt.get('_alloc', {}).get('id', None)
         owner = rt.get('owner', None)
-        if owner != None:
-            owner_s = "[" + owner + "]"
+        if allocid or owner:
+            ownerl = []
+            if owner:
+                ownerl.append(owner)
+            if allocid:
+                ownerl.append(allocid)
+            owner_s = "[" + ":".join(ownerl) + "]"
         else:
             owner_s = ""
         print("%s %s%s" % (rt['fullid'], owner_s, power))
     elif verbosity == 2:
         print(rt['fullid'])
-        commonl.data_dump_recursive(rt, prefix = "  ")
+        commonl.data_dump_recursive(rt, prefix = rt['fullid'])
     elif verbosity == 3:
         pprint.pprint(rt)
     else:
@@ -786,7 +794,13 @@ def cmdline_list(spec_strings, do_all = False):
     targetl = []
     for _fullid, rt in sorted(rest_target_broker.rts_cache.items(),
                               key = lambda x: x[0]):
-        if spec and not _target_select_by_spec(rt, spec):
+        # add the remote target info as a dictionary and ...
+        kws = dict(rt)
+        #  ... as a flattened dictionary 
+        for key, val in commonl.dict_to_flat(rt,
+                                             sort = False, empty_dict = True):
+            kws[key] = val
+        if spec and not _target_select_by_spec(kws, spec):
             continue
         targetl.append(rt)
     return targetl
@@ -828,18 +842,6 @@ def rest_target_find_all(all_targets = False):
             continue
         targets.append(rt)
     return targets
-
-def rest_target_acquire(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :returns: dictionary of tags
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_acquire(
-            rt, ticket = args.ticket, force = args.force)
 
 def rest_target_release(args):
     """

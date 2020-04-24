@@ -102,7 +102,7 @@ Metada is specified:
   or by calling :func:`ttbl.test_target.tags_update` on an already
   created target
 
-  >>> ttbl.config.targets['nwb'].tags_update({
+  >>> ttbl.test_target.get('nwb').tags_update({
   >>>     'mac_addr': '00:50:b6:27:4b:77'
   >>> })
 
@@ -398,7 +398,7 @@ Provisioning OS specific metadata
   expression that describes the format/name of the UEFI boot entry
   that will PXE boot off the network. For example:
 
-  >>> ttbl.config.targets['PC-43j'].tags_update({
+  >>> ttbl.test_target.get('PC-43j').tags_update({
   >>>     'uefi_boot_manager_ipv4_regex': 'UEFI Network'
   >>> })
 

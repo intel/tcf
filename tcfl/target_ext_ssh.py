@@ -10,6 +10,7 @@ Run commands to the target and copy files back and forth using SSH
 
 """
 
+import os
 import subprocess
 
 from . import commonl
@@ -19,8 +20,14 @@ class ssh(tc.target_extension_c):
     """Extension to :py:class:`tcfl.tc.target_c` for targets that support
     SSH to run remote commands via SSH or copy files around.
 
-    Currently the target the target has to be set to accept
-    passwordless login, either by:
+    If the target needs a password, it can be set in :data:`password`:
+
+    .. code-block:: python
+
+       target.ssh.login = "USERNAME
+       target.ssh.password = "SOMEPASSWORD"
+
+    The target can be set to passwordless login, either by:
 
     - disabling password for the target user (**DANGEROUS!!** use only
       on isolated targets)
@@ -59,6 +66,7 @@ class ssh(tc.target_extension_c):
 
     3. Use SSH::
 
+       >>>     target.ssh.password = "SOMEPASSWORD"
        >>>     exitcode, _stdout, _stderr = target.ssh.call("test -f file_that_should_exist")
        >>>     target.ssh.check_output("test -f file_that_should_exist")
        >>>     output = target.ssh.check_output("cat some_file")
@@ -111,6 +119,8 @@ class ssh(tc.target_extension_c):
         #: SSH login identity; default to root login, as otherwise it
         #: would default to the login of the user running the daemon.
         self.login = 'root'
+        #: SSH Password to use
+        self.password = None
         #: SSH port to use
         self.port = 22
 
@@ -120,7 +130,6 @@ class ssh(tc.target_extension_c):
         self._ssh_host = None
 
         self._ssh_cmdline_options = [
-            "-o", "BatchMode yes",
             "-o", "StrictHostKeyChecking no",
         ]
 
@@ -200,6 +209,8 @@ class ssh(tc.target_extension_c):
             ql = [ '-q' ]
         else:
             ql = []
+        if self.password == None:
+            ql += [ '-o', "BatchMode yes" ]
         cmdline = [ "/usr/bin/ssh", "-p", str(self._ssh_port) ] \
             + self._ssh_cmdline_options + ql \
             + [ self.login + "@" + self._ssh_host, "-t", _cmd ]
@@ -214,20 +225,24 @@ class ssh(tc.target_extension_c):
         if returncode != 0:
             self._returncode_eval(returncode)
             if nonzero_e:
-                raise nonzero_e("failed SSH command '%s': %d"
-                                % (cmd, returncode),
-                                dict(returncode = returncode,
-                                     stdout = log_stdout,
-                                     stderr = log_stderr,
-                                     ssh_cmd = " ".join(cmdline),
-                                     cmd = cmd,
-                                     target = self.target))
+                raise nonzero_e(
+                    "failed SSH command '%s': %d" % (cmd, returncode),
+                    dict(returncode = returncode,
+                         stdout = commonl.generator_factory_c(
+                             commonl.file_iterator, log_stdout.name),
+                         stderr = commonl.generator_factory_c(
+                             commonl.file_iterator, log_stderr.name),
+                         ssh_cmd = " ".join(cmdline),
+                         cmd = cmd,
+                         target = self.target))
         self.target.report_info(
             "ran SSH command '%s': %d" % (_cmd, returncode),
             attachments = dict(
                 returncode = returncode,
-                stdout = log_stdout,
-                stderr = log_stderr,
+                stdout = commonl.generator_factory_c(
+                    commonl.file_iterator, log_stdout.name),
+                stderr = commonl.generator_factory_c(
+                    commonl.file_iterator, log_stderr.name),
                 ssh_cmd = " ".join(cmdline),
                 cmd = cmd,
                 target = self.target))
@@ -292,12 +307,19 @@ class ssh(tc.target_extension_c):
         self.target.report_info("running SCP local:%s -> target:%s"
                                 % (src, dst), dlevel = 1)
         src = self.target.testcase.relpath_to_abs(src)
-        options = "-vB"
+        options = "-vvv"
         if recursive:
             options += "r"
+        env = dict(os.environ)
+        if self.password:
+            cmdline = [ 'sshpass', "-e" ]
+            env['SSHPASS'] = self.password
+        else:
+            cmdline = []
+            options += "B"
         try:
-            cmdline = \
-                [ "/usr/bin/scp", options, "-P", "%s" % self._ssh_port] \
+            cmdline += \
+                [ "/usr/bin/scp", options, "-P", str(self._ssh_port) ] \
                 + self._ssh_cmdline_options \
                 + [ src, self.login + "@" + self._ssh_host + ":" + dst ]
             self.target.report_info("running SCP command: %s"
@@ -340,18 +362,25 @@ class ssh(tc.target_extension_c):
         self._tunnel()
         self.target.report_info("running SCP target:%s -> local:%s"
                                 % (src, dst), dlevel = 1)
-        options = "-vB"
+        options = "-v"
         if recursive:
             options += "r"
         try:
-            cmdline = \
-                [ "/usr/bin/scp", options, "-P", "%s" % self._ssh_port] \
+            env = dict(os.environ)
+            if self.password:
+                cmdline = [ 'sshpass', "-e" ]
+                env['SSHPASS'] = self.password
+            else:
+                cmdline = []
+                options += "B"
+            cmdline += \
+                [ "/usr/bin/scp", options, "-P", str(self._ssh_port) ] \
                 + self._ssh_cmdline_options \
-                + [self.login + "@" + self._ssh_host + ":" + src, dst ]
+                + [ self.login + "@" + self._ssh_host + ":" + src, dst ]
             self.target.report_info("running SCP command: %s"
                                     % " ".join(cmdline), dlevel = 2)
             s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT,
-                                        shell = False)
+                                        shell = False, env = env)
         except subprocess.CalledProcessError as e:
             self._returncode_eval(e.returncode)
             commonl.raise_from(nonzero_e(

@@ -105,7 +105,7 @@ def _template_find(image_filename, image_rgb,
     image_gray = cv2.cvtColor(image_rgb, cv2.COLOR_BGR2GRAY)
     image_width, image_height = image_gray.shape[::-1]
     template = cv2.imread(template_filename, 0)
-    template_width, _template_height = template.shape[::-1]
+    template_width, template_height = template.shape[::-1]
 
     #for scale in numpy.linspace(0.2, 1.0, 20)[::-1]:
     squares = {}
@@ -120,7 +120,7 @@ def _template_find(image_filename, image_rgb,
         #print "DEBUG scaling image to %d %d" % (w, h)
 
         # stop if the image is smaller than the template
-        if w < template_width:
+        if w < template_width or h < template_height:
             logging.warning("%s: stopping at scale %.2f: smaller than "
                             "template", image_filename, scale)
             break
@@ -494,7 +494,7 @@ class extension(tc.target_extension_c):
 
     You can find available capturers with :meth:`list` or::
 
-      $ tcf capture-list TARGETNAME
+      $ tcf capture-ls TARGETNAME
       vnc0:ready
       screen:ready
       video1:not-capturing
@@ -749,7 +749,7 @@ class extension(tc.target_extension_c):
           the screenshot from; this has to be a capture output that supports
           screenshots in a graphical formatr (PNG, JPEG, etc), eg::
 
-            $ tcf capture-list nuc-01A
+            $ tcf capture-ls nuc-01A
             ...
             hdmi0_screenshot:snapshot:image/png:ready
             screen:snapshot:image/png:ready
@@ -823,9 +823,9 @@ def _cmdline_capture_list(args):
         target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
         capturers = target.capture.list()
         capture_spec = {}
-        for capture in target.rt['capture'].split():
-            capturer, streaming, mimetype = capture.split(":", 2)
-            capture_spec[capturer] = (streaming, mimetype)
+        for capturer, data \
+            in target.rt.get('interfaces', {}).get('capture', {}).items():
+            capture_spec[capturer] = (data['type'], data['mimetype'])
         for name, state in capturers.items():
             print("%s:%s:%s:%s" % (
                 name, capture_spec[name][0], capture_spec[name][1], state))
@@ -867,7 +867,7 @@ def cmdline_setup(argsp):
                     type = str, help = "Name of capturer that should stop")
     ap.set_defaults(func = _cmdline_capture_stop)
 
-    ap = argsp.add_parser("capture-list", help = "List available capturers")
+    ap = argsp.add_parser("capture-ls", help = "List available capturers")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
     ap.set_defaults(func = _cmdline_capture_list)

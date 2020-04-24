@@ -91,7 +91,7 @@ class ykush(ttbl.power.impl_c, ttbl.things.impl_c):
             ykush_dev = usb.core.find(
                 idVendor = 0x04d8,
                 backend = type(self).backend,
-                custom_match = lambda d: d.serial_number == self.ykush_serial,
+                custom_match = lambda d: ttbl.usb_serial_number(d) == self.ykush_serial,
             )
         except Exception as e:
             target.log.info("[retryable] Can't find USB devices: %s" % e)
@@ -157,7 +157,7 @@ class ykush(ttbl.power.impl_c, ttbl.things.impl_c):
         happening in another process).
         """
         ykush_target_name = self.ykush_serial
-        ykush_target = ttbl.config.targets.get(ykush_target_name, None)
+        ykush_target = ttbl.test_target.get(ykush_target_name)
         if not ykush_target:
             target.log.error("can't find a target named %s to try "
                              "to power cycle missing %s hub"
@@ -236,7 +236,8 @@ class ykush(ttbl.power.impl_c, ttbl.things.impl_c):
             # dump ourselves into not releasing, then other processes
             # can't attempt recovery.
             target.log.info("ykush %s: releasing" % ykush_target_name)
-            ykush_target.release(owner)
+            ykush_target.release_v1(owner)
+            # FIXME: replace with lockfile?
             ykush_target.fsdb.set("recovery-in-process", None)
 
     def _command(self, target, cmd):

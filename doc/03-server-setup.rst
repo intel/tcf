@@ -162,8 +162,8 @@ networks for virtual (and physical) targets to intercomunicate with
 each other::
 
   $ tcf list | grep nw
-  local/nwa                 # 192.168.61.0/24 fc00::61:0/112
-  local/nwb                 # 192.168.62.0/24 fc00::62:0/112
+  local/nwa                 # 192.168.61.0/24 fd:00:61::0/104
+  local/nwb                 # 192.168.62.0/24 fd:00:62::0/104
 
 QEMU targets defined in the default configuration are made
 members of each subnetwork. The server host is always the *.1*
@@ -184,7 +184,7 @@ More networks can be added by creating configuration files
            ipv4_prefix_len = 24,
        )
    )
-   ttbl.config.targets['NAME'].tags['interfaces'].append('interconnect_c')
+   ttbl.test_target.get('NAME').tags['interfaces']['interconnect_c'] = {}
 
 Be sure to not assign conflicting IP blocks, or IP blocks that route
 to the public internet or intranet--in the example the convention is
@@ -220,7 +220,7 @@ it basically consists on:
              ipv4_prefix_len = 24,
          )
      )
-     ttbl.config.targets['NAME'].tags['interfaces'].append('interconnect_c')
+     ttbl.test_target.get('NAME').tags['interfaces']['interconnect_c'] = {}
 
   or for an existing network (such as the configuration's default
   *nwa*):
@@ -228,15 +228,15 @@ it basically consists on:
   .. code-block:: python
 
      # eth dongle mac 00:e0:4c:36:40:b8 is assigned to NWA
-     ttbl.config.targets['nwa'].tags_update(dict(mac_addr = '00:e0:4c:36:40:b8'))
+     ttbl.test_target.get('nwa').tags_update(dict(mac_addr = '00:e0:4c:36:40:b8'))
 
 - for each target that is connected to said network, report it as part
   of the network *nwc*:
 
   .. code-block:: python
 
-     ttbl.config.targets['TARGETNAME-NN'].tags_update({ 'ipv4_addr': "192.168.10.130" },
-                                                      ic = 'nwc')
+     ttbl.test_target.get('TARGETNAME-NN').tags_update({ 'ipv4_addr': "192.168.10.130" },
+                                                       ic = 'nwc')
 
 - the network switch itself can be also power switched; if you
   connect it, for example to a Digital Loggers Web Power Switch 7
@@ -244,7 +244,7 @@ it basically consists on:
 
   .. code-block:: python
 
-     ttbl.config.targets['nwc'].pc_impl.append(
+     ttbl.test_target.get('nwc').pc_impl.append(
          ttbl.pc.dlwps7("http://admin:1234@spX/M"))
 
   thus, when powering up the network *nwc*, the last step will be to
@@ -498,7 +498,7 @@ properly configured; if you are coonecting a *THINGNAME* using method
 .. code-block:: python
 
    sometarget_add('TARGETNAME' ...)
-   ttbl.config.targets['TARGETNAME'].thing_add(
+   ttbl.test_target.get('TARGETNAME').thing_add(
        'THINGNAME', someplugger(ARG1, ARG2...))
 
 A plugger, such as :class:`ttbl.usbrly08b.plugger` and its
@@ -532,11 +532,11 @@ unplugging it, in the ``conf_10_target.py`` file, we would add:
        ic_type = 'usb__host__device')
 
    SOMETARGET_add('TARGET0'...)
-   ttbl.config.targets['TARGET0'].add_to_interconnect('usb__TARGET1__TARGET0')
+   ttbl.test_target.get('TARGET0').add_to_interconnect('usb__TARGET1__TARGET0')
 
    SOMETARGET_add('TARGET1'...)
-   ttbl.config.targets['TARGET1'].add_to_interconnect('usb__TARGET1__TARGET0')
-   ttbl.config.targets['TARGET1'].add_thing(
+   ttbl.test_target.get('TARGET1').add_to_interconnect('usb__TARGET1__TARGET0')
+   ttbl.test_target.get('TARGET1').add_thing(
        'TARGET0', ttbl.usbrly08b.plugger("SERIALNUMBER", 0))
 
 
@@ -594,7 +594,7 @@ It helps to name networks with a single letter, e.g.: *nwa*,
   ranges and MAC address generation. E.g. *a* in *nwa* is 97, 0x61
   which can be used to define networks::
 
-    ipv6_addr: fc00::61:0/112
+    ipv6_addr: fd:00:61::0/104
     ipv4_addr: 192.168.97.0/24
 
 - as well, as described :ref:`in the previous section
@@ -831,6 +831,7 @@ been tested yet, shall be similar.
      # firewall-cmd --permanent \
         --add-service=dhcp \
         --add-service=dhcpv6 \
+        --add-services=dns \
         --add-service=http \
         --add-service=https \
         --add-service=mountd \
@@ -1355,8 +1356,8 @@ a. A network is usually defined, in a ``conf_10_NAME.py``
                                vlan_pci()
                            ]),
           tags = dict(
-              ipv6_addr = 'fc00::61:1',
-              ipv6_prefix_len = 112,
+              ipv6_addr = 'fd:00:61::1',
+              ipv6_prefix_len = 104,
               ipv4_addr = '192.168.97.1',
               ipv4_prefix_len = 24,
           ),
@@ -1378,7 +1379,7 @@ a. A network is usually defined, in a ``conf_10_NAME.py``
 
    Note also the nomenclature: *nwa*, letter *a* )(ASCII 97 / 0x61)
    which we use in the *network* part of the IP address (*192.168.97.x*
-   and *fc00::61:x*).
+   and *fd:00:61::x*).
 
 b. Since we know we are using a physical network, in the form of one of
    the server's network interfaces connected to a network switch, we
@@ -1390,7 +1391,7 @@ b. Since we know we are using a physical network, in the form of one of
            ....
            tags = dict(
                mac_addr =  'a0:ce:c8:00:18:73',
-               ipv6_addr = 'fc00::61:1',
+               ipv6_addr = 'fd:00:61::1',
                ....
 
    Now, powering on or off the *nwa* target will bring up or
@@ -1436,8 +1437,8 @@ d. Now we need to add DHCP support to the network; we do that by using
                                ttbl.pc.dlwps7('http://admin:1234@sp5/8'),
                                ttbl.dhcp.pci("192.168.97.1", "192.168.97.0", 24,
                                              "192.168.97.10", "192.168.97.20"),
-                               ttbl.dhcp.pci("fc00::61:1", "fc00::61:0", 112,
-                                             "fc00::61:2", "fc00::61:fe", ip_mode = 6),
+                               ttbl.dhcp.pci("fd:00:61::1", "fd:00:61::0", 104,
+                                             "fd:00:61::2", "fd:00:61::fe", ip_mode = 6),
                            ]),
           ...
 
@@ -1462,8 +1463,8 @@ e. POS can do very fast and efficient imaging by using rsync; the
                                ttbl.pc.dlwps7('http://admin:1234@sp5/8'),
                                ttbl.dhcp.pci("192.168.97.1", "192.168.97.0", 24,
                                              "192.168.97.10", "192.168.97.20"),
-                               ttbl.dhcp.pci("fc00::61:1", "fc00::61:0", 112,
-                                             "fc00::61:2", "fc00::61:fe", ip_mode = 6),
+                               ttbl.dhcp.pci("fd:00:61:1", "fd:00:61::0", 104,
+                                             "fd:00:61:2", "fd:00:61::fe", ip_mode = 6),
                                ttbl.rsync.pci("192.168.97.1", 'images',
                                               '/home/ttbd/images'),
                            ]),
@@ -1493,8 +1494,8 @@ f. Optionally, you can implement port redirection.
                                ttbl.pc.dlwps7('http://admin:1234@sp5/8'),
                                ttbl.dhcp.pci("192.168.97.1", "192.168.97.0", 24,
                                              "192.168.97.2", "192.168.97.254"),
-                               ttbl.dhcp.pci("fc00::61:1", "fc00::61:0", 112,
-                                             "fc00::61:2", "fc00::61:fe", ip_mode = 6),
+                               ttbl.dhcp.pci("fd:00:61::1", "fd:00:61::0", 104,
+                                             "fd:00:61::2", "fd:00:61::fe", ip_mode = 6),
                                ttbl.rsync.pci("192.168.97.1", 'images',
                                               '/home/ttbd/images'),
                                ttbl.socat.pci('tcp', "192.168.97.1", 8080,
@@ -1512,8 +1513,8 @@ g. Finally, we need to specify a few more tags that the clients and
 
           ...
           tags = dict(
-              ipv6_addr = 'fc00::61:1',
-              ipv6_prefix_len = 112,
+              ipv6_addr = 'fd:00::61:1',
+              ipv6_prefix_len = 104,
               ipv4_addr = '192.168.97.1',
               ipv4_prefix_len = 24,
 
@@ -1542,7 +1543,7 @@ All together, it shall look like:
 
    # Delete existing definition of the 'nwa' target created by the
    # default initialization
-   del ttbl.config.targets['nwa']
+   del ttbl.test_target.get('nwa')
 
    ttbl.config.interconnect_add(
        ttbl.tt.tt_power(
@@ -1553,8 +1554,8 @@ All together, it shall look like:
                #ttbl.pc.dlwps7('http://admin:1234@sp5/8'),
                ttbl.dhcp.pci("192.168.97.1", "192.168.97.0", 24,
                              "192.168.97.10", "192.168.97.20"),
-               ttbl.dhcp.pci("fc00::61:1", "fc00::61:0", 112,
-                             "fc00::61:2", "fc00::61:fe", ip_mode = 6),
+               ttbl.dhcp.pci("fd:00:61::1", "fd:00:61::0", 104,
+                             "fd:00:61::2", "fd:00:61::fe", ip_mode = 6),
                ttbl.rsync.pci("192.168.97.1", 'images',
                               '/home/ttbd/images'),
                ttbl.socat.pci('tcp', "192.168.97.1", 8080,
@@ -1563,8 +1564,8 @@ All together, it shall look like:
                               'socks_proxy.mydomain.com', 1080),
            ]),
        tags = dict(
-           ipv6_addr = 'fc00::61:1',
-           ipv6_prefix_len = 112,
+           ipv6_addr = 'fd:00:61::1',
+           ipv6_prefix_len = 104,
            ipv4_addr = '192.168.97.1',
            ipv4_prefix_len = 24,
 
@@ -1600,8 +1601,8 @@ Now the configuration is loaded and you can run::
     id: nwa
     ipv4_addr: 192.168.97.1
     ipv4_prefix_len: 24
-    ipv6_addr: fc00::61:1
-    ipv6_prefix_len: 112
+    ipv6_addr: fd:00:61::1
+    ipv6_prefix_len: 104
     pos_http_url_prefix: http://192.168.97.1/ttbd-pos/%(bsps)s/
     pos_nfs_path: /home/ttbd/images/tcf-live/%(bsp)s
     pos_nfs_server: 192.168.97.1

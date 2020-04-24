@@ -26,7 +26,7 @@ class interface(ttbl.tt_interface):
     with:
 
 
-    >>> ttbl.config.targets['TARGETNAME'].interface_add(
+    >>> ttbl.test_target.get('TARGETNAME').interface_add(
     >>>     "ioc_flash_server_app",
     >>>     ttbl.ioc_flash_server_app.interface("/dev/tty-TARGETNAME-FW")
     >>> )
@@ -44,11 +44,13 @@ class interface(ttbl.tt_interface):
         ttbl.tt_interface.__init__(self)
         self.tty_path = tty_path
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
+        instr_id = commonl.mkid(self.tty_path, l = 4)
         self.instrumentation_publish_component(
             target, "ioc_flash_server_app",
-            commonl.mkid(self.tty_path, l = 4), "RS-232C serial port",
+            instr_id, "RS-232C serial port",
             { 'serial_port': self.tty_path })
+        target.tags['interfaces'][iface_name]['instrument'] = instr_id
 
     def _release_hook(self, target, _force):
         # nothing needed here
@@ -62,7 +64,7 @@ class interface(ttbl.tt_interface):
     #:
     #: or for an specific instance
     #:
-    #: >>> ttbl.config.targets['TARGETNAME'].ioc_flash_server_app._path = "/some/other/ioc_flash_server_app"
+    #: >>> ttbl.test_target.get('TARGETNAME').ioc_flash_server_app._path = "/some/other/ioc_flash_server_app"
     #:
     path = "/opt/intel/platformflashtool/bin/ioc_flash_server_app"
 

@@ -99,7 +99,8 @@ import tcfl.pos
 
 @tcfl.tc.interconnect('ipv4_addr',
                       mode = os.environ.get('MODE', 'one-per-type'))
-@tcfl.tc.target('pos_capable and capture:"screen:snapshot"')
+@tcfl.tc.target('pos_capable'
+                ' and interfaces.capture.screen.type == "snapshot"')
 class _test(tcfl.pos.tc_pos0_base):
 
     def eval(self, target, ic):
@@ -125,7 +126,7 @@ class _test(tcfl.pos.tc_pos0_base):
             target.capture.image_on_screenshot('canary-icon-firefox.png'),
             name = "desktop start")
 
-        movie = 'screen_stream:stream' in target.rt['capture']
+        movie = 'interfaces.capture.screen_stream' in target.kws
         if movie:
             target.capture.start("screen_stream")
 

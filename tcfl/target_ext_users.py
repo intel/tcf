@@ -36,6 +36,9 @@ def _cmdline_user_list(args):
         threads = {}
         tp = ttb_client._multiprocessing_pool_c(
             processes = len(ttb_client.rest_target_brokers))
+        if not ttb_client.rest_target_brokers:
+            logging.error("E: no servers available, did you configure?")
+            return
         for rtb in sorted(ttb_client.rest_target_brokers.values()):
             threads[rtb] = tp.apply_async(_user_list, (rtb, args.userid))
         tp.close()
@@ -65,8 +68,8 @@ def _cmdline_user_list(args):
         for rtb, r in result.items():
             for userid, data in r.items():
                 rolel = []
-                for role, state in list(data['roles'].items()):
-                    if state == "False":
+                for role, state in data['roles'].items():
+                    if state == False:
                         rolel.append(role + " (dropped)")
                     else:
                         rolel.append(role)
@@ -102,7 +105,7 @@ def _cmdline_role_drop(args):
 
 def _cmdline_setup(arg_subparsers):
     ap = arg_subparsers.add_parser(
-        "user-list",
+        "user-ls",
         help = "List users known to the server (note you need "
         "admin role privilege to list users others than your own)")
     ap.add_argument("userid", action = "store",

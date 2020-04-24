@@ -13,7 +13,7 @@ components that compose the power rail of a target.
 The interface is implemented by :class:`ttbl.power.interface` needs to
 be attached to a target with :meth:`ttbl.test_target.interface_add`::
 
->>> ttbl.config.targets[NAME].interface_add(
+>>> ttbl.test_target.get(NAME).interface_add(
 >>>     "INTERFACENAME",
 >>>     ttbl.power.interface(
 >>>         component0,
@@ -180,11 +180,10 @@ class interface(ttbl.tt_interface):
         # each rail component matters.
         self.impls_set(impls, kwimpls, impl_c)
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         # Called when the interface is added to a target to initialize
         # the needed target aspect (such as adding tags/metadata)
-        target.tags_update(dict(power_rail = list(self.impls.keys())))
-        self.instrumentation_publish(target, "power")
+        pass
 
 
     def _release_hook(self, target, _force):
@@ -205,10 +204,10 @@ class interface(ttbl.tt_interface):
         while ts - ts0 < impl.timeout:
             try:
                 impl.on(target, component)
-            except impl.power_on_e as e:
-                target.log.exception("%s: impl failed powering on +%.1f;"
-                                     " powering off and retrying: %s",
-                                     component, ts - ts0, e)
+            except impl.error_e as e:
+                target.log.error("%s: impl failed powering on +%.1f;"
+                                 " powering off and retrying: %s",
+                                 component, ts - ts0, e)
                 try:
                     self._impl_off(impl, target, component)
                 except impl.error_e as e:
@@ -219,11 +218,13 @@ class interface(ttbl.tt_interface):
             else:
                 target.log.info("%s: impl powered on +%.1fs",
                                 component, ts - ts0)
-                new_state = self._impl_get(impl, target, component)
-                if new_state == None or new_state == True: # check
-                    return
-                target.log.info("%s: impl didn't power on +%.1f retrying",
-                                component, ts - ts0)
+            # let's check the status, because sometimes with
+            # transitions on its own
+            new_state = self._impl_get(impl, target, component)
+            if new_state == None or new_state == True: # check
+                return
+            target.log.info("%s: impl didn't power on +%.1f retrying",
+                            component, ts - ts0)
             time.sleep(impl.wait)
             ts = time.time()
         raise RuntimeError("%s: impl power-on timed out after %.1fs"
@@ -239,13 +240,20 @@ class interface(ttbl.tt_interface):
 
         ts0 = ts = time.time()
         while ts - ts0 < impl.timeout:
-            impl.off(target, component)
-            target.log.info("%s: impl powered off +%.1fs", component, ts - ts0)
+            try:
+                impl.off(target, component)
+            except impl.error_e as e:
+                target.log.error("%s: impl failed powering off +%.1f;"
+                                 " retrying: %s", component, ts - ts0, e)
+            else:
+                target.log.info("%s: impl powered off +%.1fs",
+                                component, ts - ts0)
+            # maybe it worked, let's checked
             new_state = self._impl_get(impl, target, component)
             if new_state == None or new_state == False: # check
                 return
             target.log.info("%s: ipmi didn't power off +%.1f retrying",
-                            component, ts - ts0)
+                                component, ts - ts0)
             time.sleep(impl.wait)
             ts = time.time()
         raise RuntimeError("%s: impl power-off timed out after %.1fs"
@@ -285,7 +293,7 @@ class interface(ttbl.tt_interface):
             ts = time.time()
         raise RuntimeError(
             "%s: power-get timed out for an stable result (+%.2fs): %s"
-            % (component, impl.timeout, " ".join(results)))
+            % (component, impl.timeout, " ".join(str(r) for r in results)))
 
 
     def _get(self, target, impls = None):
@@ -412,7 +420,7 @@ class interface(ttbl.tt_interface):
             # since we are powering on, let's have whoever does this
             # select the right default console, but we wipe whatver
             # was set before
-            target.property_set('console-default', None)
+            target.property_set('interfaces.console.default', None)
             target.log.debug(
                 "power pre-on%s; fns %s"
                 % (why, " ".join(str(f) for f in target.power_on_pre_fns)))
@@ -842,7 +850,7 @@ class socat_pc(daemon_c):
     This object (or what is derived from it) can be passed to a power
     interface for implementation, eg:
 
-    >>> ttbl.config.targets['TARGETNAME'].interface_add(
+    >>> ttbl.test_target.get('TARGETNAME').interface_add(
     >>>     "power",
     >>>     ttbl.power.interface(
     >>>         ttbl.power.socat_pc(ADDR1, ADDR2)
@@ -904,15 +912,19 @@ class socat_pc(daemon_c):
     """
 
     def __init__(self, address1, address2, env_add = None,
-                 precheck_wait = 0.2):
+                 precheck_wait = 0.2, extra_cmdline = None):
         assert isinstance(address1, str)
         assert isinstance(address2, str)
-
+        if extra_cmdline == None:
+            extra_cmdline = []
+        # extra_cmdline has to be before the address pair otherwise
+        # it'll fail
         daemon_c.__init__(
             self,
             cmdline = [
                 "/usr/bin/socat",
-                "-lf", "%(path)s/%(component)s-%(name)s.log",
+                "-lf", "%(path)s/%(component)s-%(name)s.log"
+            ] + extra_cmdline + [
                 # more than three -d's is a lot of verbosity, will
                 # fill up the drive soon
                 # FIXME: allow individual control/configure strace debug

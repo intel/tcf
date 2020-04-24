@@ -484,7 +484,6 @@ class extension(tc.target_extension_c):
     """
 
     def __init__(self, target):
-        interfaces = target.rt.get('interfaces', [])
         if 'console' not in target.rt.get('interfaces', []):
             raise self.unneeded
         self.target = target
@@ -499,8 +498,8 @@ class extension(tc.target_extension_c):
         # Which is the default console that was set in the server?
         # call it only once from here, otherwise everytime we try to
         # get the console to use by default we do a call
-        self.default_property = self.target.property_get("console-default",
-                                                         None)
+        self.default_property = self.target.property_get(
+            "interfaces.console.default", None)
         if self.default_property:
             self._default = self.default_property
         elif 'default' in self.aliases:
@@ -565,7 +564,7 @@ class extension(tc.target_extension_c):
                                     % (self._default, new_console))
             self._default = new_console
             self.default_property = new_console
-            self.target.property_set("console-default", new_console)
+            self.target.property_set("interfaces.console.default", new_console)
         return new_console
 
     def select_preferred(self, console = None, shell_setup = True,
@@ -853,9 +852,6 @@ class extension(tc.target_extension_c):
         self.target.report_info("%s: wrote %dB (%s) to console"
                                 % (console, len(data), data_report))
 
-    def list(self):
-        return self.target.rt.get('consoles', [])
-
     def capture_filename(self, console = None):
         """
         Return the name of the file where this console is being captured to
@@ -1084,7 +1080,7 @@ def _console_read_thread_fn(target, console, fd, offset):
                     target.console.read_full(console, offset, 4096)
                 if generation_prev != None and generation_prev != generation:
                     sys.stderr.write(
-                        "\n\r\r\nWARNING: target power cycled\r\r\n\n")
+                        "\n\r\r\nWARNING: console was restarted\r\r\n\n")
                 generation_prev = generation
 
                 if data:
@@ -1385,8 +1381,9 @@ def _cmdline_console_wall(args):
                         done = True
                     descr = consolel[item]
                     cf.write(
-                        'screen -c tcf console-read %s -c %s --follow\n'
+                        'screen -c %s console-read %s -c %s --follow\n'
                         'title %s\n\n' % (
+                            sys.argv[0],
                             descr.target.fullid, descr.console, item
                         ))
                     if done or item == console_names[-1]:
@@ -1445,7 +1442,7 @@ def _cmdline_setup(arg_subparser):
     ap.set_defaults(func = _cmdline_console_read, offset = 0)
 
     ap = arg_subparser.add_parser(
-        "console-list",
+        "console-ls",
         help = "List consoles")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target name")

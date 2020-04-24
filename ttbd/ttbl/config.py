@@ -74,6 +74,8 @@ instance = ""
 #: *-INSTANCE* (unless INSTANCE is empty).
 instance_suffix = ""
 
+#: Maximum length of the reason given to an allocation
+reason_len_max = 128
 
 def _nested_list_flatten(l):
     for e in l:
@@ -107,7 +109,7 @@ def target_add(target, _id = None, tags = None, target_type = None,
     if tags != None:
         assert isinstance(tags, dict)
         # FIXME: this shall be a recursive lookup?
-        #for tag, value in tags.iteritems():
+        #for tag, value in tags.items():
         #    if not isinstance(tag, basestring) \
         #       or not isinstance(value, basestring):
         #        raise ValueError("tag '%s:%s' is not all strings"
@@ -178,7 +180,7 @@ def interconnect_add(ic, _id = None, tags = None, ic_type = None,
     """
     target_add(ic, _id, tags = tags, target_type = ic_type,
                acquirer = acquirer)
-    ttbl.config.targets[ic.id].tags['interfaces'].append('interconnect_c')
+    ic.tags['interfaces']['interconnect_c'] = { }
 
 _authenticators = []
 def add_authenticator(a):
