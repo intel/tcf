@@ -45,8 +45,7 @@ import collections
 import re
 import time
 
-from typing import Pattern
-
+from . import commonl
 from . import tc
 
 from . import msgid_c
@@ -108,11 +107,7 @@ class shell(tc.target_extension_c):
     """
 
     def __init__(self, target):
-        for bsp in target.rt.get('bsps', []):
-            keys = target.rt['bsps'][bsp]
-            if 'linux' in keys:
-                break
-        else:
+        if 'console' not in target.rt['interfaces']:
             raise self.unneeded
         tc.target_extension_c.__init__(self, target)
 
@@ -152,10 +147,53 @@ class shell(tc.target_extension_c):
     #: Deprecated, use :data:`shell_prompt_regex`
     linux_shell_prompt_regex = shell_prompt_regex
 
+    def setup(self, console = None):
+        """
+        Setup the shell for scripting operation
+
+        In the case of a bash shell, this:
+        - sets the prompt to something easer to latch on to
+        - disables command line editing
+        - traps errors in shell execution
+        """
+        target = self.target
+        testcase = target.testcase
+        # dereference which console we are using; we don't want to
+        # setup our trackers below to the "default" console and leave
+        # it floating because then it will get confused if we switch
+        # default consoles.
+        console = target.console._console_get(console)
+        self.run('export PS1="TCF-%s:$PS1"' % self.target.kws['tc_hash'],
+                 console = console)
+        # disable line editing for proper recording of command line
+        # when running bash; otherwise the scrolling readline does
+        # messes up the output
+        self.run('test ! -z "$BASH" && set +o vi +o emacs',
+                 console = console)
+        # Trap the shell to complain loud if a command fails, and catch it
+        # See that '' in the middle, is so the catcher later doesn't
+        # get tripped by the command we sent to set it up
+        self.run("trap 'echo ERROR''-IN-SHELL' ERR",
+                 console = console)
+        testcase.expect_global_append(
+            # add a detector for a shell error, make sure to name it
+            # after the target and console it will monitor so it
+            # doesn't override other targets/consoles we might be
+            # touching in parallel
+            target.console.text(
+                "ERROR-IN-SHELL",
+                name = "%s:%s: shell error" % (target.want_name, console),
+                console = console, timeout = 0, poll_period = 1,
+                raise_on_found = tc.error_e("error detected in shell")),
+            # if we have already added detectors for this, that's
+            # fine, ignore them
+            skip_duplicate = True
+        )
+
     def up(self, tempt = None,
            user = None, login_regex = re.compile('login:'), delay_login = 0,
            password = None, password_regex = re.compile('[Pp]assword:'),
-           shell_setup = True, timeout = 120):
+           shell_setup = True, timeout = None, console = None):
         """Wait for the shell in a console to be ready
 
         Giving it ample time to boot, wait for a :data:`shell prompt
@@ -186,84 +224,109 @@ class shell(tc.target_extension_c):
         :param int delay_login: (optional) wait this many seconds
           before sending the user name after finding the login prompt.
 
-        :param bool shell_setup: (optional, default) setup the shell
+        :param shell_setup: (optional, default) setup the shell
           up by disabling command line editing (makes it easier for
           the automation) and set up hooks that will raise an
           exception if a shell command fails.
 
+          By default calls target.shell.setup(); if *False*, nothing
+          will be called. Arguments are passed:
+
+          - *console = CONSOLENAME*: console where to operate; can be
+            *None* for the default console.
+
         :param int timeout: [optional] seconds to wait for the login
-          prompt to appear
+          prompt to appear; defaults to 60s plus whatever the target
+          specifies in metadata *bios_boot_time*.
+
+        :param str console: [optional] name of the console where to
+          operate; if *None* it will update the current default
+          console to whatever the server considers it shall be (the
+          console called *default*).
+
+          If a previous run set the default console to something else,
+          setting it to *None* will update it to what the server
+          considers shall be the default console (default console at
+          boot).
 
         """
         assert tempt == None or isinstance(tempt, str)
         assert user == None or isinstance(user, str)
-        assert isinstance(login_regex, ( str, Pattern ))
+        assert isinstance(login_regex, ( str, typing.Pattern ))
         assert delay_login >= 0
         assert password == None or isinstance(password, str)
-        assert isinstance(password_regex, ( str, Pattern ))
-        assert isinstance(shell_setup, bool)
-        assert timeout > 0
-
+        assert isinstance(password_regex, ( str, typing.Pattern ))
+        assert isinstance(shell_setup, bool) or callable(shell_setup)
+        assert timeout == None or timeout > 0
+        assert console == None or isinstance(console, str)
+    
         target = self.target
-
+        testcase = target.testcase
+        if timeout == None:
+            timeout = 60 + int(target.kws.get("bios_boot_time", 0))
+        
         def _login(target):
             # If we have login info, login to get a shell prompt
-            target.expect(login_regex)
+            target.expect(login_regex, name = "login prompt",
+                          console = console)
             if delay_login:
                 target.report_info("Delaying %ss before login in"
                                    % delay_login)
                 time.sleep(delay_login)
             target.send(user)
             if password:
-                target.expect(password_regex)
-                target.send(password)
+                target.expect(password_regex, name = "password prompt",
+                              console = console)
+                target.send(password, console = console)
 
         try:
-            original_timeout = self.target.testcase.tls.expecter.timeout
-            self.target.testcase.tls.expecter.timeout = timeout
+            if console == None:		# reset the default console
+                target.console.default = None
+            original_timeout = testcase.tls.expect_timeout
+            testcase.tls.expect_timeout = timeout
             if tempt:
-                tries = 0
-                while tries < self.target.testcase.tls.expecter.timeout:
+                tries = 3
+                while tries > 0:
                     try:
-                        self.target.send(tempt)
+                        target.send(tempt, console = console)
                         if user:
                             _login(self.target)
-                        target.expect(self.linux_prompt_regex)
+                        target.expect(self.shell_prompt_regex,
+                                      console = console, timeout = 3,
+                                      name = "early shell prompt")
                         break
                     except tc.error_e as _e:
-                        if tries == self.target.testcase.tls.expecter.timeout:
+                        if tries == 0:
                             raise tc.error_e(
                                 "Waited too long (%ds) for shell to come up "
                                 "(did not receive '%s')" %
-                                (self.target.testcase.tls.expecter.timeout,
+                                (self.target.testcase.tls.expect_timeout,
                                  self.shell_prompt_regex.pattern))
                         continue
+                    finally:
+                        tries -= 1
             else:
                 if user:
                     _login(self.target)
-                target.expect(self.shell_prompt_regex)
+                target.expect(self.shell_prompt_regex, console = console,
+                              name = "early shell prompt")
         finally:
-            self.target.testcase.tls.expecter.timeout = original_timeout
+            testcase.tls.expect_timeout = original_timeout
 
-        if shell_setup:
-            # 
-            self.run('export PS1="TCF-%s:$PS1"' % target.kws['tc_hash'])
-            # disable line editing for proper recording of command line
-            # when running bash; otherwise the scrolling readline does
-            # messes up the output
-            self.run('test ! -z "$BASH" && set +o vi +o emacs')
-            # Trap the shell to complain loud if a command fails, and catch it
-            # See that '' in the middle, is so the catcher later doesn't
-            # get tripped by the command we sent to set it up
-            self.run("trap 'echo ERROR''-IN-SHELL' ERR")
-            self.target.on_console_rx("ERROR-IN-SHELL", result = 'errr',
-                                      timeout = False)
+        # same as target.console.select_preferred()
+        if shell_setup == True:    	# passed as a parameter
+            target.shell.setup(console)
+        elif callable(shell_setup):
+            shell_setup(console)
+        # False, so we don't call shell setup
 
-        # Now commands should timeout fast
-        self.target.testcase.tls.expecter.timeout = 30
+        # don't set a timeout here, leave it to whatever it was defaulted
+
+    crnl_regex = re.compile("\r+\n")
 
     def _run(self, cmd = None, expect = None, prompt_regex = None,
-             output = False, output_filter_crlf = True, trim = False):
+             output = False, output_filter_crlf = True, trim = False,
+             console = None, origin = None):
         if cmd:
             assert isinstance(cmd, str)
         assert expect == None \
@@ -274,30 +337,49 @@ class shell(tc.target_extension_c):
             or isinstance(prompt_regex, str) \
             or isinstance(prompt_regex, Pattern)
 
+        if origin == None:
+            origin = commonl.origin_get(3)
+        else:
+            assert isinstance(origin, str)
+
+        target = self.target
+
         if output:
-            offset = self.target.console.size()
+            offset = self.target.console.size(console = console)
 
         if cmd:
-            self.target.send(cmd)
+            self.target.send(cmd, console = console)
         if expect:
             if isinstance(expect, list):
                 for expectation in expect:
                     assert isinstance(expectation, str) \
-                        or isinstance(expectation, Pattern)
-                    self.target.expect(expectation)
+                        or isinstance(expectation, typing.Pattern)
+                    target.expect(expectation, name = "command output",
+                                  console = console, origin = origin)
             else:
-                self.target.expect(expect)
+                target.expect(expect, name = "command output",
+                              console = console, origin = origin)
         if prompt_regex == None:
-            self.target.expect(self.shell_prompt_regex)
+            self.target.expect(self.shell_prompt_regex, name = "shell prompt",
+                               console = console, origin = origin)
         else:
-            self.target.expect(prompt_regex)
+            self.target.expect(prompt_regex, name = "shell prompt",
+                               console = console, origin = origin)
         if output:
-            output = self.target.console.read(offset = offset)
+            output = self.target.console.read(offset = offset,
+                                              console = console)
             if output_filter_crlf:
-                output = output.replace("\r\n", self.target.crlf)
+                # replace \r\n, \r\r\n, \r\r\r\r\n... it happens
+                output = re.sub(self.crnl_regex, self.target.crlf, output)
             if trim:
-                # FIXME: not good enough, if the output didn't include
-                # a nl, it will mess it up -- use regex finding
+                # When we can run(), it usually prints in the console:
+                ## <command-echo from our typing>
+                ## <command output>
+                ## <prompt>
+                #
+                # So to trim we just remove the first and last
+                # lines--won't work well without output_filter_crlf
+                # and it is quite a hack.
                 first_nl = output.find(self.target.crlf)
                 last_nl = output.rfind(self.target.crlf)
                 output = output[first_nl+1:last_nl+1]
@@ -306,7 +388,7 @@ class shell(tc.target_extension_c):
 
     def run(self, cmd = None, expect = None, prompt_regex = None,
             output = False, output_filter_crlf = True, timeout = None,
-            trim = False):
+            trim = False, console = None):
         """Runs *some command* as a shell command and wait for the shell
         prompt to show up.
 
@@ -328,7 +410,7 @@ class shell(tc.target_extension_c):
 
         or collecting the output:
 
-        >>> target.shell.run("ls -1 /etc/", output = True)
+        >>> target.shell.run("ls --color=never -1 /etc/", output = True)
         >>> for file in output.split('\\r\\n'):
         >>>     target.report_info("file %s" % file)
         >>>     target.shell.run("md5sum %s" % file)
@@ -351,6 +433,18 @@ class shell(tc.target_extension_c):
         :param bool trim: if ``output`` is True, trim the command and
           the prompt from the beginning and the end of the output
           respectively (True)
+        :param str console: (optional) on which console to run;
+          (defaults to *None*, the default console).
+        :param str origin: (optional) when reporting information about
+          this expectation, what origin shall it list, eg:
+
+          - *None* (default) to get the current caller
+          - *commonl.origin_get(2)* also to get the current caller
+          - *commonl.origin_get(1)* also to get the current function
+
+          or something as:
+
+          >>> "somefilename:43"
         :returns str: if ``output`` is true, a string with the output
           of the command.
 
@@ -369,18 +463,18 @@ class shell(tc.target_extension_c):
             "timeout has to be a greater than zero number of seconds " \
             "(got %s)" % timeout
         testcase = self.target.testcase
-        original_timeout = testcase.tls.expecter.timeout
+        original_timeout = testcase.tls.expect_timeout
         try:
             if timeout:
-                testcase.tls.expecter.timeout = timeout
+                testcase.tls.expect_timeout = timeout
             return self._run(
                 cmd = cmd, expect = expect,
                 prompt_regex = prompt_regex,
                 output = output, output_filter_crlf = output_filter_crlf,
-                trim = trim)
+                trim = trim, console = console)
         finally:
             if timeout:
-                testcase.tls.expecter.timeout = original_timeout
+                testcase.tls.expect_timeout = original_timeout
 
     def file_remove(self, remote_filename):
         """
@@ -435,7 +529,48 @@ class shell(tc.target_extension_c):
         # it from base64 to bin
         self.run(
             'python3 -c "import sys, binascii; '
-            'sys.stdout.buffer.write(binascii.a2b_base64(sys.stdin.read()))"'
+            'sys.stdout.buffer.write(binascii.a2b_base64(sys.stdin.buffer.read()))"'
+            ' < /tmp/file.b64 > %s' % remote_filename)
+        # FIXME: checksum and verify :/
+
+    def string_copy_to_file(self, s, remote_filename):
+        """\
+        Store a string in a target's file via the console (if the target supports it)
+
+        Encodes the file to base64 and sends it via the console in chunks
+        of 64 bytes (some consoles are kinda...unreliable) to a file in
+        the target called /tmp/file.b64, which then we decode back to
+        normal.
+
+        Assumes the target has python3; permissions are not maintained
+
+        See :meth:`copy_to_file`
+
+        .. note:: it is *slow*. The limits are not well defined; how
+                  big a file can be sent/received will depend on local
+                  and remote memory capacity, as things are read
+                  whole. This could be optimized to stream instead of
+                  just read all, but still sending a way big file over
+                  a cheap ASCII protocol is not a good idea. Warned
+                  you are.
+
+        """
+        assert isinstance(s, str)
+        assert isinstance(remote_filename, str)
+        self.files_remove(remote_filename, "/tmp/file.b64")
+        s = binascii.b2a_base64(s)
+        for i in range(0, len(s), 64):
+            # increase the log level to report each chunk of the
+            # file we are transmitting
+            self.run("echo -n %s  >> /tmp/file.b64"
+                     % s[i:i+64].decode('utf-8').strip())
+
+        # Now we do a python3 command in there (as cloud
+        # versions don't include python2. good) to regenerate
+        # it from base64 to bin
+        self.run(
+            'python3 -c "import sys, binascii; '
+            'sys.stdout.buffer.write(binascii.a2b_base64(sys.stdin.buffer.read()))"'
             ' < /tmp/file.b64 > %s' % remote_filename)
         # FIXME: checksum and verify :/
 
@@ -453,7 +588,7 @@ class shell(tc.target_extension_c):
         .. note:: it is *slow*. The limits are not well defined; how
                   big a file can be sent/received will depend on local
                   and remote memory capacity, as things are read
-                  hole. This could be optimized to stream instead of
+                  whole. This could be optimized to stream instead of
                   just read all, but still sending a way big file over
                   a cheap ASCII protocol is not a good idea. Warned
                   you are.
@@ -467,8 +602,8 @@ class shell(tc.target_extension_c):
         # b64 and read it from the console
         output = self.run(
             'python3 -c "import sys, binascii; '
-            'sys.stdout.buffer.write(binascii.b2a_base64(sys.stdin.read()))"'
-            ' < %s' % remote_filename, output = True, trim = True)
+            'sys.stdout.buffer.write(binascii.b2a_base64(sys.stdin.buffer.read()))"'
+            ' < %s' % remote_filename, output = True)
         # output comes as
         ## python3 -c...
         ## B64DATA

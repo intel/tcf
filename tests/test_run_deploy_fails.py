@@ -54,7 +54,7 @@ class _test(unittest.TestCase,
         def deploy(target):
             target.images.retries = 3
             target.images.wait = 2
-            target.images.upload_set("doesn't", "matter")
+            target.images.flash({ "doesn't": "matter" })
 
     def test_00(self):
         self.exclude_errors.append('RuntimeError("Failing on purpose")')

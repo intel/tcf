@@ -42,7 +42,7 @@ class _fwup(tcfl.tc.tc_c):
             target.report_info("running: mass_erase")
             target.debug.openocd("mass_erase")
             target.report_info("flashing the new bootrom")
-            target.images.upload_set([ "rom:" + rom_filename ])
+            target.images.flash({ "rom": rom_filename })
             target.debug.reset_halt()
             target.power.off()
         finally:

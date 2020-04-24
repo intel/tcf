@@ -98,7 +98,7 @@ to execute a *comand* as super-user (loging in as root or using
 Links will come in different flavours:
 
 - example link to a :ref:`section <conventions>`
-- example link to another :py:func:`section <conf_00_lib.dlwps7_add>`
+- example link to another :py:func:`section <conf_00_lib_pdu.dlwps7_add>`
 
 .. _system_install:
 
@@ -381,37 +381,46 @@ Everything in *ttbd* is a test target; they need to be added by
 creating Python objects that represent them in the configuration
 files. Helper functions have been created to simplify the process.
 
-Power switches are used to build power rails to power on or off the
+Power switches (PDUs) are used to build power rails to power on or off the
 different test targets and other infrastructure components
 
 Create a configuration file
 ``/etc/ttbd-production/conf_10_targets.py`` and start adding
 configuration statements as described in the links below:
 
-- :py:func:`Digital Loggers Web Power Switch 7
-  <conf_00_lib.dlwps7_add>` wall-power switch.
-- :py:func:`YKUSH USB power switches <conf_00_lib.ykush_targets_add>`
-  USB data/power switchable hub
-- :py:func:`Devantech USB-RLY08B USB controlled relays
-  <conf_00_lib.usbrly08b_targets_add>`
+- :ref:`PDUs / power switches <conf_00_lib_pdu>`:
+  
+  - :py:func:`Digital Loggers Web Power Switch 7
+    <conf_00_lib_pdu.dlwps7_add>` PDUs / wall-power switches
+    
+  - :py:func:`Raritan EMX
+    <conf_00_lib_pdu.raritan_emx_add>` based PDUs  / wall-power
+    switches
+    
+  - :py:func:`YKUSH USB power switches <conf_00_lib_pdu.ykush_targets_add>`
+    USB data/power switchable hub
+    
+  - :py:func:`Devantech USB-RLY08B USB controlled relays
+    <conf_00_lib_pdu.usbrly08b_targets_add>`
+
 - to add targets for just controlling power to something, see
   :ref:`these instructions<tt_power>`
 - :ref:`physical Linux servers <ttbd_config_phys_linux>` boards
 
 .. _ttbd_config_mcus:
 
-MCU boards supported by default require different fixtures which are
-described below:
+MCU boards supported by default require :ref:`different fixtures
+<conf_00_lib_mcu>`, for example:
 
-- :py:func:`Arduino 101 <conf_00_lib.arduino101_add>` boards
-- :py:func:`Arduino Due <conf_00_lib.arduino2_add>` boards
-- :py:func:`Atmel SAM e70 <conf_00_lib.sam_xplained_add>` boards
-- :py:func:`FRDM k64f <conf_00_lib.frdm_add>` boards
-- :py:func:`STM32 / Nucleo <conf_00_lib.stm32_add>` boards
-- :py:func:`Quark C1000 <conf_00_lib.quark_c1000_add>` boards
-- :py:func:`Quark D2000 <conf_00_lib.mv_add>` boards
-- :py:func:`Synopsis EMSK <conf_00_lib.emsk_add>` boards
-- :py:func:`TinyTILEs <conf_00_lib.tinytile_add>` boards
+- :py:func:`Arduino 101 <conf_00_lib_mcu.arduino101_add>` boards
+- :py:func:`Arduino Due <conf_00_lib_mcu.arduino2_add>` boards
+- :py:func:`Atmel SAM e70 <conf_00_lib_mcu.sam_xplained_add>` boards
+- :py:func:`FRDM k64f <conf_00_lib_mcu.frdm_add>` boards
+- :py:func:`STM32 / Nucleo <conf_00_lib_mcu.stm32_add>` boards
+- :py:func:`Quark C1000 <conf_00_lib_mcu.quark_c1000_add>` boards
+- :py:func:`Quark D2000 <conf_00_lib_mcu.mv_add>` boards
+- :py:func:`Synopsis EMSK <conf_00_lib_mcu.emsk_add>` boards
+- :py:func:`TinyTILEs <conf_00_lib_mcu.tinytile_add>` boards
 
 .. include:: 03-server-setup-LL-boards.rst
 
@@ -480,7 +489,7 @@ For implementing this, you need:
 - a thing (which is also a target)
 - a plugger, which is the driver that implements the actual physical
   act of plugging one target into another, implementing the interface
-  defined in :class:`ttbl.thing_plugger_mixin`.
+  defined in :class:`ttbl.things.interface`.
 
 For this, the target to which the thing is connected has to be
 properly configured; if you are coonecting a *THINGNAME* using method
@@ -648,12 +657,12 @@ As well, setup the proper hardware connections:
 
 - *sp1* connected to the wall and it's network cable to the server,
   name *sp1* defined in ``/etc/hosts`` to the right IP address (see
-  :py:func:`here <conf_00_lib.dlwps7_add>` for details)
+  :py:func:`here <conf_00_lib_pdu.dlwps7_add>` for details)
 - *YK20954*\'s power connected to the power switch *sp1*\'s socket #3
 - *YK20956*\'s power connected to the power switch *sp1*\'s socket #2
 - *frdm-06* USB cable connected to *YK20946*\'s port #3
 - *arduino101-2* connected as described :py:func:`here
-  <conf_00_lib.arduino101_add>`
+  <conf_00_lib_mcu.arduino101_add>`
 
 Restart the server and a listing should show::
 
@@ -807,9 +816,41 @@ been tested yet, shall be similar.
      # install -o ttbd -g ttbd -m 2775 -d \
          /home/ttbd \
          /home/ttbd/images/tcf-live/ \
+         /home/ttbd/images/misc/ \
          /home/ttbd/public_html /home/ttbd/public_html/x86_64
 
-4. Disable the firewall (FIXME: do not require this)::
+4. Enable firewall access to all the services we will use; for the
+   server itself we'll use the range 5000-5500 and double-check SSH is
+   added::
+
+     # firewall-cmd --permanent --add-port=5000-5500/tcp
+     # firewall-cmd --permanent --add-service=ssh
+
+   For the Provisioning services::
+   
+     # firewall-cmd --permanent \
+        --add-service=dhcp \
+        --add-service=dhcpv6 \
+        --add-service=http \
+        --add-service=https \
+        --add-service=mountd \
+        --add-service=nfs \
+        --add-service=nfs3 \
+        --add-service=rpc-bind \
+        --add-service=rsyncd \
+        --add-service=tftp \
+        --add-service=tftp-client
+
+   For internal proxying from test networks to outside (if
+   configured)::
+     
+     # firewall-cmd --permanent --add-port=8888/tcp
+
+   Ensure it works::
+
+     # firewall-cmd --reload
+  
+   You can alternatively, disable the firewall::
 
      # systemctl stop firewalld
      # systemctl disable firewalld
@@ -833,7 +874,12 @@ been tested yet, shall be similar.
 
        # setsebool -P httpd_enable_homedirs true
        # chcon -R -t httpd_sys_content_t /home/ttbd/public_html
+       # chcon -R -t httpd_sys_content_t /home/ttbd/images/misc
 
+     .. warning:: do not tag */home/ttbd/images*; files in there will
+                  have their own SELinux contexts based on what the
+                  Linux distribution they represent needs.
+       
      Test this is working::
 
        # systemctl restart httpd
@@ -847,7 +893,7 @@ been tested yet, shall be similar.
 
    - NFS server: provides the POS root filesystem.
 
-     Ensure UDP support is enabled::
+     Ensure UDP support is enabled (not for RHEL >= 7.6)::
 
        # sed -i 's|RPCNFSDARGS="|RPCNFSDARGS="--udp |' /etc/sysconfig/nfs
        # systemctl enable nfs-server
@@ -935,19 +981,19 @@ c. Make the kernel and initrd for POS available via Apache for
          # dracut -v -H --kver $(ls /home/ttbd/images/tcf-live/x86_64/lib/modules) \
                 -k /home/ttbd/images/tcf-live/x86_64/lib/modules/* \
                --kernel-image /home/ttbd/images/tcf-live/x86_64/boot/vmlinuz-* \
-               --add-drivers "igb r8169 virtio_net ftdi_sio" \
+               --add-drivers "igb i40e e1000e r8169 virtio_net ftdi_sio" \
                -m "nfs base network kernel-modules kernel-network-modules" \
                /home/ttbd/public_html/x86_64/initramfs-tcf-live
 
        .. warning:: ``--kver`` is needed to not default to the kernel
-                    version of the system running the co/mmand.
+                    version of the system running the command.
                     ``-H`` is needed to ensure a generic initrd that
                     works with multiple machines is created.
 
        needed drivers:
        
        - *ftdi_sio* drivers for FTDI USB serial ports
-       - *igb* Intel Gigabit adapters
+       - *igb*, *e1000e*, *i40e*: Intel adapters
        - *r8169* for some Realtek network cards
        - *virtio* for running under QEMU
 
@@ -977,14 +1023,47 @@ d. Make the POS root image available over NFS as read-only (note we
      # tee /etc/exports.d/ttbd-pos.exports <<EOF
      /home/ttbd/images/tcf-live/x86_64 *(ro,no_root_squash)
      EOF
-     # systemctl reload nfs-server
+     # systemctl reload nfs-server	# use 'nfs' for RHEL / CentOS
 
+     
    Verify the directory is exported::
 
      $ showmount -e SERVERNAME
      Export list for localhost:
      /home/ttbd/images/tcf-live/x86_64 *
 
+e. Perform final image setup:
+
+   - Allow login in via SSH--this is used when the serial console is
+     not very stable; allows us to do basic start via serial console
+     and switch to SSH to do the job:
+
+       1. Mount a FS read write where *sshd* can write its state::
+
+            $ cd /home/ttbd/images/tcf-live/x86_64/etc/
+            $ echo 'tmpfs /var/empty/sshd tmpfs defaults 0 0' | sudo tee -a fstab
+
+       1. Create *sshd*'s host keys::
+
+            $ cd /home/ttbd/images/tcf-live/x86_64/etc/ssh
+            $ for v in rsa ecdsa ed25519; do \
+                sudo ssh-keygen -f ssh_host_${v}_key -q -t $v -C '' -N ''; done
+
+       3. Allow SSH to login as root and with no password (note this
+          is safe in the POS environment since it is only being used
+          for provisioning the target)::
+
+            $ cat <<EOF | sudo tee -a sshd_config
+            PermitRootLogin yes
+            PermitEmptyPasswords yes
+            EOF
+
+f. Deploy content to the server that test content can / will use::
+
+     $ mkdir -p /home/ttbd/images/tcf-live/misc
+
+     $ cp /usr/share/tcf/content/evemu.bin.tar.gz /home/ttbd/images/tcf-live/misc
+     
 .. _ttbd_pos_deploying_images:
 
 POS: Deploying other images
@@ -1006,19 +1085,43 @@ The script ``/usr/share/tcf/tcf-image-setup.sh`` will take an image
 from different OSes and extract it so it can be used to be flashed via
 POS; for example:
 
+- CentOS::
+
+    $ wget http://isoredirect.centos.org/centos/8/isos/x86_64/CentOS-8.1.1911-x86_64-dvd1.iso
+    $ /usr/share/tcf/kickstart-install.sh centos.qcow2 CentOS-8.1.1911-x86_64-dvd1.iso 
+    $ BOOT_PARTITION=2 BOOT_MOUNTOPTS=noload ROOT_PARTITION=4 \
+        /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/centos::8.1:1911:x86_64 centos.qcow2
+        
 - Clearlinux::
 
-    $ wget https://download.clearlinux.org/releases/25930/clear/clear-25930-live.img.xz
-    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/clear:live:25930::x86_64 clear-25930-live.img.xz
+    $ wget https://cdn.download.clearlinux.org/releases/32310/clear/clear-32310-live-desktop.iso
+    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/clear:desktop:32310::x86_64 clear-32310-live-desktop.iso
 
+    $ wget https://cdn.download.clearlinux.org/releases/32310/clear/clear-32310-live-server.iso
+    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/clear:server:32310::x86_64 clear-32310-live-server.iso
+
+- Fedora::
+
+    $ https://mirrors.rit.edu/fedora/fedora/linux/releases/29/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-29-1.2.iso
+    $ /usr/share/tcf/tcf-image-setup.sh fedora:workstation:29::x86_64 Fedora-Workstation-Live-x86_64-29-1.2.iso
+
+- RHEL::
+    
+    $ /usr/share/tcf/kickstart-install.sh rhel.qcow2 RHEL-8.1.0-x86_64-dvd1.iso 
+    $ BOOT_PARTITION=2 ROOT_PARTITION=4 \
+        /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/rhel::8.1:0:x86_64 rhel.qcow2 
+
+- Ubuntu::
+
+    $ wget http://releases.ubuntu.com/18.04/ubuntu-18.04.3-desktop-amd64.iso
+    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/ubuntu:desktop:18.04:3:x86_64 ubuntu-18.04.3-desktop-amd64.iso 
+    
 - Yocto::
 
     $ wget http://downloads.yoctoproject.org/releases/yocto/yocto-2.5.1/machines/genericx86-64/core-image-minimal-genericx86-64.wic
     $ /usr/share/tcf/tcf-image-setup.sh yocto:core-image-minimal:2.5.1::x86_64 core-image-minimal-genericx86-64.wic
-
-- (others coming)
-
-Otherewise, an image can be extracted and or setup manually and it
+    
+Otherwise, an image can be extracted and or setup manually and it
 consists of:
 
 - the full root filesystem that shall be deployed
@@ -1037,6 +1140,9 @@ consists of:
   password would have to be in a test script so it can be entered, so
   it would make no sense).
 
+See mode details on how to :ref:`automate with kickstart
+<kickstart_install>` the creation of an image.
+  
 .. _ttbd_pos_network_config:
 
 POS: Configuring networks
@@ -1052,6 +1158,190 @@ NFS services have been enabled by installing the *ttbd-pos* package.
 To enable the system to know what to use, the network the target is
 connected to (which is another target) needs to have certain
 configuration settings.
+
+**The quick way**
+
+The quick way to add a POS capable network is using the POS
+configuration library function :func:`pos_target_add
+<conf_00_lib_pos.nw_pos_add>`.
+
+Add a network called *nwa*; the physical network interface with MAC
+*c0:3f:d5:67:af:99* will be used to connect to the network:
+
+.. code-block:: python
+
+   nw_pos_add('a', mac_addr = 'c0:3f:d5:67:af:99')
+
+if you want to add services, to the network, you can calculate the IP
+addresses it is going to be assigned based on the network name (*a*)
+using :func:`conf_00_lib_pos.nw_indexes`
+
+.. code-block:: python
+
+   x, y, _ = nw_indexes('a')
+
+   interconnect.tags_update(dict(
+       # implemented by tinyproxy running in the server
+       ftp_proxy = "http://192.%d.%d.1:8888" % (x, y),
+       http_proxy = "http://192.%d.%d.1:8888" % (x, y),
+       https_proxy = "http://192.%d.%d.1:8888" % (x, y),
+   ))
+  
+by default the server is in *192.x.y.1* in that network, so if we
+configure *tinyproxy* to serve on port 8888, the targets can access it
+for proxy services.
+
+See :ref:`more details <pos_network_config_details>` on network configuration.
+
+POS: Configuring targets
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+This example connects an Intel NUC5i5425OU called nuc-58 to the
+network *nwa* so it can be flashed with POS.
+
+**Overview**
+
+
+**Bill of Materials**
+
+- A PC-class machine (the *target*):
+
+  - able to UEFI boot over the network
+
+  - serial port available (and it's cable) or USB port available (and
+    USB-to-USB null modem cable or similar)
+
+  - power cable
+
+  - network cable
+
+  - Monitor, keyboard and mouse for initial configuration, will be
+    disconnected once setup.
+
+- a free outlet on a PDU unit supported by TCF
+
+**Setup the test target fixture**
+
+1. connect the target to a normal power outlet, monitor, keyboard and
+   mouse
+
+2. start the target, go into the BIOS setup menu
+
+   a. navigate to the *boot* section:
+
+      - set UEFI to boot off network IPv4 as primary boot source
+
+      - remove any other boot methods (TCF will tell it to boot to
+        local disk via the network boot) [USB, Optical, etc]
+
+      - disable unlimited amount of netwbot boots
+
+   b. navigate to the *Power* section and enable *Power on after AC
+      power loss / power failure*.
+
+      This ensures that the target will power on when power is applied
+      via the power controller instead of waiting for the user to
+      press the power button.
+
+   c. From the top level menu or advanced config menus, find the MAC
+      address of the target.
+
+      Alternative, this also can be found by booting any OS in the
+      target (eg: a Linux installation image).
+
+3. Power off the target, disconnect the power, keep the monitor,
+   keyboard and mouse for now
+
+
+**Connecting the target**
+
+1. connect the target's power cable to the port selected in the PDU
+   (for this example our PDU is a :class:`DLWPS7 <ttbl.pc.dlwps7>`
+   named *sp6* and we'll use port #6)
+
+   Label the cable with the target's name.
+
+2. connect the serial cable to the target and the other end to the
+   server.
+
+   Find :ref:`the serial number <find_usb_info>` of the USB serial
+   port connected to the server. We will need it later.
+
+
+**Configuring the system for the target**
+
+1. Pick up a :ref:`target name <bp_naming_targets>`.
+
+   For this example, we picked ``nuc5-58a``, the number 58 is then
+   used to decide the IP address that is assigned to this target
+   (192.168.97.58) on network *a* (as :ref:`defined
+   above<ttbd_pos_network_config_numbers>`).
+
+2. Configure *udev* to add a name for the serial device for the
+   target's serial console USB cable so it can be easily found at
+   ``/dev/tty-TARGETNAME``. Follow :ref:`these instructions
+   <usb_tty_serial>` using the cable's *serial number* we found in
+   the previous section.
+
+3. Add a configuration block to the configuration file
+   ``/etc/ttbd-production/conf_10_targets.py``
+
+   .. code-block:: python
+
+      pos_target_add("nuc5-63b", "c0:3f:d5:69:1a:c7",
+                     "sp7/6", "sda", "1:10:40:20", 'ttyUSB0',
+                     target_type_long = "Intel NUC5i5425OU")
+
+   :func:`pos_target_add <conf_00_lib_pos.pos_target_add>` does all
+   the low level details of arranging for the target to be configured
+   properly; some setups might need other arrangements, for which the
+   individual steps might have to be unfolded--look at the source of
+   the configuration library (in your server configuration directory)
+   for details.
+               
+Restart the server and verify *nuc-58a* works as expected::
+
+  # systemctl restart ttbd@production
+  # tcf healthcheck nuc-58a
+
+will try to power on and off the target; observe in the monitor if the
+target is coming up or not. FIXME: diagose issues
+
+**Smoke test**
+
+From another machine (or within the server) with TCF installed, flash
+the POS image itself in the system as an initial smoke test, using
+``/usr/share/tcf/examples/test_pos_deploy.py``::
+
+  $ IMAGE=tcf:live tcf run -vvvt 'nwa or nuc-58a' /usr/share/tcf/examples/test_pos_deploy.py
+
+FIXME: this will fail now because we don't have the right regex to
+catch tcf:live's root prompt (``[0-9]+ $``).
+
+.. _pos_list_images:
+
+List available images::
+
+  $ tcf run /usr/share/tcf/examples/test_pos_list_images.py
+  server10/nwa clear:live:25550::x86_64
+  server10/nwa clear:live:25890::x86_64
+  server10/nwa fedora:cloud-base:28::x86_64
+  server10/nwa yocto:core-minimal:2.5.1::x86_64
+  PASS0/	toplevel @local: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:00:06.635452) - passed
+
+and flash other images by passing the right image name to the IMAGE
+environment variable::
+
+  $ IMAGE=clear:live:25890::x86_64 tcf run -vvvt 'nwa or nuc-58a' /usr/share/tcf/examples/test_pos_deploy.py
+
+
+(of course, this assumes that image is available in your system; see
+:ref:`how to add more <ttbd_pos_deploying_images>`).
+
+.. _pos_network_config_details:
+     
+POS networks: harder details, adding extra services
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 a. A network is usually defined, in a ``conf_10_NAME.py``
    configuration file in ``/etc/ttbd-production`` (or any other
@@ -1128,7 +1418,7 @@ c. If we want to control the power to the network switch, we would add a
    to socket #5 of a :class:`Digital Weblogger Switch
    7<ttbl.pc.dlwps7>` which the server can reach through the
    infrastructure network as hostname *sp5* (see :py:func:`configuring
-   Digital Loggers Web Power Switch 7 <conf_00_lib.dlwps7_add>`) --
+   Digital Loggers Web Power Switch 7 <conf_00_lib_pdu.dlwps7_add>`) --
    note other power switches can be used too as long as a driver class
    is available for them.
 
@@ -1329,189 +1619,5 @@ Check it can power on and off::
   $ tcf power-on nwa
   $ tcf power-off nwa
 
-POS: Configuring targets
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-This example connects an Intel NUC5i5425OU called nuc-58 to the
-network *nwa* so it can be flashed with POS.
-
-**Overview**
-
-
-**Bill of Materials**
-
-- A PC-class machine (the *target*):
-
-  - able to UEFI boot over the network
-
-  - serial port available (and it's cable) or USB port available (and
-    USB-to-USB null modem cable or similar)
-
-  - power cable
-
-  - network cable
-
-  - Monitor, keyboard and mouse for initial configuration, will be
-    disconnected once setup.
-
-- a free outlet on a PDU unit supported by TCF
-
-**Setup the test target fixture**
-
-1. connect the target to a normal power outlet, monitor, keyboard and
-   mouse
-
-2. start the target, go into the BIOS setup menu
-
-   a. navigate to the *boot* section:
-
-      - set UEFI to boot off network IPv4 as primary boot source
-
-      - remove any other boot methods (TCF will tell it to boot to
-        local disk via the network boot) [USB, Optical, etc]
-
-      - disable unlimited amount of netwbot boots
-
-   b. navigate to the *Power* section and enable *Power on after AC
-      power loss / power failure*.
-
-      This ensures that the target will power on when power is applied
-      via the power controller instead of waiting for the user to
-      press the power button.
-
-   c. From the top level menu or advanced config menus, find the MAC
-      address of the target.
-
-      Alternative, this also can be found by booting any OS in the
-      target (eg: a Linux installation image).
-
-3. Power off the target, disconnect the power, keep the monitor,
-   keyboard and mouse for now
-
-
-**Connecting the target**
-
-1. connect the target's power cable to the port selected in the PDU
-   (for this example our PDU is a :class:`DLWPS7 <ttbl.pc.dlwps7>`
-   named *sp6* and we'll use port #6)
-
-   Label the cable with the target's name.
-
-2. connect the serial cable to the target and the other end to the
-   server.
-
-   Find :ref:`the serial number <find_usb_info>` of the USB serial
-   port connected to the server. We will need it later.
-
-
-**Configuring the system for the target**
-
-1. Pick up a :ref:`target name <bp_naming_targets>`.
-
-   For this example, we picked ``nuc5-58a``, the number 58 is then
-   used to decide the IP address that is assigned to this target
-   (192.168.97.58) on network *a* (as :ref:`defined
-   above<ttbd_pos_network_config_numbers>`).
-
-2. Configure *udev* to add a name for the serial device for the
-   target's serial console USB cable so it can be easily found at
-   ``/dev/tty-TARGETNAME``. Follow :ref:`these instructions
-   <usb_tty_serial>` using the cable's *serial number* we found in
-   the previous section.
-
-3. Add a configuration block to the configuration file
-   ``/etc/ttbd-production/conf_10_targets.py``
-
-   .. note:: we'll simplify this or template it at some point, it is too
-             long and most things are repetitive
-
-   .. code-block:: python
-
-      ttbl.config.target_add(
-           ttbl.tt.tt_serial(
-               "nuc-58a",
-               power_control = [
-                   ttbl.cm_serial.pc(),
-                   ttbl.pc.dlwps7("http://admin:1234@sp10/6"),
-                   ttbl.pc.delay(5),
-               ],
-               serial_ports = [
-                   "pc",
-                   { "port": "/dev/tty-nuc-58a", "baudrate": 115200 }
-               ]),
-          tags = {
-              'linux': True,
-              'bsp_models': { 'x86_64': None },
-              'bsps': {
-                  'x86_64': {
-                      'linux': True,
-                      'console': 'x86_64',
-                  },
-              },
-          },
-          target_type = "Intel NUC5i5425OU")
-
-      # plug the target to the interconnect and assign IP addresses
-      # that DHCP will always assign
-      ttbl.config.targets['nuc-58a'].add_to_interconnect(
-          'nwa', dict(
-              mac_addr = "c0:3f:5d:63:51:1d",
-              ipv4_addr = '192.168.97.158', ipv4_prefix_len = 24,
-              ipv6_addr = 'fc00::61:9e', ipv6_prefix_len = 112
-          )
-      )
-
-      # Configure POS support in the tags
-      ttbl.config.targets["nuc-58a"].tags_update(dict(
-          pos_capable = True,
-          pos_boot_interconnect = "nwa",
-          pos_boot_dev = "sda",
-          pos_partsizes = "1:15:30:10",
-          linux_serial_console_default = 'ttyUSB0'
-      ))
-
-      # activate the POS driver for this target
-      # FIXME: this needs to be hidden
-      ttbl.config.targets["nuc-58a"].power_on_pre_fns.append(
-          ttbl.dhcp.power_on_pre_pos_setup)
-
-Restart the server and verify *nuc-58a* works as expected::
-
-  # systemctl restart ttbd@production
-  # tcf healthcheck nuc-58a
-
-will try to power on and off the target; observe in the monitor if the
-target is coming up or not. FIXME: diagose issues
-
-**Smoke test**
-
-From another machine (or within the server) with TCF installed, flash
-the POS image itself in the system as an initial smoke test, using
-``/usr/share/tcf/examples/test_pos_deploy.py``::
-
-  $ IMAGE=tcf:live tcf run -vvvt 'nwa or nuc-58a' /usr/share/tcf/examples/test_pos_deploy.py
-
-FIXME: this will fail now because we don't have the right regex to
-catch tcf:live's root prompt (``[0-9]+ $``).
-
-.. _pos_list_images:
-
-List available images::
-
-  $ tcf run /usr/share/tcf/examples/test_pos_list_images.py
-  server10/nwa clear:live:25550::x86_64
-  server10/nwa clear:live:25890::x86_64
-  server10/nwa fedora:cloud-base:28::x86_64
-  server10/nwa yocto:core-minimal:2.5.1::x86_64
-  PASS0/	toplevel @local: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:00:06.635452) - passed
-
-and flash other images by passing the right image name to the IMAGE
-environment variable::
-
-  $ IMAGE=clear:live:25890::x86_64 tcf run -vvvt 'nwa or nuc-58a' /usr/share/tcf/examples/test_pos_deploy.py
-
-
-(of course, this assumes that image is available in your system; see
-:ref:`how to add more <ttbd_pos_deploying_images>`).
 
 .. include:: 03-server-setup-LL-post-steps.rst

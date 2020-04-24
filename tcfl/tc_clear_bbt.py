@@ -5,8 +5,16 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 #
+# test with
+#
+# Not yet working ok with bundles/os-clr-on-clr, but the thing is not even printing anything, can't tell?
+#
+# BBT_IGNORE_TS=bbt.git/bundles/os-core-update/bat-clr-boot-manager.t bundles/os-core-update/bat-clr-boot-manager.t
+#
+# 
 """
 Driver to run Clear Linux BBT test suite
+----------------------------------------
 
 The main TCF testcase scanner walks files looking for automation
 scripts / testcase scripts and will call
@@ -27,7 +35,7 @@ and execute all the ``.t`` files in the directory followed by all the
 
 The output of each ``.t`` execution is parsed with
 :func:`tap_parse_output` to generate for each a subcase (an instance
-of :class:`subcases <tc_taps_subcase_c_base>`) which will report the
+of :class:`subcases <tcfl.tc.subtc_c>`) which will report the
 individual result of that subcase execution.
 
 **Setup steps**
@@ -67,8 +75,9 @@ import re
 import subprocess
 import time
 
-from . import commonl
+import commonl
 import tcfl
+import tcfl.tc
 import tcfl.pos
 import tcfl.tl
 
@@ -106,15 +115,21 @@ def tap_parse_output(output):
 
     linecnt = 0
     _plan_count = 1
+    plan_max = 0
     tc = None
     for line in output.split("\n"):
         linecnt += 1
         m = tc_plan.search(line)
         if m:
+            if plan_set_at and _plan_count > plan_max:
+                # only complain if we have not completed it, otherwise
+                # consider it spurious and ignore
+                continue
             if plan_set_at:
-                raise RuntimeError(
-                    "%d: setting range, but was already set at %d",
-                    linecnt, plan_set_at)
+                raise tcfl.tc.blocked_e(
+                    "%d: setting range, but was already set at %d"
+                    % (linecnt, plan_set_at),
+                    dict(output = output, line = line))
             plan_set_at = linecnt
             plan_min = int(m.groupdict()['plan_min'])
             plan_max = int(m.groupdict()['plan_max'])
@@ -176,68 +191,11 @@ def tap_parse_output(output):
             continue
     return tcs
 
-class tc_taps_subcase_c_base(tcfl.tc.tc_c):
-    """
-    Report each subcase result of running a list of TAP testcases
-
-    Given an entry of data from the output of
-    :func:`tap_parse_output`, create a fake testcase that is just used
-    to report results of the subcase.
-
-    This is used by :class:`tc_clear_bbt_c` to report each TAP subcase
-    individually for reporting control.
-    """
-    def __init__(self, name, tc_file_path, origin, parent):
-        assert isinstance(name, str)
-        assert isinstance(tc_file_path, str)
-        assert isinstance(origin, str)
-        assert isinstance(parent, tcfl.tc.tc_c)
-
-        tcfl.tc.tc_c.__init__(self, name, tc_file_path, origin)
-        self.tc_file_path = tc_file_path
-        self.parent = parent
-        self.kw_set('tc_name_short', name)
-        self.result = None
-        self.data = dict()
-
-    def update(self, result, data):
-        assert isinstance(data, dict)
-        # create a result object with the data we parsed from the output
-        self.result = result
-        self.data = data
-
-    def configure_50(self):	# pylint: disable = missing-docstring
-	# we don't need to manipulate the targets, so don't assign;
-        # will be faster -- do it like this so we can use the same
-        # class testcases that require a target and those that don't.
-        for target in list(self.targets.values()):
-            target.acquire = False
-        self.report_pass("NOTE: This is a subtestcase of %(tc_name)s "
-                         "(%(runid)s:%(tc_hash)s); refer to it for full "
-                         "information" % self.parent.kws, dlevel = 1)
-
-    def eval_50(self):		# pylint: disable = missing-docstring
-        if self.result == None:
-            self.result = self.parent.result
-            self.result.report(
-                self, "subcase didn't run; parent didn't complete execution?",
-                dlevel = 2, attachments = self.data)
-        else:
-            self.result.report(
-                self, "subcase reported '%s'" % self.data['result'],
-                dlevel = 2, attachments = self.data)
-        return self.result
-
-    @staticmethod
-    def clean():		# pylint: disable = missing-docstring
-        # Nothing to do, but do it anyway so the accounting doesn't
-        # complain that nothing was found to run
-        pass
-
 #: Ignore t files
 #:
 #: List of individual .t files to ignore, since we can't filter
-#: those on the command line; this can be done  in a config file:
+#: those on the command line; this can be done  in a :ref:`config file
+#: <tcf_client_configuration>`:
 #:
 #: >>> tcfl.tc_clear_bbt.ignore_ts = [
 #: >>>     'bundles/XYZ/somefile.t',
@@ -270,10 +228,117 @@ ignore_ts = os.environ.get("BBT_IGNORE_TS", "").split()
 # entry to ignore_ts_regex, then release the mutex. So it is
 # guaranteed that if you take the mutex, read it and not None, it'll
 # be a valid list you can use without the mutex.
+#
 # Note we don't care if we re under a multiprocess (vs multithread)
 # environment, as long as we have a single copy
+#
+# GLOBAL!!!?? yes, because this is set from the environment's
+# BBT_IGNORE_TS, so it works for all testcases 
 ignore_ts_mutex = threading.Lock()
 ignore_ts_regex = None
+
+#: How long to wait for the BBT run to take?
+#:
+#: Each test case might take longer or shorter to run, but there is no
+#: good way to tell. Thus we hardcode some by bundle name or by .t
+#: name.
+#:
+#: More settings can be added from configuration by adding to any
+#: :ref:`TCF configuration file <tcf_client_configuration>` entries
+#: such as:
+#:
+#: >>> tcfl.tc_clear_bbt.bundle_run_timeouts['NAME'] = 456
+#: >>> tcfl.tc_clear_bbt.bundle_run_timeouts['NAME2'] = 3000
+#: >>> tcfl.tc_clear_bbt.bundle_run_timeouts['NAME3'] = 12
+#: >>> ...
+#:
+bundle_run_timeouts = {
+    # Keep this list alphabetically sorted!
+    'bat-desktop-kde-apps-gui.t': 800,
+    'bat-desktop-kde-gui.t': 800,
+    'bat-mixer.t': 3000,
+    'bat-os-testsuite-phoronix.t': 600,
+    'bat-os-utils-gui-dev-pkgconfig-compile.t': 400,
+    'bat-perl-extras-perl-use_parallel.t': 20000,	# wth...
+    'bat-R-extras-R-library_parallel.t': 480,
+    'bat-xfce4-desktop-bin-help.t': 800,
+    'bat-xfce4-desktop-gui.t': 800,
+    'kvm-host': 480,
+    'os-clr-on-clr': 640,
+    'perl-basic': 480,
+    'bat-perl-basic-perl-use_parallel.t': 1800,
+    'perl-extras': 12000,    # 4k subcases, needs to be split to parallelize
+    'quick-perms.t': 3000,
+    'telemetrics': 480,
+    'xfce4-desktop': 800,
+}
+
+#: Commands to execute before running bats on each .t file (key by .t
+#: file name or bundle-under-test name).
+#:
+#: Note these will be executed in the bundle directory and templated
+#: with ``STR % testcase.kws``.
+bundle_run_pre_sh = {
+    'bat-perl-basic-perl-use.t': [
+        "export PERL_CANARY_STABILITY_NOPROMPT=1",
+    ]
+}
+
+# bundle_add_timeouts -> moved to tcfl.tl.py
+
+#: Map bundle path names
+#:
+#: Ugly case here; this is a bad hack to work around another one.
+#:
+#: In some testcases, the *.t* file is an actuall shell script that
+#: does some setup and then executes a real *.t* file, which has been
+#: detected with different name while we scanned for subcases.
+#:
+#: So this allows us to map what we detect (the regex) to what bats is
+#: then reported when running that hack (the replacement).
+#:
+#: Confusing.
+#:
+bundle_path_map = [
+    # each entry is a regex that is matched and what is replaced with
+    # re.sub()
+    ( re.compile("^(.*bundles/os-clr-on-clr)/t"), r"\g<1>" )
+]
+
+#: Sometime this works in conjunction with :data:`bundle_path_map`
+#: above, when a .t file is actually calling another one (maybe in
+#: another directory, then you need an entry in
+#: :data:`bundle_path_map`) to rename the directory to match the entry
+#: of this one.
+#:
+#: .. admonition:: Example
+#:
+#:    In the hardcoded example, *bat-dev-tooling.t* is just doing
+#:    something to prep and then exec'ing bats to run
+#:    *t/build-package.t*.
+#:
+#:    So we need to map the directory *t* out and also rename the
+#:    entry from *build-package.t/something* that would be found from
+#:    scanning the output to what is expected from scanning the
+#:    testcases in disk.
+bundle_t_map = {
+    'bat-dev-tooling.t.autospec_nano': 'build-package.autospec_nano',
+}
+
+def _bundle_run_timeout(tc, bundle_name, test_name):
+    timeout = 240
+    if bundle_name in bundle_run_timeouts:
+        timeout = bundle_run_timeouts[bundle_name]
+        tc.report_info("adjusting timeout to %d per "
+                       "configuration tcfl.tc_clear_bbt.bundle_run_timeouts"
+                       % timeout)
+    if test_name in bundle_run_timeouts:
+        timeout = bundle_run_timeouts[test_name]
+        tc.report_info("adjusting timeout to %d per "
+                       "configuration tcfl.tc_clear_bbt.bundle_run_timeouts"
+                       % timeout)
+    return timeout
+
 
 @tcfl.tc.interconnect('ipv4_addr')
 @tcfl.tc.target('pos_capable', mode = 'any')
@@ -319,7 +384,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
 
       2. :func:`parse the output <tap_parse_output>` into subcases to
          report their results individually using
-         :class:`tc_taps_subcase_c_base`
+         :class:`tcfl.tc.subtc_c`
 
     """
 
@@ -332,10 +397,13 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
         self.rel_path_in_target = None
         self.t_files = [ os.path.basename(t_file_path) ]
         self.deploy_done = False
-        self.subtc_list = []
-        self.subtcs = {}
+        self.test_bundle_name = os.path.basename(path)
+        self.bats_parallel = False
 
-    def configure_00_set_relpath_set(self):
+    #: Shall we capture a boot video if possible?
+    capture_boot_video_source = "screen_stream"
+
+    def configure_00_set_relpath_set(self, target):
         # calculate these here in case we skip deployment
         self.bbt_tree = subprocess.check_output(
             [
@@ -357,29 +425,9 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
             os.path.realpath(self.kws['srcdir']),
             os.path.realpath(self.bbt_tree))
 
-    # Because of unfortunate implementation decissions that have to be
-    # revisited, we need to initialize the list of
-    # sub-testcases here.
-    #
-    # Why? because once we create an instance of this testcase,
-    # instead of creating a new one for each target it has to run on
-    # in tcfl.tc.tc_c._run_on_targets(), we deepcopy() it in
-    # _clone(). So the constructor is never called again -- yeah, that
-    # has to change.
-    def configure_10(self):	# pylint: disable = missing-docstring
-        for key, name, tc_file_path, origin in self.subtc_list:
-            # note how we parent it to self, not subtcs's
-            # parent--because that'll be someone else. @self is the
-            # current running TC that this parents these guys
-            self.subtcs[key] = tc_taps_subcase_c_base(name, tc_file_path,
-                                                      origin, self)
-            self.post_tc_append(self.subtcs[key])
-        if self.subtcs:
-            self.report_pass("NOTE: this testcase will unfold subcases: %s" %
-                             " ".join(list(self.subtcs.keys())), dlevel = 1)
-        else:
-            self.report_pass("NOTE: this testcase does not provide subcases",
-                             dlevel = 1)
+        if self.capture_boot_video_source + ":" \
+           not in target.kws.get('capture', ""):
+            self.capture_boot_video_source = False
 
     #: Specification of image to install
     #:
@@ -440,7 +488,6 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
     #: the client's time
     fix_time = os.environ.get("SWUPD_FIX_TIME", None)
 
-    
     def _deploy_bbt(self, _ic, target, _kws):
         # note self.bbt_tree and self.rel_path_in_target are set by
         # configure_00_set_relpath_set(); this way if we call withtout
@@ -533,24 +580,34 @@ EOF
         # fire up the target, wait for a login prompt
         # if we have video capture, get it to see if we are crashing
         # before booting
-        if "screen_stream:stream" in target.kws.get('capture', ""):
+        if self.capture_boot_video_source:
             capturing = True
-            target.capture.start("screen_stream")
+            target.capture.start(self.capture_boot_video_source)
         else:
             capturing = False
         target.pos.boot_normal()
         try:
             target.shell.up(user = 'root')
             if capturing:
-                target.capture.stop("screen_stream")
+                target.capture.stop(self.capture_boot_video_source)
         except:
             if capturing:
                 # done booting, get the boot sequence movie, in case we
                 # could record it
-                target.capture.get("screen_stream",
+                target.capture.get(self.capture_boot_video_source,
                                    self.report_file_prefix + "boot.avi")
             raise
-        target.report_pass("Booted %s" % self.image)
+        target.report_pass("booted %s" % self.image)
+
+        # allow remote access while running the testcase, in case we
+        # need to poke around to monitor
+        tcfl.tl.linux_ssh_root_nopwd(target)
+        target.shell.run("systemctl restart sshd")
+        target.shell.run(		# wait for sshd to fully restart
+            # this assumes BASH
+            "while ! exec 3<>/dev/tcp/localhost/22; do"
+            " sleep 1s; done", timeout = 15)
+        target.console.select_preferred()
 
         # Why this? because a lot of the test output can be confused
         # with a prompt and the prompt regex then trips on it and
@@ -559,17 +616,6 @@ EOF
         target.shell.run(
             'export PS1="BBT-PS1-PROMPT% " # do a very simple prompt, ' \
             'difficult to confuse with test output')
-
-        if self.fix_time:
-            target.shell.run(
-                "date -us '%s' && hwclock -wu"
-                % str(datetime.datetime.utcnow()))
-        
-        target.shell.run(
-            "test -f /etc/ca-certs/trusted/regenerate"
-            " && rm -rf /run/lock/clrtrust.lock"
-            " && clrtrust -v generate"
-            " && rm -f /etc/ca-certs/trusted/regenerate")
 
         # Install bundles we need
         #
@@ -584,72 +630,19 @@ EOF
             bundles += open(requirements_fname).read().split()
         self.report_info("Bundle requirements: %s" % " ".join(bundles),
                          dlevel = 1)
+        tcfl.tl.swupd_bundle_add(ic, target, bundles)
 
-        # if there is no distro mirror, use proxies -- HACK
-        tcfl.tl.sh_export_proxy(ic, target)
-
-        distro_mirror = ic.kws.get('distro_mirror', None)
-        if self.swupd_url:
-            swupd_url = self.swupd_url % ic.kws
-            target.shell.run("swupd mirror -s %s" % swupd_url)
-        elif distro_mirror:
-            # If the network exposes a distro mirror, use it -- this is
-            # kind of a hack for now, because we assume that if there is a
-            # mirror, we don't have to use a proxy (if any) for getting to
-            # it.
-            # FIXME
-            target.shell.run(
-                "swupd mirror -s %s/pub/mirrors/clearlinux/update/"
-                % distro_mirror)
-
-        # Install them bundles
-        #
-        # installing can take too much time, so we do one bundle at a
-        # time so the system knows we are using the target.
-        #
-        # As well, swupd doesn't seem to be able to recover well from
-        # network glitches--so we do a loop where we retry a few times;
-        # we record how many tries we did and the time it took as KPIs
-        self.tls.expecter.timeout = 240
-        for bundle in bundles:
-            if self.swupd_debug:
-                debug = "--debug"
-            else:
-                debug = ""
-            count = 0
-            top = 10
-            for count in range(1, top + 1):
-                # We use -p so the format is the POSIX standard as
-                # defined in
-                # https://pubs.opengroup.org/onlinepubs/009695399/utilities/time.html
-                # STDERR section
-                output = target.shell.run(
-                    "time -p swupd bundle-add %s %s || echo FAILED''-%s"
-                    % (debug, bundle, self.kws['tc_hash']), output = True)
-                if not 'FAILED-%(tc_hash)s' % self.kws in output:
-                    # we assume it worked
-                    break
-                target.shell.run("sleep 5s # failed %d/%d? retrying in 5s"
-                                 % (count, top))
-            else:
-                target.report_data("BBT bundle-add retries",
-                                   bundle, count)
-                raise tcfl.tc.error_e("bundle-add failed too many times")
-            # see above on time -p
-            kpi_regex = re.compile(r"^real[ \t]+(?P<seconds>[\.0-9]+)$",
-                                   re.MULTILINE)
-            m = kpi_regex.search(output)
-            if not m:
-                raise tcfl.tc.error_e(
-                    "Can't find regex %s in output" % kpi_regex.pattern,
-                    dict(output = output))
-            # maybe domain shall include the top level image type
-            # (clear:lts, clear:desktop...)
-            target.report_data("BBT bundle-add retries",
-                               bundle, int(count))
-            target.report_data("BBT bundle-add duration (seconds)",
-                               bundle, float(m.groupdict()['seconds']))
-            self.targets_active(target)
+        # once the os-test-suite thing has been installed, then we can
+        # test if bats supports parallelism
+        output = target.shell.run(
+            "bats --help | fgrep -q -- '--jobs' || echo N''O # supports -j?",
+            output = True, trim = True)
+        if 'NO' not in output:
+            self.bats_parallel = True
+            # Yeah, we could use `getconf _NPROCESSORS_ONLN`, but this
+            # works, since we want to know how many processing units we
+            # can give bats.
+            target.shell.run("CPUS=$(grep -c ^processor /proc/cpuinfo)")
 
     def _ts_ignore(self, subtcname):
         global ignore_ts_regex
@@ -684,16 +677,45 @@ EOF
                 if name.startswith(t_file):
                     subtc.result = tcfl.tc.result_c(0, 0, 0, 0, 1)
                     subtc.data = dict(result = "skipped")
+                    subtc.update(
+                        tcfl.tc.result_c(0, 0, 0, 0, 1),
+                        "skipped due to configuration"
+                        " (tcfl.tc_clear_bbt.ignore_ts or"
+                        " BBT_IGNORE_TS environment)",
+                        "")
             result.skipped += 1
         else:
             self.report_info("running %s%s" % (prefix, t_file))
             self.kw_set("t_file", t_file)
+
+            # patch any execution hot fixes
+            pre_sh_l = []
+            if self.test_bundle_name in bundle_run_pre_sh:
+                self.report_info("adding configured pre_sh steps from "
+                                 "tcfl.tc_clear_bbt.bundle_run_pre_sh[%s]"
+                                 % self.test_bundle_name)
+                pre_sh_l += bundle_run_pre_sh[self.test_bundle_name]
+            if t_file in bundle_run_pre_sh:
+                self.report_info("adding configured pre_sh steps from "
+                                 "tcfl.tc_clear_bbt.bundle_run_pre_sh[%s]"
+                                 % t_file)
+                pre_sh_l += bundle_run_pre_sh[t_file]
+            for pre_sh in pre_sh_l:
+                target.shell.run(pre_sh % self.kws)
+
+            # Run the t_file
+            # remember we cd'ed into the directory, the way these
+            # BBTs are written, it is expected
+            if self.bats_parallel and 'use_parallel' in t_file:
+                # note we set CUPS in the target in start()
+                parallel = "-j $CPUS"
+            else:
+                parallel = ""
+            run_timeout = _bundle_run_timeout(self, self.test_bundle_name, t_file)
             output = target.shell.run(
-                # remember we cd'ed into the directory, the way these
-                # BBTs are written, it is expected
-                "bats --tap %s || echo FAILED''-%s"
-                % (t_file, self.kws['tc_hash']),
-                output = True)
+                "bats --tap %s %s || echo FAILED''-%s"
+                % (t_file, parallel, self.kws['tc_hash']),
+                output = True, timeout = run_timeout)
             # top level result
             if 'bats: command not found' in output:
                 self.report_error(
@@ -719,18 +741,29 @@ EOF
             for name, data in tcs.items():
                 # get the subtc; see _scan_t_subcases() were we keyed
                 # them in
-                _name = commonl.name_make_safe(name.strip()).rstrip("_")
+                _name = commonl.name_make_safe(name.strip())
                 tc_name = t_file + "." + _name
-                subtc = self.subtcs[tc_name]
+                if tc_name in bundle_t_map:
+                    _tc_name = bundle_t_map[tc_name]
+                    self.report_info("subtestcase name %s mapped to %s "
+                                     "per configuration "
+                                     "tcfl.tc_clear_bbt.bundle_t_map"
+                                     % (tc_name, _tc_name))
+                else:
+                    _tc_name = tc_name
+                subtc = self.subtc[_tc_name]
                 if self._ts_ignore(subtc.name):
-                    data['result'] += \
-                        "result skipped due to configuration " \
+                    _result = tcfl.tc.result_c(0, 0, 0, 0, 1)
+                    summary = "result skipped due to configuration " \
                         "(tcfl.tc_clear_bbt.ignore_ts or " \
                         "BBT_IGNORE_TS environment)"
-                    subtc.update(tcfl.tc.result_c(0, 0, 0, 0, 1), data)
+                    log = data['output']
                 else:
                     # translate the taps result to a TCF result, record it
-                    subtc.update(self.mapping[data['result']], data)
+                    _result = self.mapping[data['result']]
+                    log = data['output']
+                    summary = log.split('\n', 1)[0]
+                subtc.update(_result, summary, log, )
                 result += subtc.result
         return result
 
@@ -780,8 +813,10 @@ EOF
     paths = {}
     filename_regex = re.compile(r"^.*\.t$")
 
+    # the initial ['"] has to be part of the name, as otherwise it
+    # mite strip parts that bats (the program) does consider...
     _regex_t_subcases = re.compile(
-        r"^\s*@test\s+['\"](?P<name>.+)['\"]\s+{.*", re.MULTILINE)
+        r"^\s*@test\s+(?P<name>['\"].+['\"])\s+{.*", re.MULTILINE)
 
     def _scan_t_subcases(self, path, prefix):
         # we just create here the list of parameters we'll use to
@@ -791,25 +826,34 @@ EOF
         with open(path) as tf:
             subcases = re.findall(self._regex_t_subcases, tf.read())
         for name in subcases:
-            # make sure to remove leading/trailing whitespace and then
-            # trailing _--this allows it to match what the bats tool
-            # scans, which we'll need to match in the output of
-            # tap_parse_output() in _eval_one()
-            _name = commonl.name_make_safe(name.strip()).rstrip("_")
+            # here we need to be careful to treat the scanned name
+            # exactly the same way the bats tool will do it, otherwise
+            # when we scan them from the bats output, they won't match
+            name = name.strip()
+            # strip the simple or double quotes from the name
+            # -> "Starting somethings --id=\"blah\""
+            # <- Starting somethings --id=\"blah\"
+            name = name[1:-1]
+            # ok, now somethings might have been escaped with \...we
+            # can ignore it, since we are not affected by it...
+            # -> Starting somethings --id=\"blah\"
+            # <- Starting somethings --id="blah"
+            name = name.replace("\\", "")
+            # strip here, as BATS will do too
+            _name = commonl.name_make_safe(name.strip())
+            logging.debug("%s contains subcase %s", path, _name)
             t_file_name = os.path.basename(path)
-            self.subtc_list.append((
-                # note we'll key on the .t file basename and the subtest name
-                # inside the .t file, otherwise if two different .t files
-                # in the dir have same subtest names, they'd override.
-                # In _eval_one() we'll refer to this dict
-                # We keep this, even if is basically the same because
-                # it will easily make configure_10 later print a
-                # shorter list for reference in reports...
-                t_file_name + "." + _name,
+            # note we'll key on the .t file basename and the subtest name
+            # inside the .t file, otherwise if two different .t files
+            # in the dir have same subtest names, they'd override.
+            # In _eval_one() we'll refer to this dict
+            subcase_name = t_file_name + "." + _name
+            self.subtc[subcase_name] = tcfl.tc.subtc_c(
                 # testcase full name / unique ID
                 prefix + t_file_name.replace(".t", "") + "." + _name,
-                self.kws['thisfile'], self.origin
-            ))
+                self.kws['thisfile'], self.origin,
+                # parent
+                self)
 
     @classmethod
     def is_testcase(cls, path, _from_path):
@@ -835,20 +879,31 @@ EOF
         # As a result, we only create a testcase per directory that
         # has entries for each .t file in the directory.
         srcdir = os.path.dirname(path)
-        if srcdir in cls.paths:
+        srcdir_real_path = os.path.realpath(srcdir)
+        for regex, replacement in bundle_path_map:
+            match = regex.match(srcdir_real_path)
+            if match:
+                _srcdir = re.sub(regex, replacement, srcdir_real_path)
+                logging.info("path '%s' mapped to '%s' per config "
+                             "tcfl.tc_clear_bbt.bundle_path_map",
+                             srcdir_real_path, _srcdir)
+                break
+        else:
+            _srcdir = srcdir_real_path
+        if _srcdir in cls.paths:
             # there is a testcase for this directory already, append
             # the .t
-            tc = cls.paths[srcdir]
+            tc = cls.paths[_srcdir]
             tc.t_files.append(os.path.basename(path))
-            tc._scan_t_subcases(path, srcdir + "/")
-            tc.report_info("%s will be run by %s" % (file_name, srcdir),
+            tc._scan_t_subcases(path, srcdir + "##")
+            tc.report_info("%s will be run by %s" % (path, _srcdir),
                            dlevel = 3)
         else:
             # there is no testcase for this directory, go create it;
             # set the full filename as origin.
             tc = cls(srcdir, path)
-            tc._scan_t_subcases(path, srcdir + "/")
-            cls.paths[srcdir] = tc
+            tc._scan_t_subcases(path, srcdir + "##")
+            cls.paths[_srcdir] = tc
 
             # now, we will also run anything in the any-bundle
             # directory -- per directory, so we add it now, as we
@@ -856,9 +911,9 @@ EOF
             # not work when we just point to a .t
             # any_bundle's are at ../../any-bundle from the
             # per-bundle directories where the .ts are.
-            any_bundle_path = os.path.join(srcdir, "..", "..", "any-bundle",
+            any_bundle_path = os.path.join(_srcdir, "..", "..", "any-bundle",
                                            "*.t")
             for any_t_file_path in glob.glob(any_bundle_path):
-                tc._scan_t_subcases(any_t_file_path, srcdir + "/any#")
+                tc._scan_t_subcases(any_t_file_path, srcdir + "##any-bundle/")
 
         return [ tc ]

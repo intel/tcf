@@ -15,9 +15,10 @@ import shutil
 import stat
 import subprocess
 
-from tcfl import commonl
+import commonl
 import ttbl
 import ttbl.config
+import ttbl.power
 
 #: Directory where the TFTP tree is located
 tftp_dir = "/var/lib/tftpboot"
@@ -149,7 +150,8 @@ def _tag_get_from_ic_target(kws, tag, ic, target, default = ""):
 
 tftp_prefix = "ttbd" + ttbl.config.instance_suffix
 
-class pci(ttbl.tt_power_control_impl):
+# FIXME: use daemon_pc
+class pci(ttbl.power.impl_c):
 
     class error_e(Exception):
         pass
@@ -191,7 +193,7 @@ class pci(ttbl.tt_power_control_impl):
                  debug = False,
                  ip_mode = 4):
         assert ip_mode in (4, 6)
-        ttbl.tt_power_control_impl.__init__(self)
+        ttbl.power.impl_c.__init__(self)
         self.allow_unmapped = allow_unmapped
         if mac_ip_map == None:
             self._mac_ip_map = {}
@@ -245,7 +247,7 @@ class pci(ttbl.tt_power_control_impl):
         #   }
         first = True
         res = ""
-        for arch_name, arch_data in pxe_architectures.items():
+        for arch_name, arch_data in list(pxe_architectures.items()):
             if first:
                 if_s = "if"
                 first = False
@@ -325,7 +327,7 @@ subnet6 %(if_net)s/%(if_len)s {
         #
         # FIXME: This leaves a gap, as targets in other servers could
         # be connected to this network. Sigh.
-        for target_id, target in ttbl.config.targets.items():
+        for target_id, target in list(ttbl.config.targets.items()):
             interconnects = target.tags.get('interconnects', {})
             ic = self.target
 
@@ -348,8 +350,9 @@ subnet6 %(if_net)s/%(if_len)s {
                                    % (target_id, boot_ic))
 
             if not 'bsp' in target.tags:
-                bsps = list(target.tags['bsps'].keys())
-                kws['bsp'] = sorted(bsps)[0]
+                bsps = list(target.tags.get('bsps', {}).keys())
+                if bsps:
+                    kws['bsp'] = sorted(bsps)[0]
             kws.update(dict(
                 ipv4_gateway = ic.tags.get('ipv4_gateway', ""),
                 ipv4_netmask = commonl.ipv4_len_to_netmask_ascii(
@@ -365,7 +368,7 @@ subnet6 %(if_net)s/%(if_len)s {
             _tag_get_from_ic_target(kws, 'pos_nfs_server', ic, target)
             _tag_get_from_ic_target(kws, 'pos_nfs_path', ic, target)
 
-            for ic_id, interconnect in interconnects.items():
+            for ic_id, interconnect in list(interconnects.items()):
                 if '#' in ic_id:
                     real_ic_id, instance = ic_id.split("#", 1)
                     kws['hostname'] = target.id + "-" + instance
@@ -467,7 +470,7 @@ host %(hostname)s {
             self.pxe_dir = os.path.join(tftp_dir, tftp_prefix)
             self.dhcpd_pidfile = os.path.join(self.state_dir, "dhcpd.pid")
 
-    def power_on_do(self, target):
+    def on(self, target, _component):
         """
         Start DHCPd servers on the network interface
         described by `target`
@@ -487,7 +490,7 @@ host %(hostname)s {
         commonl.makedirs_p(os.path.join(tftp_dir, tftp_prefix,
                                         "pxelinux.cfg"),
                            0o0775)
-        for arch_name, arch_data in pxe_architectures.items():
+        for arch_name, arch_data in list(pxe_architectures.items()):
             tftp_arch_dir = os.path.join(tftp_dir, tftp_prefix, arch_name)
             commonl.makedirs_p(tftp_arch_dir, 0o0775)
             cmdline = [ "rsync", "-a", "--delete" ] \
@@ -518,7 +521,7 @@ host %(hostname)s {
 
         self._dhcpd_start()
 
-    def power_off_do(self, target):
+    def off(self, target, _component):
         if self.target == None:
             self.target = target
         else:
@@ -527,7 +530,7 @@ host %(hostname)s {
         commonl.process_terminate(self.dhcpd_pidfile,
                                   path = self.dhcpd_path, tag = "dhcpd")
 
-    def power_get_do(self, target):
+    def get(self, target, _component):
         if self.target == None:
             self.target = target
         else:
@@ -540,14 +543,61 @@ host %(hostname)s {
             return False
 
 
-def power_on_pre_pos_setup(target):
+#: List of string with Linux kernel command options to be passed by
+#: the bootloader
+pos_cmdline_opts = {
+    'tcf-live':  [
+        # no 'single' so it force starts getty on different ports
+        # this needs an initrd
+        "initrd=%(pos_http_url_prefix)sinitramfs-%(pos_image)s ",
+        # needed by Fedora running as live FS hack
+        "rd.live.image",
+        # We need SELinux disabled--otherwise some utilities (eg:
+        # rsync) can't operate properly on the SELinux attributes they need to
+        # move around without SELinux itself getting on the way.
+        "selinux=0", "audit=0",
+        # ip=dhcp so we get always the same IP address and NFS root
+        # info (in option root-path when writing the DHCP config file
+        # a few lines above in _dhcp_conf_write()); thus nfsroot
+        # defers to whatever we are given over DHCP, which has all the
+        # protocol and version settings
+        #
+        # IP specification is needed so the kernel acquires an IP address
+        # and can syslog/nfsmount, etc Note we know the fields from the
+        # target's configuration, as they are pre-assigned
+        "ip=dhcp",        
+        "root=/dev/nfs",		# we are NFS rooted
+        # no exotic storage options
+        "rd.luks=0", "rd.lvm=0", "rd.md=0", "rd.dm=0", "rd.multipath=0",
+        "ro",				# we are read only
+        "plymouth.enable=0 ",		# No installer to run
+        "loglevel=2",			# kernel, be quiet to avoid
+        				# your messages polluting the
+                                        # serial terminal
+    ]
+}
 
+def power_on_pre_pos_setup(target):
+    """
+    Hook called before power on to setup TFTP to boot a target in Provisioning Mode
+
+    The DHCP server started by :mod:`ttbl.dhcp` is always configured
+    to direct a target to PXE boot *syslinux*; this will ask the TFTP
+    server for a config file for the mac address of the target.
+
+    This function is called before powering on the target to create
+    said configuration file; based on the value of the target's
+    *pos_mode* property, a config file that boots the Provisioning OS
+    or that redirects to the local disk will be created.
+    
+    """
     pos_mode = target.fsdb.get("pos_mode")
     if pos_mode == None:
         target.log.info("POS boot: ignoring, pos_mode property not set")
         return
     # We only care if mode is set to pxe or local -- local makes us
     # tell the thing to go boot local disk
+    # FIXME: assume no pos_mode means local
     if pos_mode != "pxe" and pos_mode != "local":
         target.log.info("POS boot: ignoring, pos_mode set to %s "
                         "(vs PXE or local)" % pos_mode)
@@ -575,8 +625,9 @@ def power_on_pre_pos_setup(target):
         # The service
         kws = dict(target.tags)
         if not 'bsp' in target.tags:
-            bsps = list(target.tags['bsps'].keys())
-            kws['bsp'] = sorted(bsps)[0]
+            bsps = list(target.tags.get('bsps', {}).keys())
+            if bsps:
+                kws['bsp'] = sorted(bsps)[0]
         kws.update(dict(
             ipv4_addr = interconnect['ipv4_addr'],
             ipv4_gateway = interconnect.get('ipv4_gateway', ""),
@@ -592,23 +643,11 @@ def power_on_pre_pos_setup(target):
         _tag_get_from_ic_target(kws, 'pos_http_url_prefix', ic, target)
         _tag_get_from_ic_target(kws, 'pos_nfs_server', ic, target)
         _tag_get_from_ic_target(kws, 'pos_nfs_path', ic, target)
+        _tag_get_from_ic_target(kws, 'pos_image', ic, target, 'tcf-live')
 
         # generate configuration for the target to boot the POS's linux
         # kernel with the root fs over NFS
-        # FIXME: the name of the pos image and the command line extras
-        # should go over configuration and the target's configuration
-        # should be able to say which image it wants (defaulting everyone
-        # to whichever).
-        kws['extra_kopts'] = ""
-        kws['pos_image'] = 'tcf-live'
-        kws['root_dev'] = '/dev/nfs'
-        # no 'single' so it force starts getty on different ports
-        # nfsroot: note we defer to whatever we are given over DHCP
-        kws['extra_kopts'] += \
-            "initrd=%(pos_http_url_prefix)sinitramfs-%(pos_image)s " \
-            "rd.live.image selinux=0 audit=0 ro " \
-            "rd.luks=0 rd.lvm=0 rd.md=0 rd.dm=0 rd.multipath=0 " \
-            "plymouth.enable=0 "
+        kws['extra_kopts'] = " ".join(pos_cmdline_opts[kws['pos_image']])
 
         # Generate the PXE linux configuration
         #
@@ -616,16 +655,11 @@ def power_on_pre_pos_setup(target):
         # breakage, so we use Python's \ for clearer, shorter lines which
         # will be pasted all together
         #
-        # FIXME: move somewhere else more central?
-        #
-        # IP specification is needed so the kernel acquires an IP address
-        # and can syslog/nfsmount, etc Note we know the fields from the
-        # target's configuration, as they are pre-assigned
-        #
-        # ip=DHCP so we get always the same IP address and NFS root
-        # info (in option root-path when writing the DHCP config file)
+        # Most of the juicy stuff comes from the pos_cmdline_opts for
+        # each image (see, eg: tcf-live's) which is filled in
+        # extra_opts a few lines above
         config = """\
-say TCF Network boot to Service OS
+say TCF Network boot to Provisioning OS
 #serial 0 115200
 default boot
 prompt 0
@@ -633,8 +667,7 @@ label boot
   # boot to %(pos_image)s
   linux %(pos_http_url_prefix)svmlinuz-%(pos_image)s
   append console=tty0 console=%(linux_serial_console_default)s,115200 \
-    ip=dhcp \
-    root=%(root_dev)s %(extra_kopts)s
+    %(extra_kopts)s
 """
         config = template_rexpand(config, kws)
     else:

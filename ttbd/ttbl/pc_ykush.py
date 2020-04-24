@@ -12,14 +12,14 @@ import time
 import usb.core
 import usb.util
 
-from tcfl import commonl
-from tcfl.commonl import requirements
 import ttbl
+import ttbl.things
+import ttbl.power
 
-# Verify that we can run TTBD
-commonl.requirements.verify_pyusb_version()
-
-class ykush(ttbl.tt_power_control_impl):
+# FIXME: ename to _pc
+# FIXME: move this file to ykush.py, since it provides other
+#        components, not just a power controller
+class ykush(ttbl.power.impl_c, ttbl.things.impl_c):
 
     class notfound_e(ValueError):
         pass
@@ -77,10 +77,14 @@ class ykush(ttbl.tt_power_control_impl):
         """
         if not isinstance(port, int) or port < 1 or port > 3:
             raise ValueError("ykush ports are 1, 2 and 3, gave %s" % port)
+        ttbl.power.impl_c.__init__(self)
+        ttbl.things.impl_c.__init__(self)
         self.port = port
         self.ykush_serial = ykush_serial
         self.retries = 10
         self.soft_retries = 4
+        self.upid_set("Yepkit YKUSH power control hub",
+                      serial_number = self.ykush_serial)
 
     def _find_dev(self, target):
         try:
@@ -203,7 +207,7 @@ class ykush(ttbl.tt_power_control_impl):
             timeout = 10
             while True:
                 try:
-                    ykush_target.acquire(owner)
+                    ykush_target.acquire(owner, True)
                     break
                 except ttbl.test_target_busy_e as e:
                     t = time.time()
@@ -276,13 +280,13 @@ class ykush(ttbl.tt_power_control_impl):
                 time.sleep(0.25)
                 had_to_retry = True
 
-    def power_on_do(self, target):
+    def on(self, target, _component):
         cmd = 0x10 | self.port
         r = self._command(target, cmd)
         target.log.log(8, "ykush power on %s[%d] / 0x%02x = 0x%02x %02x"
                        % (self.ykush_serial, self.port, cmd, r[0], r[1]))
 
-    def power_off_do(self, target):
+    def off(self, target, _component):
         # Okie, this is quite a hack -- when we try to power it off,
         # if the serial is not found, we just assume the device is not
         # there and thus it is off -- so we ignore it. Why? Becuase
@@ -300,7 +304,7 @@ class ykush(ttbl.tt_power_control_impl):
                            % (self.ykush_serial, self.port, cmd))
             pass
 
-    def power_get_do(self, target):
+    def get(self, target, _component):
         cmd = 0x20 | self.port
         try:
             r = self._command(target, cmd)
@@ -314,15 +318,8 @@ class ykush(ttbl.tt_power_control_impl):
             # If it is not connected, it is off
             return False
 
-class plugger(ykush,		 # pylint: disable = abstract-method
-              ttbl.thing_plugger_mixin):
-    """
-    Plugger to connect/disconnect a USB device with a YKUSH
-    """
-    def __init__(self, ykush_serial, port):
-        ykush.__init__(self, ykush_serial, port)
-        ttbl.thing_plugger_mixin.__init__(self)
-
+    # things interface, to use as a plugger
+    # get() is implemented above
     def plug(self, target, _thing):	# pylint: disable = missing-docstring
         self._command(target, 0x10 | self.port)
 

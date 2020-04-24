@@ -30,7 +30,7 @@ import types
 import pexpect
 import pexpect.fdpexpect
 
-from tcfl import commonl
+import commonl
 import ttbl
 import ttbl.cm_serial
 try:

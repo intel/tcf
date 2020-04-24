@@ -5,9 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-from . import __init__
+import ttbl
 
-class authenticator_party_c(__init__.authenticator_c):
+class authenticator_party_c(ttbl.authenticator_c):
     """Life is a party! Authenticator that allows anyone to log in and be
     an admin.
 
@@ -31,6 +31,7 @@ class authenticator_party_c(__init__.authenticator_c):
 
     """
     def __init__(self, roles = None, local_addresses = None):
+        ttbl.authenticator_c.__init__(self)
         if not roles:
             self.roles = []
         else:

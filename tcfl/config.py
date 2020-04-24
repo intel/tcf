@@ -16,7 +16,7 @@ import os
 import re
 import urllib.parse
 
-from . import commonl
+import commonl
 from . import ttb_client
 
 logger = logging.getLogger("tcfl.config")
@@ -49,7 +49,7 @@ def url_add(url, ssl_ignore = False, aka = None, ca_path = None):
         raise Exception("%s: malformed URL?" % url)
     o = inspect.stack()[1]
     origin = "%s:%s" % (o[1], o[2])
-    logger.info("%s: Added broker URL %s", origin, url)
+    logger.info("%s: Added server URL %s", origin, url)
     urls.append((url, ssl_ignore, aka, ca_path))
 
 def load(config_path = None, config_files = None,
@@ -83,13 +83,13 @@ def load(config_path = None, config_files = None,
 
     if urls == []:
         logger.warning(
-            "No broker URLs available; please use --url or "
+            "No server URLs available; please use --url or "
             "add to a conf_*.py in any of %s with:\n"
             "\n"
             "  tcfl.config.url_add('https://URL:PORT', ssl_ignore = True)\n"
             "\n" % ":".join(config_path))
 
-    for _url in urls:		# create target broker objects
+    for _url in urls:		# create target server objects
         url = _url[0]
         ssl_ignore = ignore_ssl or _url[1]
         if len(_url) > 2:

@@ -13,6 +13,11 @@
 # - do not pass device--each function should gather it from target's
 #   tags
 """
+.. _pos_multiroot:
+
+Provisioning OS: partitioning schema for multiple root FSs per device
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 The Provisioning OS multiroot methodology partitions a system with
 multiple root filesystems; different OSes are installed in each root
 so it is fast to switch from one to another to run things in
@@ -44,6 +49,21 @@ transfer (and thus slowest to fastest operation):
 - can update an existing root filesystem: in this case very little
   change is done and we are just verifying nothing was unduly
   modified.
+
+.. _pos_multiroot_partsizes:
+
+Partition Size specification
+----------------------------
+
+To simplify setup of targets, a string such as *"1:4:10:50"* is given
+to denote the sizes of the different partitions:
+
+- 1 GiB for /boot
+- 4 GiB for swap
+- 10 GiB for scratch (can be used for whatever the script wants, needs
+  to be formated/initialized before use)
+- 50 GiB for multiple root partitions (until the disk size is exhausted)
+
 """
 import operator
 import os
@@ -65,17 +85,7 @@ def _disk_partition(target):
     target.shell.run('swapoff -a || true')	    # in case we autoswapped
 
     # find device size (FIXME: Linux specific)
-    dev_info = None
-    for blockdevice in target.pos.fsinfo.get('blockdevices', []):
-        if blockdevice['name'] == device_basename:
-            dev_info = blockdevice
-            break
-    else:
-        raise tc.error_e(
-            "%s: can't find information about this block device -- is "
-            "the right pos_boot_device set in the configuration?"
-            % device_basename,
-            dict(fsinfo = pprint.pformat(target.pos.fsinfo)))
+    dev_info = target.pos.fsinfo_get_block(device_basename)
     size_gb = int(dev_info['size']) / 1024 / 1024 / 1024
     target.report_info("POS: %s is %d GiB in size" % (device, size_gb),
                        dlevel = 2)
@@ -94,13 +104,19 @@ def _disk_partition(target):
     root_size = partsize_l[3]
 
     # note we set partition #0 as boot
+    # Note we set the name of the boot partition; we use that later to
+    # detect the disk has a partitioning scheme we support. See above.
     cmdline = """parted -a optimal -ms %(device)s unit GiB \
 mklabel gpt \
 mkpart primary fat32 0%% %(boot_size)s \
 set 1 boot on \
+name 1 %(boot_label_name)s \
 mkpart primary linux-swap %(boot_size)s %(swap_end)s \
+name 2 TCF-swap \
 mkpart primary ext4 %(swap_end)s %(scratch_end)s \
+name 3 TCF-scratch \
 """ % dict(
+    boot_label_name = target._boot_label_name,
     device = device,
     boot_size = boot_size,
     swap_end = boot_size + swap_size,
@@ -117,13 +133,11 @@ mkpart primary ext4 %(swap_end)s %(scratch_end)s \
         pid += 1
 
     target.shell.run(cmdline)
-    # Now set the root device information, so we can pick stuff to
+    target.pos.fsinfo_read(target._boot_label_name)
     # format quick
     for root_dev in root_devs:
         target.property_set('pos_root_' + root_dev, "EMPTY")
 
-    # Re-read partition tables
-    target.shell.run('partprobe %s' % device)
 
     # now format filesystems
     #
@@ -180,7 +194,7 @@ def _rootfs_guess_by_image(target, image, boot_dev):
     # This prolly can be made more efficient, like collect least-used
     # partition data? to avoid the situation where two clients keep
     # imaging over each other when they could have two separate images
-    root_part_dev, score, seed = pos.image_seed_match(partl, image)
+    root_part_dev, score, check_empties, seed = pos.image_seed_match(partl, image)
     if score == 0:
         # none is a good match, find an empty one...if there are
         # non empty, just any
@@ -194,6 +208,14 @@ def _rootfs_guess_by_image(target, image, boot_dev):
                 "POS: picked up random partition %s, because none of the "
                 "existing installed ones was a good match and there "
                 "are no empty ones" % root_part_dev, dlevel = 2)
+    elif check_empties and empties:
+        # This is for the case where image and seed have the same distro
+        # but different spin. We want to check our luck if there is an empty
+        # partition. If there isn't, we will just take the given one from
+        # pos.image_seed_match.
+        root_part_dev = random.choice(empties)
+        target.report_info("POS: picked up empty root partition %s"
+                            % root_part_dev, dlevel = 2)
     else:
         target.report_info("POS: picked up root partition %s for %s "
                            "due to a %.02f similarity with %s"
@@ -220,7 +242,7 @@ def _rootfs_guess(target, image, boot_dev):
             target.report_info("POS: repartitioning because couldn't find "
                                "root partitions")
             _disk_partition(target)
-            target.pos._fsinfo_load()
+            target.pos.fsinfo_read(target._boot_label_name)
         except Exception as e:
             reason = str(e)
             if tries < 3:
@@ -247,17 +269,38 @@ def mount_fs(target, image, boot_dev):
 
     :returns: name of the root partition device
     """
+    # does the disk have a partition scheme we recognize?
+    pos_partsizes = target.rt['pos_partsizes']
+    # the name we'll give to the boot partition; see
+    # _disk_partition(); if we can't find it, we assume the things
+    # needs to be repartitioned. Note it includes the sizes, so if we
+    # change the sizes in the config it reformats automatically.  #
+    # TCF-multiroot-NN:NN:NN:NN
+    target._boot_label_name = "TCF-multiroot-" + pos_partsizes
+    pos_reinitialize_force = True
+    boot_dev_base = os.path.basename(boot_dev)
+    child = target.pos.fsinfo_get_child_by_partlabel(boot_dev_base,
+                                                     target._boot_label_name)
+    if child:
+        pos_reinitialize_force = False
+    else:
+        target.report_info("POS: repartitioning due to different"
+                           " partition schema")
+
     pos_reinitialize = target.property_get("pos_reinitialize", False)
     if pos_reinitialize:
-        # Need to reinit the partition table (we were told to by
-        # setting pos_repartition to anything
         target.report_info("POS: repartitioning per pos_reinitialize "
                            "property")
+    if pos_reinitialize or pos_reinitialize_force:
+        # Need to reinit the partition table (we were told to by
+        # setting pos_repartition to anything or we didn't recognize
+        # the existing partitioning scheme)
         for tag in list(target.rt.keys()):
             # remove pos_root_*, as they don't apply anymore
             if tag.startswith("pos_root_"):
                 target.property_set(tag, None)
         _disk_partition(target)
+        target.pos.fsinfo_read(target._boot_label_name)
         target.property_set('pos_reinitialize', None)
 
     root_part_dev = _rootfs_guess(target, image, boot_dev)
@@ -269,7 +312,7 @@ def mount_fs(target, image, boot_dev):
     target.report_info("POS: will use %s for root partition (had %s before)"
                        % (root_part_dev, image_prev))
 
-    # fsinfo looks like described in target.pos._fsinfo_load()
+    # fsinfo looks like described in target.pos.fsinfo_read()
     dev_info = None
     for blockdevice in target.pos.fsinfo.get('blockdevices', []):
         for child in blockdevice.get('children', []):
@@ -277,7 +320,7 @@ def mount_fs(target, image, boot_dev):
                 dev_info = child
     if dev_info == None:
         # it cannot be we might have to repartition because at this
-        # point *we* have partitoned.
+        # point *we* have partitioned.
         raise tc.error_e(
             "Can't find information for root device %s in FSinfo array"
             % root_part_dev_base,
@@ -333,6 +376,7 @@ def mount_fs(target, image, boot_dev):
             if 'special device ' + root_part_dev \
                + ' does not exist.' in output:
                 _disk_partition(target)
+                target.pos.fsinfo_read(target._boot_label_name)
             else:
                 # ok, this probably means probably the partitions are not
                 # formatted; so let's just reformat and retry 

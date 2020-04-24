@@ -3,3 +3,5 @@ dosfstools
 efibootmgr
 wget
 python3-cryptography
+# for some utilities that still need this after this many years
+ncurses-compat-libs

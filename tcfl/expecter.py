@@ -49,7 +49,7 @@ import requests.exceptions
 
 from . import commonl
 from . import tc
-import tcfl
+from . import tcfl
 
 class expecter_c(object):
     """Object that is told to expect things to happen and what to do when

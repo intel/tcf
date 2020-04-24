@@ -16,15 +16,6 @@ import pprint
 import subprocess
 import tempfile
 
-# from .lint.tcf.py
-# Test cases to run
-# KEY = filename that caused this
-# VALUE = dictionary:
-#  reason (for clarity in messages)
-#  spec (for tcf run -t SPEC )
-#  target (for tcf run TCS)
-tcs = {}
-
 ZEPHYR_BASE = os.environ.get('ZEPHYR_BASE', None)
 ZEPHYR_PATHS = os.environ.get('ZEPHYR_PATHS', "").split()
 
@@ -55,8 +46,9 @@ def scan_zephyr_app(tcs, _repo, cf):
     basename = os.path.basename(cf.name)
     if basename in [ "testcase.ini", "testcase.yaml", "sample.yaml" ] \
        or (basename.endswith(".py") and basename.startswith("test")):
-        tcs[cf.name] = dict(
-            reason = "found modified TC file %s" % cf.name)
+        tcs[cf.name].append(dict(
+            reason = "found modified TC file %s" % cf.name,
+            test = cf.name))
 
     path_parts = os.path.relpath(cf.name, ZEPHYR_BASE).split("/")
     acc_parts = []
@@ -67,9 +59,9 @@ def scan_zephyr_app(tcs, _repo, cf):
         if os.path.exists(os.path.join(check_path, 'testcase.ini')) \
            or os.path.exists(os.path.join(check_path, 'testcase.yaml')) \
            or os.path.exists(os.path.join(check_path, 'sample.yaml')):
-            tcs[cf.name] = dict(
+            tcs[cf.name].append(dict(
                 reason = "testcase/sample in path of modified file",
-                test = os.path.relpath(check_path))
+                test = os.path.relpath(check_path)))
 
     # the file modifies an specific architecture?
     if cf.name.startswith('arch/'):
@@ -80,29 +72,44 @@ def scan_zephyr_app(tcs, _repo, cf):
             # Well, we are touching something in that arch, so we need
             # to run tests for it
             # FIXME: refine this, tests/kernel is heavy
-            tcs[cf.name] = dict(
+            tcs[cf.name].append(dict(
                 reason = "tests/kernel has to run due to changes in arch/%s" \
                     % arch,
                 spec = 'bsp == "%s"' % arch,
-                test = "tests/kernel")
+                test = "tests/kernel"))
 
-    # FIXME: do the same thing for boards/BOARDNAME/files and add
-    # spec 'zephyr_board == BOARDNAME' as for arch
+    # is this a file inside board/ARCH/NAME or just around board/ARCH or board/
+    if path_parts[0] == "boards" and len(path_parts) >= 3:
+        board_name = path_parts[2]
+        # Well, we are touching something in that board, so we need
+        # to run tests for it
+        # FIXME: refine this, tests/kernel is heavy
+        tcs[cf.name].append(dict(
+            reason = "tests/kernel has to run due to changes in boards/%s/%s" \
+            % (path_parts[1], board_name),
+            spec = 'zephyr_board == "%s"' % board_name,
+            test = "tests/kernel"))
+        tcs[cf.name].append(dict(
+            reason = "tests/boards/%s has to run due " \
+                "to changes in boards/%s/%s" \
+            	% (board_name, path_parts[1], board_name),
+            spec = 'zephyr_board == "%s"' % board_name,
+            test = "tests/boards/%s" % board_name))
 
     if cf.name.startswith('subsys/'):
         subsys_dir = os.path.dirname(cf.name)
-        tcs[cf.name] = dict(
+        tcs[cf.name].append(dict(
             reason = "modified subsystem %s" % subsys_dir,
-            test = 'tests/' + subsys_dir)
+            test = 'tests/' + subsys_dir))
         # FIXME: need to do some work on subsys_dir, because the
         # change might be in subsys/SUBSYS/some1/some2/some3, but only
         # tests/subsys/SUBSYS/some1 will exist
 
     if cf.name.startswith('drivers/'):
         driver_dir = os.path.dirname(cf.name)
-        tcs[cf.name] = dict(
+        tcs[cf.name].append(dict(
             reason = "modified driver %s" % driver_dir,
-            test = 'tests/' + driver_dir)
+            test = 'tests/' + driver_dir))
 
     # FIXME: do the same for kernel, lib, etc
     #

@@ -2,6 +2,8 @@
 Examples and HOWTOs
 ===================
 
+.. _examples_script:
+
 Automation/testcase script examples
 ===================================
 
@@ -28,7 +30,11 @@ evertything:
   <example_pos_deploy>`
 
 - to deploy multiple targets at the same time, for client/server
-  tests, see :ref:`here <example_pos_deploy_2>`
+  tests, see :ref:`here <example_pos_deploy_2>` and :ref:`here
+  <example_pos_deploy_N>`
+
+- BIOS can be built and flashed too! see :ref:`here
+  <example_qemu_bios>` and :ref:`here <example_qemu_bios_N>`
 
 - to copy other content to the image after deploying the OS, see
   :ref:`this example <example_deploy_files>`
@@ -37,13 +43,44 @@ evertything:
 .. automodule:: examples.test_pos0_base
 .. automodule:: examples.test_pos_deploy
 .. automodule:: examples.test_pos_deploy_2
+.. automodule:: examples.test_pos_deploy_N
+.. automodule:: examples.test_pos_boot
+.. automodule:: examples.test_qemu_bios
+.. automodule:: examples.test_qemu_bios_N
 .. automodule:: examples.test_deploy_files
+.. automodule:: examples.test_linux_kernel
+.. automodule:: examples.test_qemu_bios
+
+Finding stuff in the desktop and injecting input
+------------------------------------------------
+
+TCF has a flexible expect engine, to which you can ask: wait for
+something to come back on the console, has to be this; however, this
+is an expandable pattern that can be extended to:
+
+ - a regular expression of text on console output
+ - wait for a pattern to show up in an image capture
+ - a sound to be heard on some sound output
+ - a network packet to appear in a network link
+ - ... anything that can be measure capture and analyzed
+
+These examples show case some of those use cases:
+
+.. automodule:: examples.test_desktop_gedit
+.. automodule:: examples.test_desktop_firefox_wikipedia
+                
+Common patterns
+---------------
+
+.. automodule:: examples.test_subcases
+
 
 Capturing data, doing SSH
 -------------------------
 
 .. automodule:: examples.test_audio_capture
 .. automodule:: examples.test_ssh_in
+.. automodule:: examples.test_linux_ssh
 
 .. _finding_testcase_metadata:
 
@@ -71,6 +108,51 @@ such as `%(tc_name)s` and in report templates.
 .. automodule:: examples.test_dump_kws_one_target
 .. automodule:: examples.test_dump_kws_two_targets
 
+Testcase drivers
+----------------
+
+Testcase drivers load and execute existing testcases.
+
+.. automodule:: examples.test_ptest_runner
+
+
+Creating a file in the target from the command line
+---------------------------------------------------
+
+The following Unix shell construct::
+
+  $ cat <<EOF > somefile
+  line1
+  line2
+  line3
+  EOF
+
+can also be done in a TCF script:
+
+.. code-block: python
+
+   target.shell.run("""
+   cat <<EOF > somefile
+   line1
+   line2
+   line3
+   EOF""")
+
+but since the shell console is actually *typing* the characters, it is
+slightly more reliable to use:
+
+.. code-block: python
+
+   target.shell.run("""
+   cat > somefile
+   line1
+   line2
+   line3
+   \x04
+   """)
+
+*\x04* is the ASCII end-of-transmission character, *Ctrl-D*. This is
+the equivalent of typing the file contents on the command line.
 
 
 TCF client tricks
@@ -98,6 +180,15 @@ provides access to functions to set TCF's configuration.
 You can add new paths to parse with ``--config-path`` and force
 specific files to be read with ``--config-file``. See *tcf --help*.
 
+How do I list which targets I own?
+----------------------------------
+
+Run::
+
+  $ tcf list -v 'owner:"MYNAME"'
+
+*MYNAME* is whatever identifier you used to login.
+
 .. _howto_release_target:
 
 How do I release a target I don't own?
@@ -121,8 +212,86 @@ As a user, you can always force release any of your own locks with
 
   $ tcf -t TICKETSTRING release TARGETNAME
 
-How do I keep a target(s) reserved and powered-on while I fuzz with them?
--------------------------------------------------------------------------
+How do I release all the targets I own?
+---------------------------------------
+
+Run::
+
+  $ tcf release -f $(tcf list 'owner:"MYNAME"')
+
+- *MYNAME* is whatever identifier you used to login
+- *tcf list 'owner:"MYNAME"'* lists which targets you currently own
+
+.. _howto_target_keep_acquired:
+
+How do I keep a target acquired/reserved after *tcf run* is done?
+-----------------------------------------------------------------
+
+Giving *--no-release* to *tcf run* will keep the target acquired after
+the scrip execution concludes. Note however that it will be acquired
+by *USERNAME\::term:`HASHID`* (:term:`what's a hashid? <hash>`).
+
+For example, if we were using targets *nwa* and *qu04a* to :ref:`boot
+in provisioning mode <example_pos_boot>`, the hashid could be
+*ormorh*::
+
+  $ tcf run --no-release -vvt 'nwa or qu04a' /usr/share/examples/test_pos_boot.py
+  ...
+  INFO1/ormorh	  ..../test_pos_boot.py#_test @3hyt-uo3g: will run on target group 'ic=localhost/nwa target=localhost/qu04a:x86_64'
+  ...
+
+note how the hashid is *ormorh* in this case and thus, upon completion::
+
+  $ tcf list -v owner
+  localhost/nwa [USERNAME:ormorh] ON
+  localhost/qu04a [USERNAME:ormorh] ON
+
+to maintain the target acquired and powered while potentially
+debugging or testing other things, use a *while loop* which keeps
+acquiring with the same hashid. This tells the daemon we are actively
+using the target and won't release for us. In a separate console, run::
+
+  $ while tcf -t ormorh acquire nwa or qu04a; do sleep 10s; done
+
+.. warning: remember to cancel the job when done with the target so
+            other users can acquire it and use it.
+
+now you can access the console, do captures or interact with the
+target in any other way, remembering to specify the ticket::
+
+  $ tcf -t ormorh console-write -i qu04a
+  $ tcf -t ormorh capture-get qu04a screen screencap.png
+  ...
+
+or via SSH, first we have to ask the server to create a tunnel for us
+from to the target's SSH port::
+
+  $ tcf list -vv qu04a | grep ipv4_addr
+  interconnects.nwa.ipv4_addr: 192.168.97.4
+  $ tcf tunnel-add qu04a 22 tcp 192.168.97.4
+  SERVERNAME:19893
+  $ ssh -p 19893 root@SERVERNAME
+
+.. note:: make sure you specify the user to login as; it likely won't
+          be the same as in your client machine.
+
+Release the target so it can be used by someone else::
+
+  $ kill -9 %1               # kill the while loop that keeps it acquired
+  $ tcf release -f $(tcf list 'owner:"YOURNAME"')
+
+Some details:
+
+ - use *while tcf acquire* vs *while true; do tcf acquire* because
+   that way, if the server fails, connection drops (eg: you close your
+   laptop), then the process tops and won't restart unless you do it
+   manually.
+
+ - if you depend on the network, do not forget to also acquire the
+   network, otherwise it will be powered off and routing won't work.
+
+Alternative method without hashids
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 First make sure you are not blocking anyone::
 
@@ -159,23 +328,13 @@ done, otherwise others won't be able to use them. If someone has left
 a target taken, it can be released following :ref:`these instructions
 <howto_release_target>`
 
-Some details:
-
- - use *while tcf acquire* vs *while true; do tcf acquire* because
-   that way, if the server fails, connection drops (eg: you close your
-   laptop), then the process tops and won't restart unless you do it
-   manually.
-
- - if you depend on the network, do not forget to also acquire the
-   network, otherwise it will be powered off and routing won't work.
-  
 How can I debug a target?
 -------------------------
 
 TCF provides for means to connect remote debuggers to targets that
-support them; if the target supports the
-:py:class:`ttbl.tt_debug_mixin` (which you can find with `tcf list -vv
-TARGETNAME | grep interfaces`).
+support them; if the target supports the :mod:`debug <ttbl.debug>`
+interface (which you can find with `tcf list -vv TARGETNAME | grep
+interfaces`).
 
 How it is done and what are the capabilities depends on the target,
 but in general, assuming you have a target with an image deployed::
@@ -198,7 +357,7 @@ Find more:
 
 - `tcf --help | grep debug-`
 
-- the :class:`debug extension API <tcfl.target_ext_debug.debug>` to
+- the :class:`debug extension API <tcfl.target_ext_debug.extension>` to
   :class:`target objects <tcfl.tc.target_c>` for use inside Python testcases
 
 - the :class:`*ttbd*\'s Debug interface <ttbl.tt_debug_mixin>`
@@ -391,7 +550,8 @@ When you need more detail, you can:
   case, there is no good configuration for the chosen target
 
   The output driver can be changed to lay out the information
-  diferently; look at :class:`tcfl.report.report_c`.
+  diferently; look at :ref:`more information on report drivers
+  <tcf_guide_report_driver>`.
 
 Linux targets: Common tricks
 ----------------------------
@@ -444,7 +604,7 @@ From a script, you can use :func:`tcfl.tc.target_c.shell.run
                             "3 packets transmitted, 3 received")
 
 you can also get the output by adding ``output = True``:
-  
+
 .. code-block:: python
 
            ...
@@ -497,7 +657,7 @@ Tunnels can also be created with the command line::
 
   $ tcf tunnel-add TARGETNAME 22 tcp TARGETADDR
   SERVERNAME:19893
-  $ ssh -p 19893 SERVERNAME cat /etc/passwd
+  $ ssh -p 19893 root@SERVERNAME cat /etc/passwd
   root:x:0:0:root:/root:/bin/bash
   bin:x:1:1:bin:/bin:/sbin/nologin
   daemon:x:2:2:daemon:/sbin:/sbin/nologin
@@ -506,6 +666,11 @@ Tunnels can also be created with the command line::
 
 Note you might need first the steps in the next section to allow SSH
 to login with a passwordless root.
+
+Linux targets: restarting the SSH daemon
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+See the examples in :func:`tcfl.tl.linux_ssh_root_nopwd`.
 
 .. _target_pos_manually:
 
@@ -783,11 +948,11 @@ Making the client always generate report files
 
 .. code-block:: python
 
-   tcfl.report.file_c.templates['text']['report_pass'] = True
+   tcfl.report_jinja2.driver.templates['text']['report_pass'] = True
 
-Reporting is handled by the :mod:`reporting API <tcfl.report>` and the
-*report* files are created by the Jinja2 :class:`reporter
-<tcfl.report.file_c>` based on a template called *text*.
+Reporting is handled by the :mod:`reporting API <tcfl.tc.reporter_c>`
+and the *report* files are created by the Jinja2 :mod:`reporter
+<tcfl.report_jinja2>` based on a template called *text*.
 
 .. _report_domain_breakup:
 
@@ -803,8 +968,8 @@ metadata for it, so the templating engine can use it
 
 >>> ...
 >>> tcfl.tc.tc_c.hook_pre.append(_my_hook_fn)
->>> filename = tcfl.report.templates["text"]["output_file_name"]
->>> tcfl.report.templates["text"]["output_file_name"] = \
+>>> filename = tcfl.report_jinja2.driver.templates["text"]["output_file_name"]
+>>> tcfl.report_jinja2.driver.templates["text"]["output_file_name"] = \
 >>>     "%(category)s/" + file_name
 
 The `_my_hook_fn()` would look as:
@@ -814,7 +979,7 @@ The `_my_hook_fn()` would look as:
 >>>     testcase.tag_set("category", categoryvalue)
 
 If the data needed is not available until after the testcase executes,
-you can use :class:`reporting hooks <tcfl.report.file_c.hooks>`.
+you can use :class:`reporting hooks <tcfl.report_jinja2.driver.hooks>`.
 
 Capturing network traffic
 -------------------------
@@ -831,7 +996,7 @@ property called *tcpdump* set to a file name where to capture it::
 when all the network traffic is done, it can be downloaded::
 
   $ tcf power-off nwb
-  $ tcf broker-file-dnload nwb somename.cap local_somename.cap
+  $ tcf store-dnload nwb somename.cap local_somename.cap
 
 which now can be opened with wireshark to see what happened (or
 analyzed with other tools).
@@ -851,7 +1016,7 @@ and on teardown:
 
 >>>
 >>>     def teardown_whatever(self, ic, ...):
->>>         ic.broker_files.dnload(
+>>>         ic.store.dnload(
 >>>              self.kws['tc_hash'] + ".cap",
 >>>              "report-%(runid)s:%(tc_hash)s.tcpdump" % self.kws)
 >>>         self.report_info("tcpdump available in file "
@@ -945,8 +1110,8 @@ General catchas
 
 Some common issues that make it automating hard
 
-Hidden characters in console output
------------------------------------
+Hidden characters in console output, ANSI menus
+-----------------------------------------------
 
 This happens very commonly when console prompts or text produce ANSI
 escape sequences to colorize output; as a human on the console, we see
@@ -965,6 +1130,49 @@ the regular expression is not working.
 Parsing ANSI escape sequences is quite tricky and if this is a command
 prompt, a more simple sollution is to remove them from the prompt
 configuration.
+
+An option to see them is::
+
+  tcf console-read --follow TARGET | cat -A
+
+``-A`` in cat will escape the ANSI characters for you.
+
+When trying to automate an application that implements an ANSI TUI
+(Text User Interface) with menus and such, it becomes quite
+complicated. For example, BIOS over serials.
+
+The application might be sending strings such as:
+
+    - *^[[X;YHSTRING* put *STRING* in X,Y
+    - *^[[0m* normal letters
+    - *^[[1m* bold letters
+    - *^[[37m* white FG
+    - *^[[40m* black BG
+
+sometimes text is intersped in ANSI escape sequences (especially with
+very awkward software) that print **STRING** like this::
+
+  ^[[1mS^[[1mT^[[1mR^[[1mI^[[1mN^[[1mSG
+
+to match this against a regular expression, you need to do::
+
+  re.compile("\x1b\[1mS\x1b\[1mT\x1b\[1mR\x1b\[1mI\x1b\[1mN\x1b\[1mSG")
+
+for example
+
+Another problem is the sequence of characters you will see on the
+screen menu but how they come out in the serial port might be
+different; it usually helps to open two terminals, side by side and in
+one open the TUI via the TCF console::
+
+  $ tcf console-write -i TARGET
+
+and on another, just the byte stream::
+
+  $ tcf console-read --follow TARGET | cat -A
+
+interacting with it on the first console will give you an idea of what
+is actually printed that can be used to latch on.
 
 Newlines when reading output of a command
 -----------------------------------------
@@ -1110,7 +1318,7 @@ You will need:
    dev IFNAME** for VLAN number ``NN``::
 
      # nmcli con add type vlan con-name TCF-Infrastructure dev enp0s20u4 id 4 ip4 192.168.4.209/24
-     
+
 Conventions for assignment of addresses in the infastructure network:
 
 - use IPv4 (easier)
@@ -1172,7 +1380,7 @@ note that you can also use VLANs if you add with **id NN** for VLAN
 number ``NN``::
 
   # nmcli con add type vlan con-name NETWORKNAME dev IFNAME id NN ip4 192.168.2.205/24
-     
+
 
 .. _generate_ssl_certificate:
 
@@ -1181,7 +1389,7 @@ Generating an SSL certificate
 
 To use secure layers HTTPS connections between daemon and client, you
 must have a valid certificate and key, or use an autosigned
-certificate. This can be fed to the broker server with the options
+certificate. This can be fed to the target server with the options
 ``--ssl-crt`` and ``--ssl-key``.
 
 If  you want to create your own certificate you must have installed
@@ -1227,7 +1435,7 @@ easier.
 
 - Information about a given device can be obtained with::
 
-    $ udevadm info /dev/snd/controlC0 
+    $ udevadm info /dev/snd/controlC0
     P: /devices/pci0000:00/0000:00:1f.3/sound/card0/controlC0
     N: snd/controlC0
     S: snd/by-path/pci-0000:00:1f.3
@@ -1244,7 +1452,7 @@ easier.
 
   those *KEYS=* we can use to match in the *udev* rule files to do
   actions.
-    
+
 - Verbosity can be controlled with::
 
     # udevadm control -l LEVEL    (see --help)
@@ -1584,6 +1792,60 @@ To bring up an instance (repeat these steps replacing *production* with
 Note that now, none can access the server yet because there is no way
 to authenticate with it :) Let's add some configuration.
 
+
+.. _ttbd_configuration:
+
+Where is the TCF server (TTBD) configuration taken from?
+--------------------------------------------------------
+
+*ttbd* reads configuration files from an invocation & installation
+specific set of paths.
+
+In most cases, the configuration comes from */etc/ttbd-production*
+(configuration for the system-wide production instance of *ttbd*).
+
+Other options:
+
+  - when multiple *ttbd* instances are to be executed side by side,
+    this can be controlled with the *-i INSTANCE* command line switch
+    to *ttbd* so configuration is loaded from */etc/ttbd-INSTANCE*.
+
+    When invoking with systemd, service *ttbd@INSTANCE* loads from
+    */etc/ttbd-INSTANCE*; see :ref:`starting multiple instances
+    <ttbd_config_multiple_instances>`.
+
+  - when running from source or manually, configuration and state
+    paths defaults to *~/.ttbd/*
+
+  - use the command line switch *--config-path* to force a different
+    configuration path.
+    
+Configuration files are called *conf_NN_WHATEVER.py* and imported in
+**alphabetical** order from each directory before proceeding to the
+next one. They are written in plain Python code, so you can do
+anything, even implement or add drivers from them. The naming
+convention establishes the following levels:
+
+- *conf_00_\*.py*: configuration libraries provided by the
+  distribution (documented :ref:`here <ttbd_conf_api>`)
+
+- *conf_01_\*.py*: configuration libraries specific to your deployment
+
+- *conf_04_\*.py*: configuration files specific to the :term:`herd`
+  (such as authentication, ports where the server listens, etc)
+
+- *conf_05_\*.py*: configuration of server-specific authentication
+
+- *conf_06_\*.py*: configuration of defaults, some come from the
+  source distribution, some might be specific to the site, etc.
+
+- *conf_09_\*.py*: configuration of :term:`site` specifics
+  
+- *conf_10_SERVERNAME.py*: configuration of the server's targets
+  
+The module :mod:`ttbl.config` provides access to the top functions to
+set TTBD's configuration.
+
 .. _ttbd_config_auth_local:
 
 Configure authentication for local users (optional)
@@ -1703,7 +1965,7 @@ can make it be things like::
 
 This would make *TARGETNAME*'s power be controlled by plug #5 of the
 *Digital Logger Web Power Switch 7* named *sp3* (:py:func:`setup
-instructions <conf_00_lib.dlwps7_add>`). Because this is a normal,
+instructions <conf_00_lib_pdu.dlwps7_add>`). Because this is a normal,
 120V plug, if a light bulb were connected to it::
 
     ttbl.config.target_add(
@@ -1725,7 +1987,7 @@ It could also be::
 which means that power to *TARGETNAME* would be implemented by
 powering on or off port #3 of the YKush power-switching hub with
 serial number *YK21080* (:py:func:`setup instructions
-<conf_00_lib.ykush_targets_add>`).
+<conf_00_lib_pdu.ykush_targets_add>`).
 
 Other power controller implementations are possible, of course, by
 subclassing :py:class:`ttbl.tt_power_control_impl`.
@@ -1751,7 +2013,7 @@ provides serial console access, then this will work:
   <https://www.serialgear.com/Serial-Adapters-USBG-NULL-30.html>`_ or
   two USB serial dongles with a NULL modem adapter will do.
 - one available port on a power switch, to turn the physical machine
-  on/off (eg, a :func:`DLWPS7 <conf_00_lib.dlwps7_add>`)
+  on/off (eg, a :func:`DLWPS7 <conf_00_lib_pdu.dlwps7_add>`)
 
 **Connecting the test target fixture**
 
@@ -1834,7 +2096,7 @@ This builds on the :ref:`previous section <tt_linux_simple>`.
   <https://www.serialgear.com/Serial-Adapters-USBG-NULL-30.html>`_ or
   two USB serial dongles with a NULL modem adapter will do.
 - one available port on a power switch, to turn the physical machine
-  on/off (eg, a :func:`DLWPS7 <conf_00_lib.dlwps7_add>`)
+  on/off (eg, a :func:`DLWPS7 <conf_00_lib_pdu.dlwps7_add>`)
 
 **Connecting the test target fixture**
 
@@ -2352,7 +2614,7 @@ in a number of devices, for example:
 
 These usually come as USB vendor ID 0x0403, product ID starting with
 0x6NNN.
-  
+
 When there are multiple FTDI devices that have the same serial number,
 the system needs to be able to tell them apart, so we can flash a new
 serial number in them, which we usually make match the target name, or
@@ -2689,3 +2951,92 @@ Updating the FPGA image in Synopsys EMSK boards
    OFF   ON   ARC_EM11D
    ON    ON   Reserved
    ===== ==== =============
+
+.. _pos_image_creation:
+   
+Creating images for the Provisioning OS
+=======================================
+
+For provisioning using :mod:`Provisioning OS <tcfl.pos>`, images have
+to be extracted and installed in the server (or an rsync server as
+described in the :ref:`setup guide <ttbd_pos_deploying_images>`).
+
+The images for provisioning are a flat root filesystem that is
+rsync'ed by with :mod:`tcfl.pos`.
+
+Extracting them can be a little bit tricky, but there are different
+methodologies that allow automating the process.
+
+Linux Live images
+-----------------
+
+When images are Linux Live filesystems, they can usually be extracted
+easily, using the :download:`/usr/share/tcf/tcf-image-setup.sh
+<../ttbd/pos/tcf-image-setup.sh>` script, which understands most Live
+images.
+
+See the :ref:`examples <ttbd_pos_deploying_images>`.
+
+.. _kickstart_install:
+
+Linux Kickstart images using QEMU
+---------------------------------
+
+Linux distributions that can be installed via kickstart can use
+:download:`/usr/share/tcf/kickstart-install.sh
+<../ttbd/pos/kickstart-install.sh>`, which uses QEMU to run the
+installation with a built in kickstart, creating a qcow2 file image
+that then *tcf-image-setup.sh* can install.
+
+*kickstart-install.sh* creates a kickstart file in a drive that is
+passed to the virtual machine, so there is no need for PXE servers. It
+extracts the kernel and initrd from the ISO image as well.
+
+See the :ref:`examples <ttbd_pos_deploying_images>`.
+
+Manual image extraction using QEMU
+----------------------------------
+
+1. create a 20G virtual disk::
+
+     $ qemu-img create -f qcow2 ubuntu-18.10.qcow2 20G
+     $ qemu-img create -f qcow2 Fedora-Workstation-29.qcow2 20G
+
+2. Install using QEMU all with default options (click next). Power
+   off the machine when done instead of power cycling::
+
+     $ qemu-system-x86_64 --enable-kvm -m 2048 -hdah ubuntu-18.10.qcow2 -cdrom ubuntu-18.10-desktop-amd64.iso
+     $ qemu-system-x86_64 --enable-kvm -m 2048 -hda Fedora-Workstation-29.qcow2 -cdrom Fedora-Workstation-Live-x86_64-29-1.2.iso
+
+   Key thing here is to make sure everything is contained in a
+   single partition (first partition).
+
+   For Ubuntu 18.10:
+
+     - select install
+     - select any language and keyboard layout
+     - Normal installation
+     - Erase disk and install Ubuntu
+     - Create a user 'Test User', with any password
+     - when asked to restart, restart, but close QEMU before it
+       actually starts again
+
+   For Fedora:
+
+     - turn off networking
+     - select install to hard drive
+     - select english keyboard
+     - select installation destination, "CUSTOM" storage configuration
+       > DONE
+     - Select Standard partition
+     - Click on + to add a partition, mount it on /, 20G in size
+       (the system later will add boot and swap, we only want what goes
+       in the root partition).
+       Select DONE
+     - Click BEGIN INSTALLATION
+     - Click QUIT when done
+     - Power off the VM
+
+3. Create image::
+
+     $ /usr/share/tcf/tcf-iamge-setup.sh ubuntu:desktop:18.10::x86_64 ubuntu-18.10.qcow2

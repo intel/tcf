@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # FIXME: experiment, not sure this is the best way to do this
+# FIXME: move as method under *images*
 """
 Interface to flash the target using *ioc_flash_server_app* 
 ----------------------------------------------------------
@@ -13,6 +14,7 @@ Interface to flash the target using *ioc_flash_server_app*
 import os
 import subprocess
 
+import commonl
 import ttbl
 
 
@@ -41,6 +43,16 @@ class interface(ttbl.tt_interface):
     def __init__(self, tty_path):
         ttbl.tt_interface.__init__(self)
         self.tty_path = tty_path
+
+    def _target_setup(self, target):
+        self.instrumentation_publish_component(
+            target, "ioc_flash_server_app",
+            commonl.mkid(self.tty_path, l = 4), "RS-232C serial port",
+            { 'serial_port': self.tty_path })
+
+    def _release_hook(self, target, _force):
+        # nothing needed here
+        pass
 
     #: path to the binary
     #:
@@ -77,11 +89,18 @@ class interface(ttbl.tt_interface):
         'generic', 'w', 't'
     )
 
-    def run(self, who, target, baudrate, mode, filename, _filename,
-            generic_id):
+    def put_run(self, target, who, args, _files, user_path):
+        baudrate = args.get('baudrate', None)
+        mode = args.get('mode', None)
         assert mode in self.allowed_modes, \
             "invalid mode '%s' (allowed: %s)" \
             % (mode, " ".join(self.allowed_modes))
+        filename = args.get('filename', None)
+        if filename:
+            _filename = os.path.join(user_path, filename)
+        else:
+            _filename = None
+        generic_id = args.get('generic_id', None)
         if mode == 'generic':
             assert generic_id, "mode `generic` requires an `id`"
         else:
@@ -98,7 +117,7 @@ class interface(ttbl.tt_interface):
             cmdline += [ generic_id, _filename ]
         else:
             cmdline.append(_filename)
-        with self.target_owned_and_locked(who):
+        with target.target_owned_and_locked(who):
             try:
                 target.log.info("running: %s" % " ".join(cmdline))
                 # have the monitor release the serial port so the tool can
@@ -118,24 +137,4 @@ class interface(ttbl.tt_interface):
                     target.log.warning("error output: " + line)
                     msg += "\n" + "error output: " + line
                 raise RuntimeError(msg)
-
-    def request_process(self, target, who, method, call, args, user_path):
-        ticket = args.get('ticket', "")
-        if method == "POST" and call == "run":
-            baudrate = args.get('baudrate', None)
-            mode = args.get('mode', None)
-            filename = args.get('filename', None)
-            if filename:
-                _filename = os.path.join(user_path, filename)
-            else:
-                _filename = None
-            generic_id = args.get('generic_id', None)
-            return self.run(who, target, baudrate, mode, filename, _filename,
-                            generic_id)
-        else:
-            raise RuntimeError("%s|%s: unsuported" % (method, call))
-
-    def _release_hook(self, target, _force):
-        # nothing needed here
-        pass
 

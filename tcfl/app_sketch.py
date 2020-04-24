@@ -8,8 +8,8 @@
 import inspect
 import os
 
-import tcfl.app
-import tcfl.tc
+from . import app
+from . import tc
 
 # FIXME: adapt to global installs
 # FIXME: create RPMs for this
@@ -32,7 +32,7 @@ def _get_real_srcpath(testcase, _srcpath):
         srcpath = os.path.abspath(srcpath)
     return srcpath
 
-class app_sketch(tcfl.app.app_c):
+class app_sketch(app.app_c):
     """
     Driver to build Arduino Sketch applications for flashing into
     MCU's BSPs.
@@ -94,9 +94,8 @@ class app_sketch(tcfl.app.app_c):
 
     @staticmethod
     def deploy(images, testcase, target, app_src):
-        images.add(('kernel-%(bsp)s' % target.kws,
-                    '%(sketch_outdir)s/%(sketch_srcfile)s.bin'
-                    % target.kws))
+        images['kernel-%(bsp)s' % target.kws] = \
+            '%(sketch_outdir)s/%(sketch_srcfile)s.bin' % target.kws
 
     @staticmethod
     def clean(testcase, target, app_src):

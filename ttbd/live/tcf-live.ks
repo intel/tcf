@@ -34,7 +34,12 @@ lang en_US.UTF-8
 keyboard us
 timezone US/Eastern
 auth --useshadow --passalgo=sha512
-# We don't want SELinux, as makes things more complicated
+# We need SELinux disabled--otherwise some utilities (eg:
+# rsync) can't operate properly on the SELinux attributes they need to
+# move around without SELinux itself getting on the way--as well, this
+# makes any file modification operation keep around the SELinux
+# attributes and we have to make sure they are all right on a post
+# step (similar to restorecon).
 selinux --disabled
 # NUCs talk to ttyUSB0, VMs ttyS0
 bootloader --timeout=1 --append="no_timer_check console=tty1 console=ttyS0,115200n81 console=ttyUSB0,115200n81"

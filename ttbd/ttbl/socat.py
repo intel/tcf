@@ -14,11 +14,12 @@ access outside isolated test networks via the server.
 import os
 import subprocess
 
-from tcfl import commonl
+import commonl
 import ttbl
 import ttbl.config
 
-class pci(ttbl.tt_power_control_impl):
+# FIXME: move to daemon_c
+class pci(ttbl.power.impl_c):
 
     class error_e(Exception):
         pass
@@ -58,7 +59,7 @@ class pci(ttbl.tt_power_control_impl):
     def __init__(self, proto,
                  local_addr, local_port,
                  remote_addr, remote_port):
-        ttbl.tt_power_control_impl.__init__(self)
+        ttbl.power.impl_c.__init__(self)
         assert proto in [ 'udp', 'tcp', 'sctp',
                           'udp4', 'tcp4', 'sctp4',
                           'udp6', 'tcp6', 'sctp6' ]
@@ -71,7 +72,7 @@ class pci(ttbl.tt_power_control_impl):
             self.proto, self.local_addr, self.local_port,
             self.remote_addr, self.remote_port)
 
-    def power_on_do(self, target):
+    def on(self, target, _component):
         pidfile = os.path.join(target.state_dir,
                                "socat-" + self.tunnel_id + ".pid")
         cmdline = [
@@ -104,12 +105,12 @@ class pci(ttbl.tt_power_control_impl):
             raise self.start_e("socat failed to start")
         ttbl.daemon_pid_add(pid)	# FIXME: race condition if it died?
 
-    def power_off_do(self, target):
+    def off(self, target, _component):
         pidfile = os.path.join(target.state_dir,
                                "socat-" + self.tunnel_id + ".pid")
         commonl.process_terminate(pidfile, path = self.path, tag = "socat")
 
-    def power_get_do(self, target):
+    def get(self, target, _component):
         pidfile = os.path.join(target.state_dir,
                                "socat-" + self.tunnel_id + ".pid")
         pid = commonl.process_alive(pidfile, self.path)

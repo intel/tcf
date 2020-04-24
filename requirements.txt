@@ -1,7 +1,12 @@
 Jinja2
 PyYAML
+functools32
+imutils
 ipaddress
 junit_xml
+keyring
+numpy
+opencv-python
 ply
 pykwalify
 pylint
@@ -13,3 +18,4 @@ requests
 setuptools
 sphinx
 sphinx_rtd_theme
+tabulate

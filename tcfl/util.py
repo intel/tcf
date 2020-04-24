@@ -8,7 +8,7 @@
 import logging
 
 from . import commonl
-import tcfl
+from . import tcfl
 
 
 def healthcheck_power(rtb, rt):

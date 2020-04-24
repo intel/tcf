@@ -39,14 +39,14 @@ import re
 import subprocess
 import time
 
-from tcfl import commonl
+import commonl
 import ttbl
 
 mime_type_regex = re.compile(
     "^([_a-zA-Z0-9]+/[_a-zA-Z0-9]+)"
     "(,[_a-zA-Z0-9]+/[_a-zA-Z0-9]+)*$")
 
-class impl_c(object):
+class impl_c(ttbl.tt_interface_impl_c):
     """
     Implementation interface for a capture driver
 
@@ -68,6 +68,7 @@ class impl_c(object):
             "multiple [_a-zA-Z0-9]+/[_a-zA-Z0-9]+ separated by commas" \
             % mimetype
         self.mimetype = mimetype
+        ttbl.tt_interface_impl_c.__init__(self)
 
     def start(self, target, capturer):
         """
@@ -144,7 +145,7 @@ class interface(ttbl.tt_interface):
         ttbl.tt_interface.__init__(self)
         # Verify arguments
         self.impls = {}
-        for capturer, impl in impls.items():
+        for capturer, impl in list(impls.items()):
             if isinstance(impl, impl_c):
                 if capturer in self.impls:
                     raise AssertionError("capturer '%s' is repeated "
@@ -173,13 +174,14 @@ class interface(ttbl.tt_interface):
         the needed target aspect (such as adding tags/metadata)
         """
         capturers = []
-        for capturer, impl in self.impls.items():
+        for capturer, impl in list(self.impls.items()):
             ctype = "stream" if impl.stream else "snapshot"
             descr = capturer + ":" + ctype
             if impl.mimetype:
                 descr += ":" + impl.mimetype
             capturers.append(descr)
         target.tags_update(dict(capture = " ".join(capturers)))
+        self.instrumentation_publish(target, "capture")
 
     def start(self, who, target, capturer):
         """
@@ -198,13 +200,19 @@ class interface(ttbl.tt_interface):
                 # doesn't need starting
                 return { 'result' : 'capture start not needed'}
             capturing = target.property_get("capturer-%s-started" % capturer)
+            impl.user_path = self.user_path
             if not capturing:
-                impl.user_path = self.user_path
-                impl.start(target, capturer)
                 target.property_set("capturer-%s-started" % capturer, "True")
                 return { 'result' : 'capture started'}
             else:
-                return { 'result' : 'already capturing'}
+                # if we were already capturing, restart it--maybe
+                # someone left it capturing by mistake or who
+                # knows--but what matters is what the current user wants.
+                target.property_set("capturer-%s-started" % capturer, None)
+                impl.stop_and_get(target, capturer)
+                impl.start(target, capturer)
+                target.property_set("capturer-%s-started" % capturer, "True")
+                return { 'result' : 'capture started'}
 
 
     def stop_and_get(self, who, target, capturer):
@@ -240,7 +248,7 @@ class interface(ttbl.tt_interface):
         :param ttbl.test_target target: target on which we are capturing
         """
         res = {}
-        for name, impl in self.impls.items():
+        for name, impl in list(self.impls.items()):
             if impl.stream:
                 capturing = target.property_get("capturer-%s-started"
                                                 % name)
@@ -254,7 +262,7 @@ class interface(ttbl.tt_interface):
 
 
     def _release_hook(self, target, _force):
-        for name, impl in self.impls.items():
+        for name, impl in list(self.impls.items()):
             if impl.stream == True:
                 impl.stop_and_get(target, name)
 
@@ -267,7 +275,7 @@ class interface(ttbl.tt_interface):
         return capturer
 
 
-    def request_process(self, target, who, method, call, args,
+    def request_process(self, target, who, method, call, args, _files,
                         _user_path):
         # called by the daemon when a METHOD request comes to the HTTP path
         # /ttb-vVERSION/targets/TARGET/interface/capture/CALL
@@ -286,77 +294,6 @@ class interface(ttbl.tt_interface):
             raise RuntimeError("%s|%s: unsuported" % (method, call))
         target.timestamp()	# If this works, it is acquired and locked
         return r
-
-
-
-class vnc(impl_c):
-    """
-    Implementation interface for a button driver
-    """
-    def __init__(self, port):
-        self.port = port
-        impl_c.__init__(self, False, "image/png")
-
-    def start(self, target, capturer):
-        impl_c.start(self, target, capturer)
-        # we don't do anything here, only upon stop
-
-    def stop_and_get(self, target, capturer):
-        target.log.warning("This object is deprecated, "
-                           "use ttbl.capture.generic_snapshot")
-        impl_c.stop_and_get(self, target, capturer)
-        file_name = "%s/%s-%s-%s.png" % (self.user_path, target.id, capturer,
-                                         time.strftime("%Y%m%d-%H%M%S"))
-        cmdline = [ "gvnccapture", "localhost:%s" % self.port, file_name ]
-        try:
-            subprocess.check_call(cmdline, cwd = "/tmp",
-                                  stderr = subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            target.log.error(
-                "%s: capturing VNC output with '%s' failed: (%d) %s"
-                % (target.id, " ".join(e.cmd), e.returncode, e.output))
-            raise
-        # tell the caller to stream this file to the client
-        return dict(stream_file = file_name)
-
-
-class ffmpeg(impl_c):
-    """
-    """
-    def __init__(self, video_device):
-        self.video_device = video_device
-        impl_c.__init__(self, False, "image/png")
-
-    def start(self, target, capturer):
-        impl_c.start(self, target, capturer)
-        # we don't do anything here, only upon stop
-
-    def stop_and_get(self, target, capturer):
-        target.log.warning("This object is deprecated, "
-                           "use ttbl.capture.generic_snapshot")
-        impl_c.stop_and_get(self, target, capturer)
-        file_name = "%s/%s-%s-%s.png" % (self.user_path, target.id, capturer,
-                                         time.strftime("%Y%m%d-%H%M%S"))
-        # might want to add -ss H:M:S to wait before starting
-        # capture for the device to stabilize
-        # -f video4linux can be ignored
-        cmdline = [
-            "ffmpeg",
-            "-i", self.video_device,
-            "-s", "1",
-            "-frames", str(1),	# only one frame
-            "-y", file_name	# force overwrite output file
-        ]
-        try:
-            subprocess.check_call(cmdline, cwd = "/tmp", stderr = subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            target.log.error(
-                "%s: capturing ffmpeg output with '%s' failed: (%d) %s"
-                % (target.id, " ".join(e.cmd), e.returncode,
-                   e.output))
-            raise
-        # tell the caller to stream this file to the client
-        return dict(stream_file = file_name)
 
 
 class generic_snapshot(impl_c):
@@ -467,6 +404,9 @@ class generic_snapshot(impl_c):
             self.pre_commands = []
         self.extension = extension
         impl_c.__init__(self, False, mimetype)
+        # we make the cmdline be the unique physical identifier, since
+        # it is like a different implementation each
+        self.upid_set(name, serial_number = commonl.mkid(cmdline))
 
     def start(self, target, capturer):
         impl_c.start(self, target, capturer)
@@ -479,6 +419,7 @@ class generic_snapshot(impl_c):
             time.strftime("%Y%m%d-%H%M%S"), self.extension)
         kws = dict(output_file_name = file_name)
         kws.update(target.kws)
+        kws.update(target.fsdb.get_as_dict())
         cmdline = []
         try:
             for command in self.pre_commands:
@@ -588,7 +529,9 @@ class generic_stream(impl_c):
         else:
             self.pre_commands = []
         impl_c.__init__(self, True, mimetype)
-
+        # we make the cmdline be the unique physical identifier, since
+        # it is like a different implementation each
+        self.upid_set(name, serial_number = commonl.mkid(cmdline))
 
     def start(self, target, capturer):
         impl_c.start(self, target, capturer)
@@ -598,6 +541,7 @@ class generic_stream(impl_c):
                                      time.strftime("%Y%m%d-%H%M%S"))
         kws = dict(output_file_name = file_name)
         kws.update(target.kws)
+        kws.update(target.fsdb.get_as_dict())
         target.property_set("capturer-%s-output" % capturer, file_name)
         try:
             for command in self.pre_commands:
@@ -631,6 +575,7 @@ class generic_stream(impl_c):
         file_name = target.property_get("capturer-%s-output" % capturer)
         kws = dict(output_file_name = file_name)
         kws.update(target.kws)
+        kws.update(target.fsdb.get_as_dict())
         try:
             target.property_set("capturer-%s-output" % capturer, None)
             commonl.process_terminate(

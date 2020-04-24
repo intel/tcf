@@ -13,20 +13,10 @@ Flash the target with fastboot
 import json
 
 from . import tc
-from . import ttb_client
+from . import msgid_c
 
-def _rest_tb_target_fastboot_run(rtb, rt, parameters, ticket = ''):
-    return rtb.send_request("POST", "targets/%s/fastboot/run" % rt['id'],
-                            data = {
-                                'parameters': json.dumps(parameters),
-                                'ticket': ticket
-                            })
 
-def _rest_tb_target_fastboot_list(rtb, rt, ticket = ''):
-    return rtb.send_request("GET", "targets/%s/fastboot/list" % rt['id'],
-                            data = { 'ticket': ticket })
-
-class fastboot(tc.target_extension_c):
+class extension(tc.target_extension_c):
     """
     Extension to :py:class:`tcfl.tc.target_c` to run fastboot commands
     on the target via the server.
@@ -68,38 +58,36 @@ class fastboot(tc.target_extension_c):
                 "arg #%d to '%s' has to be a string, got %s" \
                 % (count, command_name, type(arg).__name__)
             count += 1
-        parameters = [ command_name ] + list(args)
         self.target.report_info("%s: running" % command_name, dlevel = 2)
-        r = _rest_tb_target_fastboot_run(self.target.rtb, self.target.rt,
-                                         parameters,
-                                         ticket = self.target.ticket)
+        r = self.target.ttbd_iface_call(
+            "fastboot", "run", method = "PUT",
+            parameters = [ command_name ] + list(args))
         self.target.report_info("%s: ran" % (command_name),
                                 { 'diagnostics': r['diagnostics']},
                                 dlevel = 1)
 
     def list(self):
         self.target.report_info("listing", dlevel = 1)
-        r = _rest_tb_target_fastboot_list(
-            self.target.rtb, self.target.rt, ticket = self.target.ticket)
+        r = self.target.ttbd_iface_call("fastboot", "list", method = "GET")
         self.target.report_info("listed: %s" % r['commands'],
                                 { 'diagnostics': r['diagnostics'] })
         return r['commands']
 
 
-def cmdline_fastboot(args):
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    _rest_tb_target_fastboot_run(rtb, rt,
-                                 [ args.command_name ] + args.parameters,
-                                 ticket = args.ticket)
+def _cmdline_fastboot(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args, iface = "fastboot")
+        target.fastboot.run(args.command_name, *args.parameters)
 
-def cmdline_fastboot_list(args):
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    r = _rest_tb_target_fastboot_list(rtb, rt, ticket = args.ticket)
-    for command, params in r['commands'].items():
-        print("%s: %s" % (command, params))
+def _cmdline_fastboot_list(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args, iface = "fastboot")
+        r = target.fastboot.list()
+        for command, params in r.items():
+            print(("%s: %s" % (command, params)))
 
 
-def cmdline_setup(argsp):
+def _cmdline_setup(argsp):
     ap = argsp.add_parser("fastboot", help = "Run a fastboot command")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
@@ -108,10 +96,10 @@ def cmdline_setup(argsp):
     ap.add_argument("parameters", metavar = "PARAMETERS", action = "store",
                     nargs = "*", default = [],
                     help = "Parameters to the fastboot command")
-    ap.set_defaults(func = cmdline_fastboot)
+    ap.set_defaults(func = _cmdline_fastboot)
 
     ap = argsp.add_parser("fastboot-list", help = "List allowed fastboot "
                           "commands")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
-    ap.set_defaults(func = cmdline_fastboot_list)
+    ap.set_defaults(func = _cmdline_fastboot_list)

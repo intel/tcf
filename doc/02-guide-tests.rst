@@ -333,8 +333,8 @@ server to a file in the current work directory called
 >>>         ic.power.off()	# ensure tcpdump flushes
 >>>         # Get the TCP dump from the interconnect to a file in the CWD
 >>>         # called tcpdump-HASH.cap
->>>         ic.broker_files.dnload(self.kws['tc_hash'] + ".cap",
->>>                                "tcpdump-%(runid)s:%(tc_hash)s.cap" % self.kws)
+>>>         ic.store.dnload(self.kws['tc_hash'] + ".cap",
+>>>                         "tcpdump-%(runid)s:%(tc_hash)s.cap" % self.kws)
 
 
 From the command line, this would be::
@@ -344,7 +344,7 @@ From the command line, this would be::
   $ tcf power-cycle NETWORKTARGET
   ... do network operations ...
   $ tcf power-off NETWORKTARGET
-  $ tcf broker-file-dnload NETWORKTARGET CAPTURENAME myfile.cap
+  $ tcf store-dnload NETWORKTARGET CAPTURENAME myfile.cap
   $ tcf release NETWORKTARGET
 
 now *myfile.cap* can be opened with *Wireshark* or processed with any
@@ -399,18 +399,18 @@ disconnected. If they do, their tags will show::
 How this is done is specific to the driver given in the configuration,
 but it might be a target that is physically connected to another via a
 USB cutter. The USB cutter is an object implementing a :class:`plugger
-interface <ttbl.thing_plugger_mixin>` which is given to the
-configuration method :meth:`ttbl.test_target.thing_add` in the config
-files.
+interface <ttbl.things.impl_c>` which is configured as described in
+:mod:`ttbl.things` in the config files.
 
 - to find available things to connect, use the `tcf thing-list` or
-  within a test script, :meth:`tcfl.tc.target_c.thing_list`
+  within a test script, :meth:`tcfl.things.list
+  <tcfl.target_ext_things.extension.list>`
 
 - to connect, use `thing-plug` or within a test script,
-  :meth:`tcfl.tc.target_c.thing_plug`
+  :meth:`tcfl.things.plug <tcfl.target_ext_things.extension.plug>`
 
 - to disconnect, use `thing-unplug` or within a test script,
-  :meth:`tcfl.tc.target_c.thing_unplug`
+  :meth:`tcfl.things.unplug <tcfl.target_ext_things.extension.unplug>`
 
 Note you must own both the target and the thing to be able to plug one
 into another.

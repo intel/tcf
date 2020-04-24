@@ -214,7 +214,7 @@ tcfl.config.url_add("%s")
     def test_broker_file_upload__bad_params(self):
         sp = commonl.subpython(
             self.srcdir +
-            "/tcf --config-path : -vvv --url %s broker-file-upload"
+            "/tcf --config-path : -vvv --url %s store-upload"
             % (self.url))
         r = sp.join()
         self.assertNotEqual(
@@ -223,7 +223,7 @@ tcfl.config.url_add("%s")
 
         sp = commonl.subpython(
             self.srcdir +
-            "/tcf --config-path : -vvv --url %s broker-file-upload %s"
+            "/tcf --config-path : -vvv --url %s store-upload %s"
             % (self.url, self.target_names[0]))
         r = sp.join()
         self.assertNotEqual(
@@ -232,7 +232,7 @@ tcfl.config.url_add("%s")
 
         sp = commonl.subpython(
             self.srcdir +
-            "/tcf --config-path : -vvv --url %s broker-file-upload %s /dest/path/file"
+            "/tcf --config-path : -vvv --url %s store-upload %s /dest/path/file"
             % (self.url, self.target_names[0]))
         r = sp.join()
         self.assertNotEqual(
@@ -243,7 +243,7 @@ tcfl.config.url_add("%s")
         filename = self.ttbd_config.name
         sp = commonl.subpython(
             self.srcdir +
-            "/tcf --config-path : -vvv --url %s broker-file-upload %s  dest/file %s"
+            "/tcf --config-path : -vvv --url %s store-upload %s  dest/file %s"
             % (self.url, self.target_names[0], filename))
         r = sp.join()
         self.assertEqual(
@@ -262,7 +262,7 @@ tcfl.config.url_add("%s")
 
         # Check we can list it and it matches the hash
         sp = commonl.subpython(
-            self.srcdir + "/tcf --config-path : --url %s broker-file-list %s" \
+            self.srcdir + "/tcf --config-path : --url %s store-list %s" \
             % (self.url, self.target_names[0]))
         r = sp.join()
         self.assertEqual(

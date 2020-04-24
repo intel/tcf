@@ -59,7 +59,8 @@ class msgid_c(object):
 
         # Init from parent or first in the stack or defaults
         if parent:
-            assert isinstance(parent, msgid_c)
+            assert isinstance(parent, msgid_c), \
+                "parent must be type msgid_c; got %s" % type(parent)
             # inherited from the parent
             self._ident = parent._ident
             self._depth = parent._depth
@@ -114,7 +115,6 @@ class msgid_c(object):
         # Instead of +/ we use AZ, even if it removes some key-space,
         # it shall be good enough
         m = hashlib.sha256(s.encode('utf-8'))
-        # FIXME: just move this to base32 to use only lowercase
         return base64.b64encode(bytes(m.digest()), b'AZ')[:l].lower()
 
     @classmethod
@@ -159,14 +159,3 @@ class msgid_c(object):
         if len(cls.tls.msgid_lifo) > 1:
             return cls.tls.msgid_lifo[-2]
         return None
-
-def origin_get(depth = 1):
-    o = inspect.stack()[depth]
-    return "%s:%s" % (o[1], o[2])
-
-def origin_get_object(o):
-    return "%s:%s" % (inspect.getsourcefile(o),
-                      inspect.getsourcelines(o)[1])
-
-def origin_get_object_path(o):
-    return inspect.getsourcefile(o)

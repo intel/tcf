@@ -19,13 +19,16 @@ Command line and logging helpers
 """
 import argparse
 import base64
+import bisect
 import contextlib
 import errno
 import fcntl
+import fnmatch
 import glob
 import hashlib
 import imp
 import importlib
+import io
 import inspect
 import logging
 import numbers
@@ -40,9 +43,12 @@ import subprocess
 import sys
 import tempfile
 import termios
+import threading
 import time
 import traceback
+import types
 
+import keyring
 import requests
 
 from . import expr_parser
@@ -212,10 +218,7 @@ def cmdline_log_options(parser):
     """Initializes a parser with the standard command line options to
     control verbosity when using the logging module
 
-    :param parser: command line argument parser
-    :type parser: argparser.ArgParser()
-    :returns: none
-    :raises: unknown
+    :param python:argparse.ArgParser parser: command line argument parser
 
     -v|--verbose to increase verbosity (defaults to print/log errors only)
 
@@ -248,10 +251,13 @@ def mkid(something, l = 10):
     """
     Generate a 10 character base32 ID out of an iterable object
 
-    :param something: anything from which an id has to be generated
-    :type something: anything iterable
+    :param something: anything from which an id has to be generate
+      (anything iterable)
     """
-    h = hashlib.sha512(something.encode('utf-8'))
+    if isinstance(something, str):
+        h = hashlib.sha512(something.encode('utf-8'))
+    else:
+        h = hashlib.sha512(something)
     return base64.b32encode(h.digest())[:l].lower().decode('utf-8', 'ignore')
 
 
@@ -260,173 +266,14 @@ def trim_trailing(s, trailer):
     """
     Trim *trailer* from the end of *s* (if present) and return it.
 
-    :param s: string to trim from
-    :type s: string
-    :param trailer: string to trim
-    :type trailer: string
+    :param str s: string to trim from
+    :param str trailer: string to trim
     """
     tl = len(trailer)
     if s[-tl:] == trailer:
         return s[:-tl]
     else:
         return s
-
-
-class subpython(object):
-    """Convenience to run another program in a subprocess and get its output
-
-    >>> import timo
-    >>> sp = timo.subpython("some/file.py -v ARG1 ARG2")
-    # do something to stimulate it / test it
-    >>> try:
-    >>>     r = sp.join()
-    >>> except Exception as e:
-    >>> ...
-
-    Upon object instantiation, the process is spawned and started,
-    arguments passed. :func:`sp.join` waits for the process to
-    complete and then whatever it ereturns it's returned. If it was
-    terminated by a signal, it'll return the negative signal number.
-    """
-
-    #: lines of standard output
-    stdout_lines = []
-    #: lines of standard error
-    stderr_lines = []
-    #: formatted standard error and output
-    output_str = ""
-
-    def __init__(self, cmdline, stdout_name = None, stderr_name = None):
-        """
-        """
-        self.cmdline = cmdline
-        self.l = logging.getLogger("subpython")
-        frame = inspect.stack(0)[1][0]
-        # Yup, we do two sets of file descriptors so they don't
-        # interfere on eachothre; one pair is given to the subprocess
-        # to write, the other we use it to read.
-        who = frame.f_code.co_name + ":%d" % frame.f_lineno
-        if stdout_name == None:
-            self._stdout = logfile_open("stdout-", cls = subpython,
-                                        who = who, suffix = ".log")
-        else:
-            self._stdout = open(stdout_name, "w")
-        self.stdout = open(self._stdout.name, "r")
-        if stderr_name == None:
-            self._stderr = logfile_open("stderr-", cls = subpython,
-                                        who = who, suffix = ".log")
-        else:
-            self._stderr = open(stderr_name, "w")
-        self.stderr = open(self._stderr.name, "r")
-        (self.stdin_pipe_fdr, self.stdin_pipe_fdw) = os.pipe()
-        self.p = subprocess.Popen(
-            cmdline, close_fds = True, shell = True,
-            stdout = self._stdout,
-            stderr = self._stderr,
-            stdin = self.stdin_pipe_fdr)
-        self.l.log(9, "spawned: %s", self.cmdline)
-
-    def flush(self):
-        """
-        Flush output files (stdout and stderr) and rewind them to the
-        beginning of the file.
-        """
-        if not self.stdout.closed:
-            self.stdout.flush()
-            self.stdout.seek(0)
-            self.stdout_lines = self.stdout.readlines()
-        else:
-            with open(self.stdout.name) as f:
-                self.stdout_lines = f.readlines()
-        if not self.stderr.closed:
-            self.stderr.flush()
-            self.stderr.seek(0)
-            self.stderr_lines = self.stderr.readlines()
-        else:
-            with open(self.stderr.name) as f:
-                self.stderr_lines = f.readlines()
-
-    def join(self):
-        """
-        Wait for the process to finish and return it's exitcode.
-
-        Fill out outputs. See :func:`self.output`.
-
-        :returns: proccess' return code, or negative signal number if
-          killed by a signal
-        """
-        self.l.log(8, "joining: %s", self.cmdline)
-        self.p.wait()
-        self.l.log(9, "joined: %s", self.cmdline)
-        self.flush()
-        self.output()
-        for line in self.stderr_lines:
-            self.l.log(9, "stderr: " + line.strip())
-        for line in self.stdout_lines:
-            self.l.log(9, "stdout: " + line.strip())
-        self.stdout.close()
-        self._stdout.close()
-        self.stderr.close()
-        self._stderr.close()
-        if self.stdin_pipe_fdr != -1:
-            os.close(self.stdin_pipe_fdr)
-            self.stdin_pipe_fdr = -1
-        if self.stdin_pipe_fdw != -1:
-            os.close(self.stdin_pipe_fdw)
-            self.stdin_pipe_fdw = -1
-        return self.p.returncode
-
-    def stdin_write(self, data):
-        os.write(self.stdin_pipe_fdw, data)
-
-    def started(self):
-        """
-        Returns *True* if the process has succesfully started
-        """
-        self.p.poll()
-        return self.p.pid != None
-
-    def terminate_if_alive(self):
-        """
-        Stop the subprocess if it is running
-        """
-        self.p.poll()
-        if self.p.returncode == None:
-            self.l.log(8, "terminating: %s", self.cmdline)
-            # Use negative, so we also kill child processes of a setsid
-            try:
-                os.kill(-self.p.pid, signal.SIGTERM)
-                time.sleep(0.25)
-                os.kill(-self.p.pid, signal.SIGKILL)
-            except OSError:	# Most cases, already dead
-                pass
-            self.p.terminate()
-            self.l.log(9, "terminated: %s", self.cmdline)
-            self.stdout.close()
-            self._stdout.close()
-            self.stderr.close()
-            self._stderr.close()
-            if self.stdin_pipe_fdr != -1:
-                os.close(self.stdin_pipe_fdr)
-                self.stdin_pipe_fdr = -1
-            if self.stdin_pipe_fdw != -1:
-                os.close(self.stdin_pipe_fdw)
-                self.stdin_pipe_fdw = -1
-
-    def output(self):
-        """
-        Return a string formatted with all the standard and error
-        outputs of the subprocess. Fill out :data:`stdout_lines`,
-        :data:`stderr_lines` and :data:`output_str` with the
-        formatting of those two.
-        Leave the file pointers at the beginning in case we have to
-        re-read.
-        """
-        self.flush()
-        self.output_str = "stdout: ".join(["\n"] + self.stdout_lines) \
-            + "stderr: ".join(["\n"] + self.stderr_lines)
-        self.flush()
-        return self.output_str
 
 
 def name_make_safe(name, safe_chars = None):
@@ -473,10 +320,8 @@ def hash_file(hash_object, filepath, blk_size = 8192):
     Run a the contents of a file though a hash generator.
 
     :param hash_object: hash object (from :py:mod:`hashlib`)
-    :param filepath: path to the file to feed
-    :type filepath: str
-    :param blk_size: read the file in chunks of that size (in bytes)
-    :type blk_size: integer
+    :param str filepath: path to the file to feed
+    :param int blk_size: read the file in chunks of that size (in bytes)
     """
     assert hasattr(hash_object, "update")
     with open(filepath, 'rb') as f:
@@ -769,6 +614,14 @@ def origin_get(depth = 1):
     o = inspect.stack()[depth]
     return "%s:%s" % (o[1], o[2])
 
+
+def origin_get_object_path(o):
+    return inspect.getsourcefile(o)
+
+def origin_get_object(o):
+    return "%s:%s" % (inspect.getsourcefile(o),
+                      inspect.getsourcelines(o)[1])
+
 def origin_fn_get(depth = 1, sep = ":"):
     """
     Return the name of the function and line from which this was called
@@ -858,7 +711,7 @@ def kws_update_from_rt(kws, rt, kws_origin = None, origin = None,
     else:
         # Said concept does not exist in the server...
         kws[prefix + 'target'] = file_name_make_safe(rt['id'])
-    kws[prefix + 'type'] = rt['type']
+    kws[prefix + 'type'] = rt.get('type', 'n/a')
     if kws_origin:
         assert isinstance(kws_origin, dict)
         kws_origin[prefix + 'target'] = origin
@@ -1201,14 +1054,648 @@ class dict_missing_c(dict):
 
     to print "idonthavethis_UNDEFINED_SYMBOL" intead of raising KeyError
     """
-    def __init__(self, d):
+    def __init__(self, d, missing = None):
+        assert isinstance(d, dict)
+        assert missing == None or isinstance(missing, str)
         dict.__init__(self, d)
+        self.missing = missing
 
     def __getitem__(self, key):
         if self.__contains__(key):
             return dict.__getitem__(self, key)
+        if self.missing:
+            return self.missing
         return "%s_UNDEFINED_SYMBOL.%s" % (key, origin_fn_get(2, "."))
 
 def ipv4_len_to_netmask_ascii(length):
     return socket.inet_ntoa(struct.pack('>I', 0xffffffff ^ ((1 << (32 - length) ) - 1)))
-    
+
+def password_get(domain, user, password):
+    """
+    Get the password for a domain and user
+
+    This returns a password obtained from a configuration file, maybe
+    accessing secure password storage services to get the real
+    password. This is intended to be use as a service to translate
+    passwords specified in config files, which in some time might be
+    cleartext, in others obtained from services.
+
+    >>> real_password = password_get("somearea", "rtmorris", "KEYRING")
+
+    will query the *keyring* service for the password to use for user
+    *rtmorris* on domain *somearea*.
+
+    >>> real_password = password_get("somearea", "rtmorris", "KEYRING:Area51")
+
+    would do the same, but *keyring*'s domain would be *Area51*
+    instead.
+
+    >>> real_password = password_get(None, "rtmorris",
+    >>>                              "FILE:/etc/config/some.key")
+
+    would obtain the password from the contents of file
+    */etc/config/some.key*.
+
+    >>> real_password = password_get("somearea", "rtmorris", "sikrit")
+
+    would just return *sikrit* as a password.
+
+    :param str domain: a domain to which this password operation
+      applies; see below *password* (can be *None*)
+
+    :param str user: the username for maybe obtaining a password from
+      a password service; see below *password*.
+
+    :param str password: a password obtained from the user or a
+      configuration setting; can be *None*. If the *password* is
+
+      - *KEYRING* will ask the accounts keyring for the password
+         for domain *domain* for username *user*
+
+      - *KEYRING:DOMAIN* will ask the accounts keyring for the password
+         for domain *DOMAIN* for username *user*, ignoring the
+         *domain* parameter.
+
+      - *FILE:PATH* will read the password from filename *PATH*.
+
+    :returns: the actual password to use
+
+    Password management procedures (FIXME):
+
+    - to set a password in the keyring::
+
+        $ echo KEYRINGPASSWORD | gnome-keyring-daemon --unlock
+        $ keyring set "USER"  DOMAIN
+        Password for 'DOMAIN' in 'USER': <ENTER PASSWORD HERE>
+
+    - to be able to run the daemon has to be executed under a dbus session::
+
+        $ dbus-session -- sh
+        $ echo KEYRINGPASSWORD | gnome-keyring-daemon --unlock
+        $ ttbd...etc
+
+    """
+    assert domain == None or isinstance(domain, str)
+    assert isinstance(user, str)
+    assert password == None or isinstance(password, str)
+    if password == "KEYRING":
+        password = keyring.get_password(domain, user)
+        if password == None:
+            raise RuntimeError("keyring: no password for user %s @ %s"
+                               % (user, domain))
+    elif password and password.startswith("KEYRING:"):
+        _, domain = password.split(":", 1)
+        password = keyring.get_password(domain, user)
+        if password == None:
+            raise RuntimeError("keyring: no password for user %s @ %s"
+                               % (user, domain))
+    elif password and password.startswith("FILE:"):
+        _, filename = password.split(":", 1)
+        with open(filename) as f:
+            password = f.read().strip()
+    # fallthrough, if none of them, it's just a password
+    return password
+
+
+def split_user_pwd_hostname(s):
+    """
+    Return a tuple decomponsing ``[USER[:PASSWORD]@HOSTNAME``
+
+    :returns: tuple *( USER, PASSWORD, HOSTNAME )*, *None* in missing fields.
+
+    See :func:`password_get` for details on how the password is handled.
+    """
+    assert isinstance(s, str)
+    user = None
+    password = None
+    hostname = None
+    if '@' in s:
+        user_password, hostname = s.split('@', 1)
+    else:
+        user_password = ""
+        hostname = s
+    if ':' in user_password:
+        user, password = user_password.split(':', 1)
+    else:
+        user = user_password
+        password = None
+    password = password_get(hostname, user, password)
+    return user, password, hostname
+
+
+def url_remove_user_pwd(url):
+    """
+    Given a URL, remove the username and password if any::
+
+      print(url_remove_user_pwd("https://user:password@host:port/path"))
+      https://host:port/path
+    """
+    _url = url.scheme + "://" + url.hostname
+    if url.port:
+        _url += ":%d" % url.port
+    if url.path:
+        _url += url.path
+    return _url
+
+
+def field_needed(field, projections):
+    """
+    Check if the name *field* matches any of the *patterns* (ala
+    :mod:`fnmatch`).
+
+    :param str field: field name
+    :param list(str) projections: list of :mod:`fnmatch` patterns
+      against which to check field. Can be *None* and *[ ]* (empty).
+
+    :returns bool: *True* if *field* matches a pattern in *patterns*
+      or if *patterns* is empty or *None*. *False* otherwise.
+    """
+    if projections:
+        # there is a list of must haves, check here first
+        for projection in projections:
+            if fnmatch.fnmatch(field, projection):
+                return True	# we need this field
+        return False		# we do not need this field
+    else:
+        return True	# no list, have it
+
+def dict_to_flat(d, projections = None):
+    """
+    Convert a nested dictionary to a sorted list of tuples *( KEY, VALUE )*
+
+    The KEY is like *KEY[.SUBKEY[.SUBSUBKEY[....]]]*, where *SUBKEY*
+    are keys in nested dictionaries.
+
+    :param dict d: dictionary to convert
+    :param list(str) projections: (optional) list of :mod:`fnmatch`
+      patterns of flay keys to bring in (default: all)
+    :returns list: sorted list of tuples *KEY, VAL*
+
+    """
+
+    fl = []
+
+    def __update_recursive(val, field, field_flat, projections = None,
+                           depth_limit = 10, prefix = "  "):
+        # Merge d into dictionary od with a twist
+        #
+        # projections is a list of fields to include, if empty, means all
+        # of them
+        # a field X.Y.Z means od['X']['Y']['Z']
+
+        # GRRRR< has to dig deep first, so that a.a3.* goes all the way
+        # deep before evaluating if keepers or not -- I think we need to
+        # change it like that and maybe the evaluation can be done before
+        # the assignment.
+
+        if field_needed(field_flat, projections):
+            bisect.insort(fl, ( field_flat, val ))
+        elif isinstance(val, dict) and depth_limit > 0:	# dict to dig in
+            for key, value in val.items():
+                __update_recursive(value, key, field_flat + "." + str(key),
+                                   projections, depth_limit - 1,
+                                   prefix = prefix + "    ")
+
+    for key, _val in d.items():
+        __update_recursive(d[key], key, key, projections, 10)
+
+    return fl
+
+def _key_rep(r, key, key_flat, val):
+    # put val in r[key] if key is already fully expanded (it has no
+    # periods); otherwise expand it recursively
+    if '.' in key:
+        # this key has sublevels, iterate over them
+        lhs, rhs = key.split('.', 1)
+        if lhs not in r:
+            r[lhs] = {}
+        elif not isinstance(r[lhs], dict):
+            r[lhs] = {}
+
+        _key_rep(r[lhs], rhs, key_flat, val)
+    else:
+        r[key] = val
+
+def flat_slist_to_dict(fl):
+    """
+    Given a sorted list of flat keys and values, convert them to a
+    nested dictionary
+
+    :param list((str,object)): list of tuples of key and any value
+      alphabetically sorted by tuple; same sorting rules as in
+      :func:`flat_keys_to_dict`.
+
+    :return dict: nested dictionary as described by the flat space of
+      keys and values
+    """
+    tr = {}
+    for key, val in fl:
+        _key_rep(tr, key, key, val)
+    return tr
+
+
+def flat_keys_to_dict(d):
+    """
+    Given a dictionary of flat keys, convert it to a nested dictionary
+
+    Similar to :func:`flat_slist_to_dict`, differing in the
+    keys/values being in a dictionary.
+
+    A key/value:
+
+    >>> d["a.b.c"] = 34
+
+    means:
+
+    >>> d['a']['b']['c'] = 34
+
+    Key in the input dictonary are processed in alphabetical order
+    (thus, key a.a is processed before a.b.c); later keys override
+    earlier keys:
+
+    >>> d['a.a'] = 'aa'
+    >>> d['a.a.a'] = 'aaa'
+    >>> d['a.a.b'] = 'aab'
+
+    will result in:
+
+    >>> d['a']['a'] = { 'a': 'aaa', 'b': 'aab' }
+
+    The
+
+    >>> d['a.a'] = 'aa'
+
+    gets overriden by the other settings
+
+    :param dict d: dictionary of keys/values
+    :returns dict: (nested) dictionary
+    """
+    tr = {}
+
+    for key in sorted(d.keys()):
+        _key_rep(tr, key, key, d[key])
+
+    return tr
+
+
+class tls_prefix_c(object):
+
+    def __init__(self, tls, prefix):
+        assert isinstance(prefix, str)
+        self.tls = tls
+        self.prefix = unicode(prefix)
+        self.prefix_old = None
+
+    def __enter__(self):
+        self.prefix_old = getattr(self.tls, "prefix_c", u"")
+        self.tls.prefix_c = self.prefix_old + self.prefix
+        return self
+
+    def __exit__(self, _exct_type, _exce_value, _traceback):
+        self.tls.prefix_c = self.prefix_old
+        self.prefix_old = None
+
+    def __repr__(self):
+        return getattr(self.tls, "prefix_c", None)
+
+
+def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
+                        depth_limit = 10):
+    """
+    Dump a general data tree to stdout in a recursive way
+
+    For example:
+
+    >>> data = [ dict(keya = 1, keyb = 2), [ "one", "two", "three" ], "hello", sys.stdout ]
+
+    produces the stdout::
+
+      [0].keya: 1
+      [0].keyb: 2
+      [1][0]: one
+      [1][1]: two
+      [1][2]: three
+      [2]: hello
+      [3]: <open file '<stdout>', mode 'w' at 0x7f13ba2861e0>
+
+    - in a list/set/tuple, each item is printed prefixing *[INDEX]*
+    - in a dictionary, each item is prefixed with it's key
+    - strings and cardinals are printed as such
+    - others are printed as what their representation as a string produces
+    - if an attachment is a generator, it is iterated to gather the data.
+    - if an attachment is of :class:generator_factory_c, the method
+      for creating the generator is called and then the generator
+      iterated to gather the data.
+
+    See also :func:`data_dump_recursive_tls`
+
+    :param d: data to print
+    :param str prefix: prefix to start with (defaults to nothing)
+    :param str separator: used to separate dictionary keys from the
+      prefix (defaults to ".")
+    :param FILE of: output stream where to print (defaults to
+      *sys.stdout*)
+    :param int depth_limit: maximum nesting levels to go deep in the
+      data structure (defaults to 10)
+    """
+    assert isinstance(prefix, str)
+    assert isinstance(separator, str)
+    assert depth_limit > 0
+
+    if isinstance(d, dict) and depth_limit > 0:
+        if prefix.strip() != "":
+            prefix = prefix + separator
+        for key, val in sorted(d.items(), key = lambda i: i[0]):
+            data_dump_recursive(val, prefix + str(key),
+                                separator = separator, of = of,
+                                depth_limit = depth_limit - 1)
+    elif isinstance(d, (list, set, tuple)) and depth_limit > 0:
+        # could use iter(x), but don't wanna catch strings, etc
+        count = 0
+        for v in d:
+            data_dump_recursive(v, prefix + u"[%d]" % count,
+                                separator = separator, of = of,
+                                depth_limit = depth_limit - 1)
+            count += 1
+    # HACK: until we move functions to a helper or something, when
+    # someone calls the generatory factory as
+    # commonl.generator_factory_c, this can't pick it up, so fallback
+    # to use the name
+    elif isinstance(d, generator_factory_c) \
+         or type(d).__name__ == "generator_factory_c":
+        of.write(prefix)
+        of.writelines(d.make_generator())
+    elif isinstance(d, types.GeneratorType):
+        of.write(prefix)
+        of.writelines(d)
+    elif isinstance(d, file):
+        # not recommended, prefer generator_factory_c so it reopens the file
+        d.seek(0, 0)
+        of.write(prefix)
+        of.writelines(d)
+    else:
+        of.write(prefix + u": " + mkutf8(d) + u"\n")
+
+
+_dict_print_dotted = data_dump_recursive	# COMPAT
+
+def data_dump_recursive_tls(d, tls, separator = u".", of = sys.stdout,
+                            depth_limit = 10):
+    """
+    Dump a general data tree to stdout in a recursive way
+
+    This function works as :func:`data_dump_recursive` (see for more
+    information on the usage and arguments). However, it uses TLS for
+    storing the prefix as it digs deep into the data structure.
+
+    A variable called *prefix_c* is created in the TLS structure on
+    which the current prefix is stored; this is meant to be used in
+    conjunction with stream writes such as
+    :class:`io_tls_prefix_lines_c`.
+
+    Parameters are as documented in :func:`data_dump_recursive`,
+    except for:
+
+    :param threading.local tls: thread local storage to use (as returned
+      by *threading.local()*
+    """
+    assert isinstance(separator, str)
+    assert depth_limit > 0
+
+    if isinstance(d, dict):
+        for key, val in sorted(d.items(), key = lambda i: i[0]):
+            with tls_prefix_c(tls, str(key) + ": "):
+                data_dump_recursive_tls(val, tls,
+                                        separator = separator, of = of,
+                                        depth_limit = depth_limit - 1)
+    elif isinstance(d, (list, set, tuple)):
+        # could use iter(x), but don't wanna catch strings, etc
+        count = 0
+        for v in d:
+            with tls_prefix_c(tls, u"[%d]: " % count):
+                data_dump_recursive_tls(v, tls,
+                                        separator = separator, of = of,
+                                        depth_limit = depth_limit - 1)
+            count += 1
+    # HACK: until we move functions to a helper or something, when
+    # someone calls the generatory factory as
+    # commonl.generator_factory_c, this can't pick it up, so fallback
+    # to use the name
+    elif isinstance(d, generator_factory_c) \
+         or type(d).__name__ == "generator_factory_c":
+        of.writelines(d.make_generator())
+    elif isinstance(d, file):
+        # not recommended, prefer generator_factory_c so it reopens the file
+        d.seek(0, 0)
+        of.writelines(d)
+    elif isinstance(d, types.GeneratorType):
+        of.writelines(d)
+    else:
+        of.write(mkutf8(d) + u"\n")
+
+
+class io_tls_prefix_lines_c(io.TextIOWrapper):
+    """
+    Write lines to a stream with a prefix obtained from a thread local
+    storage variable.
+
+    This is a limited hack to transform a string written as::
+
+      line1
+      line2
+      line3
+
+    into::
+
+      PREFIXline1
+      PREFIXline2
+      PREFIXline3
+
+    without any intervention by the caller other than setting the
+    prefix in thread local storage and writing to the stream; this
+    allows other clients to write to the stream without needing to
+    know about the prefixing.
+
+    Note the lines yielded are unicode-escaped or UTF-8 escaped, for
+    being able to see in reports any special character.
+
+    Usage:
+
+    .. code-block:: python
+
+       import io
+       import commonl
+       import threading
+   
+       tls = threading.local()
+   
+       f = io.open("/dev/stdout", "w")
+       with commonl.tls_prefix_c(tls, "PREFIX"), \
+            commonl.io_tls_prefix_lines_c(tls, f.detach()) as of:
+   
+           of.write(u"line1\nline2\nline3\n")
+
+    Limitations:
+
+    - hack, only works ok if full lines are being printed; eg:
+    """
+    def __init__(self, tls, *args, **kwargs):
+        assert isinstance(tls, threading.local)
+        io.TextIOWrapper.__init__(self, *args, **kwargs)
+        self.tls = tls
+        self.data = u""
+
+    def __write_line(self, s, prefix, offset, pos):
+        # Write a whole (\n ended) line to the stream
+        #
+        # - prefix first
+        # - leftover data since last \n
+        # - current data from offset to the position where \n was
+        #   (unicode-escape encoded)
+        # - newline (since the one in s was unicode-escaped)
+        substr = s[offset:pos]
+        io.TextIOWrapper.write(self, prefix)
+        if self.data:
+            io.TextIOWrapper.write(
+                self, unicode(self.data.encode('unicode-escape')))
+            self.data = u""
+        io.TextIOWrapper.write(self, unicode(substr.encode('unicode-escape')))
+        io.TextIOWrapper.write(self, u"\n")
+        # flush after writing one line to avoid corruption from other
+        # threads/processes printing to the same FD
+        io.TextIOWrapper.flush(self)
+        return pos + 1
+
+    def _write(self, s, prefix, acc_offset = 0):
+        # write a chunk of data to the stream -- break it by newlines,
+        # so when one is found __write_line() can write the prefix
+        # first. Accumulate anything left over after the last newline
+        # so we can flush it next time we find one.
+        offset = 0
+        while offset < len(s):
+            pos = s.find('\n', offset)
+            if pos >= 0:
+                offset = self.__write_line(s, prefix, offset, pos)
+                continue
+            self.data += s[offset:]
+            break
+        return acc_offset + len(s)
+
+    def flush(self):
+        """
+        Flush any leftover data in the temporary buffer, write it to the
+        stream, prefixing each line with the prefix obtained from
+        *self.tls*\'s *prefix_c* attribute.
+        """
+        prefix = getattr(self.tls, "prefix_c", None)
+        if prefix == None:
+            io.TextIOWrapper.write(
+                self, unicode(self.data.encode('unicode-escape')))
+        else:
+            # flush whatever is accumulated
+            self._write(u"", prefix)
+        io.TextIOWrapper.flush(self)
+
+    def write(self, s):
+        """
+        Write string to the stream, prefixing each line with the
+        prefix obtained from *self.tls*\'s *prefix_c* attribute.
+        """
+        prefix = getattr(self.tls, "prefix_c", None)
+        if prefix == None:
+            io.TextIOWrapper.write(self, s)
+            return
+        self._write(s, prefix, 0)
+
+    def writelines(self, itr):
+        """
+        Write the iterator to the stream, prefixing each line with the
+        prefix obtained from *self.tls*\'s *prefix_c* attribute.
+        """
+        prefix = getattr(self.tls, "prefix_c", None)
+        if prefix == None:
+            io.TextIOWrapper.writelines(self, itr)
+            return
+        offset = 0
+        for data in itr:
+            offset = self._write(data, prefix, offset)
+
+def mkutf8(s):
+    #
+    # We need a generic 'just write this and heck with encodings', but
+    # we don't know how the data is coming to us.
+    #
+    # If already unicode, pass it through; if str, assume is UTF-8 and
+    # try to safely decode it it to UTF-8. If anything else, rep() it into unicode.
+    #
+    # I am still so confused by Python's string / unicode / encoding /
+    # decoding rules
+    #
+    if isinstance(s, unicode):
+        return s
+    elif isinstance(s, str):
+        return s.decode('utf-8', errors = 'replace')
+    else:
+        # represent it in unicode, however the object says
+        return unicode(s)
+
+class generator_factory_c(object):
+    """
+    Create generator objects multiple times
+
+    Given a generator function and its arguments, create it when
+    :func:`make_generator` is called.
+
+    >>> factory = generator_factory_c(genrator, arg1, arg2..., arg = value...)
+    >>> ...
+    >>> generator = factory.make_generator()
+    >>> for data in generator:
+    >>>     do_something(data)
+    >>> ...
+    >>> another_generator = factory.make_generator()
+    >>> for data in another_generator:
+    >>>     do_something(data)
+
+    generators once created cannot be reset to the beginning, so this
+    can be used to simulate that behavior.
+
+    :param fn: generator function
+    :param args: arguments to the generator function
+    :param kwargs: keyword arguments to the generator function
+    """
+    def __init__(self, fn, *args, **kwargs):
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+
+    def make_generator(self):
+        """
+        Create and return a generator
+        """
+        return self.fn(*self.args, **self.kwargs)
+
+def file_iterator(filename, chunk_size = 4096):
+    """
+    Iterate over a file's contents
+
+    Commonly used along with generator_factory_c to with the TCF
+    client API to report attachments:
+
+    :param int chunk_size: (optional) read blocks of this size (optional)
+
+    >>> import commonl
+    >>>
+    >>> class _test(tcfl.tc.tc_c):
+    >>>
+    >>>   def eval(self):
+    >>>     generator_f = commonl.generator_factory_c(commonl.file_iterator, FILENAME)
+    >>>     testcase.report_pass("some message", dict(content = generator_f))
+
+    """
+    assert chunk_size > 0
+    with io.open(filename, "rb") as f:
+        while True:
+            data = f.read(chunk_size)
+            if not data:
+                break
+            yield data

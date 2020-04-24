@@ -26,9 +26,9 @@ import jinja2
 import jinja2.filters
 
 from . import commonl
-import tcfl
-import tcfl.tc
-import tcfl.config
+from . import tcfl
+from . import tcfl.tc
+from . import tcfl.config
 
 def jinja2_xml_escape(data):
     """

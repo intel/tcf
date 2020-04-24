@@ -11,6 +11,9 @@
 #   each's __doc__
 
 """
+Core Provisioning OS functionality
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 This module provides tools to image devices with a Provisioning OS.
 
 The general operation mode for this is instructing the device to boot
@@ -55,10 +58,13 @@ import json
 import logging
 import operator
 import os
+import pprint
 import random
 import re
 import time
 import traceback
+import subprocess
+import time
 
 import distutils.version
 import Levenshtein
@@ -246,12 +252,18 @@ def target_power_cycle_to_normal_pxe(target):
     target.property_set("pos_mode", "local")
     target.power.cycle()
 
+#: Name of the directory created in the target's root filesystem to
+#: cache test content
+#:
+#: This is maintained by the provisioning process, althought it might
+#: be cleaned up to make room.
+persistent_tcf_d = '/persistent.tcf.d'
 
 def mk_persistent_tcf_d(target, subdirs = None):
     if subdirs == None:
-        dirs = [ '/mnt/persistent.tcf.d' ]
+        dirs = [ '/mnt' + persistent_tcf_d ]
     else:
-        dirs = [ '/mnt/persistent.tcf.d/' + subdir for subdir in subdirs ]
+        dirs = [ '/mnt' + persistent_tcf_d + subdir for subdir in subdirs ]
 
     # just create / recreate all the thirs
     target.shell.run('mkdir -p ' + " ".join(dirs))
@@ -259,41 +271,77 @@ def mk_persistent_tcf_d(target, subdirs = None):
     # Ensure there is a README -- this is slow, so don't do it if
     # already there
     output = target.shell.run(
-        'test -f /mnt/persistent.tcf.d/README || echo N""O' ,
+        'test -f /mnt' + persistent_tcf_d + '/README || echo N""O' ,
         output = True)
     if 'NO' in output:
         target.shell.run("""\
-cat <<EOF > /mnt/persistent.tcf.d/README
+cat <<EOF > /mnt%s/README
 This directory has been created by TCF's Provisioning OS to store files to
 be provisioned in the root file system.
 
 When flashing a new image to this partition, the contents in this tree
 will not be removed/replaced. It is then faster to rsync things in
 from the client machine.
-EOF""")
+EOF""" % persistent_tcf_d)
 
 def deploy_linux_kernel(ic, target, _kws):
     """Deploy a linux kernel tree in the local machine to the target's
-    root filesystem
+    root filesystem (:ref:`example <example_linux_kernel>`).
 
-    This is normally given to :func:`target.pos.deploy_image
-    <tcfl.pos.extension.deploy_image>` as:
+    A Linux kernel can be built and installed in a separate root
+    directory in the following form::
 
-    >>> target.kw_set("pos_deploy_linux_kernel", SOMELOCALLOCATION)
+      - ROOTDIR/boot/*
+      - ROOTDIR/lib/modules/*
+
+    all those will be rsync'ed to the target's */boot* and
+    */lib/modules* (caching on the target's persistent rootfs area for
+    performance) after flashing the OS image. Thus, it will overwrite
+    whatever kernels where in there.
+
+    The target's */boot/EFI* directories will be kept, so that the
+    bootloader configuration can pull the information to configure the
+    new kernel using the existing options.
+
+    Build the Linux kernel from a *linux* source directory to a
+    *build* directory::
+
+      $ mkdir -p build
+      $ cp CONFIGFILE build/.config
+      $ make -C PATH/TO/SRC/linux O=build oldconfig
+      $ make -C build all
+
+    (or your favourite configuration and build mechanism), now it can
+    be installed into the root directory::
+
+      $ mkdir -p root
+      $ make -C build INSTALLKERNEL=ignoreme \
+          INSTALL_PATH=root/boot INSTALL_MOD_PATH=root \
+          install modules_install
+
+    The *root* directory can now be given to
+    :func:`target.pos.deploy_image <tcfl.pos.extension.deploy_image>`
+    as:
+
+    >>> target.deploy_linux_kernel_tree = ROOTDIR
     >>> target.pos.deploy_image(ic, IMAGENAME,
     >>>                         extra_deploy_fns = [ tcfl.pos.deploy_linux_kernel ])
 
-    as it expects ``kws['pos_deploy_linux_kernel']`` which points to a
-    local directory in the form::
+    or if using the :class:`tcfl.pos.tc_pos_base` test class template,
+    it can be done such as:
 
-      - boot/*
-      - lib/modules/KVER/*
+    >>> class _test(tcfl.pos.tc_pos_base):
+    >>>     ...
+    >>>
+    >>>     def deploy_00(self, ic, target):
+    >>>         rootdir = ROOTDIR
+    >>>         target.deploy_linux_kernel_tree = rootdir
+    >>>         self.deploy_image_args = dict(extra_deploy_fns = [
+    >>>             tcfl.pos.deploy_linux_kernel ])
 
-    all those will be rsynced to the target's persistent root area
-    (for speed) and from there to the root filesystem's /boot and
-    /lib/modules. Anything else in the ``/boot/`` and
-    ``/lib/modules/`` directories will be replaced with what comes
-    from the *kernel tree*.
+    *ROOTDIR* can be hardcoded, but remember if given relative, it is
+    relative to the directory where *tcf run* was executed from, not
+    where the testcase source is.
 
     **Low level details**
 
@@ -304,21 +352,22 @@ def deploy_linux_kernel(ic, target, _kws):
     The client will rsync the tree from the local machine to the
     persistent space using :meth:`target.pos.rsync <extension.rsync>`,
     which also caches it in a persistent area to speed up multiple
-    transfers.
+    transfers. From there it will be rsynced to its final
+    location.
 
     """
-    if not '' in _kws:
+    kernel_tree = getattr(target, "deploy_linux_kernel_tree", None)
+    if kernel_tree == None:
         target.report_info("not deploying linux kernel because "
-                           "*pos_deploy_linux_kernel_tree* keyword "
+                           "*pos_deploy_linux_kernel_tree* attribute "
                            "has not been set for the target", dlevel = 2)
         return
     target.report_info("rsyncing boot image to target")
-    target.pos.rsync("%(pos_deploy_linux_kernel_tree)s/boot" % target.kws,
-                     "/boot")
+    target.pos.rsync("%s/boot" % kernel_tree, "/", path_append = "",
+                     rsync_extra = "--exclude '*efi/'")
+    target.testcase._targets_active()
     target.report_info("rsyncing lib/modules to target")
-    target.pos.rsync("%(pos_deploy_linux_kernel_tree)s/lib/modules"
-                     % target.kws,
-                     "/lib/modules")
+    target.pos.rsync("%s/lib/modules" % kernel_tree, "/lib", path_append = "")
     target.testcase._targets_active()
     target.report_pass("linux kernel transferred")
 
@@ -431,11 +480,11 @@ class extension(tc.target_extension_c):
             raise self.unneeded
         tc.target_extension_c.__init__(self, target)
 
-        pos_capable = target.kws['pos_capable']
-        if isinstance(pos_capable, bool):
-            if pos_capable == False:
-                raise tc.blocked_e("target is not POS capable",
-                                   dict(target = target))
+        pos_capable = target.rt.get('pos_capable', None)
+        if pos_capable == None or pos_capable == False:
+            raise self.unneeded("target is not POS capable",
+                                dict(target = target))
+        elif pos_capable == True:
             target.report_info("WARNING! target's pos_capable is still old "
                                "style, update your config--taking "
                                "defaults")
@@ -526,8 +575,9 @@ class extension(tc.target_extension_c):
 
 
     # can't add $ at the end because sometimes there are spurious
-    # messages after it...
-    _regex_waiting_for_login = re.compile(r".*\blogin:\s+")
+    # messages after it...\b -> beginning end of a word maybe at
+    # beg/end of string
+    _regex_waiting_for_login = re.compile(r".*\blogin:\s+", re.MULTILINE)
 
     def _unexpected_console_output_try_fix(self, output, target):
         # so when trying to boot POS we got unexpected console output;
@@ -538,7 +588,8 @@ class extension(tc.target_extension_c):
 
         # looks like a login prompt? Maybe we can login and munge
         # things around
-        if self._regex_waiting_for_login.search(output):
+        m = self._regex_waiting_for_login.search(output)
+        if m:
             boot_config_fix_fn = target.pos.cap_fn_get('boot_config_fix',
                                                        'uefi')
             if boot_config_fix_fn:
@@ -552,7 +603,10 @@ class extension(tc.target_extension_c):
                     "but I don't know how to fix it; target does not "
                     "declare capability `boot_config_fix`",
                     attachments = dict(output = output))
-
+        else:
+            target.report_error(
+                "POS: didn't find a login prompt in output to try fixing",
+                attachments = dict(output = output, alevel = 0))
     def boot_to_pos(self, pos_prompt = None,
                     # plenty to boot to an nfsroot, hopefully
                     timeout = 60,
@@ -562,37 +616,58 @@ class extension(tc.target_extension_c):
             # None specified, let's take from the target config
             boot_to_pos_fn = self.cap_fn_get('boot_to_pos', 'pxe')
 
-        bios_boot_time = int(target.kws.get("bios_boot_time", 0))
+        bios_boot_time = int(target.kws.get("bios_boot_time", 30))
 
-        for tries in range(3):
-            target.report_info("POS: rebooting into Provisioning OS [%d/3]"
-                               % tries)
-            boot_to_pos_fn(target)
+        # FIXME: this is a hack because now the expecter has a
+        # maximum timeout set that can't be overriden--the
+        # re-design of the expect sequences will fix this, but
+        # for now we have to make sure the maximum is also set
+        # here, so in case the bios_boot_time setting in
+        # boot_to_pos is higher, it still can go.
+        # bios_boot_time has to be all encapsulated in
+        # boot_to_pos(), as it can be called from other areas
+        testcase = target.testcase
+        timeout_original = testcase.tls.expect_timeout
+        try:
+            testcase.tls.expect_timeout = bios_boot_time + timeout
+            for tries in range(3):
+                target.report_info("POS: rebooting into Provisioning OS [%d/3]"
+                                   % tries)
 
-            # Sequence for TCF-live based on Fedora
-            try:
-                # POS prints this when it boots before login
-                target.expect("TCF test node")
-                target.shell.up(timeout = bios_boot_time + timeout)
-            except tc.error_e as e:
-                outputf = e.attachments_get().get('console output', None)
-                if outputf:
-                    output = open(outputf.name).read()
-                if output == None or output == "" or output == "\x00":
-                    target.report_error("POS: no console output, retrying")
+                # Sequence for TCF-live based on Fedora
+                try:
+                    boot_to_pos_fn(target)
+                    # POS prints this when it boots before login
+                    target.expect("TCF test node",
+                                  timeout = bios_boot_time + timeout)
+                    target.shell.up(timeout = timeout)
+                except ( tc.error_e, tc.failed_e ) as e:
+                    attachment = e.attachments_get().get('console output', None)
+                    output = ""
+                    for data in attachment.make_generator():
+                        output += data
+                        if len(output) > 32 * 1024:
+                            # we need enought to capture a local boot
+                            # with log messages and all that add up to
+                            # a lot
+                            break
+                    if output == "" or output == "\x00":
+                        target.report_error("POS: no console output, retrying")
+                        continue
+                    # sometimes the BIOS has been set to boot local directly,
+                    # so we might as well retry
+                    target.report_error("POS: unexpected console output, retrying",
+                                        attachments = { "console output": attachment })
+                    self._unexpected_console_output_try_fix(output, target)
                     continue
-                # sometimes the BIOS has been set to boot local directly,
-                # so we might as well retry
-                target.report_error("POS: unexpected console output, retrying")
-                self._unexpected_console_output_try_fix(output, target)
-                continue
-            target.report_info("POS: got Provisioning OS shell")
-            break
-        else:
-            raise tc.blocked_e(
-                "POS: tried too many times to boot, without signs of life",
-                { "console output": target.console.read(), 'target': target })
-
+                target.report_info("POS: got Provisioning OS shell")
+                break
+            else:
+                raise tc.blocked_e(
+                    "POS: tried too many times to boot, without signs of life",
+                    { "console output": target.console.read(), 'target': target })
+        finally:
+            testcase.tls.expect_timeout = timeout_original
 
     def boot_normal(self, boot_to_normal_fn = None):
         """
@@ -682,8 +757,8 @@ EOF""")
 
     def rsync(self, src = None, dst = None,
               persistent_name = None,
-              persistent_dir = '/persistent.tcf.d', path_append = "/.",
-              rsync_extra = ""):
+              persistent_dir = persistent_tcf_d, path_append = "/.",
+              rsync_extra = "", skip_local = False):
         """
         rsync data from the local machine to a target
 
@@ -694,6 +769,11 @@ EOF""")
         (persistent storage ``/persistent.tcd.d``) that will not be
         overriden when flashing images. Then it will rsync it from there
         to the final location.
+
+        Note this cache directory can accumulate and grow too big;
+        :func:`target.pos.deploy_image
+        <tcfl.pos.extension.deploy_image>` will cap it to a top size
+        by removing the oldest files.
 
         This allows the content to be cached in between testcase execution
         that reimages the target. Thus, the first run, the whole source
@@ -763,7 +843,7 @@ EOF""")
           specification.
 
         :param str persistent_dir: (optional) name for the persistent
-          area in the target, defaults to `/persistent.tcf.d`.
+          area in the target, defaults to :data:`persistent_tcf_d`.
         """
         target = self.target
         target.shell.run("mkdir -p /mnt/%s" % persistent_dir)
@@ -776,7 +856,17 @@ EOF""")
             # source's name; this allows it to override files of
             # different types in the cache
             persistent_name = ""
-        if src != None:
+            _persistent_name = os.path.basename(src)
+        else:
+            assert isinstance(persistent_name, str) \
+                and not os.path.sep in persistent_name, \
+                "persistent_name  can't be a subdirectory" \
+                " and has to be a string"
+            _persistent_name = persistent_name
+        # We don't want to transfer from local machine if skip_local is True
+        # If skip_local is true, we proceed to make a copy from persistent
+        # area to final destination
+        if not skip_local and src != None:
             target.report_info(
                 "rsyncing %s to target's persistent area /mnt%s/%s"
                 % (src, persistent_dir, persistent_name))
@@ -800,12 +890,12 @@ EOF""")
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
                 "time -p rsync -cHaAX %s --delete /mnt/%s/%s%s /mnt/%s"
-                % (rsync_extra, persistent_dir, persistent_name, path_append,
+                % (rsync_extra, persistent_dir, _persistent_name, path_append,
                    dst))
 
 
     def rsync_np(self, src, dst, option_delete = False, path_append = "/.",
-                 rsync_extra = "",):
+                 rsync_extra = ""):
         """rsync data from the local machine to a target
 
         The local machine is the machine executing the test script (where
@@ -868,9 +958,11 @@ EOF""")
         cmdline = \
             "time sudo rsync -cHaAX %s --numeric-ids %s" \
             " --inplace" \
-            " --exclude=persistent.tcf.d --exclude='persistent.tcf.d/*'" \
+            " --exclude=%s --exclude='%s/*'" \
             " --port %%(rsync_port)s %s%s %%(rsync_server)s::rootfs/%s%s" \
-            % (rsync_extra, _delete, src, path_append, dst, path_append)
+            % (rsync_extra, _delete,
+               persistent_tcf_d, persistent_tcf_d,
+               src, path_append, dst, path_append)
         target.report_info(
             "POS: rsyncing %s to target's %s" % (src, dst), dlevel = -1,
             attachments = dict(cmdline = cmdline))
@@ -892,11 +984,13 @@ EOF""")
         # Use sh syntax rather than bash's $(</tmp/rsync.pid) to avoid
         # surprises if the shall changes; ideally we'd use killall, but we
         # don't know if it is installed in the POS
-        target.shell.run(
-            # set -b: notify immediatelly so we get the Killed message
-            # and it does not clobber the output of the next command.
-            "set -b; kill -9 `cat /tmp/rsync.pid`",
-            re.compile("Killed +rsync"))
+        # set -b: notify immediatelly so we get the Killed message
+        # and it does not clobber the output of the next command.
+        target.shell.run("set -b")
+        target.send("kill -9 `cat /tmp/rsync.pid`")
+        # this message comes asynchronous, maybe before or after the
+        # prompt...hence why we don't use target.shell.run()
+        target.expect(re.compile(r"Killed\s+rsync"))
         # remove the runnel we created to the rsync server and the
         # keywords to access it
         target.tunnel.remove(int(target.kws['rsync_port']))
@@ -909,7 +1003,12 @@ EOF""")
             # ensure we remove any possibly existing one
             "rm -f /tmp/tcf.metadata.yaml;"
             # rsync the metadata file to target's /tmp
-            " time -p rsync -cHaAX --numeric-ids --delete --inplace -L -vv"
+            # no need to do attributes here, so do not use -AX; this
+            # allows when running on SELinux combined systems (expect
+            # vs don't) to get errors such as:
+            #
+            ## rsync: rsync_xal_set: lremovexattr("/tmp/tcf.metadata.yaml","security.selinux") failed: Permission denied (13)
+            " time -p rsync -cHa --numeric-ids --delete --inplace -L -vv"
             # don't really complain if there is none
             " --ignore-missing-args"
             " %(rsync_server)s/%(image)s/.tcf.metadata.yaml"
@@ -932,10 +1031,14 @@ EOF""")
         if post_flash_script:
             target.report_info("POS: executing post flash script from "
                                "%s:.tcf.metadata.yaml" % image_final)
-            target.shell.run(
-                "export ROOTDEV=%s" % root_part_dev
-                + " ROOT=/mnt"
-                + " ")
+            export_vars = [
+                "ROOTDEV=" + root_part_dev,
+                "ROOT=/mnt"
+            ]
+            console = target.kws.get('linux_serial_console_default', None)
+            if console:
+                export_vars.append("BOOT_TTY=" + console)
+            target.shell.run("export " + " ".join(export_vars))
         line_acc = ""
         for line in post_flash_script.split('\n'):
             if not line:
@@ -946,10 +1049,49 @@ EOF""")
                 target.shell.run(line_acc + line)
                 line_acc = ""
 
+    def fsinfo_get_block(self, name):
+        target = self.target
+        for blockdevice in target.pos.fsinfo.get('blockdevices', []):
+            if blockdevice['name'] == name:
+                return blockdevice
+        raise tc.error_e(
+            "POS: can't find information about block device '%s' -- is "
+            "the right pos_boot_device set in the configuration?"
+            % name,
+            dict(fsinfo = pprint.pformat(target.pos.fsinfo)))
+
+    def fsinfo_get_child(self, child_name):
+        target = self.target
+        for blockdevice in target.pos.fsinfo.get('blockdevices', []):
+            for child in blockdevice.get('children', []):
+                if child['name'] == child_name:
+                    return child
+        return None
+
+    def fsinfo_get_child_by_partlabel(self, blkdev, partlabel):
+        target = self.target
+        for blockdevice in target.pos.fsinfo.get('blockdevices', []):
+            if blockdevice['name'] != blkdev:
+                continue
+            for child in blockdevice.get('children', []):
+                if child['partlabel'] == partlabel:
+                    return child
+        return None
+
     def _fsinfo_load(self):
         # Query filesystem information -> self.fsinfo
+        # call partprobe first; we want to make sure the system is
+        # done reading the partition tables for slow devices in the
+        # system (eg: we booted off somewhere else) -- hence the sleep
+        # 3s too ..have to wait a wee or lsblk reports empty; wish
+        # there was a way to sync partprobe?
+        # WARNING: don't print anything other than lsblk's output!
+        # will confuse the json loader
         output = self.target.shell.run(
-            "lsblk --json -bni -o NAME,SIZE,TYPE,FSTYPE,UUID,LABEL,MOUNTPOINT",
+            "sync;"
+            " partprobe;"
+            " sleep 3s; "
+            " lsblk --json -bni -o NAME,SIZE,TYPE,FSTYPE,UUID,PARTLABEL,LABEL,MOUNTPOINT 2> /dev/null",
             output = True, trim = True)
         # this output will be
         #
@@ -971,7 +1113,205 @@ EOF""")
         ##    }
         ##  ]
         ## }
-        self.fsinfo = json.loads(output)
+        try:
+            self.fsinfo = json.loads(output)
+        except Exception as e:
+            raise tc.blocked_e("can't parse JSON: %s" % e,
+                               dict(output = output,
+                                    trace = traceback.format_exc()))
+
+
+    def fsinfo_read(self, boot_partlabel = None,
+                    raise_on_not_found = True, timeout = None):
+        """
+        Re-read the target's partition tables, load the information
+
+        Internal API for POS drivers
+
+        This will load the partition table, ensuring the information
+        is loaded and that there is at least an entry in the partition
+        table for the boot partition of the device the trget's
+        describes as POS boot device (target's *pos_boot_dev*).
+
+        :param str boot_partlabel: (optional) label of the partition
+          we need to be able to find while scanning; will retry a few
+          times up to a minute forcing a scan; defaults to nothing
+          (won't look for it).
+        :param bool raise_on_not_found: (optional); raise a blocked
+          exception if the partition label is not found after
+          retrying; default *True*.
+        :param int timeout: (optional) seconds to wait for the
+          partition tables to be re-read; defaults to 30s (some HW
+          needs more than others and there is no way to make a good
+          determination) or whatever is specified in target
+          tag/property :ref:`pos_partscan_timeout`.
+        """
+        assert timeout == None or timeout > 0, \
+            "timeout must be None or a positive number of seconds; " \
+            "got %s" % timeout
+        target = self.target
+        if timeout == None:
+            timeout = int(target.kws.get('pos_partscan_timeout', 30))
+        # Re-read partition tables
+        ts0 = time.time()
+        ts = ts0
+        device_basename = target.kws['pos_boot_dev']
+        while ts - ts0 < timeout:
+            ts = time.time()
+            target.pos._fsinfo_load()
+            boot_part = target.pos.fsinfo_get_child(
+                # lookup partition one; if found properly, the info has loaded
+                device_basename + target.kws['p_prefix'] + "1")
+            if boot_part == None:
+                target.report_info(
+                    "POS/multiroot: boot partition still not found by lsblk "
+                    "after %.1fs/%.1fs; retrying after 3s"
+                    % (ts - ts0, timeout))
+                time.sleep(3)
+                continue
+            if boot_partlabel and boot_part['partlabel'] != boot_partlabel:
+                target.report_info(
+                    "POS/multiroot: boot partition with label %s still "
+                    "not found by lsblk after %.1fs/%.1fs; retrying after 3s"
+                    % (target._boot_label_name, ts - ts0, timeout))
+                time.sleep(3)
+                continue
+            break
+        else:
+            if raise_on_not_found:
+                raise tc.blocked_e(
+                    "POS/multiroot: new partition info not found by lsblk " \
+                    "after %.1fs" % (timeout),
+                    dict(fsinfo = str(target.pos.fsinfo)))
+                # Now set the root device information, so we can pick stuff to
+
+
+    #:
+    #: List of directories to clean up when trying to make up space in
+    #: the root filesystem.
+    #:
+    #: Before an image can be flashed, we need some space so rsync can
+    #: do its job. If there is not enough, we start cleaning
+    #: directories from files that can be easily ignored or we know
+    #: are going ot be wiped.
+    #:
+    #: This list can be manipulated to fit the specific use case, for
+    #: example, from the deploy methods before calling
+    #: meth:`deploy_image`:
+    #:
+    #: >>> self.pos.rootfs_make_room_candidates.insert(0, "/mnt/opt")
+    #:
+    #: to this we will add the cache locations from
+    #: data:`cache_locations_per_distro`
+    rootfs_make_room_candidates =  [
+        "/mnt/tmp/",
+        "/mnt/var/tmp/",
+        "/mnt/var/log/",
+        "/mnt/var/cache/",
+        "/mnt/var/lib/systemd",
+        "/mnt/var/lib/spool",
+        # do this last, the caches is important...
+        # after this we'd add the cache locations; one
+    ]
+
+    #: Dictionary of locations we cache for each distribution
+    #:
+    #: keyed by the beginning of the distro name, this allows us to
+    #: respect the space where content has been previousloy downloaded, so
+    #: future executions don't have to download it again. This can heavily
+    #: cut test setup time.
+    cache_locations_per_distro = {
+        'clear': [
+            # we try to keep the downloaded content across
+            # re-flashings, so we don't have to re-download it.
+            '/var/lib/swupd',
+        ],
+        'fedora': [
+            "/var/lib/rpm",
+        ],
+        'rhel': [
+            "/var/lib/rpm",
+        ],
+    }
+
+    def _rootfs_make_room(self, target, cache_locations, minimum_megs):
+        # rsync needs have *some* space to work, otherwise it will
+        # fail
+        #
+        # ensure we have at least megs available in the root partition
+        # before trying to rsyncing in a new image; start wiping
+        # things that are not so critical and most likely will be
+        # deleted or brough it clean by the new image; for each
+        # candidate to wipe we check if there is enough space,
+        # otherwise wipe that candidate; check again, wipe next
+        # candidate, etc..
+
+        dlevel = 2	# initially don't care too much
+        for candidate in self.rootfs_make_room_candidates + cache_locations:
+            output = target.shell.run(
+                "df -BM --output=avail /mnt   # got enough free space?",
+                output = True, trim = True)
+            avail_regex = re.compile("(?P<avail>[0-9]+)M", re.MULTILINE)
+            m = avail_regex.search(output)
+            if not m:
+                target.report_error(
+                    "POS: rootfs: unable to verify available space, can't"
+                    "parse df output", dict(output = output))
+                return
+            available_megs = int(m.groupdict()['avail'])
+            if available_megs >= minimum_megs:
+                target.report_info(
+                    "POS: rootfs: %dM free (vs minimum %dM)"
+                    % (available_megs, minimum_megs), dlevel = dlevel)
+                return
+
+            dlevel = 0		# we wiped, now I need to know
+            target.report_info(
+                "POS: rootfs: only %dM free vs minimum %dM, wiping %s"
+                % (available_megs, minimum_megs, candidate))
+            # wipe like this because the dir structure won't really
+            # cost that much in terms of size; as well, this is way
+            # fast for large trees vs 'rm -rf' [now, perl is really
+            # fast, but we can't be sure is installed]
+            # || true -> we don't really care if the directory exists or not
+            target.shell.run("find %s -type f -delete || true" % candidate)
+
+        # fall through means we couldn't wipe enough stuff
+
+
+    def _rootfs_cache_manage(self, target, root_part_dev,
+                             cache_locations_mnt):
+        # Figure out how much space is being consumed by the
+        # TCF persistent cache, we might have to clean up
+        du_regex = re.compile(r"^(?P<megs>[0-9]+)M\s+total$",
+                              re.MULTILINE)
+        # we don't care if the dir doesn't exist; -c makes it 0
+        du_output = target.shell.run(
+            "du -BM -sc %s 2> /dev/null || true"
+            " # how much cached space; cleanup?"
+            % " ".join(cache_locations_mnt), output = True)
+        match = du_regex.search(du_output)
+        if not match:
+            # if it doesn't exist, we still shall be able to parse
+            # that it is 0M and that's it -- so this might be a sign
+            # of something really wrong
+            raise tc.error_e("can't parse cache space measurement",
+                             dict(output = du_output))
+        megs = int(match.groupdict()['megs'])
+        # report it for general info
+        target.report_data(
+            "TCF persistant cache usage",
+            "%s:%s" % (target.fullid, root_part_dev), megs)
+        # FIXME: initial hardcoding for deployment testing, 3GiB
+        megs_top = 3 * 1024
+        if megs < megs_top:
+            target.report_skip("POS: cache uses %d/%dM: skipping cleanup" %
+                               (megs, megs_top))
+        else:
+            for location in cache_locations_mnt:
+                tl.linux_rsync_cache_lru_cleanup(target, location,
+                                                 megs_top * 1024)
+
 
     def deploy_image(self, ic, image,
                      boot_dev = None, root_part_dev = None,
@@ -1052,14 +1392,26 @@ EOF""")
         boot_dev = self._boot_dev_guess(boot_dev)
         with msgid_c("POS"):
 
-            original_timeout = testcase.tls.expecter.timeout
+            original_timeout = testcase.tls.expect_timeout
             original_prompt = target.shell.shell_prompt_regex
+            original_console_default = target.console.default
             try:
                 # ensure we use the POS prompt
                 target.shell.shell_prompt_regex = _pos_prompt
+                # FIXME: this is a hack because now the expecter has a
+                # maximum timeout set that can't be overriden--the
+                # re-design of the expect sequences will fix this, but
+                # for now we have to make sure the maximum is also set
+                # here, so in case the bios_boot_time setting in
+                # boot_to_pos is higher, it still can go.
+                # bios_boot_time has to be all encapsulated in
+                # boot_to_pos(), as it can be called from other areas
+                bios_boot_time = int(target.kws.get("bios_boot_time", 30))
+                testcase.tls.expect_timeout = bios_boot_time + timeout
 
                 self.boot_to_pos(pos_prompt = _pos_prompt, timeout = timeout,
                                  boot_to_pos_fn = target_power_cycle_to_pos)
+                target.console.select_preferred(user = 'root')
                 if not pos_prompt:
                     # Adopt a harder to false positive prompt regex;
                     # the TCF-HASHID is set by target.shell.up() after
@@ -1068,7 +1420,7 @@ EOF""")
                     target.shell.shell_prompt_regex = \
                         _pos_prompt = re.compile(r'TCF-%s: [0-9]+ \$ '
                                                  % testcase.kws['tc_hash'])
-                    
+
                 testcase.targets_active()
                 kws = dict(
                     rsync_server = ic.kws['pos_rsync_server'],
@@ -1078,9 +1430,15 @@ EOF""")
                 kws.update(target.kws)
 
 
-                # keep console more or less clean, so we can easily parse it
+                # keep console more or less clean, so we can easily
+                # parse it, otherwise kernel drivers loading deferred
+                # will randomly "corrupt" our output. Note kernel
+                # panics still will go through.
                 target.shell.run("dmesg -n alert")
-                self._fsinfo_load()
+                # don't raise if not found, as if it is an
+                # uninitialized disk we'll have to initialize it on
+                # mount_fs() below.
+                target.pos.fsinfo_read(raise_on_not_found = False)
 
                 # List the available images and decide if we have the
                 # one we are asked to install, autocomplete missing
@@ -1097,19 +1455,62 @@ EOF""")
                 root_part_dev = self.mount_fs(image_final, boot_dev)
                 kws['root_part_dev'] = root_part_dev
 
+                # Keep a lid on how big is the cached content
+                cache_locations = [ persistent_tcf_d ]
+                for distro, locations in self.cache_locations_per_distro.items():
+                    if image_final_tuple[0].startswith(distro):
+                        cache_locations += locations
+                cache_locations_mnt = []
+                for location in cache_locations:
+                    # reroot relative to where it is mounted
+                    cache_locations_mnt.append(os.path.join(
+                        "/mnt",
+                        # make the path relative to / so join() joins
+                        # it correctly and doesn't throw away the
+                        # prefix
+                        os.path.relpath(location, os.path.sep)))
+                self._rootfs_cache_manage(target, root_part_dev,
+                                          cache_locations_mnt)
+                self._rootfs_make_room(target, cache_locations_mnt, 150)
                 target.report_info("POS: rsyncing %(image)s from "
                                    "%(rsync_server)s to %(root_part_dev)s"
                                    % kws,
                                    dlevel = -2)
-                target.shell.run(
-                    "time -p rsync -cHaAX --numeric-ids --delete --inplace"
-                    " --exclude=/persistent.tcf.d"
-                    " --exclude='/persistent.tcf.d/*'"
+
+                # generate what we will exclude from wiping by rsync;
+                # this is basically /persistent.tcf.d and any other
+                # directories that are specific to each distro and
+                # contain downloaded content (like RPMs and such), to
+                # speed things up.
+                target.shell.run("""\
+cat > /tmp/deploy.ex
+%s
+%s/*
+%s
+\x04""" % (persistent_tcf_d, persistent_tcf_d, '\n'.join(cache_locations)))
+                # DO NOT use --inplace to sync the image; this might
+                # break certain installations that rely on hardlinks
+                # to share files and then updating one pushes the same
+                # content to all.
+                output = target.shell.run(
+                    "time -p rsync -acHAX --numeric-ids --delete "
+                    " --exclude-from=/tmp/deploy.ex"
                     " %(rsync_server)s/%(image)s/. /mnt/." % kws,
                     # 500s bc rsync takes a long time, but FIXME, we need
                     # to break this up and just increase timeout on the
                     # rsyncs -- and maybe guesstimate from the image size?
-                    timeout = 500)
+                    timeout = 500, output = True)
+                # see above on time -p
+                kpi_regex = re.compile(r"^real[ \t]+(?P<seconds>[\.0-9]+)$",
+                                       re.MULTILINE)
+                m = kpi_regex.search(output)
+                if not m:
+                    raise tcfl.tc.error_e(
+                        "Can't find regex %s in output" % kpi_regex.pattern,
+                        dict(output = output))
+                target.report_data("Deployment stats image %(image)s" % kws,
+                                   "image rsync to %s (s)" % target.fullid,
+                                   float(m.groupdict()['seconds']))
                 target.report_info("POS: rsynced %(image)s from "
                                    "%(rsync_server)s to %(root_part_dev)s"
                                    % kws)
@@ -1136,13 +1537,16 @@ EOF""")
                     # maybe something, maybe nothing
                     boot_config_fn(target, boot_dev, image_final)
 
-            except Exception as e:
-                target.report_info(
-                    "BUG? exception %s: %s %s" %
-                    (type(e).__name__, e, traceback.format_exc()))
+            except tc.exception as e:
+                target.report_info("POS: deployment %s: %s"
+                                   % (e.descr_past(), e.args[0]))
                 raise
-            finally:
-                # FIXME: document
+            except Exception as e:
+                target.report_info("POS: exception during deployment: %s"
+                                   % str(e))
+                raise
+            else:
+                # run this only when we are doing a clean exit
                 # sync, kill any processes left over in /mnt, unmount it
                 # don't fail if this fails, as it'd trigger another exception
                 # and hide whatever happened that make us fail. Just make a
@@ -1154,8 +1558,10 @@ EOF""")
                     "cd /; "
                     "for device in %s; do umount -l $device || true; done"
                     % " ".join(reversed(target.pos.umount_list)))
+            finally:
+                target.console.default = original_console_default
                 target.shell.shell_prompt_regex = original_prompt
-                testcase.tls.expecter.timeout = original_timeout
+                testcase.tls.expect_timeout = original_timeout
 
             target.report_info("POS: deployed %(image)s" % kws)
             return kws['image']
@@ -1178,20 +1584,29 @@ def image_seed_match(lp, goal):
 
     goall = image_spec_to_tuple(str(goal))
     scores = {}
+    check_empties = {}
     for part_name, seed in lp.items():
         score = 0
+        check_empties[part_name] = None
         seedl = image_spec_to_tuple(str(seed))
 
         if seedl[0] == goall[0]:
             # At least we want a distribution match for it to be
             # considered
             scores[part_name] = Levenshtein.seqratio(goall, seedl)
+
+            # Here, we are checking if spin for image and seed are equal.
+            # If the spin are not equal, we should check if there is
+            # an empty one to reduce time; therefore, we enable a
+            # flag to check empties.
+            if seedl[1] != goall[1]:
+                check_empties[part_name] = True
         else:
             scores[part_name] = 0
     if scores:
         selected, score = max(iter(scores.items()), key = operator.itemgetter(1))
-        return selected, score, lp[selected]
-    return None, 0, None
+        return selected, score, check_empties[selected], lp[selected]
+    return None, 0, None, None
 
 
 def deploy_tree(_ic, target, _kws):
@@ -1220,7 +1635,7 @@ def deploy_tree(_ic, target, _kws):
     target.report_pass("rsynced tree %s -> target:/" % source_tree)
 
 
-def deploy_path(_ic, target, _kws, cache = True):
+def deploy_path(ic, target, _kws, cache = True):
     """
     Rsync a local tree to the target after imaging
 
@@ -1235,24 +1650,83 @@ def deploy_path(_ic, target, _kws, cache = True):
     """
     source_path = getattr(target, "deploy_path_src", None)
     dst_path = getattr(target, "deploy_path_dest", "/")
+    rsync_extra = getattr(target, "deploy_rsync_extra", "")
+    skip_local = getattr(target, "deploy_skip_local", False)
     if source_path == None:
         target.report_info("not deploying local path because "
                            "*target.deploy_path_src is missing or None ",
                            dlevel = 2)
         return
 
+    if isinstance(source_path, str):
+        source_path = [ source_path ]
+    elif isinstance(source_path, collections.Iterable):
+        pass
+    else:
+        raise AssertionError(
+            "argument source_path needs to be a string or a "
+            "list of such, got a %s" % type(source_path).__name__)
+
+    # try to sync first from the server cache
+    for src in source_path:
+        cache_name = os.path.basename(src)
+
+        local_type = None
+        # FIXME: Should we check file type if we skip local transfer?
+        if not skip_local:
+            # Get local file type - regular file / directory
+            local_type = subprocess.check_output([
+                "/usr/bin/stat", "-c%F", src]).strip()
+
+        # Get remote file type - regular file / directory / doesn't exist
+        remote_type = target.shell.run(
+                    "/usr/bin/stat -c%%F /mnt/persistent.tcf.d/%s 2> "
+                    "/dev/null || echo missing" % cache_name,
+                    output = True, trim = True).strip()
+
+        # Remove cache if file exists and the types are different
+        # A 'regular file' could be a 'directory' in prev life
+        if remote_type != 'missing' and local_type != remote_type:
+            target.shell.run("rm -rf /mnt/persistent.tcf.d/%s\n"
+                              % cache_name)
+
+        # Seed from server's cache if it is a directory
+        if local_type == "directory":
+            target.shell.run("mkdir -p /mnt/persistent.tcf.d/%s\n"
+                    "# trying to seed %s from the server's cache"
+                    % (cache_name, cache_name))
+
+        rsync_server = ic.kws['pos_rsync_server']
+        target.report_info("POS: rsyncing %s from %s "
+                           "to /mnt/persistent.tcf.git/%s"
+                           % (cache_name, rsync_server, cache_name),
+                           dlevel = -1)
+        target.shell.run("time rsync --numeric-ids --delete --inplace "
+                         " -cHaAX %s %s/misc/%s /mnt/persistent.tcf.d/"
+                         " || true # ignore failures, might not be cached"
+                         % (rsync_extra, rsync_server,
+                            cache_name),
+                         # FIXME: hardcoded
+                         timeout = 300)
+        target.report_info("POS: rsynced %s from %s "
+                           "to /mnt/persistent.tcf.d/%s"
+                           % (cache_name, rsync_server, cache_name))
+
     def _rsync_path(_source_path, dst_path):
-        target.report_info("rsyncing file %s -> target:%s"
-                           % (_source_path, dst_path), dlevel = 1)
+        # this might take some time, so be slightl more verbose when
+        # we start, so we know what it this waiting for
+        target.report_info("POS: rsyncing %s -> target:%s"
+                           % (_source_path, dst_path), dlevel = -1)
         target.testcase._targets_active()
         if cache:
-            # FIXME: do we need option_dlete here too? option_delete = True
-            target.pos.rsync(_source_path, dst_path, path_append = "")
+            # FIXME: do we need option_delete here too? option_delete = True
+            target.pos.rsync(_source_path, dst_path, path_append = "",
+                             rsync_extra = rsync_extra, skip_local = skip_local)
         else:
             target.pos.rsync_np(_source_path, dst_path, option_delete = True,
-                                path_append = "")
+                                path_append = "", rsync_extra = rsync_extra)
         target.testcase._targets_active()
-        target.report_pass("rsynced file %s -> target:%s"
+        target.report_pass("POS: rsynced %s -> target:%s"
                            % (_source_path, dst_path))
 
     if isinstance(source_path, str):
@@ -1301,7 +1775,7 @@ class tc_pos0_base(tc.tc_c):
     #: Once the image was deployed, this will be set with the name of
     #: the image that was selected.
     image = "image-not-deployed"
-    
+
     #: extra parameters to the image deployment function
     #: :func:`target.pos.deploy_image
     #: <tcfl.pos.extension.deploy_image>`
@@ -1325,7 +1799,7 @@ class tc_pos0_base(tc.tc_c):
     #: How many seconds to delay before login in once the login prompt
     #: is detected
     delay_login = 0
-    
+
     def deploy_50(self, ic, target):
         # ensure network, DHCP, TFTP, etc are up and deploy
         ic.power.on()

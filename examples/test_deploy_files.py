@@ -76,17 +76,16 @@ class _test(tcfl.pos.tc_pos0_base):
             os.path.join(self.kws['srcdir'], "..", "README.rst")
         ]
 
-        # note ending this in / will create a new entry under /home/,
-        # otherwise it would overwrite /home
-        target.deploy_path_dest = "/home/"
+        target.deploy_path_dest = "/home/place"
         self.deploy_image_args = dict(extra_deploy_fns = [
             tcfl.pos.deploy_path ])
 	
     def eval(self, target):
-        target.shell.run("ls -lR /home/examples")
+        target.shell.run("find /home -ls")
         # verify the file exists and is the same
-        remote = target.shell.run("md5sum < /home/examples/data/beep.wav",
-                                  output = True, trim = True).strip()
+        remote = target.shell.run(
+            "md5sum < /home/place/examples/data/beep.wav",
+            output = True, trim = True).strip()
         local = subprocess.check_output(
             "md5sum < %s" % self.kws['srcdir'] + "/data/beep.wav",
             shell = True).strip()

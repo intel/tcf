@@ -40,6 +40,13 @@ extensions = [
 autodoc_default_options = { 'members': None, 'undoc-members': None }
 autoclass_content = 'both'
 autodoc_member_order = 'bysource'
+# some imports can't be put in the build slaves without major effort
+# and in any case, they are unneeed to build docs.
+autodoc_mock_imports = [
+    "prctl",
+    "raritan",
+    "requests_ntlm",
+]
 
 # Bring in documentation from other packages
 intersphinx_mapping = {
@@ -50,6 +57,16 @@ intersphinx_mapping = {
     'requests': ( 'http://docs.python-requests.org/en/master/', None ),
     'serial': ('http://pythonhosted.org/pyserial/', None ),
 }
+
+# workaround:
+#
+## SOMEFILE.py:docstring of CLASS:: WARNING: py:class reference target not found: list
+#
+# Apaprently a backport bug to Python 2.7
+#
+# description: https://bugs.python.org/issue31117
+# workaround: https://stackoverflow.com/questions/11417221/sphinx-autodoc-gives-warning-pyclass-reference-target-not-found-type-warning
+nitpick_ignore = [('py:class', 'list')]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -97,6 +114,7 @@ exclude_patterns = [
     # which happens when including these files inside a bigger
     # one. Seems a bug in Sphinx that might have be fixed in newer
     # releases.
+    # Individual files we have included 
     "doc/02-guide-contributing.rst",
     "doc/02-guide-tcf.rst",
     "doc/02-guide-tests.rst",
@@ -104,6 +122,9 @@ exclude_patterns = [
     "doc/02-guide-report-drivers.rst",
     "doc/02-guide-tcf-run.rst",
     "doc/02-guide-app-builder.rst",
+    # these are the files we always include, so let's have them
+    # excluded from being autoadded to avoid duplicates
+    "doc/*-LL-*.rst",
 ]
 
 # The reST default role (used for this markup: `text`) to use for all

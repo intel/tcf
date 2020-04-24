@@ -35,6 +35,7 @@ syslinux
 # be able to create it really fast -- btrfs is the fastest one to
 # create filesystems, so we'll use that
 btrfs-progs
+xfsprogs
 
 # Remove all this things that definitely are not needed in a basic
 # TCF-Live node--whoever needs them can add them in other
@@ -64,4 +65,8 @@ btrfs-progs
 nmap-ncat
 rsync
 socat
-
+# to manage SELinux stuff
+attr
+libselinux-utils
+# to ask the BIOS for settings and such when discovering HW
+dmidecode

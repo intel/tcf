@@ -49,7 +49,12 @@ import time
 import tty
 import urllib.parse
 
-from . import commonl
+import requests
+import commonl
+
+logger = logging.getLogger("tcfl.ttb_client")
+
+
 # We multithread to run testcases in parallel
 #
 # When massively running threads in production environments, we end up
@@ -89,11 +94,6 @@ elif mp.lower() == 'pathos':
     import_mp_pathos()
 else:
     raise RuntimeError('Invalid value to TCF_USE_MP (%s)' % mp)
-
-from . import commonl
-import requests
-
-logger = logging.getLogger("tcfl.ttb_client")
 
 if hasattr(requests, "packages"):
     # Newer versions of Pyython will complain loud about unverified certs
@@ -158,6 +158,10 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
     # Hold the information about the remote target, as acquired from
     # the servers
     _rts_cache = None
+    # FIXME: WARNING!!! hack only for tcf list's commandline
+    # --projection; don't use for anything else, needs to be cleaned
+    # up.
+    projection = None
 
     API_VERSION = 1
     API_PREFIX = "/ttb-v" + str(API_VERSION) + "/"
@@ -223,11 +227,56 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
             rts[rt_fullid] = rt
         return rts
 
+    class __metaclass__(type):
+        @classmethod
+        def _rts_get(cls, rtb):
+            try:
+                # FIXME: the projection thing is a really bad hack so
+                #        that the command line 'tcf list' can use
+                #        --projection, until we clean that up.
+                rt_list = rtb.rest_tb_target_list(
+                    all_targets = True,
+                    projection = rest_target_broker.projection)
+            except requests.exceptions.RequestException as e:
+                logger.error("%s: can't use: %s", rtb._url, e)
+                return {}
+            return rtb._rt_list_to_dict(rt_list)
+
+        @property
+        def rts_cache(cls):
+            if cls._rts_cache != None:
+                return cls._rts_cache
+            if not rest_target_brokers:
+                cls._rts_cache = {}
+                return cls._rts_cache
+            # Collect the targets into a list of tuples (FULLID, SUFFIX),
+            # where suffix will be *! (* if powered, ! if owned)
+            # Yes, there are better ways to do this, but this one
+            # is simple -- just launch one thread per server and
+            # then collect the data in a single cache -- shall use
+            # process pool, for better performance, but can't get
+            # it to serialize properly
+            tp = _multiprocessing_pool_c(processes = len(rest_target_brokers))
+            threads = {}
+            for rtb in sorted(list(rest_target_brokers.values())):
+                threads[rtb] = tp.apply_async(cls._rts_get, (rtb,))
+            tp.close()
+            tp.join()
+            cls._rts_cache = {}
+            for thread in threads.values():
+                cls._rts_cache.update(thread.get())
+            return cls._rts_cache
 
     @classmethod
     def rts_cache_flush(cls):
         del cls._rts_cache
         cls._rts_cache = None
+
+    def tb_state_trash(self):
+        # remove the state so tb_state_save() later will not save any
+        # cookies and thus effectively log out this user from the
+        # client side standpoint.
+        self.cookies = {}
 
     def tb_state_save(self, filepath):
         """Save cookies in *path* so they can be loaded by when the object is
@@ -242,16 +291,21 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
             logger.warning("%s: created state storage directory", filepath)
             os.mkdir(filepath)
         fname = filepath + "/cookies-%s.pickle" % url_safe
-        with os.fdopen(os.open(fname, os.O_CREAT | os.O_WRONLY, 0o600),
-                       "wb") as f, \
-                self.lock:
-            pickle.dump(self.cookies, f, protocol = 2)
-            logger.debug("%s: state saved %s",
-                         self._url, pprint.pformat(self.cookies))
+        if self.cookies == {}:
+            logger.debug("%s: state deleted (no cookies)", self._url)
+            commonl.rm_f(fname)
+        else:
+            with os.fdopen(os.open(fname, os.O_CREAT | os.O_WRONLY, 0o600),
+                           "wb") as f, \
+                    self.lock:
+                pickle.dump(self.cookies, f, protocol = 2)
+                logger.debug("%s: state saved %s",
+                             self._url, pprint.pformat(self.cookies))
 
     # FIXME: this timeout has to be proportional to how long it takes
     # for the target to flash, which we know from the tags
-    def send_request(self, method, url, data = None, files = None,
+    def send_request(self, method, url,
+                     data = None, json = None, files = None,
                      stream = False, raw = False, timeout = 480):
         """
         Send request to server using url and data, save the cookies
@@ -271,6 +325,8 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
         :rtype: requests.Response
 
         """
+        assert not (data and json), \
+            "can't specify data and json at the same time"
         # create the url to send request based on API version
         if not self._base_url:
             self._base_url = urllib.parse.urljoin(
@@ -283,20 +339,24 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
             cookies = self.cookies
         session = tls_var("session", requests.Session)
         if method == 'GET':
-            r = session.get(url_request, cookies = cookies,
+            r = session.get(url_request, cookies = cookies, json = json,
                             data = data, verify = self.verify_ssl,
                             stream = stream, timeout = timeout)
+        elif method == 'PATCH':
+            r = session.patch(url_request, cookies = cookies, json = json,
+                              data = data, verify = self.verify_ssl,
+                              stream = stream, timeout = timeout)
         elif method == 'POST':
-            r = session.post(url_request, cookies = cookies,
+            r = session.post(url_request, cookies = cookies, json = json,
                              data = data, files = files,
                              verify = self.verify_ssl,
                              stream = stream, timeout = timeout)
         elif method == 'PUT':
-            r = session.put(url_request, cookies = cookies,
+            r = session.put(url_request, cookies = cookies, json = json,
                             data = data, verify = self.verify_ssl,
                             stream = stream, timeout = timeout)
         elif method == 'DELETE':
-            r = session.delete(url_request, cookies = cookies,
+            r = session.delete(url_request, cookies = cookies, json = json,
                                data = data, verify = self.verify_ssl,
                                stream = stream, timeout = timeout)
         else:
@@ -306,7 +366,7 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
         if len(r.cookies) > 0:
             with self.lock:
                 # Need to update like this because r.cookies is not
-                # really a dict, but supports iteritems() -- overwrite
+                # really a dict, but supports items() -- overwrite
                 # existing cookies (session cookie) and keep old, as
                 # it will have the stuff we need to auth with the
                 # server (like the remember_token)
@@ -333,8 +393,12 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
             return False
         return True
 
-    def logout(self):
-        self.send_request('GET', "logout")
+    def logout(self, username = None):
+        if username:
+            self.send_request('DELETE', "users/" + username)
+        else:
+            # backwards compath
+            self.send_request('PUT', "logout")
 
     def validate_session(self, validate = False):
         if self.valid_session is None or validate:
@@ -352,7 +416,8 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
                     self.valid_session = valid_session
         return valid_session
 
-    def rest_tb_target_list(self, all_targets = False, target_id = None):
+    def rest_tb_target_list(self, all_targets = False, target_id = None,
+                            projection = None):
         """
         List targets in this server
 
@@ -360,18 +425,27 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
           as disabled.
         :param str target_id: Only get information for said target id
         """
-        if target_id:
-            r = self.send_request("GET", "targets/" + target_id)
+        if projection:
+            data = { 'projection': json.dumps(projection) }
         else:
-            r = self.send_request("GET", "targets/")
+            data = None
+        if target_id:
+            r = self.send_request("GET", "targets/" + target_id, data = data)
+            # FIXME: imitate same output format until we unfold all
+            # these calls--it was a bad idea
+            if not 'targets' in r:
+                r['targets'] = [ r ]
+        else:
+            r = self.send_request("GET", "targets/", data = data)
         _targets = []
         for rt in r['targets']:
             # Skip disabled targets
-            if target_id != None and rt.get('disabled', False) == True \
+            if target_id != None and rt.get('disabled', None) != None \
                and all_targets != True:
                 continue
             rt['fullid'] = self.aka + "/" + rt['id']
-            rt["url"] = self._base_url + 'targets/' + rt["id"]
+            # FIXME: hack, we need this for _rest_target_find_by_id,
+            # we need to change where we store it in this cache
             rt['rtb'] = self
             _targets.append(rt)
         del r
@@ -394,272 +468,18 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
         else:
             raise ValueError("%s/%s: unknown target" % (self.aka, target_id))
 
-    def rest_tb_target_acquire(self, rt, ticket = ''):
+    def rest_tb_target_acquire(self, rt, ticket = '', force = False):
         return self.send_request("PUT", "targets/%s/acquire" % rt['id'],
-                                 data = { 'ticket': ticket })
+                                 data = { 'ticket': ticket, 'force': force })
 
     def rest_tb_target_active(self, rt, ticket = ''):
         self.send_request("PUT", "targets/%s/active" % rt['id'],
                           data = { 'ticket': ticket })
 
-    def rest_tb_target_enable(self, rt, ticket = ''):
-        data = { 'ticket': ticket }
-        return self.send_request("PUT", "targets/%s/enable" % rt['id'], data)
-
-    def rest_tb_target_disable(self, rt, ticket = ''):
-        data = { 'ticket': ticket }
-        return self.send_request("PUT", "targets/%s/disable" % rt['id'], data)
-
-    def rest_tb_thing_plug(self, rt, thing, ticket = ''):
-        return self.send_request("PUT", "targets/%s/thing" % rt['id'],
-                                 data = { 'thing': thing, 'ticket': ticket })
-
-    def rest_tb_thing_list(self, rt, ticket = ''):
-        r =  self.send_request("GET", "targets/%s/thing" % rt['id'],
-                               data = { 'ticket': ticket })
-        return r['result']
-
-    def rest_tb_thing_unplug(self, rt, thing, ticket = ''):
-        self.send_request("DELETE", "targets/%s/thing" % rt['id'],
-                          data = { 'thing': thing, 'ticket': ticket })
-
     def rest_tb_target_release(self, rt, ticket = '', force = False):
         self.send_request(
             "PUT", "targets/%s/release" % rt['id'],
             data = { 'force': force, 'ticket': ticket })
-
-    def rest_tb_property_set(self, rt, prop, value, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/property_set" % rt['id'],
-            data = {
-                'ticket': ticket,
-                'property': prop,
-                'value': value
-            })
-
-    def rest_tb_property_get(self, rt, prop, ticket = ''):
-        r = self.send_request(
-            "PUT", "targets/%s/property_get" % rt['id'],
-            data = {
-                'ticket': ticket,
-                'property': prop
-            })
-        return r['value']
-
-    def rest_tb_target_ip_tunnel_add(self, rt, ip_addr, port, proto,
-                                     ticket = ''):
-        r = self.send_request("POST", "targets/%s/ip_tunnel" % rt['id'],
-                              data = {
-                                  'ip_addr': ip_addr,
-                                  'port': port,
-                                  'proto': proto,
-                                  'ticket': ticket,
-                              })
-        return int(r['port'])
-
-    def rest_tb_target_ip_tunnel_remove(self, rt, ip_addr, port, proto,
-                                        ticket = ''):
-        self.send_request("DELETE", "targets/%s/ip_tunnel" % rt['id'],
-                          data = {
-                              'ip_addr': ip_addr,
-                              'port': port,
-                              'proto': proto,
-                              'ticket': ticket,
-                          })
-
-    def rest_tb_target_ip_tunnel_list(self, rt, ticket = ''):
-        r = self.send_request("GET", "targets/%s/ip_tunnel" % rt['id'],
-                              data = { 'ticket': ticket })
-        return r['tunnels']
-
-    def rest_tb_target_power_on(self, rt, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/power_on" % rt['id'],
-            data = { 'ticket': ticket })
-
-    def rest_tb_target_power_off(self, rt, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/power_off" % rt['id'],
-            data = { 'ticket': ticket })
-
-    def rest_tb_target_reset(self, rt, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/reset" % rt['id'],
-            data = { 'ticket': ticket })
-
-    def rest_tb_target_power_cycle(self, rt, ticket = '', wait = None):
-        data = { 'ticket': ticket }
-        if wait != None:
-            data['wait'] = "%f" % wait
-        self.send_request("PUT", "targets/%s/power_cycle" % rt['id'],
-                          data = data)
-
-    def rest_tb_target_power_get(self, rt):
-        r = self.send_request(
-            "GET", "targets/%s/power_get" % rt['id'])
-        return r['powered']
-
-    def rest_tb_target_images_set(self, rt, images, ticket = ''):
-        """
-        Write/configure images to the targets (depending on the
-        target)
-
-        :param images: Dictionary of image types and filenames, like in
-          :meth:`ttbl.test_target_images_mixin.images_set`.
-        :type images: dict
-        :raises: Exception in case of errors
-        """
-        data = { 'ticket': ticket }
-        data.update(images)
-        self.send_request(
-            "PUT", "targets/%s/images_set" % rt['id'],
-            data = data)
-
-    def rest_tb_file_upload(self, remote_filename, local_filename):
-        with open(local_filename, 'rb') as f:
-            self.send_request(
-                "POST", "files/" + remote_filename,
-                files = { 'file': f })
-
-    def rest_tb_file_dnload(self, remote_filename, local_filename):
-        """
-        Download a remote file from the broker to a local file
-
-        :param str remote_filename: filename in the broker's user
-          storage area
-        :params str local_filename: local filename where to download it
-        """
-        with open(local_filename, "w") as lf:
-            self.rest_tb_file_dnload_to_fd(lf.fileno(), remote_filename)
-
-    def rest_tb_file_dnload_to_fd(self, fd, remote_filename):
-        """
-        Download a remote file from the broker to a local file
-
-        :param str remote_filename: filename in the broker's user
-          storage area
-        :params int fd: file descriptor where to write the data to
-        """
-        url = "files/%s" % remote_filename
-        with contextlib.closing(self.send_request("GET", url, data = {},
-                                                  stream = True,
-                                                  raw = True)) as r:
-            # http://docs.python-requests.org/en/master/user/quickstart/#response-content
-            chunk_size = 1024
-            total = 0
-            for chunk in r.iter_content(chunk_size):
-                os.write(fd, chunk)
-                total += len(chunk)
-            return total
-
-    def rest_tb_file_delete(self, remote_filename):
-        self.send_request("DELETE", url = "files/" + remote_filename,
-                          data = {})
-
-    def rest_tb_file_list(self):
-        """
-        Return a dictionary of files names available to the user in the
-        broker and their sha256 hash.
-        """
-        return self.send_request("GET", "files/")
-
-    def rest_tb_target_console_read(self, rt, console, offset, ticket = ''):
-        url = "targets/%s/console/" % rt['id']
-        data = {
-            'offset': offset,
-        }
-        if console:
-            data['console'] = console
-        if ticket != '':
-            data['ticket'] = ticket
-        return self.send_request("GET", url, data = data,
-                                 stream = False, raw = True)
-
-    def rest_tb_target_console_size(self, rt, console, ticket = ''):
-        r = self.send_request(
-            'GET', "targets/%s/console_size" % rt['id'],
-            data = {
-                'console': console,
-                'ticket': ticket
-            }
-        )
-        return r['byte_count']
-
-    def rest_tb_target_console_read_to_fd(self, fd, rt, console, offset,
-                                          max_size = 0, ticket = ''):
-        url = "targets/%s/console/" % rt['id']
-        data = {
-            'offset': offset,
-        }
-        if console:
-            data['console'] = console
-        if ticket != '':
-            data['ticket'] = ticket
-        with contextlib.closing(self.send_request("GET", url, data = data,
-                                                  stream = True,
-                                                  raw = True)) as r:
-            # http://docs.python-requests.org/en/master/user/quickstart/#response-content
-            chunk_size = 1024
-            total = 0
-            for chunk in r.iter_content(chunk_size):
-                os.write(fd, chunk)
-                # don't use chunk_size, as it might be less
-                total += len(chunk)
-                if max_size > 0 and total >= max_size:
-                    break
-            return total
-
-    def rest_tb_target_console_write(self, rt, console, data, ticket = ''):
-        url = "targets/%s/console/" % rt['id']
-        # gosh this naming sucks...
-        _data = dict(data = data)
-        if console:
-            _data['console'] = console
-        if ticket != '':
-            _data['ticket'] = ticket
-        return self.send_request('POST', url, data = _data)
-
-    def rest_tb_target_debug_info(self, rt, ticket = ''):
-        r = self.send_request('GET', "targets/%s/debug" % rt['id'],
-                              data = { 'ticket': ticket })
-        return r['info']
-
-    def rest_tb_target_debug_start(self, rt, ticket = ''):
-        return self.send_request('PUT', "targets/%s/debug" % rt['id'],
-                                 data = { 'ticket': ticket })
-
-    def rest_tb_target_debug_stop(self, rt, ticket = ''):
-        return self.send_request('DELETE', "targets/%s/debug" % rt['id'],
-                                 data = { 'ticket': ticket })
-
-    def rest_tb_target_debug_halt(self, rt, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/debug_halt" % rt['id'],
-            data = { 'ticket': ticket })
-
-    def rest_tb_target_debug_reset(self, rt, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/debug_reset" % rt['id'],
-            data = { 'ticket': ticket })
-
-    def rest_tb_target_debug_reset_halt(self, rt, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/debug_reset_halt" % rt['id'],
-            data = { 'ticket': ticket })
-
-    def rest_tb_target_debug_resume(self, rt, ticket = ''):
-        self.send_request(
-            "PUT", "targets/%s/debug_resume" % rt['id'],
-            data = { 'ticket': ticket })
-
-    def rest_tb_target_debug_openocd(self, rt, command, ticket = ''):
-        r = self.send_request(
-            "PUT", "targets/%s/debug_openocd" % rt['id'],
-            data = {
-                'ticket': ticket,
-                'command': command
-            })
-        return r['openocd_output']
 
 def rest_init(path, url, ignore_ssl = False, aka = None):
     """
@@ -685,6 +505,68 @@ def rest_shutdown(path):
     for rtb in rest_target_brokers.values():
         rtb.tb_state_save(path)
 
+
+def _credentials_get(domain, aka, args):
+    # env general
+    user_env = os.environ.get("TCF_USER", None)
+    password_env = os.environ.get("TCF_PASSWORD", None)
+    # server specific
+    user_env_aka = os.environ.get("TCF_USER_" + aka, None)
+    password_env_aka = os.environ.get("TCF_PASSWORD_" + aka, None)
+
+    # from commandline
+    user_cmdline = args.user
+    password_cmdline = args.password
+
+    # default to what came from environment
+    user = user_env
+    password = password_env
+    # override with server specific from envrionment
+    if user_env_aka:
+        user = user_env_aka
+    if password_env_aka:
+        password = password_env_aka
+    # override with what came from the command line
+    if user_cmdline:
+        user = user_cmdline
+    if password_cmdline:
+        password = password_cmdline
+
+    if not user:
+        if args.quiet:
+            raise RuntimeError(
+                "Cannot obtain login name and"
+                " -q was given (can't ask); "
+                " please specify a login name or use environment"
+                " TCF_USER[_AKA]")
+        if not sys.stdout.isatty():
+            raise RuntimeError(
+                "Cannot obtain login name and"
+                " terminal is not a TTY (can't ask); "
+                " please specify a login name or use environment"
+                " TCF_USER[_AKA]")
+        user = input('Login for %s [%s]: ' \
+                     % (domain, getpass.getuser()))
+        if user == "":	# default to LOGIN name
+            user = getpass.getuser()
+            print("I: defaulting to login name %s (login name)" % user)
+
+    if not password:
+        if args.quiet:
+            raise RuntimeError(
+                "Cannot obtain password and"
+                " -q was given (can't ask); "
+                " please specify a login name or use environment"
+                " TCF_PASSWORD[_AKA]")
+        if not sys.stdout.isatty():
+            raise RuntimeError(
+                "Cannot obtain password and"
+                " terminal is not a TTY (can't ask); "
+                " please specify a login name or use environment"
+                " TCF_PASSWORD[_AKA]")
+        password = getpass.getpass("Password for %s at %s: " % (user, domain))
+    return user, password
+
 def rest_login(args):
     """
     Login into remote servers.
@@ -694,44 +576,21 @@ def rest_login(args):
     :returns: True if it can be logged into at least 1 remote server.
     """
     logged = False
+    if not args.split and sys.stdout.isatty() and not args.quiet:
+        if args.user == None:
+            args.user = input('Login [%s]: ' % getpass.getuser())
+        if args.password in ( "ask", None):
+            args.password = getpass.getpass("Password: ")
     for rtb in rest_target_brokers.values():
         logger.info("%s: checking for a valid session", rtb._url)
         if not rtb.valid_session:
-            if args.quiet:
-                if rtb.aka:
-                    aka = "_" + rtb.aka
-                else:
-                    aka = ""
-                userid = os.environ.get("TCF_USER" + aka,
-                                        os.environ.get("TCF_USER", None))
-                userpass = os.environ.get("TCF_PASSWORD" + aka,
-                                          os.environ.get("TCF_PASSWORD", None))
-                if not userid:
-                    logger.error("Unable to get user from env variable: "
-                                 "TCF_USER" + aka)
-                    continue
-                if not userpass:
-                    logger.error("Unable to get password from env variable: "
-                                 "TCF_PASSWORD" + aka)
-                    continue
-                logger.info("%s: login in with user/pwd from environment "
-                            "TCF_USER/PASSWORD", rtb._url)
-            else:
-                if args.userid == None:
-                    userid = input('Login for %s [%s]: ' \
-                                       % (rtb._url, getpass.getuser()))
-                    if userid == "":
-                        userid = getpass.getuser()
-                else:
-                    userid = args.userid
-                userpass = getpass.getpass(
-                    "Login to %s as %s\nPassword: " % (rtb._url, userid))
+            user, password = _credentials_get(rtb._url, rtb.aka, args)
             try:
-                if rtb.login(userid, userpass):
+                if rtb.login(user, password):
                     logged = True
                 else:
                     logger.error("%s (%s): cannot login: with given "
-                                 "credentials %s", rtb._url, rtb.aka, userid)
+                                 "credentials %s", rtb._url, rtb.aka, user)
             except Exception as e:
                 logger.exception("%s (%s): cannot login: %s",
                                  rtb._url, rtb.aka, e)
@@ -743,22 +602,6 @@ def rest_login(args):
                      "please check your config")
         exit(1)
 
-def rest_logout(args):
-    for rtb in rest_target_brokers.values():
-        logger.info("%s: checking for a valid session", rtb._url)
-        if rtb.valid_session:
-            rtb.logout()
-
-def _dict_print_dotted(d, _prefix = ""):
-    for key, val in sorted(d.items(), key = lambda i: i[0]):
-        prefix = _prefix + key
-        if isinstance(val, dict):
-            _dict_print_dotted(val, prefix + ".")
-        elif isinstance(val, list):
-            print(prefix + ": [ " + ", ".join(str(i) for i in val) + " ]")
-        else:
-            print(prefix + ": " + str(val))
-
 def rest_target_print(rt, verbosity = 0):
     """
     Print information about a REST target taking into account the
@@ -768,32 +611,29 @@ def rest_target_print(rt, verbosity = 0):
     :type rt: dict
 
     """
-
     if verbosity == 0:
         print("%(fullid)s" % rt)
     elif verbosity == 1:
         # Simple list, just show owner and power state
         if 'powered' in rt:
-            if rt['powered'] == True:
-                power = " ON"
-            else:
-                power = ""
+            # having that attribute means the target is powered; otherwise it
+            # is either off or has no power control
+            power = " ON"
         else:
             power = ""
-        if rt['owner'] != None:
-            owner = "[" + rt['owner'] + "]"
+        owner = rt.get('owner', None)
+        if owner != None:
+            owner_s = "[" + owner + "]"
         else:
-            owner = ""
-        print("%s %s%s" % (rt['fullid'], owner, power))
+            owner_s = ""
+        print("%s %s%s" % (rt['fullid'], owner_s, power))
     elif verbosity == 2:
         print(rt['fullid'])
-        _dict_print_dotted(rt, "  ")
+        commonl.data_dump_recursive(rt, prefix = "  ")
     elif verbosity == 3:
         pprint.pprint(rt)
     else:
-        rtb =  rt.pop('rtb')	# DIRTY: Can't get skipkeys to work that well
-        print(json.dumps(rt, skipkeys = True, indent = 8))
-        rt['rbt'] = rtb
+        print(json.dumps(rt, skipkeys = True, indent = 4))
 
 def _rest_target_find_by_id(_target):
     """
@@ -809,8 +649,7 @@ def _rest_target_find_by_id(_target):
         return rt['rtb'], rt
     # Dirty messy search
     for rt in rest_target_broker.rts_cache.values():
-        if rt['id'] == _target \
-           or rt['url'] == _target:
+        if rt['id'] == _target:
             return rt['rtb'], rt
     raise IndexError("target-id '%s': not found" % _target)
 
@@ -836,7 +675,7 @@ def _target_select_by_spec( rt, spec, _kws = None):
     kws_bsp = dict()
     commonl.kws_update_from_rt(kws, rt)
     rt_full_id = rt['fullid']
-    rt_type = rt['type']
+    rt_type = rt.get('type', 'n/a')
 
     for bsp in bsps:
         kws_bsp.clear()
@@ -872,7 +711,7 @@ def _target_select_by_spec( rt, spec, _kws = None):
 
 
 
-def rest_target_list_table(args, spec):
+def rest_target_list_table(targetl):
     """
     List all the targets in a table format, appending * if powered
     up, ! if owned.
@@ -882,19 +721,15 @@ def rest_target_list_table(args, spec):
     # where suffix will be *! (* if powered, ! if owned)
 
     l = []
-    for rt_fullid, rt in sorted(iter(rest_target_broker.rts_cache.items()),
-                                key = lambda x: x[0]):
-        try:
-            if spec and not _target_select_by_spec(rt, spec):
-                continue
-            suffix = ""
-            if rt['owner']:
-                suffix += "@"
-            if rt.get('powered', False) == True:
-                suffix += "!"
-            l.append((rt_fullid, suffix))
-        except requests.exceptions.ConnectionError as e:
-            logger.error("%s: can't use: %s", rt_fullid, e)
+    for rt in targetl:
+        suffix = ""
+        if rt.get('owner', None):	# target might declare no owner
+            suffix += "@"
+        if 'powered' in rt:
+            # having that attribute means the target is powered;
+            # otherwise it is either off or has no power control
+            suffix += "!"
+        l.append(( rt['fullid'], suffix ))
     if not l:
         return
 
@@ -927,28 +762,55 @@ def rest_target_list_table(args, spec):
                 fullid = i[0], suffix = i[1], column_width = maxlen))
         sys.stdout.write("\n")
 
-def rest_target_list(args):
+def cmdline_list(spec_strings, do_all = False):
+    """
+    Return a list of dictionaries representing targets that match the
+    specification strings
+
+    :param list(str) spec_strings: list of strings that put together
+      with a logical *and* bring the logical specification
+
+    :param bool do_all: (optional) include also disabled targets
+      (defaults to *False*)
+    """
     specs = []
-    # Bring in disabled targets? (note the field is a text, not a bool)
-    if args.all == False:
-        specs.append("( disabled != 'True' )")
+    # Bring in disabled targets? (note the field is a text, not a
+    # bool, if it has anything, the target is disabled
+    if do_all != True:
+        specs.append("( not disabled )")
     # Bring in target specification from the command line (if any)
-    if args.target:
-        specs.append("(" + ") or (".join(args.target) +  ")")
+    if spec_strings:
+        specs.append("(" + ") or (".join(spec_strings) +  ")")
     spec = " and ".join(specs)
 
+    targetl = []
+    for _fullid, rt in sorted(rest_target_broker.rts_cache.items(),
+                              key = lambda x: x[0]):
+        if spec and not _target_select_by_spec(rt, spec):
+            continue
+        targetl.append(rt)
+    return targetl
+
+
+def rest_target_list(args):
+
+    if args.projection:
+        rest_target_broker.projection = args.projection
+
+    targetl = cmdline_list(args.target, args.all)
     if args.verbosity < 1 and sys.stderr.isatty() and sys.stdout.isatty():
-        rest_target_list_table(args, spec)
+        rest_target_list_table(targetl)
         return
     else:
-        for rt_fullid, rt in sorted(iter(rest_target_broker.rts_cache.items()),
-                                    key = lambda x: x[0]):
-            try:
-                if spec and not _target_select_by_spec(rt, spec):
-                    continue
+        if  args.verbosity == 4:
+            # print as a JSON dump
+            for rt in targetl:
+                rtb = rt.pop('rtb')
+                rt['rtb'] = str(rtb)
+            print(json.dumps(targetl, skipkeys = True, indent = 4))
+        else:
+            for rt in targetl:
                 rest_target_print(rt, args.verbosity)
-            except requests.exceptions.ConnectionError as e:
-                logger.error("%s: can't use: %s", rt_fullid, e)
 
 
 def rest_target_find_all(all_targets = False):
@@ -962,7 +824,7 @@ def rest_target_find_all(all_targets = False):
         return list(rest_target_broker.rts_cache.values())
     targets = []
     for rt in list(rest_target_broker.rts_cache.values()):
-        if rt.get('disabled', 'False') in ('True', True):
+        if rt.get('disabled', None) != None:
             continue
         targets.append(rt)
     return targets
@@ -976,48 +838,8 @@ def rest_target_acquire(args):
     """
     for target in args.target:
         rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_acquire(rt, ticket = args.ticket)
-
-def rest_target_enable(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_enable(rt, ticket = args.ticket)
-
-def rest_target_disable(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_disable(rt, ticket = args.ticket)
-
-def rest_target_property_set(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    rtb, rt = _rest_target_find_by_id(args.target)
-    rtb.rest_tb_property_set(rt, args.property, args.value,
-                             ticket = args.ticket)
-
-def rest_target_property_get(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    rtb, rt = _rest_target_find_by_id(args.target)
-    value = rtb.rest_tb_property_get(rt, args.property, ticket = args.ticket)
-    if value != None:
-        print(value)
+        rtb.rest_tb_target_acquire(
+            rt, ticket = args.ticket, force = args.force)
 
 def rest_target_release(args):
     """
@@ -1027,410 +849,8 @@ def rest_target_release(args):
     """
     for target in args.target:
         rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_release(rt, force = args.force,
-                                   ticket = args.ticket)
-
-def rest_target_power_on(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_power_on(rt, ticket = args.ticket)
-
-def rest_target_power_off(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_power_off(rt, ticket = args.ticket)
-
-def rest_target_reset(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_reset(rt, ticket = args.ticket)
-
-def rest_target_debug_halt(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_debug_halt(rt, ticket = args.ticket)
-
-def rest_target_debug_reset(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_debug_reset(rt, ticket = args.ticket)
-
-def rest_target_debug_reset_halt(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_debug_reset_halt(rt, ticket = args.ticket)
-
-def rest_target_debug_resume(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_debug_resume(rt, ticket = args.ticket)
-
-def rest_target_debug_openocd(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    rtb, rt = _rest_target_find_by_id(args.target)
-    res = rtb.rest_tb_target_debug_openocd(rt, args.command,
-                                           ticket = args.ticket)
-    print(res)
-
-def rest_target_power_cycle(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    if args.wait != None:
-        wait = float(args.wait)
-    else:
-        wait = None
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_power_cycle(rt, wait = wait, ticket = args.ticket)
-
-def rest_target_images_set(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    rtb, rt = _rest_target_find_by_id(args.target)
-    images = dict((image_spec.split(":", 1)) for image_spec in args.images)
-    return rtb.rest_tb_target_images_set(rt, images, ticket = args.ticket)
-
-def rest_tb_target_images_upload(rtb, _images):
-    """
-    Upload images from a list images
-
-    :param dict rtb: Remote Target Broker
-    :param _images: list of images, which can be specified as:
-
-      - string with ``"IMAGE1:FILE1 IMAGE2:FILE2..."``
-      - list or set of strings ``["IMAGE1:FILE1", "IMAGE2:FILE2", ...]``
-      - list or set of tuples ``[("IMAGE1", "FILE1"), ("IMAGE2", "FILE2"), ...]``
-
-    :returns: list of remote images (that can be fed straight to
-      :meth:`tcfl.ttb_client.rest_target_broker.rest_tb_target_images_set`)
-
-    """
-    images = []
-    if isinstance(_images, str):
-        for image_spec in _images:
-            try:
-                t, f = image_spec.split(":", 1)
-                images.append((t, f))
-            except ValueError as _e:
-                raise ValueError("Bad image specification `%s` "
-                                 "(expecting TYPE:FILE)" % image_spec)
-    elif isinstance(_images, set) or isinstance(_images, list):
-        for image_spec in _images:
-            if isinstance(image_spec, str):
-                t, f = image_spec.split(":", 1)
-                images.append((t, f))
-            elif isinstance(image_spec, tuple) and len(image_spec) == 2:
-                images.append(image_spec)
-            else:
-                raise TypeError("Invalid image specification %s" % image_spec)
-    else:
-        raise TypeError("_images is type %s" % type(_images).__name__)
-
-    remote_images = {}
-    for image_type, local_filename in images:
-        logger.info("%s: uploading %s", rtb._url, local_filename)
-        digest = commonl.hash_file(hashlib.sha256(), local_filename)\
-                        .hexdigest()[:10]
-        remote_filename = commonl.file_name_make_safe(
-            os.path.abspath(local_filename)) + "-" + digest
-        rtb.rest_tb_file_upload(remote_filename, local_filename)
-        remote_images[image_type] = remote_filename
-
-    return remote_images
-
-def rest_tb_target_images_upload_set(rtb, rt, _images, ticket = ''):
-    """
-    :param rtb: Remote Target Broker
-    :param rt: Remote Target descriptor
-    :param _images: list of images, which can be specified as:
-
-      - string with ``"IMAGE1:FILE1 IMAGE2:FILE2..."``
-      - list or set of strings ``["IMAGE1:FILE1", "IMAGE2:FILE2", ...]``
-      - list or set of tuples ``[("IMAGE1", "FILE1"),  ("IMAGE2", "FILE2"), ...]``
-
-
-    """
-    remote_images = rest_tb_target_images_upload(rtb, _images)
-    return rtb.rest_tb_target_images_set(rt, remote_images, ticket = ticket)
-
-def rest_target_images_upload_set(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    rtb, rt = _rest_target_find_by_id(args.target)
-    return rest_tb_target_images_upload_set(rtb, rt, args.images)
-
-def rest_target_power_get(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    rtb, rt = _rest_target_find_by_id(args.target)
-    powered =  rtb.rest_tb_target_power_get(rt)
-    if powered:
-        print("%s: on" % args.target)
-    else:
-        print("%s: off" % args.target)
-
-def rest_broker_file_upload(args):
-    """
-    FIXME
-    """
-    rtb = _rest_target_broker_find_by_id_url(args.target)
-    rtb.rest_tb_file_upload(args.remote_filename, args.local_filename)
-
-def rest_broker_file_dnload(args):
-    """
-    Download a file from a target broker
-    """
-    rtb = _rest_target_broker_find_by_id_url(args.target)
-    rtb.rest_tb_file_dnload(args.remote_filename, args.local_filename)
-
-def rest_broker_file_delete(args):
-    """
-    FIXME
-    """
-    rtb = _rest_target_broker_find_by_id_url(args.target)
-    rtb.rest_tb_file_delete(args.remote_filename)
-
-def rest_broker_file_list(args):
-    """Print a list of files names available to the user in the broker
-    and their sha256 hash.
-
-    """
-    rtb = _rest_target_broker_find_by_id_url(args.target)
-    for name, hexdigest in rtb.rest_tb_file_list().items():
-        print(name, hexdigest)
-
-
-def _rest_target_console_read(rtb, target, console, offset, filter_ansi,
-                              ticket = ''):
-    _data =  rtb.rest_tb_target_console_read(target, console, offset,
-                                             ticket = ticket)
-    logger.info("read %d bytes - filter %s", len(_data.text), filter_ansi)
-    if filter_ansi == True:
-        data = commonl.ansi_regex.sub('', _data.text)
-    else:
-        data = _data.text
-    try:
-        sys.stdout.write(data)
-        sys.stdout.flush()
-    except IOError as e:
-        if e.errno != errno.EAGAIN:
-            raise
-        time.sleep(0.25)
-    return len(data)
-
-def _rest_target_console_read_to_fd(rtb, fd, rt, console, offset,
-                                    max_size = 0, ticket = ''):
-    _data =  rtb.rest_tb_target_console_read_to_fd(
-        fd, rt, console, offset, max_size, ticket = ticket)
-    return len(_data)
-
-def rest_target_console_read(args):
-    rtb, rt = _rest_target_find_by_id(args.target)
-    offset = int(args.offset)
-    max_size = int(args.max_size)
-    if args.output == None:
-        while True:
-            offset += _rest_target_console_read(
-                rtb, rt, args.console, offset, args.filter_ansi,
-                ticket = args.ticket)
-            if not args.follow:
-                break
-            time.sleep(0.25)
-    else:
-        with open(args.output, "wb") as fd:
-            while True:
-                offset += rtb.rest_tb_target_console_read_to_fd(
-                    fd, rt, args.console, offset, max_size,
-                    ticket = args.ticket)
-                fd.flush()
-                if not args.follow:
-                    break
-                time.sleep(0.25)
-
-
-def _console_read_thread_fn(rtb, rt, console, filter_ansi,
-                            ticket = ''):
-    offset = 0
-    while True:
-        r = _rest_target_console_read(rtb, rt, console,
-                                      offset, filter_ansi, ticket = ticket)
-        if r == 0:
-            time.sleep(0.5)	# Give the port some time
-        else:
-            time.sleep(0.1)
-        offset += r
-
-def _rest_target_console_write_interactive(rtb, rt, console, filter_ansi, crlf,
-                                           ticket = ''):
-    """
-    Poor mans interactive
-    """
-    print("""\
-WARNING: This is a very limited interactive console
-         Escape character twice ^[^[ to exit
-""")
-    time.sleep(1)
-    console_read_thread = threading.Thread(
-        target = _console_read_thread_fn,
-        args = (rtb, rt, console, filter_ansi, ticket))
-    console_read_thread.daemon = True
-    console_read_thread.start()
-
-    class _done_c(Exception):
-        pass
-
-    try:
-        one_escape = False
-        old_flags = termios.tcgetattr(sys.stdin.fileno())
-        tty.setraw(sys.stdin.fileno())
-        flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFD)
-        """
-        Non-blocking mode is not supported
-        https://bugs.python.org/issue35762
-        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
-        """
-        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags)
-        while True and console_read_thread.is_alive():
-            try:
-                chars = sys.stdin.read()
-                if not chars:
-                    continue
-                for char in chars:
-                    # if the terminal sends a \r (user hit enter),
-                    # translate to crlf
-                    if char == "\r":
-                        chars = crlf
-                    if char == '\x1b':
-                        if one_escape:
-                            raise _done_c()
-                        one_escape = True
-                    else:
-                        one_escape = False
-                rtb.rest_tb_target_console_write(
-                    rt, console, chars,
-                    ticket = ticket)
-            except _done_c:
-                break
-            except IOError as e:
-                if e.errno != errno.EAGAIN:
-                    raise
-                # If no data ready, wait a wee, try again
-                time.sleep(0.25)
-    finally:
-        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_flags)
-
-def rest_target_console_write(args):
-    rtb, rt = _rest_target_find_by_id(args.target)
-    if args.interactive:
-        _rest_target_console_write_interactive(
-            rtb, rt, args.console, args.filter_ansi, args.crlf,
-            ticket = args.ticket)
-        return
-    if args.data == []:
-        while True:
-            line = getpass.getpass("")
-            if line:
-                logger.warning("stdin: read '%s'", line)
-                rtb.rest_tb_target_console_write(rt, args.console,
-                                                 line.strip() + args.crlf,
-                                                 ticket = args.ticket)
-    else:
-        for line in args.data:
-            logger.warning("cmdline: read '%s'", line)
-            rtb.rest_tb_target_console_write(
-                rt, args.console, line + args.crlf, ticket = args.ticket)
-
-def rest_target_debug_info(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        print(rtb.rest_tb_target_debug_info(rt, ticket = args.ticket))
-
-def rest_target_debug_start(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_debug_start(rt, ticket = args.ticket)
-
-def rest_target_debug_stop(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_debug_stop(rt, ticket = args.ticket)
-
-def rest_target_thing_plug(args):
-    rtb, rt = _rest_target_find_by_id(args.target)
-    rtb.rest_tb_thing_plug(rt, args.thing, ticket = args.ticket)
-
-def rest_target_thing_unplug(args):
-    rtb, rt = _rest_target_find_by_id(args.target)
-    rtb.rest_tb_thing_unplug(rt, args.thing, ticket = args.ticket)
-
-def rest_target_thing_list(args):
-    rtb, rt = _rest_target_find_by_id(args.target)
-    r = rtb.rest_tb_thing_list(rt, ticket = args.ticket)
-    for thing_name, status in sorted(r.items()):
-        print(thing_name + (": plugged" if status is True else ": unplugged"))
+        try:
+            rtb.rest_tb_target_release(rt, force = args.force,
+                                       ticket = args.ticket)
+        except requests.HTTPError as e:
+            logging.warning("%s: error releasing: %s", target, e)

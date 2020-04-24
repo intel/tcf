@@ -201,6 +201,65 @@ names. Also, before reinitializing the server, clean up the cache::
 
 to ensure there are no left-over configuration files with old addresses
 
+POS provisioning fails to install bootloader: unknown filesystem type 'vfat'
+----------------------------------------------------------------------------
+
+When provisioning a target, it boots to the Provisioning OS
+environment, the image is provisioned and then when the bootloader is
+going to be configured, it fails with something like::
+
+  ...
+  INFO3/f4todyDPOS ...examples/test_pos_deploy.py @v27a-vmtr|pgsotc09/nuc-17pi: [+156.8s] POS/EFI: /dev/sda1: mounting in /boot
+  INFO3/f4todyDPOS ...examples/test_pos_deploy.py @v27a-vmtr|pgsotc09/nuc-17pi: [+157.4s] 1: wrote 54B (mount /dev/sda1 /boot; mkdir -p /boot/loader/entri...) to console
+  ERRR2/f4todyD    ...examples/test_pos_deploy.py @v27a-vmtr|pgsotc09/nuc-17pi: [+157.7s] deploy errored: found expected (for error) `ERROR-IN-SHELL` in console `pgsotc09/nuc-17pi:1` at 0.30s
+  ERRR1/f4tody	   ...examples/test_pos_deploy.py @v27a-vmtr: [+157.7s] deploy errored
+  ERRR0/	toplevel @local: [+158.4s] 1 tests (0 passed, 1 error, 0 failed, 0 blocked, 0 skipped, in 0:02:37.259705) - errored
+  make: *** [/tmp/tcf-TKXLbn.mk:2: tcf-jobserver-run] Error 1
+
+in the report (for the example, *report-:f4tody.txt*) or by reading
+the targets's console::
+
+  $ tcf console-read nuc-17pi
+  ...
+  TCF-f4tody: 25 $ fsck.fat -aw /dev/sda1 || true
+  fsck.fat 4.1 (2017-01-24)
+  /dev/sda1: 1 files, 1/261372 clusters
+  TCF-f4tody: 26 $ mount /dev/sda1 /boot; mkdir -p /boot/loader/entries
+  mount: /boot: unknown filesystem type 'vfat'.
+  ERROR-IN-SHELL
+
+Note the error is that we cannot mount */dev/sda1* in */boot* because
+the POS kernel doesn't recognize the filesystem *vfat*. This usually
+means that the Provisioning OS environment doesn't have the Linux
+kernel modules needed; verify that for the POS kernels available for
+targets to load in */home/ttbd/public_html* or other locations
+there is the corresponding Linux tree of kernel modules in the *TCF
+Live* image located at */home/ttbd/images/x86_64*, subdirectory
+*lib/modules*, where there shall be a subdirectory tree matching the
+kernel version.
+
+E.g, if the Linux POS kernel version is::
+
+  TCF-f4tody: 23 $ uname -a
+  Linux nuc-17pi 5.1.16-200.fc29.x86_64 #1 SMP Wed Jul 3 16:03:17 UTC 2019 x86_64 x86_64 x86_64 GNU/Linux
+
+Then in the *lib/modules* subdir of */home/ttbd/images/x86_64*, there
+shall be a subdirectory called *5.1.16-200.fc29.x86_64* which contains
+the module tree for that version::
+
+  TCF-f4tody: 24 $ $ ls -l /lib/modules
+  ls -l /lib/modules
+  total 8
+  drwxr-xr-x 3 root root 4096 Oct 11 07:45 5.1.14-788.native
+  drwxr-xr-x 6 root root 4096 Oct  2 04:01 5.1.16-200.fc29.x86_64
+  drwxr-xr-x 6 root root 4096 Oct  3 03:40 5.2.17-100.fc29.x86_64
+
+this is normall in the kernel RPM or package for the distribution; to
+ensure it is installed, once you have it downloaded, you can install
+it with::
+
+  # rpm -i --root=/home/ttbd/images/x86_64 KERNEL.rpm
+
 *ttbd* server
 =============
 
@@ -763,7 +822,7 @@ following reasons for it:
 - the JTAG cable is not properly connected; ensure the cable is the
   right one and it is properly connected, paying close attention to
   the pinout (for example, as described in the fixture documented in
-  :func:`conf_00_lib.arduino101_add`).
+  :func:`conf_00_lib_mcu.arduino101_add`).
 
 - the hardware itself might have a hardware block against
   JTAGs. Disable it (if possible).

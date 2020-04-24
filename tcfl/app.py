@@ -90,7 +90,7 @@ else:
     raise RuntimeError('Invalid value to TCF_USE_MP (%s)' % mp)
 
 from . import commonl
-import tcfl.tc
+from . import tc
 
 def _app_src_validate(app_name, app_src):
     assert isinstance(app_name, str), \
@@ -109,12 +109,12 @@ def _app_src_validate(app_name, app_src):
     elif isinstance(app_src, dict):
         for k, v in app_src.items():
             if not isinstance(k, str):
-                raise tcfl.tc.blocked_e(
+                raise tc.blocked_e(
                     "%s: key in dictionary has to be a string, found %s"
                     % (app_name, type(k).__name__))
             app_src[k] = _app_src_validate(app_name, v)
         return app_src
-    raise tcfl.tc.blocked_e(
+    raise tc.blocked_e(
         "value to '%s' has to be a path to the app to build, "
         "a tuple of strings (PATH, OPT1, OPT2...) "
         "or  a dictionary { BSP: PATH } or { BSP: (PATH, OPT1, OPT2...) }; "
@@ -122,8 +122,8 @@ def _app_src_validate(app_name, app_src):
         % (app_name, type(app_src).__name__))
 
 def _args_check(ab, testcase, target, app_src = None):
-    assert isinstance(testcase, tcfl.tc.tc_c)
-    assert isinstance(target, tcfl.tc.target_c)
+    assert isinstance(testcase, tc.tc_c)
+    assert isinstance(target, tc.target_c)
     assert target.bsp != None, "BUG: %s: target's BSP must be set" \
                          % target.fulid
     for app_name, app_driver in _drivers.items():
@@ -131,7 +131,7 @@ def _args_check(ab, testcase, target, app_src = None):
             app_src = _app_src_validate(app_name, app_src)
             break
     else:
-        raise tcfl.tc.blocked_e(
+        raise tc.blocked_e(
             "BUG? App driver %s not registered?" % ab.__name__)
     return app_src
 
@@ -207,16 +207,16 @@ def build(ab, testcase, target, app_src):
 
 def deploy(images, ab, testcase, target, app_src):
     app_src = _args_check(ab, testcase, target, app_src)
-    assert isinstance(images, set)
+    assert isinstance(images, dict)
     try:
         r = ab.deploy(images, testcase, target, app_src)
         if r == None:
-            return tcfl.tc.result_c(1, 0, 0, 0, 0)
+            return tc.result_c(1, 0, 0, 0, 0)
         else:
-            assert isinstance(r, tcfl.tc.result_c)
+            assert isinstance(r, tc.result_c)
     except NotImplementedError:
         # These come from the base class
-        return tcfl.tc.result_c(0, 0, 0, 0, 0)
+        return tc.result_c(0, 0, 0, 0, 0)
 
 def setup(ab, testcase, target, app_src):
     app_src = _args_check(ab, testcase, target, app_src)
@@ -268,9 +268,9 @@ class app_c(object):
 
     When the target contains multiple BSPs the App builders are
     invoked for each BSP in the same order as they were declared with
-    the decorator :py:func:`tcfl.tc.target`. E.g.:
+    the decorator :py:func:`tc.target`. E.g.:
 
-    >>> @tcfl.tc.target(app_zephyr = { 'arc': 'path/to/zephyr_code' },
+    >>> @tc.target(app_zephyr = { 'arc': 'path/to/zephyr_code' },
     >>>                 app_sketch = { 'x86': 'path/to/arduino_code' })
 
     We are specifying that the *x86* BSP in the target has to run code
@@ -279,7 +279,7 @@ class app_c(object):
 
     If the target is being ran in a BSP model where one or more of the
     BSPs are not used, the App builders are responsible for providing
-    stub information with :meth:`tcfl.tc.target_c.stub_app_add`. As
+    stub information with :meth:`tc.target_c.stub_app_add`. As
     well, if an app builder determines a BSP does not need to be
     stubbed, it can also remove it from the target's list with:
 
@@ -289,13 +289,13 @@ class app_c(object):
     target might have different models or needs.
 
 
-    Note you can use the dictionary :py:meth:`tcfl.tc.tc_c.buffers` to
+    Note you can use the dictionary :py:meth:`tc.tc_c.buffers` to
     store data to communicate amongst phases. This dictionary:
 
     - will be cleaned in between evaluation runs
 
     - is not multi-threaded protected; take
-      :py:meth:`tcfl.tc.tc_c.buffers_lock` if you need to access it
+      :py:meth:`tc.tc_c.buffers_lock` if you need to access it
       from different paralell execution methods
       (setup/start/eval/test/teardown methods are *always* executed
       serially).
@@ -335,7 +335,7 @@ class app_c(object):
             # it, so we tell it where to start, as we have stopped it
             # to load the image after a power cycle
             if not '__start' in target.kws:
-                raise tcfl.tc.blocked_e(
+                raise tc.blocked_e(
                     "Testcase needs to set with target.kw_set() a "
                     "keyword named '__start' with a (string) value "
                     "that describes the program counter where to start "
@@ -343,7 +343,7 @@ class app_c(object):
             target.debug.openocd("reg pc %s" % target.kws['__start'])
             target.debug.resume()
         else:
-            target.power.reset()	# Will power on if off
+            target.power.cycle()	# Will power on if off
 
         # We want to start each target only once
         testcase.buffers['started-%s' % target.want_name] = True
@@ -367,10 +367,10 @@ def make_j_guess():
     So depending on how many jobs are already queued, decide how much
     -j we want to give to make.
     """
-    if tcfl.tc.tc_c.jobs > 8:
+    if tc.tc_c.jobs > 8:
         # Let's stick to serializing it it (no -j"
         return ""
-    elif tcfl.tc.tc_c.jobs > 1:
+    elif tc.tc_c.jobs > 1:
         return '-j%d' % int(math.ceil(_multiprocessing.cpu_count()/2))
     else:
         # If it's just us, go wild

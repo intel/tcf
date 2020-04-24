@@ -25,7 +25,7 @@ class cm_loopback(ttbl.test_target_console_mixin):
 
     def consoles_close(self):
         # Tell the logger process to stop logging
-        for f in self.__consoles.values():
+        for f in list(self.__consoles.values()):
             f.close()
             self.__consoles[f] = None
             del f

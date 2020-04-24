@@ -5,9 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-import tcfl.app
+from . import app
 
-class app_manual(tcfl.app.app_c):
+class app_manual(app.app_c):
     """
     This is an App Builder that tells the system the testcase will
     provide instructions to configure/build/deploy/eval/clean in the

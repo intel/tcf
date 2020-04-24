@@ -1,6 +1,15 @@
 # Makefile for Sphinx documentation
 #
 
+# We want the directory where the source is, we take it from the
+# directory of the makefile -- we need this in case we are building to
+# a separate directory.
+srcdir = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
+
+# ok, this is a hack because some distros don't have it -- need it for
+# now so the ttbl.raritan_emx module builds ok -- until we remove the
+# need for the raritan SDK and just use JSON RPC.
+export PYTHONPATH := $(PYTHONPATH):$(srcdir):/usr/local/lib/python2.7/site-packages
 # You can set these variables from the command line.
 SPHINXOPTS    = -q -n
 SPHINXBUILD   = sphinx-build

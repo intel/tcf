@@ -11,7 +11,10 @@ Configuration API for *ttbd*
 import threading
 import collections
 import re
+
 import ttbl
+import ttbl.tunnel
+import ttbl.store
 
 urls = []
 targets = {}
@@ -19,6 +22,7 @@ targets_lock = threading.Lock()
 _count = 0
 # This is set by the main daemonpath when bringing up
 state_path = None
+lib_path = None
 upload_max_size = 16 * 1024 * 1024
 
 ssl_enabled = None
@@ -37,6 +41,14 @@ ssl_enabled_check_disregard = None
 #: are the same network but spread around multiple servers, when they
 #: are in truth different networks.
 defaults_enabled = True
+default_networks = [ 'a', 'b' ]
+#: Qemu target count start
+#:
+#: By default, qemu targets we create by default get
+#: assigned IP addresses in the 90 range, so we have plenty of space
+#: before for others
+default_qemu_start = 90
+default_qemu_count = 4
 
 #: Number of processes to start
 #:
@@ -71,7 +83,13 @@ def _nested_list_flatten(l):
         else:
             yield e
 
-def target_add(target, _id = None, tags = None, target_type = None):
+# implementation of the tunneling interface; since it contains no
+# state, only one instance is needed that all target can share
+_iface_tunnel = ttbl.tunnel.interface()
+_iface_store = ttbl.store.interface()
+
+def target_add(target, _id = None, tags = None, target_type = None,
+               acquirer = None):
     """
     Add a target to the list of managed targets
 
@@ -116,17 +134,30 @@ def target_add(target, _id = None, tags = None, target_type = None):
         raise ValueError("target ID %s: invalid characters (valid: %s)" \
                          % (_id, regex.pattern))
 
+    if acquirer == None:
+        acquirer = ttbl.symlink_acquirer_c(target)
+    target.acquirer = acquirer
     with targets_lock:
         if id in list(targets.keys()):
             raise ValueError("target ID %s already exists" % _id)
         targets[_id] = target
-    if isinstance(target, ttbl.test_target_console_mixin):
-        target.console_list()
     target.tags.setdefault('interconnects', {})
     target.tags_update(dict(id = target.id, path = target.state_dir))
     assert isinstance(target.tags['interconnects'], dict)
 
-def interconnect_add(ic, _id = None, tags = None, ic_type = None):
+    # default interfaces
+
+    # tunneling interface; always on, since we can't make a
+    # determination with the limited information we have here if the
+    # target has an IP or not...and it is very cheap.
+    global _iface_tunnel
+    target.interface_add("tunnel", _iface_tunnel)
+    global _iface_store
+    target.interface_add("store", _iface_store)
+
+
+def interconnect_add(ic, _id = None, tags = None, ic_type = None,
+                     acquirer = None):
     """
     Add a target interconnect
 
@@ -145,7 +176,8 @@ def interconnect_add(ic, _id = None, tags = None, ic_type = None):
       default it's taken from the object's type.
 
     """
-    target_add(ic, _id, tags = tags, target_type = ic_type)
+    target_add(ic, _id, tags = tags, target_type = ic_type,
+               acquirer = acquirer)
     ttbl.config.targets[ic.id].tags['interfaces'].append('interconnect_c')
 
 _authenticators = []
@@ -174,4 +206,11 @@ cleanup_files_period = 60 # 60sec
 cleanup_files_maxage = 86400 #  1day, count is in seconds, 24x60x60 sec
 
 #: Which TCP port range we can use
+#:
+#: The server will take this into account when services that need port
+#: allocation look for a port; this allows to open a certain range in a
+#: firewall, for example.
+#:
+#: Note you want normally this in a range that allows ports that fit
+#: in some preallocated range (eg: VNC requires >= 5900).
 tcp_port_range = (1025, 65530)

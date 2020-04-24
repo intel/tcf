@@ -27,6 +27,7 @@ FIXME:
   big by mistake
 
 """
+import collections
 import glob
 import logging
 import os
@@ -50,7 +51,7 @@ tcf_config = {
 #  reason (for clarity in messages)
 #  spec (for tcf run -t SPEC )
 #  target (for tcf run TCS)
-tcs = {}
+tcs = collections.defaultdict(list)
 
 # lint-all calls first the functions with the changed files (one by
 # one), the filename in 'cf.name'. Then it calls with cf == None,
@@ -114,22 +115,37 @@ def lint_tcf(repo, cf):
                       + tcf_run_cmdline_args
             specs = []
             tests = []
-            for change, data in tcs.items():
-                reason = data.get("reason", "(BUG: no reason)")
-                if 'spec' in data:
-                    spec = "-t " + data["spec"] + " "
-                    specs += [ "-t", data["spec"] ]
-                    repo.log.warning("TCF: adding target filter '%s' "
-                                     "because %s" % (spec, reason))
-                else:
-                    spec = ""
-                if 'test' in data:
+            for change, data_list in tcs.items():
+                for data in data_list:
+                    reason = data.get("reason", "(BUG: no reason)")
+
+                    if 'spec' in data:
+                        target_spec = "-t " + data["spec"] + " "
+                        # We don't want to re-add it
+                        if not target_spec in specs:
+                            specs += [ target_spec ]
+                            repo.log.warning("TCF: adding target filter '%s' "
+                                             "because %s"
+                                             % (target_spec, reason))
+                        else:
+                            repo.log.warning(
+                                "TCF: not adding target filter '%s' "
+                                "because %s because we already it"
+                                % (target_spec, reason))
+
                     test = data.get("test", "")
-                    tests += [ data["test"] ]
-                    repo.log.warning("TCF: adding testcase '%s' because %s"
-                                     % (test, reason))
-                else:
-                    test = ""
+                    if test != "":
+                        # We don't want to re-add it
+                        if not test in tests:
+                            tests += [ data["test"] ]
+                            repo.log.warning(
+                                "TCF: adding testcase '%s' because %s"
+                                % (test, reason))
+                        else:
+                            repo.log.warning(
+                                "TCF: not adding testcase '%s' because %s as "
+                                "we already have it" % (test, reason))
+
             cmdline += specs + tests
             repo.log.info("Running @%s: %s" % (cwd, " ".join(cmdline)))
             proc = subprocess.Popen(
@@ -145,11 +161,12 @@ def lint_tcf(repo, cf):
         except subprocess.TimeoutExpired:
             proc.kill()
         except FileNotFoundError:
-            repo.blockage("Can't find tcf? [%s]", cmdline[0])
+            repo.blockage("Can't find tcf binary called '%s'" % cmdline[0])
             return
         for report_filename in glob.glob(tmpdir + "/report-*"):
             repo.error("TCF generated report %s" % report_filename)
-            with open(report_filename) as fp:
+            with open(report_filename,
+                      encoding = 'utf-8', errors = 'replace') as fp:
                 for line in fp:
                     repo.message("   " + line.strip())
         if proc.returncode:

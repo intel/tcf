@@ -1,6 +1,6 @@
 #! /usr/bin/python
 #
-# Copyright (c) 2017 Intel Corporation
+# Copyright (c) 2017-20 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -43,9 +43,9 @@ run. All the instances will then be run in parallel throgh a
 multiprocessing pool.
 
 To testcases report results via the report API, which are handled by
-drivers defined following :class:`tcfl.report.report_c`, which can be
-subclassed and extended to report to different destinations according
-to need. Default drivers report to console and logfiles.
+drivers defined following :class:`tcfl.tc.report_driver_c`, which can
+be subclassed and extended to report to different destinations
+according to need. Default drivers report to console and logfiles.
 
 .. _tc_id:
 
@@ -82,6 +82,9 @@ target lock--note this does not conflict with other users, as the
 tickets are namespaced per-user. This allows the server log to be used
 to crossreference what was being ran, to sort out issues.
 
+The *hash* length (number of characters used) is controlled by
+:data:`tcfl.tc.tc_c.hashid_len`.
+
 """
 import ast
 import atexit
@@ -92,6 +95,7 @@ import datetime
 import errno
 import imp
 import inspect
+import json
 import logging
 import numbers
 import os
@@ -100,14 +104,17 @@ import pprint
 import random
 import re
 import shutil
+import signal
 import string
 import subprocess
 import sys
+
 import tempfile
 import threading
 import time
 import traceback
 import types
+
 
 # FIXME: rename want_name to role
 
@@ -127,7 +134,6 @@ import types
 # case, use process pools for the testcases.
 
 _multiprocessing_method_pool_c = None
-_multiprocessing_tc_pool_c = None
 _multiprocessing_sync_manager = None
 _multiprocessing = None
 
@@ -140,7 +146,8 @@ def import_mp_pathos():
     global _multiprocessing_sync_manager
     global _multiprocessing
     _multiprocessing_method_pool_c = pathos.pools._ThreadPool
-    _multiprocessing_tc_pool_c = pathos.pools._ProcessPool
+    def _multiprocessing_tc_pool_c(**kwargs):
+        return pathos.pools._ProcessPool(maxtasksperchild = 2, **kwargs)
     _multiprocessing_sync_manager = multiprocess.managers.SyncManager
     _multiprocessing = pathos.multiprocessing
 
@@ -153,7 +160,8 @@ def import_mp_std():
     global _multiprocessing_sync_manager
     global _multiprocessing
     _multiprocessing_method_pool_c = multiprocessing.pool.ThreadPool
-    _multiprocessing_tc_pool_c = multiprocessing.pool.ThreadPool
+    def _multiprocessing_tc_pool_c(**kwargs):
+        return multiprocessing.pool.ThreadPool(**kwargs)
     _multiprocessing_sync_manager = multiprocessing.managers.SyncManager
     _multiprocessing = multiprocessing
 
@@ -174,13 +182,10 @@ else:
 import requests.exceptions
 
 from . import app
-from . import commonl
-from .commonl import expr_parser
-from . import expecter
-from . import report
-import tcfl
+import commonl
+import commonl.expr_parser
 from . import ttb_client
-
+from . import __init__ as tcfl
 from . import msgid_c
 
 # For debugging, levels are D2: 9, D3: 8, D4:7 ...
@@ -222,47 +227,89 @@ class exception(Exception):
     keys can contain spaces, for better reporting.
     """
     def __init__(self, description, attachments = None):
-        if attachments:
+        if attachments == None:
+            attachments = {}
+        else:
             assert isinstance(attachments, dict)
         Exception.__init__(self, description, attachments)
 
     def attachments_get(self):
-        if len(self.args) < 1 or not self.args[1]:
-            return {}
-        assert isinstance(self.args[1], dict), \
-            "expected dict, got type %s" % type(self.args[1]).__name__
         return self.args[1]
+
+    def attachments_update(self, d):
+        """
+        Update an exception's attachments
+        """
+        assert isinstance(d, dict)
+        self.args[1].update(d)
+
+    def __repr__(self):
+        return self.args[0]
+
+    tag = None
+
+    def _descr(self):
+        result = valid_results.get(self.tag, None)
+        if result == None:
+            raise AssertionError(
+                "Invalid tag '%s', not a tcfl.tc.valid_result" % self.tag)
+        return result
+
+    def descr(self):
+        """
+        Return the conceptual name of this exception in present tense
+
+        >>> pass_e().descr()
+        >>> "pass"
+        >>> fail_e().descr()
+        >>> "fail"
+        ...
+        """
+        return self._descr()[0]
+
+    def descr_past(self):
+        """
+        Return the conceptual name of this exception in past tense
+
+        >>> pass_e().descr()
+        >>> "passed"
+        >>> fail_e().descr()
+        >>> "failed"
+        ...
+        """
+        return self._descr()[1]
+
 
 class pass_e(exception):
     """
     The test case passed
     """
-    pass
+    tag = 'PASS'	# see valid_results and exception.descr*
 
 class blocked_e(exception):
     """
     The test case could not be completed because something failed and
     disallowed testing if it woud pass or fail
     """
-    pass
+    tag = 'BLCK'	# see valid_results and exception.descr*
 
 class error_e(exception):
     """
     Executing the test case found an error
     """
-    pass
+    tag = 'ERRR'	# see valid_results and exception.descr*
 
 class failed_e(exception):
     """
     The test case failed
     """
-    pass
+    tag = 'FAIL'	# see valid_results and exception.descr*
 
 class skip_e(exception):
     """
     A decission was made to skip executing the test case
     """
-    pass
+    tag = 'SKIP'	# see valid_results and exception.descr*
 
 #: List of valid results and translations in present and past tense
 #:
@@ -277,11 +324,11 @@ class skip_e(exception):
 #:
 #: - *blck*: the testcase has blocked due to an infrastructure issue
 #:   which forbids from telling if it passed, failed or errored (raise
-#:   :py:exc:`tcfl.tc.blocked_e`) 
+#:   :py:exc:`tcfl.tc.blocked_e`)
 #:
 #: - *skip*: the testcase has detected a condition that deems it not
 #:   applicable and thus shall be skipped (raise
-#    :py:exc:`tcfl.tc.skipped_e`)
+#:   :py:exc:`tcfl.tc.skip_e`)
 valid_results = dict(
     PASS = ( 'pass', 'passed' ),
     ERRR = ( 'error', 'errored' ),
@@ -290,13 +337,18 @@ valid_results = dict(
     SKIP = ( 'skip', 'skipped' ),
 )
 
+
+class _simple_namespace:
+    def __init__(self, kw):
+        self.__dict__.update(kw)
+
 #
 # I dislike globals, but sometimes they are needed
 #
 
 log_dir = None
-report_console = None
-report_failures = None
+report_console_impl = None
+report_file_impl = None
 # FIXME: no like, this is a hack and shall use tc_c.ticket
 ticket = None
 
@@ -304,18 +356,18 @@ def _globals_init():
     # This function is used by test routines to cleanup the global state
 
     global log_dir
-    global report_console
-    global report_failures
+    global report_console_impl
+    global report_file_impl
     # Should be possible to move most of these to tc_c
     log_dir = None
     tc_c._dry_run = False
     tc_c.runid = None
-    if report_console:
-        report.report_c.driver_rm(report_console)
-        report_console = None
-    if report_failures:
-        report.report_c.driver_rm(report_failures)
-        report_failures = None
+    if report_console_impl:
+        report_driver_c.remove(report_console_impl)
+        report_console_impl = None
+    if report_file_impl:
+        report_driver_c.remove(report_file_impl)
+        report_file_impl = None
 
 class target_extension_c(object):
     r"""Implement API extensions to targets
@@ -385,8 +437,382 @@ class target_extension_c(object):
         # verify this is a valid extension name
         pass
 
+class report_driver_c(object):
+    """Reporting driver interface
 
-class target_c(object):
+    To create a reporting driver, subclass this class, implement
+    :meth:`report` and then create an instance, adding it calling
+    :meth:`add`.
+
+    A testcase reports information by calling the `report_*()` APIs in
+    :class:`reporter_c`, which multiplexes into each reporting driver
+    registered with :meth:`add`, calling each drivers :meth:`report`
+    function which will direct it to the appropiate place.
+
+    Drivers can be created to dump the information in any format and
+    to whichever location, as needed.
+
+    For examples, look at:
+
+    - :mod:`tcfl.report_console`
+    - :mod:`tcfl.report_jinja2`
+    - :mod:`tcfl.report_taps`
+    - :mod:`tcfl.report_mongodb`
+
+    """
+
+    def report(self, reporter, tag, ts, delta,
+               level, message, alevel, attachments):
+        """Low level report from testcases
+
+        The reporting API calls this function for the final recording
+        of a reported message. In here basically anything can be
+        done--but they being called frequently, it has to be efficient
+        or will slow testcase execution considerably. Actions done in
+        this function can be:
+
+        - filtering (to only run for certain testcases, log levels, tags or
+          messages)
+        - dump data to a database
+        - record to separate files based on whichever logic
+        - etc
+
+        When a testcase is completed, it will issue a message
+        *COMPLETION <result>*, which marks the end of the testcase.
+
+        When all the testcases are run, the global testcase reporter
+        (:data:`tcfl.tc.tc_global`) will issue a *COMPLETION <result>*
+        message. The global testcase reporter can be identified because
+        it has an attribute *skip_reports* set to *True* and thus can
+        be identified with:
+
+        .. code-block:: python
+
+           if getattr(_tc, "skip_reports", False) == True:
+               do_somethin_for_the_global_reporter
+
+        Important points:
+
+        - **do not rely on globals**; this call is not lock protected
+          for concurrency; will be called for *every* single report the
+          internals of the test runner and the testcases do from
+          multiple threads at the same time. Expect a *lot* of calls.
+
+          Must be ready to accept multiple threads calling from
+          different contexts. It is a good idea to use thread local
+          storage (TLS) to store state if needed. See an example in
+          :class:`tcfl.report_console.driver`).
+
+        :param reporter_c reporter: who is reporting this; this can be
+          a :class:`testcase <tc_c>` or a :class:`target <target_c>`.
+
+        :param str tag: type of report (PASS, ERRR, FAIL, BLCK, INFO,
+          DATA); note they are all same length and described in
+          :data:`valid_results`.
+
+        :param float ts: timestamp for when the message got generated
+          (in seconds)
+
+        :param float delta: time lapse from when the testcase started
+          execution until this message was generated.
+
+        :param int level: report level for the *message* (versus for
+          the attachments); note report levels greater or equal to
+          1000 are used to pass control messages, so they might not be
+          subject to normal verbosity control (for example, for a log
+          file you might want to always include them).
+
+        :param str message: single line string describing the message
+          to report.
+
+          If the message starts with  *"COMPLETION "*, this is the
+          final message issued to mark the result of executing a
+          single testcase. At this point, you can use fields such
+          as :data:`tc_c.result` and :data:`tc_c.result_eval` and it
+          can be used as a synchronization point to for example, flush
+          a file to disk or upload a complete record to a database.
+
+          Python2: note this has been converted to unicode UTF-8
+
+        :param int alevel: report level for the attachments
+
+        :param dict attachments: extra information to add to the
+          message being reported; shall be reported as *KEY: VALUE*;
+          VALUE shall be recursively reported:
+
+          - lists/tuples/sets shall be reported indicating the index
+            of the member (such as *KEYNAME[3]: VALUE*
+
+          - dictionaries shall be recursively reported
+
+          - strings and integers shall be reported as themselves
+
+          - any other data type can be reported as what it's *repr*
+            function returns when converting it to unicode ro whatever
+            representation the driver can do.
+
+          You can use functions such :func:`commonl.data_dump_recursive`
+          to convert a dictionary to a unicode representation.
+
+          This might contain strings that are not valid UTF-8, so you
+          need to convert them using :func:`commonl.mkutf8` or
+          similar. :func:`commonl.data_dump_recursive` do that for you.
+
+        """
+        raise NotImplementedError
+
+    _drivers = []
+    @classmethod
+    def add(cls, obj, origin = None):
+        """
+        Add a driver to handle other report mechanisms
+
+        A report driver is used by *tcf run*, the meta test runner, to
+        report information about the execution of testcases.
+
+        A driver implements the reporting in whichever way it decides
+        it needs to suit the application, uploading information to a
+        server, writing it to files, printing it to screen, etc.
+
+        >>> class my_report_driver(tcfl.tc.report_driver_c)
+        >>>     ...
+        >>> tcfl.tc.report_driver_c.add(my_report_driver())
+
+        :param tcfl.tc.report_driver_c obj: object subclasss of
+          :class:`tcfl.tc.report_driver_c` that implements the
+          reporting.
+
+        :param str origin: (optional) where is this being registered;
+          defaults to the caller of this function.
+        """
+        assert isinstance(obj, cls)
+        if origin == None:
+            o = inspect.stack()[1]
+            origin = "%s:%s" % (o[1], o[2])
+        setattr(obj, "origin", origin)
+        cls._drivers.append(obj)
+
+    @classmethod
+    def remove(cls, obj):
+        """
+        Remove a report driver previously added with :meth:`add`
+
+        :param tcfl.tc.report_driver_c obj: object subclasss of
+          :class:`tcfl.tc.report_driver_c` that implements the
+          reporting.
+
+        """
+        assert isinstance(obj, cls)
+        cls._drivers.remove(obj)
+
+    @classmethod
+    def ident_simplify(cls, ident, runid, hashid):
+        """
+        If any looks like:
+
+          RUNID:HASHID[SOMETHING]
+
+        simplify it by returning *SOMETHING*
+        """
+        if ident.startswith(runid + ":"):
+            ident = ident[len(runid) + 1:]
+        if ident.startswith(hashid):
+            ident = ident[len(hashid):]
+        return ident
+
+
+class reporter_c(object):
+    """
+    High level reporting API
+
+    Embedded as part of a target or testcase, allows them to report in
+    a unified way
+
+    This class accesses members that are undefined in here but defined
+    by the class that inherits it (tc_c and target_c):
+
+    - self.kws
+
+    """
+    def __init__(self, testcase = None):
+        # this is to be set by whoever inherits this
+        self._report_prefix = "reporter_c._report_prefix/uninitialized"
+        #: time when this testcase or target was created (and thus all
+        #: references to it's inception are done); note if this is for
+        #: a testcase, in __init_shallow__() we update this for when
+        #: we assign it to a target group to run.
+        if testcase:
+            self.ts_start = testcase.ts_start
+        else:
+            self.ts_start = time.time()
+
+    @staticmethod
+    def _argcheck(message, attachments, level, dlevel, alevel):
+        assert isinstance(message, str)
+        if attachments:
+            assert isinstance(attachments, dict)
+            # FIXME: valid values?
+        assert level >= 0
+        # just check is some kind of integer (positive, negative or zero)
+        assert dlevel >= 0 or dlevel < 0
+        assert alevel >= 0 or alevel < 0
+
+    def _report(self, level, alevel, tag, message, attachments):
+        ts = time.time()
+        delta = ts - self.ts_start
+        for driver in report_driver_c._drivers:
+            driver.report(
+                self, tag, ts, delta, level, commonl.mkutf8(message),
+                alevel, attachments)
+
+    def report_pass(self, message, attachments = None,
+                    level = None, dlevel = 0, alevel = 2):
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "PASS", message, attachments)
+
+    def report_fail(self, message, attachments = None,
+                    level = None, dlevel = 0, alevel = 2):
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "FAIL", message, attachments)
+
+    def report_error(self, message, attachments = None,
+                     level = None, dlevel = 0, alevel = 2):
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "ERRR", message, attachments)
+
+    def report_blck(self, message, attachments = None,
+                    level = None, dlevel = 0, alevel = 2):
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "BLCK", message, attachments)
+
+    def report_skip(self,  message, attachments = None,
+                    level = None, dlevel = 0, alevel = 2):
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "SKIP", message, attachments)
+
+    def report_info(self, message, attachments = None,
+                    level = None, dlevel = 0, alevel = 2):
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "INFO", message, attachments)
+
+    def report_data(self, domain, name, value, expand = True,
+                    level = 2, dlevel = 0):
+        """Report measurable data
+
+        When running a testcase, if data is collected that has to be
+        reported for later analysis, use this function to report
+        it. This will be reported by the report driver in a way that
+        makes it easy to collect later on.
+
+        Measured data is identified by a *domain* and a *name*, plus
+        then the actual value.
+
+        A way to picture how this data can look once aggregated is as
+        a table per domain, on which each invocation is a row and each
+        column will be the values for each name.
+
+        :param str domain: to which domain this measurement applies
+          (eg: "Latency Benchmark %(type)s");
+
+        :param str name: name of the value  (eg: "context switch
+          (microseconds)"); it is recommended to always add the unit
+          the measurement represents.
+
+        :param value: value to report for the given domain and name;
+           any type can be reported.
+
+        :param bool expand: (optional) by default, the *domain* and
+          *name* fields will be %(FIELD)s expanded with the keywords
+          of the testcase or target. If *False*, it will not be
+          expanded.
+
+          This enables to, for example, specify a domain of "Latency
+          measurements for target %(type)s" which will automatically
+          create a different domain for each type of target.
+        """
+        assert isinstance(domain, str)
+        assert isinstance(name, str)
+        assert level >= 0
+        assert dlevel >= 0
+        assert isinstance(expand, bool)
+
+        if expand:
+            domain = domain % self.kws
+            name = name % self.kws
+        level += dlevel
+
+        self._report(level, 1000, "DATA",
+                     domain + "::" + name + "::%s" % value,
+                     dict(domain = domain, name = name, value = value))
+
+    def report_tweet(self, what, result, extra_report = "",
+                     ignore_nothing = False, attachments = None,
+                     level = None, dlevel = 0, alevel = 2,
+                     dlevel_failed = 0, dlevel_blocked = 0,
+                     dlevel_passed = 0, dlevel_skipped = 0, dlevel_error = 0):
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(what, attachments, level, dlevel, alevel)
+        assert dlevel_failed >= 0
+        assert dlevel_blocked >= 0
+        assert dlevel_passed >= 0
+        assert dlevel_skipped >= 0
+        assert dlevel_error >= 0
+        level += dlevel
+        r = False
+        if result.failed > 0:
+            tag = "FAIL"
+            msg = valid_results[tag][1]
+            level += dlevel_failed
+        elif result.errors > 0:
+            tag = "ERRR"
+            msg = valid_results[tag][1]
+            level += dlevel_error
+        elif result.blocked > 0:
+            tag = "BLCK"
+            msg = valid_results[tag][1]
+            level += dlevel_blocked
+        elif result.passed > 0:
+            tag = "PASS"
+            msg = valid_results[tag][1]
+            r = True
+            level += dlevel_passed
+        elif result.skipped > 0:
+            tag = "SKIP"
+            msg = valid_results[tag][1]
+            r = True
+            level += dlevel_skipped
+        else:            # When here, nothing was run, all the counts are zero
+            if ignore_nothing == True:
+                return True
+            self._report(level, level + alevel, "BLCK",
+                         what + " / nothing ran " + extra_report, attachments)
+            return False
+        self._report(level, level + alevel,
+                     tag, what + " " + msg + " " + extra_report, attachments)
+        return r
+
+
+
+class target_c(reporter_c):
     """A remote target that can be manipulated
 
     :param dict rt: remote target descriptor (dictionary) as returned
@@ -406,15 +832,15 @@ class target_c(object):
     if the target exposes it or not; these is the current list of
     implemented interfaces:
 
-    - :py:class:`console <tcfl.target_ext_console.console>`
+    - :py:class:`console <tcfl.target_ext_console.extension>`
     - :py:class:`capture <tcfl.target_ext_capture.extension>` for
       stream and snapshot captures of audio, video, network traffic,
       etc
-    - :py:class:`debug <tcfl.target_ext_debug.debug>`
-    - :py:class:`fastboot <tcfl.target_ext_fastboot.fastboot>`
-    - :py:class:`images <tcfl.target_ext_images.images>`
+    - :py:class:`debug <tcfl.target_ext_debug.extension>`
+    - :py:class:`fastboot <tcfl.target_ext_fastboot.extension>`
+    - :py:class:`images <tcfl.target_ext_images.extension>`
     - :py:class:`ioc_flash_server_app <tcfl.target_ext_ioc_flash_server_app.extension>`
-    - :py:class:`power <tcfl.target_ext_power.power>`
+    - :py:class:`power <tcfl.target_ext_power.extension>`
     - :py:class:`shell <tcfl.target_ext_shell.shell>`
     - :py:class:`ssh <tcfl.target_ext_ssh.ssh>`
     - :py:class:`tunnel <tcfl.target_ext_tunnel.tunnel>`
@@ -425,9 +851,11 @@ class target_c(object):
     #
     # Public API
     #
-    def __init__(self, rt, testcase, bsp_model, target_want_name):
+    def __init__(self, rt, testcase, bsp_model, target_want_name,
+                 extensions_only = None):
         assert isinstance(rt, dict)
         assert isinstance(testcase, tc_c)
+        reporter_c.__init__(self, testcase = testcase)
         #: Name this target is known to by the testcase (as it was
         #: claimed with the :func:`tcfl.tc.target` decorator)
         self.want_name = target_want_name
@@ -442,7 +870,7 @@ class target_c(object):
         #: Type name of this target
         self.type = rt['type']
         #: ticket used to acquire this target
-        self.ticket = None
+        self.ticket = testcase.ticket
         #: Testcase that this target is currently executing
         self.testcase = testcase
         #: All of BSPs supported by this target
@@ -468,7 +896,6 @@ class target_c(object):
         #: BSP (inside the :term:`BSP model`) this target is currently
         #: configured for
         self.bsp = None
-        self._prefix = ""
         # KW handling for targets is a little bit messed up, as we
         # want to include the keywords root testcase kws, the ones for
         # the testcase instance, the ones for the target (incuding
@@ -477,6 +904,7 @@ class target_c(object):
         # BSP.  So we keep the "originals" for modification with
         # kw_set in self._kw and then the update KWS modifies the
         # self.kws set of keywords merging everthing together.
+        # note self.kws comes from reporter_c
         #: Target specific keywords
         self._kws = {}
         #: Target specific keywords for each BSP
@@ -494,9 +922,11 @@ class target_c(object):
         #: find where to put stuff.
         self.tmpdir = testcase.tmpdir
 
-        #: Keywords for ``%(KEY)[sd]`` substitution specific to this
-        #: target and current active :term:`BSP model` and BSP as set
-        #: with :meth:`bsp_set`.
+        #: Keywords for ``%(KEY)[sd]`` substitution specific to the
+        #: testcase or target and its current active :term:`BSP model`
+        #: and BSP as set with :meth:`bsp_set`.
+        #:
+        #: FIXME: elaborate on testcase keywords, target keyworkds
         #:
         #: These are obtained from the remote target descriptor
         #: (`self.rt`) as obtained from the remote *ttbd* server.
@@ -526,9 +956,9 @@ class target_c(object):
         #: :meth:`TARGET.property_set<tcfl.tc.target_c.property_set>`
         #: (or it's command line equivalent ``tcf property-set TARGET
         #: PROPERTY VALUE``) will show up as keywords.
-        self.kws = {}
+        self.kws = {}		# Updated when we update the kws
         #: Origin of keys defined in self.kws
-        self.kws_origin = {}
+        self.kws_origin = {}	# in tc_c.__init_shallow__()
         # Generate KWS in case the extensions have to use it
         if bsp_model:
             self._bsp_model_set(bsp_model)
@@ -536,6 +966,8 @@ class target_c(object):
             self._report_mk_prefix()
         # Fire up the extensions
         for name, extension in self.__extensions.items():
+            if extensions_only != None and name not in extensions_only:
+                continue
             try:
                 self.report_info("%s: %s: initializing target extension"
                                  % (self.want_name, name),
@@ -567,7 +999,16 @@ class target_c(object):
         #: Shall we acquire this target? By default the testcases get
         #: the targets they request acquired for exclusive use, but in
         #: some cases, it might not be needed (default: True)
-        self.acquire = True
+        self.do_acquire = True
+
+        #: Lock to manipulate the target--when doing state
+        #: modification operations from multiple threads in the same
+        #: testcase, this can be taken to avoid race conditions.
+        #
+        #: Note this only applies mainly to _*set()* operations and
+        #: remember other testcases can't use the target.
+        self.lock = threading.Lock()
+
 
     @classmethod
     def extension_register(cls, ext_cls, name = None):
@@ -842,7 +1283,7 @@ class target_c(object):
         :param str instance: (optional) when this target has multiple
           connections to the same interconnect (via multiple physical
           or virtual network interfaces), you can select which
-          instance of those it is wanted. 
+          instance of those it is wanted.
 
           By default this will return the default instance (eg, the
           one corresponding to the interconnect ``ICNAME``), but if an
@@ -894,165 +1335,17 @@ class target_c(object):
             bsp = self.bsps[0]
         return self._app_get_for_bsp(None, bsp = bsp, noraise = noraise)[0]
 
-
-    def report_pass(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "PASS", message, attachments)
-
-    def report_fail(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "FAIL", message, attachments)
-
-    def report_error(self, message, attachments = None,
-                     level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "ERRR", message, attachments)
-
-    def report_blck(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "BLCK", message, attachments)
-
-    def report_skip(self,  message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "SKIP", message, attachments)
-
-    def report_info(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "INFO", message, attachments)
-
-    def report_data(self, domain, name, value, expand = True,
-                    level = None, dlevel = 0):
-        """Report measurable data
-
-        When running a testcase, if data is collected that has to be
-        reported for later analysis, use this function to report
-        it. This will be reported by the report driver in a way that
-        makes it easy to collect later on.
-
-        Measured data is identified by a *domain* and a *name*, plus
-        then the actual value.
-
-        A way to picture how this data can look once aggregated is as
-        a table per domain, on which each invocation is a row and each
-        column will be the values for each name.
-
-        :param str domain: to which domain this measurement applies
-          (eg: "Latency Benchmark %(type)s");
-
-        :param str name: name of the value  (eg: "context switch
-          (microseconds)"); it is recommended to always add the unit
-          the measurement represents.
-
-        :param value: value to report for the given domain and name;
-           any type can be reported.
-
-        :param bool expand: (optional) by default, the *domain* and
-          *name* fields will be %(FIELD)s expanded with the keywords
-          of the testcase or target. If *False*, it will not be
-          expanded.
-
-          This enables to, for example, specify a domain of "Latency
-          measurements for target %(type)s" which will automatically
-          create a different domain for each type of target.
-        """
-        assert isinstance(domain, str)
-        assert isinstance(name, str)
-        if expand:
-            domain = domain % self.kws
-            name = name % self.kws
-        if level == None:		# default args are computed upon def'on
-            level = 1
-        assert isinstance(level, int)
-        assert isinstance(dlevel, int)
-        level += dlevel
-        report.report_c.report(
-            level, 1000, 1000, self,
-            "DATA", domain + "::" + name + "::%s" % value,
-            dict(domain = domain, name = name, value = value))
-
-    def report_tweet(self, what, result, extra_report = "",
-                     ignore_nothing = False, attachments = None,
-                     level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(what, attachments, level, dlevel, alevel, ulevel)
-        level += dlevel
-        r = False
-        if result.failed > 0:
-            tag = "FAIL"
-            msg = valid_results[tag][1]
-        elif result.errors > 0:
-            tag = "ERRR"
-            msg = valid_results[tag][1]
-        elif result.blocked > 0:
-            tag = "BLCK"
-            msg = valid_results[tag][1]
-        elif result.passed > 0:
-            tag = "PASS"
-            msg = valid_results[tag][1]
-            r = True
-        elif result.skipped > 0:
-            tag = "SKIP"
-            msg = valid_results[tag][1]
-            r = True
-        else:            # When here, nothing was run, all the counts are zero
-            if ignore_nothing == True:
-                return True
-            report.report_c.report(level, level + alevel, level + ulevel, self,
-                                   "BLCK",
-                                   what + " / nothing ran " + extra_report,
-                                   attachments)
-            return False
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               tag, what + " " + msg + " " + extra_report,
-                               attachments)
-        return r
-
     def shcmd_local(self, cmd, origin = None, reporter = None,
-                    logfile = None):
+                    logfile = None, env = None):
         """
         Run a shell command in the local machine, substituting
         *%(KEYWORD)[sd]* with keywords defined by the target and testcase.
         """
         if origin == None:
-            origin = tcfl.origin_get(2)
+            origin = commonl.origin_get(2)
         return self.testcase._shcmd_local(cmd % self.kws, origin = origin,
-                                          reporter = self, logfile = logfile)
+                                          reporter = self, logfile = logfile,
+                                          env = env)
     #
     # Actions that operate on the target
     #
@@ -1094,10 +1387,14 @@ class target_c(object):
         :param str property_name: Name of the property to read
         :returns str: value of the property (if set) or None
         """
-        self.report_info("reading property '%s'" % property_name, dlevel = 1)
-        r = self.rtb.rest_tb_property_get(
-            self.rt, property_name, ticket = self.ticket)
-        self.report_info("read property '%s': '%s'" % (property_name, r))
+        self.report_info("reading property '%s'" % property_name, dlevel = 3)
+        data = { "projections": json.dumps([ property_name ]) }
+        if self.ticket:
+            data['ticket'] = self.ticket
+        r = self.rtb.send_request("GET", "targets/" + self.id, data = data)
+        r = r.get(property_name, None)
+        self.report_info("read property '%s': '%s' [%s]"
+                         % (property_name, r, default), dlevel = 2)
         if r == None and default != None:
             return default
         return r
@@ -1112,10 +1409,34 @@ class target_c(object):
         if value:
             assert isinstance(value, str)
         self.report_info("setting property '%s' to '%s'"
-                         % (property_name, value), dlevel = 1)
-        self.rtb.rest_tb_property_set(
-            self.rt, property_name, value, ticket = self.ticket)
-        self.report_info("set property '%s' to '%s'" % (property_name, value))
+                         % (property_name, value), dlevel = 3)
+        data = { property_name: value }
+        if self.ticket:
+            data['ticket'] = self.ticket
+        self.rtb.send_request("PATCH", "targets/" + self.id,
+                              json = data)
+        self.report_info("set property '%s' to '%s'" % (property_name, value),
+                         dlevel = 2)
+
+    def disable(self, reason = 'disabled by the administrator'):
+        """
+        Disable a target, setting an optional reason
+
+        :param str reason: (optional) string describing the reason
+          [default: none]
+
+        This sets a field *disabled* in the inventory with
+        the messages; convention is this means it is disabled.
+        """
+        self.property_set('disabled', reason)
+
+    def enable(self):
+        """
+        Enable a (maybe disabled) target
+
+        This removes the *disabled* field from the inventory.
+        """
+        self.property_set('disabled', None)
 
     def thing_plug(self, thing):
         """
@@ -1165,20 +1486,13 @@ class target_c(object):
            send the data (otherwise use the default one).
 
         Note this function is equivalent to
-        :meth:`tcfl.target_ext_console.console.write`, which is the raw
+        :meth:`target.console.write
+        <tcfl.target_ext_console.console.write>`, which is the raw
         version of this function.
 
-        However, this function works with the send/expect engine and
-        will flush the expect buffer so that next time we call
-        :meth:`expect`, it wil look for the expected data **only** in
-        data received after calling this function.
+        See :meth:`send` for a version that works with the expect sequence
 
         """
-        # Why does this work? Because next expect runs a new
-        # console_rx_eval function that will get it's offset
-        # to be zero and thus it'll initialize to the offset from the
-        # poller, which this _flush() call is resetting.
-        expecter.console_rx_flush(self.testcase.tls.expecter, self, console)
         # the console member is only present if the member extension has
         # been loaded for the target (determined at runtime), hence
         # pylint gets confused
@@ -1201,7 +1515,7 @@ class target_c(object):
         self._crlf = __crlf
         return self._crlf
 
-    def send(self, data, console = None, crlf = None):
+    def send(self, data, console = None, crlf = None, detect_context = ""):
         """Like :py:meth:`console_tx`, transmits the string of data
         over the given console.
 
@@ -1209,7 +1523,8 @@ class target_c(object):
         it will append a CRLF sequence at the end of the given
         string. As well, it will *flush* the receive pipe so that next
         time we :meth:`expect` something, it will be only for anything
-        received after we called this function.
+        received after we called this function (so we'll expect to see
+        even the sending of the command).
 
         :param str data: string of data to send
         :param str console: (optional) name of console over which to
@@ -1223,52 +1538,19 @@ class target_c(object):
           - ``\\n``: use line feed
           - ``ANYSTRING``: append *ANYSTRING*
 
+
+        :param str detect_context: (optional) the detection context is
+          a string which is used to help identify how to keep track of
+          where we are looking for things (detecting) in a console's
+          output. Further info :ref:`here
+          <console_expectation_detect_context>`
         """
         assert isinstance(data, str)
         if crlf == None:
             crlf = self._crlf
-        self.console_tx(str(data) + crlf, console)
+        self.console.send_expect_sync(console, detect_context)
+        self.console.write(str(data) + crlf, console)
 
-
-    # FIXME: add console_rx_itr() to return an iterator over the read
-    # file that closes it on file delete
-    # http://stackoverflow.com/a/14798115
-
-    def console_rx_read(self, console = None, offset = 0):
-        """
-        Return the data that has been read for a console until now.
-
-        :param str console: (optional) name of console on which the
-           the data was received (otherwie use the default one).
-        :param int offset: (optional) offset into the recorded data
-           from which to read. If negative, it is offset from the last
-           data received.
-        """
-        _, console_code = expecter.console_mk_code(self, console)
-        of = self.testcase.tls.expecter.buffers.get(console_code, None)
-        if of == None:
-            return None
-        with open(of.name) as f:
-            if offset < 0:
-                f.seek(-offset, 2)
-            else:
-                f.seek(offset)
-            return f.read()
-
-    def console_rx_size(self, console = None):
-        """
-        Return how many bytes have returned for a console
-
-        :param str console: (optional) name of console on which the
-           the data was received (otherwie use the default one).
-        """
-        _, console_code = expecter.console_mk_code(self, console)
-        of = self.testcase.tls.expecter.buffers.get(console_code, None)
-        if of == None:
-            return 0
-        with open(of.name) as f:
-            stat_info = os.fstat(of.fileno())
-            return stat_info.st_size
 
     def on_console_rx(self, regex_or_str, timeout = None, console = None,
                       result = "pass"):
@@ -1324,14 +1606,29 @@ class target_c(object):
           testcase's expecter loop, *False* otherwise.
 
         """
-        # Won't be re-added if already there
-        added = self.testcase.tls.expecter.add(
-            False, expecter.console_rx_poller, (self, console),)
-        has_to_pass = True if result == "pass" else False
-        self.testcase.tls.expecter.add(has_to_pass, expecter.console_rx_eval,
-                                       (self, regex_or_str, console, timeout,
-                                        result))
-        return added
+        self.report_info("on_console_rx is deprecated, use expect_global_append")
+        if timeout == False:
+            timeout = 0
+        elif timeout == None:
+            timeout = self.testcase.tls.expect_timeout
+
+        if result == "pass":
+            raise_on_found = None
+        elif result == "block":
+            raise_on_found = blocked_e
+        elif result == "error":
+            raise_on_found = error_e
+        elif result == "failed":
+            raise_on_found = failed_e
+        elif result == "skip":
+            raise_on_found = skip_e
+        else:
+            raise AssertionError("unknown result %s" % result)
+
+        self.testcase.expect_global_append(
+            self.console.text(regex_or_str, timeout = timeout,
+                              console = console,
+                              raise_on_found = raise_on_found))
 
     def wait(self, regex_or_str, timeout = None, console = None):
         """
@@ -1352,22 +1649,22 @@ class target_c(object):
         :returns: *True* if the output was received before the
           timeout, *False* otherwise.
         """
+
         if timeout:
             assert isinstance(timeout, int)
         if console:
             assert isinstance(console, str)
 
         try:
-            with self.on_console_rx_cm(regex_or_str, timeout = timeout,
-                                       console = console, result = "pass"):
-                # Run the expect loop
-                self.testcase.tls.expecter.run()
-        except pass_e:
+            self.expect(regex_or_str, timeout, console,
+                        raise_on_timeout = _timeout_e)
             return True
-        except error_e:
+        except _timeout_e:
             return False
 
-    def expect(self, regex_or_str, timeout = None, console = None):
+    def expect(self, regex_or_str, timeout = None, console = None,
+               name = None, raise_on_timeout = failed_e,
+               origin = None, detect_context = ""):
         """
         Wait for a particular regex/string to be received on a given
         console of this target before a given timeout.
@@ -1383,85 +1680,44 @@ class target_c(object):
         :param str console: (optional) name of console from which to
            receive the data
 
+        :param str origin: (optional) when reporting information about
+          this expectation, what origin shall it list, eg:
+
+          - *None* (default) to get the current caller
+          - *commonl.origin_get(2)* also to get the current caller
+          - *commonl.origin_get(1)* also to get the current function
+
+          or something as:
+
+          >>> "somefilename:43"
+
+        :param str detect_context: (optional) the detection context is
+          a string which is used to help identify how to keep track of
+          where we are looking for things (detecting) in a console's
+          output. Further info :ref:`here
+          <console_expectation_detect_context>`
+
         :returns: Nothing, if the output is received.
 
         :raises: :py:exc:`tcfl.tc.blocked_e` on error,
           :py:exc:`tcfl.tc.error_e` if not received,
           any other runtime exception.
         """
-        if timeout:
-            assert isinstance(timeout, int)
-        if console:
-            assert isinstance(console, str)
+        if timeout == False:
+            timeout = 0
+        elif timeout == None:
+            timeout = self.testcase.tls.expect_timeout
 
-        try:
-            uid = "just_me" # There is only one target.expect()
-                            # running at a single time
-            with self.on_console_rx_cm(regex_or_str, timeout = timeout,
-                                       console = console, result = "pass",
-                                       uid = uid):
-                # Run the expect loop
-                self.testcase.tls.expecter.run()
-        except pass_e:
-            pass
-        finally:
-            if uid in self.testcase.tls.expecter.buffers_persistent:
-                del self.testcase.tls.expecter.buffers_persistent[uid]
-
-    @contextlib.contextmanager
-    def on_console_rx_cm(self, regex_or_str, timeout = None, console = None,
-                         result = "pass", uid = None):
-        """
-        When regex_or_str is received on the given console (default
-        console), execute the action given by result.
-
-        Context Manager version of :py:meth:`on_console_rx`.
-
-        :param regex_or_str: string or regular expression (compiled
-          with :py:func:`re.compile`.
-
-        :param result: what to do when that regex_or_str is found on
-          the given console:
-
-          - *pass*, raise :py:exc:`tcfl.tc.pass_e`
-          - *block*, raise :py:exc:`tcfl.tc.blocked_e`
-          - *failed*, raise :py:exc:`tcfl.tc.error_e`,
-          - *failed*, raise :py:exc:`tcfl.tc.failed_e`,
-          - *blocked*, raise :py:exc:`tcfl.tc.blocked_e`
-
-        :raises: :py:exc:`tcfl.tc.pass_e`,
-          :py:exc:`tcfl.tc.blocked_e`,
-          :py:exc:`tcfl.tc.error_e`,
-          :py:exc:`tcfl.tc.failed_e`,
-          :py:exc:`tcfl.tc.skip_e`).
-
-        :returns: Nothing
-        """
-        has_to_pass = True if result == "pass" else False
-        _tc = self.testcase
-        if isinstance(timeout, numbers.Number) \
-           and timeout > _tc.tls.expecter.timeout:
-            raise ValueError(
-                "Asked for a timeout of %s that is higher than the "
-                "testcase's timeout of %s; you can adjust the testcases's "
-                "global timeout with `self.tls.expecter.timeout = VALUE`"
-                % (timeout, _tc.tls.expecter.timeout))
-        added = False
-        try:
-            added = _tc.tls.expecter.add(False, expecter.console_rx_poller,
-                                         (self, console))
-            has_to_pass = True if result == "pass" else False
-            _tc.tls.expecter.add(has_to_pass, expecter.console_rx_eval,
-                                 (self, regex_or_str, console, timeout,
-                                  result, uid))
-            yield
-        finally:
-            _tc.tls.expecter.remove(expecter.console_rx_eval,
-                                    (self, regex_or_str, console, timeout,
-                                     result, uid))
-            if added:
-                _tc.tls.expecter.remove(expecter.console_rx_poller,
-                                        (self, console))
+        if origin == None:
+            origin = commonl.origin_get(2)
+        return self.testcase.expect(
+            self.console.text(
+                regex_or_str,
+                console = console, timeout = timeout, name = name,
+                raise_on_timeout = raise_on_timeout,
+                detect_context = detect_context),
+            origin = origin,
+        )
 
     def stub_app_add(self, bsp, _app, app_src, app_src_options = ""):
         """\
@@ -1505,11 +1761,105 @@ class target_c(object):
            or self.bsps_stub[bsp][0] == None:
             self.bsps_stub[bsp] = (_app, app_src, app_src_options)
 
+
+    @staticmethod
+    def create_from_cmdline_args(args, target_name = None, iface = None,
+                                 extensions_only = None):
+        """
+        Create a :class:`tcfl.tc.target_c` object from command line
+          arguments
+
+        :param argparse.Namespace args: arguments from argparse
+        :param str target_name: (optional) name of the target, by
+          default is taken from *args.target*.
+        :param str iface: (optional) target must support the given
+          interface, otherwise an exception is raised.
+        :returns: instance of :class:`tcfl.tc.target_c` representing
+          said target, if it is available.
+        """
+        if target_name == None:
+            if not hasattr(args, 'target'):
+                raise RuntimeError("missing 'target' argument")
+            target_name = getattr(args, 'target', None)
+        _rtb, rt = ttb_client._rest_target_find_by_id(target_name)
+        target = target_c(rt, tc_global, None, "cmdline",
+                          extensions_only = extensions_only)
+        if iface != None and not iface in target.rt.get('interfaces', []):
+            raise RuntimeError("%s: target does not support the %s interface"
+                               % (target_name, iface))
+        if args.ticket:
+            target.ticket = args.ticket
+        else:
+            target.ticket = None	# target_c.__init__ inits this
+        return target
+
+    def ttbd_iface_call(self, interface, call, method = "PUT",
+                        component = None, stream = False, raw = False,
+                        files = None,
+                        **kwargs):
+        """
+        Execute a general interface call to TTBD, the TCF remoting server
+
+        This allows to call any interface on the server that provides
+        this target. It is used to implement higher level calls.
+
+        :param str interface: interface name (eg: "power", "console",
+          etc); normally any new style interface listed in the
+          target's *interfaces* tag.
+        :param str call: name of the call implemented by such
+          interface (eg: for power, "on", "off"); these are described
+          on the interface's implementation.
+        :param str method: (optional, defaults to *PUT*); HTTP method
+          to use to call; one of *PUT*, *GET*, *DELETE*,
+          *POST*. The interface dictates the method.
+        :param str component: (optional, default *None*) for
+          interfaces that implement multiple components (a common
+          pattern), specify which component the call applies to.
+        :param dict files: (optional) dictionary of keys pointing to
+          file names that have to be streamed to the server. Keys are
+          strings with names of the files, values opened file
+          descriptors (or iterables). FIXME: needs more clarification
+          on how this works.
+
+        Rest of the arguments are a dictionary keyed by string with
+        values that will be serialized to pass the remote call
+        as arguments, and thus are interface specific.
+
+        Anything that is an interable or dictionary will be
+        serialized as JSON. The rest are kept as body arguments so the
+        daemon can decode it properly.
+        """
+        assert isinstance(interface, str)
+        assert isinstance(call, str)
+        assert component == None or isinstance(component, str)
+        assert isinstance(stream, bool)
+        assert isinstance(raw, bool)
+        assert method.upper() in ( "PUT", "GET", "DELETE", "POST" ), \
+            "method must be PUT|GET|DELETE|POST; got %s" % method
+
+        for k, v in kwargs.items():
+            if isinstance(v, str):
+                continue
+            if isinstance(v, (collections.Sequence, collections.Mapping)):
+                kwargs[k] = json.dumps(v)
+        if component:
+            kwargs['component'] = component
+        if self.ticket:
+            kwargs['ticket'] = self.ticket
+        return self.rtb.send_request(
+            method,
+            "targets/%s/%s/%s" % (self.id, interface, call),
+            stream = stream, raw = raw, files = files,
+            data = kwargs if kwargs else None)
+
+
     #
     # Private API
     #
 
     __extensions = {}
+
+
 
     def _kws_update(self, bsp = None):
         self.kws.clear()
@@ -1539,10 +1889,9 @@ class target_c(object):
           taken from the stack
 
         """
-        # FIXME: override kws __setitem__ to fill it out automagically?
         assert isinstance(kw, str)
-        assert isinstance(value, str), \
-                "value: expected str, got %s: %s" % (type(value).__name__, value)
+        assert isinstance(value, (str, int)), \
+                "value: expected str|int, got %s: %s" % (type(value).__name__, value)
         if origin == None:
             o = inspect.stack()[1]
             origin = "%s:%s" % (o[1], o[2])
@@ -1600,11 +1949,11 @@ class target_c(object):
                 tgname = "|" + self.fullid
         else:
             tgname = ""
-        self._prefix = self.testcase.report_mk_prefix() \
-                       + tgname + self.bsp_suffix()
+        self._report_prefix = self.testcase.report_mk_prefix() \
+            + tgname + self.bsp_suffix()
 
     def report_mk_prefix(self):
-        return self._prefix
+        return self._report_prefix
 
 
 
@@ -1717,7 +2066,8 @@ class target_group_c(object):
         self._targets = targets
         return targets
 
-assign_period = 2
+assign_period = 5
+poll_period = 0.25
 
 class result_c():
     def __init__(self, passed = 0, errors = 0, failed = 0,
@@ -1838,6 +2188,8 @@ class result_c():
         assert isinstance(message, str)
         if attachments:
             assert isinstance(attachments, dict)
+        else:
+            attachments = dict()
         if level:
             assert level >= 0
         assert dlevel >= 0
@@ -1884,12 +2236,16 @@ class result_c():
 
         By default, this is the mapping:
 
-        - :meth:`tc_c.report_pass` is used for :exc:`pass_e`
-        - :meth:`tc_c.report_error` is used for :exc:`error_e`
-        - :meth:`tc_c.report_fail` is used for :exc:`failed_e`
-        - :meth:`tc_c.report_blck` is used for :exc:`blocked_e`
-          and any other exception
-        - :meth:`tc_c.report_skip` is used for :exc:`skip_e`
+        - :meth:`tc.report_pass<reporter_c.report_pass>` is used for
+          :exc:`pass_e`
+        - :meth:`tc.report_pass<reporter_c.report_error>` is used for
+          :exc:`error_e`
+        - :meth:`tc.report_pass<reporter_c.report_fail>` is used for
+          :exc:`failed_e`
+        - :meth:`tc.report_pass<reporter_c.report_blck>` is used for
+          :exc:`blocked_e` and any other exception
+        - :meth:`tc.report_pass<reporter_c.report_skip>` is used for
+          :exc:`skip_e`
 
         However, it can be forced by passing as *force_result* or each
         testcase can be told to consider specific exceptions as others
@@ -1912,6 +2268,7 @@ class result_c():
         reporter = attachments.pop('target', _tc)
         _alevel = attachments.pop('alevel', 1)
         dlevel = attachments.pop('dlevel', 0)
+        level = attachments.pop('level', None)
 
         if isinstance(_tc, target_c):
             tc = _tc.testcase
@@ -1919,8 +2276,7 @@ class result_c():
             assert isinstance(_tc, tc_c)
             tc = _tc
 
-        trace_alevel = 4
-        trace_dlevel = 4
+        trace_alevel = 1
         if force_result == None:
             force_result = tc.exception_to_result.get(type(e), None)
         if isinstance(e, pass_e) or force_result == pass_e:
@@ -1951,13 +2307,24 @@ class result_c():
             dlevel = 0
             alevel = 0
             trace_alevel = 0
-            trace_dlevel = 0
-
-        _attachments = { "%s%s trace" % (phase, tag) : traceback.format_exc() }
+        _attachments = {
+            "%s%s trace" % (phase, tag) : traceback.format_exc()
+        }
         _attachments.update(attachments)
         report_fn("%s%s: %s" % (phase, tag, _e), _attachments,
-                  dlevel = dlevel, alevel = trace_alevel)
+                  level = level, dlevel = dlevel, alevel = trace_alevel)
         return result
+
+    @staticmethod
+    def from_exception_cpe(tc, e, result_e = error_e):
+        return result_c.report_from_exception(
+            tc, e, attachments = {
+                "output": e.output,
+                "return": e.returncode,
+                "cmd": e.cmd
+            },
+            force_result = result_e
+        )
 
     @staticmethod
     def from_exception(fn):
@@ -1985,13 +2352,7 @@ class result_c():
             # Some exceptions that are common and we know about, so we
             # can print some more info that will be helpful
             except subprocess.CalledProcessError as e:
-                return result_c.report_from_exception(
-                    _tc, e, attachments = {
-                        "output": e.output,
-                        "return": e.returncode,
-                        "cmd": e.cmd
-                    }, force_result = error_e
-                )
+                return result_c.from_exception_cpe(_tc, e)
             except OSError as e:
                 attachments = dict(
                     errno = e.errno,
@@ -2034,7 +2395,7 @@ def tags(*args, **kwargs):
     :param dict kwargs: every argument `name = value` is added as tag
       `name` with value `value`.
     """
-    origin = tcfl.origin_get(2)
+    origin = commonl.origin_get(2)
     # It is fine to pass no tags at all; this allows us to
     # calculate them dynamically (for example seeing if some env
     # vars are available and filing a skip if not available) but
@@ -2049,7 +2410,7 @@ def tags(*args, **kwargs):
         # base class -- but not modify them; so when we add, we COPY the
         # _tags dictionary from our base class to modify it specific
         # to this class
-        origin = tcfl.origin_get(2)
+        origin = commonl.origin_get(2)
         if id(super(cls, cls)._tags) == id(cls._tags):
             cls._tags = dict(super(cls, cls)._tags)
         for name in args:
@@ -2128,7 +2489,7 @@ def _target_app_setup(obj, cls_name, target_want_name):
             "    return tc._%s_50_for_target(%s)\n"
             % (cls_name, fnname, target_want_name,
                target_want_name, fnname, target_want_name),
-            tcfl.origin_get(2) + "|" + tcfl.origin_get(), 'exec')
+            commonl.origin_get(2) + "|" + commonl.origin_get(), 'exec')
         eval(object_code)
         if type(obj) == type:
             # Bind to the class, no need to bind to an instance, will
@@ -2168,14 +2529,14 @@ def _target_app_add(obj, target_want_name, app_name, app_src):
             raise blocked_e(
                 "%s: Cannot have a wildcard BSP '*' and other "
                 "BSPs specified in the app_* sections @%s"
-                % (target_want_name, tcfl.origin_get_object(app_name)))
+                % (target_want_name, commonl.origin_get_object(app_name)))
     elif app_name.endswith("_options") and app.driver_valid(app_name[:-8]):
     # Note 8 is the lenght of "_options"
         pass
     else:
         raise blocked_e("%s: unknown App builder '%s' (or option to "
                         "existing) @%s"
-                        % (target_want_name, app_name, tcfl.origin_get(3)))
+                        % (target_want_name, app_name, commonl.origin_get(3)))
 
 def _target_want_decorate_class(obj, cls_name,
                                 name, type_name, short_type_name,
@@ -2203,19 +2564,22 @@ def _target_want_decorate_class(obj, cls_name,
     # ic0 ic1 target target1 target2
     #
     # Will need to remove hack `FIXME: reversed for decorator workaround`_
+
     if name != None:
         assert isinstance(name, str)
+        if '%d' in name:
+            name = name % next_index
         if name in obj._targets:
             raise blocked_e("%s name '%s' @%s already defined, "
                             "choose another"
-                            % (type_name, name, tcfl.origin_get(2)))
+                            % (type_name, name, commonl.origin_get(2)))
         target_want_name = name
     else:
         if next_index == 0:
             target_want_name = short_type_name
         else:
             target_want_name = short_type_name + "%d" % next_index
-    origin = tcfl.origin_get(3)
+    origin = commonl.origin_get(3)
     obj._targets[target_want_name] = dict(
         app = {},
         kws = kwargs,
@@ -2238,19 +2602,25 @@ def _target_want_add_check_key(obj, cls_name, target_want_name,
         valid = True
     return valid
 
-def _target_want_add(obj, cls_name, name, spec, origin, **kwargs):
-    target_want_name = _target_want_decorate_class(
-        obj, cls_name, name, "target", "target", obj._target_count, **kwargs)
-    obj._targets[target_want_name]['spec'] = spec
-    obj._targets[target_want_name]['origin'] = origin
-    for key, val in kwargs.items():
-        valid = _target_want_add_check_key(obj, cls_name, target_want_name,
-                                           key, val)
-        if not valid:
-            raise blocked_e("%s: unknown key @%s" % (key, origin))
-    obj._target_count += 1
+def _target_want_add(obj, cls_name, name, spec, origin, count = 1, **kwargs):
+    if count > 1 and name != None:
+        # later a default will be given
+        name = name + "%d"
+    for _cnt in range(count):
+        target_want_name = _target_want_decorate_class(
+            obj, cls_name, name, "target", "target",
+            obj._target_count, **kwargs)
+        obj._targets[target_want_name]['spec'] = spec
+        obj._targets[target_want_name]['origin'] = origin
+        for key, val in kwargs.items():
+            valid = _target_want_add_check_key(
+                obj, cls_name, target_want_name, key, val)
+            if not valid:
+                raise blocked_e("%s: unknown key @%s" % (key, origin))
+        obj._target_count += 1
 
-def target_want_add(_tc, target_want_name, spec, origin, **kwargs):
+def target_want_add(_tc, target_want_name, spec, origin,
+                    count = 1, **kwargs):
     """\
     Add a requirement for a target to a testcase instance
 
@@ -2274,9 +2644,9 @@ def target_want_add(_tc, target_want_name, spec, origin, **kwargs):
         _tc._target_count = cls._target_count
         _tc._interconnects = copy.deepcopy(cls._interconnects)
     _target_want_add(_tc, cls.__name__, target_want_name,
-                     spec, origin, **kwargs)
+                     spec, origin, count = count, **kwargs)
 
-def target(spec = None, name = None, **kwargs):
+def target(spec = None, name = None, count = 1, **kwargs):
     """\
     Add a requirement for a target to a testcase instance
 
@@ -2296,9 +2666,30 @@ def target(spec = None, name = None, **kwargs):
 
     :param str spec: :ref:`specification <target_specification>` to
       filter against the tags the remote target exposes.
+
     :param str name: name for the target (must not exist already). If
       none, first declared target is called *target*, the next
       *target1*, then *target2* and so on.
+
+    :param int count: (optional, default 1) number of targets to
+      allocate; if more than one, targets will be called *target*,
+      *target1*, *target2*, following the count of targets assigned to
+      the testcase.
+
+      Note in case of doubt, these can be discovered with (eg for an
+      example of an interconnect with one server and two clients):
+
+      >>> import tcfl.tc
+      >>> @tcfl.tc.interconnect()
+      >>> @tcfl.tc.target(name = "server")
+      >>> @tcfl.tc.target(name = "client", count = 2)
+      >>> @tcfl.tc.tags(build_only = True)
+      >>> class _test(tcfl.tc.tc_c):
+      >>>     def configure(self):
+      >>>         self.report_info("target names: "
+      >>>                          + " ".join(self.target_group.targets.keys()),
+      >>>                          level = 0)
+
     :param dict kwargs: extra keyword arguments are allowed, which
       might be used in different ways that are still TBD. Main ones
       recognized:
@@ -2381,7 +2772,8 @@ def target(spec = None, name = None, **kwargs):
             cls._targets = collections.OrderedDict(super(cls, cls)._targets)
 
         _target_want_add(cls, cls.__name__,
-                         name, spec, tcfl.origin_get(2), **kwargs)
+                         name, spec, commonl.origin_get(2),
+                         count = count, **kwargs)
         return cls
 
     return decorate_class
@@ -2431,7 +2823,7 @@ def interconnect(spec = None, name = None, **kwargs):
         if id(super(cls, cls)._targets) == id(cls._targets):
             cls._targets = copy.deepcopy(super(cls, cls)._targets)
 
-        origin = tcfl.origin_get(2)
+        origin = commonl.origin_get(2)
         ic_want_name = _target_want_decorate_class(
             cls, cls.__name__,
             name, "interconnect", "ic", cls._ic_count, **kwargs)
@@ -2452,6 +2844,304 @@ def interconnect(spec = None, name = None, **kwargs):
         return cls
 
     return decorate_class
+
+class expectation_c(object):
+    '''
+    Expectations are something we expect to find in the data polled
+    from a source.
+
+    An object implementing this interface can be given to
+    :meth:`tcfl.tc.tc_c.expect` as something to expect, which can be,
+    for example:
+
+    - text in a serial console output
+    - templates in an image capture
+    - audio in an audio capture
+    - network data in a network data capture
+    - ...
+
+    when what is being expected is found, :meth:`tcfl.tc.tc_c.expect`
+    can return data about it (implementation specific) can be
+    returned to the caller or exceptions can be raised (eg: if we see
+    an error), or if not found, timeout exceptions can be raised.
+
+    See :meth:`tcfl.tc.tc_c.expect` for more details and
+    :class:`tcfl.target_ext_console.expect_text_on_console_c` and
+    :class:`tcfl.target_ext_capture._expect_image_on_screenshot_c` for
+    implementation examples.
+
+    .. note:: the :meth:`poll` and :meth:`detect` methods will be
+              called in a loop until all the expectations have been
+              detected.
+
+              It is recommended that internal state is only saved in
+              the *buffers* and *buffers_poll* storage areas provided
+              (vs storing inside the object).
+
+    :param tcfl.tc.target_c target: target on which this expectation
+      is operating.
+
+    :param float poll_period: how often this data needs to be polled
+      in seconds (default *1s*).
+
+    :param int timeout: maximum time to wait for this expectation;
+      raises an exception of type *raise_on_timeout* if the timeout is
+      exceeded. If zero (default), no timeout is raised, which
+      effectively treats an expectation as optional or along with
+      *raise_on_found* above, to raise an exception if an expectation
+      is to be associated with an error condition.
+
+    :param tcfl.tc.exception raise_on_timeout: (optional) a *type*
+      (**not an instance**) to throw when not found before the
+      timeout; a subclass of :class:`tcfl.tc.exception`.
+
+    :param tcfl.tc.exception raise_on_found: an *instance* (**not a
+      type**) to throw when found; this is useful to implement errors,
+      such as *if I see this image in the screen, bail out*:
+
+      >>> self.expect("wait for boot",
+      >>>             crash = image_on_screenshot(
+      >>>                 target, 'screen', 'icon-crash.png',
+      >>>                 raise_on_found = tcfl.tc.error_e("Crash found"),
+      >>>                 timeout = 0),
+      >>>             login_prompt = image_on_screenshot(
+      >>>                 target, 'screen', 'canary-login-prompt.png',
+      >>>                 timeout = 4),
+      >>> )
+
+      Note you need to tell it also *zero* timeout, otherwise it will
+      complain if it didn't find it.
+
+      The exception's attachments will be updated with the dictionary
+      of data returned by the expectation's :meth:`detect`.
+
+    :param str origin: (optional) when reporting information about
+      this expectation, what origin shall it list, eg:
+
+      - *None* (default) to get the current caller
+      - *commonl.origin_get(2)* also to get the current caller
+      - *commonl.origin_get(1)* also to get the current function
+
+      or something as:
+
+      >>> "somefilename:43"
+
+    '''
+
+    def __init__(self, target, poll_period, timeout = 0,
+                 raise_on_timeout = error_e,
+                 raise_on_found = None, origin = None):
+        assert target == None or isinstance(target, target_c)
+        assert issubclass(raise_on_timeout, exception), \
+            'expected subclass of tcfl.tc.exception, got %s' \
+            % type(raise_on_timeout).__name__
+        assert raise_on_found == None \
+            or isinstance(raise_on_found, exception), \
+            'expected instance of tcfl.tc.exception, got %s' \
+            % type(raise_on_found).__name__
+        assert poll_period > 0
+        # FIXME: if too frequent, set some warning
+        assert timeout >= 0
+        self.target = target
+        self.poll_period = poll_period
+        self.poll_name = None	# will be set by :meth:tcfl.tc.tc_c.expect()
+        self.timeout = timeout
+        self.raise_on_timeout = raise_on_timeout
+        self.raise_on_found = raise_on_found
+        # this is a default, in case it is not overriden by the class
+        # that implements this interface
+        self.name = commonl.mkid('%s' % id(self), 4)
+        self.origin = origin
+
+    def poll_context(self):
+        """
+        Return a string that uniquely identifies the polling source for
+        this expectation so multiple expectations that are polling
+        from the same place don't poll repeatedly.
+
+        For example, if we are looking for multiple image templates in
+        a screenshot, it does not make sense to take one screenshot
+        per image. It can take one screenshot and look for the images
+        in the same place.
+
+        Thus:
+
+        - if we are polling from target with role *target.want_name*
+          from it's screen capturer called *VGA*, our context becomes:
+
+          >>> return '%s-%s' % (self.target.want_name, "VGA")
+
+          so it follows that for a generic expectation from a
+          screenshot capturer stored in *self.capturer*:
+
+          >>> return '%s-%s' % (self.target.want_name, self.capturer)
+
+        - for a serial console, it would become:
+
+          >>> return '%s-%s' % (self.target.want_name, self.console_name)
+
+        """
+        raise NotImplementedError
+
+    def poll(self, testcase, run_name, buffers_poll):
+        """
+        Poll a given expectation for new data from their data source
+
+        The expect engine will call this from
+        :meth:`tcfl.tc.tc_c.expect` periodically to get data where to
+        detect what we are expecting. This data could be serial
+        console output, video output, screenshots, network data,
+        anything.
+
+        The implementation of this interface will store the data
+        (append, replace, depending on the nature of it) in
+        *buffers_poll*.
+
+        For example, a serial console reader might read from the
+        serial console and append to a file; a screenshot capturer
+        might capture the screenshot and put it in a file and make the
+        file name available in *buffers_poll['filename']*.
+
+        Note that when we are working with multiple expectations, if a
+        number of them share the same data source (as determined by
+        :meth:`poll_context`), only one poll per each will be done and
+        they will be expected to share the polled data stored in
+        *buffers_poll*.
+
+        :param tcfl.tc.tc_c testcase: testcase for which we are
+          polling.
+
+        :param str run_name: name of this run of
+          :meth:`tcfl.tc.tc_c.expect`--they are always different.
+
+        :param dict buffers_poll: dictionary where we can store state
+          for this poll so it can be shared between calls. Detection
+          methods that use the same poling source (as given by
+          :meth:`poll_context`) will all be given the same storage
+          space.
+
+        Called with a lock held for exclusive access to *buffers_poll*;
+        *buffers* is thread specific.
+        """
+        raise NotImplementedError
+
+    def detect(self, testcase, run_name, buffers_poll, buffers):
+        """
+        Look for what is being expected in the polled data
+
+        After the :meth:`tcfl.tc.tc_c.expect` has polled data (with
+        :meth:`poll` above) and stored it in *buffers_poll*, this
+        function is called to detect what we are expecting in that
+        data.
+
+        Note the form of the data is completely specific to this
+        expectation object. It can be data saved into the
+        *buffers_poll* dictionary or that can be referring to a file
+        in the filesystem. See FIXME examples.
+
+        For example, a serial console detector might take the data
+        polled by :meth:`poll`, load it and look for a string in there.
+
+        :param tcfl.tc.tc_c testcase: testcase for which we are
+          detecting.
+
+        :param str run_name: name of this run of
+          :meth:`tcfl.tc.tc_c.expect`--they are always different.
+
+        :param dict buffers_poll: dictionary where the polled data has
+          is available. Note Detection methods that use the same
+          poling source (as given by :meth:`poll_context`) will all be
+          given the same storage space. as per :meth:`poll` above.
+
+        :param dict buffers: dictionary available exclusively to this
+          expectation object to keep data from run to run.
+
+        :returns: information about the detection; if *None*, this
+          means the detection process didn't find what is being looked
+          for and the detection process will continue.
+
+          If not *None* is returned, whatever it is, it is considered
+          what was expected has been found.
+
+          :meth:`tcfl.tc.tc_c.expect` will save this in a dictionary
+          of results specific to each expectation object that
+          will be returned to the user as the return value of
+          :meth:`tcfl.tc.tc_c.expect`.
+
+          As well, if a *raise_on_found* exception was given, these
+          fields are added to the attachments.
+
+        Called with a lock held for exclusive access to *buffers_poll*;
+        *buffers* is thread specific.
+        """
+        raise NotImplementedError
+
+
+    def flush(self, testcase, run_name, buffers_poll, buffers, results):
+        """
+        Generate collateral for this expectation
+
+        This is called by :meth:`tcfl.tc.tc_c.expect` when all the
+        expectations are completed and can be used to for example, add
+        marks to an image indicating where a template or icon was
+        detected.
+
+        Note different expectations might be creating collateral from
+        the same source, on which case you need to pile on (eg: adding
+        multiple detectio marks to the same image)
+
+        Collateral files shall be generated with name
+        :data:`tcfl.tc.tc_c.report_file_prefix` such as:
+
+        >>> collateral_filename = testcase.report_file_prefix + "something"
+
+        will generate filename `report-RUNID:HASHID.something`; thus,
+        when multiple testcases are executed in parallel, they will
+        not override each other's collateral.
+
+        :param tcfl.tc.tc_c testcase: testcase for which we are
+          detecting.
+
+        :param str run_name: name of this run of
+          :meth:`tcfl.tc.tc_c.expect`--they are always different.
+
+        :param dict buffers_poll: dictionary where the polled data has
+          is available. Note Detection methods that use the same
+          poling source (as given by :meth:`poll_context`) will all be
+          given the same storage space. as per :meth:`poll` above.
+
+        :param dict buffers: dictionary available exclusively to this
+          expectation object to keep data from run to run. This was
+          used by :meth:`detect` to store data needed during the
+          detection process.
+
+        :param dict results: dictionary of results generated by
+          :meth:`detect` as a result of the detection process.
+
+        Called with a lock held for exclusive access to *buffers_poll*;
+        *buffers* is thread specific.
+        """
+        raise NotImplementedError
+
+    def on_timeout(self, run_name, poll_context, buffers_poll, buffers,
+                   ellapsed, timeout):
+        """
+        Perform an action when the expectation times out being found
+
+        Called by the innards of the expec engine when the expectation
+        times out; by default, raises a generic exception (as
+        specified during the expectation's creation); can be overriden
+        to offer a more specific message, etc.
+        """
+        attachments = {
+            'origin': self.origin
+        }
+        raise self.raise_on_timeout(
+            "%s/%s: timed out finding expectation in "
+            "'%s' @%.1f/%.1fs/%.1fs)"
+            % (run_name, self.name, poll_context,
+               ellapsed, timeout, self.timeout),
+            attachments)
 
 
 #
@@ -2482,7 +3172,7 @@ class _tc_mc(type):
 #
 # The core testcase object
 #
-class tc_c(object, metaclass=_tc_mc):
+class tc_c(reporter_c, metaclass=_tc_mc):
     r"""
     A testcase, with instructions for configuring, building, deploying,
     setting up, running, evaluating, tearing down and cleaning up.
@@ -2506,6 +3196,28 @@ class tc_c(object, metaclass=_tc_mc):
               starts with *_base_*; this is useful to create common
               code which will be instantiated in another class without
               it being confused with a testcase.
+
+    :param str name: the name of the testcase
+    :param str tc_file_path: the path to the file where the testcase
+      was found
+    :param str origin: the origin of the testcase (in most cases this
+      is a string *FILENAME:LINE*)
+
+    Note that in the most cases, the three arguments will be the same,
+    as the name of the testcase will be the same as the path where the
+    test case is found and if there is only one testcase per file, the
+    origin is either line 1 or no line.
+
+    When a file contains specifies multiple testcases, then they can
+    be created such as:
+
+     - name TCFILEPATH#TCCASENAME
+     - tc_file_path TCFILEPATH
+     - origin TCFILEPATH:LINENUMBER (matching the line number where
+       the subcase is specified)
+
+    this allows a well defined namespace in which cases from multiple
+    files that are run at the same time don't conflict in name.
 
     The runner will call the testcase methods to evaluate the test;
     any failure/blockage causes the evaluation to stop and move on to
@@ -2556,8 +3268,8 @@ class tc_c(object, metaclass=_tc_mc):
     The testcase methods use the APIs exported by this class and module:
 
      - to report information at the appropiate log level:
-       :meth:`report_pass`, :meth:`report_fail`, :meth:`report_blck`
-       and :meth:`report_info`
+       :meth:`reporter_c.report_pass`, :meth:`reporter_c.report_fail`,
+       :meth:`reporter_c.report_blck` and :meth:`reporter_c.report_info`
 
      - raise an exception to indicate result of this method:
 
@@ -2603,7 +3315,7 @@ class tc_c(object, metaclass=_tc_mc):
          >>>         ic.expect("targets are online")
          >>>
          >>>     def teardown(self):
-         >>>         for _n, target in reversed(self.targets.iteritems()):
+         >>>         for _n, target in reversed(self.targets.items()):
          >>>            target.power.off()
          >>>
 
@@ -2613,62 +3325,32 @@ class tc_c(object, metaclass=_tc_mc):
     """
 
     #
-    # Public testcase interface
+    # Public testcase API/interface
     #
 
     #: List of places where we declared this testcase is build only
     build_only = []
 
     def __init__(self, name, tc_file_path, origin):
+        reporter_c.__init__(self)
         for hook_pre in self.hook_pre:
             assert callable(hook_pre), \
                 "tcfl.tc.tc_c.hook_pre contains %s, defined as type '%s', " \
                 "which  is not callable" % type(hook_pre).__name__
+        # see also __init_shallow__()
 
-        #: Keywords for *%(KEY)[sd]* substitution specific to this
-        #: testcase.
-        #:
-        #: Note these do not include values gathered from remote
-        #: targets (as they would collide with each other). Look at
-        #: data:`target.kws <tcfl.tc.target_c.kws>` for that.
-        #:
-        #: These can be used to generate strings based on information,
-        #: as:
-        #:
-        #:   >>>  print "Something %(FIELD)s" % target.kws
-        #:   >>>  target.shcmd_local("cp %(FIELD)s.config final.config")
-        #:
-        #: Fields available:
-        #:
-        #:   - `runid`: string specified by the user that applies to
-        #:     all the testcases
-        #:
-        #:   - `srcdir` and `srcdir_abs`: directory where this
-        #:     testcase was found
-        #:
-        #:   - `thisfile`: file where this testscase as found
-        #:
-        #:   - `tc_hash`: unique four letter ID assigned to this
-        #:     testcase instance. Note that this is the same for all
-        #:     the targets it runs on. A unique ID for each target of
-        #:     the same testcase instance is the field *tg_hash* in the
-        #:     target's keywords :data:`target.kws
-        #:     <tcfl.tc.target_c.kws>` (FIXME: generate, currently
-        #:     only done by app builders)
-        #:
-        self.kws = {}
-        #: Origin of the keyword in self.kws; the values for these are
-        #: lists of places where the setting was set, or re-set
-        self.kws_origin = {}
-	#: For use during execution of phases; testcase drivers can
-        #: store anything they need during the execution of each phase.
-        #: It will be, however, deleted when the phase is completed.
-        self.buffers = {}
-        #: Lock to access :attr:`buffers` safely from multiple threads
-        #: at the same time for the same testcase.
-        self.buffers_lock = threading.Lock()
+        self.__init_shallow__(None)
         self.name = name
         self.kw_set('tc_name', self.name)
+        # top level testcase name is that of the toplevel testcase,
+        # with any subcases removed (anything after ##), so
+        #
+        # some/test/path/name#param1#param2##subcase/path/subcase
+        #
+        # becomes
+        #
+        # some/test/path/name#param1#param2
+        self.kw_set('tc_name_toplevel', self.name.split("##", 1)[0])
         self.kw_set('cwd', os.getcwd())
         # This one is left for drivers to do their thing in here
         self.kw_set('tc_name_short', self.name)
@@ -2685,13 +3367,10 @@ class tc_c(object, metaclass=_tc_mc):
 
         #: dictionary of tags this test case has been stamped with
         self._tags = dict(self._tags)
-        self._tags['name'] = (self.name, tcfl.origin_get())
+        self._tags['name'] = (self.name, commonl.origin_get())
         self._tags_update()
         #: Group of targets this testcase is being ran on
         self.target_group = None
-
-        # Create a logger
-        self.log = tc_logadapter_c(logging, None)
 
         if os.path.isabs(tc_file_path):
             srcdir = os.path.relpath(os.path.dirname(
@@ -2709,10 +3388,9 @@ class tc_c(object, metaclass=_tc_mc):
                      os.path.dirname(os.path.abspath(tc_file_path)))
         self._kw_set("thisfile", thisfile)
 
-        self.tls = threading.local()
         #: Expect loop to wait for things to happen
-        self.tls.expecter = expecter.expecter_c(self._expecter_log, self,
-                                                timeout = 60)
+        self.tls.expect_timeout = 60
+        # FIXME: alias self.tls.expecter.timeout for backwards compat
         # Ticket ID for this testcase / target group
         self.ticket = None
         # The group of targets where the TC is running
@@ -2733,13 +3411,6 @@ class tc_c(object, metaclass=_tc_mc):
         # Prefix used for lines that print reports
         self._report_prefix = ""
         self._prefix_update()	# Update the prefix
-
-        # Prefix used for lines that print reports
-        self._report_prefix = ""
-        self._prefix_update()	# Update the prefix
-
-        # instance specific list of files/paths to wipe at the end
-        self._cleanup_files = set()
 
         #: Result of the last evaluation run
         #:
@@ -2774,6 +3445,10 @@ class tc_c(object, metaclass=_tc_mc):
         self._kw_set("tmpdir", self.tmpdir)
         self._kw_set("tc_hash", self.ticket)
 
+        #: time when this testcase was created (and thus all
+        #: references to it's inception are done); note in
+        #: __init_shallow__() we update this for when we assign it to
+        #: a target group to run.
         self.ts_start = time.time()
         self.ts_end = None
 
@@ -2807,17 +3482,143 @@ class tc_c(object, metaclass=_tc_mc):
         for hook in self.hook_pre:
             hook(self)
 
-    def __thread_init__(self, expecter_parent):
+        #: list of subcases this test is asked to execute by the test
+        #: case runner (see :data:`subtc`)
+        #:
+        #: Subcases follow the format
+        #: *NAME/SUBNAME/SUBSUBNAME/SUBSUBSUBNAME...*
+        self.subcases = []
+
+        #: list of subcases this testcase contains
+        #:
+        #: Note this is different to :data:`subcases` in that this is
+        #: the final list the testcase has collected after doing
+        #: discovery in the machine and (possibly) examining the
+        #: execution logs.
+        #:
+        #: It is ordered by addition time, so things sub-execute in
+        #: addition order.
+        self.subtc = collections.OrderedDict()
+        #: parent of this testcase (normally used for subcases)
+        self.parent = None
+        #: do we have to actually acquire any targets?
+        #:
+        #: in general (default), the testcases need to acquire the
+        #: targets where they are going to be executed, but in some
+        #: cases, they do not.
+        self.do_acquire = True
+
+
+    def __init_shallow__(self, other):
+        # Called by clone() to initialize those things that are
+        # different in shallow clones (instances that are almost
+        # identical except for ... a few things)
+
+        #: Lock to access :attr:`buffers` safely from multiple threads
+        #: at the same time for the same testcase.
+        self.lock = threading.Lock()
+
+	#: For use during execution of phases; testcase drivers can
+        #: store anything they need during the execution of each phase.
+        #: It will be, however, deleted when the phase is completed.
+        self.buffers = {}
+        #: Keywords for *%(KEY)[sd]* substitution specific to this
+        #: testcase.
+        #:
+        #: Note these do not include values gathered from remote
+        #: targets (as they would collide with each other). Look at
+        #: data:`target.kws <tcfl.tc.target_c.kws>` for that.
+        #:
+        #: These can be used to generate strings based on information,
+        #: as:
+        #:
+        #:   >>>  print "Something %(FIELD)s" % target.kws
+        #:   >>>  target.shcmd_local("cp %(FIELD)s.config final.config")
+        #:
+        #: Fields available:
+        #:
+        #:   - `runid`: string specified by the user that applies to
+        #:     all the testcases
+        #:
+        #:   - `srcdir` and `srcdir_abs`: directory where this
+        #:     testcase was found
+        #:
+        #:   - `thisfile`: file where this testscase as found
+        #:
+        #:   - `tc_hash`: unique four letter ID assigned to this
+        #:     testcase instance. Note that this is the same for all
+        #:     the targets it runs on. A unique ID for each target of
+        #:     the same testcase instance is the field *tg_hash* in the
+        #:     target's keywords :data:`target.kws
+        #:     <tcfl.tc.target_c.kws>` (FIXME: generate, currently
+        #:     only done by app builders)
+        #:
+        if other:
+            self.kws = dict(other.kws)
+        else:
+            self.kws = dict()
+
+        #: Origin of the keyword in self.kws; the values for these are
+        #: lists of places where the setting was set, or re-set
+        if other:
+            self.kws_origin = dict(other.kws_origin)
+        else:
+            self.kws_origin = dict()
+
+        #: list of files kept as collateral in logdir (to decide if we
+        #: remove later or not)
+        self.collateral = set()
+        self.tls = threading.local()
+        self.log = tc_logadapter_c(logging, None)
+        # instance specific list of files/paths to wipe at the end
+        self._cleanup_files = set()
+
+        if other:
+            self.subcases = list(other.subcases)
+        else:
+            self.subcases = list()
+        self.subtc = collections.OrderedDict()
+        if other:
+            self.parent = other.parent
+            for subtc_name, subtc in other.subtc.items():
+                subtc_copy = subtc._clone()
+                subtc_copy.parent = self
+                self.subtc[subtc_name] = subtc_copy
+        else:
+            self.parent = None
+
+        # sequentially incremented everytime we call expect()
+        self._expect_count = 0
+        self._expectations_global = []
+        self._expectations_global_names = set()
+
+        # update it's inception time (from reporter_c.__init__), since
+        # calling this means this is being assigned to a target group
+        # to run.
+        self.ts_start = time.time()
+
+    def __thread_init__(self, tls_parent):
         """
         When we run some methods of this object in a different thread,
         we need to initialize some parts first.
 
         This is currently quite a dirty hack, but it is what we
         have. We use it when we clone the object to run in a target
-        group or when we spawn thredas to run methods in parallel.
+        group or when we spawn threads to run methods in parallel.
         """
-        self.tls.expecter = expecter.expecter_c(
-            self._expecter_log, self, timeout = expecter_parent.timeout)
+        # we want to keep the same buffering state we had in the
+        # parent thread, for any search context, etc, so we do a full
+        # replication.
+        if hasattr(tls_parent, 'buffers'):
+            self.tls.buffers = copy.deepcopy(tls_parent.buffers)
+        else:
+            self.tls.buffers = {}
+        if hasattr(tls_parent, '_expectations'):
+            self.tls._expectations = copy.deepcopy(tls_parent._expectations)
+        else:
+            self.tls._expectations = []
+        if tls_parent:
+            self.tls.expect_timeout = tls_parent.expect_timeout
 
     def is_static(self):
         """
@@ -2827,166 +3628,121 @@ class tc_c(object, metaclass=_tc_mc):
         return not self._targets
 
 
-    # Reporting interface FIXME: document
-    def report_pass(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "PASS", message, attachments)
+    #: Number of characters in the testcase's :term:`hash`
+    #:
+    #: The testcase's *HASHID* is a unique identifier to identify a
+    #: testcase the group of test targets where it ran.
+    #:
+    #: This defines the lenght of such hash; before it used 4 to be
+    #: four but once over 40k testcases are being run, conflicts start
+    #: to pop up, where more than one testcase/target combo maps to
+    #: the same hash.
+    #:
+    #:  32 ^ 4 = 1048576 unique combinations
+    #:
+    #:  32 ^ 6 = 1073741824 unique combinations
+    #:
+    #: 6 chars offers a keyspace 1024 times larger with base32 than
+    #: 4 chars. Base64 increases the amount, but not that much
+    #: compared to the ease of confusion between caps and non caps.
+    #:
+    #: So it has been raised to 6.
+    #:
+    #: FIXME: add a registry to warn of used ids
+    hashid_len = 6
 
-    def report_error(self, message, attachments = None,
-                     level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "ERRR", message, attachments)
-
-    def report_fail(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "FAIL", message, attachments)
-
-    def report_blck(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "BLCK", message, attachments)
-
-    def report_skip(self,  message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "SKIP", message, attachments)
-
-    def report_info(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, ulevel = 5):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(message, attachments,
-                              level, dlevel, alevel, ulevel)
-        level += dlevel
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               "INFO", message, attachments)
-
-    def report_data(self, domain, name, value, expand = True):
-        """Report measurable data
-
-        When running a testcase, if data is collected that has to be
-        reported for later analysis, use this function to report
-        it. This will be reported by the report driver in a way that
-        makes it easy to collect later on.
-
-        Measured data is identified by a *domain* and a *name*, plus
-        then the actual value.
-
-        A way to picture how this data can look once aggregated is as
-        a table per domain, on which each invocation is a row and each
-        column will be the values for each name.
-
-        :param str domain: to which domain this measurement applies
-          (eg: "Latency Benchmark %(type)s");
-
-        :param str name: name of the value  (eg: "context switch
-          (microseconds)"); it is recommended to always add the unit
-          the measurement represents.
-
-        :param value: value to report for the given domain and name;
-           any type can be reported.
-
-        :param bool expand: (optional) by default, the *domain* and
-          *name* fields will be %(FIELD)s expanded with the keywords
-          of the testcase or target. If *False*, it will not be
-          expanded.
-
-          This enables to, for example, specify a domain of "Latency
-          measurements for target %(type)s" which will automatically
-          create a different domain for each type of target.
+    def relpath_to_abs(self, path):
         """
-        assert isinstance(domain, str)
-        assert isinstance(name, str)
-        if expand:
-            domain = domain % self.kws
-            name = name % self.kws
-        report.report_c.report(
-            2, 1000, 1000, self, "DATA", domain + "::" + name + "::%s" % value,
-            dict(domain = domain, name = name, value = value))
+        Given a path relative to the test script's source, make it absolute.
 
-    def report_tweet(self, what, result, extra_report = "",
-                     ignore_nothing = False, attachments = None,
-                     level = None, dlevel = 0, alevel = 2, ulevel = 5,
-                     dlevel_failed = 0, dlevel_blocked = 0,
-                     dlevel_passed = 0, dlevel_skipped = 0, dlevel_error = 0):
-        if level == None:		# default args are computed upon def'on
-            level = msgid_c.depth()
-        self._report_argcheck(what, attachments, level, dlevel, alevel, ulevel)
-        level += dlevel
-        r = False
-        if result.failed > 0:
-            tag = "FAIL"
-            msg = valid_results[tag][1]
-            level += dlevel_failed
-        elif result.errors > 0:
-            tag = "ERRR"
-            msg = valid_results[tag][1]
-            level += dlevel_error
-        elif result.blocked > 0:
-            tag = "BLCK"
-            msg = valid_results[tag][1]
-            level += dlevel_blocked
-        elif result.passed > 0:
-            tag = "PASS"
-            msg = valid_results[tag][1]
-            r = True
-            level += dlevel_passed
-        elif result.skipped > 0:
-            tag = "SKIP"
-            msg = valid_results[tag][1]
-            level += dlevel_skipped
-            r = True
-        else:            # When here, nothing was run, all the counts are zero
-            if ignore_nothing == True:
-                return True
-            report.report_c.report(level, level + alevel, level + ulevel, self,
-                                   "BLCK",
-                                   what + " / nothing ran " + extra_report,
-                                   attachments)
-            return False
-        report.report_c.report(level, level + alevel, level + ulevel, self,
-                               tag, what + " " + msg + " " + extra_report,
-                               attachments)
-        return r
+        .. admonition: example
 
+           If the testscript calling this API (as given by
+           ``testcase.kws['srcdir_abs']`` is
+           ``/some/path/test_file.py`` and this is given as
+           ``subdir/somefile``, then the source will be considered to
+           be ``/some/path/subdir/somefile``
+
+        @returns string with the absolutized path if relative, the
+          same if already absolute
+
+        """
+
+        if os.path.isabs(path):
+            return path
+        return os.path.join(self.kws['srcdir_abs'], path)
 
     def shcmd_local(self, cmd, origin = None, reporter = None,
-                    logfile = None):
+                    logfile = None, env = None):
         """
         Run a shell command in the local machine, substituting
         %(KEYWORD)[sd] with keywords defined by the testcase.
+
+        :param str origin: (optional) when reporting information about
+          this expectation, what origin shall it list, eg:
+
+          - *None* (default) to get the current caller
+          - *commonl.origin_get(2)* also to get the current caller
+          - *commonl.origin_get(1)* also to get the current function
+
+          or something as:
+
+          >>> "somefilename:43"
+
+        See also :meth:`run_local`.
+
+        :param dict env: (optional) dictionary of environment
+          variables to be passed to :func:`subprocess.check_output`
+          (same format as such).
         """
         if origin == None:
-            origin = tcfl.origin_get(2)
+            origin = commonl.origin_get(2)
         return self._shcmd_local(cmd % self.kws, origin = origin,
-                                 reporter = reporter, logfile = logfile)
+                                 reporter = reporter, logfile = logfile,
+                                 env = env)
+
+    def run_local(self, command, expect = None, cwd = None):
+        """
+        Run a command on the local system with an interface similar to
+        :meth:`target.shell.run <tcfl.target_ext_shell.extension.run>`.
+
+        This is similar to :meth:`shcmd_local`.
+
+        :param str command: command line to run (will be run a shell command)
+
+        :param str,re._pattern_type expect: (optional) if defined, a
+          string or regular expression that shall be found in the output
+          of the command, raising :exc:`tcfl.tc.failed_e` otherwise.
+
+        :param str cwd: (optional) change into this directory before
+          starting
+
+        :raises: :exc:`subprocess.CalledProcessError` if the command fails
+
+        """
+        if cwd == None:
+            cwd = self.tmpdir
+
+        output = subprocess.check_output(command, cwd = cwd, shell = True,
+                                         stderr = subprocess.STDOUT)
+        if expect:
+            if isinstance(expect, str):
+                if expect not in output:
+                    raise tcfl.tc.failed_e(
+                        "can't find '%s' in output" % expect,
+                        dict(output = output))
+            elif isinstance(expect, re._pattern_type):
+                if not expect.search(output):
+                    raise tcfl.tc.failed_e(
+                        "can't find '%s' in output" % expect.pattern,
+                        dict(output = output))
+            else:
+                raise tcfl.tc.blocked_e(
+                    "can't handle expect of type %s;"
+                    " can do strings or compiled regex" % expect)
+        self.report_info("command ran: " + command,
+                         dict(output = output), alevel = 1)
+        return output
 
 
     @classmethod
@@ -3320,7 +4076,7 @@ class tc_c(object, metaclass=_tc_mc):
     # list of images to the images set to be uploaded to the target
     # using the images interface.
     def _deploy_50_for_target(self, _target):
-        images = set()
+        images = dict()
         result = result_c(0, 0, 0, 0, 0)
         for bsp in _target.bsps:
             # FIXME: use msgid_c here
@@ -3347,7 +4103,7 @@ class tc_c(object, metaclass=_tc_mc):
 
         if images:
             if getattr(_target, "images", None) != None:
-                result = _target.images.upload_set(images)
+                result = _target.images.flash(images)
             else:
                 result = result_c(0, 0, 0, 1, 0)
                 _target.report_info("Images collected by deploy phase, but "
@@ -3412,16 +4168,6 @@ class tc_c(object, metaclass=_tc_mc):
     #
     # Linkage into the report API and support for it
     #
-
-    @staticmethod
-    def _report_argcheck(message, attachments, level, dlevel, alevel, ulevel):
-        assert isinstance(message, str)
-        if attachments:
-            assert isinstance(attachments, dict)
-        assert isinstance(level, int)
-        assert isinstance(dlevel, int)
-        assert isinstance(alevel, int)
-        assert isinstance(ulevel, int)
 
     def _report_mk_prefix(self):
         """
@@ -3513,7 +4259,7 @@ class tc_c(object, metaclass=_tc_mc):
                 raise blocked_e(
                     "%s.%s(): not a valid method (missing 'self'?), "
                     "@classmethod or @staticmethod @%s"
-                    % (cls.__name__, fname, tcfl.origin_get_object(fn)))
+                    % (cls.__name__, fname, commonl.origin_get_object(fn)))
         else:
             _type = False
 
@@ -3525,7 +4271,7 @@ class tc_c(object, metaclass=_tc_mc):
                     "%s.%s() (%s): argument '%s' is not a "
                     "valid Python identifier"
                     % (cls.__name__, fname,
-                       tcfl.origin_get_object(fn), argname))
+                       commonl.origin_get_object(fn), argname))
             if not argname in list(self._targets.keys()):
                 raise blocked_e(
                     "%s @ %s.%s() %s: needs target named '%s', which hasn't "
@@ -3577,7 +4323,7 @@ class tc_c(object, metaclass=_tc_mc):
         # generated by an App builder, we need to look for the alias
         #
         try:
-            return tcfl.origin_get_object(fn)
+            return commonl.origin_get_object(fn)
         except IOError as e:
             fname = fn.__name__
             if e.message == 'source code not available':
@@ -3735,7 +4481,7 @@ class tc_c(object, metaclass=_tc_mc):
                     "interconnect or target '%s' not present in target "
                     "group `%s` (available: %s)"
                     % (type(self).__name__, fn.__name__,
-                       tcfl.origin_get_object(fn), wanted_target,
+                       commonl.origin_get_object(fn), wanted_target,
                        self.target_group.name,
                        ", ".join([
                            i for i in list(self.target_group.targets.keys())
@@ -3792,7 +4538,7 @@ class tc_c(object, metaclass=_tc_mc):
                    type(r).__name))
 
     def __method_trampoline_thread(self, msgid, fname, fn, _type, targets,
-                                   thread_init_args):
+                                   tls_parent):
         # runs a function and returns a tuple (result, exception
         # info). If there was no exception, [1] will be None;
         # otherwise it will contain the exception information so it
@@ -3800,13 +4546,9 @@ class tc_c(object, metaclass=_tc_mc):
         #
         # Because we are in the context of a newly initialized thread,
         # we need to initialize some things
-        if thread_init_args == None:
-            thread_init_args = {}
-        else:
-            assert isinstance(thread_init_args, dict)
         try:
             with msgid_c(parent = msgid, l = 2):
-                self.__thread_init__(**thread_init_args)
+                self.__thread_init__(tls_parent)
                 return (
                     self.__method_trampoline_call(fname, fn, _type, targets),
                     None)
@@ -3863,7 +4605,12 @@ class tc_c(object, metaclass=_tc_mc):
                 threads[fname] = thread_pool.apply_async(
                     self.__method_trampoline_thread,
                     (msgid_c(l = 2), fname, fn, _type, targets,
-                     dict(expecter_parent = self.tls.expecter)))
+                     _simple_namespace(self.tls.__dict__))
+                )
+                # so we can Ctrl-C right away--the system is designed
+                # to cleanup top bottom, with everything being
+                # expendable
+                threads[fname].daemon = True
             thread_pool.close()
             thread_pool.join()
             for thread in list(threads.values()):
@@ -3929,20 +4676,23 @@ class tc_c(object, metaclass=_tc_mc):
     # Helpers for the public API
     #
     def _shcmd_local(self, cmd, origin = None, reporter = None,
-                     logfile = None, nonzero_e = error_e):
+                     logfile = None, nonzero_e = error_e, env = None):
         """
         Run a single shell command
 
         :param tc_c _tc: test case
         :param str cmd: shell command to run
         :param str origin: where the shell command was found
+        :param dict env: (optional) dictionary of environment
+          variables to be passed to :func:`subprocess.check_output`
+          (same format as such).
         :return: True if successful, False if failed, None if blocked
 
         """
         if reporter == None:
             reporter = self
         if origin == None:
-            origin = tcfl.origin_get(2)
+            origin = commonl.origin_get(2)
         # This is safe as it runs in the client, as the current user
         # FIXME: we might want to jail it so rogue test cases don't
         # run silly things...
@@ -3970,26 +4720,34 @@ class tc_c(object, metaclass=_tc_mc):
             logf = logfile
         try:
             p = subprocess.Popen([ cmd ], shell = True, close_fds = False,
-                                 stdout = logf, stderr = subprocess.STDOUT)
+                                 stdout = logf, stderr = subprocess.STDOUT,
+                                 env = env)
             rc = p.wait()
-            del p
             logf.flush()
-            logf.seek(0,0)
-
+            generator_factory = commonl.generator_factory_c(
+                commonl.file_iterator, logf.name)
             if rc == 0:
-                reporter.report_pass("%spassed: '%s' @%s"
-                                     % (phase, cmd, origin),
-                                     { output_tag: logf })
+                reporter.report_pass(
+                    "%spassed: '%s' @%s" % (phase, cmd, origin),
+                    {
+                        output_tag: generator_factory
+                    })
                 logf.seek(0,0)
                 return logf.read()
             elif rc == 127:
-                raise blocked_e("exit code %d from '%s' @%s" \
-                                % (rc, cmd, origin),
-                                { output_tag: logf, "alevel": 0})
+                raise blocked_e(
+                    "exit code %d from '%s' @%s" % (rc, cmd, origin),
+                    {
+                        output_tag: generator_factory ,
+                        "alevel": 0
+                    })
             else:
-                raise nonzero_e("exit code %d from '%s' @%s" \
-                                % (rc, cmd, origin),
-                                { output_tag: logf, "alevel": 0})
+                raise nonzero_e(
+                    "exit code %d from '%s' @%s" % (rc, cmd, origin),
+                    {
+                        output_tag: generator_factory,
+                        "alevel": 0
+                    })
         except (failed_e, error_e, blocked_e):
             raise
         except Exception as e:
@@ -4123,7 +4881,7 @@ class tc_c(object, metaclass=_tc_mc):
             assert isinstance(value, str) \
                 or isinstance(value, bool)
         if origin == None:
-            origin = "[builtin default] " + tcfl.origin_get(1)
+            origin = "[builtin default] " + commonl.origin_get(1)
         else:
             assert isinstance(origin, str)
         self._tags[tagname] = (value, origin)
@@ -4153,7 +4911,7 @@ class tc_c(object, metaclass=_tc_mc):
             if origin:
                 _origin = origin
             if _origin == None:
-                _origin = "[builtin default] " + tcfl.origin_get(1)
+                _origin = "[builtin default] " + commonl.origin_get(1)
             if tagname in self._tags and overwrite == False:
                 continue
             self._tags[tagname] = (value, _origin)
@@ -4195,10 +4953,623 @@ class tc_c(object, metaclass=_tc_mc):
             assert isinstance(origin, str)
         for key, value in d.items():
             self._kw_set(key, value, origin)
+
+    class _poll_state_c(object):
+        def __init__(self):
+            self.lock = threading.Lock()
+            self.last_ts = time.time()
+            self.buffers = {}
+
+    _poll_state = {}	    # protected by testcase.lock
+
+    def _expect_append(self, run_name, expectations_required, exps,
+                       poll_period, exp, name):
+        # FIXME: print the origin of this
+        assert isinstance(exp, expectation_c), \
+            'argument %s is not an instance of expectation_c but %s' \
+            % (exp, type(exp).__name__)
+        assert name == None or isinstance(name, str)
+
+        # if we forced a name, use it, otherwise use whichever if
+        # there; if there is none, create a default
+        if name:
+            exp.name = name
+        elif not exp.name:
+            exp.name = '%03d' % (len(exps) - 1)
+        # note the poll name does not include the run name. Why?
+        # because we want to reuse the poll data from one run to the
+        # other insted of re-reading everything; the polling mechanism
+        # is supposed to know to append stuff
+        exp.poll_name = exp.poll_context()
+        poll_period.setdefault(exp.poll_name, 3) # FIXME: default
+        if exp.name in [ i.name for i in exps ]:
+            raise AssertionError(
+                "an expectation named '%s' is already present" % exp.name)
+        exps.append(exp)
+        if exp.timeout > 0:
+            expectations_required.add(exp)
+        if exp.poll_period < poll_period[exp.poll_name]:
+            self.report_info(
+                '%s/%s: reducing poll period from %.2fs to %.2fs for poll '
+                'context %s'
+                % (run_name, exp.name, poll_period[exp.poll_name],
+                   exp.poll_period, exp.poll_name), dlevel = 4)
+            poll_period[exp.poll_name] = exp.poll_period
+        # Initialize the polling lock for this poll; the polling in
+        # most cases is shared by multiple threads in multiple
+        # expectations, so we want to do it in a very coordinated
+        # way. The poll() method will be called only once and state
+        # will be ketp shared.
+        with self.lock:
+            if exp.poll_name not in self._poll_state:
+                self._poll_state[exp.poll_name] = self._poll_state_c()
+
+    def expect_global_append(self, exp, skip_duplicate = False):
+        """
+        Append an expectation to the testcase global expectation list
+
+        Refer to :meth:`expect` for more information
+        """
+        assert isinstance(exp, expectation_c), \
+            'argument %s is not an instance of expectation_c but %s' \
+            % (exp, type(exp).__name__)
+        if exp.origin == None:
+            exp.origin = commonl.origin_get(2)
+        if exp.name in self._expectations_global_names:
+            if skip_duplicate:
+                return
+            else:
+                raise tcfl.tc.blocked_e(
+                    "expectation '%s' already exists in testcase "
+                    "global list" % exp.name)
+        self._expectations_global.append(exp)
+        self._expectations_global_names.add(exp.name)
+
+    def expect_global_remove(self, exp):
+        """
+        Remove an expectation from the testcase global expectation list
+
+        Refer to :meth:`expect` for more information
+        """
+        assert isinstance(exp, expectation_c), \
+            'argument %s is not an instance of expectation_c but %s' \
+            % (exp, type(exp).__name__)
+        self._expectations_global_names.remove(exp.name)
+        self._expectations_global.remove(exp)
+
+    def expect_tls_append(self, exp):
+        """
+        Append an expectation to the thread-specific expectation list
+
+        Refer to :meth:`expect` for more information
+        """
+        assert isinstance(exp, expectation_c), \
+            'argument %s is not an instance of expectation_c but %s' \
+            % (exp, type(exp).__name__)
+        if exp.origin == None:
+            exp.origin = commonl.origin_get(2)
+        self.tls._expectations.append(exp)
+
+    def expect_tls_remove(self, exp):
+        """
+        Remove an expectation from the testcase global expectation list
+
+        Refer to :meth:`expect` for more information
+        """
+        assert isinstance(exp, expectation_c), \
+            'argument %s is not an instance of expectation_c but %s' \
+            % (exp, type(exp).__name__)
+        self.tls._expectations.remove(exp)
+
+    def expect(self, *exps_args, **exps_kws):
+        """Wait for a list of things we expect to happen
+
+        This is a generalization of the pattern *expect this string in
+        a serial console* where we can wait, in the same loop for many
+        things (expectations) from multiple sources such as serial
+        console, screen shots, network captures, audio captures, etc...
+
+        Each expectation is an object that implements the
+        :class:`expectation_c` interface which indicates how to:
+
+         - poll from a data source
+
+         - detect what we are expecting in the polled data
+
+         - generate collateral for said detected data
+
+        This function will enter into a loop, polling the different
+        expectation data sources according to the poll periods they
+        establish, then detecting data and reporting the results back
+        to the user and raising exceptions if so the user indicates want
+        (eg: raise an exception if timeout looking for a shell prompt,
+        or raise an exception if a *kernel panic* string is found).
+
+        For example:
+
+        >>> self.expect(
+        >>>     name = "waiting for desktop to boot",
+        >>>     timeout = 30,
+        >>>     text_on_console(target, "Kernel Panic",
+        >>>                     name = "kernel panic watchdog",
+        >>>                     raise_on_found = tcfl.tc.error_e(
+        >>>                         "Kernel Panic found!"),
+        >>>     image_on_screenshot(target, 'screen', 'icon-power.png'),
+        >>>     config_button = image_on_screenshot(target, 'screen',
+        >>>                                         'icon-config.png')
+        >>> )
+
+        The first expectation will be called *kernel panic watchdog*
+        and will raise an exception if the console print a
+        (oversimplified for the sake of the example) kernel panic
+        message. If not found, nothing happens.
+
+        The second will default to be called whatever the
+        :class:`image_on_screenshot` calls it (*icon-power.png*),
+        while the second will have it's name overriden to
+        *config_button*. These last two will capture an screenshot
+        from the target's screenshot capturer called *screen* and the
+        named icons need to be found for the call to be
+        succesful. Otherwise, error exceptions due to timeout will be
+        raised.
+
+        The list of expectations that will be always scanned is in
+        this order:
+
+        - testcase's global list of expectations (add with
+          :meth:`expect_global_append`)
+
+        - testcase's thread specific list of expectations (add with
+          :meth:`expect_tls_append`)
+
+        - list of expectations in the arguments
+
+        :param expectation_c exps_args: expectation objects which are
+          expected to be self-named (their implementations will assign
+          names or a default will be given). eg:
+
+          >>> self.expect(tcfl.tc.tc_c.text_on_console(args..etc),
+          >>>             tcfl.tc.tc_c.image_on_screenshot(args..etc))
+
+        :param expectation_c exps_kws: expectation objects named after
+          the keyword they are assigned to; note the keywords *name*
+          and *timeout* are reserved. eg:
+
+          >>> self.expect(
+          >>>     shell_prompt = tcfl.tc.tc_c.text_on_console(args..etc),
+          >>>     firefox_icon = tcfl.tc.tc_c.image_on_screenshot(args..etc)
+          >>> )
+
+        :param int timeout: Maximum time of seconds to wait for all
+          non-optional expectations to be met.
+
+          >>> timeout = 4
+
+        :param str name: a name for this execution, used for reporting
+          and generation of collateral; it defaults to a test-specific
+          monotonically increasing number shared amongst all the
+          threads running in this testcase. eg:
+
+          >>> name = "shell prompt received"
+
+        :param str origin: (optional) when reporting information about
+          this expectation, what origin shall it list, eg:
+
+          - *None* (default) to get the current caller
+          - *commonl.origin_get(2)* also to get the current caller
+          - *commonl.origin_get(1)* also to get the current function
+
+          or something as:
+
+          >>> "somefilename:43"
+        """
+        origin = exps_kws.pop('origin', None)
+        if origin == None:
+            origin = commonl.origin_get(2)
+        # where detectors store detection data, keyed by expectation
+        buffers = dict()
+        # where results are dumped, keyed by expectation
+        results = dict()
+
+        if 'name' in exps_kws:
+            name = exps_kws['name']
+            del exps_kws['name']
+            assert isinstance(name, str), \
+                "argument 'name' has to be a string, found %s" \
+                % type(name).__name__
+        else:
+            name = ""
+
+        if 'timeout' in exps_kws:
+            assert exps_kws['timeout'] > 0
+            timeout = exps_kws['timeout']
+            del exps_kws['timeout']
+        else:
+            timeout = self.tls.expect_timeout
+
+        with self.lock:
+            run_name = '%02d' % self._expect_count
+            self._expect_count += 1
+        if name:
+            run_name += "." + commonl.name_make_safe(name)
+
+        exps = []	# has to be a list to maintain declaration order
+        poll_period = dict()
+        # these are the expectations that are required to be detected
+        # in some form; it is a subset of them all because there might
+        # be some we only want to detect optionally (timeout == 0)
+        expectations_required = set()
+
+        # at the end add the thread specific expectations, then the
+        # global ones -- we always check first the ones from the
+        # arguments
+        for exp in self._expectations_global:
+            self._expect_append(run_name, expectations_required, exps,
+                                poll_period, exp, None)
+
+        for exp in self.tls._expectations:
+            self._expect_append(run_name, expectations_required, exps,
+                                poll_period, exp, None)
+
+        # read in all the expectations without name from *exps_args, the
+        # ones with names in **exps_kws
+        for exp in exps_args:
+            if exp.origin == None:
+                exp.origin = origin
+            self._expect_append(run_name, expectations_required, exps,
+                                poll_period, exp, None)
+
+        # kws is at this point just a named list of expectations and
+        # their implementation
+        for exp_name, exp in exps_kws.items():
+            if exp.origin == None:
+                exp.origin = origin
+            self._expect_append(run_name, expectations_required, exps,
+                                poll_period, exp, exp_name)
+
+
+        expectations_pending = list(exps)
+
+        time_ts0 = time.time()
+        time_ts = time_ts0
+        time_out = time_ts0 + timeout
+        detect_ts = dict()
+        min_poll_period = min(poll_period.values())
+        self.report_info('%s: poll_period %.2f, timeout %.2f'
+                         % (run_name, min_poll_period, timeout), dlevel = 5)
+        try:
+            while time_ts <= time_out:
+                # iterate over this copy, we'll remove from the original,
+                # so next iteration doesn't take the original; respect
+                # the original order
+                _expectations_pending = list(expectations_pending)
+                for exp in _expectations_pending:
+                    poll_context = exp.poll_context()
+                    time_ts = time.time()
+                    # if it is the first run, set these timestamps so
+                    # we kick in a poll
+                    detect_ts.setdefault(exp.name, time_ts)
+                    buffers.setdefault(exp.name, dict())
+                    with self.lock:
+                        poll_state = self._poll_state[exp.poll_name]
+                    if exp.target:
+                        reporter = exp.target
+                    else:
+                        reporter = self
+
+                    # Poll the expectation if the poll period has
+                    # ellapsed; remember we might be sharing this poll
+                    # source between multiple expectations in multiple
+                    # threads -- hence why the polling is testcase
+                    # global and we lock it per poll_name
+                    with poll_state.lock:
+                        ellapsed = time_ts - time_ts0
+                        last_poll_ts = poll_state.last_ts
+                        poll_ellapsed = time_ts - last_poll_ts
+                        # == 0 -> first time we run, so poll
+                        if exp.poll_name not in poll_period:
+                            # sometimes this hits and it is still not
+                            # clear why; funny thing is nothing really
+                            # happens, since it checks later and it
+                            # works ok...
+                            self.log.error(
+                                "BUG: exp %08x name %s context %s"
+                                " poll_name %s is MISSING"
+                                " from poll_period %s: %s;"
+                                " this happens when multiple"
+                                " expectation that poll the same"
+                                " source had the same name"
+                                %  (
+                                    id(exp), exp.name,
+                                    exp.poll_context(), exp.poll_name,
+                                    poll_period,
+                                    "".join(traceback.format_stack())
+                                )
+                            )
+                        else:
+                            exp_poll_period = poll_period[exp.poll_name]
+                            if poll_ellapsed == 0 \
+                               or poll_ellapsed >= exp_poll_period:
+                                reporter.report_info(
+                                    '%s/%s: polling on %s @%.1f/%.1fs '
+                                    '(%.1fs ellapsed on a %.1fs period)'
+                                    % (run_name, exp.name, poll_context,
+                                       ellapsed, timeout, poll_ellapsed,
+                                       exp_poll_period), dlevel = 3)
+                                exp.poll(self, run_name, poll_state.buffers)
+                                poll_state.last_ts = time_ts
+                                last_poll_ts = time_ts	# we need this below
+                            else:
+                                reporter.report_info(
+                                    '%s/%s: not polling on %s @%.1f/%.1fs '
+                                    '(only %.1fs ellapsed on a %.1fs period)'
+                                    % (run_name, exp.name, poll_context,
+                                       ellapsed, timeout, poll_ellapsed,
+                                       exp_poll_period), dlevel = 3)
+                    # Detect this expectation from the poll -- only if
+                    # there has been a more recent poll
+                    # If it detection is succesful, we are done, remove it
+                    # from the list. Check if it times out (each
+                    # expectation can timeout shorter than the global
+                    # timeout)
+                    last_detect_ts = detect_ts[exp.name]
+                    last_detect_ellapsed = last_poll_ts - time_ts
+                    if last_detect_ellapsed == 0 \
+                       or last_detect_ts < last_poll_ts:
+                        reporter.report_info(
+                            "%s/%s: detecting expectation on '%s' "
+                            "@%.1f/%.1fs (last detect %.1fs before "
+                            "last poll on %.1fs)"
+                            % (run_name, exp.name, poll_context, ellapsed,
+                               timeout, last_detect_ts, last_poll_ts),
+                            dlevel = 3)
+                        with poll_state.lock:
+                            r = exp.detect(self, run_name, poll_state.buffers,
+                                           buffers[exp.name])
+                        if r:
+                            assert r == None or isinstance(r, dict), \
+                                "%s/%s: expect returned an unexpected" \
+                                " type '%s'; expected *None* or dictionary" \
+                                % (run_name, exp.name, r)
+                            # this is done
+                            results[exp.name] = r
+                            expectations_pending.remove(exp)
+                            if exp in expectations_required:
+                                expectations_required.remove(exp)
+                            if exp.raise_on_found:	# attach context
+                                exp.raise_on_found.attachments_update(r)
+                                if exp.origin:
+                                    exp.raise_on_found.attachments_update({
+                                        'origin': exp.origin
+                                    })
+                                raise exp.raise_on_found
+                        if exp.timeout > 0 and ellapsed > exp.timeout:
+                            # timeout for this specific expectation
+                            with poll_state.lock:
+                                exp.on_timeout(run_name, poll_context,
+                                               poll_state.buffers, buffers,
+                                               ellapsed, timeout)
+                        detect_ts[exp.name] = time_ts
+                    else:
+                        reporter.report_info(
+                            '%s/%s: not re-detecting on %s (no new poll) '
+                            '@%.1f/%.1fs (last detect %.1fs after last poll '
+                            'on %.1fs)'
+                            % (run_name, exp.name, poll_context, ellapsed,
+                               timeout, last_detect_ts, last_poll_ts),
+                            dlevel = 3)
+
+                # if all the required expectations are done, get out!
+                if not expectations_required:
+                    break
+                time.sleep(min_poll_period)
+                time_ts += min_poll_period
+            if time_ts > time_out:
+                ellapsed = time_ts - time_ts0
+                # timeout exceeded; look at the expectations we
+                # required to pass, sort them by timeout and raise the
+                # one with the lowest timeout and exception...or do nothing
+                for exp in sorted(expectations_required,
+                                  key = lambda exp: exp.timeout):
+                    if exp.timeout <= 0:
+                        continue
+                    # timeout for this specific expectation
+                    with self.lock:
+                        poll_state = self._poll_state[exp.poll_name]
+                    with poll_state.lock:
+                        exp.on_timeout(run_name, poll_context,
+                                       poll_state.buffers,
+                                       buffers.get(exp.name, {}),
+                                       ellapsed, timeout)
+
+        except Exception as e:
+            # Left over here for when fast debug is needed; this will
+            # print a lot of extra data in every call and is not
+            # always needed.
+            # result_c.report_from_exception(self, e)
+            raise
+        finally:
+            # we got them all, return the results dictionary
+            time_ts = time.time()
+            self.report_info('%s: completed after @%.1fs, found %d matches'
+                             % (run_name, time_ts - time_ts0,
+                                len(results)), dlevel = 3)
+
+            # flush the expectations
+            # this will generate collaterals as needed
+            for exp in exps:
+                try:
+                    with self.lock:
+                        poll_state = self._poll_state[exp.poll_name]
+                    with poll_state.lock:
+                        exp.flush(self, run_name,
+                                  poll_state.buffers,
+                                  buffers.get(exp.name, {}),
+                                  results.get(exp.name, {}))
+                except Exception as e:
+                    result_c.report_from_exception(
+                        self, e, dict(
+                            context = "flushing expectation %s/%s" % (
+                                run_name, exp.name)
+                        )
+                    )
+                    # do not re-raise this, this can be the raise path
+                    # of an exception in our main body
+                    # FIXME: detect if we are not in a raise path and
+                    # raise then?
+
+        return results
+
+    def threaded(self, fn):
+        """
+        Decorate a testcase method so it can be used with
+        :meth:`run_for_each_target_threaded`.
+
+        Use in a test class as described in
+        :meth:`run_for_each_target_threaded`'s examples.
+        """
+        def _decorated_fn(*args, **kwargs):
+            try:
+                # the caller has added these extra parameters we use
+                # to initialize the TLS for the thread, inheriting
+                # values--we remove them from the args list, so the
+                # calling later doesn't complain about extra
+                # unexpected parameters.
+                # args[-1] is always kwargs
+                parent_msgid = kwargs.pop('parent_msgid', None)
+                parent_tls = kwargs.pop('parent_tls', None)
+                with tcfl.msgid_c(parent = parent_msgid, l = 2) as msgid:
+                    msgid._depth -= 1
+                    self.__thread_init__(parent_tls)
+                    result = fn(*args, **kwargs)
+                    return result, None
+            except:
+                return None, sys.exc_info()
+        _decorated_fn.func_dict['threaded_decorator'] = True
+        return _decorated_fn
+
+    def run_for_each_target_threaded(
+            self, function, args = None, kwargs = None,
+            targets = None, processes = None, re_raise_exceptions = True):
+        """
+        Executes a function in parallel for each listed target waiting
+        for them to finish
+
+        By default, all of the testcase target's are used; (eg) to power
+        cycle all targets in parallel (note the use of the
+        :meth:`self.threaded <threaded>` decorator):
+
+        >>> @tcfl.tc.target(count = 10)
+        >>> class _test(tcfl.tc.tc_c):
+        >>>
+        >>>     def start(self):
+        >>>         @self.threaded
+        >>>         def _target_start(target):
+        >>>             target.power.cycle()
+        >>>
+        >>>         self.run_for_each_target_threaded(_target_start)
+
+        if you have your own list of targets:
+
+        >>> @tcfl.tc.interconnect()
+        >>> @tcfl.tc.target(name = "server")
+        >>> @tcfl.tc.target(name = "client1")
+        >>> @tcfl.tc.target(name = "client2")
+        >>> @tcfl.tc.target(name = "client3")
+        >>> class _test(tcfl.tc.tc_c):
+        >>>
+        >>>     clients = [ "client1", "client2", "client3" ]
+        >>>
+        >>>     def start(self, ic):
+        >>>         ic.power.on()
+        >>>         server.power.cycle()
+        >>>         # do some server setup...
+        >>>         @self.threaded
+        >>>         def _client_start(client):
+        >>>             client.power.cycle()
+        >>>             client.shell.up(user = 'root')
+        >>>
+        >>>         self.run_for_each_target_threaded(_client_start,
+        >>>                                           targets = clients)
+
+        :param function: function to execute; this has to be a
+          function decorated with *@:func:`self.threaded
+          <tcfl.tc.tc_c.threaded>`*; it must take as first argument a
+          :class:`tcfl.tc.target_c` object, which will be the target
+          it is running for.
+
+          The rest of the arguments will be the ones supplied with
+          *args* and *kwargs*.
+
+        :param tuple args: (optional, default none) extra arguments to
+          pass to each function call
+
+        :param tuple kwargs: (optional, default none) extra keyword
+          arguments to pass to each function call
+
+        :param list(str) targets: (optional, default all testcase's
+          targets) list of targets on which to launch the function
+          (each on a thread); this is a list of the strings, each
+          being a target role (old *target want name*), the names
+          assigned to the targets on the *@tcfl.tc.interconnect* or
+          *@tcfl.tc.target* decorators.
+
+        :param int processes: (optional, default as many as targets)
+          how many threads to run in parallel
+
+        :param bool re_raise_exceptions: if any function raises an
+          exception, reraise when all are done.
+
+        :returns: dictionary keyed by target role of tuples containing
+          the *( result, exception )* function's return value and
+          information about exception raised (if it was raised, *None*
+          otherwise).
+
+          Exception information is a tuple as returned by
+          :func:`sys.exc_info`.
+
+        """
+        assert args == None or isinstance(args, tuple)
+        assert kwargs == None or isinstance(kwargs, dict)
+        assert targets == None or isinstance(targets, list)
+        assert processes == None or processes > 0
+        assert isinstance(re_raise_exceptions, bool)
+        assert hasattr(function, "func_dict") \
+            and function.func_dict.get("threaded_decorator", False) == True, \
+            "%s: function has to be decorated with @tcfl.tc.tc_c.threaded"
+
+        if targets == None:
+            targets = self.target_group.targets.keys()
+        if processes == None:
+            processes = len(targets)
+        threads = {}
+        if args == None:
+            args = ( )
+        if kwargs == None:
+            kwargs = {}
+
+        thread_pool = tcfl.tc._multiprocessing_method_pool_c(processes = processes)
+        for target_role in targets:
+            target = self.target_group.targets[target_role]
+            kwargs['parent_tls'] = tcfl.tc._simple_namespace(self.tls.__dict__)
+            kwargs['parent_msgid'] = tcfl.msgid_c(l = 2)
+            threads[target_role] = \
+                thread_pool.apply_async(function, (target, ) + args, kwargs, )
+
+        thread_pool.close()
+        thread_pool.join()
+        results = {}
+        for role, thread in threads.items():
+            result, exception = thread.get()
+            if exception and re_raise_exceptions:
+                raise ( exception[0], exception[1], exception[2] )
+            results[role] = ( result, exception )
+        return results
+
+
     #
     # Helpers for private APIs
     #
-
 
     def tag_get(self, tagname, value_default, origin_default = None):
         """
@@ -4207,7 +5578,7 @@ class tc_c(object, metaclass=_tc_mc):
         """
 
         if origin_default == None:
-            origin_default = "[builtin default] " + tcfl.origin_get(1)
+            origin_default = "[builtin default] " + commonl.origin_get(1)
         return self._tags.get(tagname, (value_default, origin_default))
 
     def _prefix_update(self):
@@ -4249,8 +5620,8 @@ class tc_c(object, metaclass=_tc_mc):
           taken from the stack
         """
         assert isinstance(kw, str)
-        assert isinstance(value, str), \
-                "value: expected str, got %s: %s" % (type(value).__name__, value)
+        assert isinstance(value, (str, int)), \
+                "value: expected str|int, got %s: %s" % (type(value).__name__, value)
         if origin == None:
             o = inspect.stack()[1]
             origin = "%s:%s" % (o[1], o[2])
@@ -4259,10 +5630,6 @@ class tc_c(object, metaclass=_tc_mc):
         self.kws[kw] = value
         self.kws_origin.setdefault(kw, []).append(origin)
 
-
-    def _expecter_log(self, msg, **attachments):
-        # FIXME: move this to report to the target it is expecting from
-        self.report_info(msg, **attachments)
 
     def _components_fixup(self):
         # Based on tags called component/COMPONENTNAME define a tag
@@ -4332,17 +5699,39 @@ class tc_c(object, metaclass=_tc_mc):
                     continue
                 raise
 
+    #: Maximum time (seconds) to wait to succesfully acquire a set of targets
+    #:
+    #: In heavily contented scenarios or large executions, this
+    #: becomes oversimplistic and not that useful and shall be
+    #: delegated to something like Jenkins timing out after so long
+    #: running things.
+    #:
+    #: In that case set it to over that timeout (eg: 15 hours); it'll
+    #: keep trying to assign until killed; in a tcf :ref:`configuration
+    #: file <tcf_client_configuration>`, add:
+    #:
+    #: >>> tcfl.tc.tc_c.assign_timeout = 15 * 60 * 60
+    #:
+    #: or even in the testcase itself, before it assigns (in build or
+    #: config methods)
+    #:
+    #: >>> self.assign_timeout = 15 * 60 * 60
+    assign_timeout = 1000
+
     # FIXME: add phase "assign"
     @contextlib.contextmanager
-    def _targets_assign(self, timeout = 1000, period = assign_period):
-        if self.is_static():
+    def _targets_assign(self):
+        timeout = self.assign_timeout
+        period = assign_period
+
+        if not self.do_acquire or self.is_static():
             yield
             return
 
         acquired = []
         pending = []
         for target in list(self.target_group.targets.values()):
-            if target.acquire:
+            if target.do_acquire:
                 pending.append(target)
         if not pending:
             yield
@@ -4388,8 +5777,8 @@ class tc_c(object, metaclass=_tc_mc):
                         if not self._targets_disabled_too:
                             # Refresh info
                             _rtb, _rt = tcfl.ttb_client._rest_target_find_by_id(_target.fullid)
-                            disabled = _rt.get('disabled', False)
-                            if disabled:
+                            disabled = _rt.get('disabled', None)
+                            if disabled != None:
                                 raise blocked_e(
                                     "%s: acquisition failed (target has "
                                     "been disabled)" % _target.fullid)
@@ -5077,18 +6466,6 @@ class tc_c(object, metaclass=_tc_mc):
     # and spawns on one thread per TC/targetgroup _run(), which calls
     # _run_on_target_group()
 
-    def _eval_prepare(self, cnt1, name):
-        # Make each run a fresh run
-        self.buffers.clear()
-        self.tls.expecter.buffers.clear()
-        self.tls.expecter.buffers_persistent.clear()
-        self.buffersdir = os.path.join(self.tmpdir,
-                                       "eval-buffers-%02d-%s" % (cnt1, name))
-        # Wipe the directory (if it exists, and recreate it fresh)
-        # --nothing interesting should be left over here anyway.
-        shutil.rmtree(self.buffersdir, True)
-        os.makedirs(self.buffersdir)
-
     def _do_the_eval(self):
         # on each eval repetition, we want self.result_eval to only
         # have the eval data for that repetition; for all the
@@ -5105,7 +6482,6 @@ class tc_c(object, metaclass=_tc_mc):
                 with msgid_c("E#%d" % (self.eval_count + 1), phase = 'eval'):
                     self.result_eval = result_c(0, 0, 0, 0, 0)
                     if self._eval_serial:
-                        self._eval_prepare(self.eval_count, 0)
                         retval = self._methods_call("setup")
                         self.result_eval += retval
                         if retval.errors or retval.failed or retval.blocked:
@@ -5120,7 +6496,6 @@ class tc_c(object, metaclass=_tc_mc):
                         self._methods_call("teardown")
                     for fname, fn, _type, args in self._test_serial:
                         self.result_eval = result_c(0, 0, 0, 0, 0)
-                        self._eval_prepare(self.eval_count, fname)
                         retval = self._methods_call("setup")
                         self.result_eval += retval
                         if retval.errors or retval.failed or retval.blocked:
@@ -5163,6 +6538,15 @@ class tc_c(object, metaclass=_tc_mc):
                 hook(self)
             # specific, we can take it out to the TC level
             if not self._phase_skip("configure"):
+                if self.subtc:
+                    self.report_info(
+                        "NOTE: this testcase unfolds %d subcases: %s" %
+                        (len(self.subtc), " ".join(self.subtc.keys())),
+                        dlevel = 1)
+                else:
+                    self.report_info(
+                        "NOTE: this testcase does not unfold subcases",
+                        dlevel = 3)
                 with msgid_c("C", phase = 'config'):
                     retval = self._methods_call("configure")
                 result += retval
@@ -5213,7 +6597,6 @@ class tc_c(object, metaclass=_tc_mc):
                 with self._targets_assign():
                     if not deploy_skip:
                         with msgid_c("D", phase = "deploy"):
-                            self._eval_prepare(0, "deploy")
                             retval = self._methods_call("deploy")
                         result += retval
                         # We don't report deploy as much as build/eval
@@ -5292,11 +6675,12 @@ class tc_c(object, metaclass=_tc_mc):
                             if self.target_group else 'n/a'
         if ticket == None:
             self.ticket = msgid_c.encode(
-                self._hash_salt + self.name + target_group_name, 4).decode('UTF-8')
+                self._hash_salt + self.name + target_group_name,
+                self.hashid_len).decode('UTF-8')
         else:
             self.ticket = self._ident.decode('UTF-8')
 
-    def _run(self, msgid, thread_init_args):
+    def _run(self, msgid, tls_parent):
         """
         High level executor for the five phases of the testcase
 
@@ -5307,7 +6691,7 @@ class tc_c(object, metaclass=_tc_mc):
         TLS.
         """
         try:
-            self.__thread_init__(**thread_init_args)
+            self.__thread_init__(tls_parent)
             result = result_c(0, 0, 0, 0, 0)
             self.mkticket()
             # temporary directory specialization for this TC
@@ -5321,11 +6705,18 @@ class tc_c(object, metaclass=_tc_mc):
             global log_dir
             self.report_file_prefix = os.path.join(
                 log_dir, "report-%(runid)s:%(tc_hash)s." % self.kws)
-            with msgid_c(self.ticket, depth = 1, l = 4) as msgid:
+            with msgid_c(self.ticket, depth = 1, l = self.hashid_len) as msgid:
                 self._ident = msgid_c.ident()
                 try:
-                    self.report_info("will run on target group '%s'"
-                                     % (self.target_group.descr))
+                    self.report_info(
+                        "will run on target group '%s' (PID %d / TID %x)"
+                        % (
+                            self.target_group.descr, os.getpid(),
+                            threading.current_thread().ident
+                        ),
+                        # be less verbose for subcases,
+                        # since we know this info already
+                        dlevel = 2 if self.parent else 0 )
                     for _target in list(self.target_group.targets.values()):
                         # We need to update all the target's KWS, as we
                         # have added KWS to the tescase (tc_hash and
@@ -5357,7 +6748,7 @@ class tc_c(object, metaclass=_tc_mc):
         except Exception as e:
             # This msgid_c context is a hack so that this exception
             # report has a proper RUNID and HASH prefix
-            with msgid_c(self.ticket, depth = 0, l = 4) as msgid:
+            with msgid_c(self.ticket, depth = 0, l = self.hashid_len) as msgid:
                 self.report_blck(
                     "BUG exception: %s %s" % (type(e).__name__, e),
                     { 'exception info': traceback.format_exc() },
@@ -5367,7 +6758,8 @@ class tc_c(object, metaclass=_tc_mc):
         self.result = result
         results = [ (type(self), result.summary()) ]
 
-        for tc in self._tcs_post:
+        # run the list of sub testcases and the post tcs added
+        for tc in self.subtc.values() + self._tcs_post:
             # Well, this is quite a hack -- for reporting to work ok,
             # rebind each's target's testcase pointer to this
             # subtestcase.
@@ -5379,7 +6771,8 @@ class tc_c(object, metaclass=_tc_mc):
             tc._methods_prepare()	# setup phase running methods
             # remember this returns a list, so we have to concatenate them
             results += tc._run(msgid_c.parent(),
-                               dict(expecter_parent = self.tls.expecter))
+                               _simple_namespace(self.tls.__dict__))
+            del tc	# not needed any more
 
         # Undo the hack from before, as we might need these values to
         # be proper for reporting later on
@@ -5457,14 +6850,176 @@ class tc_c(object, metaclass=_tc_mc):
 
         """
         c = copy.copy(self)
-        c.buffers = {}	# For use during execution of actions
-        c.kws = dict(self.kws)
-        c.kws_origin = dict(self.kws_origin)
-        c.log = tc_logadapter_c(logging, None)
+        c.__init_shallow__(self)
         c._prefix_update()
-        c.tls = threading.local()
-        c._cleanup_files = set()
         return c
+
+    @result_c.from_exception
+    def _permutations_make(self, rt_all, rt_selected, ic_selected):
+        # FIXME: maybe move this to __init__
+        self._methods_prepare()	# setup phase running methods
+        self.rt_all = rt_all
+        if self.is_static():
+            if self._dry_run:
+                self.report_info("will run")
+            rt_selected = { 'local': rt_all['local']['bsp_models'].keys() }
+            ic_selected = { }
+
+        # This will be now testcase-specific, so make a deep copy
+        # so it can be modified by the testcase -- note we might alter
+        # FIXME: note we might not need this deep coy --
+        # verify once the reorg is done
+        self.rt_selected = copy.deepcopy(rt_selected)
+        self.ic_selected = copy.deepcopy(ic_selected)
+
+        # list candidates to interconnects
+        #
+        # We requested R interconnects [len(self._interconnects)] and we
+        # have ic_selected as candidates for those interconnects. Each
+        # interconnect requested might put restrictons to which
+        # interconnects can be used. So in ic_candidates, return which of
+        # ic_selected can be used for each interconnect.
+        self.report_info("interconnect groups: finding remote ic targets",
+                         dlevel = 6)
+        ic_candidates = self._target_wants_find_candidates(
+            self._interconnects, ic_selected)
+        self.report_info("interconnect groups: available remote ic "
+                         "targets: %s" % self._selected_str(ic_selected),
+                         dlevel = 5)
+        # The list of candidates to interconnects could be arranged in
+        # different ways. Permutations will make it grow quick. If IC0 =
+        # {AB}, IC1={ABC} and IC2={ABC}, there is an upper ceiling of
+        # N!/(N-R)!, where R is the number of interconnects and N is the
+        # max number of available candidates (len(ic_selected) (the real
+        # ceiling will be lower as this is not a pure permutation
+        # problem--some of the sets of candidates don't include all the
+        # available N candidates in ic_selected and I don't really know if
+        # there is a math way to compute it -- internet got too dense for
+        # my limited set theory knowledge quite quick).
+        #
+        # So we are just going to generate a few at random; if we only have
+        # one interconnect, we'll try to get one for each type of
+        # interconnect. Otherwise we use the command line to limit the
+        # amount of IC groups we create.
+        if len(self._interconnects) == 1:
+            ic_want_name = list(self._interconnects)[0]
+            max_permutations = \
+                len(self._rt_types(ic_candidates[ic_want_name]))
+        else:
+            # FIXME: get from command line and defaults
+            max_permutations = 10
+        self.report_info("interconnect groups: generating %d by "
+                         "permuting remote ic targets" %
+                         max_permutations, dlevel = 6)
+        ic_permutations = self._target_wants_list_permutations(
+            ic_candidates, max_permutations, tag = "interconnect")
+        if len(self._interconnects):
+            if len(ic_permutations) == 0:
+                type(self).class_result += result_c(0, 0, 0, 0, 1)
+                raise skip_e("WARNING! No interconnects available")
+        elif len(self._interconnects) == 0:
+            # Cheat, when we don't use interconnects, just define an empty
+            # one so we enter into the loop below
+            ic_permutations = { "all": { } }
+        for icgid, icg in ic_permutations.items():
+            self.report_info("interconnect group %s: %s"
+                             % (icgid, self._tg_str(icg)), dlevel = 5)
+
+
+        # FIXME: now filter them
+
+        # Now that we have a set of interconnect permutations, we need
+        # to select, for each, which targets fit in the permutation
+        # Basically, this is a simple OR, if the target is in any of
+        # the interconnects, it's good to go.
+        self.report_info("interconnect groups: finding remote "
+                         "targets available for each",
+                         dlevel = 6)
+        icg_selected = collections.defaultdict(dict)
+        for icgid, icg in ic_permutations.items():
+            for icwn, (rtic, _) in icg.items():
+                rtic_id = self.rt_all[rtic]['id']
+                for rt_full_id, bsp_models in rt_selected.items():
+                    rt = self.rt_all[rt_full_id]
+                    if rtic_id in rt.get('interconnects', {}):
+                        icg_selected[icgid][rt_full_id] = bsp_models
+            if icgid == "all":	# No interconnects, take'em all
+                icg_selected[icgid] = dict(rt_selected)
+
+            if not icg_selected[icgid]:
+                type(self).class_result += result_c(0, 0, 0, 0, 1)
+                self.report_skip(
+                    "interconnect group %s (%s): no targets can be used!!"
+                    % (icgid, self._tg_str(icg)), dlevel = 3)
+            else:
+                self.report_info(
+                    "interconnect group %s (%s): candidate targets "
+                    "available: %s" %
+                    (icgid, self._tg_str(icg),
+                     self._selected_str(icg_selected[icgid])),
+                    dlevel = 4)
+
+        # So now icg_selected is a dict, keyed by interconnet
+        # group name, which contains the remote targets that are
+        # valid candidates to be used for that interconnect group
+        # (so they satisfy the condition of being in any of the
+        # interconnects that are required for the group).
+        #
+        # So now, for each of those interconnect groups we need to
+        # generate a list of target groups.
+        self.report_info("interconnect groups: generating target "
+                         "groups for each", dlevel = 6)
+        rt_candidates = {}
+        rt_permutations = {}
+        target_want_list = set(self._targets.keys()) - self._interconnects
+        for icgid, rt_selected in icg_selected.items():
+            # Generate keywords that describe the current
+            # interconnects
+            kws_ics = dict()
+            for icwn, ic in ic_permutations[icgid].items():
+                commonl.kws_update_from_rt(kws_ics, self.rt_all[ic[0]],
+                                           prefix = icwn + ".")
+            # list candidates to targets in this interconnect group
+            self.report_info("interconnect group %s: "
+                             "finding remote target candidates" %
+                             icgid, dlevel = 8)
+            rt_candidates = self._target_wants_find_candidates(
+                target_want_list, rt_selected, kws_ics)
+            self.report_info("interconnect group %s: "
+                             "remote target candidates: %s"
+                             % (icgid, pprint.pformat(rt_candidates)),
+                             dlevel = 7)
+
+            # Generate permutations of targets wants vs available
+            # targets for this interconnect group
+            if len(target_want_list) == 1:
+                twn = list(target_want_list)[0]
+                max_permutations = len(self._rt_types(rt_candidates[twn]))
+            else:
+                max_permutations = tc_c.max_permutations
+
+            self.report_info("interconnect group %s: generating "
+                             "target groups" % icgid, dlevel = 6)
+            tgs = self._target_wants_list_permutations(
+                rt_candidates, max_permutations, name_prefix = icgid)
+            if tgs:
+                for tgid, tg in tgs.items():
+                    rt_permutations[(icgid, tgid)] = tg
+            elif len(self._targets) == 0: # static TC
+                ic_permutations["localic"] = {}
+                rt_permutations = { ("localic", "localtg") : {} }
+            elif len(target_want_list) == 0: # only ICs?
+                self.report_info("interconnect group %s: "
+                                 "no targets needed" % (icgid),
+                                 dlevel = 4)
+                # FIXME: fix so if tgid == None, nothjing is printed
+                rt_permutations[(icgid, None)] = {}
+            else:
+                self.report_info("interconnect group %s: "
+                                 "not enough targets" % (icgid),
+                                 dlevel = 4)
+        return ic_permutations, rt_permutations
+
 
     @result_c.from_exception
     def _run_on_targets(self, tp, rt_all, rt_selected, ic_selected):
@@ -5498,168 +7053,8 @@ class tc_c(object, metaclass=_tc_mc):
         try:
             threads = []
 
-            # FIXME: maybe move this to __init__
-            self._methods_prepare()	# setup phase running methods
-            self.rt_all = rt_all
-            if self.is_static():
-                if self._dry_run:
-                    self.report_info("will run")
-                rt_selected = { 'local': list(rt_all['local']['bsp_models'].keys()) }
-                ic_selected = { }
-
-            # This will be now testcase-specific, so make a deep copy
-            # so it can be modified by the testcase -- note we might alter
-            # FIXME: note we might not need this deep coy --
-            # verify once the reorg is done
-            self.rt_selected = copy.deepcopy(rt_selected)
-            self.ic_selected = copy.deepcopy(ic_selected)
-
-            # list candidates to interconnects
-            #
-            # We requested R interconnects [len(self._interconnects)] and we
-            # have ic_selected as candidates for those interconnects. Each
-            # interconnect requested might put restrictons to which
-            # interconnects can be used. So in ic_candidates, return which of
-            # ic_selected can be used for each interconnect.
-            self.report_info("interconnect groups: finding remote ic targets",
-                             dlevel = 6)
-            ic_candidates = self._target_wants_find_candidates(
-                self._interconnects, ic_selected)
-            self.report_info("interconnect groups: available remote ic "
-                             "targets: %s" % self._selected_str(ic_selected),
-                             dlevel = 5)
-            # The list of candidates to interconnects could be arranged in
-            # different ways. Permutations will make it grow quick. If IC0 =
-            # {AB}, IC1={ABC} and IC2={ABC}, there is an upper ceiling of
-            # N!/(N-R)!, where R is the number of interconnects and N is the
-            # max number of available candidates (len(ic_selected) (the real
-            # ceiling will be lower as this is not a pure permutation
-            # problem--some of the sets of candidates don't include all the
-            # available N candidates in ic_selected and I don't really know if
-            # there is a math way to compute it -- internet got too dense for
-            # my limited set theory knowledge quite quick).
-            #
-            # So we are just going to generate a few at random; if we only have
-            # one interconnect, we'll try to get one for each type of
-            # interconnect. Otherwise we use the command line to limit the
-            # amount of IC groups we create.
-            if len(self._interconnects) == 1:
-                ic_want_name = list(self._interconnects)[0]
-                max_permutations = \
-                    len(self._rt_types(ic_candidates[ic_want_name]))
-            else:
-                # FIXME: get from command line and defaults
-                max_permutations = 10
-            self.report_info("interconnect groups: generating %d by "
-                             "permuting remote ic targets" %
-                             max_permutations, dlevel = 6)
-            ic_permutations = self._target_wants_list_permutations(
-                ic_candidates, max_permutations, tag = "interconnect")
-            if len(self._interconnects):
-                if len(ic_permutations) == 0:
-                    type(self).class_result += result_c(0, 0, 0, 0, 1)
-                    raise skip_e("WARNING! No interconnects available")
-            elif len(self._interconnects) == 0:
-                # Cheat, when we don't use interconnects, just define an empty
-                # one so we enter into the loop below
-                ic_permutations = { "all": { } }
-            for icgid, icg in ic_permutations.items():
-                self.report_info("interconnect group %s: %s"
-                                 % (icgid, self._tg_str(icg)), dlevel = 5)
-
-
-            # FIXME: now filter them
-
-            # Now that we have a set of interconnect permutations, we need
-            # to select, for each, which targets fit in the permutation
-            # Basically, this is a simple OR, if the target is in any of
-            # the interconnects, it's good to go.
-            self.report_info("interconnect groups: finding remote "
-                             "targets available for each",
-                             dlevel = 6)
-            icg_selected = collections.defaultdict(dict)
-            for icgid, icg in ic_permutations.items():
-                for icwn, (rtic, _) in icg.items():
-                    rtic_id = self.rt_all[rtic]['id']
-                    for rt_full_id, bsp_models in rt_selected.items():
-                        rt = self.rt_all[rt_full_id]
-                        if rtic_id in rt.get('interconnects', {}):
-                            icg_selected[icgid][rt_full_id] = bsp_models
-                if icgid == "all":	# No interconnects, take'em all
-                    icg_selected[icgid] = dict(rt_selected)
-
-                if not icg_selected[icgid]:
-                    type(self).class_result += result_c(0, 0, 0, 0, 1)
-                    self.report_skip(
-                        "interconnect group %s (%s): no targets can be used!!"
-                        % (icgid, self._tg_str(icg)), dlevel = 3)
-                else:
-                    self.report_info(
-                        "interconnect group %s (%s): candidate targets "
-                        "available: %s" %
-                        (icgid, self._tg_str(icg),
-                         self._selected_str(icg_selected[icgid])),
-                        dlevel = 4)
-
-            # So now icg_selected is a dict, keyed by interconnet
-            # group name, which contains the remote targets that are
-            # valid candidates to be used for that interconnect group
-            # (so they satisfy the condition of being in any of the
-            # interconnects that are required for the group).
-            #
-            # So now, for each of those interconnect groups we need to
-            # generate a list of target groups.
-            self.report_info("interconnect groups: generating target "
-                             "groups for each", dlevel = 6)
-            rt_candidates = {}
-            rt_permutations = {}
-            target_want_list = set(self._targets.keys()) - self._interconnects
-            for icgid, rt_selected in icg_selected.items():
-                # Generate keywords that describe the current
-                # interconnects
-                kws_ics = dict()
-                for icwn, ic in ic_permutations[icgid].items():
-                    commonl.kws_update_from_rt(kws_ics, self.rt_all[ic[0]],
-                                               prefix = icwn + ".")
-                # list candidates to targets in this interconnect group
-                self.report_info("interconnect group %s: "
-                                 "finding remote target candidates" %
-                                 icgid, dlevel = 8)
-                rt_candidates = self._target_wants_find_candidates(
-                    target_want_list, rt_selected, kws_ics)
-                self.report_info("interconnect group %s: "
-                                 "remote target candidates: %s"
-                                 % (icgid, pprint.pformat(rt_candidates)),
-                                 dlevel = 7)
-
-                # Generate permutations of targets wants vs available
-                # targets for this interconnect group
-                if len(target_want_list) == 1:
-                    twn = list(target_want_list)[0]
-                    max_permutations = len(self._rt_types(rt_candidates[twn]))
-                else:
-                    max_permutations = tc_c.max_permutations
-
-                self.report_info("interconnect group %s: generating "
-                                 "target groups" % icgid, dlevel = 6)
-                tgs = self._target_wants_list_permutations(
-                    rt_candidates, max_permutations, name_prefix = icgid)
-                if tgs:
-                    for tgid, tg in tgs.items():
-                        rt_permutations[(icgid, tgid)] = tg
-                elif len(self._targets) == 0: # static TC
-                    ic_permutations["localic"] = {}
-                    rt_permutations = { ("localic", "localtg") : {} }
-                elif len(target_want_list) == 0: # only ICs?
-                    self.report_info("interconnect group %s: "
-                                     "no targets needed" % (icgid),
-                                     dlevel = 4)
-                    # FIXME: fix so if tgid == None, nothjing is printed
-                    rt_permutations[(icgid, None)] = {}
-                else:
-                    self.report_info("interconnect group %s: "
-                                     "not enough targets" % (icgid),
-                                     dlevel = 4)
+            ic_permutations, rt_permutations = self._permutations_make(
+                rt_all, rt_selected, ic_selected)
 
             # So now we are going to iterate over all the groups
             for (icgid, tgid), tg in rt_permutations.items():
@@ -5671,6 +7066,11 @@ class tc_c(object, metaclass=_tc_mc):
                         tg_name = tgid
                     else:
                         tg_name = "%s-%s" % (icgid, tgid)
+                # create a representation of the name that indicates
+                # the twn/role, such as
+                #
+                # ic=SERVER1/nwa target=SERVER2/target2 target2=SERVER1/target3
+                icg = ic_permutations[icgid]
                 strs = []
                 icg_str = self._tg_str(icg)
                 if len(icg_str):
@@ -5683,12 +7083,12 @@ class tc_c(object, metaclass=_tc_mc):
                 group_str = " ".join(strs)
                 del strs
 
-                icg = ic_permutations[icgid]
                 tc_for_tg = self._clone()
                 if self._dry_run:
                     self.report_info("will run on target group '%s'"
                                      % group_str, dlevel = 1)
                     continue
+
                 # FIXME: this order could be better
                 target_group = target_group_c(group_str)
                 # Ids of the interconnect targets we'll be using
@@ -5720,13 +7120,20 @@ class tc_c(object, metaclass=_tc_mc):
                     # this just updates the core keys, but later calls
                     # to kw_set() and company will refresh the main
                     # target.kws dict.
+                tc_for_tg.report_info("queuing for execution", dlevel = 3)
                 thread = tp.apply_async(
                     tc_for_tg._run,
                     (
                         msgid_c.current(),
-                        dict(expecter_parent = self.tls.expecter)
+                        _simple_namespace(self.tls.__dict__)
                     )
                 )
+                # so we can Ctrl-C easily; we don't care for the
+                # cleanup, we consider all expendable resournces
+                # and the toplevel tempdirs will be cleaned below
+                # Targets acquired will be released as idle by the
+                # daemon
+                thread.daemon = True
                 threads.append(thread)
             self.log.info("%d jobs launched" % len(threads))
             return threads
@@ -5781,7 +7188,68 @@ class tc_c(object, metaclass=_tc_mc):
     # Default driver loader; most test case drivers would over load
     # this to determine if a file is a testcase or not.
     @classmethod
-    def is_testcase(cls, path, _from_path):
+    def is_testcase(cls, path, from_path, tc_name, subcases_cmdline):
+        """Determine if a given file describes one or more testcases and
+        crete them
+
+        TCF's test case discovery engine calls this method for each
+        file that could describe one or more testcases. It will
+        iterate over all the files and paths passed on the command
+        line files and directories, find files and call this function
+        to enquire on each.
+
+        This function's responsibility is then to look at the contents
+        of the file and create one or more objects of type
+        :class:`tcfl.tc.tc_c` which represent the testcases to be
+        executed, returning them in a list.
+
+        When creating :term:`testcase driver`, the driver has to
+        create its own version of this function. The default
+        implementation recognizes python files called *test_\*.py* that
+        contain one or more classes that subclass :class:`tcfl.tc.tc_c`.
+
+        See examples of drivers in:
+
+        - :meth:`tcfl.tc_clear_bbt.tc_clear_bbt_c.is_testcase`
+        - :meth:`tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.is_testcase`
+        - :meth:`examples.test_ptest_runner` (:term:`impromptu
+          testcase driver`)
+
+        note drivers need to be registered with
+        :meth:`tcfl.tc.tc_c.driver_add`; on the other hand, a Python
+        :term:`impromptu testcase driver` needs no registration, but
+        the test class has to be called *_driver*.
+
+        :param str path: path and filename of the file that has to be
+          examined; this is always a regular file (or symlink to it).
+
+        :param str from_path: source command line argument this file
+          was found on; e.g.: if *path* is *dir1/subdir/file*, and the
+          user ran::
+
+            $ tcf run somefile dir1/ dir2/
+
+          *tcf run* found this under the second argument and thus:
+
+          >>> from_path = "dir1"
+
+        :param str tc_name: testcase name the core has determine based
+          on the path and subcases specified on the command line; the
+          driver can override it, but it is recommended it is kept.
+
+        :param list(str) subcases_cmdline: list of subcases the user
+          has specified in the command line; e.g.: for::
+
+            $ tcf run test_something.py#sub1#sub2
+
+          this would be:
+
+          >>> subcases_cmdline = [ 'sub1', 'sub2']
+
+        :returns: list of testcases found in *path*, empty if none
+          found or file not recognized / supported.
+
+        """
         if not cls.file_regex.search(os.path.basename(path)):
             return []
         try:
@@ -5790,7 +7258,7 @@ class tc_c(object, metaclass=_tc_mc):
             sys.path.insert(0, os.path.dirname(path))
             name = path.translate(str.maketrans("/.", "__"))
             module = imp.load_source(name, path)
-        except tcfl.tc.exception as e:
+        except exception as e:
             raise
         except (ImportError, Exception) as e:
             if 'base.util.tag' in e.args \
@@ -5817,14 +7285,38 @@ class tc_c(object, metaclass=_tc_mc):
         tcs = []
         for _cls in l:
             path = inspect.getsourcefile(_cls)
-            tc = _cls(path + "#" + _cls.__name__,	# Name
-                      path,				# File, origin
-                      path + ":" + "%d" % inspect.getsourcelines(_cls)[1])
+            subcase_name = _cls.__name__
+            if subcase_name != "_driver" \
+               and subcases_cmdline and subcase_name not in subcases_cmdline:
+                logging.info("%s: subcase ignored since it wasn't "
+                             "given in the command line list: %s",
+                             subcase_name, " ".join(subcases_cmdline))
+                continue
+            if subcase_name not in ( "_test", "_driver" ):
+                # if the test class name is just "_test", we don't
+                # even list it as as test, we assume per convention it
+                # is the only test in the file
+                name = tc_name + "#" + subcase_name
+            else:
+                name = tc_name
+            # testcase name, file where it came from, origin
+            try:
+                # some forms of defining classes (like using type)
+                # might not find it funny and make it easy to find the
+                # line number
+                source_line = str(inspect.getsourcelines(_cls)[1])
+            except IOError as e:
+                source_line = "n/a"
+            tc = _cls(name, path, path + ":" + source_line)
+            if subcase_name == "_driver":
+                # make a copy, as we might modify during execution
+                tc.subcases = list(subcases_cmdline)
             tcs.append(tc)
         return tcs
 
     @classmethod
-    def _create_from_file_name(cls, tcis, file_name, from_path):
+    def _create_from_file_name(cls, tcis, file_name, from_path,
+                               subcases_cmdline):
         """
         Given a filename that contains a possible test case, create one or
         more TC structures from it and return them in a list
@@ -5833,6 +7325,8 @@ class tc_c(object, metaclass=_tc_mc):
         :param str file_name: path to file to consider
         :param str from_path: original path from which this file was
           scanned (this will be a parent path of this file)
+        :param list subcases: list of subcase names the testcase should
+          consider
         :returns: result_c with counts of tests passed/failed (zero,
           as at this stage we cannot know), blocked (due to error
           importing) or skipped(due to whichever condition).
@@ -5849,33 +7343,82 @@ class tc_c(object, metaclass=_tc_mc):
             argspec = inspect.getargspec(_tc_driver.is_testcase)
             if len(argspec.args) == 2:
                 return 2
+            # v2: added from_path
             elif len(argspec.args) == 3:
                 return 3
+            # v3; added tc_name, subcases
+            elif len(argspec.args) == 5:
+                return 4
             else:
                 raise AssertionError(
                     "%s: unknown # of arguments %d to is_testcase()"
                     % (_tc_driver, len(argspec.args)))
-            
+
+        def _is_testcase_call(tc_driver, tc_name, file_name,
+                              from_path, subcases_cmdline):
+            style = _style_get(tc_driver)
+            # hack to support multiple versions of the interface
+            if style == 2:
+                return tc_driver.is_testcase(file_name)
+            elif style == 3:
+                return tc_driver.is_testcase(file_name, from_path)
+            elif style == 4:
+                return tc_driver.is_testcase(file_name, from_path,
+                                             tc_name, subcases_cmdline)
+            raise AssertionError("bad style %d" % style)
+
+        if subcases_cmdline:
+            tc_name = file_name + "#" + "#".join(subcases_cmdline)
+        else:
+            tc_name = file_name
         for _tc_driver in cls._tc_drivers:
             tc_instances = []
-            try:
-                style = _style_get(_tc_driver)
-                # hack to support multiple versions of the interface
-                if style == 2:
-                    tc_instances += _tc_driver.is_testcase(file_name)
-                elif style == 3:
-                    tc_instances += _tc_driver.is_testcase(file_name,
-                                                           from_path)
-            except Exception as e:
-                tc_fake = tc_c(file_name, file_name, "builtin")
-                tc_fake.mkticket()
-                with msgid_c(tc_fake.ticket, depth = 1, l = 4) as _msgid:
-                    tc_fake._ident = msgid_c.ident()
+            # new one all the time, in case we use it and close it
+            tc_fake = tc_c(tc_name, file_name, "builtin")
+            tc_fake.mkticket()
+            tc_fake._ident = msgid_c.ident()
+            with msgid_c(tc_fake.ticket, depth = 1, l = cls.hashid_len) \
+                 as _msgid:
+                cwd_original = os.getcwd()
+                try:
+                    tc_instances += _is_testcase_call(_tc_driver, tc_name,
+                                                      file_name, from_path,
+                                                      subcases_cmdline)
+                    for _tc in tc_instances:
+                        logger.info("testcase found @ %s by %s",
+                                    _tc.origin, _tc_driver)
+
+                # this is so ugly, need to merge better with result_c's handling
+                except subprocess.CalledProcessError as e:
+                    retval = result_c.from_exception_cpe(tc_fake, e)
+                    tc_fake.finalize(retval)
+                    result += retval
+                    continue
+                except OSError as e:
+                    attachments = dict(
+                        errno = e.errno,
+                        strerror = e.strerror
+                    )
+                    if e.filename:
+                        attachments['filename'] = e.filename
+                    retval = result_c.report_from_exception(tc_fake, e,
+                                                            attachments)
+                    tc_fake.finalize(retval)
+                    result += retval
+                    continue
+                except Exception as e:
                     retval = result_c.report_from_exception(tc_fake, e)
                     tc_fake.finalize(retval)
                     result += retval
-                continue
-
+                    continue
+                finally:
+                    cwd = os.getcwd()
+                    if cwd != cwd_original:
+                        logging.error(
+                            "%s: driver changed working directory from "
+                            "%s to %s; this is a BUG in the driver!"
+                            % (_tc_driver.origin, cwd_original, cwd))
+                        os.chdir(cwd_original)
             if not tc_instances:
                 continue
 
@@ -5883,7 +7426,6 @@ class tc_c(object, metaclass=_tc_mc):
                 for testcase_patcher in cls.testcase_patchers:
                     testcase_patcher(_tc)
                 _tc._components_fixup()
-                logger.info("testcase found @ %s", _tc.origin)
             tcis += tc_instances
             break
         else:
@@ -5892,7 +7434,7 @@ class tc_c(object, metaclass=_tc_mc):
         return result
 
     @classmethod
-    def find_in_path(cls, tcs, path):
+    def find_in_path(cls, tcs, path, subcases_cmdline):
         """
         Given a path, scan for test cases and put them in the
         dictionary @tcs based on filename where found.
@@ -5901,6 +7443,9 @@ class tc_c(object, metaclass=_tc_mc):
         :param dict tcs: dictionary where to add the test cases found
 
         :param str path: path where to scan for test cases
+
+        :param list subcases: list of subcase names the testcase should
+          consider
 
         :returns: result_c with counts of tests passed/failed (zero,
           as at this stage we cannot know), blocked (due to error
@@ -5933,14 +7478,14 @@ class tc_c(object, metaclass=_tc_mc):
                 for filename in sorted(_filenames):
                     tc_instances = []
                     file_name = os.path.join(tc_path, filename)
-                    result += cls._create_from_file_name(tc_instances,
-                                                         file_name, path)
+                    result += cls._create_from_file_name(
+                        tc_instances, file_name, path, subcases_cmdline)
                     for _tc in tc_instances:
                         tcs[_tc.name] = _tc
         elif os.path.isfile(path):
             tc_instances = []
-            result += cls._create_from_file_name(tc_instances, path,
-                                                 os.path.dirname(path))
+            result += cls._create_from_file_name(
+                tc_instances, path, os.path.dirname(path), subcases_cmdline)
             for _tc in tc_instances:
                 tcs[_tc.name] = _tc
         return result
@@ -5952,6 +7497,77 @@ class tc_c(object, metaclass=_tc_mc):
         return self._methods_call("class_teardown")
 
 tc_c.driver_add(tc_c)
+
+class subtc_c(tc_c):
+    """Helper for reporting sub testcases
+
+    This is used to implement a pattern where a testcase reports, when
+    executed, multiple subcases that are always executed. Then the
+    output is parsed and reported as individual testcases.
+
+    As well as the parameters in :class:`tcfl.tc.tc_c`, the
+    following parameter is needed:
+
+    :param tcfl.tc.tc_c parent: testcase which is the parent of this
+      testcase.
+
+    Refer to this :ref:`simplified example <example_subcases>` for a
+    usage example.
+
+    Note these subcases are just an artifact to report the subcases
+    results individually, so they do not actually need to acquire or
+    physically use the targets.
+
+    """
+    def __init__(self, name, tc_file_path, origin, parent):
+        assert isinstance(name, str)
+        assert isinstance(tc_file_path, str)
+        assert isinstance(origin, str)
+        assert isinstance(parent, tcfl.tc.tc_c)
+
+        tcfl.tc.tc_c.__init__(self, name, tc_file_path, origin)
+        self.parent = parent
+        self.result = None	# FIXME: already there?
+        self.summary = None
+        self.output = None
+        # we don't need to acquire our targets, won't use them
+        self.do_acquire = False
+
+    def update(self, result, summary, output):
+        """
+        Update the results this subcase will report
+
+        :param tcfl.tc.result_c result: result to be reported
+        :param str summary: one liner summary of the execution report
+        """
+        assert isinstance(result, tcfl.tc.result_c)
+        assert isinstance(summary, str)
+        assert isinstance(output, str)
+        self.result = result
+        self.summary = summary
+        self.output = output
+
+    def eval_50(self):		# pylint: disable = missing-docstring
+        if self.result == None:
+            self.result = self.parent.result
+            self.result.report(
+                self, "subcase didn't run; parent didn't complete execution?",
+                dlevel = 2, attachments = dict(output = self.output))
+        else:
+            self.result.report(
+                self, "subcase run summary: %s"
+                % (self.summary if self.summary else "<not provided>"),
+                dlevel = 2, attachments = dict(output = self.output))
+        self.result.report(self, "NOTE: this is a subtestcase of %(tc_name)s "
+                           "(%(runid)s:%(tc_hash)s); refer to it for full "
+                           "information" % self.parent.kws, dlevel = 1)
+        return self.result
+
+    @staticmethod
+    def clean():		# pylint: disable = missing-docstring
+        # Nothing to do, but do it anyway so the accounting doesn't
+        # complain that nothing was found to run
+        pass
 
 
 def find(args):
@@ -5977,7 +7593,10 @@ def find(args):
     if len(tcs) == 0:
         logger.warning("No testcases found")
 
-
+#: Global testcase reporter
+#:
+#: Used to report top-level progress and messages beyond the actual
+#: testcases we have to execute
 tc_global = tc_c("toplevel", "", "builtin")
 tc_global.skip_reports = True
 
@@ -6022,28 +7641,35 @@ def testcases_discover(tcs_filtered, args):
     ignore_r = re.compile(r"^(\s*#.*|\s*)$")
     for manifest_file in args.manifest:
         try:
-            with open(manifest_file) as manifest_fp:
+            with open(os.path.expanduser(manifest_file)) as manifest_fp:
                 for tc_path_line in manifest_fp:
                     if not ignore_r.match(tc_path_line):
-                        args.testcase.append(tc_path_line.strip())
+                        args.testcase.append(
+                            os.path.expanduser(tc_path_line.strip()))
         except OSError:
             file_error = sys.exc_info()[1]
             logger.error("Error reading file: " + str(file_error))
             result.blocked += 1
 
     for tc_path in args.testcase:
+        if '#' in tc_path:
+            parts = tc_path.split("#")
+            tc_path = parts[0]
+            subcases_cmdline = parts[1:]
+        else:
+            subcases_cmdline = []
         if not os.path.exists(tc_path):
             logger.error("%s: does not exist; ignoring", tc_path)
             continue
-        result += tc_c.find_in_path(tcs, tc_path)
+        result += tc_c.find_in_path(tcs, tc_path, subcases_cmdline)
         for tcd in tc_c._tc_drivers:
             # If a driver has a different find function, use it to
             # find more
             tcd_find_in_path = getattr(tcd, "find_in_path", None)
             if tcd_find_in_path is not None and\
                id(getattr(tcd_find_in_path, "im_func", tcd_find_in_path)) \
-               != id(tc_c.find_in_path.__func__):
-                result += tcd.find_in_path(tcs, tc_path)
+               != id(tc_c.find_in_path.im_func):
+                result += tcd.find_in_path(tcs, tc_path, subcases_cmdline)
     if len(tcs) == 0:
         logger.error("WARNING! No testcases found")
         return result
@@ -6083,7 +7709,7 @@ def testcases_discover(tcs_filtered, args):
             tcs_filtered[tc_path] = tc
         except exception as e:
             tc.mkticket()
-            with msgid_c(tc.ticket, l = 4) as _msgid:
+            with msgid_c(tc.ticket, l = tc_c.hashid_len) as _msgid:
                 tc._ident = msgid_c.ident()
                 result += result_c.report_from_exception(tc, e)
 
@@ -6110,7 +7736,7 @@ def _targets_discover_local(targets_all):
         'type': platform.system(),
         'id': 'local',
         'fullid': 'local',
-        'url' : 'file://' + tcfl.origin_get_object_path(_targets_discover_local)
+        'url' : 'file://' + commonl.origin_get_object_path(_targets_discover_local)
     }
 
 
@@ -6131,6 +7757,9 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
         logger.error("WARNING! No targets available")
     for rt in rt_all_list:
         rt_all[rt['fullid']] = rt
+        if rt.get('disabled', None) != None \
+           and tc_c._targets_disabled_too == False:
+            continue            
         if 'interconnect_c' in rt.get('interfaces', []):
             ic_selected_all[rt['fullid']] = set(rt.get('bsp_models', {}).keys())
         else:
@@ -6194,6 +7823,10 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
         "interconnects selected by command line: %s"
         % tc_c._selected_str(ic_selected), dlevel = 4)
 
+
+# This need to be imported here since they rely on definitions
+from . import report_console
+from . import report_jinja2
 
 def _run(args):
     """
@@ -6304,14 +7937,19 @@ def _run(args):
         log_file = os.path.join(tc_c.tmpdir, "run.log")
 
     # Init report drivers FIXME: need a hook to add more
-    global report_console
-    global report_failures
-    report_console = report.report_console_c(
-        args.verbosity - args.quietosity, log_dir, log_file,
-        verbosity_logf = args.log_file_verbosity)
-    report.report_c.driver_add(report_console)
-    report_failures = report.file_c(log_dir)
-    report.report_c.driver_add(report_failures)
+    global report_console_impl
+    global report_file_impl
+    if log_file:
+        if os.path.dirname(log_file) == '':
+            log_file = os.path.join(log_dir, log_file)
+        else:
+            log_file = os.path.abspath(log_file)
+    report_console_impl = report_console.driver(
+        args.verbosity - args.quietosity,
+        log_file, verbosity_logf = args.log_file_verbosity)
+    report_driver_c.add(report_console_impl)
+    report_file_impl = report_jinja2.driver(log_dir)
+    report_driver_c.add(report_file_impl)
 
     # Setup defaults in the base testcase class
     global ticket
@@ -6399,17 +8037,37 @@ def _run(args):
 
         tc_c._tcs_total = len(tcs_filtered)
         threads_no = int(args.threads)
+
+        def _sigint_handler(signum, frame):
+            logging.error("brute force termination")
+            if args.remove_tmpdir:
+                shutil.rmtree(tc_c.tmpdir, True)
+            os.kill(0, 9)
+            tp.terminate()
+            sys.exit()
+
+        signal.signal(signal.SIGINT, _sigint_handler)
+        signal.signal(signal.SIGQUIT, _sigint_handler)
+
+        # we do oly two executions per process--it doesn't matter in
+        # terms of the cost of bringing up the new process, since the
+        # interaction with the target takes way longer; but we want
+        # the resources to be cleaned up, otherwise memory consumption
+        # / leaks which we can't control accumulate.
         tp = _multiprocessing_tc_pool_c(processes = threads_no)
+
         # So now run as many testcases as possible
         threads = []
         time_start = time.time()
         tc_c.jobs = len(tcs_filtered)
         for tc in list(tcs_filtered.values()):
             tc.mkticket()
-            with msgid_c(tc.ticket, l = 4) as _msgid:
+            tc.report_info("queuing for pairing", dlevel = 3)
+            with msgid_c(tc.ticket, l = tc_c.hashid_len) as _msgid:
                 tc._ident = msgid_c.ident()
                 _threads = tc._run_on_targets(tp, rt_all,
                                               rt_selected, ic_selected)
+                del tc	# we don't need it anymore
             if isinstance(_threads, result_c):
                 result += _threads
             elif _threads == []:
@@ -6436,7 +8094,7 @@ def _run(args):
                 continue
             else:
                 seen_classes.add(cls)
-                with msgid_c(tc.ticket, l = 4, depth = 0,
+                with msgid_c(tc.ticket, l = tc_c.hashid_len, depth = 0,
                              phase = "class_teardown") as _msgid:
                     result += tc._class_teardowns_run()
         # If something failed or blocked, report totals verbosely
@@ -6644,36 +8302,57 @@ def argp_setup(arg_subparsers):
 # Get drivers registered
 
 # FIXME: move to config if sketch package is installed
-import tcfl.app_sketch
-tcfl.app.driver_add(tcfl.app_sketch.app_sketch)
+from . import app_sketch
+app.driver_add(app_sketch.app_sketch)
 
 from . import app_manual
-tcfl.app.driver_add(app_manual.app_manual)
+app.driver_add(app_manual.app_manual)
 
 # Target API extensions
-from . import target_ext_broker_files
-target_c.extension_register(target_ext_broker_files.broker_files)
-from . import target_ext_console
-target_c.extension_register(target_ext_console.console)
-from . import target_ext_power
-target_c.extension_register(target_ext_power.power)
-from . import target_ext_images
-target_c.extension_register(target_ext_images.images)
-from . import target_ext_debug
-target_c.extension_register(target_ext_debug.debug)
-from . import target_ext_tunnel
-target_c.extension_register(target_ext_tunnel.tunnel)
-from . import target_ext_shell
-target_c.extension_register(target_ext_shell.shell)
-from . import target_ext_ssh
-target_c.extension_register(target_ext_ssh.ssh)
-from . import target_ext_ioc_flash_server_app
-target_c.extension_register(target_ext_ioc_flash_server_app.extension)
 from . import target_ext_buttons
-target_c.extension_register(target_ext_buttons.buttons)
+target_c.extension_register(target_ext_buttons.extension, "button")
+
 from . import target_ext_capture
 target_c.extension_register(target_ext_capture.extension, "capture")
+
+from . import target_ext_console
+target_c.extension_register(target_ext_console.extension, "console")
+
+from . import target_ext_debug
+target_c.extension_register(target_ext_debug.extension, "debug")
+
 from . import target_ext_fastboot
-target_c.extension_register(target_ext_fastboot.fastboot)
+target_c.extension_register(target_ext_fastboot.extension, "fastboot")
+
+from . import target_ext_images
+target_c.extension_register(target_ext_images.extension, "images")
+
+from . import target_ext_input
+target_c.extension_register(target_ext_input.extension, "input")
+
+from . import target_ext_ioc_flash_server_app
+target_c.extension_register(target_ext_ioc_flash_server_app.extension,
+                            "ioc_flash_server_app")
+
+from . import target_ext_shell
+target_c.extension_register(target_ext_shell.shell)
+
+from . import target_ext_ssh
+target_c.extension_register(target_ext_ssh.ssh)
+
+from . import target_ext_store
+target_c.extension_register(target_ext_store.extension, "store")
+
+from . import target_ext_power
+target_c.extension_register(target_ext_power.extension, "power")
+
+from . import target_ext_things
+target_c.extension_register(target_ext_things.extension, "things")
+
+from . import target_ext_tunnel
+target_c.extension_register(target_ext_tunnel.tunnel)
+
+from . import target_ext_users
+
 from . import pos
 target_c.extension_register(pos.extension, "pos")

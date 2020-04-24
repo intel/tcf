@@ -64,9 +64,9 @@ class _install_data(setupl._install_data):
                 with fileinput.FileInput(filename, inplace = True,
                                          backup = None) as f:
                     for line in f:
-                        print(line.replace("SupplementalGroups = ",
+                        print((line.replace("SupplementalGroups = ",
                                            "SupplementalGroups = ttbd ",
-                                           end = ''))
+                                           end = '')))
 
 class _bdist_rpm(distutils.command.bdist_rpm.bdist_rpm):
     def _make_spec_file(self):
@@ -113,6 +113,11 @@ targets over HTTP to be controlled by the TCF client.
         ]),
         ('etc/ttbd-production', [
             'conf_00_lib.py',
+            'conf_00_lib_capture.py',
+            'conf_00_lib_mcu.py',
+            'conf_00_lib_mcu_stm32.py',
+            'conf_00_lib_pos.py',
+            'conf_00_lib_pdu.py',
             'conf_06_default.py',
             'conf_05_auth_local.py',
             'example_conf_05_auth_localdb.py',
@@ -136,14 +141,6 @@ targets over HTTP to be controlled by the TCF client.
         ]),
         ('@prefix@/lib/udev/rules.d', [ '80-ttbd.rules' ]),
         ('var/lib/ttbd', [ 'frdm_k64f_recovery.bin' ]),
-    ],
-    ext_modules = [
-        distutils.core.Extension(
-            'ttblc',
-            [ 'ttbl/ttblc.c' ],
-            # It is not clear where this is coming from in my setup,
-            # so just in case, force it's definition.
-            extra_compile_args = [ "-D_FORTIFY_SOURCE=2" ],
-        )
     ]
 )
+

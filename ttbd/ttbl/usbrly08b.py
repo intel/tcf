@@ -12,6 +12,7 @@ import serial
 import serial.tools.list_ports
 
 import ttbl
+import ttbl.things
 import ttbl.buttons
 
 class rly08b(object):
@@ -131,14 +132,17 @@ class rly08b(object):
             return response
 
 
-class pc(rly08b, ttbl.tt_power_control_impl):
-
+class pc(rly08b, ttbl.power.impl_c):
+    """
+    Power control implementation that uses a relay to close/open a
+    circuit on on/off
+    """
     def __init__(self, serial_number, relay):
         self.relay = relay
         rly08b.__init__(self, serial_number)
-        ttbl.tt_power_control_impl.__init__(self)
+        ttbl.power.impl_c.__init__(self)
 
-    def power_on_do(self, target):
+    def on(self, target, _component):
         cmd = 0x64 + self.relay
         rs = self._command(cmd, get_state = True)[-1]
         rl = struct.unpack('<' + 'B' *len(rs), rs)
@@ -148,7 +152,7 @@ class pc(rly08b, ttbl.tt_power_control_impl):
                                " (returned 0x%02x)"
                                % (self.serial_number, self.relay, r))
 
-    def power_off_do(self, target):
+    def off(self, target, _component):
         # Okie, this is quite a hack -- when we try to power it off,
         # if the serial is not found, we just assume the device is not
         # there and thus it is off -- so we ignore it. Why? Becuase
@@ -170,7 +174,7 @@ class pc(rly08b, ttbl.tt_power_control_impl):
                            "#%d powered off"
                            % (self.serial_number, self.relay))
 
-    def power_get_do(self, target):
+    def get(self, target, _component):
         cmd = 0x5b
         try:
             rs = self._command(cmd)[-1]
@@ -190,25 +194,26 @@ class pc(rly08b, ttbl.tt_power_control_impl):
             return False
 
 
-class button(pc, ttbl.buttons.impl):
-
+class button_c(pc, ttbl.buttons.impl_c):
+    """
+    Implement a button press by closing/opening a relay circuit
+    """
     def __init__(self, serial_number, relay):
-        ttbl.buttons.impl.__init__(self)
+        ttbl.buttons.impl_c.__init__(self)
         pc.__init__(self, serial_number, relay)
 
-    def press(self, target, _button):
-        self.power_on_do(target)
+    def press(self, target, button):
+        self.on(target, button)
 
-    def release(self, target, _button):
-        self.power_off_do(target)
+    def release(self, target, button):
+        self.off(target, button)
 
-    def get(self, target, _button):
-        return self.power_get_do(target)
+    # get implemented by pc.get()
 
 
 class plugger(rly08b,		 # pylint: disable = abstract-method
-              ttbl.thing_plugger_mixin,
-              ttbl.tt_power_control_impl):
+              ttbl.things.impl_c,
+              ttbl.power.impl_c):
     """
     Implement a USB multiplexor/plugger that allows a DUT to be
     plugged to Host B and to Host A when unplugged. It follows it can
@@ -301,16 +306,12 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
 
       To connect a USB device from system A to system B, so power off
       means connected to B, power-on connected to A, add to the
-      configuration::
+      configuration:
 
-        ttbl.config.target_add(
-          ttbl.tt.tt_power(
-              "devicename",
-              power_control = [
-                  ttbl.usbrly08b.plugger("00023456", 0),
-              ]),
-            target_type = "device-switcher"
-        )
+      >>> target.interface_add("power", ttbl.power.inteface(
+      >>>      ttbl.usbrly08b.plugger("00023456", 0)
+      >>> )
+      >>> ...
 
       Thus to connect to system B::
 
@@ -330,35 +331,22 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
       on (in this example, a NUC mini-PC with a USB drive connected
       to boot off it, the configuration block would be as::
 
-        ttbl.config.target_add(
-          ttbl.tt.tt_power(
-              "nuc-43",
-              power_control = [
-                  # Ensure the dongle is / has been connected to the server
-                  ttbl.pc.delay_til_usb_device("7FA50D00FFFF00DD",
-                                               when_powering_on = False,
-                                               want_connected = True),
-                  ttbl.usbrly08b.plugger("00023456", 0),
-                  # Ensure the dongle disconnected from the server
-                  ttbl.pc.delay_til_usb_device("7FA50D00FFFF00DD",
-                                               when_powering_on = True,
-                                               want_connected = False),
-                  # power on the target
-                  ttbl.pc.dlwps7("http://admin:1234@SPNAME/SPPORT"),
-                  # let it boot
-                  ttbl.pc.delay(2)
-              ]),
-            tags = {
-                'linux': True,
-                'bsp_models': { 'x86_64': None },
-                'bsps': {
-                    'x86_64': {
-                        'linux': True,
-                    }
-                }
-            },
-            target_type = "nuc-linux-x86_64"
-        )
+      >>> target.interface_add("power", ttbl.power.interface(
+      >>>     # Ensure the dongle is / has been connected to the server
+      >>>     ttbl.pc.delay_til_usb_device("7FA50D00FFFF00DD",
+      >>>                                  when_powering_on = False,
+      >>>                                  want_connected = True),
+      >>>     ttbl.usbrly08b.plugger("00023456", 0),
+      >>>     # Ensure the dongle disconnected from the server
+      >>>     ttbl.pc.delay_til_usb_device("7FA50D00FFFF00DD",
+      >>>                                  when_powering_on = True,
+      >>>                                  want_connected = False),
+      >>>     # power on the target
+      >>>     ttbl.pc.dlwps7("http://admin:1234@SPNAME/SPPORT"),
+      >>>     # let it boot
+      >>>     ttbl.pc.delay(2)
+      >>> )
+      >>> ...
 
       Note that the serial number *7FA50D00FFFF00DD* is that of the
       USB drive and *00023456* is the serial number of the USB-RLY8b
@@ -405,7 +393,8 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
                                "(only 0 or 1 available)" % bank)
         # 0 is ignored, we don't use an specific relay in this mode
         rly08b.__init__(self, serial_number)
-        ttbl.thing_plugger_mixin.__init__(self)
+        ttbl.things.impl_c.__init__(self)
+        ttbl.power.impl_c.__init__(self)
 
     def plug(self, target, _thing):	# pylint: disable = missing-docstring
         # Connect terminals C and NC (Host B), disconnecting NO (Host A)
@@ -448,16 +437,16 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
                                   self.vcc, self.dp, self.dm, self.gnd,
                                   state & self.mask))
 
-    def power_on_do(self, target):
+    def on(self, target, _component):
         # Why reverse? Because we'd rather have default power off to
         # be disconnected from the target that requires it on until we
         # turn the target on
         self.unplug(target, None)
 
-    def power_off_do(self, target):
+    def off(self, target, _component):
         self.plug(target, None)
 
-    def power_get_do(self, target):
+    def get(self, target, _thing = None):
         cmd = 0x5b
         try:
             rs = self._command(cmd)[-1]
@@ -474,90 +463,3 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
                            % (self.serial_number, self.bank))
             return False
 
-if __name__ == "__main__":
-    import unittest
-
-    logging.basicConfig()
-
-    class _tt(object):
-        log = logging
-
-    class _test(unittest.TestCase):
-        longMessage = True
-        serial = None
-
-        def test_0(self):
-            tt = _tt()
-            for relay in range(1, 9):
-                y1 = pc(self.serial, relay)
-                y1.power_get_do(tt)
-
-        def test_1(self):
-            tt = _tt()
-            for relay in range(1, 9):
-                y1 = pc(self.serial, relay)
-                y1.power_on_do(tt)
-                self.assertTrue(y1.power_get_do(tt))
-
-        def test_2(self):
-            tt = _tt()
-            for relay in range(1, 9):
-                y1 = pc(self.serial, relay)
-                y1.power_off_do(tt)
-                self.assertFalse(y1.power_get_do(tt))
-
-        def test_3(self):
-            tt = _tt()
-            for relay in range(1, 9):
-                y1 = pc(self.serial, relay)
-                y1.power_off_do(tt)
-                self.assertFalse(y1.power_get_do(tt))
-                y1.power_on_do(tt)
-                self.assertTrue(y1.power_get_do(tt))
-
-        def test_4(self):
-            tt = _tt()
-            for relay in range(1, 9):
-                y1 = pc(self.serial, relay)
-
-                y1.power_on_do(tt)
-                self.assertTrue(y1.power_get_do(tt))
-
-                y1.power_off_do(tt)
-                self.assertFalse(y1.power_get_do(tt))
-
-        def test_5(self):
-            tt = _tt()
-            for relay in range(1, 9):
-                y1 = pc(self.serial, relay)
-
-                y1.power_off_do(tt)
-                self.assertFalse(y1.power_get_do(tt))
-
-                y1.power_off_do(tt)
-                self.assertFalse(y1.power_get_do(tt))
-
-                y1.power_on_do(tt)
-                self.assertTrue(y1.power_get_do(tt))
-
-                y1.power_on_do(tt)
-                self.assertTrue(y1.power_get_do(tt))
-
-                y1.power_off_do(tt)
-                self.assertFalse(y1.power_get_do(tt))
-
-                y1.power_off_do(tt)
-                self.assertFalse(y1.power_get_do(tt))
-
-                y1.power_on_do(tt)
-                self.assertTrue(y1.power_get_do(tt))
-
-                y1.power_on_do(tt)
-                self.assertTrue(y1.power_get_do(tt))
-
-    if 'SERIAL' in os.environ:
-        _test.serial = os.environ['SERIAL']
-    else:
-        logging.warning("missing serial number for test RLY08B, "
-                        "export SERIAL env variable")
-    unittest.main()

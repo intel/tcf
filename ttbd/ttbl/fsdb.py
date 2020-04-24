@@ -124,7 +124,7 @@ if __name__ == "__main__":
             cls = type(self)
             location = os.path.join(cls.tmpdir, "test_2")
             os.makedirs(location)
-            print("LOCATION ", location)
+            print(("LOCATION ", location))
             f1 = fsdb(location)
             f2 = fsdb(location)
             f1.set("field1", "value1")

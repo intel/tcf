@@ -100,6 +100,62 @@ The *tcf run* testcase (`tcfl.tc._run()`) will:
   <tcfl.expecter>`), a loop which ensures what is expected to
   happen happens.
 
+.. _testcase_driver_impromptu:
+
+Testcases that have no representation in the client's filesystem
+----------------------------------------------------------------
+
+A very common execution flow involves that the client has a file in
+their filesystem that represents the testcase to run in the target,
+eg::
+
+  $ tcf run some/file/test_this.py
+  $ tcf run jdk8u.git/test/path/test1.java jdk8u.git/test/path/test2.java
+
+different drivers can pick up the testcase and execute the testcase,
+in most case involving the sending of the test content (script, data,
+etc) to the target and then executing it there.
+
+However the case of a test suite whose content is already installed in
+the target makes this model not possible. If for example, in the
+remote system the test suite is executed by running::
+
+  $ run-test /usr/lib/something/test_1
+  $ run-test /usr/lib/something/test_2
+  $ run-test /usr/lib/something/test_3
+
+we can create a script that executes each of those commands, but it
+becomes repetitive.
+
+A different sollution is a :term:`impromptu testcase driver`; this is a
+Python test class instance called *_driver* by it's own in a file, eg:
+*test_something.py* which can get subcase parameter execution from
+TCF's command line::
+
+  $ tcf run test_something.py#test_1#test_2#test_3
+
+like this, the invocation of *test_something.py* is passed a list of
+subcases (*test_1*, *test_2*, *test_3*) to run. However, the following::
+
+  $ tcf run test_something.py#test_1#test_2 test_something.py#test_3
+
+would execute two testcases, one which runs subcases *test_1* and
+*test_2*, another who runs *test_3* only.
+
+Note this is basically a way for the command line to tell a script
+which subcases to execute. However, the key things here are that:
+
+- this makes the testname be SCRIPT#SUBCASE1#SUBCASE#SUBCASE3
+
+  this is important because altering the execution order might alter
+  the test results, and hence they shall be considered different
+  tests.
+
+  If for a given test environment the order is not important or shall
+  not affect the result, this becomes then another measurement point
+  (eg: that running the testcases in multiple orders shall not matter).
+
+
 
 The Test Target Broker
 ======================
@@ -130,7 +186,7 @@ is implemented by either:
   (:meth:`ttbl.test_target.interface_add`). See
   (:meth:`ttbl.buttons.interface` as an example of an interface
   implemented on the daemon and it's counterpart,
-  :meth:`tcfl.target_ext_buttons.buttons` for the client side).
+  :meth:`tcfl.target_ext_buttons.extension` for the client side).
 
 Note details about the actual drivers that implement the interfaces do
 not necessarily belong here and are detailed in the actual driver code.
@@ -222,14 +278,23 @@ similarly; we could not use POSIX advisory locking because it is tied
 to running processes and the daemon works as a loose collection of
 processes with undertermined life cycles.
 
+
+.. automodule:: ttbl.tunnel
+
+.. automodule:: ttbl.store
+
 Interfaces
 ----------
+
+(old doc, needs updating and moving to ttbl.INTERFACE)
 
 Power control
 ^^^^^^^^^^^^^
 
+# FIXME: COMPAT: move this to ttbl.power
+
 Allows powering on, off resetting or power cycling hardware
-(:class:`ttbl.tt_power_control_mixin`).
+(:mod:`ttbl.power`).
 
 This interface can be implemented by:
 
@@ -256,7 +321,7 @@ This interface can be implemented by:
 
 There are currently a few implementations:
 
-* QEMU targets (:class:`ttbl.tt_qemu.tt_qemu`) implement power
+* QEMU targets (:class:`ttbl.qemu.pc`) implement power
   control by starting/stopping QEMU daemons.
 
 * `Digital Logger's Web Power Switch 7
@@ -280,6 +345,9 @@ There are currently a few implementations:
 
 Console management
 ^^^^^^^^^^^^^^^^^^
+
+# FIXME: COMPAT: move to ttbl.console
+
 This interface is used to list serial consoles, read from them
 (logging their output) and writing to them. It is implemented by
 :class:`ttbl.test_target_console_mixin`.
@@ -298,24 +366,10 @@ The class :class:`ttbl.cm_serial.cm_serial` implements a driver for
 serial ports (over serial, TCP and others as supported by the PySerial
 submodule).
 
-File deployment
-^^^^^^^^^^^^^^^
-
-A user can upload files to a TTBD daemon which are stored in a user's
-specifc area. This is used for the image deployment interface, for
-example, so the user can upload a file than then is going to be
-flashed or deployed into a target.
-
-This interface is not target-specific and provides three primitives:
-- file upload
-- file removal
-- file list
-
-*ttbd* implements it directly in Flask routing methods
-``_file_upload``, ``_file_delete`` and ``_files_list``.
 
 Image deployment
 ^^^^^^^^^^^^^^^^
+# FIXME: COMPAT: move to ttbl.images
 
 This interface is used to deploy files available to the daemon into a
 target.
@@ -375,11 +429,23 @@ Things are entities that can be connected to a target, for example:
 
 each driver is responsible to implement the different thing
 plug/unplug methods by adding methods and their handling functions to
-the :attr:`ttbl.test_target.thing_methods` dictionary.
+the target's *things* interface:
 
-Then the target client can plug or unplug those things using the
-API :meth:`tcfl.tc.target_c.thing_plug` or
-:meth:`tcfl.tc.target_c.thing_plug`.
+>>> target.interface_add("things", ttbl.things.interface(**impls))
+
+The implementations are objects subclass of
+:class:`ttbl.things.impl_c`, such as:
+
+- :class:`ttbl.usbrly08b.plugger`: uses a USBRLY8b relay bank to
+  connect/disconnect a USB2 device to a target.
+
+- :class:`ttbl.qemu.plugger`: given a QEMU target and a USB device
+  available to the host, connect it or disconnect it from the QEMU
+  target.
+
+Then the target client can plug or unplug those things using the API
+:meth:`target.things.plug <tcfl.target_ext_things.extension.plug>` or
+:meth:`target.things.unplug <tcfl.target_ext_things.extension.unplug>`.
 
 .. _authentication:
 

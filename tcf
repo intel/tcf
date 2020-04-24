@@ -12,24 +12,23 @@
 #   rest_tb, as they are target broker specific
 #
 
-import collections
 import argparse
-import os
-from tcfl import commonl
-from tcfl.commonl import requirements
-# Verify that we can run TCF
-commonl.requirements.verify_python_version()
-
-import tcfl.ttb_client as ttb_client
-import tcfl.config
-import tcfl.tc
-import tcfl.util
-import tempfile
-import re
+import collections
+import commonl
 import getpass
+import json
+import os
+import re
 import requests
 import shutil
 import sys
+import tempfile
+
+import commonl
+import tcfl
+import tcfl.ttb_client as ttb_client
+import tcfl.config
+import tcfl.tc
 
 # I bet there is a better way to do this...but we need the symbol to
 # be in the logging module so that it is not included in the "function
@@ -45,6 +44,7 @@ setattr(logging, "logd", logging.root.debug)
 setattr(logging, "logdl", logging.root.log)
 from logging import logc, loge, logx, logw, logi, logd, logdl
 
+
 def join_args_for_make_shell_command(args):
     """
     Given a list of arguments to a shell command, escape them to run
@@ -56,6 +56,130 @@ def join_args_for_make_shell_command(args):
         _arg = re.sub(r'(\$)', r'$$', _arg)
         s += " '" + _arg + "'"
     return s
+
+def _target_get(args):
+    # pure target get w/o going through the cache
+
+    if args.projection:
+        data = { 'projection': json.dumps(args.projection) }
+    else:
+        data = None
+    rtb, _rt = ttb_client._rest_target_find_by_id(args.target)
+    rt = rtb.send_request("GET", "targets/" + args.target, data = data)
+    print(json.dumps(rt, skipkeys = True, indent = 4))
+
+def _target_patch(args):
+    # set data
+    data = collections.OrderedDict()	# respect user's order
+    for data_s in args.data:
+        if not "=" in data_s:
+            raise AssertionError(
+                "data specification has to be in the format KEY=JSON-DATA;"
+                " got (%s) %s" % (type(data_s), data_s))
+        k, v = data_s.split("=", 1)
+        data[k] = v
+    rtb, _rt = ttb_client._rest_target_find_by_id(args.target)
+    if data:
+        rtb.send_request("PATCH", "targets/" + args.target, data = data)
+    else:
+        # JSON from stdin
+        rtb.send_request("PATCH", "targets/" + args.target,
+                         json = json.loads(sys.stdin.read()))
+
+def _target_property_set(args):
+    with tcfl.msgid_c("cmdline"):
+        target = tcfl.tc.target_c.create_from_cmdline_args(args)
+        target.property_set(args.property, args.value)
+
+def _target_property_get(args):
+    with tcfl.msgid_c("cmdline"):
+        target = tcfl.tc.target_c.create_from_cmdline_args(args)
+        r = target.property_get(args.property)
+        if r:	# print nothing if None
+            print(r)
+        
+
+def _target_disable(args):
+    with tcfl.msgid_c("cmdline"):
+        for target_name in args.target:
+            target = tcfl.tc.target_c.create_from_cmdline_args(
+                args, target_name = target_name)
+            target.disable(args.reason)
+
+def _target_enable(args):
+    with tcfl.msgid_c("cmdline"):
+        for target_name in args.target:
+            target = tcfl.tc.target_c.create_from_cmdline_args(
+                args, target_name = target_name)
+            target.enable()
+
+def healthcheck(args):
+    tcfl.tc.report_driver_c.add(		# FIXME: hack console driver
+        tcfl.report_console.driver(0, None))
+
+        
+    with tcfl.msgid_c("cmdline"):
+        target = tcfl.tc.target_c.create_from_cmdline_args(args)
+
+        if args.interfaces == []:
+            # no interface list give; scan the list of interfaces the
+            # target exposes, starting with "power" (always)
+            args.interfaces.append("power")
+
+            # list extensions/interfaces w/ healthcheck
+            for attr, value in target.__dict__.items():
+                if isinstance(value, tcfl.tc.target_extension_c) \
+                   and hasattr(value, "_healthcheck") \
+                   and attr != "power":	# we did this first
+                    args.interfaces.append(attr)
+        
+        target.report_info("acquiring")
+        target.acquire()
+        target.report_pass("acquired")
+
+        for interface_name in args.interfaces:
+            interface = getattr(target, interface_name, None)
+            if interface == None:
+                target.report_blck("%s: non-existing interface"
+                                    % interface_name)
+                continue
+            if not isinstance(interface, tcfl.tc.target_extension_c):
+                target.report_blck(
+                    "%s: interface not a real interface (type %s)"
+                    % (interface_name, type(interface)))
+                continue
+            
+            if interface == "power" and not hasattr(target, "power"):
+                target.report_info("WARNING: No power control interface")
+            
+            target.report_info(
+                "HEALTHCHECK for %s interface" % interface_name, level = 0)
+            try:
+                interface._healthcheck()
+            except Exception as e:
+                target.report_blck(
+                    "HEALTCHECK for %s: exception" % interface_name,
+                    dict(exception = e), alevel = 0)
+            
+        target.report_info("released")
+        target.release()
+        target.report_pass("released")
+
+        target.report_pass("HEALTHCHECK completed")
+
+def _cookies(args):
+    if '/' in args.target:
+        # cache is by full id
+        rtb = ttb_client.rest_target_broker.rts_cache[args.target]['rtb']
+    else:
+        for rt_fullid, rt in ttb_client.rest_target_broker.rts_cache.iteritems():
+            if rt['id'] == args.target:
+                rtb = rt['rtb']
+                break
+        else:
+            raise ValueError("%s: unknown target" % args.target)
+
+    commonl._dict_print_dotted(rtb.cookies, separator = "")
 
 
 if __name__ == "__main__":
@@ -78,7 +202,7 @@ if __name__ == "__main__":
     install_time_etc_tcf = bindir + ":" + bindir + "/zephyr"
     install_time_share_tcf = bindir
     arg_parser.add_argument(
-        "--config-path",
+        "-p", "--config-path",
         action = "append", dest = "config_path",
         default = [ install_time_etc_tcf + ":~/.tcf:.tcf" ],
         help = "List of colon separated paths from where to load conf_.*.py "
@@ -89,6 +213,9 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "-u", "--url", action = "append", default = [],
         help = "URL to the test broker (multiple may be specified)")
+    arg_parser.add_argument(
+        "-d", "--debug", action = "store_true", default = False,
+        help = "Enable internal debug prints and checks")
     arg_parser.add_argument(
         "-x", "--traces", action='store_true', default = False,
         help = "Print exception traces")
@@ -125,19 +252,32 @@ if __name__ == "__main__":
         help = "Change to DIR before starting")
     arg_subparsers = arg_parser.add_subparsers(help = "commands")
 
-    ap = arg_subparsers.add_parser("login", help = "Login to the different brokers")
-    ap.add_argument("userid", nargs = '?', metavar = "USERID", action = "store",
-                    default = None, help = "User's ID (email address)")
+    ap = arg_subparsers.add_parser("login",
+                                   help = "Login to the different servers")
+    ap.add_argument("--password", "-p", metavar = "PASSWORD", action = "store",
+                    default = None,
+                    help = "User's password ('ask' to get it asked on"
+                    " the terminal)")
+    ap.add_argument("-s","--split", action = "store_true", default = False,
+                    help = "Ask for different user names and passwords for"
+                    " each server")
     ap.add_argument("-q","--quiet", action = "store_true",
                     default = False, help = "Quiet mode. Don't ask for user or "
                     "password and instead look for env variables like "
                     "'TCF_{USER|PASSWORD}_${AKA}'. "
                     "AKA is the short name of the server (defaults to the sole "
                     "host name, without the domain).")
+    ap.add_argument("user", nargs = '?', metavar = "USERNAME",
+                    action = "store", default = None,
+                    help = "User's login ID")
     ap.set_defaults(func = ttb_client.rest_login)
 
-    ap = arg_subparsers.add_parser("logout", help = "Logout from the different brokers")
-    ap.set_defaults(func = ttb_client.rest_logout)
+    ap = arg_subparsers.add_parser("cookies",
+                                   help = "Show logging cookies (to feed"
+                                   " into curl, etc) maybe only for one server")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = [], help = "Target name")
+    ap.set_defaults(func = _cookies)
 
     arg_parser_target_list = arg_subparsers.add_parser(
         "list", help = "List the targets; by default, in a terminal, it will "
@@ -152,6 +292,10 @@ if __name__ == "__main__":
         "-a", "--all", action = "store_true", default = False,
         help = "List also disabled targets")
     arg_parser_target_list.add_argument(
+        "-p", "--projection", action = "append",
+        help = "List of fields to return (*? [CHARS] or [!CHARS] supported)"
+        " as per python's fnmatch module")
+    arg_parser_target_list.add_argument(
         "target", metavar = "TARGETSPEC", nargs = "*",
         action = "store", default = None,
         help = "Target's names or URLs or a general target specification "
@@ -159,25 +303,52 @@ if __name__ == "__main__":
         "'zephyr_board and not type:\"^qemu.*\"'")
     arg_parser_target_list.set_defaults(func = ttb_client.rest_target_list)
 
-    arg_parser_target_acquire = arg_subparsers.add_parser(
+    ap = arg_subparsers.add_parser(
+        "get", help = "Return target information straight from the "
+        "server formated as JSON (unlike 'list', which will add some "
+        "client fields)")
+    ap.add_argument(
+        "-p", "--projection", action = "append",
+        help = "List of fields to return (*? [CHARS] or [!CHARS] supported)"
+        " as per python's fnmatch module")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target's name")
+    ap.set_defaults(func = _target_get)
+
+    ap = arg_subparsers.add_parser(
+        "patch", help = "Store target information in the server")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target's name")
+    ap.add_argument("data", metavar = "KEY=JSON-VALUE", nargs = "*",
+                    default = None, help = "Data items to store; if"
+                    " none, specify a JSON dictionary over stdin")
+    ap.set_defaults(func = _target_patch)
+
+    ap = arg_subparsers.add_parser(
         "acquire", help = "Acquire ownership of a target")
-    arg_parser_target_acquire.add_argument(
+    ap.add_argument(
         "target", metavar = "TARGET", action = "store",
         nargs = "+", default = None,
         help = "Target's name or URL")
-    arg_parser_target_acquire.set_defaults(func = ttb_client.rest_target_acquire)
+    ap.add_argument("-f", "--force", action = "store_true", default = False,
+                    help = "Force the acquisition, removing the target "
+                    "from its current owner (requires admin rights)")
+    ap.set_defaults(func = ttb_client.rest_target_acquire)
 
     ap = arg_subparsers.add_parser("enable",
                                    help = "Enable a disabled target")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_enable)
+    ap.set_defaults(func = _target_enable)
 
     ap = arg_subparsers.add_parser("disable",
                                    help = "Disable an enabled target")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_disable)
+    ap.add_argument("-r", "--reason", metavar = "REASON", action = "store",
+                    default = 'disabled by the administrator',
+                    help = "Reason why targets are disabled")
+    ap.set_defaults(func = _target_disable)
 
     ap = arg_subparsers.add_parser("property-set",
                                    help = "Set a target's property")
@@ -189,38 +360,15 @@ if __name__ == "__main__":
                     nargs = "?",
                     default = None, help = "Value of property (none "
                     "to remove it)")
-    ap.set_defaults(func = ttb_client.rest_target_property_set)
+    ap.set_defaults(func = _target_property_set)
 
     ap = arg_subparsers.add_parser("property-get",
                                    help = "Get a target's property")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target's name or URL")
     ap.add_argument("property", metavar = "PROPERTY", action = "store",
-                    default = None, help = "OpenOCD command")
-    ap.set_defaults(func = ttb_client.rest_target_property_get)
-
-
-    ap = arg_subparsers.add_parser("thing-plug",
-                                   help = "Plug a thing to the target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("thing", metavar = "THING", action = "store",
-                    default = None, help = "Thing to plug")
-    ap.set_defaults(func = ttb_client.rest_target_thing_plug)
-
-    ap = arg_subparsers.add_parser("thing-unplug",
-                                   help = "Unplug a thing from the target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("thing", metavar = "THING", action = "store",
-                    default = None, help = "Thing to unplug")
-    ap.set_defaults(func = ttb_client.rest_target_thing_unplug)
-
-    ap = arg_subparsers.add_parser("thing-list",
-                                   help = "List plugged things")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_thing_list)
+                    default = None, help = "Name of property")
+    ap.set_defaults(func = _target_property_get)
 
 
     arg_parser_target_release = arg_subparsers.add_parser(
@@ -233,248 +381,49 @@ if __name__ == "__main__":
         nargs = "+", help = "Target's name or URL")
     arg_parser_target_release.set_defaults(func = ttb_client.rest_target_release)
 
-    ap = arg_subparsers.add_parser(
-        "power-on", help = "Power target on")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_power_on)
-
-    ap = arg_subparsers.add_parser("power-off",
-                                   help = "Power target off")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_power_off)
-
-    ap = arg_subparsers.add_parser("reset",
-                                   help = "Reset target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_reset)
-
-    ap = arg_subparsers.add_parser("debug-halt",
-                                   help = "Halt target's CPUs")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_debug_halt)
-
-    ap = arg_subparsers.add_parser("debug-reset",
-                                   help = "Reset target's CPUs")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_debug_reset)
-
-    ap = arg_subparsers.add_parser("debug-reset-halt",
-                                   help = "Reset and halt target's CPUs")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_debug_reset_halt)
-
-    ap = arg_subparsers.add_parser("debug-resume",
-                                   help = "Resume target's CPUs")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_debug_resume)
-
-    ap = arg_subparsers.add_parser("debug-openocd",
-                                   help = "Run an OpenOCD command, return output")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("command", metavar = "COMMAND", action = "store",
-                    default = None, help = "OpenOCD command")
-    ap.set_defaults(func = ttb_client.rest_target_debug_openocd)
-
-    ap = arg_subparsers.add_parser("power-cycle",
-                                   help = "Power target cycle")
-    ap.add_argument(
-        "-w", "--wait", metavar = "SECONDS", action = "store",
-        default = None, help = "How long to wait between power "
-        "off and power on")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_power_cycle)
-
-    ap = arg_subparsers.add_parser("power-get", help = "Power target get")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_power_get)
-
-    ap = arg_subparsers.add_parser("broker-file-upload",
-                                   help = "Upload a local file to a broker")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None,
-                    help = "Target's name or URL whose broker we'll use")
-    ap.add_argument("remote_filename", action = "store",
-                    help = "Path to remote file file (defaults to same as " \
-                    "local). Note the file will be stored in a hierarchy "
-                    "relative to a top level path specified by the daemon "
-                    "which is unique for each user")
-    ap.add_argument("local_filename", action = "store",
-                    help = "Path to local file to upload")
-    ap.set_defaults(func = ttb_client.rest_broker_file_upload)
-
-    ap = arg_subparsers.add_parser("broker-file-dnload",
-                                   help = "Download a file from the broker")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None,
-                    help = "Target's name or URL whose broker we'll use")
-    ap.add_argument("remote_filename", action = "store",
-                    help = "Path to remote file name. "
-                    "Note the file will be stored in a hierarchy "
-                    "relative to a top level path specified by the daemon "
-                    "which is unique for each user")
-    ap.add_argument("local_filename", action = "store",
-                    help = "Path to local file to upload")
-    ap.set_defaults(func = ttb_client.rest_broker_file_dnload)
-
-    ap = arg_subparsers.add_parser("broker-file-delete",
-                                   help = "Delete a file stored in the broker")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None,
-                    help = "Target's name or URL whose broker we'll use")
-    ap.add_argument("remote_filename", action = "store",
-                    help = "Path to remote file")
-    ap.set_defaults(func = ttb_client.rest_broker_file_delete)
-
-    ap = arg_subparsers.add_parser("broker-file-list",
-                                   help = "List files stored in the broker")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None,
-                    help = "Target's name or URL whose broker we'll use")
-    ap.set_defaults(func = ttb_client.rest_broker_file_list)
-
-    ap = arg_subparsers.add_parser("images-set",
-                                   help = "Set images in the target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("images", metavar = "TYPE:FILENAME",
-                    action = "store", default = None, nargs = '+',
-                    help = "List of images to set FIXME")
-    ap.set_defaults(func = ttb_client.rest_target_images_set)
-
-    ap = arg_subparsers.add_parser(
-        "images-upload-set",
-        help = "Upload and set images in the target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("images", metavar = "TYPE:LOCALFILENAME",
-                    action = "store", default = None, nargs = '+',
-                    help = "Each LOCALFILENAME is uploaded to the broker and "
-                    "then set as an image of the given TYPE")
-    ap.set_defaults(func = ttb_client.rest_target_images_upload_set)
-
-
-    ap = arg_subparsers.add_parser("console-read",
-                                   help = "Read from a target's console")
-    ap.add_argument("-s", "--offset", action = "store",
-                    dest = "offset",
-                    help = "Read the console output starting from "
-                    "offset (some targets might or not support this)")
-    ap.add_argument("-m", "--max-size", action = "store",
-                    dest = "max_size", default = 0,
-                    help = "Read as much bytes (approx) [only available with "
-                    "-o]")
-    ap.add_argument("-f", "--filter-ansi",
-                    action = "store_true", default = False,
-                    help = "filter out ANSI sequences "
-                    "WARNING!!! Doesn't work so well because the data "
-                    "from the server might be broken up and thus we "
-                    "can't detect an ANSI sequence--have to change the"
-                    "model so we only filter once we have a full line")
-    ap.add_argument("-o", "--output", action = "store", default = None,
-                    metavar = "FILENAME",
-                    help = "Write output to FILENAME")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("--console", "-c", metavar = "CONSOLE",
-                    action = "store", default = None,
-                    help = "Console to read from")
-    ap.add_argument("--follow",
-                    action = "store_true", default = False,
-                    help = "Continue reading in a loop until Ctrl-C is "
-                    "pressed")
-    ap.set_defaults(func = ttb_client.rest_target_console_read,
-                    offset = 0)
-
-    ap = arg_subparsers.add_parser("console-write",
-                                   help = "Write to a target's console")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("--console", "-c", metavar = "CONSOLE",
-                    action = "store", default = None,
-                    help = "Console to write to")
-    ap.add_argument("--interactive", "-i",
-                    action = "store_true", default = False,
-                    help = "Print back responses")
-    ap.add_argument("--local-echo", "-e",
-                    action = "store_true", default = True,
-                    help = "Do local echo (%(default)s)")
-    ap.add_argument("--no-local-echo", "-E",
-                    action = "store_false", default = True,
-                    help = "Do not local echo (%(default)s)")
-    ap.add_argument("-r", dest = "crlf",
-                    action = "store_const", const = "\r",
-                    help = "CRLF lines with \\r")
-    ap.add_argument("-n", dest = "crlf",
-                    action = "store_const", const = "\n",
-                    help = "CRLF lines with \\n (default)")
-    ap.add_argument("-R", dest = "crlf",
-                    action = "store_const", const = "\r\n",
-                    help = "CRLF lines with \\r\\n")
-    ap.add_argument("-N", dest = "crlf",
-                    action = "store_const", const = "",
-                    help = "Don't add anything to CRLF lines")
-    ap.add_argument("-f", "--filter-ansi",
-                    action = "store_true", default = False,
-                    help = "[interactive] filter out ANSI sequences"
-                    "WARNING!!! Doesn't work so well because the data "
-                    "from the server might be broken up and thus we "
-                    "can't detect an ANSI sequence--have to change the"
-                    "model so we only filter once we have a full line")
-    ap.add_argument("data", metavar = "DATA",
-                    action = "store", default = None, nargs = '*',
-                    help = "Data to write; if none given, "
-                    "read from stdin")
-    ap.set_defaults(func = ttb_client.rest_target_console_write,
-                    crlf = "\n")
-
-    ap = arg_subparsers.add_parser(
-        "debug-start", help = "Start debugging bridge")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_debug_start)
-
-    ap = arg_subparsers.add_parser(
-        "debug-stop", help = "Stop debugging bridge")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_debug_stop)
-
-    ap = arg_subparsers.add_parser(
-        "debug-info", help = "Report information needed to connect "
-        "to the debugging bridge")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = ttb_client.rest_target_debug_info)
-
     # Setup different modules and drivers
     tcfl.tc.argp_setup(arg_subparsers)
-    tcfl.util.argp_setup(arg_subparsers)
-    # FIXME: ugly
-    import tcfl.target_ext_tunnel
-    tcfl.target_ext_tunnel.cmdline_setup(arg_subparsers)
     # imported by tcfl.tc
     tcfl.tc.pos.cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_buttons.cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_ioc_flash_server_app.cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_fastboot.cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_console._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_debug._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_images._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_ioc_flash_server_app._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_fastboot._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_power._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_store._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_things._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_tunnel.cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_users._cmdline_setup(arg_subparsers)
 
+    ap = arg_subparsers.add_parser("healthcheck",
+                                   help = "Do a very basic health check")
+    ap.set_defaults(level = logging.ERROR)
+    ap.add_argument(
+        "-i", "--interface", metavar = "INTERFACE",
+        dest = "interfaces", action = "append", default = [],
+        help = "Names of interfaces to healtcheck (default all "
+        "exposed by the target)")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target's name or URL")
+    ap.set_defaults(func = healthcheck)
 
     global args
     args = arg_parser.parse_args()
     log_format = "%(levelname)s %(module)s.%(funcName)s():%(lineno)d: %(message)s"
     log_format = commonl.log_format_compose(log_format, False, False)
     logging.basicConfig(format = log_format, level = args.level)
+
+    if args.debug:
+        import httplib
+        # Debug logging
+        httplib.HTTPConnection.debuglevel = 1
+        logging.getLogger().setLevel(logging.DEBUG)
+        req_log = logging.getLogger('requests.packages.urllib3')
+        req_log.setLevel(logging.DEBUG)
+        req_log.propagate = True
 
     if args.chdir:
         os.chdir(args.chdir)

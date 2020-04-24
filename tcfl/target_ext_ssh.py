@@ -86,7 +86,7 @@ class ssh(tc.target_extension_c):
            E#1   @local  returncode: 255
 
     For seeing verbose SSH output to debug, append ``-v`` to
-    ``_ssh_cmdline_options``::
+    variable *_ssh_cmdline_options*::
 
     >>> target.ssh._ssh_cmdline_options.append("-v")
 
@@ -133,6 +133,16 @@ class ssh(tc.target_extension_c):
         self._ssh_host = target.rtb.parsed_url.hostname
         self._ssh_port = target.tunnel.add(self.port)
 
+    def tunnel_up(self):
+        """
+        Return *True* if the SSH tunneling information is set and we
+        can run SSH commands to the target.
+
+        This assumes the user has previously setup and started the SSH
+        daemon and authentication in the target.
+        """
+        return self._ssh_host != None and self._ssh_port != None
+
     def _returncode_eval(self, returncode):
         if returncode == 0:
             return
@@ -147,8 +157,8 @@ class ssh(tc.target_extension_c):
         Run a shell command over SSH, return exitcode and output
 
         Similar to :func:`subprocess.call`; note SSH is normally run
-        in verbose mode (unless ``-q`` has been set it
-        :data:`_ssh_cmdline_options`, so the stderr will contain SSH
+        in verbose mode (unless ``-q`` has been set in
+        *_ssh_cmdline_options*, so the stderr will contain SSH
         debug information.
 
         :param str cmd: shell command to execute via SSH, substituting
@@ -190,12 +200,13 @@ class ssh(tc.target_extension_c):
             ql = [ '-q' ]
         else:
             ql = []
-        cmdline = [ "/usr/bin/ssh", "-p", "%s" % self._ssh_port ] \
+        cmdline = [ "/usr/bin/ssh", "-p", str(self._ssh_port) ] \
             + self._ssh_cmdline_options + ql \
             + [ self.login + "@" + self._ssh_host, "-t", _cmd ]
         self.target.report_info("running SSH command: %s"
                                 % " ".join(cmdline), dlevel = 2)
         returncode = subprocess.call(cmdline, stdin = None,
+                                     shell = False,
                                      stdout = log_stdout,
                                      stderr = log_stderr)
         log_stdout.seek(0, 0)
@@ -256,10 +267,14 @@ class ssh(tc.target_extension_c):
 
     def copy_to(self, src, dst = "", recursive = False,
                 nonzero_e = tc.error_e):
-        """
-        Copy a file or tree with *SCP* to the target from the client
+        """Copy a file or tree with *SCP* to the target from the client
 
         :param str src: local file or directory to copy
+
+          Note a relative path will be made relative to the location
+          of the testscript, see :func:`testcase.relpath_to_abs
+          <tcfl.tc.tc_c.relpath_to_abs>`.
+
         :param str dst: (optional) destination file or directoy
           (defaults to root's home directory)
         :param bool recursive: (optional) copy recursively (needed for
@@ -271,10 +286,12 @@ class ssh(tc.target_extension_c):
           :class:`tcfl.tc.skip_e`, :class:`tcfl.tc.blocked_e`) or
           *None* (default) to not raise anything and just return the
           exit code.
+
         """
         self._tunnel()
         self.target.report_info("running SCP local:%s -> target:%s"
                                 % (src, dst), dlevel = 1)
+        src = self.target.testcase.relpath_to_abs(src)
         options = "-vB"
         if recursive:
             options += "r"
@@ -285,7 +302,8 @@ class ssh(tc.target_extension_c):
                 + [ src, self.login + "@" + self._ssh_host + ":" + dst ]
             self.target.report_info("running SCP command: %s"
                                     % " ".join(cmdline), dlevel = 2)
-            s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT)
+            s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT,
+                                        shell = False)
         except subprocess.CalledProcessError as e:
             self._returncode_eval(e.returncode)
             commonl.raise_from(nonzero_e(
@@ -332,7 +350,8 @@ class ssh(tc.target_extension_c):
                 + [self.login + "@" + self._ssh_host + ":" + src, dst ]
             self.target.report_info("running SCP command: %s"
                                     % " ".join(cmdline), dlevel = 2)
-            s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT)
+            s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT,
+                                        shell = False)
         except subprocess.CalledProcessError as e:
             self._returncode_eval(e.returncode)
             commonl.raise_from(nonzero_e(

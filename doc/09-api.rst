@@ -22,17 +22,19 @@ Provisioning/deploying/flashing PC-class devices with a Provisioning OS
 Other target interfaces
 -----------------------
 
-.. automodule:: tcfl.target_ext_broker_files
 .. automodule:: tcfl.target_ext_buttons
 .. automodule:: tcfl.target_ext_capture
 .. automodule:: tcfl.target_ext_console
 .. automodule:: tcfl.target_ext_debug
 .. automodule:: tcfl.target_ext_fastboot
 .. automodule:: tcfl.target_ext_images
+.. automodule:: tcfl.target_ext_input
 .. automodule:: tcfl.target_ext_ioc_flash_server_app
 .. automodule:: tcfl.target_ext_power
 .. automodule:: tcfl.target_ext_shell
 .. automodule:: tcfl.target_ext_ssh
+.. automodule:: tcfl.target_ext_store
+.. automodule:: tcfl.target_ext_things
 .. automodule:: tcfl.target_ext_tunnel
 
 *TCF run* Application builders
@@ -47,8 +49,8 @@ Other target interfaces
 *TCF run* report drivers
 -------------------------
 
-.. automodule:: tcfl.report
-.. automodule:: tcfl.report_mongodb
+See :ref:`report reference <tcf_guide_report_driver>`.
+
                 
 *TCF* client configuration
 ==========================
@@ -65,6 +67,7 @@ Other target interfaces
 
 .. automodule:: tcfl.tc_zephyr_sanity
 .. automodule:: tcfl.tc_clear_bbt
+.. automodule:: tcfl.tc_jtreg
 
                 
 Target metadata
@@ -189,8 +192,8 @@ Common metadata
     in this interconnect (when describing ethernet or similar
     interconnects)
 
-  - *ipv4_addr* (str): IPv4 Address (32bits, DDD.DDD.DDD.DDD, where
-    DDD are decimal integers 0-255) that will be assigned to this
+  - *ipv4_addr* (str): IPv4 Address (32bits, *DDD.DDD.DDD.DDD*, where
+    *DDD* are decimal integers 0-255) that will be assigned to this
     target in this interconnect
 
   - *ipv4_prefix_len* (int): length in bits of the network portion of
@@ -301,8 +304,8 @@ Driver / targe type specific metadata
 Provisioning OS specific metadata
 ---------------------------------
 
-- *linux_serial_console_default*: which device is the system's serial
-  console connected to TCF's first console.
+- *linux_serial_console_default*: which device **the target** sees as
+  the system's serial console connected to TCF's first console.
 
   If *DEVICE* (eg: ttyS0) is given, Linux will be booted with the
   argument *console=DEVICE,115200*.
@@ -345,6 +348,50 @@ Provisioning OS specific metadata
   not present, the first BSP (in alphabetical order) declared in the
   target tags ``bsps`` will be used.
 
+.. _pos_image:
+
+- *pos_image*: string describing the image used to boot the target in
+  POS mode; defaults to *tcf-live*.
+
+  For each image, in the server, :data:`ttbl.dhcp.pos_cmdline_opts`
+  describes the kernel options to append to the kernel image, which is
+  expected to be found in *http://:data:`POS_HTTP_URL_PREFIX
+  <pos_http_url_prefix>`/vmlinuz-POS_IMAGE*
+
+.. _pos_partscan_timeout:
+
+- *pos_partscan_timeout*: maximum number of seconds we wait for a
+  partition table scan to show information about the partition table
+  before we consider it is really empty (some HW takes a long time).
+
+  This is used in :func:`tcfl.pos.fsinfo_read
+  <tcfl.target_ext_pos.extension.fsinfo_read>`.
+  
+.. _pos_reinitialize:
+
+- *pos_reinitialize*: when set to any value, the client provisioning
+  code understands the boot drive for the target has to be
+  repartitioned and reformated before provisioning::
+
+    $ tcf property-set TARGET pos_reinitialize True
+    $ tcf run -t TARGETs <something that deploys>
+
+.. __roles_required:
+
+- *_roles_required*: list of strings describing roles.
+
+  In order to be able to see or use this targer, a user must have
+  been granted one of the roles in the list by the authentication
+  module. See :ref:`access control <target_access_control>`.
+
+.. __roles_excluded:
+
+- *_roles_excluded*: list of strings describing roles.
+
+  In order to be able to see or use this targer, a user must have
+  *not* been granted one of the roles in the list. See :ref:`access
+  control <target_access_control>`.
+  
 .. _uefi_boot_manager_ipv4_regex:
 
 - *uefi_boot_manager_ipv4_regex*: allows specifying a Python regular
@@ -365,12 +412,35 @@ Provisioning OS specific metadata
 
   Note this will be compiled into a Python regex.
 
+*ttbd* HTTP API
+===============
+
+.. include:: 09-api-http.rst
+
+.. _ttbd_conf_api::
+             
 *ttbd* Configuration API for targets
 ====================================
 
 .. automodule:: conf_00_lib
    :members:
    :undoc-members:
+.. automodule:: conf_00_lib_capture
+   :members:
+   :undoc-members:
+.. automodule:: conf_00_lib_mcu
+   :members:
+   :undoc-members:
+.. automodule:: conf_00_lib_mcu_stm32
+   :members:
+   :undoc-members:
+.. automodule:: conf_00_lib_pos
+   :members:
+   :undoc-members:
+.. automodule:: conf_00_lib_pdu
+   :members:
+   :undoc-members:
+.. automodule:: conf_06_default
 
 *ttbd* Configuration API
 ========================
@@ -384,16 +454,46 @@ Provisioning OS specific metadata
 .. automodule:: ttbl
 .. automodule:: ttbl.fsdb
 
-Target types drivers
---------------------
-
-.. automodule:: ttbl.tt
-.. automodule:: ttbl.tt_qemu
-.. automodule:: ttbl.tt_qemu2
-.. automodule:: ttbl.flasher
+.. _target_control:
 
 User access control and authentication
 --------------------------------------
+
+TTBD provides for means for users to authenticate themselves to the
+system and to decide which users can see and use what targets.
+
+TTBD, however, does not implement the authentication; that is
+delegated to :ref:`*authentication drivers* <ttbl.authenticator_c>`
+which can authenticate a user agains LDAP, a local database, any
+remote service, etc.
+
+When a user succesfully *logs in*, the authentication drivers, based
+on their configuration, provide a list of roles the user has, each
+represented by a string, which minimally are defined as:
+
+- *user*: standard label for all users; if an authentication system
+   doesn't grant access to the *user* role, the user has no access to
+   the system.
+
+- *admin*: super users with access to everything; note *amdins* can
+  always see/use all target, disregarding any exclude rules.
+
+any other roles are deployment specific and can be used to control
+access to targets, since the targets can define tags
+:ref:`_roles_required` and :ref:`_roles_excluded` to require users
+have a role or to exclude users with a certain role. For example, a
+target defined such as:
+
+>>> ttbl.config.target_add(
+>>>     ttbl.test_target(TARGETNAME),
+>>>     tags = dict(
+>>>         ...
+>>>         _roles_required = [ 'lab7', 'wizard' ],
+>>>         _roles_excluded = [ 'guest' ],
+>>>  ))
+
+would allow any user with is given the *lab7* or *wizard* role by the
+authentication system and would exclude anyone with the role *guest*.
 
 .. automodule:: ttbl.user_control
 .. automodule:: ttbl.auth_ldap
@@ -403,39 +503,50 @@ User access control and authentication
 Console Management Interface
 ----------------------------
 
-.. autoclass:: ttbl.test_target_console_mixin
-.. automodule:: ttbl.cm_serial
-.. automodule:: ttbl.cm_loopback
-.. automodule:: ttbl.cm_logger
+.. automodule:: ttbl.console
 
 Debugging Interface
 -------------------
 
-.. autoclass:: ttbl.tt_debug_mixin
+.. autoclass:: ttbl.debug
 
 Power Control Interface
 -----------------------
 
-.. autoclass:: ttbl.tt_power_control_mixin
-.. automodule:: ttbl.dhcp
+.. automodule:: ttbl.power
 .. automodule:: ttbl.pc
+.. automodule:: ttbl.ipmi
+.. automodule:: ttbl.raritan_emx
+.. automodule:: ttbl.apc
 .. automodule:: ttbl.pc_ykush
+.. automodule:: ttbl.usbrly08b
+
+Daemons that can be started in the server as part of a power rail:
+
+.. automodule:: ttbl.dhcp
+.. automodule:: ttbl.dnsmasq
+.. automodule:: ttbl.qemu
+.. automodule:: ttbl.openocd
 .. automodule:: ttbl.rsync
 .. automodule:: ttbl.socat
-.. automodule:: ttbl.usbrly08b
 
 Other interfaces
 ----------------
 
 .. automodule:: ttbl.buttons
 .. automodule:: ttbl.capture
+.. automodule:: ttbl.debug
 .. automodule:: ttbl.fastboot
+.. automodule:: ttbl.images
 .. automodule:: ttbl.ioc_flash_server_app
+.. automodule:: ttbl.things
 
 
 Common helper library
 ---------------------
 
+.. automodule:: commonl
+
 .. automodule:: commonl.expr_parser
 
-.. automodule:: commonl.tcob
+.. include:: 09-api-LL-extras.rst

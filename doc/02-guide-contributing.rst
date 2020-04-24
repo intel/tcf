@@ -29,7 +29,7 @@ For that, you can set the configuration::
 
   $ mkdir ~/.tcf
   $ cd ~/.tcf
-  $ ln -s ~/tcf.git/zephyr/conf_zephyr.py
+  $ ln -s ~/tcf.git/conf_*.py .
 
 If you have installed TCF systemwide, you might have to remove
 `/etc/tcf/conf_zephyr.py` or alternatively, pass ``--config-path
@@ -75,15 +75,100 @@ installing system wide (and potentially conflicting versions),
 requires some setup. This is usually called the *staging* server,
 running locally on your machine:
 
-1. Disable SELinux::
+0. Install dependencies:
+
+   - Fedora / RHEL / CentOS, client::
+     
+       # dnf install -y \
+         android-tools \
+         gvnc-tools \
+         make \
+         python-ply \
+         python2-pykwalify \
+         python-requests \
+         python2-Levenshtein \
+         python2-backports-functools_lru_cache \
+         python2-jinja2 \
+         python2-junit_xml \
+         python2-keyring \
+         python2-numpy \
+         python2-opencv \
+         python2-pyyaml
+
+     server::
+
+       # dnf install -y \
+         alsa-utils \
+         android-tools \
+         dfu-util \
+         dosfstools \
+         gcc \
+         git \
+         httpd \
+         ipmitool \
+         libcap-devel \
+         livecd-tools \
+         make \
+         openocd \
+         openssh-clients \
+         parted \
+         pexpect \
+         pyOpenSSL \
+         pyserial \
+         python-flask \
+         python-flask-login \
+         python-flask-principal \
+         python-ldap \
+         python-ply \
+         python-requests \
+         python-systemd \
+         python-tornado \
+         python-werkzeug \
+         python2-devel \
+         python2-keyring \
+         python2-pyghmi \
+         python2-pysnmp \
+         pyusb \
+         qemu \
+         socat \
+         sshpass \
+         tftp-server \
+         v4l-utils
+       $ pip2 install --user sdnotify python-prctl
+
+     If you will be isntrumenting targets with video capture, you
+     might need *ffmpeg* installed on your servers (see
+     https://rpmfusion.org/Configuration) and then::
+
+       # dnf install -y ffmpeg
+
+     or::
+
+       # yum install -y ffmpeg
+     
+   - pure PIP2 dependencies::
+
+         $ pip2 install --user \
+            Flask              
+            Flask-Login        
+            Flask-Principal    
+            Jinja2             
+            Werkzeug           
+            keyring            
+            ply                
+            prctl              
+            pykwalify          
+            python-Levenshtein 
+            pyusb              
+            setuptools         
+            tornado            
+
+       
+1. Disable SELinux (to be able to run from your home directory)::
 
    # setenforce 0
 
-2. Build what’s needed (*ttblc.so*)::
-
-     $ cd ~/z/tcf.git/ttbd
-     $ python setup.py build
-     $ ln -s build/lib.linux-x86_64-2.7/ttblc.so
+2. there is no step two anymore
 
 3. Ensure your home directory and such are readable by users members
    of your group::
@@ -91,17 +176,21 @@ running locally on your machine:
      $ chmod g+rX ~
      $ chmod -R g+rX ~/tcf.git
 
+4. Create a user and group *ttbd*::
+
+     # useradd -U ttbd
+     
 4. Create a staging configuration directory `/etc/ttbd-staging`, make it
    owned by your user, so you don’t have to work as root::
 
      $ sudo install -d -o $LOGNAME -g $LOGNAME /etc/ttbd-staging
 
+   (note you can also create a config file ``conf_NAME.py`` anywhere
+   and invoke later with ``--config-file conf_NAME.py``.
+     
 5. link the following config files from your source tree::
 
-     $ cd /etc/ttbd-staging
-     $ ln -s ~/tcf.git/ttbd/conf_00_lib.py
-     $ ln -s ~/tcf.git/ttbd/conf_06_default.py
-     $ ln -s ~/tcf.git/ttbd/zephyr/conf_06_zephyr.py
+     $ ln -s ~/tcf.git/ttbd/conf_0*.py /etc/ttbd-staging
 
 6. Create a local configuration, so you can login without a password
    from the local machine to port 5001 (port 5000 we leave it for
@@ -123,12 +212,22 @@ running locally on your machine:
    configuration statements to enable hardware as needed. The default
    configuration has only virtual machines.
 
-8. If you will use local Linux VMs (qlf*), set up the images by
-   following this FIXME: procedure.
+8. To start manually, running on the console::
 
-9. Create a configuration for systemd to start the daemon::
+     $ ttbd --config-path :/etc/ttbd-staging -vvvv
 
-     # cp ~user/tcf.git/ttbd/ttbd@.service /etc/systemd/systemctl/ttbd@staging.service
+   Depending on your user's permissions and privleges, you might not
+   be able to access certain system features or hardware devices. Or
+   if there is a config file that you want used anywhere else::
+
+     $ ttbd --config-file conf_NAME.py -vvvv
+
+   which can be combined also with ``--config-path`` to load both.
+   
+9. (optionally) To start using *systemd* create a configuration for
+   systemd to start the daemon::
+
+     # cp ~/tcf.git/ttbd/ttbd@.service /etc/systemd/system/ttbd@staging.service
 
    Edit said file and:
 
@@ -144,6 +243,7 @@ running locally on your machine:
      every single system call...for those hard debug cases :)
 
    - Reload the systemd configuration::
+
        # systemctl daemon-reload
 
 Start the daemon with::
@@ -153,6 +253,56 @@ Start the daemon with::
 Make it always start automatically with::
 
   # systemctl enable ttbd@staging
+
+
+Manual installation of rsync server for Provisioning OS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To setup a system wide rsync server, along other services, instead of
+relying on ttbd starting a specific instance for each network, follow
+these instructions:
+
+a. Install rsync
+
+b. configure rsync to export */home/ttbd/images* as read only,
+   appending to */etc/rsyncd.conf*::
+
+     # TCF provisioning
+     # We run the daemon as root and need to run as root so we can access
+     # folders that have root-only weird permissions
+     [images]
+     path = /home/ttbd/images
+     read only = True
+     timeout = 300
+     # need root perms in this images so we can read all files and transfer
+     # them properly, even those that seem closed; that's how the oS images
+     # are
+     uid = root
+     gid = root
+
+   Ensure daemon is listening on the interfaces where the targets
+   will call from, like for example:
+
+     address = 0.0.0.0
+
+   Ensure port 873 (rsync) is open on the firewall::
+
+    # firewall-cmd --zone=public --add-port=873/tcp --permanent
+    # firewall-cmd --zone=public --add-service=rsyncd --permanent
+
+c. Enable and start the rsync service::
+
+     # systemctl enable rsyncd
+     # systemctl start rsyncd
+
+d. test::
+
+     $ rsync localhost::images/
+     $ rsync localhost::images/tcf-live/x86_64/
+
+   now lists what is in /home/ttbd/images and allows copying it
+
+
 
 Workflow for contributions
 --------------------------

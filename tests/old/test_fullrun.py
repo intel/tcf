@@ -89,14 +89,14 @@ ttbl.config.target_add(tt_qemu.tt_qemu("%s", [ 'x86' ],
             % (self.port, self.target))
         self.assertEqual(sp.join(), 0, msg = sp.output_str)
 
-    def test_01_images_upload_set(self):
+    def test_01_images_flash(self):
         kernel = commonl.testing.test_ttbd_mixin.srcdir + "/tests/data/philosophers-uk-generic_pc.elf"
         image = os.path.basename(kernel)
         shutil.copy(kernel, self.wd)
         # FIXME copy file
         sp = commonl.subpython(
             self.srcdir + "/tcf --config-path : --url http://localhost:%d "
-            "images-upload-set %s kernel:%s"
+            "images-flash %s kernel:%s"
             % (self.port, self.target, image))
         self.assertEqual(sp.join(), 0, msg = sp.output_str)
 
@@ -133,10 +133,10 @@ ttbl.config.target_add(tt_qemu.tt_qemu("%s", [ 'x86' ],
         self.assertEqual(sp.join(), 0, msg = sp.output_str)
 
     @unittest.expectedFailure
-    def test_05_broker_file_delete(self):
+    def test_05_store_delete(self):
         sp = commonl.subpython(
             self.srcdir + "/tcf --config-path : --url http://localhost:%d "
-            "broker-file-delete %s %s"\
+            "store-delete %s %s"\
             % (self.port, self.image))
         self.assertEqual(sp.join(), 0, msg = sp.output_str)
 

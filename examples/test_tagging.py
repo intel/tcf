@@ -39,6 +39,6 @@ import tcfl.pos
               ignore_example = True)
 class _test(tcfl.tc.tc_c):
     def eval(self):
-        for tag, value in self._tags.iteritems():
+        for tag, value in self._tags.items():
             self.report_info("tag %s: %s [from %s]"
                              % (tag, value[0], value[1]), level = 0)

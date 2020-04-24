@@ -9,10 +9,46 @@
 # self-descriptive:
 #
 # - pylint: disable = missing-docstring
+""".. _example_linux_ssh:
+
+Different options of accessing a target via SSH
+===============================================
+
+Given a target that can be provisioned with :ref:`Provisioning OS
+<pos_setup>`, setup its SSH server and run commands, copy files around.
+
+Note that accessing a target over *ssh* with automation is not as
+straightforward as doing it by hand, since humans are way slower than
+automation. We also tend to assume passwords and keys are setup,
+hostnames availables and server started and ready to go. Those are the
+most common source of issues.
+
+.. literalinclude:: /examples/test_linux_ssh.py
+   :language: python
+   :pyobject: _test
+
+Execute :download:`the testcase <../examples/test_linux_ssh.py>`
+with (where *IMAGE* is the name of a Linux OS image :ref:`installed in
+the server <pos_list_images>`)::
+
+  $ tcf run -v /usr/share/tcf/examples/test_linux_ssh.py
+  INFO1/q4ux      ..../test_linux_ssh.py#_test @t7rd-4e2t: will run on target group 'ic=jfsotc11/nwk target=jfsotc11/nuc-70k:x86_64'
+  INFO1/q4uxDPOS  ..../test_linux_ssh.py#_test @t7rd-4e2t|jfsotc11/nuc-70k: POS: rsyncing clear:server:30590::x86_64 from 192.168.107.1::images to /dev/sda6
+  PASS1/q4ux      ..../test_linux_ssh.py#_test @t7rd-4e2t: evaluation passed
+  PASS0/  toplevel @local: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:02:20.841000) - passed
+
+(depending on your installation method, location might be
+*~/.local/share/tcf/examples*)
+
+where IMAGE is the name of a Linux OS image :ref:`installed in the
+server <pos_list_images>`.
+
+"""
 
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import time
 
@@ -21,31 +57,20 @@ import tcfl.tc
 import tcfl.tl
 import tcfl.pos
 
-image = os.environ.get("IMAGE", "clear")
-
-@tcfl.tc.interconnect("ipv4_addr")
-@tcfl.tc.target('pos_capable', mode = 'any')
-class _test(tcfl.tc.tc_c):
+class _test(tcfl.pos.tc_pos_base):
     """
-    Example test using different SSH calls with the SSH extension on a
-    PC target that is provisioned to a Linux OS (Clear, by default)
+    Exercise different SSH calls with the SSH extension on a PC target
+    that is provisioned to a Linux OS (Clear, by default)
     """
-    def deploy(self, ic, target):
-        # ensure network, DHCP, TFTP, etc are up and deploy
-        ic.power.on()
-        ic.report_pass("powered on")
+    image_requested = os.environ.get("IMAGE", 'clear:desktop')
 
-        target.power.on()
-
-        _image = target.pos.deploy_image(
-            ic, image,
-            extra_deploy_fns = [
-                # Config SSH to allow login as root with no password
-                tcfl.pos.deploy_linux_ssh_root_nopwd
-            ])
-        target.report_info("Deployed %s" % _image)
-
-    def setup(self, ic, target):
+    def eval_00_setup(self, ic, target):
+        # setup the SSH server to allow login as root with no password
+        tcfl.tl.linux_ssh_root_nopwd(target)
+        target.shell.run("systemctl restart sshd")
+        target.shell.run(		# wait for sshd to be ready
+            "while ! curl -s http://localhost:22 | /usr/bin/fgrep SSH-2.0; do"
+            " sleep 1s; done", timeout = 10)
         # Tell the tunnelling system which IP address to use
         # Note the client running this can't connect directly to the
         # DUT because the DUT is connected to an isolated
@@ -54,22 +79,17 @@ class _test(tcfl.tc.tc_c):
         # address to use.
         target.tunnel.ip_addr = target.addr_get(ic, "ipv4")
 
-    def start(self, target):
-        target.power.cycle()
-        target.expect("login")
-        target.shell.linux_shell_prompt_regex = tcfl.tl.linux_root_prompts
-        target.shell.up(user = "root")
-
-    def eval_00_run_ssh_commands(self, target):
+    def eval_01_run_ssh_commands(self, target):
         #
         # Run commands over SSH
         #
-        # https://zerobot2.ostc.intel.com/job/TCF-master/lastSuccessfulBuild/artifact/html/doc/09-api.html?highlight=ssh#tcfl.target_ext_ssh.ssh.check_output
+        # https://intel.github.io/tcf/doc/09-api.html?highlight=ssh#tcfl.target_ext_ssh.ssh.check_output
+        #target.ssh._ssh_cmdline_options.append("-v")	# DEBUG login problems
         #target.ssh._ssh_cmdline_options.append("-v")	# DEBUG login problems
         output = target.ssh.check_output("echo hello")
         assert 'hello' in output
 
-        # Alternative way to do it https://zerobot2.ostc.intel.com/job/TCF-master/lastSuccessfulBuild/artifact/html/doc/04-HOWTOs.html?highlight=ssh#linux-targets-ssh-login-from-a-testcase-client
+        # Alternative way to do it https://intel.github.io/tcf/doc/04-HOWTOs.html?highlight=ssh#linux-targets-ssh-login-from-a-testcase-client
         # by hand
 
         # create a tunnel from server_name:server_port -> to target:22
@@ -97,7 +117,7 @@ class _test(tcfl.tc.tc_c):
         self.report_pass("created a file with SSH command")
 
     def eval_04_check_output(self, target):
-        output = target.ssh.check_output("dmidecode -t system | grep UUID")
+        output = target.ssh.check_output("echo example output")
         self.report_pass("SSH check_output returns: %s" % output.strip())
 
     def eval_05_copy_from(self, target):
@@ -113,8 +133,10 @@ class _test(tcfl.tc.tc_c):
         self.report_pass("File created with SSH command copied back ok")
 
     def eval_06_copy_to(self, target):
-        target.ssh.copy_to(__file__)
-        base_file = os.path.basename(__file__)
+        # test copying file relative to the script source
+        target.ssh.copy_to('data/beep.wav')
+        base_file = os.path.basename(__file__)	# this file
+        target.ssh.copy_to(base_file)
         copied_file = os.path.join(self.tmpdir, base_file)
         target.ssh.copy_from(base_file, copied_file)
 
@@ -126,12 +148,12 @@ class _test(tcfl.tc.tc_c):
 
 
     def eval_07_tree_copy(self, target):
-        dirname = self.kws['srcdir']
         copied_subdir = self.kws['tmpdir'] + "/dest"
 
         # Copy a tree to remote, then copy it back
         target.shell.run("rm -rf subdir")
-        target.ssh.copy_to(dirname, "subdir", recursive = True)
+        shutil.rmtree(copied_subdir, True)
+        target.ssh.copy_to(self.kws['srcdir_abs'], "subdir", recursive = True)
         target.ssh.copy_from("subdir", copied_subdir, recursive = True)
 
         # Generate MD5 signatures of the python files in the same order
@@ -146,10 +168,15 @@ class _test(tcfl.tc.tc_c):
         self.report_info("copied_md5 %s" % copied_md5, dlevel = 1)
 
         if local_md5 != copied_md5:
-            raise tcfl.tc.failed_e("local and copied MD5s differ")
+            local_list = self.shcmd_local(
+                r"find %(srcdir)s -type f -iname \*.py | sort").strip()
+            copied_list = self.shcmd_local(
+                r"find %(tmpdir)s/dest -type f -iname \*.py | sort").strip()
+            raise tcfl.tc.failed_e(
+                "local and copied MD5s differ",
+                dict(local_list = local_list, copied_list = copied_list))
 
         self.report_pass("tree copy passed")
-
 
     def teardown(self):
         tcfl.tl.console_dump_on_failure(self)

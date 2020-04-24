@@ -12,8 +12,8 @@ import json
 import re
 import subprocess
 
-from typing import Pattern
-
+import typing
+import commonl
 import ttbl
 
 class interface(ttbl.tt_interface):
@@ -60,8 +60,8 @@ class interface(ttbl.tt_interface):
     this allows to control which commands can be executed in the sever
     using fastboot, allowing access to the server's user storage area
     (to which files can be uploaded using the *tcf broker-upload*
-    command or :func:`tcfl.tc.target_c.broker_files.upload
-    <tcfl.target_ext_broker_files.broker_files.upload>`).
+    command or :meth:`target.store.upload
+    <tcfl.target_ext_store.extension.upload>`).
 
     The server configuration will decide which commands can be
     executed or not (a quick list can be obtained with *tcf
@@ -72,39 +72,7 @@ class interface(ttbl.tt_interface):
       ``"R1J56L1006ba8b"``.
 
     :param dict allowed_commands: Commands that can be executed with
-      fastboot. This is a KEY/VALUE list. Each KEY is a command name
-      (which doesn't necessarily need to map a fastboot command
-      itself). The *VALUE* is a list of arguments to fastboot.
-
-      The user must send the same amount of arguments as in the
-      *VALUE* list.
-
-      Each entry in the *VALUE* list is either a string or a regular
-      expression. What ever the user sends must match the string or
-      regular expression. Otherwise it will be rejected.
-
-      The entry can be a tuple *( STR|REGEX, REPLACEMENT )* that
-      allows to replace what the user sends (using
-      :func:`re.sub`). In the example above:
-
-      >>> ( re.compile("^(.+)$"), "%USERPATH%/\\g<1>" )
-
-      it is meant to take a filename uploaded to the server's user
-      storage area. A match is done on the totality of the argument
-      (ala: file name) and then ``\\g<1>`` in the substitution string
-      is replaced by that match (group #1), to yield
-      ``%USERPATH%/FILENAME``.
-
-      Furthermore, the following substitutions are done on the final
-      strings before passing the arguments to fastboot:
-
-        - ``%USERPATH%`` will get replaced by the current user path
-
-      .. warning:: There is a potential to exploit the system's
-                   security if wide access is given to touch files or
-                   execute commands without filtering what the user is
-                   given. Be very restrictive about what commands and
-                   arguments are whitelisted.
+      fastboot. See :data:`interface.allowed_commands`.
 
     """
     def __init__(self, usb_serial_number, allowed_commands):
@@ -116,7 +84,7 @@ class interface(ttbl.tt_interface):
             "allowed command name, got %s" \
             % type(allowed_commands).__name__
         count = 0
-        for key, data in allowed_commands.items():
+        for key, data in list(allowed_commands.items()):
             assert isinstance(key, str), \
                 "allowed_commands: item #%d: keys must be strings, found %s" \
                 % (count, type(key).__name__)
@@ -132,7 +100,7 @@ class interface(ttbl.tt_interface):
                             "expected for allowed argument"
                             % type(item).__name__)
                     assert isinstance(item[0],
-                                      ( str, Pattern )), \
+                                      ( str, typing.Pattern )), \
                         "allowed_commands: item #%d/%d[0]: first value must " \
                         "be a string or compiled regex, found a %s" \
                         % (count, count2, type(item).__name__)
@@ -142,7 +110,7 @@ class interface(ttbl.tt_interface):
                         % (count, count2, type(item).__name__)
                 else:
                     assert isinstance(item,
-                                      ( str, Pattern )), \
+                                      ( str, typing.Pattern )), \
                         "allowed_commands: item #%d/%d: values in list must " \
                         "be strings or compiled regexs, found a %s" \
                         % (count, count2, type(item).__name__)
@@ -150,9 +118,56 @@ class interface(ttbl.tt_interface):
             count += 1
 
         ttbl.tt_interface.__init__(self)
+        
+        #: Commands that can be executed with fastboot.
+        #:
+        #: This is a KEY/VALUE list. Each KEY is a command name
+        #: (which doesn't necessarily need to map a fastboot command
+        #: itself). The *VALUE* is a list of arguments to fastboot.
+        #:
+        #: The user must send the same amount of arguments as in the
+        #: *VALUE* list.
+        #:
+        #: Each entry in the *VALUE* list is either a string or a regular
+        #: expression. What ever the user sends must match the string or
+        #: regular expression. Otherwise it will be rejected.
+        #:
+        #: The entry can be a tuple *( STR|REGEX, REPLACEMENT )* that
+        #: allows to replace what the user sends (using
+        #: :func:`re.sub`). In the example above:
+        #:
+        #: >>> ( re.compile("^(.+)$"), "%USERPATH%/\\g<1>" )
+        #:
+        #: it is meant to take a filename uploaded to the server's user
+        #: storage area. A match is done on the totality of the argument
+        #: (ala: file name) and then ``\\g<1>`` in the substitution string
+        #: is replaced by that match (group #1), to yield
+        #: ``%USERPATH%/FILENAME``.
+        #:
+        #: Furthermore, the following substitutions are done on the final
+        #: strings before passing the arguments to fastboot:
+        #:
+        #:   - ``%USERPATH%`` will get replaced by the current user path
+        #:
+        #: .. warning:: There is a potential to exploit the system's
+        #:              security if wide access is given to touch files or
+        #:              execute commands without filtering what the user is
+        #:              given. Be very restrictive about what commands and
+        #:              arguments are whitelisted.
         self.allowed_commands = allowed_commands
         self.usb_serial_number = usb_serial_number
-        self.user_path = None	# we'll fill this on the request_process
+
+
+    def _target_setup(self, target):
+        self.instrumentation_publish_component(
+            target, "fastboot",
+            commonl.mkid(self.usb_serial_number, l = 4), "ADB bridge",
+            { 'usb_serial_number': self.usb_serial_number })
+
+
+    def _release_hook(self, target, _force):
+        # nothing needed here
+        pass
 
     #: path to the fastboot binary
     #:
@@ -170,12 +185,12 @@ class interface(ttbl.tt_interface):
     def _regex_make(arg):
         if isinstance(arg, str):
             return re.compile(re.escape(arg))
-        elif isinstance(arg, Pattern):
+        elif isinstance(arg, typing.Pattern):
             return arg
         raise ValueError("Bad type given (%s); str or re.compile() expected"
                          % type(arg).__name__)
 
-    def _allowed(self, target, given_arg, allowed_arg):
+    def _allowed(self, target, given_arg, allowed_arg, user_path):
         # allowed_arg can be
         #
         # - str
@@ -199,7 +214,7 @@ class interface(ttbl.tt_interface):
                 return None
             # expand some values to replace
             for key, value in [
-                    ("%USERPATH%", self.user_path)
+                    ("%USERPATH%", user_path)
             ]:
                 replacement_with = replacement_with.replace(key, value)
             return re.sub(allowed_regex, replacement_with, given_arg)
@@ -210,13 +225,29 @@ class interface(ttbl.tt_interface):
                 return None
             return given_arg
 
+    # called by the daemon when a METHOD request comes to the HTTP path
+    # /ttb-vVERSION/targets/TARGET/interface/console/CALL
 
-    def _run(self, who, target, all_args):
+    def put_run(self, target, who, args, _files, user_path):
+        """
+        Run a fastboot command
+
+        Note we don't allow any command execution, only what is
+        allowed by :data:`allowed_commands`, which might also filter
+        the arguments based on the configuration.
+        """
+        if not 'parameters' in args:
+            raise RuntimeError("missing argument: parameters")
+
+        # FIXME: :100 is a hard limit on args, configurable?
+        all_args = json.loads(args['parameters'])[:100]
         translated_args = []
         command = all_args[0]
         if command not in self.allowed_commands:
             raise RuntimeError("fastboot %s: disallowed by configuration"
                                % command)
+
+        # The command is allowed, so now filter it if the config says so
         allowed_args = self.allowed_commands[command]
         count = 0
         target.log.warning("filtering args %s with %s",
@@ -226,14 +257,16 @@ class interface(ttbl.tt_interface):
                 raise RuntimeError(
                     "fastboot %s: argument #%d disallowed by "
                     "configuration (not enough count)" % (command, count))
-            translated_arg = self._allowed(target,
-                                           given_arg, allowed_args[count])
+            translated_arg = self._allowed(target, given_arg,
+                                           allowed_args[count], user_path)
             if translated_arg == None:
                 raise RuntimeError(
                     "fastboot %s: argument #%d disallowed by "
                     "configuration (no match)" % (command, count))
             translated_args.append(translated_arg)
             count += 1
+
+        # we have a filtered command ready to run
         cmdline = [ self.path, "-s", self.usb_serial_number ] \
             + translated_args
         with target.target_owned_and_locked(who):
@@ -255,9 +288,10 @@ class interface(ttbl.tt_interface):
                     target.log.warning("error output: " + line)
                     raise RuntimeError(msg)
 
-    def _list(self, _who, _target):
+
+    def get_list(self, _target, _who, _args, _files, _user_path):
         data = dict()
-        for command, param_list in self.allowed_commands.items():
+        for command, param_list in list(self.allowed_commands.items()):
             _param_list = []
             count = 0
             for param in param_list:
@@ -265,12 +299,12 @@ class interface(ttbl.tt_interface):
                     value = param[0]
                     if isinstance(value, str):
                         _param_list.append(value)
-                    elif isinstance(value, Pattern):
+                    elif isinstance(value, typing.Pattern):
                         _param_list.append(value.pattern)
                     else:
                         assert(
                             "BUG: bad type %s in item #%d, expected "
-                            "str or Pattern"
+                            "str or typing.Pattern"
                             % (type(value).__name__, count))
                 else:
                     _param_list.append(param)
@@ -279,19 +313,3 @@ class interface(ttbl.tt_interface):
             data[command] = params
         return { 'commands': data }
 
-    def request_process(self, target, who, method, call, args, _user_path):
-        self.user_path = _user_path
-        if method == "POST" and call == "run":
-            if not 'parameters' in args:
-                raise RuntimeError("missing argument: parameters")
-            parameters = json.loads(args['parameters'])
-            # FIXME: :100 is a hard limit on args, configurable?
-            return self._run(who, target, parameters[:100])
-        elif method == "GET" and call == "list":
-            return self._list(who, target)
-        else:
-            raise RuntimeError("%s|%s: unsuported" % (method, call))
-
-    def _release_hook(self, target, _force):
-        # nothing needed here
-        pass

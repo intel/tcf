@@ -36,11 +36,10 @@ import threading
 import traceback
 
 # Needed so I can also import from tc to initialize -- ugly
-from . import commonl
-from .commonl import expr_parser
-from . import expecter
+import commonl
 import tcfl
-from . import tc
+import tcfl.tc
+import tcfl.tl
 from . import tc_zephyr_scl
 
 from . import msgid_c
@@ -285,14 +284,21 @@ class _harness_console_c(harness_c):	# pylint: disable = too-few-public-methods
 
     def _evaluate_ordered(self, testcase):
         target = testcase.targets['target']
+        count = 0
         for regex in self.regexs:
-            target.expect(regex)
+            target.expect(regex, name = "console harness #%d" % count,
+                          console = target.kws.get("console", None))
+            count += 1
 
     def _evaluate_unordered(self, testcase):
         target = testcase.targets['target']
+        count = 0
         for regex in self.regexs:
-            target.on_console_rx(regex)
-        testcase.tls.expecter.run()
+            testcase.expect_global_append(target.console.text(
+                regex, name = "harness console #%d" % count,
+                console = target.kws.get("console", None)))
+            count += 1
+        testcase.expect()
 
     def evaluate(self, testcase):
         if self.repeat == 1:
@@ -403,7 +409,7 @@ def _stc_scan_path_source(path):
             subcases += _subcases
     return subcases, warnings,
 
-class tc_zephyr_subsanity_c(tc.tc_c):
+class tc_zephyr_subsanity_c(tcfl.tc.tc_c):
     """Subtestcase of a Zephyr Sanity Check
 
     A Zephyr Sanity Check testcase might be composed of one or more
@@ -432,7 +438,7 @@ class tc_zephyr_subsanity_c(tc.tc_c):
         assert isinstance(parent, tcfl.tc.tc_c)
         assert not attachments or isinstance(attachments, dict)
 
-        tc.tc_c.__init__(self, name, tc_file_path, origin)
+        tcfl.tc.tc_c.__init__(self, name, tc_file_path, origin)
         self.parent = parent
         self.attachments = attachments if attachments else {}
         # This is to be left uninitialized so if it is when we are
@@ -440,6 +446,9 @@ class tc_zephyr_subsanity_c(tc.tc_c):
         # errored/failed/skip/block to configure, build, deploy etc,
         # all the subTCs are errored/failed/skipped/blocked
         self._result = None
+        # need to set this because we are a subcase of it and we can't
+        # execute independently
+        self.kw_set('tc_name_toplevel', parent.kws['tc_name_toplevel'])
         self.kw_set('tc_name_short', zephyr_name)
 
     def configure_50(self):	# pylint: disable = # missing-docstring
@@ -448,7 +457,7 @@ class tc_zephyr_subsanity_c(tc.tc_c):
         # class for normal sanity check testcases that require a
         # target and unit test cases that don't.
         for target in list(self.targets.values()):
-            target.acquire = False
+            target.do_acquire = False
         self.report_pass("NOTE: This is a subtestcase of %(tc_name)s "
                          "(%(runid)s:%(tc_hash)s); refer to it for full "
                          "information" % self.parent.kws, dlevel = 1)
@@ -497,7 +506,7 @@ class tc_zephyr_subsanity_c(tc.tc_c):
         # complain that nothing was found to run
         return
 
-class tc_zephyr_sanity_c(tc.tc_c):
+class tc_zephyr_sanity_c(tcfl.tc.tc_c):
     """
     Test case driver specific to Zephyr project testcases
 
@@ -564,7 +573,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
 
     """
     def __init__(self, name, tc_file_path, origin, zephyr_name, subcases):
-        tc.tc_c.__init__(self, name, tc_file_path, origin)
+        tcfl.tc.tc_c.__init__(self, name, tc_file_path, origin)
         # app_zephyr will have inserted methods to build, cleanup, setup
         # Force hooks to be run by app_zephyr's setup
         self.unit_test = False
@@ -757,7 +766,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         origin = path + "#" + section
 
         if tc_dict.get("skip", False):
-            raise tc.skip_e("%s: test case skipped" % section)
+            raise tcfl.tc.skip_e("%s: test case skipped" % section)
 
         if tc_dict.get("build_only", False):
             self.build_only.append(origin)
@@ -828,7 +837,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         if tc_dict.get('type', None) == 'unit':
             self.unit_test = True
         else:
-            tc.target_want_add(self, "target", spec, origin,
+            tcfl.tc.target_want_add(self, "target", spec, origin,
                                app_zephyr = self.app_src,
                                app_zephyr_options = self.extra_args)
 
@@ -863,7 +872,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
 
 
         if 'timeout' in tc_dict:
-            self.tls.expecter.timeout = int(tc_dict['timeout'])
+            self.tls.expect_timeout = int(tc_dict['timeout'])
 
         self.zephyr_filter = tc_dict.get("filter", None)
         self.zephyr_filter_origin = origin
@@ -946,7 +955,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
             schema = cls.schema_get_file(os.path.join(location, filename))
             if schema:
                 return schema
-        raise tc.error_e("%s: can't load schema from paths %s"
+        raise tcfl.tc.error_e("%s: can't load schema from paths %s"
                          % (filename, "".join(locations)))
 
     def build_00_tc_zephyr(self):
@@ -1056,21 +1065,21 @@ class tc_zephyr_sanity_c(tc.tc_c):
 
         board_ram = board_yaml.get('ram', 128)	# default from sanitycheck
         if 'min_ram' in self.tc_dict and board_ram < self.tc_dict['min_ram']:
-            raise tc.skip_e("test case skipped, need at least "
+            raise tcfl.tc.skip_e("test case skipped, need at least "
                             "%dKiB RAM (have %dKiB)" %
                             (self.tc_dict['min_ram'], board_ram))
 
         board_flash = board_yaml.get('flash', 512)	# default from sanitycheck
         if 'min_flash' in self.tc_dict \
            and board_flash < self.tc_dict['min_flash']:
-            raise tc.skip_e("test case skipped, need at least "
+            raise tcfl.tc.skip_e("test case skipped, need at least "
                             "%dKiB flash (have %dKiB)" %
                             (self.tc_dict['min_flash'], board_flash))
 
         ignore_tags = board_yaml.get('testing', {}).get('ignore_tags', [])
         for tag, (_value, origin) in self._tags.items():
             if tag in ignore_tags:
-                raise tc.skip_e(
+                raise tcfl.tc.skip_e(
                     "skipped: testcase tagged %s (@%s), marked to ignore "
                     "in Zephyr's board YAML testing.ignore_tags"
                     % (tag, origin))
@@ -1084,7 +1093,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
                 zephyr_supported.append(supported.split(":")[0])
         for dependency in self.zephyr_depends_on:
             if not dependency in zephyr_supported:
-                raise tc.skip_e("zephyr board '%s' doesn't provide required "
+                raise tcfl.tc.skip_e("zephyr board '%s' doesn't provide required "
                                 "'%s' dependency" % (board, dependency))
 
 
@@ -1118,13 +1127,13 @@ class tc_zephyr_sanity_c(tc.tc_c):
 
         if os.path.exists(os.path.join(ZEPHYR_BASE, "CMakeLists.txt")):
             if not os.path.exists(os.path.join(srcdir, "CMakeLists.txt")):
-                raise tc.error_e(
+                raise tcfl.tc.error_e(
                     "%s: Zephyr App is not cmake based, but Zephyr @%s is"
                     % (srcdir, ZEPHYR_BASE))
             is_cmake = True
         else:
             if os.path.exists(os.path.join(srcdir, "CMakeLists.txt")):
-                raise tc.error_e(
+                raise tcfl.tc.error_e(
                     "%s: Zephyr App is cmake based, but Zephyr @%s is not"
                     % (srcdir, ZEPHYR_BASE))
             is_cmake = False
@@ -1169,13 +1178,13 @@ class tc_zephyr_sanity_c(tc.tc_c):
                 self.shcmd_local("%(zephyr_objdir)s/testbinary",
                                  logfile = logf)
                 if self._in_file(logf, "PROJECT EXECUTION FAILED"):
-                    raise tc.failed_e("PROJECT EXECUTION FAILED found",
+                    raise tcfl.tc.failed_e("PROJECT EXECUTION FAILED found",
                                       { "output": logf })
                 if self._in_file(logf, "PROJECT EXECUTION SUCCESSFUL"):
-                    raise tc.pass_e("PROJECT EXECUTION SUCCESSFUL found",
+                    raise tcfl.tc.pass_e("PROJECT EXECUTION SUCCESSFUL found",
                                     { "output": logf })
                 else:
-                    raise tc.error_e("PROJECT EXECUTION SUCCESSFUL not found",
+                    raise tcfl.tc.error_e("PROJECT EXECUTION SUCCESSFUL not found",
                                      { "output": logf })
         else:			# Default Zephyr harness evaluation
             # This mimics what app_zephyr is computing for us and setting
@@ -1195,15 +1204,24 @@ class tc_zephyr_sanity_c(tc.tc_c):
             # timeout (eg: first expect passes, thr process is put to
             # sleep for a long time before the next expect can run and
             # decide it was a timeout, when it wasn't).
-            target.on_console_rx("RunID: %(runid)s:%(tg_hash)s" % target.kws,
-                                 console = target.kws.get("console", None))
-            target.on_console_rx(
+            console = target.kws.get("console", None)
+            # add success expectations in the right order, wait for them
+            self.expect_global_append(target.console.text(
                 re.compile("\*\*\*\*\* Booting Zephyr OS [^\*]*\*\*\*\*\*"),
-                console = target.kws.get("console", None))
-            target.on_console_rx("PROJECT EXECUTION SUCCESSFUL",
-                                 console = target.kws.get("console", None))
-            # And wait for them to happen
-            self.tls.expecter.run()
+                name = "Zephyr boot banner",
+                console = console
+            ))
+            self.expect_global_append(target.console.text(
+                "RunID: %(runid)s:%(tg_hash)s" % target.kws,
+                name = "testcase RunID tag",
+                console = console
+            ))
+            self.expect_global_append(target.console.text(
+                "PROJECT EXECUTION SUCCESSFUL",
+                name = "testcase successful",
+                console = console
+            ))
+            self.expect()
 
     _data_parse_regexs = {}
 
@@ -1216,7 +1234,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         After a Zephyr sanity check is executed succesfully, the
         output of each target is examined by the data harvesting
         engine to extract data to store in the database with
-        :meth:`tcfl.tc.tc_c.report_data`.
+        :meth:`target.report_data <tcfl.tc.reporter_c.report_data>`.
 
         The harvester is a very simple state machine controlled by up
         to three regular expressions whose objective is to extract a
@@ -1319,13 +1337,10 @@ class tc_zephyr_sanity_c(tc.tc_c):
         if self.unit_test:
             f = codecs.open(self.unit_test_output, 'r', encoding = 'utf-8')
         else:
-            console_id = target.kws.get('console', None)
-            f_existing = self.tls.expecter.console_get_file(target, console_id)
-            # this gives a file descriptor whose pointer might be in
-            # any location, so we are going to reopen a new one to
-            # read from the start--because we don't want to modify the
-            # file pointer
-            f = open(f_existing.name)
+            f = codecs.open(
+                target.console.capture_filename(target.kws.get('console', None)),
+                encoding = 'utf-8', errors = 'replace')
+
         main_triggered = set()
         triggered = set()
         # Note the triggers; each regex might depend on a trigger and
@@ -1397,19 +1412,14 @@ class tc_zephyr_sanity_c(tc.tc_c):
         # a separate subtestcase using the tcfl.tc_c.post_tc_append()
         # facility.
 
-        # The output has been captured already by the expecter's
-        # polling loop, but (FIXME) I don't really like much how we
-        # are using internal details on the buffers, we are kind of
-        # breaking inside the knowledge of expecter.console_*
-        # functions
         if self.unit_test:
             outputf = codecs.open(self.unit_test_output, 'r',
                                   encoding = 'utf-8')
         else:
-            console = target.kws.get('console', None)
-            _console_id_name, console_code = expecter.console_mk_code(
-                target, console)
-            outputf = self.tls.expecter.buffers.get(console_code, None)
+            # The output has been captured already by the expecter's
+            # polling loop, so tap it
+            outputf = target.console.text_capture_file(
+                target.kws.get('console', None))
             if not outputf:
                 return	# *shrug* no output to parse
         results = collections.defaultdict(dict)
@@ -1507,10 +1517,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
                 self._subtestcases_grok(target)
 
     def teardown(self):
-        if self.result_eval.summary().passed == 0:
-            return
-        for target in list(self.targets.values()):
-            self._report_data_from_target(target)
+        tcfl.tl.console_dump_on_failure(self)
 
     def clean(self):
         if not self.unit_test:
@@ -1536,7 +1543,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
             try:
                 tc_dict = cp.get_section(section, testcase_valid_keys)
             except ConfigurationError as e:
-                raise tc.blocked_e("can't parse: %s @%s" % (e[1], e[0]),
+                raise tcfl.tc.blocked_e("can't parse: %s @%s" % (e[1], e[0]),
                                    { "trace": traceback.format_exc() })
             _tc = cls(origin, path, origin, section)
             _tc.log.debug("Original testcase.ini data for section '%s'\n%s"
@@ -1638,7 +1645,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         return d
     
     @classmethod
-    def _testcasesample_yaml_mktcs(cls, path):
+    def _testcasesample_yaml_mktcs(cls, path, _tc_name, subcases_cmdline):
         #
         #
         # ASSUMPTIONS:
@@ -1646,11 +1653,11 @@ class tc_zephyr_sanity_c(tc.tc_c):
         #
         # 1 - each subtestcase listed in testcase|sample.yaml or in the
         #     output of 'sanitycheck --list-tests' is in the form
-        #     something.other.whatever.final
+        #     something.other.whatever.final.
         #
         # 2 - if the testcase provides subcases inside the source,
         #     something.other.whatever has to match as a subcase in the
-        #     testcase|sample.yaml
+        #     testcase|sample.yaml; those are subsubcases.
         #
         # so anyhoo, there are multiple testcases declared in the
         # yaml, which allow us to build multiple testcases from the
@@ -1660,7 +1667,7 @@ class tc_zephyr_sanity_c(tc.tc_c):
         #
         # So it is kinda hard to identify what is the top_subcase
         # subtestcase (off the YAML file) or scanned from the source
-        # (src_subcase)
+        # (src_subsubcase)
         #
         # For example, when listing zephyr/samples/philosophers
         #
@@ -1708,9 +1715,9 @@ class tc_zephyr_sanity_c(tc.tc_c):
             # this means this .yaml has just a description but it does
             # not specify how to run any of it, so we are going to
             # pass
-            raise tc.skip_e(
+            raise tcfl.tc.skip_e(
                 "no `tests` section declared in %s" % path)
-            return
+            return [ ]
         else:
             assert isinstance(data, dict), \
                 "tests data is not a dict but a %s" % type(data).__name__
@@ -1723,32 +1730,43 @@ class tc_zephyr_sanity_c(tc.tc_c):
         src_subcases = set()
         yaml_subcases = list(mapping.keys())
         for subcase in subcases:
-            if subcase not in yaml_subcases:
+            if subcase not in yaml_subsubcases:
                 top_subcase, src_subcase = os.path.splitext(subcase)
-                if top_subcase not in yaml_subcases:
+                if top_subcase not in yaml_subsubcases:
                     raise tcfl.tc.error_e(
                         "testcase declares subcase %s (top %s src %s) whose "
                         "top not listed in YAML's subcases (%s)"
                         % (subcase, top_subcase, src_subcase,
-                           " ".join(yaml_subcases)))
-                src_subcases.add(src_subcase[1:])
+                           " ".join(yaml_subsubcases)))
+                src_subsubcases.add(src_subcase[1:])
 
-        for tc_name, _tc_vals in mapping.items():
-            tc_vals = cls._get_test(tc_name, _tc_vals, common, testcase_valid_keys)
-            origin = path + "#" + tc_name
-            _tc = cls(origin, path, origin, tc_name, src_subcases)
-            _tc.log.debug("Original %s data for test '%s'\n%s"
-                          % (os.path.basename(path), tc_name,
+        # Now we create a top level test for each subtestcase we
+        # found in the YAML file; if we were given test names in the
+        # command line, we only create for those.
+        for subtc_name, _tc_vals in mapping.items():
+            tc_vals = cls._get_test(subtc_name, _tc_vals, common,
+                                    testcase_valid_keys)
+            origin = path + "#" + subtc_name
+            if subcases_cmdline and subtc_name not in subcases_cmdline:
+                logging.info(
+                    "%s#%s: ignoring subcase, not in command line list",
+                    path, subtc_name)
+                continue
+            _tc = cls(path + "#" + subtc_name, path, origin,
+                      subtc_name, src_subsubcases)
+            _tcfl.tc.log.debug("Original %s data for test '%s'\n%s"
+                          % (os.path.basename(path), subtc_name,
                              pprint.pformat(tc_vals)))
-            _tc._dict_init(tc_vals, path, tc_name)
+            _tcfl.tc._dict_init(tc_vals, path, subtc_name)
             tcs.append(_tc)
         return tcs
 
     @classmethod
-    def is_testcase(cls, path, _from_path):
+    def is_testcase(cls, path, _from_path, tc_name, subcases_cmdline):
         if cls.filename_regex.match(os.path.basename(path)):
             return cls._testcase_ini_mktcs(path)
         if cls.filename_yaml_regex.match(os.path.basename(path)):
-            return cls._testcasesample_yaml_mktcs(path)
+            return cls._testcasesample_yaml_mktcs(path, tc_name,
+                                                  subcases_cmdline)
         else:
             return []

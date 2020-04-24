@@ -18,13 +18,31 @@ Glossary
 
    hash
 
-     In the context of *tcf run*, a hash is a four character code that
-     uniquely identifies the test case name and the target where it ran.
+     In the context of *tcf run*, a hash is a six character code that
+     uniquely identifies the test case name and the target/s where it
+     ran along with its :term:`BSP model`.
 
+     It stays stable across different runs.
+
+   hashid
+
+     Same as :term:`hash`.
+     
    herd
 
      Group of TCF servers that are meant to be used together, they all
      provide redundancy for targets of the same style.
+
+   impromptu testcase driver
+
+     A Python test file implementing :term:`testcase driver` that:
+
+     - contains a single class called *_driver*
+
+     - allows executing one or more test cases that have no
+       file representation in the client's filesystem
+
+     :ref:`More details <testcase_driver_impromptu>` available.
 
    RunID
 
@@ -33,11 +51,11 @@ Glossary
      testcase output to clarify when it was generated.
 
    site
-   
+
      Server herds can be split into *sites*, which is a subgroup of
      servers of the same herd that are physically located in the same
      place and might be sharing physical infrastructure
-     
+
    static testcase
 
      A :term:`test case` that doesn't run on remote targets but in the
@@ -60,6 +78,17 @@ Glossary
      or functionality.
 
      A test case can be a program or a script
+
+   testcase driver
+
+     A testcase driver is a script that when pointed to a file of any
+     type in the client's filesystem (not in the target's), can
+     determine if it can recognize it as something it can execute as a
+     flow for evaluating a test case.
+
+     This allows test content written in anything than Python to be
+     exectured by the automation process without modifying it. See
+     :meth:`tcfl.tc.tc_c.is_testcase`.
 
    test target
 
