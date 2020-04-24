@@ -615,17 +615,39 @@ def pos_target_add(
     assert isinstance(mac_addr, basestring), \
         "mac_addr must be a string HH:HH:HH:HH:HH:HH; got: %s %s" \
         % (type(name).__name__, name)
-    assert power_rail \
-        and (
-            # a single power rail or a char spec of it
-            isinstance(power_rail, (ttbl.power.impl_c, basestring))
-            or (
-                # a power rail list
-                isinstance(power_rail, list)
-                and all(isinstance(i, ttbl.power.impl_c)
-                        for i in power_rail))
-        ), \
-        "power_rail must be a power rail spec, see doc; got %s" % power_rail
+    if power_rail:
+        # FIXME: move to ttlb.power.validate_spec
+        if isinstance(power_rail, ttbl.power.impl_c):
+            pass
+        elif isinstance(power_rail, basestring):
+            # compat, a descriptor that gets transformed to a pc_dlwps7
+            pass
+        elif isinstance(power_rail, list):
+            count = -1
+            for pc in power_rail:
+                count += 1
+                if isinstance(pc, ttbl.power.impl_c):
+                    continue
+                if isinstance(pc, (tuple, list)):
+                    # list of NAME, IMPL
+                    if len(pc) != 2:
+                        raise AssertionError(
+                            "power rail #%d: list of %d items given;"
+                            " expect 2 (NAME, IMPL)" % (count, len(pc)))
+                    pc_name = pc[0]
+                    pc_impl = pc[1]
+                    if not isinstance(pc_name, basestring):
+                        raise AssertionError(
+                            "power rail #%d: first element must be a string; got %s"
+                            % (count, type(pc_name)))
+                    if not isinstance(pc_impl, ttbl.power.impl_c):
+                        raise AssertionError(
+                            "power rail #%d: second element must be a ttbl.power.impl_c; got %s"
+                            % (count, type(pc_impl)))
+        else:
+            raise AssertionError(
+                "power rail must be a power rail spec (ttbl.power.impl_c"
+                " or list of them), see doc; got %s" % power_rail)
     assert isinstance(boot_disk, basestring) \
         and not '/' in boot_disk, \
         'boot_disk is the base name of the disk from which ' \
