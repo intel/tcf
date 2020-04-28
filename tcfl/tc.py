@@ -3381,6 +3381,9 @@ class tc_c(reporter_c):
     #: List of places where we declared this testcase is build only
     build_only = []
 
+    #: Force to use an specific allocid (already obtained)
+    allocid = None
+    
     def __init__(self, name, tc_file_path, origin):
         reporter_c.__init__(self)
         for hook_pre in self.hook_pre:
@@ -5727,6 +5730,13 @@ class tc_c(reporter_c):
     # FIXME: add phase "assign"
     @contextlib.contextmanager
     def _targets_assign(self):
+
+        # targets have been already assigned, there is an allocid that
+        # can be used
+        if self.allocid:
+            yield
+            return
+
         timeout = self.assign_timeout
         period = assign_period
 
@@ -7923,6 +7933,8 @@ def _run(args):
         ticket = ""
     else:
         ticket = args.ticket	# Or use this ticket
+    if args.allocid:			# Meaning I have them allocated ... 
+        tc_c.allocid = args.allocid	# ... use this allocid
     tc_c.release = args.release
     tc_c._dry_run = args.dry_run
     tc_c.eval_repeat = args.repeat_evaluation
