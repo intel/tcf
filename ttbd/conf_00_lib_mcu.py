@@ -647,7 +647,14 @@ def arduino_add(name, usb_serial_number, fqbn,
         "images",
         ttbl.images.interface(**{
             # The ARM BSP refers to an arduino_cli_c
-            "kernel-arm": ttbl.images.arduino_cli_c(),
+            "kernel-arm": ttbl.images.arduino_cli_c(
+                # power cycle all components before flashing
+                power_cycle_pre = [ ],
+                # power off everyhing after flashing
+                power_off_post = [ ],
+                # disable the serial0 console so flasher can user that port
+                consoles_disable = [ 'serial0' ],
+            ),
             "kernel": "kernel-arm"
         })
     )

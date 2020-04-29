@@ -31,8 +31,65 @@ import ttbl
 class impl_c(ttbl.tt_interface_impl_c):
     """
     Driver interface for flashing with :class:`interface`
+
+
+    :param list(str) power_cycle_pre: (optional) before flashing,
+      power cycle the target. Argument is a list of power rail
+      component names.
+
+      - *None* (default) do not power cycle
+      - *[]*: power cycle all components
+      - *[ *COMP*, *COMP* .. ]*: list of power components to power
+        cycle
+
+      From this list, anything in :data:power_exclude will be
+      excluded.
+
+    :param list(str) power_off_post: (optional) after flashing, power
+      off the given list of components; same specification as for
+      :data:power_cycle_pre.
+
+    :param list(str) power_cycle_post: (optional) after flashing, power
+      cycle the given list of components; same specification as for
+      :data:power_cycle_pre.
+
+    :param list(str) power_exclude: (optional) list of power component
+      names to exclude from any of the pre or post power cycle
+      operations; this is useful when they are given as the default
+      power rail (*[]*), but some components need to be excluded.
+
+    :param list(str) console_disable: (optional) before flashing,
+      disable consoles and then re-enable them. Argument is a list of
+      console names that need disabling and then re-enabling.
     """
-    def __init__(self):
+    def __init__(self,
+                 power_cycle_pre = None,
+                 power_cycle_post = None,
+                 power_off_post = None,
+                 power_exclude = None,
+                 consoles_disable = None):
+        commonl.assert_none_or_list_of_strings(
+            power_cycle_pre, "power_cycle_pre", "power component name")
+
+        commonl.assert_none_or_list_of_strings(
+            power_cycle_post, "power_cycle_post", "power component name")
+
+        commonl.assert_none_or_list_of_strings(
+            power_off_post, "power_off_post", "power component name")
+
+        commonl.assert_none_or_list_of_strings(
+            power_exclude, "power_exclude", "power component name")
+
+        commonl.assert_none_or_list_of_strings(
+            consoles_disable, "consoles_disable", "console name")
+
+        self.power_cycle_pre = power_cycle_pre
+        self.power_off_post = power_off_post
+        self.power_cycle_post = power_cycle_post
+        self.power_exclude = power_exclude
+        if consoles_disable == None:
+            consoles_disable = []
+        self.consoles_disable = consoles_disable
         ttbl.tt_interface_impl_c.__init__(self)
 
     def flash(self, target, images):
@@ -108,6 +165,95 @@ class interface(ttbl.tt_interface):
     def _release_hook(self, target, _force):
         pass
 
+    @staticmethod
+    def _power_cycle_pre(impl, target):
+        # power cycle the power rail components needed to flash
+        #
+        # Only if the implementation says it needs it and it supports
+        # the power interface.
+        if impl.power_cycle_pre == None:
+            return
+        if not hasattr(target, "power"):
+            return
+        args = {}
+        if impl.power_cycle_pre:
+            args['components'] = impl.power_cycle_pre
+        if impl.power_exclude:
+            args['components_exclude'] = impl.power_exclude
+        target.power.put_cycle(target, ttbl.who_daemon(), args, None, None)
+
+    @staticmethod
+    def _power_cycle_post(impl, target):
+        # power cycle the power rail components after flashing
+        #
+        # Only if the implementation says it needs it and it supports
+        # the power interface.
+        if impl.power_cycle_post == None:
+            return
+        if not hasattr(target, "power"):
+            return
+        args = {}
+        if impl.power_cycle_post:
+            args['components'] = impl.power_cycle_post
+        if impl.power_exclude:
+            args['components_exclude'] = impl.power_exclude
+        target.power.put_cycle(target, ttbl.who_daemon(), args, None, None)
+
+    @staticmethod
+    def _power_off_post(impl, target):
+        # power cycle the power rail components after flashing
+        #
+        # Only if the implementation says it needs it and it supports
+        # the power interface.
+        if impl.power_off_post == None:
+            return
+        if not hasattr(target, "power"):
+            return
+        args = {}
+        if impl.power_off_post:
+            args['components'] = impl.power_off_post
+        if impl.power_exclude:
+            args['components_exclude'] = impl.power_exclude
+        target.power.put_off(target, ttbl.who_daemon(), args, None, None)
+
+
+    def _impl_flash(self, impl, target, img_type, subimages):
+        self._power_cycle_pre(impl, target)
+        try:
+            # in some flashers, the flashing occurs over a
+            # serial console we might be using, so we can
+            # disable it -- we'll renable on exit--or not.
+            # This has to be done after the power-cycle, as it might
+            # be enabling consoles
+            for console_name in impl.consoles_disable:
+                target.log.info(
+                    "flasher %s: disabling console %s to allow flasher to work"
+                    % (img_type, console_name))
+                target.console.put_disable(
+                    target, ttbl.who_daemon(),
+                    dict(component = console_name),
+                    None, None)
+            impl.flash(target, subimages)
+            # note in case of flashing failure we don't
+            # necessarily power on the components, since
+            # things might be a in a bad state--we let the
+            # user figure it out.
+        finally:
+            for console_name in impl.consoles_disable:
+                target.log.info(
+                    "flasher %s: enabling console %s after flashing"
+                    % (img_type, console_name))
+                target.console.put_enable(
+                    target, ttbl.who_daemon(),
+                    dict(component = console_name),
+                    None, None)
+        # note this might seem counterintuitive; the
+        # configuration might specify some components are
+        # switched off while others are power cycled, or none
+        self._power_off_post(impl, target)
+        self._power_cycle_post(impl, target)
+
+
     def put_flash(self, target, who, args, _files, user_path):
         images = json.loads(self._arg_get(args, "images"))
         with target.target_owned_and_locked(who):
@@ -125,7 +271,7 @@ class interface(ttbl.tt_interface):
             # iterate over the real implementations only
             for img_type, subimages in v.iteritems():
                 impl = self.impls[img_type]
-                impl.flash(target, subimages)
+                self._impl_flash(impl, target, img_type, subimages)
             return {}
 
     # FIXME: save the names of the last flashed in fsdb so we can
@@ -153,13 +299,11 @@ class arduino_cli_c(impl_c):
        representing the serial port this device is connected
        to. Defaults to */dev/tty-TARGETNAME*.
 
-    :param str console: (optional) name of the target's console tied
-       to the serial port; this is needed to disable it so this can
-       flash. Defaults to the default console.
-
     :param str sketch_fqbn: (optional) name of FQBN to be used to
       program the board (will be passed on the *--fqbn* arg to
       *arduino-cli upload*).
+
+    Other parameteres are described :class:impl_c.
 
     *Requirements*
 
@@ -217,14 +361,13 @@ class arduino_cli_c(impl_c):
           SYMLINK += "tty-arduino-mega-01"
 
     """
-    def __init__(self, serial_port = None, console = None, sketch_fqbn = None):
+    def __init__(self, serial_port = None, sketch_fqbn = None,
+                 **kwargs):
         assert serial_port == None or isinstance(serial_port, basestring)
-        assert console == None or isinstance(console, basestring)
         assert sketch_fqbn == None or isinstance(sketch_fqbn, basestring)
-        impl_c.__init__(self)
         self.serial_port = serial_port
-        self.console = console
         self.sketch_fqbn = sketch_fqbn
+        impl_c.__init__(self, **kwargs)
         self.upid_set("Arduino CLI Flasher", serial_port = serial_port)
 
     #: Path to *arduino-cli*
@@ -251,29 +394,6 @@ class arduino_cli_c(impl_c):
         else:
             serial_port = self.serial_port
 
-        if not hasattr(target, "console"):
-            raise RuntimeError(
-                "%s: configuration error, there is no console "
-                " interface in this target" % target.id)
-        if self.console == None:
-            console_name = target.console.get_default_name(target)
-        else:
-            console_name = self.console
-        if console_name == None:
-            raise RuntimeError(
-                "%s: configuration error, flasher is looking for"
-                " console '%s', which does not exist (target lists: %s)"
-                % (target.id, self.console,
-                   " ".join(target.console.impls.keys())))
-
-        target.power.put_cycle(target, ttbl.who_daemon(), {}, None, None)
-        # give up the serial port, we need it to flash
-        # we don't care it is off because then we are switching off
-        # the whole thing and then someone else will power it on
-        target.log.info("%s: disabling console %s to allow flasher to work"
-                        % (target.id, console_name))
-        target.console.put_disable(target, ttbl.who_daemon(),
-                                   dict(component = console_name), None, None)
         # remember this only handles one image type
         bsp = images.keys()[0].replace("kernel-", "")
         sketch_fqbn = self.sketch_fqbn
@@ -315,7 +435,6 @@ class arduino_cli_c(impl_c):
                              % (" ".join(cmdline),
                                 e.returncode, e.output))
             raise
-        target.power.put_off(target, ttbl.who_daemon(), {}, None, None)
         target.log.info("flashed image")
 
 
