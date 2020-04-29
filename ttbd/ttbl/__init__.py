@@ -1039,7 +1039,12 @@ class tt_interface(object):
             impls = [ ( component, impl ) ]
             _all = False
         if components_exclude:
-            impls = [ i for i in impls if i[0] not in components_exclude ]
+            # if we are excluding components, then we need to reset
+            # the list and also the _all flag
+            new_impls = [ i for i in impls if i[0] not in components_exclude ]
+            if len(new_impls) < len(impls):
+                _all = False
+                impls = new_impls
         return impls, _all
 
 
