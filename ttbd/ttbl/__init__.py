@@ -1018,13 +1018,18 @@ class tt_interface(object):
         (internal interface)
 
         :params dict args: dictionary of arguments keyed by argument
-          name
+          name:
+
+          - *components*: list of component names to consider, if none, all
+          - *components_exclude*: (optional) list of components to exclude
+
         :returns: a list of *(NAME, IMPL)* based on if we got an
           instance to run on (only execute that one) or on all the
           components
         """
         impl, component = self.arg_impl_get(args, 'component',
                                             allow_missing = True)
+        components_exclude = args.get('components_exclude', [])
         if impl == None:
             # no component was specified, so we operate over all the components
             # KEEP THE ORDER
@@ -1033,6 +1038,8 @@ class tt_interface(object):
         else:
             impls = [ ( component, impl ) ]
             _all = False
+        if components_exclude:
+            impls = [ i for i in impls if i[0] not in components_exclude ]
         return impls, _all
 
 
