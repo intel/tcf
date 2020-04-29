@@ -51,7 +51,8 @@ imaging on PC-class targets via DHCP / TFTP.
             'tcf-image-setup.sh',
         ]),
         ( '@prefix@/share/tcf/content', [
-            'evemu.bin.tar.gz'
+            'evemu.bin.armv7l.tar.gz',
+            'evemu.bin.x86_64.tar.gz',
         ]),
     ],
 )

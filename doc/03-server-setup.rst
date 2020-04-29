@@ -862,6 +862,7 @@ been tested yet, shall be similar.
 
        # tee /etc/httpd/conf.d/ttbd.conf <<EOF
        Alias "/ttbd-pos" "/home/ttbd/public_html"
+       Alias "/ttbd-images-misc" "/home/ttbd/images/misc"
 
        <Directory "/home/ttbd/public_html">
        AllowOverride FileInfo AuthConfig Limit Indexes
@@ -1062,8 +1063,7 @@ e. Perform final image setup:
 f. Deploy content to the server that test content can / will use::
 
      $ mkdir -p /home/ttbd/images/tcf-live/misc
-
-     $ cp /usr/share/tcf/content/evemu.bin.tar.gz /home/ttbd/images/tcf-live/misc
+     $ cp /usr/share/tcf/content/evemu.bin.*.tar.gz /home/ttbd/images/tcf-live/misc
      
 .. _ttbd_pos_deploying_images:
 
