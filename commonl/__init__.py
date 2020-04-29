@@ -1722,3 +1722,18 @@ def file_iterator(filename, chunk_size = 4096):
                 break
             yield data
 
+def assert_list_of_strings(l, list_name, item_name):
+    assert isinstance(l, list), \
+        "'%s' needs to be None or a list of strings (%s); got %s" % (
+            list_name, item_name, type(l))
+    count = -1
+    for i in l:
+        count += 1
+        assert isinstance(i, basestring), \
+            "items in '%s' needs to be strings (%s); got %s on #%d"  % (
+                list_name, item_name, type(i), count)
+
+def assert_none_or_list_of_strings(l, list_name, item_name):
+    if l == None:
+        return
+    assert_list_of_strings(l, list_name, item_name)
