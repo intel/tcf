@@ -255,7 +255,10 @@ class arduino_cli_c(impl_c):
             raise RuntimeError(
                 "%s: configuration error, there is no console "
                 " interface in this target" % target.id)
-        console_name = target.console.get_default_name(target)
+        if self.console == None:
+            console_name = target.console.get_default_name(target)
+        else:
+            console_name = self.console
         if console_name == None:
             raise RuntimeError(
                 "%s: configuration error, flasher is looking for"
