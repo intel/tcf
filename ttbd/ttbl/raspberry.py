@@ -13,7 +13,7 @@ Some parts of the system use PXE and this contains the
 implementations.
 
 
-.. _pos_rpi_bootloader_setup::
+.. _pos_rpi_bootloader_setup:
 
 Setup:
 

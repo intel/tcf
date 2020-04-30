@@ -1548,14 +1548,15 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
        import io
        import commonl
        import threading
-   
+
        tls = threading.local()
-   
+
        f = io.open("/dev/stdout", "w")
        with commonl.tls_prefix_c(tls, "PREFIX"), \
             commonl.io_tls_prefix_lines_c(tls, f.detach()) as of:
-   
+
            of.write(u"line1\nline2\nline3\n")
+
 
     Limitations:
 

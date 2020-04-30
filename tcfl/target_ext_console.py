@@ -18,7 +18,7 @@ Text expectations
 consoles and look for text on them.
 
 
-.. _console_expectation_detect_context::
+.. _console_expectation_detect_context:
 
 Console Expectation: Detect context
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -804,10 +804,14 @@ class extension(tc.target_extension_c):
           amount of data to read
 
         :returns: tuple consisting of:
+
           - stream generation
+
           - stream size after reading
+
           - data read (or if written to a file descriptor,
             amount of bytes read)
+
         """
         return self._read(console = console, offset = offset,
                           max_size = max_size, fd = fd)

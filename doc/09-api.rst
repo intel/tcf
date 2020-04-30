@@ -376,7 +376,7 @@ Provisioning OS specific metadata
     $ tcf property-set TARGET pos_reinitialize True
     $ tcf run -t TARGETs <something that deploys>
 
-.. __roles_required:
+.. _roles_required:
 
 - *_roles_required*: list of strings describing roles.
 
@@ -384,7 +384,7 @@ Provisioning OS specific metadata
   been granted one of the roles in the list by the authentication
   module. See :ref:`access control <target_access_control>`.
 
-.. __roles_excluded:
+.. _roles_excluded:
 
 - *_roles_excluded*: list of strings describing roles.
 
@@ -417,7 +417,7 @@ Provisioning OS specific metadata
 
 .. include:: 09-api-http.rst
 
-.. _ttbd_conf_api::
+.. _ttbd_conf_api:
              
 *ttbd* Configuration API for targets
 ====================================
@@ -480,7 +480,7 @@ represented by a string, which minimally are defined as:
 
 any other roles are deployment specific and can be used to control
 access to targets, since the targets can define tags
-:ref:`_roles_required` and :ref:`_roles_excluded` to require users
+:ref:`roles_required` and :ref:`roles_excluded` to require users
 have a role or to exclude users with a certain role. For example, a
 target defined such as:
 

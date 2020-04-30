@@ -67,7 +67,7 @@ class impl_c(ttbl.tt_interface_impl_c):
       >>>       ## Last login: Thu Jan  1 00:04:20 1970 from 10.24.11.35^M$
       >>>       ## Current time: Thu Jan  1 00:02:03 1970^M$
       >>>       ## For a list of commands, type 'help'^M$
-
+      >>>
       >>>       # command prompt, 'CR[USERNAME@IP]> '... or not, so just
       >>>       # look for 'SOMETHING> '
       >>>       # ^ will not match because we are getting a Carriage

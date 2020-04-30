@@ -177,7 +177,7 @@ class fsdb_c(object):
 
     def get_as_slist(self, *patterns):
         """
-        Return a sorted list of tuples *(KEY, VALUE)*s available in the
+        Return a sorted list of tuples *(KEY, VALUE)*\s available in the
         database.
 
         :param list(str) patterns: (optional) list of patterns of fields
@@ -192,7 +192,7 @@ class fsdb_c(object):
 
     def get_as_dict(self, *patterns):
         """
-        Return a dictionary of *KEY/VALUE*s available in the
+        Return a dictionary of *KEY/VALUE*\s available in the
         database.
 
         :param str pattern: (optional) pattern against the key names
@@ -407,7 +407,7 @@ class process_posix_file_lock_c(object):
     """
     Very simple interprocess file-based spinning lock
 
-    .. warnings::
+    .. warning::
 
        - Won't work between threads of a process
 
@@ -768,7 +768,7 @@ class tt_interface(object):
 
        - *stream_file*: (string) the named file will be streamed to the client
        - *stream_offset*: (positive integer) the file *steam_file*
-         *will be streamed starting at the given offset.
+         will be streamed starting at the given offset.
        - *stream-generation*: (positive monotonically increasing
          integer) a number that describes the current iteration of
          this file that might be reset [and thus bringing its apparent
@@ -1166,7 +1166,7 @@ class tt_interface(object):
           to the call, some might be JSON encoded.
         :param dict files: dictionary of key/value with the files
           uploaded via forms
-        (https://flask.palletsprojects.com/en/1.1.x/api/#flask.Request.form)
+          (https://flask.palletsprojects.com/en/1.1.x/api/#flask.Request.form)
         :param str user_path: Path to where user files are located
 
         :returns: dictionary of results, call specific

@@ -310,7 +310,7 @@ class arduino_cli_c(impl_c):
     - Needs a connection to the USB programming port, represented as a
       serial port (TTY)
 
-    .. _arduino_cli_setup::
+    .. _arduino_cli_setup:
 
     - *arduino-cli* has to be available in the path variable :data:`path`.
 

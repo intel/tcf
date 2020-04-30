@@ -288,7 +288,7 @@ class extension(tc.target_extension_c):
           a client accessing
           *http://SERVERIP/ttbd-images-misc/evemu.bin.tar.gz* will be
           able to get this content. The server install instructions
-        provide for this to be the case.
+          provide for this to be the case.
         """
         assert isinstance(ic, tc.target_c)
         target = self.target
