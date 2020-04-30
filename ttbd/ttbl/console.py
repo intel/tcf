@@ -438,7 +438,7 @@ class interface(ttbl.tt_interface):
           default console's name
 
         :returns str: the name of the default console
-        :raises RuntimeError: if there are no consoles
+        :raises: *RuntimeError* if there are no consoles
         """
         console_default = target.property_get("interfaces.console.default", None)
         try:

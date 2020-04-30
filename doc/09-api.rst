@@ -353,10 +353,12 @@ Provisioning OS specific metadata
 - *pos_image*: string describing the image used to boot the target in
   POS mode; defaults to *tcf-live*.
 
-  For each image, in the server, :data:`ttbl.dhcp.pos_cmdline_opts`
+  For each image, in the server, :data:`ttbl.pxe.pos_cmdline_opts`
   describes the kernel options to append to the kernel image, which is
   expected to be found in *http://:data:`POS_HTTP_URL_PREFIX
-  <pos_http_url_prefix>`/vmlinuz-POS_IMAGE*
+  <pos_http_url_prefix>`/vmlinuz-POS_IMAGE* for HTTP boot. For other
+  boot methods (eg: TFTP) the driver shall copy the files around as
+  needed.
 
 .. _pos_partscan_timeout:
 
@@ -365,7 +367,7 @@ Provisioning OS specific metadata
   before we consider it is really empty (some HW takes a long time).
 
   This is used in :func:`tcfl.pos.fsinfo_read
-  <tcfl.target_ext_pos.extension.fsinfo_read>`.
+  <tcfl.pos.extension.fsinfo_read>`.
   
 .. _pos_reinitialize:
 
@@ -452,7 +454,6 @@ Provisioning OS specific metadata
 ================
 
 .. automodule:: ttbl
-.. automodule:: ttbl.fsdb
 
 .. _target_control:
 
@@ -463,7 +464,7 @@ TTBD provides for means for users to authenticate themselves to the
 system and to decide which users can see and use what targets.
 
 TTBD, however, does not implement the authentication; that is
-delegated to :ref:`*authentication drivers* <ttbl.authenticator_c>`
+delegated to :class:`*authentication drivers* <ttbl.authenticator_c>`
 which can authenticate a user agains LDAP, a local database, any
 remote service, etc.
 
@@ -480,9 +481,9 @@ represented by a string, which minimally are defined as:
 
 any other roles are deployment specific and can be used to control
 access to targets, since the targets can define tags
-:ref:`roles_required` and :ref:`roles_excluded` to require users
-have a role or to exclude users with a certain role. For example, a
-target defined such as:
+:ref:`roles_required <roles_required>` and :ref:`roles_excluded
+<roles_excluded>` to require users have a role or to exclude users
+with a certain role. For example, a target defined such as:
 
 >>> ttbl.config.target_add(
 >>>     ttbl.test_target(TARGETNAME),

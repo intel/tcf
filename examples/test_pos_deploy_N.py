@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
-""".. _example_pos_deploy_2:
+""".. _example_pos_deploy_N:
 
 Deploy an OS image to many targets targets simultaneously
 =========================================================
