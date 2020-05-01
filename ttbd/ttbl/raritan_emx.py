@@ -74,8 +74,8 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
 
          $ wget http://cdn.raritan.com/download/EMX/version-3.5.0/EMX_JSON_RPC_SDK_3.5.0_45371.zip
          $ unzip -x EMX_JSON_RPC_SDK_3.5.0_45371.zip
-         $ install -m 0755 -o root -g root -d /usr/local/lib/python2.7/site-packages/raritan
-         $ cp -a emx-json-rpc-sdk-030500-45371/emx-python-api/raritan/* /usr/local/lib/python2.7/site-packages/raritan
+         $ sudo install -m 0755 -o root -g root -d /usr/local/lib/python2.7/site-packages/raritan
+         $ sudo cp -a emx-json-rpc-sdk-030500-45371/emx-python-api/raritan/* /usr/local/lib/python2.7/site-packages/raritan
 
     2. As the Raritan SDK had to be installed manually away from PIP
        or distro package management, ensurePython to looks into
