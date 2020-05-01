@@ -10,6 +10,8 @@
 
 import urlparse
 
+import commonl
+
 import ttbl
 import ttbl.power
 import raritan
@@ -43,6 +45,11 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
 
     :param bool https_verify: (optional, default *True*) do or
       do not HTTPS certificate verification.
+
+    :param str password: (optional) password to use for
+      authentication; will be processed with
+      :func:`commonl.password_get`; if not specified, it is extracted
+      from the URL if present there.
 
     The RPC implementation is documented in
     https://help.raritan.com/json-rpc/emx/v3.4.0; while this driver
@@ -106,12 +113,18 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
       controlled).
 
     """
-    def __init__(self, url, outlet_number, https_verify = True):
+    def __init__(self, url, outlet_number, https_verify = True, password = None):
         assert isinstance(url, basestring)
         assert isinstance(outlet_number, int) and outlet_number > 0
+        assert password == None or isinstance(password, basestring)
 
         ttbl.power.impl_c.__init__(self)
         self.url = urlparse.urlparse(url)
+        if password:
+            self.password = commonl.password_get(
+                self.url.netloc, self.url.username, password)
+        else:
+            self.password = None
         # note the indexes for the SW are 0-based, while in the labels
         # in the HW for humans, they are 1 based.
         self.outlet_number = outlet_number - 1
@@ -129,9 +142,13 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
         # and the initialization done in __init__ might have staled
         # when the processes forked.
         if not self._outlet_rpc:
+            if self.password:
+                password = self.password
+            else:
+                password = self.url.password
             agent = raritan.rpc.Agent(
                 self.url.scheme, self.url.hostname,
-                self.url.username, self.url.password,
+                self.url.username, password,
                 disable_certificate_verification = not self.https_verify)
             pdu = raritan.rpc.pdumodel.Pdu("/model/pdu/0", agent)
             outlets = pdu.getOutlets()
