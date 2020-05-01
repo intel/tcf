@@ -56,7 +56,7 @@ class extension(tc.target_extension_c):
         return r['result']
 
 
-    def flash(self, images, upload = True):
+    def flash(self, images, upload = True, timeout = 80):
         """Flash images onto target
 
         >>> target.images.flash({
@@ -80,6 +80,13 @@ class extension(tc.target_extension_c):
           The types if images supported are determined by the target's
           configuration and can be reported with :meth:`list` (or
           command line *tcf images-ls TARGETNAME*).
+
+        :param int timeout: (optional) seconds to wait for the
+          operation to complete; defaults to 80s.
+
+          This is very tool and file specific, a bigger file with a
+          slow tool is going to take way longer than a bigfer file on
+          a slow one.
 
         :param bool upload: (optional) the image names are local files
           that need to be uploaded first to the server (this function
@@ -127,7 +134,8 @@ class extension(tc.target_extension_c):
 
         # We don't do retries here, we leave it to the server
         target.report_info("flashing: " + images_str, dlevel = 2)
-        target.ttbd_iface_call("images", "flash", images = _images)
+        target.ttbd_iface_call("images", "flash", images = _images,
+                               timeout = timeout)
         target.report_info("flashed: " + images_str, dlevel = 1)
 
 
@@ -151,7 +159,7 @@ def _cmdline_images_flash(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "images")
         target.images.flash(_image_list_to_dict(args.images),
-                            upload = args.upload)
+                            upload = args.upload, timeout = args.timeout)
 
 
 def _cmdline_setup(arg_subparser):
@@ -177,4 +185,7 @@ def _cmdline_setup(arg_subparser):
     ap.add_argument("-u", "--upload",
                     action = "store_true", default = False,
                     help = "upload FILENAME first and then flash")
+    ap.add_argument("-t", "--timeout",
+                    action = "store", default = 80, type = int,
+                    help = "timeout in seconds [%(default)ss]")
     ap.set_defaults(func = _cmdline_images_flash)
