@@ -1738,3 +1738,54 @@ def assert_none_or_list_of_strings(l, list_name, item_name):
     if l == None:
         return
     assert_list_of_strings(l, list_name, item_name)
+
+def assert_dict_of_strings(d, d_name):
+    for k, v in d.items():
+        assert isinstance(k, basestring), \
+            "'%s' needs to be a dict of strings keyed by string;" \
+            " got a key type '%s'; expected string" % (d_name, type(k))
+        assert isinstance(v, basestring), \
+            "'%s' needs to be a dict of strings keyed by string;" \
+            " for key '%s' got a value type '%s'" % (d_name, k, type(v))
+
+def assert_none_or_dict_of_strings(d, d_name):
+    if d == None:
+        return
+    assert_dict_of_strings(d, d_name)
+
+#: List of known compressed extensions and ways to decompress them
+#: without removing the input file
+#:
+#: To add more:
+#:
+#: >>> commonl.decompress_handlers[".gz"] = "gz -fkd"
+decompress_handlers = {
+    # keep compressed files
+    ".gz": "gz -fkd",
+    ".bz2": "bzip2 -fkd",
+    ".xz": "xz -fkd",
+}
+
+def maybe_decompress(filename):
+    """
+    Decompress a file if it has a compressed file extension and return
+    the name
+
+    :param str filename: a filename to maybe decompress
+
+    :returns str: the name of the file; if it was compressed. If it
+      is *file.ext*, where *ext* is a compressed file extension, then
+      it decompresses the file to *file* and returns *file*, without
+      removing the original *file.ext*.
+
+    The compressed extensions are registered in
+    :data:`decompress_handlers`.
+    """
+    assert isinstance(filename, basestring)
+    basename, ext = os.path.splitext(filename)
+    if ext not in decompress_handlers:	# compressed logfile support
+        return filename
+    command = decompress_handlers[ext]
+    subprocess.check_call(command.split() + [ filename ],
+                          stdin = subprocess.PIPE)
+    return basename
