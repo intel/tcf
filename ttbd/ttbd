@@ -816,6 +816,8 @@ def _target_interface(target_id, interface, call):
         assert isinstance(iface, ttbl.tt_interface)
         username = flask_login.current_user.get_id()
         user_path = os.path.join(app.config['files_path'], username)
+        # make sure the directory exists
+        commonl.makedirs_p(user_path)
         with log_to_str_too(target.log, iostr_wrapper):
             method_name = flask.request.method.lower() + "_" + call
             method = getattr(iface, method_name, None)
