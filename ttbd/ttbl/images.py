@@ -45,12 +45,16 @@ class impl_c(ttbl.tt_interface_impl_c):
       From this list, anything in :data:power_exclude will be
       excluded.
 
-    :param list(str) power_off_post: (optional) after flashing, power
+    :param list(str) power_off_pre: (optional) before flashing, power
       off the given list of components; same specification as for
       :data:power_cycle_pre.
 
     :param list(str) power_cycle_post: (optional) after flashing, power
       cycle the given list of components; same specification as for
+      :data:power_cycle_pre.
+
+    :param list(str) power_off_post: (optional) after flashing, power
+      off the given list of components; same specification as for
       :data:power_cycle_pre.
 
     :param list(str) power_exclude: (optional) list of power component
@@ -64,12 +68,16 @@ class impl_c(ttbl.tt_interface_impl_c):
     """
     def __init__(self,
                  power_cycle_pre = None,
+                 power_off_pre = None,
                  power_cycle_post = None,
                  power_off_post = None,
                  power_exclude = None,
                  consoles_disable = None):
         commonl.assert_none_or_list_of_strings(
             power_cycle_pre, "power_cycle_pre", "power component name")
+
+        commonl.assert_none_or_list_of_strings(
+            power_off_pre, "power_off_pre", "power component name")
 
         commonl.assert_none_or_list_of_strings(
             power_cycle_post, "power_cycle_post", "power component name")
@@ -84,8 +92,9 @@ class impl_c(ttbl.tt_interface_impl_c):
             consoles_disable, "consoles_disable", "console name")
 
         self.power_cycle_pre = power_cycle_pre
-        self.power_off_post = power_off_post
+        self.power_off_pre = power_off_pre
         self.power_cycle_post = power_cycle_post
+        self.power_off_post = power_off_post
         self.power_exclude = power_exclude
         if consoles_disable == None:
             consoles_disable = []
@@ -166,59 +175,43 @@ class interface(ttbl.tt_interface):
         pass
 
     @staticmethod
-    def _power_cycle_pre(impl, target):
+    def _power_cycle(target, components, exclude):
         # power cycle the power rail components needed to flash
         #
         # Only if the implementation says it needs it and it supports
         # the power interface.
-        if impl.power_cycle_pre == None:
+        if components == None:
             return
         if not hasattr(target, "power"):
             return
         args = {}
-        if impl.power_cycle_pre:
-            args['components'] = impl.power_cycle_pre
-        if impl.power_exclude:
-            args['components_exclude'] = impl.power_exclude
+        if components:
+            args['components'] = components
+        if exclude:
+            args['components_exclude'] = exclude
         target.power.put_cycle(target, ttbl.who_daemon(), args, None, None)
 
     @staticmethod
-    def _power_cycle_post(impl, target):
-        # power cycle the power rail components after flashing
+    def _power_off(target, components, exclude):
+        # power off the power rail components needed to flash
         #
         # Only if the implementation says it needs it and it supports
         # the power interface.
-        if impl.power_cycle_post == None:
+        if components == None:
             return
         if not hasattr(target, "power"):
             return
         args = {}
-        if impl.power_cycle_post:
-            args['components'] = impl.power_cycle_post
-        if impl.power_exclude:
-            args['components_exclude'] = impl.power_exclude
-        target.power.put_cycle(target, ttbl.who_daemon(), args, None, None)
-
-    @staticmethod
-    def _power_off_post(impl, target):
-        # power cycle the power rail components after flashing
-        #
-        # Only if the implementation says it needs it and it supports
-        # the power interface.
-        if impl.power_off_post == None:
-            return
-        if not hasattr(target, "power"):
-            return
-        args = {}
-        if impl.power_off_post:
-            args['components'] = impl.power_off_post
-        if impl.power_exclude:
-            args['components_exclude'] = impl.power_exclude
+        if components:
+            args['components'] = components
+        if exclude:
+            args['components_exclude'] = exclude
         target.power.put_off(target, ttbl.who_daemon(), args, None, None)
 
 
     def _impl_flash(self, impl, target, img_type, subimages):
-        self._power_cycle_pre(impl, target)
+        self._power_cycle(target, impl.power_cycle_pre, impl.power_exclude)
+        self._power_off(target, impl.power_off_pre, impl.power_exclude)
         try:
             # in some flashers, the flashing occurs over a
             # serial console we might be using, so we can
@@ -250,8 +243,8 @@ class interface(ttbl.tt_interface):
         # note this might seem counterintuitive; the
         # configuration might specify some components are
         # switched off while others are power cycled, or none
-        self._power_off_post(impl, target)
-        self._power_cycle_post(impl, target)
+        self._power_off(target, impl.power_off_post, impl.power_exclude)
+        self._power_cycle(target, impl.power_cycle_post, impl.power_exclude)
 
 
     def put_flash(self, target, who, args, _files, user_path):
@@ -266,7 +259,8 @@ class interface(ttbl.tt_interface):
                 # the components and aliases
                 _, img_type_real = self.impl_get_by_name(img_type,
                                                          "image type")
-                v[img_type_real][img_type] = os.path.join(user_path, img_name)
+                v[img_type_real][img_type] = commonl.maybe_decompress(
+                    os.path.join(user_path, img_name))
             target.timestamp()
             # iterate over the real implementations only
             for img_type, subimages in v.iteritems():
@@ -905,3 +899,115 @@ class esptool_c(impl_c):
             raise
         target.power.put_off(target, ttbl.who_daemon(), {}, None, None)
         target.log.info("%s: flashing succeeded" % image_type)
+
+
+class sf100linux_c(impl_c):
+    """Flash Dediprog SF100 and SF600 with *dpcmd* from
+    https://github.com/DediProgSW/SF100Linux
+
+    :param str dediprog_id: ID of the dediprog to use (when multiple
+      are available); this can be found by running *dpdmd --detect* with
+      super user privileges (ensure they are connected)::
+
+        # dpcmd
+        DpCmd Linux 1.11.2.01 Engine Version:
+        Last Built on May 25 2018
+
+        Device 1 (SF611445):    detecting chip
+        By reading the chip ID, the chip applies to [ MX66L51235F ]
+        MX66L51235F chip size is 67108864 bytes.
+
+      in here, *Device 1* has ID  *SF611445*. It is recommended to do
+      this step only on an isolated machine to avoid confusions with
+      other devices connected.
+
+    :param dict args: dictionary of extra command line options to
+      *dpcmd*; these are expanded with the target keywords with
+      *%(FIELD)s* templates, with fields being the target's
+      :ref:`metadata <finding_testcase_metadata>`:
+
+      .. code-block:: python
+
+         args = {
+             # extra command line arguments for dpcmd
+             'dediprog:id': 435,
+         }
+
+    Other parameters documented in :meth:`ttbl.images.impl_c`
+
+    **System setup**
+
+    *dpcmd* is not packaged by most distributions, needs to be
+    manuallly built and installed.
+
+    1. build and install *dpcmd*::
+
+         $ git clone https://github.com/DediProgSW/SF100Linux sf100linux.git
+         $ make -C sf100linux.git
+         $ sudo install -o root -g root \
+             sf100linux.git/dpcmd sf100linux.git/ChipInfoDb.dedicfg \
+             /usr/local/bin
+
+       Note *dpcmd* needs to always be invoked with the full path
+       (*/usr/local/bin/dpmcd*) so it will pick up the location of its
+       database; otherwise it will fail to list, detect or operate.
+
+    2. (optionally, if installed in another location) configure the
+       path of *dpcmd* by setting :data:`path`.
+    """
+    def __init__(self, dediprog_id, args = None, name = None, **kwargs):
+        assert isinstance(dediprog_id, basestring)
+        commonl.assert_none_or_dict_of_strings(args, "args")
+
+        if args:
+            self.args = args
+        else:
+            self.args = {}
+        self.dediprog_id = dediprog_id
+        impl_c.__init__(self, **kwargs)
+        if name == None:
+            name = "Dediprog SF[16]00 " + dediprog_id
+        self.upid_set(name, dediprog_id = dediprog_id)
+
+    #: Path to *dpcmd*
+    #:
+    #: We need to use an ABSOLUTE PATH, as *dpcmd* relies on it to
+    #: find its database.
+    #:
+    #: Change by setting, in a :ref:`server configuration file
+    #: <ttbd_configuration>`:
+    #:
+    #: >>> ttbl.images.sf100linux_c.path = "/usr/local/bin/dpcmd"
+    #:
+    #: or for a single instance that then will be added to config:
+    #:
+    #: >>> imager = ttbl.images.sf100linux_c.path(...)
+    #: >>> imager.path =  "/opt/bin/dpcmd"
+    path = "/usr/local/bin/dpcmd"
+
+    def flash(self, target, images):
+        assert len(images) == 1, \
+            "only one image suported, got %d: %s" \
+            % (len(images), " ".join("%s:%s" % (k, v)
+                                     for k, v in images.iteritems()))
+        image_name = images.values()[0]
+        cmdline = [
+            self.path,
+            "--device", self.dediprog_id,
+            "--silent",
+            "--log", image_name + ".log",
+            "--batch", image_name,
+        ]
+        for key, value in self.args.iteritems():
+            cmdline += [ key, value % target.kws ]
+        target.log.info("flashing image with: %s" % " ".join(cmdline))
+        try:
+            subprocess.check_output(cmdline, stdin = None, cwd = "/tmp",
+                                    stderr = subprocess.STDOUT)
+            target.log.info("ran %s" % (" ".join(cmdline)))
+        except subprocess.CalledProcessError as e:
+            target.log.error("flashing with %s failed: (%d) %s"
+                             % (" ".join(cmdline),
+                                e.returncode, e.output))
+            raise
+        target.log.info("flashed image")
