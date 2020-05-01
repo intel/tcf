@@ -611,6 +611,46 @@ class fake_c(impl_c):
         return state
 
 
+class inverter_c(impl_c):
+    """
+    A power controller that wraps another power controller and does
+    the opposite.
+
+    When turned on, the wrapped controlled is turned off
+
+    When turned off, the wrapped controlled is turned on
+
+    When querying power, it returns *off* if the wrapped controller is
+      *on*, *on* if *off*.
+
+    :param ttbl.power.impl_c pc: power controller to wrap
+
+    """
+    def __init__(self, pc):
+        assert isinstance(pc, impl_c)
+        impl_c.__init__(self)
+        self.pc = pc
+        # These have to be the same set of default properties in
+        # ttbl.power.impl_c
+        self.power_on_recovery = pc.power_on_recovery
+        self.paranoid = pc.paranoid
+        self.timeout = pc.timeout
+        self.wait = pc.wait
+        self.paranoid_get_samples = pc.paranoid_get_samples
+
+    def on(self, target, component):
+        self.pc.off(target, component)
+
+    def off(self, target, component):
+        self.pc.on(target, component)
+
+    def get(self, target, component):
+        state = self.pc.get(target, component)
+        if state == None:
+            return state
+        return not state
+
+
 class daemon_c(impl_c):
     """
     Generic power controller to start daemons in the server machine
