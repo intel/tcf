@@ -1696,7 +1696,8 @@ class target_c(reporter_c):
 
     def expect(self, regex_or_str, timeout = None, console = None,
                name = None, raise_on_timeout = failed_e,
-               origin = None, detect_context = ""):
+               previous_max = 4096,
+               origin = None, detect_context = "", report = None):
         """
         Wait for a particular regex/string to be received on a given
         console of this target before a given timeout.
@@ -1747,8 +1748,9 @@ class target_c(reporter_c):
                 regex_or_str,
                 console = console, timeout = timeout, name = name,
                 raise_on_timeout = raise_on_timeout,
-                detect_context = detect_context),
-            origin = origin,
+                previous_max = previous_max,
+                detect_context = detect_context, report = report),
+            origin = origin, timeout = timeout,
         )
 
     def stub_app_add(self, bsp, _app, app_src, app_src_options = ""):
