@@ -412,6 +412,7 @@ class expect_text_on_console_c(tc.expectation_c):
                 match_data["origin"] = self.origin
                 match_data["console"] = self.console
                 match_data["pattern"] = self.regex.pattern
+                match_data["groupdict"] = match.groupdict()
                 match_data["offset"] = search_offset
                 match_data["offset_match_start"] = \
                     search_offset + match.start()
