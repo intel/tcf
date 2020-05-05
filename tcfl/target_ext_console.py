@@ -1084,12 +1084,6 @@ def _console_read_thread_fn(target, console, fd, offset):
     # read in the background the target's console output and print it
     # to stdout
     with msgid_c("cmdline"):
-        if offset == -1:
-            offset = target.console.size(console)
-            if offset == None:	# disabled console? fine
-                offset = 0
-        else:
-            offset = 0
         generation = 0
         generation_prev = None
         backoff_wait = 0.1
@@ -1152,12 +1146,17 @@ WARNING: This is a very limited interactive console
     class _done_c(Exception):
         pass
 
+    if sys.stdin.isatty():
+        flags_set = True
+        old_flags = termios.tcgetattr(sys.stdin.fileno())
+    else:
+        flags_set = False
     try:
         one_escape = False
-        old_flags = termios.tcgetattr(sys.stdin.fileno())
-        tty.setraw(sys.stdin.fileno())
-        flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFD)
-        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        if flags_set:
+            tty.setraw(sys.stdin.fileno())
+            flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFD)
+            fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
         while True and console_read_thread.is_alive():
             try:
                 chars = sys.stdin.read()
@@ -1186,15 +1185,28 @@ WARNING: This is a very limited interactive console
                 # If no data ready, wait a wee, try again
                 time.sleep(0.25)
     finally:
-        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_flags)
+        if flags_set:
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_flags)
+
+def _offset_calc(target, console, offset):
+    if offset >= 0:
+        return offset
+    # negative offset, calculate from current size
+    size = target.console.size(console)
+    if size == None:
+        return 0	# disabled console
+    # offset larger than current size?
+    offset = max(0, size + offset + 1)
+    return offset
 
 
 def _cmdline_console_write(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args)
+        offset = _offset_calc(target, args.console, int(args.offset))
         if args.interactive:
             _cmdline_console_write_interactive(target, args.console,
-                                               args.crlf, args.offset)
+                                               args.crlf, offset)
         elif args.data == []:	# no data given, so get from stdin
             while True:
                 line = getpass.getpass("")
@@ -1211,7 +1223,7 @@ def _cmdline_console_read(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args)
         console = args.console
-        offset = int(args.offset)
+        offset = _offset_calc(target, args.console, int(args.offset))
         max_size = int(args.max_size)
         if args.output == None:
             fd = sys.stdout
@@ -1509,8 +1521,8 @@ def _cmdline_setup(arg_subparser):
                     "read from stdin")
     ap.add_argument("-s", "--offset", action = "store",
                     dest = "offset", type = int, default = 0,
-                    help = "(for interfactive) read the console "
-                    "output starting from (-1 for last)")
+                    help = "read the console from the given offset"
+                    " (negative to start from the end, -1 for last)")
     ap.set_defaults(func = _cmdline_console_write, crlf = "\n")
 
 
