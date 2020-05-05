@@ -921,6 +921,11 @@ class sf100linux_c(impl_c):
       this step only on an isolated machine to avoid confusions with
       other devices connected.
 
+    :param int timeout: (optional) seconds to give the flashing
+      process to run; if exceeded, it will raise an exception. This
+      usually depends on the size of the binary being flashed and the
+      speed of the interface.
+
     :param dict args: dictionary of extra command line options to
       *dpcmd*; these are expanded with the target keywords with
       *%(FIELD)s* templates, with fields being the target's
@@ -955,8 +960,10 @@ class sf100linux_c(impl_c):
     2. (optionally, if installed in another location) configure the
        path of *dpcmd* by setting :data:`path`.
     """
-    def __init__(self, dediprog_id, args = None, name = None, **kwargs):
+    def __init__(self, dediprog_id, args = None, name = None, timeout = 60,
+                 **kwargs):
         assert isinstance(dediprog_id, basestring)
+        assert isinstance(timeout, int)
         commonl.assert_none_or_dict_of_strings(args, "args")
 
         if args:
@@ -964,6 +971,7 @@ class sf100linux_c(impl_c):
         else:
             self.args = {}
         self.dediprog_id = dediprog_id
+        self.timeout = timeout
         impl_c.__init__(self, **kwargs)
         if name == None:
             name = "Dediprog SF[16]00 " + dediprog_id
@@ -1001,9 +1009,22 @@ class sf100linux_c(impl_c):
         for key, value in self.args.iteritems():
             cmdline += [ key, value % target.kws ]
         target.log.info("flashing image with: %s" % " ".join(cmdline))
+        ts0 = time.time()
+        ts = ts0
         try:
-            subprocess.check_output(cmdline, stdin = None, cwd = "/tmp",
-                                    stderr = subprocess.STDOUT)
+            p = subprocess.Popen(cmdline, stdin = None, cwd = "/tmp",
+                                 stderr = subprocess.STDOUT)
+            while ts - ts0 < self.timeout:
+                returncode = p.poll()
+                if returncode != None:
+                    break		# process completed
+                target.timestamp()	# timestamp so we don't idle...
+                time.sleep(5)		# ...snooze
+            else:
+                msg = "flashing with %s failed: timedout after %ds" \
+                    % (" ".join(cmdline), self.timeout)
+                p.kill()
+                raise RuntimeError(msg)
             target.log.info("ran %s" % (" ".join(cmdline)))
         except subprocess.CalledProcessError as e:
             target.log.error("flashing with %s failed: (%d) %s"
