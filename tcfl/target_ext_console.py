@@ -120,7 +120,7 @@ class expect_text_on_console_c(tc.expectation_c):
                  raise_on_found = None,
                  name = None,
                  target = None,
-                 detect_context = ""):
+                 detect_context = "", report = None):
         assert isinstance(target, tc.target_c)	# mandatory
         assert isinstance(text_or_regex, (basestring, re._pattern_type))
         assert console == None or isinstance(console, basestring)
@@ -150,6 +150,7 @@ class expect_text_on_console_c(tc.expectation_c):
         self._console = console
         self.previous_max = previous_max
         self.detect_context = detect_context
+        self.report = report
 
     @property
     def console(self):
@@ -376,14 +377,29 @@ class expect_text_on_console_c(tc.expectation_c):
                     _name = ""
                 else:
                     _name = "/" + self.name
-                match_data = {
-                    # this allows an exception raised when found to
-                    # include this iterator as an attachment that can
-                    # be reported
-                    "console output": target.console.generator_factory(
-                        self.console,
-                        search_offset, search_offset + match.end()),
-                }
+                if self.report == 0:
+                    console_output = None
+                elif isinstance(self.report, int):
+                    _search_offset = search_offset + match.end() - self.report
+                    search_offset = max(search_offset, _search_offset)
+                    console_output = "console output (partial)"
+                elif self.report == None:
+                    console_output = "console output"
+                else:
+                    raise AssertionError(
+                        "self.report: invalid type '%s' or value (%s)"
+                        % (type(self.report), self.report))
+                if console_output != None:
+                    match_data = {
+                        # this allows an exception raised when found to
+                        # include this iterator as an attachment that can
+                        # be reported
+                        console_output: target.console.generator_factory(
+                            self.console,
+                            search_offset, search_offset + match.end()),
+                    }
+                else:
+                    match_data = {}
                 target.report_info(
                     "%s%s: found '%s' at @%d-%d on console %s:%s [%s]"
                     % (run_name, _name, self.regex.pattern,
@@ -924,6 +940,12 @@ class extension(tc.target_extension_c):
           where we are looking for things (detecting) in a console's
           output. Further info :ref:`here
           <console_expectation_detect_context>`
+
+        :param int report: (optional) how much data to report; when we
+          find a match, the report will include all data received until
+          the match; sometimes it is too much and uneeded. This allows
+          to specify how many bytes of data before the match are going
+          to be reported at most. Defaults to *None* (all).
 
         (other parameters are the same as described in
         :class:`tcfl.tc.expectation_c`.)
