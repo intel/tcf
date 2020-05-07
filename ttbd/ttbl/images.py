@@ -16,6 +16,7 @@ drivers implemented subclassing :class:`ttbl.images.impl_c <impl_c>`.
 
 """
 
+import codecs
 import collections
 import json
 import os
@@ -926,6 +927,14 @@ class sf100linux_c(impl_c):
       usually depends on the size of the binary being flashed and the
       speed of the interface.
 
+    :param str mode: (optional; default "--batch") flashing mode, this
+      can be:
+
+      - *--prog*: programs without erasing
+      - *--auto*: erase and update only sectors that changed
+      - *--batch*: erase and program
+      - *--erase*: erase
+
     :param dict args: dictionary of extra command line options to
       *dpcmd*; these are expanded with the target keywords with
       *%(FIELD)s* templates, with fields being the target's
@@ -961,9 +970,11 @@ class sf100linux_c(impl_c):
        path of *dpcmd* by setting :data:`path`.
     """
     def __init__(self, dediprog_id, args = None, name = None, timeout = 60,
+                 mode = "--batch",
                  **kwargs):
         assert isinstance(dediprog_id, basestring)
         assert isinstance(timeout, int)
+        assert mode in [ "--batch", "--auto", "--prog", "--erase" ]
         commonl.assert_none_or_dict_of_strings(args, "args")
 
         if args:
@@ -972,6 +983,7 @@ class sf100linux_c(impl_c):
             self.args = {}
         self.dediprog_id = dediprog_id
         self.timeout = timeout
+        self.mode = mode
         impl_c.__init__(self, **kwargs)
         if name == None:
             name = "Dediprog SF[16]00 " + dediprog_id
@@ -1004,7 +1016,7 @@ class sf100linux_c(impl_c):
             "--device", self.dediprog_id,
             "--silent",
             "--log", image_name + ".log",
-            "--batch", image_name,
+            self.mode, image_name,
         ]
         for key, value in self.args.iteritems():
             cmdline += [ key, value % target.kws ]
@@ -1031,4 +1043,13 @@ class sf100linux_c(impl_c):
                              % (" ".join(cmdline),
                                 e.returncode, e.output))
             raise
+        # verify the logfile
+        with codecs.open(image_name + ".log", errors = 'ignore') as logf:
+            for line in logf:
+                if 'Fail' in line:
+                    logf.seek(0)
+                    msg = "flashing with %s failed, issues in logfile: %s" \
+                        % (" ".join(cmdline), logf.read())
+                    target.log.error(msg)
+                    raise RuntimeError(msg)
         target.log.info("flashed image")
