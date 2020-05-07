@@ -973,7 +973,7 @@ c. Make the kernel and initrd for POS available via Apache for
 
    i. Copy the kernel::
 
-        # ln /home/ttbd/images/tcf-live/x86_64/boot/vmlinuz-* \
+        # cp /home/ttbd/images/tcf-live/x86_64/boot/vmlinuz-* \
             /home/ttbd/public_html/x86_64/vmlinuz-tcf-live
 
    ii. Regenerate the *initrd* with nfs-root support, as the initrd
@@ -1014,7 +1014,15 @@ c. Make the kernel and initrd for POS available via Apache for
          # install -m 0644 -o ttbd -g ttbd /home/ttbd/public_html/x86_64/* \
               /var/lib/tftpboot/ttbd-production/efi-x86_64
 
-       This allows targets to get the boot kernel/initrd over TFTP.
+       This allows targets to get the boot kernel/initrd over
+       TFTP. Let's do the same for iPXE for HTTP boot::
+
+         # install -o ttbd -g ttbd /usr/share/ipxe/ipxe-x86_64.efi \
+              /home/ttbd/public_html/x86_64/
+
+       Note the name changes; as well, there is no need to copy it to
+       the TFTP directory as new code paths do it for us.
+
 
    Ensure those two files work by pointing a browser to
    http://YOURSERVERNAME/ttbd-pos/ and verifying they can be downloaded.
@@ -1062,8 +1070,8 @@ e. Perform final image setup:
 
 f. Deploy content to the server that test content can / will use::
 
-     $ mkdir -p /home/ttbd/images/tcf-live/misc
-     $ cp /usr/share/tcf/content/evemu.bin.*.tar.gz /home/ttbd/images/tcf-live/misc
+     $ install -m 0775 -d /home/ttbd/images/misc
+     $ cp /usr/share/tcf/content/evemu.bin.*.tar.gz /home/ttbd/images/misc
      
 .. _ttbd_pos_deploying_images:
 
