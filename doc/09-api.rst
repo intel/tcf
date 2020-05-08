@@ -11,6 +11,7 @@ Test library (utilities for testcases)
 --------------------------------------
 
 .. automodule:: tcfl.tl
+.. automodule:: tcfl.biosl
 
 Provisioning/deploying/flashing PC-class devices with a Provisioning OS
 -----------------------------------------------------------------------
