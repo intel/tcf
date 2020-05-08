@@ -123,7 +123,18 @@ class _test(tcfl.pos.tc_pos0_base):
         target.input.evemu_target_setup(ic)
 
         r_desktop = self.expect(
-            target.capture.image_on_screenshot('canary-icon-firefox.png'),
+            # this assumes we are auto-login in to a GNOME desktop in English
+            target.capture.image_on_screenshot('canary-icon-power.png',
+                                               in_area = ( 0.80, 0, 1, 0.20 )),
+            target.capture.image_on_screenshot('canary-activities.png'),
+            name = "desktop start")
+
+        target.input.image_click(r_desktop['canary-activities_png'])
+
+        r_desktop = self.expect(
+            # this assumes we are auto-login in to a GNOME desktop in English
+            target.capture.image_on_screenshot('canary-icon-firegox.png',
+                                               in_area = ( 0.80, 0, 1, 0.20 )),
             name = "desktop start")
 
         movie = 'interfaces.capture.screen_stream' in target.kws
