@@ -1734,6 +1734,18 @@ def assert_list_of_strings(l, list_name, item_name):
             "items in '%s' needs to be strings (%s); got %s on #%d"  % (
                 list_name, item_name, type(i), count)
 
+def assert_list_of_types(l, list_name, item_name, item_types):
+    assert isinstance(l, list), \
+        "'%s' needs to be None or a list of strings (%s); got %s" % (
+            list_name, item_name, type(l))
+    count = -1
+    for i in l:
+        count += 1
+        assert isinstance(i, item_types), \
+            "items in '%s' needs to be %s (%s); got %s on #%d"  % (
+                list_name, "|".join(i.__name__ for i in item_types),
+                item_name, type(i), count)
+
 def assert_none_or_list_of_strings(l, list_name, item_name):
     if l == None:
         return
