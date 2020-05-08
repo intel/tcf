@@ -76,6 +76,7 @@ import io
 import logging
 import math
 import mmap
+import numbers
 import os
 import re
 import sys
@@ -575,7 +576,7 @@ class extension(tc.target_extension_c):
             "new default console %s is not an existing console (%s)" \
             % (new_console, " ".join(console_list))
         if new_console == None:
-            new_console = self.aliases['default']
+            new_console = self.aliases.get('default', console_list[0])
         if self._default != new_console:
             self.target.report_info("default console changed from %s to %s"
                                     % (self._default, new_console))
@@ -846,14 +847,69 @@ class extension(tc.target_extension_c):
             return None			# console disabled
         return int(r['result'])
 
-    def write(self, data, console = None):
-        """
-        Write data to a console
+    #: Default chunk sizes for the different consoles
+    #:
+    #: Dictionary keyed by console name that specifies the chunk size
+    #: for the console; if there is no entry for a console, it means
+    #: no chunking is to be done for it.
+    #:
+    #: See :meth:write.
+    #:
+    #: This can be set with::
+    #:
+    #:    >> target.console.chunk_size['my consolename'] = 32
+    chunk_size = {}
+
+
+    #: Default interchunk wait times (in seconds) for the different consoles
+    #:
+    #: Dictionary keyed by console name that specifies the time to
+    #: wait between sending chunks for each console when chunking is enabled.
+    #:
+    #: See :meth:write.
+    #:
+    #: This can be set with::
+    #:
+    #:    >> target.console.interchunk_wait['my consolename'] = 3.4
+    interchunk_wait = {}
+
+    def write(self, data, console = None, crlf = None,
+              chunk_size = None, interchunk_wait = None):
+        """Write data to a console
 
         :param data: data to write (string or bytes)
 
+        :param int chunk_size: (optional) break the transimission into
+          chunks of this size, with a possible wait of
+          *interchunk_wait* seconds between. By default no chunking
+          occurs.
+
+          This is useful when the receiving end doesn't have good flow
+          control and needs breathers or we want to simulate some
+          timing. The server in theory can implement it better, but
+          when the server configuration doesn't offer it, this offers
+          a way to force it from the client side.
+
+          Global chunking per console can be set in :data:chunk_size.
+
+        :param float interchunk_wait: (optional; default 0) seconds to
+          wait in between transmitting chunks when *chunk_size* is
+          enabled.
+
+          Note the lag of making the remote request has to be
+          considered; thus interchunk waits of less than one second
+          might be impractical. Look at doing chunk in the server side
+          for those timing needs.
+
+          Global interchunk waits per console can be set in
+          :data:interchunk_wait.
+
         :param str console: (optional) console to write to
+
         """
+        assert chunk_size == None or isinstance(chunk_size, int)
+        assert interchunk_wait == None \
+            or isinstance(interchunk_wait, numbers.Real)
         # the reporting of unprintable is left to the report driver;
         # however, for readability in the reporting, we'll replace \n
         # (0x0d) with <N>
@@ -867,8 +923,38 @@ class extension(tc.target_extension_c):
         testcase = self.target.testcase
         self.target.report_info("%s: writing %dB to console"
                                 % (console, len(data)), dlevel = 3)
-        self.target.ttbd_iface_call("console", "write",
-                                    component = console, data = data)
+        if chunk_size == None:
+            chunk_size = self.chunk_size.get(console, None)
+        if interchunk_wait == None:
+            interchunk_wait = self.interchunk_wait.get(console, None)
+        if crlf == None:
+            # FIXME: per console
+            crlf = self.target.crlf
+
+        # FIXME: all this is very inneficient--python3 has better
+        # facilities for it
+        def _chunk_crlf(chunk, crlf):
+            if crlf == None or crlf == "":
+                return chunk
+            _chars = ""
+            for char in chunk:
+                if char == "\n":
+                    _chars += crlf
+                else:
+                    _chars += char
+            return _chars
+        if chunk_size == None:
+            data = _chunk_crlf(data, crlf)
+            self.target.ttbd_iface_call("console", "write",
+                                        component = console, data = data)
+        else:
+            for i in range((len(data) + chunk_size - 1) / chunk_size):
+                chunk = data[chunk_size * i : chunk_size * i + chunk_size]
+                chunk = _chunk_crlf(chunk, crlf)
+                self.target.ttbd_iface_call("console", "write",
+                                            component = console, data = chunk)
+                if interchunk_wait:
+                    time.sleep(interchunk_wait)
         self.target.report_info("%s: wrote %dB (%s) to console"
                                 % (console, len(data), data_report))
 
@@ -1176,7 +1262,8 @@ WARNING: This is a very limited interactive console
                         one_escape = True
                     else:
                         one_escape = False
-                target.console.write(_chars, console = console)
+                # force no crlf, we already translated it
+                target.console.write(_chars, console = console, crlf = "")
             except _done_c:
                 break
             except IOError as e:
@@ -1212,10 +1299,12 @@ def _cmdline_console_write(args):
                 line = getpass.getpass("")
                 if line:
                     target.console.write(line.strip() + args.crlf,
+                                         crlf = args.crlf,
                                          console = args.console)
         else:
             for line in args.data:
                 target.console.write(line + args.crlf,
+                                     crlf = args.crlf,
                                      console = args.console)
 
 
