@@ -83,6 +83,7 @@ Note the columns and the messages:
 import io
 import os
 import subprocess
+import sys
 import threading
 
 import commonl
@@ -139,7 +140,7 @@ class driver(tc.report_driver_c):
                     encoding = 'utf-8', errors = 'replace')
         else:
             self.logf = None
-        consolef = io.open("/dev/stdout", "w",
+        consolef = io.open(sys.stdin.fileno(), "w",
                            encoding = 'utf-8', errors = 'replace')
         self.consolef = commonl.io_tls_prefix_lines_c(
             self.tls, consolef.detach(),
