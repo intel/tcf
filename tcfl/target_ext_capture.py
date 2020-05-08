@@ -350,7 +350,7 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
             self.template_image_filename, self.template_img,
             min_width = self.min_width, min_height = self.min_height)
         if self.in_area:
-            r_in_area = []
+            r_in_area = {}
             ax0 = self.in_area[0]
             ay0 = self.in_area[1]
             ax1 = self.in_area[2]
