@@ -858,18 +858,10 @@ been tested yet, shall be similar.
 
 5. Enable required services:
 
-   - Apache: to serve the POS Linux kernel and initrd::
-
-       # tee /etc/httpd/conf.d/ttbd.conf <<EOF
-       Alias "/ttbd-pos" "/home/ttbd/public_html"
-       Alias "/ttbd-images-misc" "/home/ttbd/images/misc"
-
-       <Directory "/home/ttbd/public_html">
-       AllowOverride FileInfo AuthConfig Limit Indexes
-       Options MultiViews Indexes SymLinksIfOwnerMatch IncludesNoExec
-       Require method GET POST OPTIONS
-       </Directory>
-       EOF
+   - Apache: to serve the POS Linux kernel/initrd and bootloaders that
+     might be serve over HTTP (eg using UEFI HTTP boot to bring in
+     iPXE) the installation will install Apache configuration file
+     */etc/httpd/conf.d/ttbd.conf*.
 
      SELinux requires setting a few more things to enable serving from
      home directories::
@@ -889,9 +881,6 @@ been tested yet, shall be similar.
 
      from any other browser try to access
      http://YOURSERVERNAME/ttbd-pos/testfile and check it succeeds.
-
-     FIXME: move ttbd.conf file as a config file in package
-     ``ttbd-pos``.
 
    - NFS server: provides the POS root filesystem.
 
