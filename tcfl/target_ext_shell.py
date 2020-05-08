@@ -284,10 +284,13 @@ class shell(tc.target_extension_c):
                               console = console)
                 target.send(password, console = console)
 
+        original_timeout = testcase.tls.expect_timeout
         try:
             if console == None:		# reset the default console
                 target.console.default = None
-            original_timeout = testcase.tls.expect_timeout
+                # this will yield the default console name, not None
+                # as we set it above; bad API
+                console = target.console.default
             testcase.tls.expect_timeout = timeout
             ts0 = time.time()
             ts = ts0
@@ -298,25 +301,25 @@ class shell(tc.target_extension_c):
                 # the machine power cycles, so make sure it is enabled
                 action = "n/a"
                 try:
-                    if target.console.default.startswith("ssh"):
-                        action = "enable SSH console"
-                        target.console.setup(target.console.default,
-                                             user = user)
-                        target.console.enable()
+                    if console.startswith("ssh"):
+                        action = "enable console %s" % console
+                        target.console.setup(console, user = user)
+                        target.console.enable(console = console)
                         ts = time.time()
                         target.report_info(
                             "shell-up: %s: success at +%.1fs"
                             % (action, ts - ts0), dlevel = 2)
                     if tempt:
-                        action = "tempt the console"
-                        target.send(tempt)
+                        action = "tempt console %s" % console
+                        target.send(tempt, console = console)
                         ts = time.time()
                         target.report_info(
                             "shell-up: %s: success at +%.1fs"
                             % (action, ts - ts0), dlevel = 2)
-                    if not target.console.default.startswith("ssh"):
+                    if not console.startswith("ssh"):
                         if user:
-                            action = "login in via the console"
+                            action = "login in via console %s" % console
+                            # _login uses this 'console' definition
                             _login(self.target)
                             ts = time.time()
                             target.report_info(
@@ -336,14 +339,15 @@ class shell(tc.target_extension_c):
                         dlevel = 2)
                     time.sleep(inner_timeout)
                     ts = time.time()
-                    if target.console.default.startswith("ssh"):
-                        target.console.disable()
+                    if console.startswith("ssh"):
+                        target.console.disable(console = console)
                     continue
             else:
                 raise tc.error_e(
-                    "Waited too long (%ds) for shell to come up "
-                    "(did not receive '%s')" % (
-                        3* timeout, self.shell_prompt_regex.pattern))
+                    "Waited too long (%ds) for shell to come up on"
+                    " console '%s' (did not receive '%s')" % (
+                        3 * timeout, console,
+                        self.shell_prompt_regex.pattern))
         finally:
             testcase.tls.expect_timeout = original_timeout
 
@@ -353,8 +357,8 @@ class shell(tc.target_extension_c):
         elif callable(shell_setup):
             shell_setup(console)
         # False, so we don't call shell setup
-
         # don't set a timeout here, leave it to whatever it was defaulted
+        return
 
     crnl_regex = re.compile("\r+\n")
 
