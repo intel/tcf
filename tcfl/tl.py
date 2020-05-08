@@ -430,20 +430,22 @@ def sh_export_proxy(ic, target):
     """
     proxy_cmd = ""
     if 'http_proxy' in ic.kws:
-        proxy_cmd += " http_proxy=%(http_proxy)s "\
-            "HTTP_PROXY=%(http_proxy)s"
+        target.shell.run("export http_proxy=%(http_proxy)s; "
+                         "export HTTP_PROXY=$http_proxy" % ic.kws)
     if 'https_proxy' in ic.kws:
-        proxy_cmd += " https_proxy=%(https_proxy)s "\
-            "HTTPS_PROXY=%(https_proxy)s"
-    if proxy_cmd != "":
+        target.shell.run("export https_proxy=%(https_proxy)s; "
+                         "export HTTPS_PROXY=$https_proxy")
+    if 'https_proxy' in ic.kws or 'http_proxy' in ic.kws:
         # if we are setting a proxy, make sure it doesn't do the
         # local networks
-        proxy_cmd += \
-            " no_proxy=127.0.0.1,%(ipv4_addr)s/%(ipv4_prefix_len)s," \
-            "%(ipv6_addr)s/%(ipv6_prefix_len)d,localhost" \
-            " NO_PROXY=127.0.0.1,%(ipv4_addr)s/%(ipv4_prefix_len)s," \
-            "%(ipv6_addr)s/%(ipv6_prefix_len)d,localhost"
+        no_proxyl = [ "127.0.0.1", "localhost" ]
+        if 'ipv4_addr' in ic.kws:
+            no_proxyl += [ "%(ipv4_addr)s/%(ipv4_prefix_len)s" ]
+        if 'ipv6_addr' in ic.kws:
+            no_proxyl += [ "%(ipv6_addr)s/%(ipv6_prefix_len)s" ]
+        proxy_cmd += " no_proxy=" + ",".join(no_proxyl)
         target.shell.run("export " + proxy_cmd % ic.kws)
+        target.shell.run("export NO_PROXY=$no_proxy")
 
 def sh_proxy_environment(ic, target):
     """
