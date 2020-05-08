@@ -43,7 +43,7 @@ imaging on PC-class targets via DHCP / TFTP.
         ( 'etc/systemd/system/ttbd@.service.d/', [
             'pos.conf'
         ]),
-        ( '@prefix@/etc/httpd/conf.d/', [
+        ( '/etc/httpd/conf.d/', [
             'ttbd.conf',
         ]),
         ( '@prefix@/share/tcf/', [
