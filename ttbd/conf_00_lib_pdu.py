@@ -346,7 +346,7 @@ except ImportError as e:
 
 
 def usbrly08b_targets_add(serial_number, target_name_prefix = None,
-                          power = False):
+                          powered_on_start = None):
     """Set up individual power control targets for each relay of a
     `Devantech USB-RLY08B
     <https://www.robot-electronics.co.uk/htm/usb_rly08btech.htm>`_
@@ -358,6 +358,15 @@ def usbrly08b_targets_add(serial_number, target_name_prefix = None,
 
     :param str target_name_prefix: (optional) Prefix for the target
       names (which defaults to *usbrly08b-SERIALNUMBER-*)
+
+    :param bool powered_on_start: what to do with the power on the
+      downstream ports:
+
+      - *None*: leave them as they are
+
+      - *False*: power them off
+
+      - *True*: power them on
 
     **Bill of materials**
 
