@@ -43,6 +43,7 @@ A string such as::
 - *^[[1m* means bold (*^[[0m* means normal display)
 - *^[[37m* means white foreground
 - *^[[40m* means black background
+- *^[[46m* means cyan background
 
 Depending on the types of BIOS menus, in general when an entry is
 highlighted, it is printed in:
@@ -134,7 +135,7 @@ def menu_scroll_to_entry(
         max_scrolls = 30, direction = "down",
         highlight_string = normal_white_fg_black_bg,
         normal_string = normal_black_fg_white_bg,
-        level = "top",
+        level = "top", column_key = 4,
         timeout = 10):
     """Scroll in an ANSI menu until the entry is highlighted
 
@@ -231,9 +232,14 @@ def menu_scroll_to_entry(
     assert isinstance(max_scrolls, int) and max_scrolls > 0
     assert isinstance(highlight_string, basestring)
     assert isinstance(normal_string, basestring)
+    assert direction in [ 'up', 'down' ]
     assert isinstance(level, basestring)
     assert isinstance(timeout, int) and timeout > 0
 
+    if direction == 'up':
+        _direction = True
+    else:
+        _direction = False
 
     target.report_info("BIOS:%s: scrolling to '%s'" % (level, entry_string),
                        dlevel = 1)
@@ -271,9 +277,14 @@ def menu_scroll_to_entry(
             # spaces; they might finish with a string of spaces, but
             # definitely in a escape sequence
             + "(?P<key>[^\x1b]*[^ \x1b][^\x1b]*) *\x1b")
+
     entry_regex = re.compile(entry_string)
+    seen_entries = collections.defaultdict(int)
+    last_seen_entry = None
+    last_seen_entry_count = 0
+    target.expect("")	# flush
     for _ in range(max_scrolls):
-        if direction == "up":
+        if _direction:
             # FIXME: use get_key() -- how do we pass the terminal encoding?
             target.console_tx("\x1b[A")			# press arrow up
         else:
@@ -284,8 +295,8 @@ def menu_scroll_to_entry(
             skips -= 1
             target.report_info(
                 # FIXME: make column a part of the BIOS menu profile
-                "%s: waiting for highlighted entry on column 04"
-                % (name), dlevel = 1)
+                "%s: waiting for highlighted entry on column %s"
+                % (name, column_key), dlevel = 1)
             # read until we receive something that looks like an entry
             # selected
             try:
@@ -313,9 +324,9 @@ def menu_scroll_to_entry(
             # the key always matches spaces all the way to the end, so it
             # needs to be stripped
             key = r[name]['groupdict']['key'].strip()
-            column_key = r[name]['groupdict']['column_key']
+            key_at_column = int(r[name]['groupdict']['column_key'])
             # entries are always on column four (FIXME: BIOS profile)
-            if column_key == "04":
+            if key_at_column == column_key:
                 break
             # this might be another false negative we hit (like the
             # drawing of parts at the bottom in highlight), so let's retry
@@ -330,6 +341,24 @@ def menu_scroll_to_entry(
 
         target.report_info("%s: found highlighted entry '%s' @%s"
                            % (name, key, column_key), dlevel = 1)
+        seen_entries[key] += 1
+        if all(seen_count > 3 for seen_count in seen_entries.values()):
+            target.report_info("%s: scrolled twice through all entries;"
+                               " did not find '%s'"
+                               % (name, entry_string), dlevel = 1)
+            return None
+        if last_seen_entry == key:
+            last_seen_entry_count += 1
+        else:
+            last_seen_entry = key
+            last_seen_entry_count = 1
+        if last_seen_entry_count > 2:
+            # make sure this count is lower then the one above for
+            # seen_entries; we might not have seen all the entries in
+            # the menu and have a limited count to make a judgement on
+            # maybe this is a menu that does not wrap around, flip the
+            # direction
+            _direction = not _direction
         m = entry_regex.search(key)
         if m:
             target.report_info("%s: highlighted entry found" % name)
@@ -543,7 +572,8 @@ def multiple_entry_select_one(
         max_scrolls = 30,
         # regex format, to put inside (?P<values>VALUES)
         wait = 0.5, timeout = 10,
-        highlight_str = "\x1b\\[1m\x1b\\[37m\x1b\\[46m"):
+        highlight_string = "\x1b\\[1m\x1b\\[37m\x1b\\[46m",
+        level = ""):
     """
     In a simple menu, wait for it to be drown and select a given entry
 
@@ -555,8 +585,10 @@ def multiple_entry_select_one(
 
     :params int max_scrolls: how many times to scroll maximum
 
-    :params str hightlight_str: (optional) ANSI sequence for
+    :params str hightlight_string: (optional) ANSI sequence for
       highlightling an entry (defaults to blue BG, yellow FG, bold)
+
+    :param str level: (optional; default *top*) name of the top level menu
 
     The menu is usually printed like (blue background, white foreground,
     yellow highlight, like::
@@ -598,41 +630,69 @@ def multiple_entry_select_one(
     assert isinstance(max_scrolls, int) and max_scrolls > 0
     assert isinstance(wait, numbers.Real) and wait > 0
     assert isinstance(timeout, numbers.Real) and timeout > 0
+    assert isinstance(level, basestring)
 
-    submenu_header_expect(target, select_entry,
-                          canary_end_menu_redrawn = None)
-    # FIXME: use def menu_scroll_to_entry
+    _direction = False
     entry_highlighted_regex = re.compile(
-        highlight_str
+        r"/-+\\"
+        + ".*"
+        + highlight_string
         + "\x1b\[[0-9]+;[0-9]+H"
-        + select_entry)
-    target.report_info("scrolling for '%s'" % select_entry)
+        + "(?P<key>[^\x1b]+)"
+        + ".*"
+        + r"\-+/")
+    target.report_info("BIOS: %s: scrolling for '%s'"
+                       % (level, select_entry))
+    last_seen_entry = None
+    last_seen_entry_count = 0
     for toggle in range(0, max_scrolls):
-        offset = target.console.size()
-        if toggle & 1:
+        if _direction:
             target.console_tx("\x1b[A")			# press arrow up
         else:
             target.console_tx("\x1b[B")			# press arrow down
 
-        target.report_info("%s: waiting for highlight string %s"
-                           % (select_entry, highlight_str))
+        target.report_info("BIOS: %s: waiting for highlighted entry" % level)
         # wait for highlighted then give it a breather to send the rest
-        target.expect(re.compile(highlight_str), timeout = timeout)
-        time.sleep(wait)
-        # now read the last things that were printed since we recorded
-        # the offset and if 'select_entry' is in there, it means
-        # it was highlighted, so this is the entry we are looking
-        # for
-        output = target.console.read(offset = offset)
-        target.report_info("%s: waiting for highlighted option"
-                           % (select_entry))
-        m = entry_highlighted_regex.search(output)
-        if m:
+        retry_top = 5
+        retry_cnt = 0
+        while retry_cnt < retry_top:
+            r = target.expect(entry_highlighted_regex,
+                              timeout = timeout, name = "highlight")
+            if 'highlight' in r:
+                break
+            retry_cnt += 1
             target.report_info(
-                "%s: highlighted entry %s found at offset %d"
-                % (select_entry, entry_highlighted_regex.pattern,
-                   offset + m.start()))
-            return m.groupdict()
+                "BIOS: %s: %s: didn't find a highlighted entry, retrying"
+                % (level, select_entry))
+            # tickle it
+            target.console_tx("\x1b[A")			# press arrow up
+            target.console_tx("\x1b[B")			# press arrow down
+        else:
+            # nothing found, raise it
+            raise tcfl.tc.error_e(
+                "BIOS: %s: can't find highlighted entries after %d tries"
+                % (level, retry_top))
+
+        key = r['highlight']['groupdict']['key']
+        if key == select_entry:
+            target.report_info("BIOS: %s: entry '%s' found"
+                               % (level, select_entry))
+            return key, r['highlight']['groupdict']
+        if last_seen_entry == key:
+            last_seen_entry_count += 1
+        else:
+            last_seen_entry = key
+            last_seen_entry_count = 1
+        if last_seen_entry_count > 2:
+            # make sure this count is lower then the one above for
+            # seen_entries; we might not have seen all the entries in
+            # the menu and have a limited count to make a judgement on
+            # maybe this is a menu that does not wrap around, flip the
+            # direction
+            _direction = not _direction
+        target.report_info("BIOS: %s: entry '%s' found, scrolling"
+                           % (level, key))
+
     # nothing found, raise it
     raise tcfl.tc.error_e("%s: can't find entry option after %d entries"
                           % (select_entry, max_scrolls))
@@ -771,7 +831,7 @@ def menu_config_network_enable(target):
     target.report_info("BIOS: %s: enabling (was: %s)" % (entry, value))
     # it's disabled, let's enable
     target.console_tx("\r")			# select it
-    r = multiple_entry_select_one(target, "Enable")
+    multiple_entry_select_one(target, "Enable")
     target.console_tx("\r")			# select it
     # Need to hit ESC twice to get the "save" menu
     target.console_tx("\x1b\x1b")
