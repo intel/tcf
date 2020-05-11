@@ -876,6 +876,27 @@ def menu_continue(target):
         raise tcfl.tc.error_e("BIOS: can't find 'Continue'")
 
 
+def bios_boot_expect(target):
+    """
+    Wait for the BIOS boot messages to show up and then select the
+    options to bring the main menu and wait for it to appear.
+
+    :param tcfl.tc.target_c target: target on which to operate (uses
+      the default console)
+    """
+    # FIXME: move to BIOS profile
+    assert isinstance(target, tcfl.tc.target_c)
+
+    target.report_info("BIOS: waiting for main menu after power on")
+    target.expect(re.compile("Press\s+\[F7\]\s+to show boot menu options"),
+                  # this prints a lot, so when reporting, report
+                  # only the previous 500 or per spend so much
+                  # time reporting we miss the rest
+                  report = 500,
+                  # can take a long time w/ some BIOSes
+                  timeout = 180)
+
+
 def main_menu_expect(target):
     """
     When the platform boots, wait for the BIOS boot messages to show
@@ -889,14 +910,7 @@ def main_menu_expect(target):
     """
     assert isinstance(target, tcfl.tc.target_c)
 
-    target.report_info("BIOS: waiting for main menu after power on")
-    target.expect(re.compile("Press\s+\[F7\]\s+to show boot menu options"),
-                  # this prints a lot, so when reporting, report
-                  # only the previous 500 or per spend so much
-                  # time reporting we miss the rest
-                  report = 500,
-                  # can take a long time w/ some BIOSes
-                  timeout = 180)
+    bios_boot_expect(target)
     # let's just go to the BIOS menu, F7 is not working
     target.console.write(ansi_key_code("F2", "vt100"))
     target.console.write(ansi_key_code("F2", "vt100"))
@@ -1026,7 +1040,7 @@ def boot_network_http_boot_add_entry(target, entry, url):
     target.send("Y")
 
 
-def boot_select_entry(target, boot_entry):
+def main_boot_select_entry(target, boot_entry):
     """
     From the main menu, go to the boot menu and boot an entry
 
@@ -1094,7 +1108,7 @@ def boot_network_http(target, entry, url,
             assume_in_main_menu = False
         else:
             main_menu_expect(target)
-        if boot_select_entry(target, entry):
+        if main_boot_select_entry(target, entry):
             target.console_tx("\r")			# select it
             break
         target.report_info("BIOS: can't find network boot entry '%s';"
@@ -1167,7 +1181,7 @@ def boot_network_pxe(target, entry = "UEFI PXEv4.*",
             assume_in_main_menu = False
         else:
             main_menu_expect(target)
-        if boot_select_entry(target, entry):
+        if main_boot_select_entry(target, entry):
             target.console_tx("\r")			# select it
             break
         target.report_info("BIOS: can't find network boot entry '%s';"
@@ -1192,7 +1206,7 @@ def boot_efi_shell(target):
     assert isinstance(target, tcfl.tc.target_c)
     main_menu_expect(target)
 
-    if boot_select_entry(target, "EFI .* Shell"):
+    if main_boot_select_entry(target, "EFI .* Shell"):
         target.console_tx("\r")			# select it
         target.expect("Shell>")
     else:
