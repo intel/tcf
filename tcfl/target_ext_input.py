@@ -55,8 +55,8 @@ What can be sent to devices?
 This driver uses as reference standard what *evemu* can do, as it is
 believed to be the most complete platform-independent input device
 reference. This in turn is using the input event codes from the Linux
-kernel; a summary from the  :ref:`libevdev's authoritative
-<https://github.com/freedesktop/libevdev/blob/master/include/linux/input-event-codes.h>`:
+kernel; a summary from the `libevdev's authoritative
+<https://github.com/freedesktop/libevdev/blob/master/include/linux/input-event-codes.h>`_:
 
 - Event types (EV_*):
 
@@ -149,7 +149,8 @@ B: 15 00 00 00 00 00 00 00 00
 #: Default mouse descriptor (touchpad)
 #:
 #: This is an absolute mouse whose axes go from 0 to 65535;
-#: note we are making that assumption in mouse_move_to()
+#: note we are making that assumption in
+#: :meth:`target.input.mouse_move_to <extension.mouse_move_to>`.
 descriptor_mouse = """
 # EVEMU 1.3
 N: Generic Mouse
@@ -560,15 +561,15 @@ class extension(tc.target_extension_c):
 
         The coordinates are given in an absolute form and require the
         mouse to support absolute addressing. The default mouse created
-        by :meth:`setup_target_evemu` can do this (axes range from
+        by :meth:`evemu_target_setup` can do this (axes range from
         0-65536).
 
-        :param int|float x: X coordinate where to click; if integer,
+        :param int or float x: X coordinate where to click; if integer,
           it is considered to be an absolute coordinate. If float
           between 0 and 1, a relative coordinate (0 leftmost edge, 1
           rightmost) If *None*, don't move the mouse on the X axis.
 
-        :param int|float y: Y coordinate where to click, same typing a
+        :param int or float y: Y coordinate where to click, same typing a
           X.  If *None*, don't move the mouse on the Y axis.
 
         :param str did: (optional) name of mouse to use; defaults
@@ -621,12 +622,12 @@ class extension(tc.target_extension_c):
 
         >>> self.input.mouse_click(0.5, 0.5)
 
-        :param int|float x: X coordinate where to click; if integer,
+        :param int or float x: X coordinate where to click; if integer,
           it is considered to be an absolute coordinate. If float
           between 0 and 1, a relative coordinate (0 leftmost edge, 1
           rightmost) If *None*, don't move the mouse on the X axis.
 
-        :param int|float y: Y coordinate where to click,same typing a X.
+        :param int or float y: Y coordinate where to click,same typing a X.
           If *None*, don't move the mouse on the Y axis.
 
         :param str did: (optional) name of mouse to use; defaults
@@ -713,7 +714,7 @@ class extension(tc.target_extension_c):
                     times = 1, interclick_time = 0.35):
         """
         Given the square where an image is detected (by the likes of
-        :ref:`target.capture.image_on_screenshot
+        :class:`target.capture.image_on_screenshot
         <tcfl.target_ext_capture.extension.image_on_screenshot>`),
         double click on that icon:
 
@@ -724,7 +725,7 @@ class extension(tc.target_extension_c):
         >>> self.input.image_click(r['icon-firefox_png'])
 
         :param dict detection: square where the image was detected by
-          :ref:`target.capture.image_on_screenshot
+          :class:`target.capture.image_on_screenshot
           <tcfl.target_ext_capture.extension.image_on_screenshot>`
 
         For info on other parameters, see :meth:`mouse_click`
