@@ -1203,6 +1203,51 @@ output we are getting is *SOMEPATH\\n*. So :func:`strip
 General Linux system
 ====================
 
+.. _setup_wsl:
+
+Setup: install Windows Services for Linux
+-----------------------------------------
+
+The TCF client can be installed in Windows Services for Linux, which
+can be setup following these instructions (applies to WSL v1,
+untested on v2):
+
+1. Enable Windows Services for Linux (summary of
+   https://docs.microsoft.com/en-us/windows/wsl/install-win10):
+
+   A. Open PowerShell as Administrator and run (press left Windows
+      key, type *PowerShell* and click on *Run as administrator*)::
+
+        Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
+
+   B. Restart your computer when prompted.
+
+2. Wait for Windows to boot
+
+3. Press left Windows key, type *Microsoft store* > search for *Ubuntu
+   18.08 LTS*, press on *Get*; wait for Ubuntu 18.04 LTS to download.
+
+4. Click 'Launch" for the install process to start; opens a Ubuntu
+   18.04 LTS black window that works for a while.
+
+   Install process will ask to *Enter new Unix name*, this is your
+   Unix account name.
+
+   Install process will ask for a *Unix password*: enter a password
+   for the Unix machine that will run inside your Windows machine; you
+   can use the same as in Windows
+
+5. The install process now goes into a Linux shell; it can be closed.
+
+6. Click the Windows search box, type *Ubuntu*, select *Ubuntu
+   18.04 LTS*; a terminal window opens.
+
+From the Linux environment, you can access your Windows files:
+
+- `/mnt/c/Users/USERNAME/Desktop`
+- `/mnt/c/Users/USERNAME/Documents`
+
+
 .. _setup_proxies:
 
 Setup proxies

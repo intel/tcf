@@ -32,6 +32,9 @@
 
    a. You can run *tcf* from the :ref:`source directory
       <tcf_run_from_source_tree>`
+
+   b. You can run it under WSL (Windows Services for Linux), which
+      first has to be :ref:`installed <setup_wsl>`
      
    .. include:: doc/02-client-setup-LL-01.rst
 
