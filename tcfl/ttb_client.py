@@ -272,17 +272,13 @@ class rest_target_broker(object):
         generated from request, search for issues on connection and
         raise and exception or return the response object.
 
-        :param url: url to request
-        :type url: str
-        :param data: args to send in the request. default None
-        :type data: dict
-        :param method: method used to request GET, POST and PUT. default PUT
-        :type method: str
-        :param raise_error: if true, raise an error if something goes
-            wrong in the request. default True
-        :type raise_error: bool
-        :returns: response object
-        :rtype: requests.Response
+        :param str url: url to request
+        :param dict data: args to send in the request. default None
+        :param str method: method used to request GET, POST and
+          PUT. Defaults to PUT.
+        :param bool raise_error: if true, raise an error if something goes
+           wrong in the request. default True
+        :returns requests.Response: response object
 
         """
         assert not (data and json), \
