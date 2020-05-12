@@ -440,7 +440,7 @@ def usbrly08b_targets_add(serial_number, target_name_prefix = None,
         target.disable("")
 
 
-def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
+def ykush_targets_add(ykush_serial, pc_url = None, powered_on_start = None):
     """Given the :ref:`serial number <ykush_serial_number>` for an YKUSH
     hub connected to the system, set up a number of targets to
     manually control it.
@@ -475,15 +475,15 @@ def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
     :param str ykush_serial: USB Serial Number of the hub
       (:ref:`finding <ykush_serial_number>`).
 
-    :param str pc_url: Power Control URL
+    :param str pc_url: (optional) Power Control URL
 
      - A DLPWS7 URL (:py:class:`ttbl.pc.dlwps7`), if given, will create a
        target *YKNNNNN* to power on or off the whole hub and wait for it
        to connect to the system.
 
-     - If None, no power control targets for the whole hub will be
-       created. It will just be expected the hub is connected permanently
-       to the system.
+     - If *None* (default) no power control targets for the whole hub
+       will be created. It will just be expected the hub is connected
+       permanently to the system.
 
     :param bool powered_on_start: what to do with the power on the
       downstream ports:
