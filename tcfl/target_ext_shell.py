@@ -582,7 +582,7 @@ class shell(tc.target_extension_c):
 
         Assumes the target has python3; permissions are not maintained
 
-        See :meth:`copy_to_file`
+        See :meth:`file_copy_to`
 
         .. note:: it is *slow*. The limits are not well defined; how
                   big a file can be sent/received will depend on local
