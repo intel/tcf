@@ -18,24 +18,25 @@ ellaborate and complicated to send/expect for.
 This is a collection of tools to handle them. Most of this functions
 can be used from test scripts to navigate BIOS menus, such as
 
-- :func:menu_scroll_to_entry
-- :func:menu_dig_to
-- :func:main_menu_expect
-- :func:boot_select_entry
-- :func:boot_efi_shell or :func:boot_network_pxe or :func:boot_network_http
+- :func:`menu_scroll_to_entry`
+- :func:`menu_dig_to`
+- :func:`main_menu_expect`
+- :func:`main_boot_select_entry`
+- :func:`boot_efi_shell` or :func:`boot_network_pxe` or
+  :func:`boot_network_http`
 
 All funcions will raise :exc:tcfl.tc.error_e if they cannot find what
 is expected at any time. In some cases they will try to recover but
 will give up after a certain number of tries.
 
-.. _biosl_ansi_sortref:
+.. _biosl_ansi_shortref:
 
 ANSI short reference
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
 
 A string such as::
 
-  [1m[37m[40m[1m[37m[40m[02;03HEFI Shell
+  ^[[1m^[[37m^[[40m^[[1m^[[37m^[[40m^[[02;03HEFI Shell
 
 (where *^[* is the escape character, hex 0x1b) means:
 
@@ -50,7 +51,7 @@ highlighted, it is printed in:
 
 - bold on white foreground black background::
 
-    [0m[37m[40m[1m[37m[40m[02;03HENTRY
+    ^[[0m^[[37m^[[40m^[[1m^[[37m^[[40m^[[02;03HENTRY
 
 - bold on white foregound, blue background
 
@@ -58,7 +59,7 @@ highlighted, it is printed in:
 
 We can use regular Python expressions, such as::
 
-  \x1b[1m\x1b\[37m\x1b\[40m\x1b\[[0-9]+;[0-9]+HLaunch EFI Shell
+  \\x1b[1m\\x1b\[37m\\x1b\[40m\\x1b\[[0-9]+;[0-9]+HLaunch EFI Shell
 
 References:
 
@@ -194,14 +195,14 @@ def menu_scroll_to_entry(
       highlighted; defaults to ANSI normal (non bold), white
       foreground, black background::
 
-        \x1b[0m\x1b\[37m\x1b\[40m
+        \\x1b[0m\\x1b\[37m\\x1b\[40m
 
 
     :param str normal_string: (optional) sequence that prefixes an
       entry not highlighted; defaults to ANSI normal, black
       foreground, white background::
 
-        \x1b[0m\x1b\[30m\x1b\[47m
+        \\x1b[0m\\x1b\[30m\\x1b\[47m
 
     :param str level: (optional; defaults to *top*): the name of the
       level we are working on.
@@ -426,7 +427,7 @@ def menu_dig_to(
       *HASVALUE*. 
 
       *HASVALUE* is a boolean that indicates the entry is a key/value
-      entry (see :func:menu_scroll_to_entry).
+      entry (see :func:`menu_scroll_to_entry`).
 
     :param str canary_end_menu_redrawn: (optional) string that is
       printed when the whole menu has been refreshed (and thus marks
@@ -436,7 +437,7 @@ def menu_dig_to(
       entry being highlighted; defaults to ANSI normal (non bold),
       white foreground, black background::
 
-        \x1b[0m\x1b\[37m\x1b\[40m
+        \\x1b[0m\\x1b\[37m\\x1b\[40m
 
     :param bool dig_last: (optional; default *True*) select the last
       menu entry once highlighted.
@@ -518,7 +519,7 @@ def submenu_header_expect(
     When a submenu or dialog box is printed, it is prefixed by a
     header like::
 
-      /------------------------------------\
+      /------------------------------------\\
       |                                    |
       |           Submenu title            |
       |                                    |
@@ -593,7 +594,7 @@ def multiple_entry_select_one(
     The menu is usually printed like (blue background, white foreground,
     yellow highlight, like::
 
-      /------------\
+      /------------\\
       | Enable     |
       | Disable    |
       \------------/
@@ -610,7 +611,7 @@ def multiple_entry_select_one(
        ^[[11;34H
        ^[[12;34H
        ^[[13;34H
-       ^[[10;34H^[[10;34H/------------\
+       ^[[10;34H^[[10;34H/------------\\
        ^[[11;34H|^[[11;47H|^[[12;34H|^[[12;47H|	 <--- vertical bars |
        ^[[1m^[[37m^[[46m^[[11;36HEnable
        ^[[0m^[[37m^[[44m^[[12;36HDisable
@@ -780,7 +781,8 @@ def dialog_changes_not_saved_expect(target, action):
       *\x1b*)
 
     ::
-      /---------------------------------------------------------------------\
+
+      /---------------------------------------------------------------------\\
       |                                                                     |
       |           Changes have not saved. Save Changes and exit?            |
       |Press 'Y' to save and exit, 'N' to discard and exit, 'ESC' to cancel.|
@@ -938,8 +940,10 @@ def boot_network_http_boot_add_entry(target, entry, url):
          MAC:UPPERCASEMACADDR > HTTP Boot Configuration*
 
       2. Leaf menu white bg, black fg
+
          - Prints "HTTP Boot Configuration" menu banner (bold, blue
            bg, white fg)
+
          - two columns, key and value; value printed first
            (highlighted) to the right, then key to the left
            highlight: normal, black bg, white fg::
