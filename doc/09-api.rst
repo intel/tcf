@@ -354,9 +354,10 @@ Provisioning OS specific metadata
 - *pos_image*: string describing the image used to boot the target in
   POS mode; defaults to *tcf-live*.
 
-  For each image, in the server, :data:`ttbl.pxe.pos_cmdline_opts`
-  describes the kernel options to append to the kernel image, which is
-  expected to be found in *http://:data:`POS_HTTP_URL_PREFIX
+  For each image, in the server, :data:`ttbl.pxe.pos_cmdline_opts
+  <ttbl.pxe.pos_cmdline_opts>` describes the kernel options to append
+  to the kernel image, which is expected to be found in
+  *http://:data:`POS_HTTP_URL_PREFIX
   <pos_http_url_prefix>`/vmlinuz-POS_IMAGE* for HTTP boot. For other
   boot methods (eg: TFTP) the driver shall copy the files around as
   needed.
@@ -456,7 +457,7 @@ Provisioning OS specific metadata
 
 .. automodule:: ttbl
 
-.. _target_control:
+.. _target_access_control:
 
 User access control and authentication
 --------------------------------------
