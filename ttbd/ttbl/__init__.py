@@ -1384,7 +1384,7 @@ class test_target(object):
 
           Field names can use periods to dig into dictionaries.
 
-          Field names can match :mod:`python.fnmatch` regular
+          Field names can match :mod:`fnmatch` regular
           expressions.
         """
 
