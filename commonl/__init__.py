@@ -1415,7 +1415,7 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
     :param str prefix: prefix to start with (defaults to nothing)
     :param str separator: used to separate dictionary keys from the
       prefix (defaults to ".")
-    :param FILE of: output stream where to print (defaults to
+    :param :python:file of: output stream where to print (defaults to
       *sys.stdout*)
     :param int depth_limit: maximum nesting levels to go deep in the
       data structure (defaults to 10)
@@ -1478,7 +1478,7 @@ def data_dump_recursive_tls(d, tls, separator = u".", of = sys.stdout,
     Parameters are as documented in :func:`data_dump_recursive`,
     except for:
 
-    :param thread._local tls: thread local storage to use (as returned
+    :param threading.local tls: thread local storage to use (as returned
       by *threading.local()*
     """
     assert isinstance(separator, basestring)
