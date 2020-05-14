@@ -6,10 +6,14 @@
 #
 
 import hashlib
+import logging
+
 import ttbl
 
 class authenticator_localdb_c(ttbl.authenticator_c):
     """Use a simple DB to authenticate users
+
+    **THIS MODULE IS DEPRECATED:** use :class:`ttbl.auth_userdb.driver`.
 
     To configure, create a config file that looks like:
 
@@ -40,6 +44,8 @@ class authenticator_localdb_c(ttbl.authenticator_c):
         assert isinstance(name, basestring)
         assert isinstance(users, list)
 
+        logging.error("WARNING! auth_localdb with user lists is deprecated,"
+                      " use auth_userdb")
         self.name = name
         self.passwords = {}
         self.roles = {}

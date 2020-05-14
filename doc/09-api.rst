@@ -464,9 +464,10 @@ TTBD provides for means for users to authenticate themselves to the
 system and to decide which users can see and use what targets.
 
 TTBD, however, does not implement the authentication; that is
-delegated to :class:`*authentication drivers* <ttbl.authenticator_c>`
-which can authenticate a user agains LDAP, a local database, any
-remote service, etc.
+delegated to :class:`authentication drivers <ttbl.authenticator_c>`
+which can authenticate a user agains :class:`LDAP
+<ttbl.auth_ldap.authenticator_ldap_c>`, a :class:`local database
+<ttbl.auth_userdb.driver>`, any remote service, etc.
 
 When a user succesfully *logs in*, the authentication drivers, based
 on their configuration, provide a list of roles the user has, each
@@ -500,6 +501,7 @@ authentication system and would exclude anyone with the role *guest*.
 .. automodule:: ttbl.auth_ldap
 .. automodule:: ttbl.auth_localdb
 .. automodule:: ttbl.auth_party
+.. automodule:: ttbl.auth_userdb
 
 Console Management Interface
 ----------------------------

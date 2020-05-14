@@ -65,11 +65,8 @@ record = "%s:%s:%d:%s:%s" % (
     password_hashed.hexdigest()[:args.digest_len])
 if args.path:
     path = os.path.join(args.path, args.username)
-    try:
-        os.unlink(path)
-    except OSError as e:
-        if e.errno != errno.ENOENT:
-            raise
-    os.symlink(record, path)
+    os.umask(0o037)	# remove write perms for group/others
+    with open(path, "w") as f:
+        f.write(record + "\n")
 else:
     print(args.username + ":" + record)

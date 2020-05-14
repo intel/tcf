@@ -1929,26 +1929,7 @@ Configure simple authentication / for Jenkins jobs (optional)
 -------------------------------------------------------------
 
 You can setup static accounts for users or Jenkins autobuilders with
-hardcoded passwords by creating a file
-``/etc/ttbd-production/conf_00_auth_localdb.py`` with the contents:
-
-.. code-block:: python
-
-   import ttbl.auth_localdb
-
-   ttbl.config.add_authenticator(ttbl.auth_localdb.authenticator_localdb_c(
-        "Jenkins and other",
-        [
-            [ 'usera', 'PASSWORDA', 'user', ],
-            [ 'superuserB', 'PASSWORDB', 'user', 'admin', ],
-            [ 'jenkins1', 'PASSWORD1', 'user', ],
-            [ 'jenkins2', 'PASSWORD2', 'user', ],
-            ...
-        ]))
-
-Restart to read the configuration::
-
-  # systemctl restart ttbd@production
+passwords by following the instructions in :class:`ttbl.auth_userdb.driver`
 
 .. _ttbd_config_auth_ldap:
 
