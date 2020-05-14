@@ -1306,7 +1306,8 @@ EOF""")
           partition tables to be re-read; defaults to 30s (some HW
           needs more than others and there is no way to make a good
           determination) or whatever is specified in target
-          tag/property :ref:`pos_partscan_timeout`.
+          tag/property :ref:`*pos_partscan_timeout*
+          <pos_partscan_timeout>`.
         """
         assert timeout == None or timeout > 0, \
             "timeout must be None or a positive number of seconds; " \
@@ -1662,6 +1663,7 @@ cat > /tmp/deploy.ex
 %s/*
 %s
 \x04""" % (persistent_tcf_d, persistent_tcf_d, '\n'.join(cache_locations)))
+                # \x04 is EOF, like pressing Ctrl-D in the shell
                 # DO NOT use --inplace to sync the image; this might
                 # break certain installations that rely on hardlinks
                 # to share files and then updating one pushes the same
@@ -1679,7 +1681,7 @@ cat > /tmp/deploy.ex
                                        re.MULTILINE)
                 m = kpi_regex.search(output)
                 if not m:
-                    raise tcfl.tc.error_e(
+                    raise tc.error_e(
                         "Can't find regex %s in output" % kpi_regex.pattern,
                         dict(output = output))
                 target.report_data("Deployment stats image %(image)s" % kws,
