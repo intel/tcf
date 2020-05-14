@@ -1908,6 +1908,173 @@ def deploy_path(ic, target, _kws, cache = True):
     for _source_path in source_path:
         _rsync_path(_source_path, dst_path)
 
+
+#: List of string with Linux kernel command options to be passed by
+#: the bootloader
+#:
+
+pos_cmdline_opts = {
+    # FIXME: this is now also in the server, but different clients
+    # also need it depending on the boot method; we need a way to be
+    # able to have a single source for them.
+    'tcf-live':  [
+        # Command Line options for TCF-Live (as created in
+        # tcf.git/ttbd/live
+        #
+        # If you need to debug dracut/initrd/bootup, uncomment these
+        #"rd.info",
+        #"rd.debug",		# WARNING! Very noisy!!
+        # Some networks devices need a lot of time to come up. Oh well
+        "rd.net.timeout.carrier=30",
+        # no 'single' so it force starts getty on different ports
+        # this needs an initrd
+        # needed by Fedora running as live FS hack, so disable selinux
+        # and auditing
+        "rd.live.image",
+        # We need SELinux disabled--otherwise some utilities (eg:
+        # rsync) can't operate properly on the SELinux attributes they need to
+        # move around without SELinux itself getting on the way.
+        "selinux=0", "enforcing=0",
+        "audit=0",
+        # We would hardcode the IP address because we know it ahead of time
+        # *and* it is faster, but we'd lack DNS then
+        #"ip=%(ipv4_addr)s:::%(ipv4_netmask)s::eth0:none",
+        "ip=dhcp",
+        "ro",				# we are read only
+        "quiet",			# don't print much of the boot process
+        "loglevel=2",                   # kernel, be quiet to avoid
+                                        # your messages polluting the
+                                        # serial terminal
+        "plymouth.enable=0 ",		# No installer to run
+        # so syscfg BIOS config utility can run in POS environment
+        "iomem=relaxed",
+        "root=/dev/nfs",
+        "nfsroot=%(pos_nfs_server)s:%(pos_nfs_path)s,soft,nolock,nfsvers=3",
+    ]
+}
+
+
+def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
+    """Wait for iPXE to boot on a serial console, seize control and
+    direct boot to a giveb TCF POS image
+
+    This function is a building block to implement functionality to
+    force a target to boot to Provisioning OS; once a target is made
+    to boot an iPXE bootloader that has enabled Ctrl-B (to interrupt
+    the boot process) functionality, this function sends Ctrl-Bs to
+    get into the iPXE command line and then direct the system to boot
+    the provisioning OS image described
+
+    :param tcfl.tc.target_c target: target on which to operate
+
+    :param bool dhcp: (optional) have iPXE issue DHCP for IP
+      configuration or manually configure using target's data.
+
+    :param str url: (optional) base URL where to load the *pos_image*
+      from; this will ask to load *URL/vmlinuz-POSIMAGE* and
+      *URL/initrd-POSIMAGE*.
+
+      By default, this is taken from the target's keywords
+      (*pos_http_url_prefix*) or from the boot interconnect.
+
+    :param str pos_image: (optional; default *tcf-live*) name of the
+      POS image to load.
+
+    """
+    # can't wait also for the "ok" -- debugging info might pop in th emiddle
+    target.expect("iPXE initialising devices...")
+    # if the connection is slow, we have to start sending Ctrl-B's
+    # ASAP
+    #target.expect(re.compile("iPXE .* -- Open Source Network Boot Firmware"))
+
+    # send Ctrl-B to go to the PXE shell, to get manual control of iPXE
+    #
+    # do this as soon as we see the boot message from iPXE because
+    # otherwise by the time we see the other message, it might already
+    # be trying to boot pre-programmed instructions--we'll see the
+    # Ctrl-B message anyway, so we expect for it.
+    #
+    # before sending these "Ctrl-B" keystrokes in ANSI, but we've seen
+    # sometimes the timing window being too tight, so we just blast
+    # the escape sequence to the console.
+    target.console.write("\x02\x02")	# use this iface so expecter
+    time.sleep(0.3)
+    target.console.write("\x02\x02")	# use this iface so expecter
+    time.sleep(0.3)
+    target.console.write("\x02\x02")	# use this iface so expecter
+    time.sleep(0.3)
+    target.expect("Ctrl-B")
+    target.console.write("\x02\x02")	# use this iface so expecter
+    time.sleep(0.3)
+    target.console.write("\x02\x02")	# use this iface so expecter
+    time.sleep(0.3)
+    target.expect("iPXE>")
+    prompt_orig = target.shell.shell_prompt_regex
+    try:
+        #
+        # When matching end of line, match against \r, since depends
+        # on the console it will send one or two \r (SoL vs SSH-SoL)
+        # before \n -- we removed that in the kernel driver by using
+        # crnl in the socat config
+        #
+        # FIXME: block on anything here? consider infra issues
+        # on "Connection timed out", http://ipxe.org...
+        target.shell.shell_prompt_regex = "iPXE>"
+        kws = dict(target.kws)
+        boot_ic = target.kws['pos_boot_interconnect']
+        ipv4_addr = target.kws['interconnects'][boot_ic]['ipv4_addr']
+        ipv4_prefix_len = target.kws['interconnects'][boot_ic]['ipv4_prefix_len']
+        kws['ipv4_netmask'] = commonl.ipv4_len_to_netmask_ascii(ipv4_prefix_len)
+
+        if dhcp:
+            target.shell.run("dhcp", re.compile("Configuring.*ok"))
+            target.shell.run("show net0/ip", "ipv4 = %s" % ipv4_addr)
+        else:
+            # static is much faster and we know the IP address already
+            # anyway; but then we don't have DNS as it is way more
+            # complicated to get it
+            target.shell.run("set net0/ip %s" % ipv4_addr)
+            target.shell.run("set net0/netmask %s" % kws['ipv4_netmask'])
+            target.shell.run("ifopen")
+
+        if pos_image == None:
+            pos_image = target.kws.get('pos_image', None)
+        if pos_image == None:
+            raise tc.blocked_e(
+                "POS: cannot determine what provisioning image is to be used"
+                "; (no pos_image provided and target doesn't provide"
+                " *pos_image* to indicate it")
+        kws['pos_cmdline_opts'] = \
+            " ".join(pos_cmdline_opts[pos_image]) % kws
+        if url == None:
+            url = target.kws['pos_http_url_prefix']
+
+        target.shell.run("set base %s" % url)
+        # command line options in a variable so later the command line
+        # doesn't get too long and maybe overfill some buffer (has
+        # happened before)
+        target.shell.run(
+            "set cmdline %(pos_cmdline_opts)s" % kws)
+        target.shell.run(
+            "kernel"
+            " ${base}vmlinuz-%(pos_image)s"
+            " initrd=initramfs-%(pos_image)s"
+            " console=tty0 console=%(linux_serial_console_default)s,115200"
+            " ${cmdline}"
+            % kws,
+            # .*because there are a lot of ANSIs that can come
+            re.compile(r"\.\.\..* ok"))
+        target.shell.run(
+            "initrd ${base}initramfs-%(pos_image)s"
+            % kws,
+            # .*because there are a lot of ANSIs that can come
+            re.compile(r"\.\.\..* ok"))
+        target.send("boot")
+        # now the kernel boots
+    finally:
+        target.shell.shell_prompt_regex = prompt_orig
+
+
 # FIXME: when tc.py's import hell is fixed, this shall move to tl.py?
 
 class tc_pos0_base(tc.tc_c):
