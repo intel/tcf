@@ -56,8 +56,7 @@ would need a different context:
 - a global detector in the same number of threads as above looking for
   signs of a shell command that caused an error in the console; this
   also uses the *detect_context* and is done by
-  :meth:`target.shell.setup
-  <tcfl.tc.target_ext_shell.extension.setup>`.
+  :meth:`target.shell.setup <tcfl.target_ext_shell.shell.setup>`.
 
 - another detector in any number of threads looking for telltale signs
   of a Kernel Crash message; this would have its own context as it is
@@ -103,13 +102,13 @@ def _poll_context(target, console):
 
 
 class expect_text_on_console_c(tc.expectation_c):
-    """
-    Object that expects to find a string or regex in a target's
+    """Object that expects to find a string or regex in a target's
     serial console.
 
-    See parameter description in builder :meth:`console.expect_text`,
-    as this is meant to be used with the expecter engine,
-    :meth:`tcfl.tc.tc_c.expect`.
+    See parameter description in builder :meth:`target.console.text
+    <tcfl.target_ext_console.extension.text>`, as this is meant to be
+    used with the expecter engine, :meth:`tcfl.tc.tc_c.expect`.
+
     """
     def __init__(self,
                  text_or_regex,
@@ -324,10 +323,12 @@ class expect_text_on_console_c(tc.expectation_c):
 
     def detect(self, testcase, run_name, buffers_poll, _buffers):
         """
-        See :meth:`expectation_c.detect` for reference on the arguments
+        See :meth:`tcfl.tc.expectation_c.detect` for reference on the
+        arguments
 
         :returns: dictionary of data describing the match, including
           an interator over the console output
+
         """
 
         target = self.target

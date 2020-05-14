@@ -1643,9 +1643,9 @@ class target_c(reporter_c):
         Note this does not wait for said string; you need to run the
         testcase's *expecter* loop with::
 
-        >>>  self.tls.expecter.run()
+        >>> self.expect()
 
-        Als well, those actions will be performed when running
+        As well, those actions will be performed when running
         :meth:`expect` or :meth:`wait` for blocking versions.
 
         This allows you to specify many different things you are
@@ -1677,7 +1677,7 @@ class target_c(reporter_c):
           actions are added indicating they are expected to pass, the
           seven of them must have raised a pass exception (or
           indicated passage somehow) before the loop will consider it
-          a full pass. See :py:meth:`tcfl.expecter.expecter_c.run`.
+          a full pass. See :py:meth:`tcfl.tc.tc_c.expect`.
 
         :raises: :py:exc:`tcfl.tc.pass_e`,
           :py:exc:`tcfl.tc.blocked_e`, :py:exc:`tcfl.tc.failed_e`,
@@ -2937,8 +2937,7 @@ def interconnect(spec = None, name = None, **kwargs):
     return decorate_class
 
 class expectation_c(object):
-    '''
-    Expectations are something we expect to find in the data polled
+    '''Expectations are something we expect to find in the data polled
     from a source.
 
     An object implementing this interface can be given to
@@ -2957,8 +2956,10 @@ class expectation_c(object):
     an error), or if not found, timeout exceptions can be raised.
 
     See :meth:`tcfl.tc.tc_c.expect` for more details and
-    :class:`tcfl.target_ext_console.expect_text_on_console_c` and
-    :class:`tcfl.target_ext_capture._expect_image_on_screenshot_c` for
+    :class:`target.console.text
+    <tcfl.target_ext_console.expect_text_on_console_c>` and
+    :class:`target.capture.image_on_screenshot
+    <tcfl.target_ext_capture.extension.image_on_screenshot>` for
     implementation examples.
 
     .. note:: the :meth:`poll` and :meth:`detect` methods will be
@@ -3448,6 +3449,41 @@ class tc_c(reporter_c):
 
         self.__init_shallow__(None)
         self.name = name
+
+        #: Keywords for *%(KEY)[sd]* substitution specific to this
+        #: testcase.
+        #:
+        #: Note these do not include values gathered from remote
+        #: targets (as they would collide with each other). Look at
+        #: data:`target.kws <tcfl.tc.target_c.kws>` for that.
+        #:
+        #: These can be used to generate strings based on information,
+        #: as:
+        #:
+        #:   >>>  print "Something %(FIELD)s" % target.kws
+        #:   >>>  target.shcmd_local("cp %(FIELD)s.config final.config")
+        #:
+        #: Fields available:
+        #:
+        #:   - `runid`: string specified by the user that applies to
+        #:     all the testcases
+        #:
+        #:   - `srcdir` and `srcdir_abs`: directory where this
+        #:     testcase was found
+        #:
+        #:   - `thisfile`: file where this testscase as found
+        #:
+        #:   - `tc_hash`: unique four letter ID assigned to this
+        #:     testcase instance. Note that this is the same for all
+        #:     the targets it runs on. A unique ID for each target of
+        #:     the same testcase instance is the field *tg_hash* in the
+        #:     target's keywords :data:`target.kws
+        #:     <tcfl.tc.target_c.kws>` (FIXME: generate, currently
+        #:     only done by app builders)
+        #:
+        #: (this will actually be fully initialzied in *__init_shallow__()*)
+        self.kws = {}
+
         self.kw_set('pid', str(os.getpid()))
         self.kw_set('tid', "%x" % threading.current_thread().ident)
         # use instead of getfqdn(), since it does a DNS lookup and can
@@ -3620,51 +3656,22 @@ class tc_c(reporter_c):
         #: cases, they do not.
         self.do_acquire = True
 
+        #: Lock to access :attr:`buffers` safely from multiple threads
+        #: at the same time for the same testcase.
+        self.lock = None	# initialized by __init_shallow__()
+
 
     def __init_shallow__(self, other):
         # Called by clone() to initialize those things that are
         # different in shallow clones (instances that are almost
         # identical except for ... a few things)
 
-        #: Lock to access :attr:`buffers` safely from multiple threads
-        #: at the same time for the same testcase.
         self.lock = threading.Lock()
 
 	#: For use during execution of phases; testcase drivers can
         #: store anything they need during the execution of each phase.
         #: It will be, however, deleted when the phase is completed.
         self.buffers = {}
-        #: Keywords for *%(KEY)[sd]* substitution specific to this
-        #: testcase.
-        #:
-        #: Note these do not include values gathered from remote
-        #: targets (as they would collide with each other). Look at
-        #: data:`target.kws <tcfl.tc.target_c.kws>` for that.
-        #:
-        #: These can be used to generate strings based on information,
-        #: as:
-        #:
-        #:   >>>  print "Something %(FIELD)s" % target.kws
-        #:   >>>  target.shcmd_local("cp %(FIELD)s.config final.config")
-        #:
-        #: Fields available:
-        #:
-        #:   - `runid`: string specified by the user that applies to
-        #:     all the testcases
-        #:
-        #:   - `srcdir` and `srcdir_abs`: directory where this
-        #:     testcase was found
-        #:
-        #:   - `thisfile`: file where this testscase as found
-        #:
-        #:   - `tc_hash`: unique four letter ID assigned to this
-        #:     testcase instance. Note that this is the same for all
-        #:     the targets it runs on. A unique ID for each target of
-        #:     the same testcase instance is the field *tg_hash* in the
-        #:     target's keywords :data:`target.kws
-        #:     <tcfl.tc.target_c.kws>` (FIXME: generate, currently
-        #:     only done by app builders)
-        #:
         if other:
             self.kws = dict(other.kws)
         else:
@@ -3816,13 +3823,13 @@ class tc_c(reporter_c):
     def run_local(self, command, expect = None, cwd = None):
         """
         Run a command on the local system with an interface similar to
-        :meth:`target.shell.run <tcfl.target_ext_shell.extension.run>`.
+        :meth:`target.shell.run <tcfl.target_ext_shell.shell.run>`.
 
         This is similar to :meth:`shcmd_local`.
 
         :param str command: command line to run (will be run a shell command)
 
-        :param str,re._pattern_type expect: (optional) if defined, a
+        :param str or re._pattern_type expect: (optional) if defined, a
           string or regular expression that shall be found in the output
           of the command, raising :exc:`tcfl.tc.failed_e` otherwise.
 
@@ -5223,13 +5230,14 @@ class tc_c(reporter_c):
         message. If not found, nothing happens.
 
         The second will default to be called whatever the
-        :class:`image_on_screenshot` calls it (*icon-power.png*),
-        while the second will have it's name overriden to
-        *config_button*. These last two will capture an screenshot
-        from the target's screenshot capturer called *screen* and the
-        named icons need to be found for the call to be
-        succesful. Otherwise, error exceptions due to timeout will be
-        raised.
+        :class:`target.capture.image_on_screenshot
+        <tcfl.target_ext_capture.extension.image_on_screenshot>`
+        calls it (*icon-power.png*), while the second will have it's
+        name overriden to *config_button*. These last two will capture
+        an screenshot from the target's screenshot capturer called
+        *screen* and the named icons need to be found for the call to
+        be succesful. Otherwise, error exceptions due to timeout will
+        be raised.
 
         The list of expectations that will be always scanned is in
         this order:
@@ -5280,6 +5288,7 @@ class tc_c(reporter_c):
           or something as:
 
           >>> "somefilename:43"
+
         """
         origin = exps_kws.pop('origin', None)
         if origin == None:
@@ -5619,10 +5628,10 @@ class tc_c(reporter_c):
           The rest of the arguments will be the ones supplied with
           *args* and *kwargs*.
 
-        :param tuple args: (optional, default none) extra arguments to
+        :param args: (optional, default none) extra arguments to
           pass to each function call
 
-        :param tuple kwargs: (optional, default none) extra keyword
+        :param dict kwargs: (optional, default none) extra keyword
           arguments to pass to each function call
 
         :param list(str) targets: (optional, default all testcase's
