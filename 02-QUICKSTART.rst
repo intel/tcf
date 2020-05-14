@@ -8,7 +8,14 @@
 
 .. include:: doc/02-client-setup-LL-00.rst
 
-1. Install the client software from source::
+1. Install the client software from source; install Python2
+   development support::
+
+     $ sudo dnf install -y python2-devel	# Fedora
+     $ sudo yum install -y python2-devel	# older CentOS/RHEL
+     $ sudo apt install -y python-dev		# Ubuntu
+
+   now clone install Python dependencies and install the TCF client::
 
      $ git clone http://github.com/intel/tcf tcf.git
      $ cd tcf.git
@@ -42,6 +49,7 @@
    `~/.tcf/conf_servers.py` or `/etc/tcf/conf_servers.py`::
 
      $ mkdir -p ~/.tcf
+     $ vi ~/.tcf/conf_servers.py
    
    .. include:: doc/02-client-setup-LL-03.rst
 
