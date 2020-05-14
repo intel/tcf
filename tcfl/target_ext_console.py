@@ -1171,6 +1171,8 @@ def f_write_retry_eagain(fd, data):
                 continue
             raise
 
+_flags_set = None
+_flags_old = None
 
 def _console_read_thread_fn(target, console, fd, offset):
     # read in the background the target's console output and print it
@@ -1215,6 +1217,10 @@ def _console_read_thread_fn(target, console, fd, offset):
             except Exception as e:	# pylint: disable = broad-except
                 logging.exception(e)
                 raise
+            finally:
+                if _flags_set:
+                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN,
+                                      _flags_old)
 
 
 def _cmdline_console_write_interactive(target, console, crlf, offset):
@@ -1239,13 +1245,13 @@ WARNING: This is a very limited interactive console
         pass
 
     if sys.stdin.isatty():
-        flags_set = True
-        old_flags = termios.tcgetattr(sys.stdin.fileno())
+        _flags_set = True
+        _flags_old = termios.tcgetattr(sys.stdin.fileno())
     else:
-        flags_set = False
+        _flags_set = False
     try:
         one_escape = False
-        if flags_set:
+        if _flags_set:
             tty.setraw(sys.stdin.fileno())
             flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFD)
             fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
@@ -1278,8 +1284,9 @@ WARNING: This is a very limited interactive console
                 # If no data ready, wait a wee, try again
                 time.sleep(0.25)
     finally:
-        if flags_set:
-            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_flags)
+        if _flags_set:
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN,
+                              _flags_old)
 
 def _offset_calc(target, console, offset):
     if offset >= 0:
