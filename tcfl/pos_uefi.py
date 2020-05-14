@@ -398,47 +398,64 @@ def _linux_boot_guess(target, image):
         return kernel, initrd, options
     return None, None, None
 
+#
+# Boot order manipulation
+#
 
-pos_boot_names = [
-    # UEFI Network
-    # UEFI Network N
-    re.compile(r"^UEFI Network(\s+[0-9]+)?$"),
-    # UEFI: PXE IP[46].*
-    # UEFI PXEv[46].*
-    re.compile(r"^UEFI:?\s+PXE[v ](IP)?[46].*$"),
-    # UEFI: IP4 Intel(R) Ethernet Connection I354
-    # UEFI : LAN : IP[46] Intel(R) Ethernet Connection (\(3\))? I218-V
-    # UEFI : LAN : IP[46] Realtek PCIe GBE Family Controller
-    # UEFI : LAN : PXE IP[46] Intel(R) Ethernet Connection (2) I219-LM
-    re.compile(r"^UEFI\s?:( LAN :)? (IP|PXE IP)[46].*$"),
-]
+pos_boot_names = {
+    'pxe': [
+        # UEFI Network
+        # UEFI Network N
+        re.compile(r"^UEFI Network(\s+[0-9]+)?$"),
+        # UEFI: PXE IP[46].*
+        # UEFI PXEv[46].*
+        re.compile(r"^UEFI:?\s+PXE[v ](IP)?[46].*$"),
+        # UEFI: IP4 Intel(R) Ethernet Connection I354
+        # UEFI : LAN : IP[46] Intel(R) Ethernet Connection (\(3\))? I218-V
+        # UEFI : LAN : IP[46] Realtek PCIe GBE Family Controller
+        # UEFI : LAN : PXE IP[46] Intel(R) Ethernet Connection (2) I219-LM
+        re.compile(r"^UEFI\s?:( LAN :)? (IP|PXE IP)[46].*$"),
+    ],
+}
 
-tcf_local_boot_names = [
-    # TCF Localboot v2
-    re.compile("^TCF Localboot v2$"),
-]
+tcf_local_boot_names = {
+    "default": [
+        # TCF Localboot v2
+        re.compile("^TCF Localboot v2$"),
+    ],
+}
 
-local_boot_names = [
-    # UEFI : INTEL SSDPEKKW010T8 : PART 0 : OS Bootloader
-    # UEFI : SATA : PORT 0 : INTEL SSDSC2KW512G8 : PART 0 : OS Bootloader
-    # UEFI : M.2 SATA :INTEL SSDSCKJF240A5 : PART 0 : OS Bootloader
-    re.compile("^UEFI : .* PART [0-9]+ : OS Bootloader$"),
-]
+local_boot_names = {
+    "default":  [
+        # UEFI : INTEL SSDPEKKW010T8 : PART 0 : OS Bootloader
+        # UEFI : SATA : PORT 0 : INTEL SSDSC2KW512G8 : PART 0 : OS Bootloader
+        # UEFI : M.2 SATA :INTEL SSDSCKJF240A5 : PART 0 : OS Bootloader
+        re.compile("^UEFI : .* PART [0-9]+ : OS Bootloader$"),
+    ]
+}
 
-def _name_is_pos_boot(name):
-    for regex in pos_boot_names:
+def _name_is_pos_boot(name, boot_config):
+    _pos_boot_names = pos_boot_names.get(boot_config,
+                                         pos_boot_names.get("default", []))
+    for regex in _pos_boot_names:
         if regex.search(name):
             return True
     return False
 
-def _name_is_tcf_local_boot(name):
-    for regex in tcf_local_boot_names:
+def _name_is_tcf_local_boot(name, boot_config):
+    _tcf_local_boot_names = tcf_local_boot_names.get(
+        boot_config,
+        tcf_local_boot_names.get("default", []))
+    for regex in _tcf_local_boot_names:
         if regex.search(name):
             return True
     return False
 
-def _name_is_local_boot(name):
-    for regex in local_boot_names:
+def _name_is_local_boot(name, boot_config):
+    _local_boot_names = local_boot_names.get(
+        boot_config,
+        local_boot_names.get("default", []))
+    for regex in _local_boot_names:
         if regex.search(name):
             return True
     return False
@@ -450,7 +467,6 @@ _entry_regex = re.compile(
     r"^Boot(?P<entry>[0-9A-F]{4})\*? (?P<name>.*)$", re.MULTILINE)
 
 def _efibootmgr_output_parse(target, output):
-
     boot_order_match = _boot_order_regex.search(output)
     if not boot_order_match:
         raise tc.error_e("can't extract boot order",
@@ -460,14 +476,15 @@ def _efibootmgr_output_parse(target, output):
     entry_matches = re.findall(_entry_regex, output)
     # returns a list of [ ( HHHH, ENTRYNAME ) ], HHHH hex digits, all str
 
+    boot_config = target.pos.capabilities.get('boot_config', None)
     boot_entries = []
     for entry in entry_matches:
-        if _name_is_pos_boot(entry[1]):
+        if _name_is_pos_boot(entry[1], boot_config):
             section = 0		# POS (PXE, whatever), boot first
-        elif _name_is_tcf_local_boot(entry[1]):
+        elif _name_is_tcf_local_boot(entry[1], boot_config):
             section = 05	# TCF local boots, always first so we
                                 # can control
-        elif _name_is_local_boot(entry[1]):
+        elif _name_is_local_boot(entry[1], boot_config):
             section = 10	# LOCAL, boot after
         else:
             section = 20	# others, whatever
