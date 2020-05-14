@@ -11,9 +11,9 @@
 1. Install the client software from source; install Python2
    development support::
 
-     $ sudo dnf install -y python2-devel	# Fedora <= 30
-     $ sudo yum install -y python2-devel	# CentOS/RHEL 7
-     $ sudo apt install -y python-dev		# Ubuntu <= 18
+     $ sudo dnf install -y python2-devel python2-pip  # Fedora <= 30
+     $ sudo yum install -y python2-devel python2-pip  # CentOS/RHEL 7
+     $ sudo apt install -y python-dev python-pip      # Ubuntu <= 18
 
    (TCF is still using python2, hence the limitation to older ditros
    that still support it, we are in the process of porting to Python3;
@@ -30,8 +30,9 @@
    troubleshooting<tcf_client_install_troubleshooting>` for things
    that can go wrong)
 
-   .. note:: Ensure your PATH includes *$HOME/.local/bin*, where *install
-             --user* puts things, by adding to *~/.bashrc*::
+   .. note:: For **Ubuntu** (mostly): ensure your PATH includes
+             *$HOME/.local/bin*, where *install --user* puts things,
+             by adding to *~/.bashrc*::
      
                $ echo 'test -z "${PATH##*$HOME/.local/bin*}" || export PATH=$PATH:$HOME/.local/bin' >> ~/.bashrc
 
