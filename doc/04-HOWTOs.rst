@@ -224,109 +224,95 @@ Run::
 
 .. _howto_target_keep_acquired:
 
+How do I keep a target acquired
+-------------------------------
+
+The server will release targets it considers idle.
+
+The server considers activity, once acquired
+
+ - running server commands (such as power control, console
+   reading/writing, accessing buttons, etc)
+
+ - script execution (since those run commands)
+
+The server can't detect as activity:
+
+ - accessing the target via a tunnel (eg: an SSH session)
+
+ - accessing the target via the network or instrumentation not
+   abstracted by the server (eg: a KVM)
+
+When the server doesn't detect activity, it will release the target to
+make it available to others. If the system is being actively used, but
+you find the server making it available because you are using
+interfaces that the server doesn't know about, you can run::
+
+  $ tcf acquire TARGETs --hold
+
+``--hold`` takes the *acquire* command to send keep alives to the
+server indicating the machine is under active use. It will keep
+sending commands until you cancel it (or give it a time length for
+which to send keep alives).
+
+
 How do I keep a target acquired/reserved after *tcf run* is done?
 -----------------------------------------------------------------
 
 Giving *--no-release* to *tcf run* will keep the target acquired after
 the scrip execution concludes. Note however that it will be acquired
-by *USERNAME\::term:`HASHID`* (:term:`what's a hashid? <hash>`).
+by *USERNAME\::term:`ALLOCID`* (:term:`what's an ALLOCID? <allocid>`).
 
 For example, if we were using targets *nwa* and *qu04a* to :ref:`boot
-in provisioning mode <example_pos_boot>`, the hashid could be
-*ormorh*::
+in provisioning mode <example_pos_boot>`:
 
   $ tcf run --no-release -vvt 'nwa or qu04a' /usr/share/examples/test_pos_boot.py
   ...
   INFO1/ormorh	  ..../test_pos_boot.py#_test @3hyt-uo3g: will run on target group 'ic=localhost/nwa target=localhost/qu04a:x86_64'
   ...
 
-note how the hashid is *ormorh* in this case and thus, upon completion::
+to find the allocation ID, upon completion::
 
   $ tcf list -v owner
-  localhost/nwa [USERNAME:ormorh] ON
-  localhost/qu04a [USERNAME:ormorh] ON
+  localhost/nwa [USERNAME:ALLOCID] ON
+  localhost/qu04a [USERNAME:ALLOCID] ON
 
 to maintain the target acquired and powered while potentially
-debugging or testing other things, use a *while loop* which keeps
-acquiring with the same hashid. This tells the daemon we are actively
-using the target and won't release for us. In a separate console, run::
+debugging or testing other things, run in a separate console, run::
 
-  $ while tcf -t ormorh acquire nwa or qu04a; do sleep 10s; done
-
-.. warning: remember to cancel the job when done with the target so
-            other users can acquire it and use it.
+  $ tcf -a ALLOCID nwa qu04a --hold
+  OoOWEa: NOT ALLOCATED! Holdin allocation ID given with -a
+  allocation ID OoOWEa: [+224.5s] keeping alive during state 'active'
 
 now you can access the console, do captures or interact with the
 target in any other way, remembering to specify the ticket::
 
-  $ tcf -t ormorh console-write -i qu04a
-  $ tcf -t ormorh capture-get qu04a screen screencap.png
+  $ tcf console-write -i qu04a
+  $ tcf capture-get qu04a screen screencap.png
   ...
 
 or via SSH, first we have to ask the server to create a tunnel for us
 from to the target's SSH port::
 
-  $ tcf list -vv qu04a | grep ipv4_addr
-  interconnects.nwa.ipv4_addr: 192.168.97.4
-  $ tcf tunnel-add qu04a 22 tcp 192.168.97.4
+  $ tcf tunnel-add qu04a 22
   SERVERNAME:19893
   $ ssh -p 19893 root@SERVERNAME
 
 .. note:: make sure you specify the user to login as; it likely won't
           be the same as in your client machine.
 
-Release the target so it can be used by someone else::
+.. warning: remember to cancel the *tcf acquire* command when done
+            with the target so other users can acquire it and use it.
 
-  $ kill -9 %1               # kill the while loop that keeps it acquired
-  $ tcf release -f $(tcf list 'owner:"YOURNAME"')
+You can also run either of::
+
+  $ tcf release nwa qu04a
+  $ tcf alloc-rm ALLOCID
 
 Some details:
 
- - use *while tcf acquire* vs *while true; do tcf acquire* because
-   that way, if the server fails, connection drops (eg: you close your
-   laptop), then the process tops and won't restart unless you do it
-   manually.
-
  - if you depend on the network, do not forget to also acquire the
    network, otherwise it will be powered off and routing won't work.
-
-Alternative method without hashids
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-First make sure you are not blocking anyone::
-
-  $ while tcf acquire TARGET1 TARGET2 TARGET3...; do sleep 15s; done &
-  $ tcf_pid=$!
-
-this keeps acquiring the target every 10 seconds, which tells the
-server you are actively using it, so it won't release them nor power
-them off.
-
-When done::
-
-  $ kill $tcf_pid
-  $ tcf release TARGET1 TARGET2 TARGET3...
-
-You can *tcf run* without releasing them::
-
-  $ tcf -t " " run --no-release -vvt "TARGET1 or TARGET2 or TARGET3 ..." test_mytc.py
-
-Note the following:
-
--  ``-t " "`` tells TCF to *use no ticket*, as we have made the reservation
-   with no ticket
-
-- ``--no-release`` tells TCF to not release the targets when done
-
-this way, once the test completes (let's say, with failure), we can
-log in via the serial console to do some debugging::
-
-  $ tcf console-write -i TARGET2
-
-Do not forget to kill the *while* process and release the targets when
-done, otherwise others won't be able to use them. If someone has left
-a target taken, it can be released following :ref:`these instructions
-<howto_release_target>`
 
 How can I debug a target?
 -------------------------

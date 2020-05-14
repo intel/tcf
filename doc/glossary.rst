@@ -4,6 +4,12 @@ Glossary
 
 .. glossary::
 
+   AllocID
+
+     A handle that describes the allocation of one or more targets in
+     a server. Targets are allocated to a handle and the handle allows
+     to manipulate those acquired targets.
+
    BSP
 
      A board support package supported by a :term:`test target`

@@ -173,18 +173,24 @@ def _cmdline_alloc_targets(args):
             logging.error("Targets span more than one server")
             sys.exit(1)
         rtb = list(rtbs)[0]
-        allocid = None
+        allocid = args.allocid
         try:
             groups = { "group": list(targets) }
             ts0 = time.time()
-            allocid, state, group_allocated = \
-                _alloc_targets(rtb, groups, obo = args.obo,
-                               preempt = args.preempt,
-                               queue = args.queue, priority = args.priority,
-                               reason = args.reason)
-            ts = time.time()
-            print "allocation ID %s: [+%.1fs] allocated: %s" % (
-                allocid, ts - ts0, " ".join(group_allocated))
+            if allocid == None:
+                allocid, state, group_allocated = \
+                    _alloc_targets(rtb, groups, obo = args.obo,
+                                   preempt = args.preempt,
+                                   queue = args.queue, priority = args.priority,
+                                   reason = args.reason)
+                ts = time.time()
+                print "allocation ID %s: [+%.1fs] allocated: %s" % (
+                    allocid, ts - ts0, " ".join(group_allocated))
+            else:
+                print "%s: NOT ALLOCATED! Holdin allocation ID given with -a" \
+                    % allocid
+                state = 'unknown'	# wild guess
+                ts = time.time()
             if args.hold == None:	# user doesn't want us to ...
                 return			# ... keepalive while active
             _alloc_hold(rtb, allocid, state, ts0, args.hold)
