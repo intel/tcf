@@ -1506,26 +1506,55 @@ class target_c(reporter_c):
         return r
 
 
-    def console_tx(self, data, console = None):
-        """
-        Transmits the data over the given console
+    def console_tx(self, data, console = None, detect_context = ""):
+        """Transmits the data over the given console doing a
+        synchronization point with the expect sequences engine.
+
+        This function does not append a newline not translates newline
+        characters, see :meth:send for that.
+
+        Synchronization point with the expect sequences engine means
+        that after calling this function to send anything to a
+        console, :meth:`target.expect <tcfl.tc.target_c.expect>` or
+        :meth:`testcase.expect <tcfl.tc.tc_c.expect>` can be used to
+        expect only anything received after sending:
+
+        >>> target.console_tx("echo hello1")
+        >>> target.console_tx("echo hello2")
+        >>> target.console_tx("echo hello3")
+        >>> target.expect("hello")		# will match only hello3
+
+        but then:
+
+        >>> target.console_tx("echo hello1")
+        >>> target.console_tx("echo hello2")
+        >>> target.console_tx("echo hello3")
+        >>> target.expect("hello1")		# will not match
 
         :param data: data to be sent; data can be anything that can be
            transformed into a sequence of bytes
+
         :param str console: (optional) name of console over which to
            send the data (otherwise use the default one).
 
+        :param str detect_context: (optional) the detection context is
+          a string which is used to help identify how to keep track of
+          where we are looking for things (detecting) in a console's
+          output. Further info :ref:`here
+          <console_expectation_detect_context>`
+
         Note this function is equivalent to
         :meth:`target.console.write
-        <tcfl.target_ext_console.console.write>`, which is the raw
+        <tcfl.target_ext_console.extension.write>`, which is the raw
         version of this function.
 
-        See :meth:`send` for a version that works with the expect sequence
-
+        See :meth:`send` for a version that also translates newline
+        conventions and appends a newline
         """
         # the console member is only present if the member extension has
         # been loaded for the target (determined at runtime), hence
         # pylint gets confused
+        self.console.send_expect_sync(console, detect_context)
         self.console.write(data, console)	# pylint: disable = no-member
 
     _crlf = '\n'
@@ -1545,7 +1574,8 @@ class target_c(reporter_c):
         self._crlf = __crlf
         return self._crlf
 
-    def send(self, data, console = None, crlf = None, detect_context = ""):
+    def send(self, data, crlf = None, crlf_replace = "\n",
+             console = None, detect_context = ""):
         """Like :py:meth:`console_tx`, transmits the string of data
         over the given console.
 
@@ -1556,31 +1586,53 @@ class target_c(reporter_c):
         received after we called this function (so we'll expect to see
         even the sending of the command).
 
-        :param str data: string of data to send
-        :param str console: (optional) name of console over which to
-           send the data (otherwise use the default one).
-        :param str ctlf: (optional) CRLF technique to use, or what to
-          append to the string as a CRLF:
+        Arguments are the same as :meth:`console_tx` plus:
 
-          - None: use whatever is in :attr:`target_c.crlf`
+        :param str crlf: (optional) CRLF end-of-line convention to
+          use:
+
+          - *None*: [**default**] use whatever is in or
+            :attr:`target.console.crlf
+            <tcfl.target_ext_console.extension.crlf>` for the current
+            console; if it all resolves to *None*, no replacement will
+            be done.
+
+          - ``""``: (empty string) do not append anything
+
           - ``\\r``: use carriage return
+
           - ``\\r\\n``: use carriage return and line feed
+
           - ``\\n``: use line feed
+
           - ``ANYSTRING``: append *ANYSTRING*
 
+        :param str crlf_replace: (optional; default *\\n*)
+          string/character that denotes and end of line convention to
+          replace with *crlf*
 
-        :param str detect_context: (optional) the detection context is
-          a string which is used to help identify how to keep track of
-          where we are looking for things (detecting) in a console's
-          output. Further info :ref:`here
-          <console_expectation_detect_context>`
         """
         assert isinstance(data, basestring)
         if crlf == None:
-            crlf = self._crlf
-        self.console.send_expect_sync(console, detect_context)
-        self.console.write(str(data) + crlf, console)
+            if console == None:
+                console = self.console.default
+            crlf = self.console.crlf.get(console, self._crlf)
 
+        # FIXME: all this is very inneficient--python3 has better
+        # facilities for it
+        def _chunk_crlf(chunk, crlf):
+            # convert \n to @crlf
+            if crlf == None or crlf == "":
+                return chunk
+            _chars = ""
+            for char in chunk:
+                if char == crlf_replace:
+                    _chars += crlf
+                else:
+                    _chars += char
+            return _chars
+        self.console.send_expect_sync(console, detect_context)
+        self.console.write(_chunk_crlf(data, crlf) + crlf, console)
 
     def on_console_rx(self, regex_or_str, timeout = None, console = None,
                       result = "pass"):

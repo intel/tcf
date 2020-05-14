@@ -847,6 +847,26 @@ class extension(tc.target_extension_c):
             return None			# console disabled
         return int(r['result'])
 
+    #: Default end of line for the different consoles
+    #:
+    #: Dictionary keyed by console name that specifies the end-of-string
+    #: for the console; if there is no entry for a console.
+    #:
+    #: See :meth:tcfl.tc.target_c.send.
+    #:
+    #: This can be set with::
+    #:
+    #:    >> target.console.crlf['my consolename'] = '\r'
+    #:
+    #: If nothing is specified, it will default to '\n' or no
+    #: translation, depending on what needs to be done. Different
+    #: consoles of the same machine might have different needs
+    #: depending on their transport.
+    #:
+    #: FIXME: default to server specification on the inventory for
+    #:        the console
+    crlf = {}
+
     #: Default chunk sizes for the different consoles
     #:
     #: Dictionary keyed by console name that specifies the chunk size
@@ -873,7 +893,7 @@ class extension(tc.target_extension_c):
     #:    >> target.console.interchunk_wait['my consolename'] = 3.4
     interchunk_wait = {}
 
-    def write(self, data, console = None, crlf = None,
+    def write(self, data, console = None,
               chunk_size = None, interchunk_wait = None):
         """Write data to a console
 
@@ -906,6 +926,9 @@ class extension(tc.target_extension_c):
 
         :param str console: (optional) console to write to
 
+        .. warning:: this function does no end-of-line conversions (eg
+           \\r to \\r\\n or \\n to \\r\\n, etc). For that, look into
+           :meth:`target.send <tcfl.tc.target_c.send>`.
         """
         assert chunk_size == None or isinstance(chunk_size, int)
         assert interchunk_wait == None \
@@ -927,30 +950,13 @@ class extension(tc.target_extension_c):
             chunk_size = self.chunk_size.get(console, None)
         if interchunk_wait == None:
             interchunk_wait = self.interchunk_wait.get(console, None)
-        if crlf == None:
-            # FIXME: per console
-            crlf = self.target.crlf
 
-        # FIXME: all this is very inneficient--python3 has better
-        # facilities for it
-        def _chunk_crlf(chunk, crlf):
-            if crlf == None or crlf == "":
-                return chunk
-            _chars = ""
-            for char in chunk:
-                if char == "\n":
-                    _chars += crlf
-                else:
-                    _chars += char
-            return _chars
         if chunk_size == None:
-            data = _chunk_crlf(data, crlf)
             self.target.ttbd_iface_call("console", "write",
                                         component = console, data = data)
         else:
             for i in range((len(data) + chunk_size - 1) / chunk_size):
                 chunk = data[chunk_size * i : chunk_size * i + chunk_size]
-                chunk = _chunk_crlf(chunk, crlf)
                 self.target.ttbd_iface_call("console", "write",
                                             component = console, data = chunk)
                 if interchunk_wait:
@@ -1263,7 +1269,7 @@ WARNING: This is a very limited interactive console
                     else:
                         one_escape = False
                 # force no crlf, we already translated it
-                target.console.write(_chars, console = console, crlf = "")
+                target.console.write(_chars, console = console)
             except _done_c:
                 break
             except IOError as e:

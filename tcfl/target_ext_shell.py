@@ -404,11 +404,15 @@ class shell(tc.target_extension_c):
             self.target.expect(prompt_regex, name = "shell prompt",
                                console = console, origin = origin)
         if output:
+            if console == None:
+                console = target.console.default
+            crlf = self.target.console.crlf.get(console, "\n")
             output = self.target.console.read(offset = offset,
                                               console = console)
             if output_filter_crlf:
-                # replace \r\n, \r\r\n, \r\r\r\r\n... it happens
-                output = re.sub(self.crnl_regex, self.target.crlf, output)
+                if crlf:
+                    # replace \r\n, \r\r\n, \r\r\r\r\n... it happens
+                    output = re.sub(self.crnl_regex, crlf, output)
             if trim:
                 # When we can run(), it usually prints in the console:
                 ## <command-echo from our typing>
@@ -418,8 +422,8 @@ class shell(tc.target_extension_c):
                 # So to trim we just remove the first and last
                 # lines--won't work well without output_filter_crlf
                 # and it is quite a hack.
-                first_nl = output.find(self.target.crlf)
-                last_nl = output.rfind(self.target.crlf)
+                first_nl = output.find(crlf)
+                last_nl = output.rfind(crlf)
                 output = output[first_nl+1:last_nl+1]
             return output
         return None
@@ -494,7 +498,7 @@ class shell(tc.target_extension_c):
 
              ``output_filter_crlf`` enabled replaces this output with
 
-             >>> output = output.replace('\\r\\n', target.crlf)
+             >>> output = output.replace('\\r\\n', target.console.crlf[CONSOLENAME])
 
         """
         assert timeout == None or timeout > 0, \
