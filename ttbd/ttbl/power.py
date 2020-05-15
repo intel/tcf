@@ -3,8 +3,7 @@
 # Copyright (c) 2019 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
-"""
-Control power to targets
+"""Control power to targets
 ------------------------
 
 This interface provides means to power on/off targets and the invidual
@@ -43,10 +42,118 @@ Also power components are able to:
   :class:`appearing <ttbl.pc.delay_til_file_appears>`, a USB device is
   :class:`detected <ttbl.pc.delay_til_usb_device>` in the system
 
+.. _ttbd_power_explicit:
+
+Explicit vs normal power components
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Power components can be declared as:
+
+  - **normal** (default): upon running whole rail power **on** or
+    **off** sequences, they are always acted upon.
+
+  - **explicit**: upon running a whole rail power **on** or **off**
+    sequence, they will be skipped, unless the *explicit* option is
+    given.
+
+  - **explicit/on**: upon running a whole rail power **on** sequence,
+    they will be skipped unless the *explicit* option is given.
+
+  - **explicit/off**: upon running a whole rail power **off**
+    sequence, they will be skipped unless the *explicit* option is
+    given.
+
+Thus, an *explicit* power components will be only acted upon when we
+explicitly power them on/off.
+
+Use models for the *explicit* tagging:
+
+- a target is powered by components A and B. Component A takes a
+  long time to power up and can be left on, since the actual power
+  control to the target depends on also on B being on and B is more
+  responsive.
+
+  Component A would be declared as *explicit off*.
+
+  This can be applied for example to servers powered via a PDU for AC
+  power but whose actual state can be governed via a BMC using the
+  IPMI protocol.
+
+- Invasive instrumentation C connected to a target that is to be used
+  only in certain ocassions but has to be powered off for normal use.
+
+  Component C would be declared as *explicit on*.
+
+To configure a component at the configuration level, the :attr:impl_cexplicit
+attribute can be set to:
+
+- *None* for normal behaviour
+
+- *both* explicit for both powering on and off
+
+- *on* explicit for powering on
+
+- *off* explicit for powering off
+
+this can be used either in the intialization sequence or afterwards:
+
+>>> pc = ttbl.power.socat_pc(ADDR1, ADDR2)
+>>> pc.explicit = 'both'
+
+Overall power state and explicit power components
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Deciding what is the overall power state has a few nuances to take
+into account, especially when explicit power components are taken into
+account.
+
+The target is:
+
+- **fully on**: when **all** the power components (including those
+  tagged as *explicit* and *explicit/on*) are reporting *on* or *n/a*
+
+  Note this state might be impossible to reach for operation of the
+  target, as some explicit/on power components might not allow the
+  target to work normally (eg: invasive instrumentation that disallows
+  normal operation).
+
+- **on**: when **all** the power components (except those tagged as
+   **explict/on**) are reporting *on* or *n/a*
+
+  This is supposed to be the state in which a user would be able to
+  use the target as it is expected to be used.
+
+- *partially off*: when **any** power components (excluding those
+  tagged as *explicit* and *explicit/off*) reports *off*
+
+- *off*: when **all** power components (excluding those tagged as
+  *explicit* and *explicit/off*) report *off*
+
+  This is supposed to be the state in which a user would expect to set
+  the targets when they power it off.
+
+- **fully off**: when **all** the power components (including those
+  tagged as *explicit* and *explicit/off*) report *off*
+
+Note the computation of *is the target* off depends on the context:
+
+- for a remote user, *partially off* likely means the target is in an
+  inconsistent state, thus it shall be power cycled (take to off, then
+  power on).
+
+- for a daemon powering off unused infrastructure, it should take to
+  *off* anything on *partially off*, *on* and *fully on* and after a
+  longer count, maybe bring to *fully off*.
+
+As a convenience, the system publishes in the inventory the data
+*interfaces.power.state* as *true* if *on*. Otherwise, the state is
+not published and must be assumed as *off* or *fully off*.
+
 """
 
 import collections
 import errno
+import json
 import time
 import os
 import traceback
@@ -90,15 +197,30 @@ class impl_c(ttbl.tt_interface_impl_c):
     :param bool paranoid: don't trust the operation is really
       blocking, as it should, so double check the state changed happen
       and retry if not.
+
+    :param str explicit: (optional, default *None*) declare if this power
+      component shall be only turned on or off when explicitly named in
+      a power rail. See :ref:ttbd_power_explicit.
+
+      - *None*: for normal behaviour
+
+      - *both*: explicit for both powering on and off
+
+      - *on*: explicit for powering on
+
+      - *off*: explicit for powering off
+
     """
-    def __init__(self, paranoid = False):
+    def __init__(self, paranoid = False, explicit = None):
         assert isinstance(paranoid, bool)
+        assert explicit in ( None, 'on', 'off', 'both' )
         #: If the power on fails, automatically retry it by powering
         #: first off, then on again
         self.power_on_recovery = False
         self.paranoid = paranoid
         self.timeout = 10	# used for paranoid checks
         self.wait = 0.5
+        self.explicit = explicit
         #: for paranoid power getting, now many samples we need to get
         #: that are the same for the value to be considered stable
         self.paranoid_get_samples = 6
@@ -182,7 +304,10 @@ class interface(ttbl.tt_interface):
     def _target_setup(self, target, iface_name):
         # Called when the interface is added to a target to initialize
         # the needed target aspect (such as adding tags/metadata)
-        pass
+        for name, impl in self.impls.iteritems():
+            assert impl.explicit in ( None, 'on', 'off', 'both' ), \
+                "power %s: impls' explicit value is %s; expected " \
+                "None, 'on', 'off' or 'both'" % (name, impl.implicit)
 
 
     def _release_hook(self, target, _force):
@@ -315,8 +440,10 @@ class interface(ttbl.tt_interface):
         # consider if we are fully on, is like they are on
         result_all = all(i in ( True, None ) for i in data.values())
         result_any = any(i == True for i in data.values())
+        # FIXME: move to report on/off+normal/full/partial
         if result_all:					# update cache
             power = True
+            # FIXME: set interfaces.power.state / substate
             target.fsdb.set('powered', "On")
         else:
             power = False
@@ -330,7 +457,7 @@ class interface(ttbl.tt_interface):
         return result_any
 
 
-    def _off(self, target, impls, why, whole_rail = True):
+    def _off(self, target, impls, why, whole_rail = True, explicit = False):
         #
         # Power off everything
         #
@@ -367,6 +494,11 @@ class interface(ttbl.tt_interface):
                 target.log.debug("%s: powering off%s: skipping (already off)"
                                  % (component, why))
                 continue            	# it says it is off, so we skip it
+            if whole_rail \
+               and impl.explicit in ( "off", "both" ) and not explicit:
+                target.log.debug("%s: powering off%s: skipping (explicit/%s)"
+                                 % (component, why, impl.explicit))
+                continue            	# it says it is off, so we skip it
 
             target.log.debug("%s: powering off%s" % (component, why))
             try:			# we retry power off twice
@@ -396,7 +528,7 @@ class interface(ttbl.tt_interface):
         target.log.info("powered off%s" % why)
 
 
-    def _on(self, target, impls, why, whole_rail = True):
+    def _on(self, target, impls, why, whole_rail = True, explicit = False):
         #
         # Power on
         #
@@ -450,6 +582,11 @@ class interface(ttbl.tt_interface):
                 component_real = self.aliases[component]
             else:
                 component_real = component
+            if whole_rail \
+               and impl.explicit in ( "on", "both" ) and not explicit:
+                target.log.debug("%s: powering on%s: skipping (explicit/%s)"
+                                 % (component, why, impl.explicit))
+                continue            	# it says it is off, so we skip it
             if data[component] == True:
                 target.log.debug("%s: powering on%s: skipping (already on)"
                                  % (component, why))
@@ -542,6 +679,16 @@ class interface(ttbl.tt_interface):
     # called by the daemon when a METHOD request comes to the HTTP path
     # /ttb-vVERSION/targets/TARGET/interface/console/CALL
 
+    def _explicit_get(self, args):
+        # return the value of the 'explicit' argument, if given
+        explicit = self.arg_get(args, 'explicit', None, True, False)
+        # support that it might come as bool already
+        if not isinstance(explicit, bool):
+            explicit = json.loads(explicit)
+            assert isinstance(explicit, bool), \
+                "'explicit' argument must be a boolean"
+        return explicit
+
     def get_list(self, target, _who, _args, _files, _user_path):
         # return a dictionary indicating the individual state of
         # each power component
@@ -557,16 +704,18 @@ class interface(ttbl.tt_interface):
 
     def put_on(self, target, who, args, _files, _user_path):
         impls, _all = self.args_impls_get(args)
+        explicit = self._explicit_get(args)
         with target.target_owned_and_locked(who):
             target.timestamp()
-            self._on(target, impls, "", _all)
+            self._on(target, impls, "", _all, explicit)
             return {}
 
     def put_off(self, target, who, args, _files, _user_path):
         impls, _all = self.args_impls_get(args)
+        explicit = self._explicit_get(args)
         with target.target_owned_and_locked(who):
             target.timestamp()
-            self._off(target, impls, "", _all)
+            self._off(target, impls, "", _all, explicit)
             return {}
 
     def put_cycle(self, target, who, args, _files, _user_path):
@@ -574,12 +723,13 @@ class interface(ttbl.tt_interface):
         # default wait is two seconds
         wait = float(args.get('wait',
                               target.tags.get('power_cycle_wait', 2)))
+        explicit = self._explicit_get(args)
         with target.target_owned_and_locked(who):
             target.timestamp()
-            self._off(target, impls, " (because power-cycle)", _all)
+            self._off(target, impls, " (because power-cycle)", _all, explicit)
             if wait:
                 time.sleep(wait)
-            self._on(target, impls, " (because power-cycle)", _all)
+            self._on(target, impls, " (because power-cycle)", _all, explicit)
             return {}
 
     def put_reset(self, target, who, args, _files, _user_path):
@@ -595,7 +745,11 @@ class fake_c(impl_c):
 
     It can rely on the *target* and *component* parameters to
     each method to derive where to act.
+
+    Parameters are the same as for :class:impl_c.
     """
+    def __init__(self, **kwargs):
+        impl_c.__init__(self, **kwargs)
 
     def on(self, target, component):
         target.log.info("power-fake-%s on" % component)

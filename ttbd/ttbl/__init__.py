@@ -975,6 +975,31 @@ class tt_interface(object):
             raise RuntimeError("missing '%s' argument" % name)
         return args[name]
 
+    def arg_get(self, args, arg_name, arg_type,
+                allow_missing = False, default = None):
+        """Return the value of an argument passed to the call
+
+        Given the arguments passed with an HTTP request check if one
+        called ARG_NAME of type ARG_TYPE is present, return whatever
+        value it has.
+
+        :returns: the value
+        """
+        assert isinstance(args, dict)
+        assert isinstance(arg_name, basestring)
+        assert arg_type == None or isinstance(arg_type, type)
+        assert isinstance(allow_missing, bool)
+        if not arg_name in args:
+            if allow_missing:
+                return default
+            raise RuntimeError("missing '%s' argument" % arg_name)
+        arg = args[arg_name]
+        if arg_type != None and not isinstance(arg, arg_type):
+            raise RuntimeError(
+                "%s: argument must be a %s; got '%s'"
+                % (arg_name, arg_type.__name__, type(arg).__name__))
+        return arg
+
     def impl_get_by_name(self, arg, arg_name = "component"):
         """
         Return an interface's component implementation by name
@@ -997,14 +1022,9 @@ class tt_interface(object):
         :returns: the implementation in *self.impls* for the component
           specified in the args
         """
-        if not arg_name in args:
-            if allow_missing:
-                return None, None
-            raise RuntimeError("missing '%s' argument" % arg_name)
-        arg = args[arg_name]
-        if not isinstance(arg, basestring):
-            raise RuntimeError("%s: argument must be a string; got '%s'"
-                               % (arg_name, type(arg).__name__))
+        arg = self.arg_get(args, arg_name, basestring, allow_missing)
+        if arg == None:
+            return None, None
         return self.impl_get_by_name(arg, arg_name)
 
 

@@ -67,7 +67,7 @@ class extension(tc.target_extension_c):
         self.target.report_info("listed")
         return r.get('power', [])
 
-    def off(self, component = None):
+    def off(self, component = None, explicit = False):
         """
         Power off a target or parts of its power rail
 
@@ -75,14 +75,15 @@ class extension(tc.target_extension_c):
           power off, defaults to whole target's power rail
         """
         assert component == None or isinstance(component, basestring)
+        assert isinstance(explicit, bool)
         self.target.report_info("powering off", dlevel = 1)
         self.target.ttbd_iface_call(
-            "power", "off", component = component,
+            "power", "off", component = component, explicit = explicit,
             # extra time, since power ops can take long
             timeout = 60)
         self.target.report_info("powered off")
 
-    def on(self, component = None):
+    def on(self, component = None, explicit = False):
         """
         Power on a target or parts of its power rail
 
@@ -90,16 +91,17 @@ class extension(tc.target_extension_c):
           power on, defaults to whole target's power rail
         """
         assert component == None or isinstance(component, basestring)
+        assert isinstance(explicit, bool)
         self.target.report_info("powering on", dlevel = 1)
         self.target.ttbd_iface_call(
-            "power", "on", component = component,
+            "power", "on", component = component, explicit = explicit,
             # extra time, since power ops can take long
             timeout = 60)
         self.target.report_info("powered on")
         if hasattr(self.target, "console"):
             self.target.console._set_default()
 
-    def cycle(self, wait = None, component = None):
+    def cycle(self, wait = None, component = None, explicit = False):
         """
         Power cycle a target or one of its components
 
@@ -109,10 +111,11 @@ class extension(tc.target_extension_c):
         """
         assert wait == None or wait >= 0
         assert component == None or isinstance(component, basestring)
+        assert isinstance(explicit, bool)
         self.target.report_info("power cycling", dlevel = 1)
         self.target.ttbd_iface_call(
             "power", "cycle",
-            component = component, wait = wait,
+            component = component, wait = wait, explicit = explicit,
             # extra time, since power ops can take long
             timeout = 60)
         self.target.report_info("power cycled")
