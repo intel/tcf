@@ -1930,8 +1930,7 @@ class target_c(reporter_c):
         for k, v in kwargs.items():
             if isinstance(v, basestring):
                 continue
-            if isinstance(v, (collections.Sequence, collections.Mapping)):
-                kwargs[k] = json.dumps(v)
+            kwargs[k] = json.dumps(v)
         if component:
             kwargs['component'] = component
         if self.ticket:
