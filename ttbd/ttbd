@@ -438,7 +438,7 @@ def _target_get(target_id):
     if target == None:
         flask.abort(404, "%s: unknown target" % target_id)
     d = target.to_dict(projections)
-    return json.dumps(d, sort_keys = False)
+    return flask.jsonify(d)
 
 _admin_required = [
     'disabled',
@@ -1281,6 +1281,11 @@ if __name__ == "__main__":
     app.config['state_path'] = ttbl.test_target.state_path
     ttbl.user_control.User.state_dir = args.var_lib_path
     app.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(4)
+    # ensure that when we JSON encode sorted dictionaries, the encode
+    # respects the order of the keys.
+    # JSON/Python don't necessary require ordering dictionaries, but
+    # for our protocol, we do, since it simplifies the data structures
+    app.config["JSON_SORT_KEYS"] = False
     app.secret_key = base64.b64encode(sk)
 
     # SSL config: default to at least TLS v1.2
