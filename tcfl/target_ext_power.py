@@ -13,6 +13,9 @@ target as well as the hooks to access these interfaces from the
 command line.
 """
 
+import collections
+import json
+
 import tc
 from . import msgid_c
 
@@ -55,17 +58,69 @@ class extension(tc.target_extension_c):
         """
         Return a list of a target's power rail components and their status
 
-        :returns: dictionary keyed by component number and their state
-          (*True* if powered, *False* if not, *None* if not
-          applicable, for fake power controls)
+        :returns: dictionary keyed by component name listing their
+          state and other flags about them:
+
+          .. code-block:: python
+
+             {
+                 "NAME1": {
+                     "state": STATE1,
+                     ["explicit": "on|off|both" ]
+                 },
+                 "NAME2": {
+                     "state": STATE2,
+                     ["explicit": "on|off|both" ]
+                 },
+                 ...
+             }
+
+          - *state*: *True* if powered, *False* if not, *None* if not
+             applicable, for fake power controls
+
+          - *explicit*: (see :ref:`ttbd_power_explicit`) if missing,
+             not explicit, will be turned on/off normally:
+
+            - *on*: only powered on if explicitly named
+
+            - *off*: only powered off if explicitly named
+
+            - *both*: only powered on/off if explicitly named
+
+
         """
         self.target.report_info("listing", dlevel = 1)
         r = self.target.ttbd_iface_call(
             "power", "list", method = "GET",
             # extra time, since power ops can take long
             timeout = 60)
+        if 'power' in r:
+            data = collections.OrderedDict()
+            # backwards compat
+            #
+            ## [
+            ##   [ NAME1, STATE2 ],
+            ##   [ NAME2, STATE2 ],
+            ##   ...
+            ## ]
+            #
+            for i in r.get('power', []):
+                data[i[0]] = dict(state = i[1])
+        elif isinstance(r, collections.Mapping):
+            # proper response format
+            #
+            ## {
+            ##   NAME1: { state: STATE1, [explicit: "on|off|both" ] },
+            ##   NAME2: { state: STATE2, [explicit: "on|off|both" ] },
+            ##   ...
+            ## }
+            #
+            # FIXME: verify the format
+            data = r
+        else:
+            raise AssertionError("can't parse response")
         self.target.report_info("listed")
-        return r.get('power', [])
+        return data
 
     def off(self, component = None, explicit = False):
         """
@@ -225,16 +280,27 @@ def _cmdline_power_list(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args)
         r = target.power.list()
-        for component, state in r:
-            if state == True:
-                _state = 'on'
-            elif state == False:
-                _state = 'off'
-            elif state == None:
-                _state = "n/a"
-            else:
-                _state = "BUG:unknown-state"
-            print "%s: %s" % (component, _state)
+
+        if args.verbosity < 2:
+            for component, data in r.iteritems():
+                state = data['state']
+                explicit = data.get('explicit', None)
+                if state == True:
+                    _state = 'on'
+                elif state == False:
+                    _state = 'off'
+                elif state == None:
+                    _state = "n/a"
+                else:
+                    _state = "BUG:unknown-state"
+                if not explicit or args.verbosity == 0:
+                    explicit = ""
+                else:
+                    explicit = " (explicit/" + explicit + ")"
+                print "%s: %s%s" % (component, _state, explicit)
+
+        else:  # args.verbosity >= 2:
+            print json.dumps(r, skipkeys = True, indent = 4)
 
 def _cmdline_power_get(args):
     with msgid_c("cmdline"):
@@ -283,6 +349,11 @@ def _cmdline_setup(arg_subparser):
     ap = arg_subparser.add_parser("power-ls",
                                   help = "List power rail components and "
                                   "their state")
+    ap.add_argument(
+        "-v", dest = "verbosity", action = "count", default = 0,
+        help = "Increase verbosity of information to display "
+        "(default displays state, -v adds component flags, -vv python"
+        " dictionary, -vvv JSON format)")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target's")
     ap.set_defaults(func = _cmdline_power_list)

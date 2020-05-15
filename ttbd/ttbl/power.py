@@ -150,7 +150,6 @@ As a convenience, the system publishes in the inventory the data
 not published and must be assumed as *off* or *fully off*.
 
 """
-
 import collections
 import errno
 import json
@@ -435,7 +434,11 @@ class interface(ttbl.tt_interface):
             state = self._impl_get(impl, target, component_real)
             self.assert_return_type(state, bool, target,
                                     component, "power.get", none_ok = True)
-            data[component] = state
+            data[component] = {
+                "state": state
+            }
+            if impl.explicit:
+                data[component]['explicit'] = impl.explicit
         # the values that are None, we don't care for them, so to
         # consider if we are fully on, is like they are on
         result_all = all(i in ( True, None ) for i in data.values())
@@ -694,7 +697,7 @@ class interface(ttbl.tt_interface):
         # each power component
         _, data, _ = self._get(target)
         # return a sorted list, so the order is maintained
-        return dict(power = [ ( i, s ) for i, s in data.items() ])
+        return data
 
     def get_get(self, target, _who, _args, _files, _user_path):
         # return a single bool saying if all the power rail
