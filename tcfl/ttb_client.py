@@ -30,6 +30,7 @@ daemon; it is divided in two main blocks:
 """
 # FIXME: this is crap, need to move all the functions to core or something
 import cPickle
+import collections
 import contextlib
 import errno
 import fcntl
@@ -332,11 +333,14 @@ class rest_target_broker(object):
         commonl.request_response_maybe_raise(r)
         if raw:
             return r
-        rdata = r.json()
-        diagnostics = rdata.get('diagnostics', "").encode("utf-8", 'replace')
-        if diagnostics != "":
-            for line in diagnostics.split("\n"):
-                logger.warning("diagnostics: " + line)
+        rdata = r.json(object_pairs_hook = collections.OrderedDict)
+        if 'diagnostics' in rdata:
+            diagnostics = rdata.get('diagnostics', "").encode("utf-8",
+                                                              'replace')
+            if diagnostics != "":
+                for line in diagnostics.split("\n"):
+                    logger.warning("diagnostics: " + line)
+            rdata.pop('diagnostics')
         return rdata
 
     def login(self, email, password):
