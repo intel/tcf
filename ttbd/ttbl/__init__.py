@@ -1040,21 +1040,36 @@ class tt_interface(object):
         :params dict args: dictionary of arguments keyed by argument
           name:
 
+          - *component*: a  component name to consider, if none, all
           - *components*: list of component names to consider, if none, all
           - *components_exclude*: (optional) list of components to exclude
 
-        :returns: a list of *(NAME, IMPL)* based on if we got an
-          instance to run on (only execute that one) or on all the
-          components
+        :returns: a tuple of *(list, bool)*; list of a list of
+          implementations that need to be operated on; bool is *True*
+          if the list refers to all the components because the user
+          specified no *component* or *components* argument in the
+          call. *False* means only specific implementations are being
+          refered.
         """
         impl, component = self.arg_impl_get(args, 'component',
                                             allow_missing = True)
         components_exclude = args.get('components_exclude', [])
+        components = args.get('components', [])
         if impl == None:
-            # no component was specified, so we operate over all the components
+            # no component was specified, so we operate over all the
+            # components unless components was given
             # KEEP THE ORDER
-            impls = self.impls.items()
-            _all = True
+            if components:
+                impls = []
+                for component in components:
+                    impl, name = self.impl_get_by_name(
+                        component, arg_name = "component")
+                    impls.append(( name, impl ))
+                # even if it might be all, we don't now for sure
+                _all = False
+            else:
+                impls = self.impls.items()
+                _all = True
         else:
             impls = [ ( component, impl ) ]
             _all = False
