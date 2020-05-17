@@ -283,7 +283,6 @@ def menu_scroll_to_entry(
     seen_entries = collections.defaultdict(int)
     last_seen_entry = None
     last_seen_entry_count = 0
-    target.expect("")	# flush
     for _ in range(max_scrolls):
         if _direction:
             # FIXME: use get_key() -- how do we pass the terminal encoding?
@@ -717,7 +716,7 @@ def menu_escape_to_main(target, esc_first = True):
 
     max_levels = 10	# FIXME: BIOS profile?
     if esc_first:
-        target.send("\x1b")
+        target.console_tx("\x1b")
     #
     # We look for the Move Highlight marker that is printed at the end
     # of each menu; when we find that, then we look to see if what
@@ -747,7 +746,7 @@ def menu_escape_to_main(target, esc_first = True):
             target.report_info(
                 "BIOS: escaping to main, pressing ESC after timeout %d/%d"
                 % (level, max_levels))
-            target.send("\x1b")
+            target.console_tx("\x1b")
             continue
         read = target.console.read(offset = offset)
         # then let's see if all the main menu entries are there
@@ -760,7 +759,7 @@ def menu_escape_to_main(target, esc_first = True):
             return
         target.report_info("BIOS: escaping to main, pressing ESC %d/%d"
                            % (level, max_levels))
-        target.send("\x1b")
+        target.console_tx("\x1b")
 
     # nothing found, raise it
     raise tcfl.tc.error_e(
@@ -827,7 +826,7 @@ def menu_config_network_enable(target):
     value = r['EFI Network']['value']
     if value != '<Disable>':	# sic, no typo there, missing a 'd'
         target.report_info("BIOS: %s: already enabled (%s)" % (entry, value))
-        target.send("\x1b")	# ESC one menu up
+        target.console_tx("\x1b")	# ESC one menu up
         return False
 
     target.report_info("BIOS: %s: enabling (was: %s)" % (entry, value))
@@ -1041,7 +1040,7 @@ def boot_network_http_boot_add_entry(target, entry, url):
     # save; this takes us to the previous menu
     target.console_tx(ansi_key_code("F10", "vt100"))
     target.expect("Press 'Y' to save and exit")
-    target.send("Y")
+    target.console_tx("Y")
 
 
 def main_boot_select_entry(target, boot_entry):
