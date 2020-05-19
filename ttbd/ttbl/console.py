@@ -565,7 +565,7 @@ class interface(ttbl.tt_interface):
             while True:
                 try:
                     impl.write(target, component,
-                               self._arg_get(args, 'data'))
+                               self.arg_get(args, 'data', basestring, False))
                     break
                 except OSError:
                     # sometimes many of these errors happen because the

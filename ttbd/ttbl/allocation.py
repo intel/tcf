@@ -950,10 +950,12 @@ def _maintain_released_target(target, calling_user):
     allocdb = get_from_cache(r['allocid'])
     try:
         # the power interface is defined in ttbl.power
-        any_powered_on = target.power._get_any(target)
-        if any_powered_on == False:		# Is it off? pass
+        power_state, _, power_substate = target.power._get(target)
+        # Power off anything that is on or in inconsistent state
+        if power_state == False and power_substate != 'inconsistent':
             return
-
+        # FIXME: check also a full power off from normal off after a
+        #        certain time
         # calculate the idle time once we own the target, to be sure
         # none came in the middle and we are killing it for them...
         ts_now = datetime.datetime.now()

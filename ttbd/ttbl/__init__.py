@@ -975,7 +975,8 @@ class tt_interface(object):
             raise RuntimeError("missing '%s' argument" % name)
         return args[name]
 
-    def arg_get(self, args, arg_name, arg_type,
+    @staticmethod
+    def arg_get(args, arg_name, arg_type,
                 allow_missing = False, default = None):
         """Return the value of an argument passed to the call
 
@@ -983,17 +984,34 @@ class tt_interface(object):
         called ARG_NAME of type ARG_TYPE is present, return whatever
         value it has.
 
+        Now, some values can be passed JSON encoded, some not -- this
+        is done for making it easy on the client side, so it can do
+        calls with curl/wget without having to mess it up too much:
+
         :returns: the value
         """
         assert isinstance(args, dict)
         assert isinstance(arg_name, basestring)
-        assert arg_type == None or isinstance(arg_type, type)
+        assert arg_type == None or isinstance(arg_type, type)\
+            or isinstance(arg_type, tuple) and all(isinstance(i, type)
+                                                   for i in arg_type)
         assert isinstance(allow_missing, bool)
         if not arg_name in args:
             if allow_missing:
                 return default
             raise RuntimeError("missing '%s' argument" % arg_name)
-        arg = args[arg_name]
+        try:
+            arg = json.loads(args[arg_name])
+        except ValueError as e:
+            if 'No JSON object could be decoded' not in e.message:
+                raise
+            # so let's assume is not properly JSON encoded and it is
+            # just a string to pass along
+            arg = args[arg_name]
+            if arg == "True":		# all this is backwards compat..
+                arg = True		# ... fugly, yes; but early clients
+            elif arg == "False":	# failed to properly json encode
+                arg = False		# args
         if arg_type != None and not isinstance(arg, arg_type):
             raise RuntimeError(
                 "%s: argument must be a %s; got '%s'"

@@ -208,17 +208,19 @@ def login():
     authenticate it.
     """
     while True:
-        username = flask.request.form.get('username', None)
+        username = ttbl.tt_interface.arg_get(
+            flask.request.form, 'username', basestring, True, None)
         if username:
             break
         # backwards compat
-        username = flask.request.form.get('email', None)
+        username = ttbl.tt_interface.arg_get(
+            flask.request.form, 'email', basestring, True, None)
         if username:
             break
         return flask.abort(404, "missing user ID 'username' field")
 
-    password = flask.request.form.get('password', None)
-
+    password = ttbl.tt_interface.arg_get(
+        flask.request.form, 'password', basestring, True, None)
     user = flask_login.current_user
     user_id = user.get_id()
 
@@ -304,17 +306,6 @@ def logout():
 def validate_session():
     return flask.jsonify({'status': "You have a valid session"})
 
-
-def _flask_arg_projections():
-    projections_json = flask.request.form.get('projection', None)
-    if projections_json:
-        projections = json.loads(projections_json)
-        if not isinstance(projections, list):
-            raise ValueError("parameter projections: expected JSON-encoded "
-                             "list of strings naming fields")
-        return projections
-    else:
-        return []
 
 @app.route(API_PREFIX + 'users/', methods = [ 'GET' ])
 @app.route(API_PREFIX + 'users/<userid>', methods = [ 'GET' ])
@@ -415,7 +406,8 @@ def _user_role(userid, action, role):
 @app.route(API_PREFIX + 'targets/', methods = ['GET'])
 @flask_login.login_required
 def _targets_gets():
-    projections = _flask_arg_projections()
+    projections = ttbl.tt_interface.arg_get(
+        flask.request.form, 'projections', list, True, [])
     _list = []
     calling_user = flask_login.current_user._get_current_object()
     for target in ttbl.test_target.known_targets():
@@ -432,7 +424,8 @@ def _targets_gets():
 @app.route(API_PREFIX + 'targets/<string:target_id>', methods = ['GET'])
 @flask_login.login_required
 def _target_get(target_id):
-    projections = _flask_arg_projections()
+    projections = ttbl.tt_interface.arg_get(
+        flask.request.form, 'projections', list, True, [])
     calling_user = flask_login.current_user._get_current_object()
     target = ttbl.test_target.get_for_user(target_id, calling_user)
     if target == None:
@@ -488,7 +481,8 @@ def _target_patch(target_id):
     target = ttbl.test_target.get_for_user(target_id, calling_user)
     if target == None:
         flask.abort(404, "%s: unknown target" % target_id)
-    ticket = flask.request.form.get('ticket', "")
+    ticket = ttbl.tt_interface.arg_get(
+        flask.request.form, 'ticket', basestring, True, "")
     user_is_admin = current_user_is_admin()
     try:
         # check policy setting first
@@ -513,8 +507,8 @@ def _target_patch(target_id):
             # from it
             if prop == 'ticket':
                 continue
-            _target_property_set(target, prop, flask.request.form[prop],
-                                 user_is_admin, ticket)
+            value = ttbl.tt_interface.arg_get(flask.request.form, prop, None)
+            _target_property_set(target, prop, value, user_is_admin, ticket)
 
         if data:			# Set parameter via JSON data body
             for prop, val in data_flat:	# convert to our interal flat key space
@@ -524,38 +518,6 @@ def _target_patch(target_id):
     except Exception as e:
         flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
     return flask.jsonify({ })
-
-
-@app.route(API_PREFIX + 'targets/<string:target_id>/acquire', methods = ['PUT'])
-@flask_login.login_required
-def _target_acquire(target_id):
-    # a valid user can try to acquire multiple times (it's a PUT request after all) and it
-    # would succeed if already acquired.
-    # FIXME: some security checks on this ticket?
-    ticket = flask.request.form.get('ticket', "")
-    if flask.request.form.get('force', 'false').lower() == 'true':
-        force = True
-        if not current_user_is_admin():
-            flask_logd_abort(400, "forced acquisition requires admin rights")
-    else:
-        force = False
-
-    calling_user = flask_login.current_user._get_current_object()
-    target = ttbl.test_target.get_for_user(target_id, calling_user)
-    if target == None:
-        flask.abort(404, "%s: unknown target" % target_id)
-    try:
-        target.acquire(who_make(ticket), force)
-        target.timestamp()
-    except ttbl.test_target_busy_e as e:
-        flask_log_abort(3, 400, "%s" % e, exc_info = False)
-    except ttbl.test_target_e as e:
-        # Not considered as errors, no traces printed -- as these are
-        # normal during operation.
-        flask_logd_abort(400, "%s" % e, exc_info = False)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({})
 
 
 @app.route(API_PREFIX + 'targets/<string:target_id>/active', methods = ['PUT'])
@@ -568,7 +530,8 @@ def _target_active(target_id):
     target = ttbl.test_target.get_for_user(target_id, calling_user)
     if target == None:
         flask.abort(404, "%s: unknown target" % target_id)
-    ticket = flask.request.form.get('ticket', "")
+    ticket = ttbl.tt_interface.arg_get(
+        flask.request.form, 'ticket', basestring, True, "")
     try:
         if who_make(ticket) == target.owner_get():
             # when this is the owner, this marks the target as active
@@ -587,13 +550,10 @@ def _target_release(target_id):
     target = ttbl.test_target.get_for_user(target_id, calling_user)
     if target == None:
         flask.abort(404, "%s: unknown target" % target_id)
-    if flask.request.form.get('force', 'false').lower() == 'true':
-        force = True
-    else:
-        force = False
-
-    # FIXME: some security checks on this ticket?
-    ticket = flask.request.form.get('ticket', "")
+    force = ttbl.tt_interface.arg_get(
+        flask.request.form, 'force', bool, True, False)
+    ticket = ttbl.tt_interface.arg_get(
+        flask.request.form, 'ticket', basestring, True, "")
     try:
         who = who_make(ticket)
         if force and not current_user_is_admin():
@@ -636,11 +596,11 @@ def _put_allocation():
     try:
         data = flask.request.get_json()
         if data == None:
-            # get from from encoding
+            # get from form encoding
             data = {}
-            for key, value in flask.request.form.iteritems():
-                #logging.error("DEBUG args key %s value %s", key, value)
-                data[key] = json.loads(value)
+            for key in flask.request.form.keys():
+                data[key] = ttbl.tt_interface.arg_get(flask.request.form,
+                                                      key, None)
         assert isinstance(data, dict), \
             "need a dictionary of data parameters to make a request;" \
             " got %s (%s)" % (data, type(data))
@@ -731,9 +691,10 @@ def _put_keepalive():
         if data == None:
             # get from from encoding
             data = {}
-            for key, value in flask.request.form.iteritems():
+            for key in flask.request.form.keys():
                 #logging.error("DEBUG args key %s value %s", key, value)
-                data[key] = json.loads(value)
+                data[key] = ttbl.tt_interface.arg_get(flask.request.form,
+                                                      key, None)
         assert isinstance(data, dict), \
             "need a dictionary of data parameters to make a request;" \
             " got %s (%s)" % (data, type(data))
@@ -802,7 +763,8 @@ def _target_interface(target_id, interface, call):
     target = ttbl.test_target.get_for_user(target_id, calling_user)
     if target == None:
         flask.abort(404, "%s: unknown target" % target_id)
-    ticket = flask.request.form.get('ticket', "")
+    ticket = ttbl.tt_interface.arg_get(
+        flask.request.form, 'ticket', basestring, True, "")
     iostr = StringIO.StringIO()
     iostr_wrapper = codecs.StreamReaderWriter(
         iostr, codec_utf8.streamreader,
@@ -829,7 +791,8 @@ def _target_interface(target_id, interface, call):
                     user_path)
                 iface.assert_return_type(
                     result, dict, target,
-                    flask.request.form.get('component', None),
+                    ttbl.tt_interface.arg_get(
+                        flask.request.form, 'component', basestring, True, None),
                     method_name, none_ok = False)
             else:
                 result = iface.request_process(

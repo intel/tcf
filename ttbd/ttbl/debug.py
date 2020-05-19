@@ -186,7 +186,7 @@ class interface(ttbl.tt_interface):
 
 
     def _impls_by_component(self, args):
-        components = json.loads(self._arg_get(args, "components"))
+        components = self.arg_get(args, "components", list)
         if not components:
             components = self.impls.keys()
         # do a single call to one component with everything that
@@ -203,7 +203,7 @@ class interface(ttbl.tt_interface):
 
 
     def get_list(self, target, who, args, _files, _user_path):
-        components = json.loads(self._arg_get(args, "components"))
+        components = self.arg_get(args, "components", list)
         if not components:
             components = self.impls.keys()
         with target.target_owned_and_locked(who):
@@ -218,7 +218,7 @@ class interface(ttbl.tt_interface):
             return dict(result = r)
 
     def put_start(self, target, who, args, _files, _user_path):
-        components = json.loads(self._arg_get(args, "components"))
+        components = self.arg_get(args, "components", list)
         if not components:
             components = self.impls.keys()
         with target.target_owned_and_locked(who):
@@ -246,7 +246,7 @@ class interface(ttbl.tt_interface):
 
 
     def put_stop(self, target, who, args, _files, _user_path):
-        components = json.loads(self._arg_get(args, "components"))
+        components = self.arg_get(args, "components", list)
         if not components:
             components = self.impls.keys()
         with target.target_owned_and_locked(who):
@@ -254,7 +254,7 @@ class interface(ttbl.tt_interface):
             return {}
 
     def put_halt(self, target, who, args, _files, _user_path):
-        components = json.loads(self._arg_get(args, "components"))
+        components = self.arg_get(args, "components", list)
         if not components:
             components = self.impls.keys()
         with target.target_owned_and_locked(who):
@@ -264,7 +264,7 @@ class interface(ttbl.tt_interface):
             return {}
 
     def put_resume(self, target, who, args, _files, _user_path):
-        components = json.loads(self._arg_get(args, "components"))
+        components = self.arg_get(args, "components", list)
         if not components:
             components = self.impls.keys()
         with target.target_owned_and_locked(who):
@@ -281,7 +281,7 @@ class interface(ttbl.tt_interface):
             return {}
 
     def put_reset_halt(self, target, who, args, _files, _user_path):
-        components = json.loads(self._arg_get(args, "components"))
+        components = self.arg_get(args, "components", list)
         if not components:
             components = self.impls.keys()
         with target.target_owned_and_locked(who):
