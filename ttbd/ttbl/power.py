@@ -112,34 +112,55 @@ The target is:
 - **fully on**: when **all** the power components (including those
   tagged as *explicit* and *explicit/on*) are reporting *on* or *n/a*
 
-  Note this state might be impossible to reach for operation of the
-  target, as some explicit/on power components might not allow the
-  target to work normally (eg: invasive instrumentation that disallows
-  normal operation).
+
+- *partial on*: when **all** the power components (excluding those
+  tagged as *explicit* and *explicit/on*) reports *on* and some (but
+  not all) of those tagged as *explict* and *explicit/on* are
+  on.
+
+  This might be an inconsistent state, since some of the explicit
+  components might not allow the target to operate normally.
 
 - **on**: when **all** the power components (except those tagged as
-   **explict/on**) are reporting *on* or *n/a*
+   **explicit** and **explicit/on**) are reporting *on* or *n/a*
 
-  This is supposed to be the state in which a user would be able to
-  use the target as it is expected to be used.
-
-- *partially off*: when **any** power components (excluding those
-  tagged as *explicit* and *explicit/off*) reports *off*
+- *partial off*: when **any** (but not all) power components
+  (excluding those tagged as *explicit* and *explicit/on*) reports
+  *off*
 
 - *off*: when **all** power components (excluding those tagged as
   *explicit* and *explicit/off*) report *off*
 
-  This is supposed to be the state in which a user would expect to set
-  the targets when they power it off.
-
 - **fully off**: when **all** the power components (including those
-  tagged as *explicit* and *explicit/off*) report *off*
+  tagged as *explicit* and *explicit/off*) report *off*.
 
 Note the computation of *is the target* off depends on the context:
 
-- for a remote user, *partially off* likely means the target is in an
-  inconsistent state, thus it shall be power cycled (take to off, then
-  power on).
+- for a remote user:
+
+  - *fully on* might be impossible to reach for operation of the
+    target, as some explicit/on power components might not allow the
+    target to work normally (eg: invasive instrumentation that disallows
+    normal operation).
+
+  - *partial on* like *fully on*, this might be an inconsistent state,
+    since some of the explicit components might not allow the target
+    to operate normally.
+
+    This might be used for non-common circumnstances to administer,
+    diagnose or do non typical work on the targets.
+
+  - *on* means the target should operate as it'd be normally
+
+  - *partial off* likely means the not everything the target needs to
+    work is operative; to bring it to operation most likely it shall
+    be power cycled (take to off, then power on).
+
+  - *off* means the target is powered off as it'd be normally
+
+  - *partial off* likely means the not everything the target needs to
+    work is operative; to bring it to operation most likely it shall
+    be power cycled (take to off, then power on).
 
 - for a daemon powering off unused infrastructure, it should take to
   *off* anything on *partially off*, *on* and *fully on* and after a
@@ -153,8 +174,9 @@ not published and must be assumed as *off* or *fully off*.
 import collections
 import errno
 import json
-import time
+import numbers
 import os
+import time
 import traceback
 import types
 import subprocess
@@ -425,6 +447,10 @@ class interface(ttbl.tt_interface):
         data = collections.OrderedDict()
         if impls == None:	# none give, do the whole power rail
             impls = self.impls.iteritems()
+        normal = {}
+        explicit = {}
+        explicit_on = {}
+        explicit_off = {}
         for component, impl in impls:
             # need to get state for the real one!
             if component in self.aliases:
@@ -439,25 +465,54 @@ class interface(ttbl.tt_interface):
             }
             if impl.explicit:
                 data[component]['explicit'] = impl.explicit
-        # the values that are None, we don't care for them, so to
-        # consider if we are fully on, is like they are on
-        result_all = all(i in ( True, None ) for i in data.values())
-        result_any = any(i == True for i in data.values())
-        # FIXME: move to report on/off+normal/full/partial
-        if result_all:					# update cache
-            power = True
-            # FIXME: set interfaces.power.state / substate
-            target.fsdb.set('powered', "On")
+            if impl.explicit == None:
+                normal[component] = state
+            elif impl.explicit == 'both':
+                explicit[component] = state
+            elif impl.explicit == 'on':
+                explicit_on[component] = state
+            elif impl.explicit == 'off':
+                explicit_off[component] = state
+            else:
+                raise AssertionError(
+                    "BUG! component %s: unknown explicit tag '%s'" %
+                    (component, impl.explicit))
+
+        # What state are we in?
+        #
+        # See 'Overall power state and explicit power components'
+        # above, but basically we need to report:
+        #
+        #  state: True (on) or False (off)
+        #  substate: 'normal', 'full', 'partial'
+        #
+        if all(i == True for i in normal.values() + explicit_off.values()):
+            state = True
+            if all(i['state'] in (True, None) for i in data.values()):
+                substate = 'full'
+            elif all(i == False
+                     for i in explicit.values() + explicit_on.values()):
+                substate = 'normal'
+            else:
+                substate = 'partial'
+        elif any(i == False
+                 for i in normal.values() + explicit_on.values()):
+            state = False
+            if all(i['state'] in (False, None) for i in data.values()):
+                substate = 'full'
+            elif all(i == True
+                     for i in explicit_off.values()):
+                substate = 'normal'
+            else:
+                substate = 'partial'
         else:
-            power = False
-            target.fsdb.set('powered', None)
-        return power, data, result_any
+            # something is really off
+            state = False
+            substate = 'partial'
 
-
-    def _get_any(self, target):
-        # return if any power component in the rail is on
-        _, _, result_any = self._get(target)
-        return result_any
+        target.fsdb.set('interfaces.power.state', state)
+        target.fsdb.set('interfaces.power.substate', substate)
+        return state, data, substate
 
 
     def _off(self, target, impls, why, whole_rail = True, explicit = False):
@@ -469,10 +524,7 @@ class interface(ttbl.tt_interface):
         #
         # If the user asked for the whole rail, then we'll also run
         # the pre/post hooks.
-        _, data, result_any = self._get(target, impls)
-        if result_any == False:		# everything is off already
-            target.log.debug("power-off%s: skipping (already off)" % why)
-            return
+        _state, data, _substate = self._get(target, impls)
 
         target.log.info("powering off%s" % why)
         if whole_rail:
@@ -493,7 +545,7 @@ class interface(ttbl.tt_interface):
                 component_real = self.aliases[component]
             else:
                 component_real = component
-            if data[component] == False:
+            if data[component]['state'] == False:
                 target.log.debug("%s: powering off%s: skipping (already off)"
                                  % (component, why))
                 continue            	# it says it is off, so we skip it
@@ -545,10 +597,8 @@ class interface(ttbl.tt_interface):
         #
         # Recovery can be quite painful, since we might have to retry
         # (a single component) or the whole rail. Code gets ugly.
-        result_all, data, _ = self._get(target, impls)
-        if result_all == True:
-            target.log.debug("power-on%s: skipping (already on)" % why)
-            return
+        _state, data, _substate = self._get(target, impls)
+
         target.log.info("powering on%s" % why)
         if whole_rail:
             # since we are powering on, let's have whoever does this
@@ -590,7 +640,7 @@ class interface(ttbl.tt_interface):
                 target.log.debug("%s: powering on%s: skipping (explicit/%s)"
                                  % (component, why, impl.explicit))
                 continue            	# it says it is off, so we skip it
-            if data[component] == True:
+            if data[component]['state'] == True:
                 target.log.debug("%s: powering on%s: skipping (already on)"
                                  % (component, why))
                 continue            	# it says it is off, so we skip it
@@ -695,15 +745,9 @@ class interface(ttbl.tt_interface):
     def get_list(self, target, _who, _args, _files, _user_path):
         # return a dictionary indicating the individual state of
         # each power component
-        _, data, _ = self._get(target)
+        state, data, substate = self._get(target)
         # return a sorted list, so the order is maintained
-        return data
-
-    def get_get(self, target, _who, _args, _files, _user_path):
-        # return a single bool saying if all the power rail
-        # components are on
-        result, _, _  = self._get(target)
-        return dict(result = result)
+        return dict(state = state, substate = substate, components = data)
 
     def put_on(self, target, who, args, _files, _user_path):
         impls, _all = self.args_impls_get(args)
@@ -724,8 +768,10 @@ class interface(ttbl.tt_interface):
     def put_cycle(self, target, who, args, _files, _user_path):
         impls, _all = self.args_impls_get(args)
         # default wait is two seconds
-        wait = float(args.get('wait',
-                              target.tags.get('power_cycle_wait', 2)))
+        wait = self.arg_get(args, 'wait', (type(None), numbers.Real),
+                            allow_missing = True, default = None)
+        if wait == None:
+            wait = float(target.tags.get('power_cycle_wait', 2))
         explicit = self._explicit_get(args)
         with target.target_owned_and_locked(who):
             target.timestamp()

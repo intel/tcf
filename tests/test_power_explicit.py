@@ -28,49 +28,86 @@ class _test(tcfl.tc.tc_c):
         # power ALL off
         target.power.off(explicit = True)
         r = target.power.list()
-        assert all(s[1] == False for s in r), \
-            "after explicit off, power state is not all off: %s" % r
-        self.report_pass("explicit off powered everything off")
+        state, substate, components = r
+        assert state == False and substate == 'full' \
+            and all(c['state'] == False for c in components.values()), \
+            "after explicit off, power state is not all off: %s" % (r, )
+        self.report_pass(
+            "after explicit off, we got full off",
+            dict(state = state, substate = substate, components = components),
+            alevel = 1)
 
-        # power ALL on
+        # power to full on
         target.power.on(explicit = True)
         r = target.power.list()
-        assert all(s[1] == True for s in r), \
-            "after explicit on, power state is not all on: %s" % r
-        self.report_pass("explicit on powered everything on")
+        state, substate, components = r
+        assert state == True and substate == 'full' \
+            and all(c['state'] == True for c in components.values()), \
+            "after explicit on, power state is not all on: %s" % (r, )
+        self.report_pass(
+            "after explicit on, we got full on",
+            dict(state = state, substate = substate, components = components),
+            alevel = 1)
         
-        # power off, leaving explicits on
+        # power off, leaving explicits/off on
         target.power.off()
         r = target.power.list()
-        d = {}
-        for k, v in r:
-            d[k] = v
-        assert all(i == True for i in [ d['ex'], d['ac1'], d['ac2'] ]), \
-            "after normal off," \
-            " expected explicit/offs not ON after normal power off: %s" % r
-        assert all(i == False for i in [ d['fp1'], d['fp2'], d['dc'] ]), \
-            "after normal off," \
-            " expected non-explicit not OFF after normal power off: %s" % r
-        self.report_pass("normal off powered non-explicits off")
-        
-        # power ALL off
-        target.power.off(explicit = True)
-        r = target.power.list()
-        assert all(s[1] == False for s in r), \
-            "after explicit off, power state is not all off: %s" % r
-        self.report_pass("explicit off powered everything off")
+        state, substate, components = r
+        assert state == False and substate == 'normal', \
+            "after power off, power state is not normal off: %s" % (r, )
+        for c, d in components.iteritems():
+            explicit = d.get('explicit', None)
+            if explicit == 'both':
+                assert d['state'] == True, \
+                    "after powering off from full on," \
+                    " explicit/both %s's power is not off: %s" \
+                    % (c, r, )
+            elif explicit == 'off':
+                assert d['state'] == True, \
+                    "after powering off from full on," \
+                    " explicit/off %s's is not on: %s" \
+                    % (c, r, )
+            elif explicit == 'on':
+                assert d['state'] == False, \
+                    "after powering off from full on," \
+                    " explicit/on %s's is not off: %s" \
+                    % (c, r, )
+            else:
+                assert d['state'] == False, \
+                    "after powering off from full on," \
+                    " %s is not off: %s" \
+                    % (c, r, )
+        self.report_pass(
+            "after normal off, powered non-explicits off",
+            dict(state = state, substate = substate, components = components),
+            alevel = 1)
 
-        # power on, leaving explicits off
+        target.power.off(explicit = True)
+        self.report_pass("full power off")
+
+        # normal power on
         target.power.on()
         r = target.power.list()
-        d = {}
-        for k, v in r:
-            d[k] = v
-        assert all(i == False for i in [ d['fp1'], d['fp2'], d['ex'] ]), \
-            "expected explicit not OFF after normal power on: %s" % r
-        assert all(i == True for i in [ d['ac1'], d['ac2'], d['dc'] ]), \
-            "after normal power on, expected all ON but 'ex': %s" % r
-        self.report_pass("normal on powered non-explicits on")
+        state, substate, components = r
+        assert state == True and substate == 'normal', (
+            "after power on, power state is not normal on",
+            dict(state = state, substate = substate, components = components))
+        self.report_pass(
+            "after normal on, powered non-explicits on",
+            dict(state = state, substate = substate, components = components),
+            alevel = 1)
+
+        # normal power off after normal power on leaves explicit/off on
+        target.power.on()
+        r = target.power.list()
+        state, substate, components = r
+        assert state == True and substate == 'normal', (
+            "after power on, power state is not normal on",
+            dict(state = state, substate = substate, components = components))
+        self.report_pass(
+            "after normal on, powered non-explicits on",
+            dict(state = state, substate = substate, components = components),
+            alevel = 1)
 
     def teardown_90_scb(self):
         ttbd.check_log_for_issues(self)

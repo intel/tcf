@@ -47,46 +47,51 @@ class extension(tc.target_extension_c):
         A target is considered *on* when all of its power rail
         components are on; fake power components report power state as
         *None* and those are not taken into account.
+
+        A more detailed picture of the target's power state can be
+        obtained with :meth:list.
         """
-        r = self.target.ttbd_iface_call(
-            "power", "get", method = "GET",
-            # extra time, since power ops can take long
-            timeout = 60)
-        return r['result']
+        state, _, _ = self.list()
+        return state
 
     def list(self):
         """
         Return a list of a target's power rail components and their status
 
-        :returns: dictionary keyed by component name listing their
-          state and other flags about them:
+        :returns tuple(state, substate, data):
 
-          .. code-block:: python
+          - state: *True* on, *False* off, *None* not available
+          - substate: "normal", "full", "inconsistent"; if
+            inconsistent, it would be a good idea to power cycle
+          - data: dictionary keyed by
+            component name listing their state and other flags about
+            them:
 
-             {
-                 "NAME1": {
-                     "state": STATE1,
-                     ["explicit": "on|off|both" ]
-                 },
-                 "NAME2": {
-                     "state": STATE2,
-                     ["explicit": "on|off|both" ]
-                 },
-                 ...
-             }
+            .. code-block:: python
 
-          - *state*: *True* if powered, *False* if not, *None* if not
-             applicable, for fake power controls
+               {
+                   "NAME1": {
+                       "state": STATE1,
+                       ["explicit": "on|off|both" ]
+                   },
+                   "NAME2": {
+                       "state": STATE2,
+                       ["explicit": "on|off|both" ]
+                   },
+                   ...
+               }
 
-          - *explicit*: (see :ref:`ttbd_power_explicit`) if missing,
-             not explicit, will be turned on/off normally:
+            - *state*: *True* if powered, *False* if not, *None* if not
+               applicable, for fake power controls
 
-            - *on*: only powered on if explicitly named
+            - *explicit*: (see :ref:`ttbd_power_explicit`) if missing,
+               not explicit, will be turned on/off normally:
 
-            - *off*: only powered off if explicitly named
+              - *on*: only powered on if explicitly named
 
-            - *both*: only powered on/off if explicitly named
+              - *off*: only powered off if explicitly named
 
+              - *both*: only powered on/off if explicitly named
 
         """
         self.target.report_info("listing", dlevel = 1)
@@ -106,6 +111,8 @@ class extension(tc.target_extension_c):
             #
             for i in r.get('power', []):
                 data[i[0]] = dict(state = i[1])
+            substate = 'normal' # older doesn't support substates
+            state = all(i['state'] in (True, None) for i in data.values())
         elif isinstance(r, collections.Mapping):
             # proper response format
             #
@@ -116,11 +123,13 @@ class extension(tc.target_extension_c):
             ## }
             #
             # FIXME: verify the format
-            data = r
+            state = r['state']
+            substate = r['substate']
+            data = r['components']
         else:
             raise AssertionError("can't parse response")
         self.target.report_info("listed")
-        return data
+        return state, substate, data
 
     def off(self, component = None, explicit = False):
         """
@@ -255,20 +264,21 @@ def _cmdline_power_off(args):
     with msgid_c("cmdline"):
         for target_name in args.targets:
             target = tc.target_c.create_from_cmdline_args(args, target_name)
-            target.power.off(args.component)
+            target.power.off(args.component, explicit = args.explicit)
 
 def _cmdline_power_on(args):
     with msgid_c("cmdline"):
         for target_name in args.targets:
             target = tc.target_c.create_from_cmdline_args(args, target_name)
-            target.power.on(args.component)
+            target.power.on(args.component, explicit = args.explicit)
 
 def _cmdline_power_cycle(args):
     with msgid_c("cmdline"):
         for target_name in args.targets:
             target = tc.target_c.create_from_cmdline_args(args, target_name)
-            target.power.cycle(wait = float(args.wait),
-                               component = args.component)
+            target.power.cycle(
+                wait = float(args.wait),
+                component = args.component, explicit = args.explicit)
 
 def _cmdline_power_reset(args):
     with msgid_c("cmdline"):
@@ -279,25 +289,31 @@ def _cmdline_power_reset(args):
 def _cmdline_power_list(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args)
-        r = target.power.list()
+        state, substate, components = target.power.list()
+
+        def _state_to_str(state):
+            if state == True:
+                return 'on'
+            if state == False:
+                return 'off'
+            if state == None:
+                return "n/a"
+            return "BUG:unknown-state"
 
         if args.verbosity < 2:
-            for component, data in r.iteritems():
+            _state = _state_to_str(state)
+            print "overall: %s (%s)" % (_state, substate)
+            for component, data in components.iteritems():
                 state = data['state']
                 explicit = data.get('explicit', None)
-                if state == True:
-                    _state = 'on'
-                elif state == False:
-                    _state = 'off'
-                elif state == None:
-                    _state = "n/a"
-                else:
-                    _state = "BUG:unknown-state"
-                if not explicit or args.verbosity == 0:
+                _state = _state_to_str(state)
+                if explicit and args.verbosity == 0:
+                    continue
+                if not explicit:
                     explicit = ""
                 else:
                     explicit = " (explicit/" + explicit + ")"
-                print "%s: %s%s" % (component, _state, explicit)
+                print "  %s: %s%s" % (component, _state, explicit)
 
         else:  # args.verbosity >= 2:
             print json.dumps(r, skipkeys = True, indent = 4)
@@ -311,60 +327,91 @@ def _cmdline_power_get(args):
 
 
 def _cmdline_setup(arg_subparser):
-    ap = arg_subparser.add_parser("power-on", help = "Power target on")
-    ap.add_argument("--component", "-c", metavar = "COMPONENT",
-                    action = "store", default = None,
-                    help = "Operate only on the given component of the "
-                    "power rail")
-    ap.add_argument("targets", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None,
-                    help = "Target names")
+    ap = arg_subparser.add_parser(
+        "power-on",
+        help = "Power on target's power rail (or individual components)")
+    ap.add_argument(
+        "--component", "-c",
+        metavar = "COMPONENT", action = "store", default = None,
+        help = "Operate only on the given component of the power rail")
+    ap.add_argument(
+        "--explicit", "-e",
+        action = "store_true", default = False,
+        help = "Operate also on all the explicit components; "
+        " explicit components are only powered on if"
+        " --explicit is given or if they are explicitly selected"
+        " with --component")
+    ap.add_argument(
+        "targets",
+        metavar = "TARGET", action = "store", nargs = "+", default = None,
+        help = "Names of targets to power on")
     ap.set_defaults(func = _cmdline_power_on)
 
-    ap = arg_subparser.add_parser("power-off", help = "Power target off")
-    ap.add_argument("--component", "-c", metavar = "COMPONENT",
-                    action = "store", default = None,
-                    help = "Operate only on the given component of the "
-                    "power rail")
-    ap.add_argument("targets", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None,
-                    help = "Target names")
+    ap = arg_subparser.add_parser(
+        "power-off",
+        help = "Power off target's power rail (or individual components)")
+    ap.add_argument(
+        "--component", "-c", metavar = "COMPONENT",
+        action = "store", default = None,
+        help = "Operate only on the given component of the power rail")
+    ap.add_argument(
+        "--explicit", "-e",
+        action = "store_true", default = False,
+        help = "Operate also on all the explicit components; "
+        " explicit components are only powered off if"
+        " --explicit is given or if they are explicitly selected"
+        " with --component")
+    ap.add_argument(
+        "targets",
+        metavar = "TARGET", action = "store", nargs = "+", default = None,
+        help = "Names of targets to power off")
     ap.set_defaults(func = _cmdline_power_off)
 
-    ap = arg_subparser.add_parser("power-cycle",
-                                  help = "Power cycle target (off, then on)")
+    ap = arg_subparser.add_parser(
+        "power-cycle",
+        help = "Power cycle target's power rail (or individual components)")
     ap.add_argument(
-        "-w", "--wait", metavar = "SECONDS", action = "store",
-        default = 0, help = "How long to wait between power "
-        "off and power on")
-    ap.add_argument("--component", "-c", metavar = "COMPONENT",
-                    action = "store", default = None,
-                    help = "Operate only on the given component of the "
-                    "power rail")
-    ap.add_argument("targets", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None,
-                    help = "Target names")
+        "--explicit", "-e",
+        action = "store_true", default = False,
+        help = "Operate also on all the explicit components;  explicit"
+        " components are only power cycled if --explicit is given or"
+        " if they are explicitly selected with --component")
+    ap.add_argument(
+        "-w", "--wait",
+        metavar = "SECONDS", action = "store", default = 0,
+        help = "How long to wait between power off and power on")
+    ap.add_argument(
+        "--component", "-c", metavar = "COMPONENT",
+        action = "store", default = None,
+        help = "Operate only on the given component of the power rail")
+    ap.add_argument(
+        "targets",
+        metavar = "TARGET", action = "store", nargs = "+", default = None,
+        help = "Names of targets to power cycle")
     ap.set_defaults(func = _cmdline_power_cycle)
 
-    ap = arg_subparser.add_parser("power-ls",
-                                  help = "List power rail components and "
-                                  "their state")
+    ap = arg_subparser.add_parser(
+        "power-ls",
+        help = "List power rail components and their state")
     ap.add_argument(
         "-v", dest = "verbosity", action = "count", default = 0,
         help = "Increase verbosity of information to display "
-        "(default displays state, -v adds component flags, -vv python"
-        " dictionary, -vvv JSON format)")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's")
+        "(default displays state of non-explicit components,"
+        " -v adds component flags and lists explicit components,"
+        " -vv python dictionary, -vvv JSON format)")
+    ap.add_argument(
+        "target", metavar = "TARGET", action = "store", default = None,
+        help = "Name of target")
     ap.set_defaults(func = _cmdline_power_list)
 
     ap = arg_subparser.add_parser(
         "power-get",
-        help = "print target's power state."
-        " A target is considered *on* when all of its power rail"
-        " components are on; fake power components report power state as"
-        " *n/a* and those are not taken into account."
-    )
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target")
+        help = "Print target's power state."
+        "A target is considered *on* when all of its power rail"
+        "components are on; fake power components report power state as"
+        "*n/a* and those are not taken into account.")
+    ap.add_argument(
+        "target",
+        metavar = "TARGET", action = "store", default = None,
+        help = "Target")
     ap.set_defaults(func = _cmdline_power_get)
