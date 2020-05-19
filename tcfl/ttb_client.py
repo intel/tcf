@@ -172,12 +172,72 @@ class rest_target_broker(object):
                 raise e
             else:
                 logger.debug("%s: no state-file, will not load", file_name)
+        #: Version of the code ran by the server; filled up when we do
+        #: the first target list, from the target local, metadata
+        #: versions.server; done in _rts_get() _> _rt_list_to_dict()
+        #:
+        #: Used to adjust backwards compat for short periods of time
+        self.server_version = None
+
+        #: Major version of the server code
+        self.server_version_major = None
+        #: Minor version of the server code
+        self.server_version_minor = None
+        self.server_version_pl = 0
+        #: Changes since the major/minor version tag
+        self.server_version_changes = None
+        #: Commit ID of the server code
+        self.server_version_commit = None
+        
+        #: Server can take all arguments JSON encoded
+        #:
+        #: Previous servers woul donly take as JSON things are are not
+        #: strings, numbers, bools. Newer can do both, since this
+        #: allows the server to also be used from curl command line
+        #: with much ado.
+        #:
+        #: This allows us to transition the code without major changes
+        #: to the code or hard dependencies.
+        self.server_json_capable = True
+
+    _server_version_regex = re.compile(
+        r"v?(?P<major>[0-9]+)\.(?P<minor>[0-9]+)(\.(?P<pl>[0-9]+))?"
+        r"(-(?P<changes>[0-9]+))?"
+        r"(-g(?P<commit>[a-f0-9]+))?")
+
+    def _server_tweaks(self, version):
+        if self.server_version != None:
+            return	# already done
+        if version == None:
+            return	# can't do, no info
+        self.server_version = version
+
+        # Server version is like:
+        #
+        ## [v]0.13[.pl][-202[-gf361416]]
+        #
+        # if not, this is an implementation we know not how to handle
+        m = self._server_version_regex.match(version)
+        if not m:
+            return
+        gd = m.groupdict()
+        self.server_version_major = int(gd['major'])
+        self.server_version_minor = int(gd['minor'])
+        if gd['pl']:
+            self.server_version_pl = int(gd['pl'])
+        self.server_version_changes = int(gd['changes'])
+        self.server_version_commit = gd['commit']
+
+        if self.server_version_major == 0:
+            if self.server_version_minor == 13:
+                # protocol changes
+                if self.server_version_changes <= 202:
+                    self.server_json_capable = False
 
     def __str__(self):
         return self.parsed_url.geturl()
 
-    @classmethod
-    def _rt_list_to_dict(cls, rt_list):
+    def _rt_list_to_dict(self, rt_list):
         rts = {}
         for rt in rt_list:
             rt_fullid = rt['fullid']
@@ -185,6 +245,8 @@ class rest_target_broker(object):
             # TARGETNAME" works
             rt[rt_fullid] = True
             rt[rt['id']] = True
+            if rt['id'] == 'local':	# magic! server description
+                self._server_tweaks(rt.get('versions', {}).get('server', None))
             rts[rt_fullid] = rt
         return rts
 
@@ -755,7 +817,7 @@ def cmdline_list(spec_strings, do_all = False):
                               key = lambda x: x[0]):
         # add the remote target info as a dictionary and ...
         kws = dict(rt)
-        #  ... as a flattened dictionary 
+        #  ... as a flattened dictionary
         for key, val in commonl.dict_to_flat(rt,
                                              sort = False, empty_dict = True):
             kws[key] = val

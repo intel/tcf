@@ -1927,13 +1927,32 @@ class target_c(reporter_c):
         assert method.upper() in ( "PUT", "GET", "DELETE", "POST" ), \
             "method must be PUT|GET|DELETE|POST; got %s" % method
 
+        if self.rtb.server_json_capable:
+            all_json = True
+        else:
+            all_json = False
+
         for k, v in kwargs.items():
-            if isinstance(v, basestring):
-                continue
-            kwargs[k] = json.dumps(v)
+            if all_json:
+                # We need None  passed verbatim so it is not really
+                # passed, so we don't encode it as JSON here--this needs
+                # some cleanup, is quite confusing, to be fair.
+                if v == None: # or isinstance(v, basestring):
+                    continue
+                kwargs[k] = json.dumps(v)
+            else:
+                if isinstance(v, basestring):
+                    continue
+                if isinstance(v, (collections.Sequence, collections.Mapping)):
+                    kwargs[k] = json.dumps(v)
+
         if component:
-            kwargs['component'] = component
-        if self.ticket:
+            if all_json == True:
+                kwargs['component'] = json.dumps(component)
+            else:
+                kwargs['component'] = component
+
+        if self.ticket:		# almost deprecated
             kwargs['ticket'] = self.ticket
         try:
             return self.rtb.send_request(
