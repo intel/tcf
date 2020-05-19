@@ -2462,6 +2462,17 @@ class result_c():
                     return r
             # Some exceptions that are common and we know about, so we
             # can print some more info that will be helpful
+            except AssertionError as e:
+                if isinstance(e.args, tuple) and len(e.args[0]) == 2:
+                    # if you raise AssertionError and the second
+                    # expression is a tupple (str, dict), we convert
+                    # that to a blocke_d(str, attachments = dict)
+                    if isinstance(e.args[0][1], dict):
+                        newe = tcfl.tc.blocked_e(e.args[0][0], e.args[0][1])
+                        return result_c.report_from_exception(_tc, newe)
+                # not something we recognize we can easily convert to
+                # blocked_e, so just pass it along
+                raise
             except subprocess.CalledProcessError as e:
                 return result_c.from_exception_cpe(_tc, e)
             except OSError as e:
