@@ -140,7 +140,7 @@ class driver(tc.report_driver_c):
                     encoding = 'utf-8', errors = 'replace')
         else:
             self.logf = None
-        consolef = io.open(sys.stdin.fileno(), "w",
+        consolef = io.open(sys.stdout.fileno(), "w",
                            encoding = 'utf-8', errors = 'replace')
         self.consolef = commonl.io_tls_prefix_lines_c(
             self.tls, consolef.detach(),
