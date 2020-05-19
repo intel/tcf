@@ -831,7 +831,7 @@ been tested yet, shall be similar.
      # firewall-cmd --permanent \
         --add-service=dhcp \
         --add-service=dhcpv6 \
-        --add-services=dns \
+        --add-service=dns \
         --add-service=http \
         --add-service=https \
         --add-service=mountd \
@@ -884,11 +884,11 @@ been tested yet, shall be similar.
 
    - NFS server: provides the POS root filesystem.
 
-     Ensure UDP support is enabled (not for RHEL >= 7.6)::
+     Ensure UDP support is enabled (not for RHEL >= 7.6 or CentOS 7)::
 
        # sed -i 's|RPCNFSDARGS="|RPCNFSDARGS="--udp |' /etc/sysconfig/nfs
-       # systemctl enable nfs-server
-       # systemctl restart nfs-server
+       # systemctl enable --now nfs-server
+
 
 POS: deploy PXE boot image to HTTP and NFS server locations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1009,6 +1009,11 @@ c. Make the kernel and initrd for POS available via Apache for
          # install -o ttbd -g ttbd /usr/share/ipxe/ipxe-x86_64.efi \
               /home/ttbd/public_html/x86_64/
 
+       CentOS 7::
+
+         # install -o ttbd -g ttbd /usr/share/ipxe/ipxe.efi \
+              /home/ttbd/public_html/x86_64/ipxe-x86_64.efi
+
        Note the name changes; as well, there is no need to copy it to
        the TFTP directory as new code paths do it for us.
 
@@ -1016,13 +1021,17 @@ c. Make the kernel and initrd for POS available via Apache for
    Ensure those two files work by pointing a browser to
    http://YOURSERVERNAME/ttbd-pos/ and verifying they can be downloaded.
 
-d. Make the POS root image available over NFS as read-only (note we
-   only export those images only, not all)::
+d. Make the POS root image available over NFS as read-only; verify
+   file ``/etc/exports.d/ttbd-pos.exports`` has been installed. This
+   tells the NFS subsystem to export the POS images for the different
+   architectures.
+
+   Manually, it can be created with::
 
      # tee /etc/exports.d/ttbd-pos.exports <<EOF
      /home/ttbd/images/tcf-live/x86_64 *(ro,no_root_squash)
      EOF
-     # systemctl reload nfs-server	# use 'nfs' for RHEL / CentOS
+     # systemctl reload nfs-server		# use 'nfs' for RHEL
 
      
    Verify the directory is exported::

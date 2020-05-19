@@ -46,6 +46,9 @@ imaging on PC-class targets via DHCP / TFTP.
         ( '/etc/httpd/conf.d/', [
             'ttbd.conf',
         ]),
+        ( '/etc/exports.d/', [
+            'ttbd-pos.exports',
+        ]),
         ( '@prefix@/share/tcf/', [
             'kickstart-install.sh',
             'tcf-image-setup.sh',
