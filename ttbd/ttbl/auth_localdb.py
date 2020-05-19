@@ -44,8 +44,9 @@ class authenticator_localdb_c(ttbl.authenticator_c):
         assert isinstance(name, basestring)
         assert isinstance(users, list)
 
-        logging.error("WARNING! auth_localdb with user lists is deprecated,"
-                      " use auth_userdb")
+        logging.info(
+            "NOTE! auth_localdb with user lists for production use is"
+            " deprecated; use auth_userdb--this driver for tests only")
         self.name = name
         self.passwords = {}
         self.roles = {}
