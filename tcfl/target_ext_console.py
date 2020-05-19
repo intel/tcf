@@ -1318,7 +1318,6 @@ def _cmdline_console_write(args):
         else:
             for line in args.data:
                 target.console.write(line + args.crlf,
-                                     crlf = args.crlf,
                                      console = args.console)
 
 
