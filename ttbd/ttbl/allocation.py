@@ -693,7 +693,7 @@ def request(groups, calling_user, obo_user, guests,
             if not target:
                 return {
                     "state": "rejected",
-                    "message": "target %s in group '%s' does not exist" % (
+                    "_message": "target %s in group '%s' does not exist" % (
                         target_name, group_name
                     )
                 }
@@ -706,7 +706,7 @@ def request(groups, calling_user, obo_user, guests,
             duplicates = target_set.difference(target_list)
             return {
                 "state": "rejected",
-                "message": "targets %s in group '%s' are duplicated" % (
+                "_message": "targets %s in group '%s' are duplicated" % (
                     ",".join(duplicates), group_name
                 )
             }
@@ -718,7 +718,7 @@ def request(groups, calling_user, obo_user, guests,
         if original_group != None:
             return {
                 "state": "rejected",
-                "message": "targets in group '%s' are the same as in '%s'" % (
+                "_message": "targets in group '%s' are the same as in '%s'" % (
                     group_name, original_group
                 )
             }
@@ -739,7 +739,7 @@ def request(groups, calling_user, obo_user, guests,
         if not isinstance(guest, basestring):
             return {
                 "state": "rejected",
-                "message": "guest #%d in the guest lists must" \
+                "_message": "guest #%d in the guest lists must" \
                            " described by a string; got %s" \
                            % (count, type(guest).__name__)
             }
@@ -751,7 +751,7 @@ def request(groups, calling_user, obo_user, guests,
         if priority < priority_min or priority > priority_max:
             return {
                 "state": "rejected",
-                "message": "invalid priority %d (expected %d-%d)" % (
+                "_message": "invalid priority %d (expected %d-%d)" % (
                     priority, priority_min, priority_max)
             }
         # FIXME: verify calling user has this priority
@@ -847,7 +847,7 @@ def request(groups, calling_user, obo_user, guests,
     result = {
         "state": state,
         "allocid": allocid,
-        "message": states[state],
+        "_message": states[state],
     }
     if queue == False:
         if state == 'active':		# we got it
@@ -856,7 +856,7 @@ def request(groups, calling_user, obo_user, guests,
             allocdb.delete(None)
             return  {
                 "state": "busy",
-                "message": states['busy']
+                "_message": states['busy']
             }
         else:			     	# something wong
             allocdb.delete(None)
@@ -887,7 +887,7 @@ def get(allocid, calling_user):
     if not allocdb.check_query_permission(calling_user):
         return {
             # could also just return invalid
-            "message": "not allowed to read allocation"
+            "_message": "not allowed to read allocation"
         }
     return allocdb.to_dict()
 
@@ -906,10 +906,10 @@ def keepalive(allocid, expected_state, _pressure, calling_user):
     try:
         allocdb = get_from_cache(allocid)
     except allocation_c.invalid_e:
-        return dict(state = "invalid", message = states['invalid'])
+        return dict(state = "invalid", _message = states['invalid'])
     if not allocdb.check_user_is_creator_admin(calling_user):
         # guests are *NOT* allowed to keepalive
-        return dict(state = "rejected", message = states['rejected'])
+        return dict(state = "rejected", _message = states['rejected'])
 
     allocdb.timestamp()				# first things first
     state = allocdb.state_get()
@@ -1015,19 +1015,19 @@ def delete(allocid, calling_user):
         allocdb.delete("removed")
         return {
             "state": "removed",
-            "message": states['removed']
+            "_message": states['removed']
         }
 
     if allocdb.check_userid_is_guest(userid):
         allocdb.guest_remove(userid)
         return {
             "state": "removed",
-            "message": "%s: guest removed from allocation" % userid
+            "_message": "%s: guest removed from allocation" % userid
         }
 
     return {
         "state": "rejected",
-        "message": "no permission to remove other's allocation"
+        "_message": "no permission to remove other's allocation"
     }
 
 
@@ -1036,14 +1036,14 @@ def guest_add(allocid, calling_user, guest):
     if not isinstance(guest, basestring):
         return {
             "state": "rejected",
-            "message": "guest must be described by a string; got %s" \
+            "_message": "guest must be described by a string; got %s" \
             % type(guest).__name__
         }
     assert isinstance(allocid, basestring)
     allocdb = get_from_cache(allocid)
     # verify user is owner/creator
     if not allocdb.check_user_is_creator_admin(calling_user):
-        return { "message": "guests not allowed to set guests in allocation" }
+        return { "_message": "guests not allowed to set guests in allocation" }
     allocdb.guest_add(guest)
     return {}
 
@@ -1053,7 +1053,7 @@ def guest_remove(allocid, calling_user, guest):
     if not isinstance(guest, basestring):
         return {
             "state": "rejected",
-            "message": "guest must be described by a string;"
+            "_message": "guest must be described by a string;"
                        " got %s" % type(guest)
         }
     assert isinstance(allocid, basestring)
@@ -1061,7 +1061,7 @@ def guest_remove(allocid, calling_user, guest):
     guestid = commonl.mkid(guest, l = 4)
     if calling_user.get_id() != guest \
        and not allocdb.check_user_is_creator_admin(calling_user):
-        return { "message": "not allowed to remove guests from allocation" }
+        return { "_message": "not allowed to remove guests from allocation" }
     allocdb.guest_remove(guest)
     return {}
 

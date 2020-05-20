@@ -143,7 +143,7 @@ def flask_log_abort(l, http_code, *args, **kwargs):
 @app.errorhandler(404)
 #@app.errorhandler(423)
 def _error_handler(error):
-    r = flask.make_response(flask.jsonify({ 'message': error.description }))
+    r = flask.make_response(flask.jsonify({ '_message': error.description }))
     r.status_code = error.code
     return r
 
@@ -363,7 +363,7 @@ def _user_delete(userid = None):
         flask_logi_abort(
             403, "not enough privilege to remove user %s" % userid)
     user.wipe()
-    return flask.jsonify({'result': "session closed"})
+    return flask.jsonify({'_message': "session closed"})
 
 @app.route(
     API_PREFIX + 'users/<userid>/<any("drop","gain"):action>/<string:role>',
@@ -391,15 +391,15 @@ def _user_role(userid, action, role):
             flask_logi_abort(
                 403, "user '%s' has no access to role %s" % (userid, role))
         user.role_drop(role)
-        r = { "result": "user '%s' dropped role '%s'" % (userid, role) }
+        r = { "_message": "user '%s' dropped role '%s'" % (userid, role) }
     elif action == "gain":
         if not user.role_present(role):
             flask_logi_abort(
                 403, "user '%s' has no access to role %s" % (userid, role))
         user.role_gain(role)
-        r = { "result": "user '%s' gained role '%s'" % (userid, role) }
+        r = { "_message": "user '%s' gained role '%s'" % (userid, role) }
     else:
-        r = { "result": "user '%s' role '%s' invalid action %s"
+        r = { "_message": "user '%s' role '%s' invalid action %s"
                         % (userid, role, action) }
     return flask.jsonify(r)
 
