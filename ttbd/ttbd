@@ -408,7 +408,7 @@ def _user_role(userid, action, role):
 def _targets_gets():
     projections = ttbl.tt_interface.arg_get(
         flask.request.form, 'projections', list, True, [])
-    _list = []
+    result = {}
     calling_user = flask_login.current_user._get_current_object()
     for target in ttbl.test_target.known_targets():
         if not target.check_user_allowed(calling_user):
@@ -418,8 +418,8 @@ def _targets_gets():
             # list it only if the projections yielded a non empty
             # set of data
             d['id'] = target.id
-            _list.append(d)
-    return flask.jsonify({'targets': _list})
+            result[target.id] = d
+    return flask.jsonify(result)
 
 @app.route(API_PREFIX + 'targets/<string:target_id>', methods = ['GET'])
 @flask_login.login_required

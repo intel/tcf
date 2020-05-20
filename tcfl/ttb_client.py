@@ -454,13 +454,17 @@ class rest_target_broker(object):
             # FIXME: imitate same output format until we unfold all
             # these calls--it was a bad idea
             if not 'targets' in r:
-                r['targets'] = [ r ]
+                target_list = [ r ]
         else:
             # force a short timeout to get rid of failing servers quick
             r = self.send_request("GET", "targets/",
                                   data = data, timeout = 20)
+            if 'targets' in r:		# old version, deprecated # COMPAT
+                target_list = r['targets']
+            else:
+                target_list = r.values()	# new, target dict
         _targets = []
-        for rt in r['targets']:
+        for rt in target_list:
             # Skip disabled targets
             if target_id != None and rt.get('disabled', None) != None \
                and all_targets != True:
@@ -470,7 +474,6 @@ class rest_target_broker(object):
             # we need to change where we store it in this cache
             rt['rtb'] = self
             _targets.append(rt)
-        del r
         return _targets
 
     def rest_tb_target_update(self, target_id):
