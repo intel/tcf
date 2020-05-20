@@ -1175,9 +1175,21 @@ def f_write_retry_eagain(fd, data):
 _flags_set = None
 _flags_old = None
 
+def _offset_calc(target, console, offset):
+    if offset >= 0:
+        return offset
+    # negative offset, calculate from current size
+    size = target.console.size(console)
+    if size == None:
+        return 0	# disabled console
+    # offset larger than current size?
+    offset = max(0, size + offset + 1)
+    return offset
+
 def _console_read_thread_fn(target, console, fd, offset):
     # read in the background the target's console output and print it
     # to stdout
+    offset = _offset_calc(target, console, int(offset))
     with msgid_c("cmdline"):
         generation = 0
         generation_prev = None
@@ -1225,6 +1237,9 @@ def _console_read_thread_fn(target, console, fd, offset):
 
 
 def _cmdline_console_write_interactive(target, console, crlf, offset):
+
+    if console == None:
+        console = target.console.default
     #
     # Poor mans interactive console
     #
@@ -1232,8 +1247,8 @@ def _cmdline_console_write_interactive(target, console, crlf, offset):
     # capture user's keyboard input and send it to the target.
     print """\
 WARNING: This is a very limited interactive console
-         Escape character twice ^[^[ to exit; CRLF is '%s'
-""" % crlf.encode('unicode-escape')
+         Escape character twice ^[^[ to exit; using console '%s' with CRLF '%s'
+""" % (console, crlf.encode('unicode-escape'))
     time.sleep(1)
     fd = os.fdopen(sys.stdout.fileno(), "w+")
     console_read_thread = threading.Thread(
@@ -1289,25 +1304,19 @@ WARNING: This is a very limited interactive console
             termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN,
                               _flags_old)
 
-def _offset_calc(target, console, offset):
-    if offset >= 0:
-        return offset
-    # negative offset, calculate from current size
-    size = target.console.size(console)
-    if size == None:
-        return 0	# disabled console
-    # offset larger than current size?
-    offset = max(0, size + offset + 1)
-    return offset
-
-
 def _cmdline_console_write(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args)
-        offset = _offset_calc(target, args.console, int(args.offset))
+        if args.offset == None:
+            # if interactive, default the offset to the last that
+            # comes up; otherwise it gets confusing
+            if args.interactive:
+                args.offset = -1
+            else:
+                args.offset = 0
         if args.interactive:
             _cmdline_console_write_interactive(target, args.console,
-                                               args.crlf, offset)
+                                               args.crlf, args.offset)
         elif args.data == []:	# no data given, so get from stdin
             while True:
                 line = getpass.getpass("")
@@ -1622,9 +1631,10 @@ def _cmdline_setup(arg_subparser):
                     help = "Data to write; if none given, "
                     "read from stdin")
     ap.add_argument("-s", "--offset", action = "store",
-                    dest = "offset", type = int, default = 0,
-                    help = "read the console from the given offset"
-                    " (negative to start from the end, -1 for last)")
+                    dest = "offset", type = int, default = None,
+                    help = "read the console from the given offset, "
+                    " negative to start from the end, -1 for last"
+                    " (defaults to 0 or -1 if -i is active)")
     ap.set_defaults(func = _cmdline_console_write, crlf = "\n")
 
 
