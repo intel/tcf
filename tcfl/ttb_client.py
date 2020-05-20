@@ -396,13 +396,11 @@ class rest_target_broker(object):
         if raw:
             return r
         rdata = r.json(object_pairs_hook = collections.OrderedDict)
-        if 'diagnostics' in rdata:
-            diagnostics = rdata.get('diagnostics', "").encode("utf-8",
-                                                              'replace')
-            if diagnostics != "":
-                for line in diagnostics.split("\n"):
-                    logger.warning("diagnostics: " + line)
-            rdata.pop('diagnostics')
+        if '_diagnostics' in rdata:
+            diagnostics = rdata.pop('_diagnostics').encode("utf-8", 'replace')
+            # this is not very...memory efficient
+            for line in diagnostics.split("\n"):
+                logger.warning("diagnostics: " + line)
         return rdata
 
     def login(self, email, password):

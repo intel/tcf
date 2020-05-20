@@ -806,11 +806,17 @@ def _target_interface(target_id, interface, call):
             "BUG: %s: request_process() did not return a dictionary" \
             " but a %s" \
             % (interface, type(result).__name__)
-        if 'diagnostics' in result:
+        if '_diagnostics' in result:
             target.log.error("BUG: %s: request_process() added a "
-                             "'diagnostics' field that will be overriden"
+                             "'_diagnostics' field that will be overriden"
                              % interface)
-        result['diagnostics'] = iostr.getvalue()
+
+        if calling_user.is_admin():
+            # only admins get diagnostics, since this might include
+            # stuff we don't want you to know because of internals of
+            # the server.
+            # FIXME: maybe add a 'diagnostics' role?
+            result['_diagnostics'] = iostr.getvalue()
     except ttbl.test_target_e as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
     except Exception as e:
