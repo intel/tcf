@@ -336,8 +336,13 @@ def request_response_maybe_raise(response):
     if not response:
         try:
             json = response.json()
-            if json != None and 'message' in json:
-                message = json['message']
+            if json != None:
+                if '_message' in json:
+                    message = json['_message']
+                elif 'message' in json:	# COMPAT: older daemons
+                    message = json['message']
+                else:
+                    message = "no specific error text available"
             else:
                 message = "no specific error text available"
         except ValueError as e:
