@@ -20,10 +20,12 @@ requires =
          python-flask
          python-flask-login
          @@Fedora@@python-flask-principal
+         python2-ipaddress
          python2-keyring
          @@Fedora@@python2-pysnmp
          @@CentOS|RHEL@@pysnmp
          python-ldap
+         python2-netifaces
          @@Fedora@@python-pexpect
          @@CentOS|RHEL@@pexpect
          python-ply

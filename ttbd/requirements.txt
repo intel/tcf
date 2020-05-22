@@ -1,7 +1,9 @@
 flask
 flask-login
 flask-principal
+ipaddress
 keyring
+netifaces
 pexpect
 ply
 prctl
