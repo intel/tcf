@@ -1003,15 +1003,29 @@ class tt_interface(object):
         try:
             arg = json.loads(args[arg_name])
         except ValueError as e:
-            if 'No JSON object could be decoded' not in e.message:
-                raise
             # so let's assume is not properly JSON encoded and it is
             # just a string to pass along
             arg = args[arg_name]
-            if arg == "True":		# all this is backwards compat..
-                arg = True		# ... fugly, yes; but early clients
-            elif arg == "False":	# failed to properly json encode
-                arg = False		# args
+            # all this is backwards compat..... fugly, yes; but early clients
+            # failed to properly json encode args; also, when calling
+            # from curl with -d it becomes more ellaborate, so let's
+            # keep it.
+            if arg in ( "none", "None", "null" ):
+                arg = None
+            elif arg in ( "True", "true" ):
+                arg = True
+            elif arg in ( "False", "false" ):
+                arg = False
+            else:
+                # if we are expecting another type, let's try to
+                # convert it
+                if arg_type and arg_type != basestring:
+                    try:
+                        arg = arg_type(arg)
+                    except ValueError:
+                        raise ValueError(
+                            "%s: can't convert expected type %s; value: %s"
+                            % (arg_name, arg_type.__name__, arg))
         if arg_type != None and not isinstance(arg, arg_type):
             raise RuntimeError(
                 "%s: argument must be a %s; got '%s'"
