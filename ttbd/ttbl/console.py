@@ -112,8 +112,19 @@ class impl_c(ttbl.tt_interface_impl_c):
 
     :param int command_timeout: (optional) number of seconds to wait
       for a response ot a command before declaring a timeout
+
+    :param str crlf: (optional; default *None*) newline convention for
+      this console; this is informational for the clients, to know which
+      string they need to use as end of line; the only practical
+      choices are:
+
+      - ``\r``: one carriage return
+      - ``\n``: one new line
+      - ``\r\n``: one carriage return folloed by a new line
+
     """
-    def __init__(self, command_sequence = None, command_timeout = 5):
+    def __init__(self, command_sequence = None, command_timeout = 5,
+                 crlf = '\r'):
         assert command_sequence == None \
             or isinstance(command_sequence, list), \
             "command_sequence: expected list of tuples; got %s" \
@@ -122,6 +133,9 @@ class impl_c(ttbl.tt_interface_impl_c):
         self.command_sequence = command_sequence
         self.command_timeout = command_timeout
         self.parameters = {}
+        assert crlf == None or isinstance(crlf, basestring), \
+            "console implementation declares CRLF with" \
+            " a type %s; expected string" % type(crlf)
         ttbl.tt_interface_impl_c.__init__(self)
         #: Check if the implementation's link died and it has to be
         #: re-enabled
@@ -133,6 +147,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         #: reports is disabled because the link died but it should be
         #: enabled, it will be automatically re-enabled.
         self.re_enable_if_dead = False
+        self.crlf = crlf
 
     class exception(Exception):
         """
@@ -408,6 +423,16 @@ class interface(ttbl.tt_interface):
         # matter what, and we want it to fail early and not seem there
         # is something odd.
         target.power_off_pre_fns.append(self._pre_off_disable_all)
+        for console, impl in self.impls.iteritems():
+            if impl.crlf:
+                # if it declares a CRLF string, publish it
+                assert isinstance(impl.crlf, basestring), \
+                    "%s: target declares CRLF for console %s with" \
+                    " a type %s; expected string" % (
+                        target.id, console, type(impl.crlf))
+                target.fsdb.set("interfaces.console." + console + ".crlf",
+                                impl.crlf)
+
 
     def _release_hook(self, target, _force):
         # nothing to do on target release
@@ -630,14 +655,16 @@ class generic_c(impl_c):
 
     """
     def __init__(self, chunk_size = 0, interchunk_wait = 0.2,
-                 command_sequence = None, escape_chars = None):
+                 command_sequence = None, escape_chars = None,
+                 crlf = '\r'):
         assert chunk_size >= 0
         assert interchunk_wait > 0
         assert escape_chars == None or isinstance(escape_chars, dict)
 
         self.chunk_size = chunk_size
         self.interchunk_wait = interchunk_wait
-        impl_c.__init__(self, command_sequence = command_sequence)
+        impl_c.__init__(self, command_sequence = command_sequence,
+                        crlf = crlf)
         if escape_chars == None:
             self.escape_chars = {}
         else:
@@ -898,7 +925,8 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
         generic_c.__init__(self,
                            chunk_size = chunk_size,
                            interchunk_wait = interchunk_wait,
-                           command_sequence = command_sequence)
+                           command_sequence = command_sequence,
+                           crlf = '\r\n')
         ttbl.power.socat_pc.__init__(
             self,
             "PTY,link=console-%(component)s.write,rawer"

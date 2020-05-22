@@ -512,6 +512,40 @@ class extension(tc.target_extension_c):
         r = self.target.ttbd_iface_call("console", "list", method = "GET")
         self.aliases = r['aliases']
         self._set_default()
+        #: Default end of line for the different consoles
+        #:
+        #: Dictionary keyed by console name that specifies the end-of-string
+        #: for the console; if there is no entry for a console.
+        #:
+        #: See :meth:tcfl.tc.target_c.send.
+        #:
+        #: This can be set with::
+        #:
+        #:    >> target.console.crlf['my consolename'] = '\r'
+        #:
+        #: If nothing is specified, it will default to '\n' or no
+        #: translation, depending on what needs to be done. Different
+        #: consoles of the same machine might have different needs
+        #: depending on their transport.
+        self.crlf = {}
+
+        # See if the servr declares any CRLF convention to default to;
+        # we do this now because this info doesn't change, makes no
+        # sense to keep udpating it in tcfl.tc.target_c.send() [main
+        # user of it]
+        console_iface = target.rt['interfaces']['console']
+        for console in self.console_list:
+            # Maybe the server declares in the inventory which
+            # CRLF convention to use in interfaces.console.CONSOLENAME.crlf
+            console_info = console_iface.get(console, {})
+            if isinstance(console_info, basestring):
+                # alias for something else, ignore
+                continue
+            if 'crlf' in console_info:
+                self.crlf[console] = console_info['crlf']
+            else:
+                # for those who don't declare anything, we default to \r
+                self.crlf[console] = '\r'
 
     def _set_default(self):
         # Which is the default console that was set in the server?
@@ -847,26 +881,6 @@ class extension(tc.target_extension_c):
         if r['result'] == None:
             return None			# console disabled
         return int(r['result'])
-
-    #: Default end of line for the different consoles
-    #:
-    #: Dictionary keyed by console name that specifies the end-of-string
-    #: for the console; if there is no entry for a console.
-    #:
-    #: See :meth:tcfl.tc.target_c.send.
-    #:
-    #: This can be set with::
-    #:
-    #:    >> target.console.crlf['my consolename'] = '\r'
-    #:
-    #: If nothing is specified, it will default to '\n' or no
-    #: translation, depending on what needs to be done. Different
-    #: consoles of the same machine might have different needs
-    #: depending on their transport.
-    #:
-    #: FIXME: default to server specification on the inventory for
-    #:        the console
-    crlf = {}
 
     #: Default chunk sizes for the different consoles
     #:
