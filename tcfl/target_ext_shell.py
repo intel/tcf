@@ -412,7 +412,8 @@ class shell(tc.target_extension_c):
             if output_filter_crlf:
                 if crlf:
                     # replace \r\n, \r\r\n, \r\r\r\r\n... it happens
-                    output = re.sub(self.crnl_regex, crlf, output)
+                    output = re.sub(self.crnl_regex, "\n", output)
+                    crlf = "\n"
             if trim:
                 # When we can run(), it usually prints in the console:
                 ## <command-echo from our typing>
