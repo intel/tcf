@@ -249,7 +249,7 @@ class interface(ttbl.tt_interface):
 
 
     def put_flash(self, target, who, args, _files, user_path):
-        images = self.arg_get(args, 'images', list)
+        images = self.arg_get(args, 'images', dict)
         with target.target_owned_and_locked(who):
             # do a single call to one flasher with everything that
             # resolves to the same implementation from the aliases with
