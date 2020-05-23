@@ -743,6 +743,25 @@ class extension(tc.target_extension_c):
         r = self.target.ttbd_iface_call("console", "list", method = "GET")
         return r['result']
 
+    @staticmethod
+    def offset_calc(target, console, offset):
+        """
+        Calculate offset based on current console size
+
+        :param int offset: if negative, it is calculated relative to
+          the end of the console output
+        """
+        if offset >= 0:
+            return offset
+        # negative offset, calculate from current size
+        size = target.console.size(console)
+        if size == None:
+            return 0	# disabled console
+        # offset larger than current size?
+        offset = max(0, size + offset + 1)
+        return offset
+
+
     def _read(self, console = None, offset = 0, max_size = 0, fd = None):
         """
         Read data received on the target's console
@@ -1189,21 +1208,10 @@ def f_write_retry_eagain(fd, data):
 _flags_set = None
 _flags_old = None
 
-def _offset_calc(target, console, offset):
-    if offset >= 0:
-        return offset
-    # negative offset, calculate from current size
-    size = target.console.size(console)
-    if size == None:
-        return 0	# disabled console
-    # offset larger than current size?
-    offset = max(0, size + offset + 1)
-    return offset
-
 def _console_read_thread_fn(target, console, fd, offset):
     # read in the background the target's console output and print it
     # to stdout
-    offset = _offset_calc(target, console, int(offset))
+    offset = target.console.offset_calc(target, console, int(offset))
     with msgid_c("cmdline"):
         generation = 0
         generation_prev = None
@@ -1348,7 +1356,7 @@ def _cmdline_console_read(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args)
         console = args.console
-        offset = _offset_calc(target, args.console, int(args.offset))
+        offset = target.console.offset_calc(target, args.console, int(args.offset))
         max_size = int(args.max_size)
         if args.output == None:
             fd = sys.stdout
