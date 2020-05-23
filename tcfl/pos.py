@@ -339,9 +339,23 @@ def mount_root_part(target, root_part_dev, repartition):
         dict(target = target))
 
 
-# FIXME: what I don't like about this is that we have no info on the
-# interconnect -- this must require it?
 def target_power_cycle_to_pos_pxe(target):
+    """
+    Boot a target to provisioning mode using by booting BIOS to PXE
+
+    By setting a property *pos_mode* to *pxe*, we tell the server we
+    want to boot this target in POS mode. When the server receives the
+    order to power up this target, it will configure the PXE
+    bootloader configuration to direct the target to boot Provisioning
+    OS.
+
+    Requires the target be configured with a pre-power on hook such as
+    :func:ttbl.pxe.power_on_pre_pos_setup, or
+    :meth:ttbl.ipmi.pci.pre_power_pos_setup or with a power component
+    such as :class:ttbl.ipmi.pos_mode_c which take care of configuring
+    the PXE bootloader configuration for redirecting the boot
+    process.
+    """
     target.report_info("POS: setting target to PXE boot Provisioning OS")
     target.property_set("pos_mode", "pxe")
     target.power.cycle()
@@ -687,7 +701,7 @@ class extension(tc.target_extension_c):
         # let's see what can we do about it.
         if output == None:
             # nah, can't do much
-            return
+            return False
 
         # looks like a login prompt? Maybe we can login and munge
         # things around
@@ -700,16 +714,38 @@ class extension(tc.target_extension_c):
                                    "prompt, will try to fix the "
                                    "boot configuration")
                 boot_config_fix_fn(target)
+                return True
             else:
                 target.report_error(
                     "POS: seems we got a login prompt that is not POS, "
                     "but I don't know how to fix it; target does not "
                     "declare capability `boot_config_fix`",
                     attachments = dict(output = output))
+                return False
         else:
             target.report_error(
                 "POS: didn't find a login prompt in output to try fixing",
                 attachments = dict(output = output, alevel = 0))
+            return False
+
+    def _maybe_recovery(self, target):
+        # FIXME: add negative offset support to the protocol
+        offset = target.console.offset_calc(
+            target, None,
+            # we need enought to capture a local boot with
+            # log messages and all that add up to a lot
+            - 32 * 1024)
+        output = target.console.read(offset = offset)
+        if output == "" or output == "\x00":
+            return False
+        # FIXME: move this to read() as an option?
+        output = re.sub(r"(\r+\n|\r)", "\n", output)
+        # sometimes the BIOS has been set to boot local directly,
+        # so we might as well retry
+        target.report_error(
+            "POS: unexpected console output, retrying",
+            attachments = { "console output": output })
+        return self._unexpected_console_output_try_fix(output, target)
 
     def boot_to_pos(self, pos_prompt = None,
                     # plenty to boot to an nfsroot, hopefully
@@ -744,6 +780,7 @@ class extension(tc.target_extension_c):
                 # logs in, we will see it
                 try:
                     boot_to_pos_fn(target)
+                    retry = False
                     ts0 = time.time()
                     # Try a few times to enable the console and expect
                     # the *TCF test node* banner
@@ -778,32 +815,31 @@ class extension(tc.target_extension_c):
                                 % (ts - ts0),
                                 dict(target = target, exception = e),
                                 dlevel = 2)
+                            if self._maybe_recovery(target):
+                                # found that we had booted to
+                                # localhost and fixed the boot order
+                                # if we had to. Now we need a power
+                                # cycle, so exit two levels up to do so
+                                retry = True
+                                break	# exit to outer for loop
                             # no wait here, since expect did for us already
                             continue
+                    else:
+                        if not self._maybe_recovery(target):
+                            target.report_error(
+                                "POS: no console output, retrying")
+
+                        continue
+                    if retry:		# force another power cyle
+                        continue
                     # Ok, we have a console that seems to be
                     # ready...so setup the shell.
                     target.shell.up(timeout = timeout)
                 except ( tc.error_e, tc.failed_e ) as e:
                     tc.result_c.report_from_exception(target.testcase, e)
-                    attachment = e.attachments_get().get('console output', None)
-                    output = ""
-                    if attachment:
-                        for data in attachment.make_generator():
-                            output += data
-                            if len(output) > 32 * 1024:
-                                # we need enought to capture a local boot
-                                # with log messages and all that add up to
-                                # a lot
-                                break
-                    if output == "" or output == "\x00":
-                        target.report_error("POS: no console output, retrying")
-                        continue
-                    # sometimes the BIOS has been set to boot local directly,
-                    # so we might as well retry
-                    target.report_error(
-                        "POS: unexpected console output, retrying",
-                        attachments = { "console output": attachment })
-                    self._unexpected_console_output_try_fix(output, target)
+                    if not self._maybe_recovery(target):
+                        target.report_error(
+                            "POS: no console output, retrying")
                     continue
                 target.report_info("POS: got Provisioning OS shell")
                 break
