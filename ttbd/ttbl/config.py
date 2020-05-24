@@ -22,7 +22,6 @@ targets_lock = threading.Lock()
 _count = 0
 # This is set by the main daemonpath when bringing up
 state_path = None
-lib_path = None
 upload_max_size = 16 * 1024 * 1024
 
 ssl_enabled = None

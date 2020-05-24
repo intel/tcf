@@ -423,7 +423,7 @@ def rm_f(filename):
         if e.errno != errno.ENOENT:
             raise
 
-def makedirs_p(dirname, mode = None):
+def makedirs_p(dirname, mode = None, reason = None):
     """
     Create a directory tree, ignoring an error if it already exists
 
@@ -439,7 +439,11 @@ def makedirs_p(dirname, mode = None):
             os.chmod(dirname, mode)
     except OSError:
         if not os.path.isdir(dirname):
-            raise
+            raise RuntimeError("%s: path for %s is not a directory"
+                               % (dirname, reason))
+        if not os.access(dirname, os.W_OK):
+            raise RuntimeError("%s: path for %s does not allow writes"
+                               % (dirname, reason))
 
 def symlink_f(source, dest):
     """

@@ -748,7 +748,7 @@ def tb_file_local_path_get(username, filepath):
     path.
     """
     local_filepath = os.path.normpath("%s/%s/%s" % (
-        app.config['files_path'], username, filepath))
+        ttbl.test_target.files_path, username, filepath))
     if not os.path.isfile(local_filepath):
         return None
     else:
@@ -777,7 +777,7 @@ def _target_interface(target_id, interface, call):
             flask_logi_abort(400, "%s: interface broken" % interface)
         assert isinstance(iface, ttbl.tt_interface)
         username = flask_login.current_user.get_id()
-        user_path = os.path.join(app.config['files_path'], username)
+        user_path = os.path.join(ttbl.test_target.files_path, username)
         # make sure the directory exists
         commonl.makedirs_p(user_path)
         with log_to_str_too(target.log, iostr_wrapper):
@@ -849,7 +849,7 @@ def _target_interface(target_id, interface, call):
         return flask.jsonify(result)
 
 def cleanup_files():
-    for f in glob.iglob(app.config['files_path'] + "/*/*"):
+    for f in glob.iglob(ttbl.test_target.files_path + "/*/*"):
        if (time.time() - os.stat(f).st_mtime ) > ttbl.config.cleanup_files_maxage:
                os.remove(f)
 
@@ -934,7 +934,7 @@ _local_addresses = set()
 # we just create an special anonymous user that has full privilege.
 def _create_anonymous_user():
     local_auth_disabled_runtime = os.path.exists(
-        os.path.join(ttbl.config.lib_path, "local_auth_disabled"))
+        os.path.join(args.var_state_path, "local_auth_disabled"))
     if not local_auth_disabled_runtime \
        and flask.request.remote_addr in _local_addresses:
         return ttbl.user_control.User('local', roles = [ "admin" ])
@@ -1055,12 +1055,9 @@ if __name__ == "__main__":
         "--files-path", action = "store", default = "~/.ttbd/files",
         help = "directory where to store uploaded files [%(default)s]")
     arg_parser.add_argument(
-        "--state-path", action = "store", default = "~/.ttbd/state",
-        help = "Directory where to save state")
-    arg_parser.add_argument(
-        "--var-lib-path", "--state-persistent-path", dest = "var_lib_path",
-        action = "store", default = "~/.ttbd/lib",
-        help = "Directory where to save persistent state")
+        "--state-path", dest = "var_state_path",
+        action = "store", default = "~/.ttbd",
+        help = "Directory where to save peristent state")
     arg_parser.add_argument(
         "--upload-max-size", action = "store", type = int,
         default = ttbl.config.upload_max_size,
@@ -1131,53 +1128,45 @@ if __name__ == "__main__":
     if args.system_wide == None:
         ttbl.config.instance_suffix = ""
         ttbl.config.instance = ""
-        # args.VAR stuff comes from settings on the argparser
-        pass
     elif args.system_wide == "":
         ttbl.config.instance_suffix = ""
         ttbl.config.instance = ""
         args.config_path = "/etc/ttbd"
         args.files_path = "/var/cache/ttbd"
-        args.state_path = "/var/run/ttbd"
         # State that stays through reboots
-        args.var_lib_path = "/var/lib/ttbd"
+        args.var_state_path = "/var/lib/ttbd"
     else:
         ttbl.config.instance = args.system_wide
         ttbl.config.instance_suffix = "-" + args.system_wide
         args.config_path = "/etc/ttbd" + ttbl.config.instance_suffix
         args.files_path = "/var/cache/ttbd" + ttbl.config.instance_suffix
-        args.state_path = "/var/run/ttbd" + ttbl.config.instance_suffix
         # State that stays through reboots
-        args.var_lib_path = os.path.join("/var/lib/ttbd", args.system_wide)
-    args.var_lib_path = os.path.expanduser(args.var_lib_path)
-
-    os.umask(0o007)
-
-    if not os.path.exists(args.var_lib_path):
-        try:
-            os.makedirs(args.var_lib_path, 0o2770)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                loge("%s: cannot create path: %s" % (args.var_lib_path, e))
-                raise
-    else:
-        commonl.check_dir_writeable(args.var_lib_path, "storing state")
-
+        args.var_state_path = os.path.join("/var/lib/ttbd", args.system_wide)
     # Define things ttbl.config needs for configuring targets
-    ttbl.test_target.state_path = os.path.expanduser(args.state_path)
-    ttbl.config.state_path = os.path.expanduser(args.state_path)
-    ttbl.config.lib_path = os.path.expanduser(args.var_lib_path)
-    if not os.path.isdir(ttbl.test_target.state_path):
-        os.makedirs(ttbl.test_target.state_path, 0o2770)
-    else:
-        commonl.check_dir_writeable(ttbl.test_target.state_path,
-                                    "storing state")
-    args.state_path = ttbl.test_target.state_path
     args.config_path = os.path.expanduser(args.config_path)
+    args.files_path = os.path.expanduser(args.files_path)
+    args.var_state_path = os.path.expanduser(args.var_state_path)
+    ttbl.allocation.path = os.path.join(args.var_state_path, "allocations")
+    ttbl.test_target.state_path = os.path.join(args.var_state_path, "targets")
+    ttbl.test_target.files_path = args.files_path
+    ttbl.user_control.User.state_dir = os.path.join(args.var_state_path, "users")
+
+
+    os.umask(0o007)		# daemon gives no permissions to others
+
+    commonl.makedirs_p(args.var_state_path, 0o2770,
+                       reason = "storing state")
+    commonl.makedirs_p(ttbl.test_target.state_path, 0o2770,
+                       reason = "storing target state")
+    commonl.makedirs_p(ttbl.test_target.files_path, 0o2770,
+                       reason = "storing user's files")
+    commonl.makedirs_p(ttbl.user_control.User.state_dir, 0o2770,
+                       reason = "storing user state")
+
 
     # get the key for this instance; we need to do this before we read
     # the configuration, as we'll use ttbl._who_daemon
-    key_filename = os.path.join(args.var_lib_path, "session.key")
+    key_filename = os.path.join(args.var_state_path, "session.key")
     try:
         with open(key_filename) as f:
             sk = cPickle.load(f)
@@ -1237,18 +1226,10 @@ if __name__ == "__main__":
         ##ttbl.config._authenticators.insert(0, ttbl.auth_party.authenticator_party_c(
         ##    [ 'user', 'admin' ], local_addresses = _local_addresses))
 
-    files_path = os.path.expanduser(args.files_path)
-    ttbl.test_target.files_path = files_path
-    commonl.check_dir_writeable(files_path, "storing uploaded files")
 
-    # FIXME: needs a thread to clean up app.config['files_path']
-    # enforcing LRU date and maximum size
     if ttbl.config.upload_max_size != args.upload_max_size:
         args.upload_max_size = ttbl.config.upload_max_size
     app.config['MAX_CONTENT_LENGTH'] = args.upload_max_size
-    app.config['files_path'] = os.path.expanduser(args.files_path)
-    app.config['state_path'] = ttbl.test_target.state_path
-    ttbl.user_control.User.state_dir = args.var_lib_path
     app.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(4)
     # ensure that when we JSON encode sorted dictionaries, the encode
     # respects the order of the keys.
@@ -1282,7 +1263,7 @@ if __name__ == "__main__":
         old_umask = os.umask(0o077)	# Create files go=
         try:
             cert_fn, pkey_fn = werkzeug.serving.make_ssl_devcert(
-                os.path.join(args.state_path, "cert"))
+                os.path.join(args.var_state_path, "cert"))
         finally:
             os.umask(old_umask)
         ssl_context.load_cert_chain(cert_fn, pkey_fn)
@@ -1290,7 +1271,6 @@ if __name__ == "__main__":
     else:
         raise RuntimeError("can't give --no-ssl and --ssl* options")
 
-    ttbl.allocation.path = os.path.join(ttbl.config.state_path, "allocations")
     ttbl.allocation.init()
 
     #

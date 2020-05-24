@@ -604,7 +604,6 @@ host = '127.0.0.1'
             "-vvvvv",
             "--files-path", self.files_dir,
             "--state-path", self.state_dir,
-            "--var-lib-path", self.lib_dir,
             "--config-path", "", # This empty one is to clear them all
             "--config-path", self.etc_dir
         ]

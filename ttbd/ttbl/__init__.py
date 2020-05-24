@@ -1272,11 +1272,11 @@ import ttbl.config
 
 class test_target(object):
 
-    #! Path where the runtime state is stored
-    state_path = "/var/run/ttbd"
+    #: Path where the runtime state is stored
+    state_path = None
 
     #: Path where files are stored
-    files_path = "__undefined__"
+    files_path = None
 
     #: Properties that normal users (non-admins) can set when owning a
     #: target and that will be reset when releasing a target (except
@@ -1329,9 +1329,12 @@ class test_target(object):
 
         # Create the directory where we'll keep the target's state
         self.state_dir = os.path.join(self.state_path, self.id)
+        commonl.makedirs_p(self.state_dir, 0o2770,
+                           "target %s's state" % self.id)
+        commonl.makedirs_p(os.path.join(self.state_dir, "queue"), 0o2770,
+                           "target %s's allocation queue" % self.id)
         self.lock = process_posix_file_lock_c(
-            os.path.join(self.state_path, "lockfile"))
-        commonl.makedirs_p(os.path.join(self.state_dir, "queue"), 0o2770)
+            os.path.join(self.state_dir, "lockfile"))
         #: filesystem database of target state; the multiple daemon
         #: processes use this to store information that reflect's the
         #: target's state.
