@@ -394,6 +394,8 @@ class allocation_c(ttbl.fsdb_symlink_c):
             "state": self.state_get(),
             "user": self.get("user"),
             "creator": self.get("creator"),
+            "priority": self.get('priority'),
+            "preempt": self.get('preempt'),
         }
         reason = self.get("reason", None)
         if reason:
@@ -767,10 +769,13 @@ def request(groups, calling_user, obo_user, guests,
     # Create an allocation record and from there, get the ID -- we
     # abuse python's tempdir making abilities for it
     allocid_path = tempfile.mkdtemp(dir = path, prefix = "")
+    # we allow ttbd group (admins) to look into these dirs
+    os.chmod(allocid_path, 02770)
     allocid = os.path.basename(allocid_path)
 
     allocdb = get_from_cache(allocid)
 
+    allocdb.set("preempt", preempt)
     allocdb.set("priority", priority)
     allocdb.set("user", obo_user)
     allocdb.set("creator", calling_user.get_id())

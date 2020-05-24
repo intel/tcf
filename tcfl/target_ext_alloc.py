@@ -404,6 +404,12 @@ def _alloc_ls(verbosity):
             user = data.get('user', None)
             creator = data['creator']
             guests = data.get('guests', [])
+            if 'priority' in data:
+                prio = str(data['priority'])
+                if data['preempt']:
+                    prio += ":P"
+            else:
+                prio = "n/a"
             userl = [ user ]
             if user != creator:
                 userl.append(creator + " (creator)")
@@ -412,7 +418,8 @@ def _alloc_ls(verbosity):
             if verbosity == 0:
                 table.append([
                     allocid,
-                    data['state'],
+                    # put state/prio/preempt together
+                    data['state'] + " " + prio,
                     "\n".join(userl),
                     len(data.get('target_group', [])),
                     data.get('reason', "n/a"),
@@ -425,6 +432,7 @@ def _alloc_ls(verbosity):
                     allocid,
                     rtb,
                     data['state'],
+                    prio,
                     data.get('timestamp', 'n/a'),
                     "\n".join(userl),
                     "\n".join(tgs),
@@ -446,6 +454,7 @@ def _alloc_ls(verbosity):
             "AllocID",
             "Server",
             "State",
+            "Priority",
             "Timestamp",
             "Users",
             "Groups",
