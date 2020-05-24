@@ -7621,29 +7621,6 @@ class subtc_c(tc_c):
         pass
 
 
-def find(args):
-    """
-    Discover test cases in a list of paths
-    """
-    # discover test cases
-    tcs = {}
-    if len(args.testcase) == 0:
-        logger.warning("No testcases specified, searching in "
-                       "current directory, %s", os.getcwd())
-        args.testcase = [ '.' ]
-    for tc_path in args.testcase:
-        tc_c.find_in_path(tcs, tc_path)
-        for tcd in tc_c._tc_drivers:
-            # If a driver has a different find function, use it to
-            # find more
-            tcd_find_in_path = getattr(tcd, "find_in_path", None)
-            if tcd_find_in_path is not None and\
-               id(getattr(tcd_find_in_path, "im_func", tcd_find_in_path)) \
-               != id(tc_c.find_in_path.im_func):
-                tcd.find_in_path(tcs, tc_path)
-    if len(tcs) == 0:
-        logger.warning("No testcases found")
-
 #: Global testcase reporter
 #:
 #: Used to report top-level progress and messages beyond the actual
@@ -8168,19 +8145,6 @@ def _run(args):
         return 0
 
 def argp_setup(arg_subparsers):
-    ap = arg_subparsers.add_parser("find",
-                                   help = "List testcases")
-    ap.add_argument(
-        "-v", dest = "verbosity", action = "count", default = 0,
-        help = "Increase information to display about the tests")
-    ap.add_argument("-t", "--target", metavar = "TARGET",
-                    help = "Test target on which to run the "
-                    "test cases--if none, if will be autodetermined")
-    ap.add_argument("testcase", metavar = "TEST-CASE",
-                    nargs = "*",
-                    help = "Test cases files or directories "
-                    "where to find test cases")
-    ap.set_defaults(func = find)
 
     ap = arg_subparsers.add_parser("run",
                                    help = "Run testcases")
