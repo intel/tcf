@@ -3448,6 +3448,15 @@ class tc_c(reporter_c):
     #: exports.
     reason = None
 
+    #: Priority to use to allocate targets when running testcases
+    priority = 500
+
+    #: Allocate targets with preemption rights
+    preempt = False
+
+    #: Allocate on behalf of another user
+    obo = None
+
     #: List of places where we declared this testcase is build only
     build_only = []
 
@@ -5862,8 +5871,9 @@ class tc_c(reporter_c):
         allocid, state, targetids = target_ext_alloc._alloc_targets(
             rtb,
             { "group": [ target.id for target in pending ] },
-            # FIXME: do we want to do OBO here? how?
-            obo = None,
+            obo = self.obo,
+            preempt = self.preempt,
+            priority = self.priority,
             queue_timeout = timeout,
             reason = self.reason % commonl.dict_missing_c(self.kws))
         if state != 'active':
@@ -7980,7 +7990,11 @@ def _run(args):
     report_driver_c.add(report_file_impl)
 
     # Setup defaults in the base testcase class
+    tc_c.preempt = args.preempt
+    tc_c.priority = args.priority
     tc_c.reason = args.reason
+    tc_c.obo = args.obo
+
     global ticket
     if args.ticket == '':	# default for tcf run means generate a ticket
         ticket = None
@@ -8316,6 +8330,17 @@ def argp_setup(arg_subparsers):
         "testcase's hash ID; useful when multiple runs of the same "
         "cases and targets are going to be run with different external "
         "variations, such as different compiler or library versions")
+    ap.add_argument(
+        "-p", "--priority", action = "store", type = int, default = 500,
+        help = "Priority (0 highest, 999 lowest, %(default)s);"
+        " policy might restrict the highest priority")
+    ap.add_argument(
+        "-o", "--obo", action = "store", default = None,
+        help = "User to allocate on behalf of; policy might disallow")
+    ap.add_argument(
+        "--preempt", action = "store_true", default = False,
+        help = "Enable allocation preemption (disabled by default);"
+        " server policy might restrict if allowed or not.")
     ap.add_argument("testcase", metavar = "TEST-CASE",
                     nargs = "*",
                     help = "Files describing testcases")
