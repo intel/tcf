@@ -277,7 +277,7 @@ def _cmdline_power_cycle(args):
         for target_name in args.targets:
             target = tc.target_c.create_from_cmdline_args(args, target_name)
             target.power.cycle(
-                wait = float(args.wait),
+                wait = float(args.wait) if args.wait else None,
                 component = args.component, explicit = args.explicit)
 
 def _cmdline_power_reset(args):
@@ -378,8 +378,9 @@ def _cmdline_setup(arg_subparser):
         " if they are explicitly selected with --component")
     ap.add_argument(
         "-w", "--wait",
-        metavar = "SECONDS", action = "store", default = 0,
-        help = "How long to wait between power off and power on")
+        metavar = "SECONDS", action = "store", default = None,
+        help = "How long to wait between power off and power on;"
+        " default to server configuration")
     ap.add_argument(
         "--component", "-c", metavar = "COMPONENT",
         action = "store", default = None,
