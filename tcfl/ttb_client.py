@@ -446,7 +446,7 @@ class rest_target_broker(object):
         :param str target_id: Only get information for said target id
         """
         if projection:
-            data = { 'projection': json.dumps(projection) }
+            data = { 'projections': json.dumps(projection) }
         else:
             data = None
         if target_id:

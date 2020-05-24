@@ -69,7 +69,7 @@ def _target_get(args):
     # pure target get w/o going through the cache
 
     if args.projection:
-        data = { 'projection': json.dumps(args.projection) }
+        data = { 'projections': json.dumps(args.projection) }
     else:
         data = None
     rtb, _rt = ttb_client._rest_target_find_by_id(args.target)
