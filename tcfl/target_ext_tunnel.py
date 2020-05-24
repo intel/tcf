@@ -141,7 +141,7 @@ class tunnel(tc.target_extension_c):
         else:
             assert isinstance(protocol, basestring), \
                 "protocol shall be a string; got %s" % type(protocol)
-        assert port > 0
+        assert isinstance(port, int)
         ip_addr = self._ip_addr_get(ip_addr)
 
         self.target.ttbd_iface_call("tunnel", "tunnel",
@@ -278,7 +278,7 @@ def cmdline_setup(argsp):
     commonl.argparser_add_aka(argsp, "tunnel-rm", "tunnel-delete")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
-    ap.add_argument("port", metavar = "PORT", action = "store",
+    ap.add_argument("port", metavar = "PORT", action = "store", type = int,
                     help = "Port to tunnel to")
     ap.add_argument("protocol", metavar = "PROTOCOL", action = "store",
                     nargs = "?", default = None,
