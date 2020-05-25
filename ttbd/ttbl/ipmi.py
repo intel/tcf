@@ -378,7 +378,7 @@ class sol_ssh_console_pc(ttbl.console.ssh_pc):
         assert isinstance(ipmi_timeout, numbers.Real)
         assert isinstance(ipmi_retries, int)
         ttbl.console.ssh_pc.__init__(
-            self, hostname, port = ssh_port, crlf = "\n",
+            self, hostname, port = ssh_port,
             chunk_size = chunk_size, interchunk_wait = interchunk_wait)
         _user, password, _hostname = commonl.split_user_pwd_hostname(hostname)
         self.ipmi_timeout = ipmi_timeout
