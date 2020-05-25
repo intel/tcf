@@ -761,8 +761,25 @@ class extension(tc.target_extension_c):
         offset = max(0, size + offset + 1)
         return offset
 
+    # \r+\n is because some transports pile \rs on top of each other...
+    _crlf_regex_universal = re.compile("(\r+\n|\r|\n)")
 
-    def _read(self, console = None, offset = 0, max_size = 0, fd = None):
+    @classmethod
+    def _newline_convert(cls, data, newline):
+        if newline == '':
+            return data
+        if newline == None:
+            return re.sub(cls._crlf_regex_universal, "\n", data)
+        if isinstance(newline, re._pattern_type):
+            return re.sub(newline, "\n", data)
+        if isinstance(newline, basestring):
+            return data.replace(newline, "\n")
+        raise AssertionError(
+            "can't understand newline of type %s; expected none, '',"
+            " regex or string" % type(newline))
+
+    def _read(self, console = None, offset = 0, max_size = 0, fd = None,
+              newline = None):
         """
         Read data received on the target's console
 
@@ -801,7 +818,9 @@ class extension(tc.target_extension_c):
                 for chunk in r.iter_content(chunk_size):
                     while True:
                         try:
-                            fd.write(chunk)
+                            # calc len before EOL conversion
+                            chunk_len = len(chunk)
+                            fd.write(self._newline_convert(chunk, newline))
                             break
                         except IOError as e:
                             # for those files opened in O_NONBLOCK
@@ -816,7 +835,7 @@ class extension(tc.target_extension_c):
                             raise
 
                     # don't use chunk_size, as it might be less
-                    total += len(chunk)
+                    total += chunk_len
                     if max_size > 0 and total >= max_size:
                         break
                 fd.flush()
@@ -829,6 +848,7 @@ class extension(tc.target_extension_c):
                                        raw = True)
             ret = r.text
             l = len(ret)
+            ret = self._newline_convert(ret, newline)
         target.report_info("%s: read %dB from console @%d"
                            % (console, l, offset), dlevel = 3)
         generation_s, offset_s = \
@@ -839,23 +859,41 @@ class extension(tc.target_extension_c):
             + int(r.headers.get('Content-Length', 0))
         return generation, new_offset, ret
 
-    def read(self, console = None, offset = 0, max_size = 0, fd = None):
+    def read(self, console = None, offset = 0, max_size = 0, fd = None,
+             newline = None):
         """
         Read data received on the target's console
 
         :param str console: (optional) console to read from
-        :param int offset: (optional) offset to read from (defaults to zero)
+
+        :param int offset: (optional) offset to read from (defaults to
+          zero)
+
         :param int fd: (optional) file descriptor to which to write
           the output (in which case, it returns the bytes read).
+
         :param int max_size: (optional) if *fd* is given, maximum
           amount of data to read
+
+        :param newline: (optional, defaults to *None*, universal)
+          convention for end-of-line characters.
+          - *None* any of *\\r*, *\\n*, *\\r\\n* or multile *\\r* followed
+            by a *\\n* are considered a newline and replaced with *\\n*
+          - *''* (empty string): no translation is done
+          - a string: the string is considered an end of line
+            character and replaced by a *\\n*. Most common characters
+            would be *\\r*, *\\n* or *\\r\\n*.
+          - a regular expresion: whatever matches the regular
+            expression is replaced with a *\\n*.
+
         :returns: data read (or if written to a file descriptor,
           amount of bytes read)
         """
         return self._read(console = console, offset = offset,
-                          max_size = max_size, fd = fd)[2]
+                          max_size = max_size, fd = fd, newline = newline)[2]
 
-    def read_full(self, console = None, offset = 0, max_size = 0, fd = None):
+    def read_full(self, console = None, offset = 0, max_size = 0, fd = None,
+                  newline = None):
         """
         Like :meth:`read`, reads data received on the target's console
         returning also the stream generation and offset at which to
@@ -875,6 +913,17 @@ class extension(tc.target_extension_c):
         :param int max_size: (optional) if *fd* is given, maximum
           amount of data to read
 
+        :param newline: (optional, defaults to *None*, universal)
+          convention for end-of-line characters.
+          - *None* any of *\\r*, *\\n*, *\\r\\n* or multile *\\r* followed
+            by a *\\n* are considered a newline and replaced with *\\n*
+          - *''* (empty string): no translation is done
+          - a string: the string is considered an end of line
+            character and replaced by a *\\n*. Most common characters
+            would be *\\r*, *\\n* or *\\r\\n*.
+          - a regular expresion: whatever matches the regular
+            expression is replaced with a *\\n*.
+
         :returns: tuple consisting of:
 
           - stream generation
@@ -886,7 +935,7 @@ class extension(tc.target_extension_c):
 
         """
         return self._read(console = console, offset = offset,
-                          max_size = max_size, fd = fd)
+                          max_size = max_size, fd = fd, newline = newline)
 
     def size(self, console = None):
         """
