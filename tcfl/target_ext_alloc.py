@@ -70,7 +70,7 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
     if state not in ( 'queued', 'active'):
         raise RuntimeError(
             "allocation failed: %s: %s"
-            % (state, r.get('message', 'message n/a')))
+            % (state, r.get('_message', 'message n/a')))
     allocid = r['allocid']
     data = { allocid: state }
     if state == 'active':			# got it
@@ -170,7 +170,7 @@ def _cmdline_alloc_targets(args):
             rtbs.add(rt['rtb'])
 
         if len(rtbs) > 1:
-            logging.error("Targets span more than one server")
+            logging.error("Targets span more than one server: %s", rtbs)
             sys.exit(1)
         rtb = list(rtbs)[0]
         allocid = args.allocid
