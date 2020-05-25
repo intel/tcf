@@ -255,7 +255,7 @@ class shell(tc.target_extension_c):
         """
         assert tempt == None or isinstance(tempt, basestring)
         assert user == None or isinstance(user, basestring)
-        assert isinstance(login_regex, ( basestring, re._pattern_type ))
+        assert login_regex == None or isinstance(login_regex, ( basestring, re._pattern_type ))
         assert delay_login >= 0
         assert password == None or isinstance(password, basestring)
         assert isinstance(password_regex, ( basestring, re._pattern_type ))
@@ -272,8 +272,10 @@ class shell(tc.target_extension_c):
         
         def _login(target):
             # If we have login info, login to get a shell prompt
-            target.expect(login_regex, name = "login prompt",
-                          console = console)
+            if login_regex != None:
+                # we have already recevied this, so do not expect it
+                target.expect(login_regex, name = "login prompt",
+                              console = console)
             if delay_login:
                 target.report_info("Delaying %ss before login in"
                                    % delay_login)
@@ -360,8 +362,6 @@ class shell(tc.target_extension_c):
         # don't set a timeout here, leave it to whatever it was defaulted
         return
 
-    crnl_regex = re.compile("\r+\n")
-
     def _run(self, cmd = None, expect = None, prompt_regex = None,
              output = False, output_filter_crlf = True, trim = False,
              console = None, origin = None):
@@ -406,14 +406,12 @@ class shell(tc.target_extension_c):
         if output:
             if console == None:
                 console = target.console.default
-            crlf = self.target.console.crlf.get(console, "\n")
-            output = self.target.console.read(offset = offset,
-                                              console = console)
             if output_filter_crlf:
-                if crlf:
-                    # replace \r\n, \r\r\n, \r\r\r\r\n... it happens
-                    output = re.sub(self.crnl_regex, "\n", output)
-                    crlf = "\n"
+                newline = None
+            else:
+                newline = ''
+            output = self.target.console.read(
+                offset = offset, console = console, newline = newline)
             if trim:
                 # When we can run(), it usually prints in the console:
                 ## <command-echo from our typing>
@@ -423,8 +421,8 @@ class shell(tc.target_extension_c):
                 # So to trim we just remove the first and last
                 # lines--won't work well without output_filter_crlf
                 # and it is quite a hack.
-                first_nl = output.find(crlf)
-                last_nl = output.rfind(crlf)
+                first_nl = output.find("\n")
+                last_nl = output.rfind("\n")
                 output = output[first_nl+1:last_nl+1]
             return output
         return None
