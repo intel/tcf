@@ -691,61 +691,21 @@ class extension(tc.target_extension_c):
         return capability_fn
 
 
-    # can't add $ at the end because sometimes there are spurious
-    # messages after it...\b -> beginning end of a word maybe at
-    # beg/end of string
-    _regex_waiting_for_login = re.compile(r".*\blogin:\s+", re.MULTILINE)
-
     def _unexpected_console_output_try_fix(self, output, target):
-        # so when trying to boot POS we got unexpected console output;
-        # let's see what can we do about it.
-        if output == None:
-            # nah, can't do much
-            return False
-
-        # looks like a login prompt? Maybe we can login and munge
-        # things around
-        m = self._regex_waiting_for_login.search(output)
-        if m:
-            boot_config_fix_fn = target.pos.cap_fn_get('boot_config_fix',
-                                                       'uefi')
-            if boot_config_fix_fn:
-                target.report_info("POS: got an unexpected login "
-                                   "prompt, will try to fix the "
-                                   "boot configuration")
-                boot_config_fix_fn(target)
-                return True
-            else:
-                target.report_error(
-                    "POS: seems we got a login prompt that is not POS, "
-                    "but I don't know how to fix it; target does not "
-                    "declare capability `boot_config_fix`",
-                    attachments = dict(output = output))
-                return False
-        else:
-            target.report_error(
-                "POS: didn't find a login prompt in output to try fixing",
-                attachments = dict(output = output, alevel = 0))
-            return False
-
-    def _maybe_recovery(self, target):
-        # FIXME: add negative offset support to the protocol
-        offset = target.console.offset_calc(
-            target, None,
-            # we need enought to capture a local boot with
-            # log messages and all that add up to a lot
-            - 32 * 1024)
-        output = target.console.read(offset = offset)
-        if output == "" or output == "\x00":
-            return False
-        # FIXME: move this to read() as an option?
-        output = re.sub(r"(\r+\n|\r)", "\n", output)
-        # sometimes the BIOS has been set to boot local directly,
-        # so we might as well retry
+        boot_config_fix_fn = target.pos.cap_fn_get('boot_config_fix',
+                                                   'uefi')
+        if boot_config_fix_fn:
+            target.report_info("POS: got an unexpected login "
+                               "prompt, will try to fix the "
+                               "boot configuration")
+            boot_config_fix_fn(target)
+            return True
         target.report_error(
-            "POS: unexpected console output, retrying",
-            attachments = { "console output": output })
-        return self._unexpected_console_output_try_fix(output, target)
+            "POS: seems we got a login prompt that is not POS, "
+            "but I don't know how to fix it; target does not "
+            "declare capability `boot_config_fix`",
+            attachments = dict(output = output))
+        return False
 
     def boot_to_pos(self, pos_prompt = None,
                     # plenty to boot to an nfsroot, hopefully
@@ -780,7 +740,7 @@ class extension(tc.target_extension_c):
                 # logs in, we will see it
                 try:
                     boot_to_pos_fn(target)
-                    retry = False
+                    pos_boot_found = False
                     ts0 = time.time()
                     # Try a few times to enable the console and expect
                     # the *TCF test node* banner
@@ -801,45 +761,74 @@ class extension(tc.target_extension_c):
                             time.sleep(inner_timeout)
                             continue
                         try:
-                            # POS prints this when it boots before
-                            # login (/etc/issue) or when we login
-                            # (/etc/motd) so that when we enable an
-                            # SSH console it also pops out
-                            target.expect("TCF test node",
-                                          timeout = inner_timeout)
-                            break	# made it here, got it!
+                            # POS prints this 'TCF test node' when it
+                            # boots before login (/etc/issue) or when
+                            # we login (/etc/motd) so that when we
+                            # enable an SSH console it also pops out
+                            #
+                            # If we do not get the login prompt, it
+                            # might be we are in an SSH only console,
+                            # so if we have the issue, we are good.
+                            r = testcase.expect(
+                                target.console.text(
+                                    "TCF test node",
+                                    name = "POS boot issue",
+                                    # if not found, it is ok, we'll
+                                    # handle it
+                                    timeout = 0
+                                ),
+                                # FIXME: for ssh consoles this does
+                                # not apply, find an equivalent
+                                target.console.text(
+                                    "login: ",
+                                    name = "login prompt",
+                                ),
+                                name = "wait for Provisioning OS to boot",
+                                timeout = inner_timeout,
+                            )
+                            if 'POS boot issue' not in r:
+                                # probably booted to the OS instead of
+                                # to the POS
+                                offset = target.console.offset_calc(
+                                    target, None,
+                                    # we need enought to capture a local boot with
+                                    # log messages and all that add up to a lot
+                                    - 32 * 1024)
+                                output = target.console.read(offset = offset)
+                                if 'login prompt' in r:
+                                    self._unexpected_console_output_try_fix(
+                                        output, target)
+                                # it is broken, need a retry w/ power cycle
+                                # is needed
+                                pos_boot_found = False
+                                break
+                            # found the issue and the login banner; good to go!
+                            pos_boot_found = True
+                            break
                         except ( tc.error_e, tc.failed_e ) as e:
+                            # we didn't find the login banner nor the
+                            # issue, so we have a big problem, let's retry
                             ts = time.time()
                             target.report_info(
                                 "POS: no signs of prompt after +%.1fs"
                                 % (ts - ts0),
                                 dict(target = target, exception = e),
                                 dlevel = 2)
-                            if self._maybe_recovery(target):
-                                # found that we had booted to
-                                # localhost and fixed the boot order
-                                # if we had to. Now we need a power
-                                # cycle, so exit two levels up to do so
-                                retry = True
-                                break	# exit to outer for loop
                             # no wait here, since expect did for us already
                             continue
-                    else:
-                        if not self._maybe_recovery(target):
-                            target.report_error(
-                                "POS: no console output, retrying")
-
-                        continue
-                    if retry:		# force another power cyle
+                    if pos_boot_found != True:
+                        target.report_error(
+                            "POS: did not boot, retrying")
                         continue
                     # Ok, we have a console that seems to be
                     # ready...so setup the shell.
                     target.shell.up(timeout = timeout)
                 except ( tc.error_e, tc.failed_e ) as e:
                     tc.result_c.report_from_exception(target.testcase, e)
-                    if not self._maybe_recovery(target):
-                        target.report_error(
-                            "POS: no console output, retrying")
+                    # if we are here, we got no console output because
+                    # it wasn't caught in the inner loopsq
+                    target.report_error(
+                            "POS: no console output? retrying")
                     continue
                 target.report_info("POS: got Provisioning OS shell")
                 break

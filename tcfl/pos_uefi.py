@@ -905,7 +905,7 @@ def boot_config_fix(target):
         # get the super-generic prompt -- not a really good fix, but
         # will do for now
         target.shell.shell_prompt_regex = target_ext_shell._shell_prompt_regex
-        target.shell.up(user = 'root')
+        target.shell.up(user = 'root', login_regex = None)
 
         # Some drivers disable efibootmgr to avoid the boot order
         # being changed without control--in said case, hack to use the
