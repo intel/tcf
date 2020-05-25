@@ -2449,7 +2449,8 @@ class result_c():
             # Some exceptions that are common and we know about, so we
             # can print some more info that will be helpful
             except AssertionError as e:
-                if isinstance(e.args, tuple) and len(e.args[0]) == 2:
+                if isinstance(e.args, tuple) and len(e.args) > 0 \
+                   and len(e.args[0]) == 2:
                     # if you raise AssertionError and the second
                     # expression is a tupple (str, dict), we convert
                     # that to a blocke_d(str, attachments = dict)
@@ -3007,13 +3008,17 @@ class expectation_c(object):
       such as *if I see this image in the screen, bail out*:
 
       >>> self.expect("wait for boot",
-      >>>             crash = image_on_screenshot(
-      >>>                 target, 'screen', 'icon-crash.png',
+      >>>             crash = target.capture.image_on_screenshot(
+      >>>                 'screen', 'icon-crash.png',
       >>>                 raise_on_found = tcfl.tc.error_e("Crash found"),
       >>>                 timeout = 0),
-      >>>             login_prompt = image_on_screenshot(
-      >>>                 target, 'screen', 'canary-login-prompt.png',
+      >>>             login_prompt = target.capture.image_on_screenshot(
+      >>>                 'screen', 'canary-login-prompt.png',
       >>>                 timeout = 4),
+      >>>             login_prompt_serial = target.console.text(
+      >>>                 "login: ",
+      >>>                 name = "login prompt",
+      >>>             ),
       >>> )
 
       Note you need to tell it also *zero* timeout, otherwise it will
