@@ -1260,8 +1260,6 @@ def _console_read_thread_fn(target, console, fd, offset):
 
 def _cmdline_console_write_interactive(target, console, crlf, offset):
 
-    if console == None:
-        console = target.console.default
     #
     # Poor mans interactive console
     #
@@ -1336,6 +1334,13 @@ def _cmdline_console_write(args):
                 args.offset = -1
             else:
                 args.offset = 0
+        if args.console == None:
+            args.console = target.console.default
+        if args.crlf == None:
+            # get the CRLF the server says, otherwise default to \n,
+            # which seems to work best for most
+            args.crlf = target.rt.get(
+                "interfaces.console." + args.console + ".crlf", "\n")
         if args.interactive:
             _cmdline_console_write_interactive(target, args.console,
                                                args.crlf, args.offset)
@@ -1638,13 +1643,15 @@ def _cmdline_setup(arg_subparser):
                     help = "Do not local echo (%(default)s)")
     ap.add_argument("-r", dest = "crlf",
                     action = "store_const", const = "\r",
-                    help = "CRLF lines with \\r")
+                    help = "end lines with \\r")
     ap.add_argument("-n", dest = "crlf",
                     action = "store_const", const = "\n",
-                    help = "CRLF lines with \\n (default)")
+                    help = "end lines with \\n"
+                    " (defaults to this if the server does not declare "
+                    " the interfaces.console.CONSOLE.crlf property)")
     ap.add_argument("-R", dest = "crlf",
                     action = "store_const", const = "\r\n",
-                    help = "CRLF lines with \\r\\n")
+                    help = "end lines with \\r\\n")
     ap.add_argument("-N", dest = "crlf",
                     action = "store_const", const = "",
                     help = "Don't add any CRLF to lines")
@@ -1657,7 +1664,7 @@ def _cmdline_setup(arg_subparser):
                     help = "read the console from the given offset, "
                     " negative to start from the end, -1 for last"
                     " (defaults to 0 or -1 if -i is active)")
-    ap.set_defaults(func = _cmdline_console_write, crlf = "\n")
+    ap.set_defaults(func = _cmdline_console_write, crlf = None)
 
 
     ap = arg_subparser.add_parser("console-setup",
