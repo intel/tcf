@@ -6,13 +6,14 @@ keyring
 netifaces
 pexpect
 ply
-prctl
+python-prctl
 pyghmi
 pyserial
 pysnmp
 python_ldap
 pyusb
 requests
+sdnotify
 setuptools
 systemd
 tornado

@@ -20,16 +20,17 @@ requires =
          python-flask
          python-flask-login
          @@Fedora@@python-flask-principal
-         python2-ipaddress
+         @@Fedora@@python2-ipaddress
+         @@CentOS|RHEL@@python-ipaddress
          python2-keyring
          @@Fedora@@python2-pysnmp
          @@CentOS|RHEL@@pysnmp
          python-ldap
-         python2-netifaces
+         @@Fedora@@python2-netifaces
+         @@CentOS|RHEL@@python-netifaces
          @@Fedora@@python-pexpect
          @@CentOS|RHEL@@pexpect
          python-ply
-         python-prctl
          python-requests
          @@Fedora@@python-systemd
          @@CentOS|RHEL@@systemd-python
@@ -39,7 +40,6 @@ requires =
          python-werkzeug
          pyusb
          qemu
-         sdnotify
          openssh-clients
          sshpass
          socat
