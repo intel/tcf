@@ -118,9 +118,9 @@ class impl_c(ttbl.tt_interface_impl_c):
       string they need to use as end of line; the only practical
       choices are:
 
-      - ``\r``: one carriage return
-      - ``\n``: one new line
-      - ``\r\n``: one carriage return folloed by a new line
+      - ``\\r``: one carriage return
+      - ``\\n``: one new line
+      - ``\\r\\n``: one carriage return followed by a new line
 
     """
     def __init__(self, command_sequence = None, command_timeout = 5,
