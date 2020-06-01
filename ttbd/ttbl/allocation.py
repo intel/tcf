@@ -248,8 +248,6 @@ class allocation_c(ttbl.fsdb_symlink_c):
         if ttl > 0:
             ts_start = int(self.get('_alloc.ts_start'))
             if ts_now - ts_start > ttl:
-                logging.error("DEBUG: %s: allocation expired",
-                              self.allocid)
                 self.delete('overtime')
                 return
 
@@ -924,6 +922,57 @@ def keepalive(allocid, expected_state, _pressure, calling_user):
         r['group_allocated'] = allocdb.get("group_allocated")
     return r
 
+def _idle_power_off(target, calling_user,
+                    idle_power_off, idle_power_fully_off):
+    assert isinstance(target, ttbl.test_target)
+    assert isinstance(idle_power_off, int)
+    assert isinstance(idle_power_fully_off, int)
+
+    # get the target's timestamp before allocating it, since
+    # allocating it will update the timestamp; then allocate it and
+    # get its power state; turn it off it it has been on for too
+    # long
+    ts = target.timestamp_get()
+
+    r = request(
+        { "target": [ target.id ] },
+        calling_user, calling_user.get_id(), [], queue = False,
+        reason = "checking if need to power off due to idleness")
+    if r['state'] != "active":
+        # someone else got it, that's fine, means they are using it
+        return
+    allocdb = get_from_cache(r['allocid'])
+    try:
+        # the power interface is defined in ttbl.power
+        power_state, _, power_substate = target.power._get(target)
+
+        # calculate the idle time once we own the target, to be sure
+        # none came in the middle and we are killing it for them...
+        ts_now = datetime.datetime.now()
+        idle_time = ts_now - datetime.datetime.strptime(ts, "%Y%m%d%H%M%S")
+
+        if idle_time.seconds > idle_power_fully_off:
+            # if it is already fully off or we fully power it off,
+            # then we can exit, as it is automatically normal off
+            if power_state == False and power_substate == 'full':
+                return		# already fully off, so normal too
+            target.log.info("powering fully off, idle for %ss (max %ss)",
+                            idle_time, idle_power_fully_off)
+            target.power.put_off(target, calling_user.get_id(),
+                                 dict(explicit = True), {}, None)
+            return
+
+        if idle_time.seconds > idle_power_off:
+            if power_state == False \
+               and power_substate in [ 'normal', 'full' ]:
+                return		            	# already off
+            target.log.info("powering off, idle for %ss (max %ss)",
+                            idle_time, idle_power_off)
+            target.power.put_off(target, calling_user.get_id(),
+                                 dict(explicit = False), {}, None)
+    finally:
+        allocdb.delete("removed")
+
 def _maintain_released_target(target, calling_user):
     # a target that is released is not being used, so we power it all
     # off...unless it is configured to be left on
@@ -934,43 +983,16 @@ def _maintain_released_target(target, calling_user):
     skip_cleanup = target.tags.get('skip_cleanup', False)
     if skip_cleanup:
         target.log.debug("ALLOC: skiping powering off, skip_cleanup defined")
+
     idle_poweroff = target.tags.get('idle_poweroff',
                                     ttbl.config.target_max_idle)
-    if idle_poweroff == 0:
-        target.log.debug("ALLOC: skiping powering off, idle_poweroff is 0")
-        return
+    idle_power_fully_off = target.tags.get(
+        'idle_power_fully_off',
+        ttbl.config.target_max_idle_power_fully_off)
+    if idle_poweroff > 0 or idle_power_fully_off > 0:
+        _idle_power_off(target, calling_user,
+                        idle_poweroff, idle_power_fully_off)
 
-    # get the target's timestamp before allocating it, since
-    # allocating it will update the timestamp; then allocate it and
-    # get its power state; turn it off it it has been on for too
-    # long
-    ts = target.timestamp_get()
-    # by default the allocation is inmediate, not queued
-    r = request({ "target": [ target.id ] },
-                calling_user, calling_user.get_id(), [],
-                reason = "powering off because it is idle")
-    if r['state'] != "active":
-        # someone else got it, that's fine, means they are using it
-        return
-    allocdb = get_from_cache(r['allocid'])
-    try:
-        # the power interface is defined in ttbl.power
-        power_state, _, power_substate = target.power._get(target)
-        # Power off anything that is on or in inconsistent state
-        if power_state == False and power_substate != 'inconsistent':
-            return
-        # FIXME: check also a full power off from normal off after a
-        #        certain time
-        # calculate the idle time once we own the target, to be sure
-        # none came in the middle and we are killing it for them...
-        ts_now = datetime.datetime.now()
-        idle_time = ts_now - datetime.datetime.strptime(ts, "%Y%m%d%H%M%S")
-        if idle_time.seconds > idle_poweroff:
-            target.log.info("powering off, idle for %ss (max %ss)",
-                            idle_time, idle_poweroff)
-            target.power.put_off(target, calling_user.get_id(), {}, {}, None)
-    finally:
-        allocdb.delete("removed")
 
 def maintenance(ts_now, calling_user, keepalive_fn = None):
     # this will be called by a parallel thread / process to run

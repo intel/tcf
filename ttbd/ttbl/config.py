@@ -197,6 +197,10 @@ def add_authenticator(a):
 #: Maximum time a target is idle before it is powered off (seconds)
 target_max_idle = 30  # .5 min
 
+#: Maximum time a target is idle before it is fully powered off (seconds)
+#: (see :ref:`power states <ttbd_power_states>`)
+target_max_idle_power_fully_off = 10 * target_max_idle
+
 #: Maximum time an acquired target is idle before it is released (seconds)
 target_owned_max_idle = 5 * 60  # 5 min
 
