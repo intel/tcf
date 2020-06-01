@@ -722,6 +722,8 @@ class network_tap_pc(ttbl.power.impl_c):
     A target declares connectivity to one or more interconnects; when
     this object is instantiated as part of the power rail:
 
+    Parameters as to :class:ttbl.power.impl_c.
+
     >>> target.interface_add(
     >>>     "power",
     >>>     ttbl.power.interface(
@@ -764,8 +766,8 @@ class network_tap_pc(ttbl.power.impl_c):
     the interface.
 
     """
-    def __init__(self):
-        ttbl.power.impl_c.__init__(self)
+    def __init__(self, **kwargs):
+        ttbl.power.impl_c.__init__(self, **kwargs)
         if not commonl.prctl_cap_get_effective() & 1 << 12:
             # If we don't have network setting privilege,
             # don't even go there

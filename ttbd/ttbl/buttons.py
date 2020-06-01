@@ -212,9 +212,11 @@ class button_click_pc(ttbl.power.impl_c):
     """
     Power control implementation that clicks a button as a step to
     power on or off something on a target.
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, button, time_on = 5, time_off = 20):
-        ttbl.power.impl_c.__init__(self)
+    def __init__(self, button, time_on = 5, time_off = 20, **kwargs):
+        ttbl.power.impl_c.__init__(self, **kwargs)
         assert isinstance(button, basestring)
         self.button = button
         self.time_on = time_on
@@ -247,9 +249,12 @@ class button_sequence_pc(ttbl.power.impl_c):
     """
     Power control implementation that executest a button sequence on
     power on, another on power off.
+
+    Other parameters as to :class:ttbl.power.impl_c.
+
     """
-    def __init__(self, sequence_on = None, sequence_off = None):
-        ttbl.power.impl_c.__init__(self)
+    def __init__(self, sequence_on = None, sequence_off = None, **kwargs):
+        ttbl.power.impl_c.__init__(self, **kwargs)
         self.sequence_on = sequence_on
         self.sequence_off = sequence_off
 
@@ -272,10 +277,13 @@ class buttons_released_pc(ttbl.power.impl_c):
     """
     Power control implementation that ensures a list of buttons
     are released (not pressed) before powering on a target.
+
+    Other parameters as to :class:ttbl.power.impl_c.
+
     """
-    def __init__(self, button_list):
+    def __init__(self, button_list, **kwargs):
         assert isinstance(button_list, list)
-        ttbl.power.impl_c.__init__(self)
+        ttbl.power.impl_c.__init__(self, **kwargs)
         self.sequence = [ ( 'release', button )
                           for button in button_list ]
 

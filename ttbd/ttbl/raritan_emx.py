@@ -51,6 +51,8 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
       :func:`commonl.password_get`; if not specified, it is extracted
       from the URL if present there.
 
+    Other parameters as to :class:ttbl.power.impl_c.
+
     The RPC implementation is documented in
     https://help.raritan.com/json-rpc/emx/v3.4.0; while this driver
     uses the Raritan SDK driver, probably this is overkill--we could
@@ -113,12 +115,13 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
       controlled).
 
     """
-    def __init__(self, url, outlet_number, https_verify = True, password = None):
+    def __init__(self, url, outlet_number, https_verify = True,
+                 password = None, **kwargs):
         assert isinstance(url, basestring)
         assert isinstance(outlet_number, int) and outlet_number > 0
         assert password == None or isinstance(password, basestring)
 
-        ttbl.power.impl_c.__init__(self)
+        ttbl.power.impl_c.__init__(self, **kwargs)
         self.url = urlparse.urlparse(url)
         if password:
             self.password = commonl.password_get(

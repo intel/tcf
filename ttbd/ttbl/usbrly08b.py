@@ -164,11 +164,13 @@ class pc(rly08b, ttbl.power.impl_c):
     """
     Power control implementation that uses a relay to close/open a
     circuit on on/off
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, serial_number, relay):
+    def __init__(self, serial_number, relay, **kwargs):
         self.relay = relay
         rly08b.__init__(self, serial_number)
-        ttbl.power.impl_c.__init__(self)
+        ttbl.power.impl_c.__init__(self, **kwargs)
 
     def on(self, target, _component):
         cmd = 0x64 + self.relay

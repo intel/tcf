@@ -100,6 +100,8 @@ this can be used either in the intialization sequence or afterwards:
 >>> pc = ttbl.power.socat_pc(ADDR1, ADDR2)
 >>> pc.explicit = 'both'
 
+.. _ttbd_power_states:
+
 Overall power state and explicit power components
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -111,7 +113,6 @@ The target is:
 
 - **fully on**: when **all** the power components (including those
   tagged as *explicit* and *explicit/on*) are reporting *on* or *n/a*
-
 
 - *partial on*: when **all** the power components (excluding those
   tagged as *explicit* and *explicit/on*) reports *on* and some (but
@@ -828,10 +829,11 @@ class inverter_c(impl_c):
 
     :param ttbl.power.impl_c pc: power controller to wrap
 
+    Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, pc):
+    def __init__(self, pc, **kwargs):
         assert isinstance(pc, impl_c)
-        impl_c.__init__(self)
+        impl_c.__init__(self, **kwargs)
         self.pc = pc
         # These have to be the same set of default properties in
         # ttbl.power.impl_c
@@ -868,18 +870,21 @@ class daemon_c(impl_c):
       All the entries in the list are templated with *%(FIELD)s*
       expansion, where each field comes either from the *kws*
       dictionary or the target's metadata.
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
     #: KEY=VALUE to add to the environment
     #: Keywords to add for templating the arguments
     def __init__(self, cmdline,
                  precheck_wait = 0, env_add = None, kws = None,
                  path = None, name = None,
-                 pidfile = None, mkpidfile = True, paranoid = False):
+                 pidfile = None, mkpidfile = True, paranoid = False,
+                 **kwargs):
         assert isinstance(cmdline, list), \
             "cmdline has to be a list of strings; got %s" \
             % type(cmdline).__name__
         assert precheck_wait >= 0
-        impl_c.__init__(self, paranoid = paranoid)
+        impl_c.__init__(self, paranoid = paranoid, **kwargs)
         self.cmdline = cmdline
         #: extra command line elements that can be added by anybody
         #: subclassing this; note an *on()* method that adds to this
@@ -942,6 +947,11 @@ class daemon_c(impl_c):
         or
 
         >>> return os.path.exists(self.pidfile % kws)
+
+        or to verify a pid file exists and the prcoess exists:
+
+        >>> return commonl.process_alive(PATH-TO-PIDFILE, PATH-TO-BINARY)
+
 
         :returns: *True* if the daemon started, *False* otherwise
         """
@@ -1089,6 +1099,8 @@ class socat_pc(daemon_c):
       checking if the daemon is running; sometimes it dies after we
       check, so it is good to give it a wait.
 
+    Other arguments as to :class:ttbl.power.impl_c.
+
     This object (or what is derived from it) can be passed to a power
     interface for implementation, eg:
 
@@ -1154,7 +1166,8 @@ class socat_pc(daemon_c):
     """
 
     def __init__(self, address1, address2, env_add = None,
-                 precheck_wait = 0.2, extra_cmdline = None):
+                 precheck_wait = 0.2, extra_cmdline = None,
+                 **kwargs):
         assert isinstance(address1, basestring)
         assert isinstance(address2, basestring)
         if extra_cmdline == None:
@@ -1176,7 +1189,8 @@ class socat_pc(daemon_c):
                 address2,		# will be formatted against kws
             ],
             precheck_wait = precheck_wait,
-            env_add = env_add)
+            env_add = env_add,
+            **kwargs)
 
     def verify(self, target, component, cmdline_expanded):
         # this is the log file name, that has been expanded already by

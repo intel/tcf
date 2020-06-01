@@ -29,7 +29,7 @@ class ykush(ttbl.power.impl_c, ttbl.things.impl_c):
     # backend to cut in the number of open file handles
     backend = None
 
-    def __init__(self, ykush_serial, port):
+    def __init__(self, ykush_serial, port, **kwargs):
         """
         A power control implementation using an YKUSH switchable hub
         https://www.yepkit.com/products/ykush
@@ -70,6 +70,8 @@ class ykush(ttbl.power.impl_c, ttbl.things.impl_c):
 
         :param int port: Port number in the hub (one-based)
 
+        Other parameters as to :class:ttbl.power.impl_c.
+
         .. warning: it is *strongly* recommended to also create targets with
                     with :func:`ykush_targets_add` to manage the hub
                     itself and that it is power controlled so it can
@@ -78,7 +80,7 @@ class ykush(ttbl.power.impl_c, ttbl.things.impl_c):
         """
         if not isinstance(port, int) or port < 1 or port > 3:
             raise ValueError("ykush ports are 1, 2 and 3, gave %s" % port)
-        ttbl.power.impl_c.__init__(self)
+        ttbl.power.impl_c.__init__(self, **kwargs)
         ttbl.things.impl_c.__init__(self)
         self.port = port
         self.ykush_serial = ykush_serial

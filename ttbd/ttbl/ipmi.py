@@ -41,9 +41,12 @@ class pci(ttbl.power.impl_c):
       passed to *ipmitool*'s *-N* option
     :param int ipmi_retries: times to retry the IPMI operation (will be
       passed to *ipmitool*'s *-R* option.
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, bmc_hostname, ipmi_timeout = 10, ipmi_retries = 3):
-        ttbl.power.impl_c.__init__(self, paranoid = True)
+    def __init__(self, bmc_hostname, ipmi_timeout = 10, ipmi_retries = 3,
+                 **kwargs):
+        ttbl.power.impl_c.__init__(self, paranoid = True, **kwargs)
         user, password, hostname \
             = commonl.split_user_pwd_hostname(bmc_hostname)
         self.hostname = hostname
@@ -152,12 +155,15 @@ class pos_mode_c(ttbl.power.impl_c):
       passed to *ipmitool*'s *-N* option
     :param int ipmi_retries: times to retry the IPMI operation (will be
       passed to *ipmitool*'s *-R* option.
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, hostname, ipmi_timeout = 10, ipmi_retries = 3):
+    def __init__(self, hostname, ipmi_timeout = 10, ipmi_retries = 3,
+                 **kwargs):
         assert isinstance(hostname, basestring)
         assert isinstance(ipmi_timeout, numbers.Real)
         assert isinstance(ipmi_retries, int)
-        ttbl.power.impl_c.__init__(self, paranoid = True)
+        ttbl.power.impl_c.__init__(self, paranoid = True, **kwargs)
         self.power_on_recovery = True
         self.paranoid_get_samples = 1
         user, password, hostname = commonl.split_user_pwd_hostname(hostname)
