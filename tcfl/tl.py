@@ -434,7 +434,7 @@ def sh_export_proxy(ic, target):
                          "export HTTP_PROXY=$http_proxy" % ic.kws)
     if 'https_proxy' in ic.kws:
         target.shell.run("export https_proxy=%(https_proxy)s; "
-                         "export HTTPS_PROXY=$https_proxy")
+                         "export HTTPS_PROXY=$https_proxy" % ic.kws)
     if 'https_proxy' in ic.kws or 'http_proxy' in ic.kws:
         # if we are setting a proxy, make sure it doesn't do the
         # local networks
