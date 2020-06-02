@@ -592,10 +592,10 @@ def linux_rsync_cache_lru_cleanup(target, path, max_kbytes):
         # And don't print anything...takes too long for large trees
         target.shell.run("""
 import os, errno, stat
-fsbsize = os.statvfs('%(path)s').f_bsize
 l = []
 dirs = []
 try:
+    fsbsize = os.statvfs('%(path)s').f_bsize
     for r, dl, fl in os.walk('%(path)s', topdown = False):
         for fn in fl + dl:
             fp = os.path.join(r, fn)
