@@ -1226,6 +1226,38 @@ class extension(tc.target_extension_c):
                 raise
             yield u""
 
+    def captured_chunk(self, console, offset_from = 0, size = -1):
+        """
+        Iterate over the captured contents of the console
+
+        :class:`expect_text_on_console_c.poll` has created a file
+        where it has written all the contents read from the console;
+        this function is a generator that iterates over it, yielding
+        safe UTF-8 strings.
+
+        Note these are not reseteable, so to use in
+        attachments with multiple report drivers, use instead a
+        :meth:generator_factory.
+
+        :param str console: name of console on which to operate
+        :param int offset_from: (optional) offset where to start
+          (default from beginning)
+        :param int len: (optional) how much to read; if negative
+          (default), read the whole file since the offset
+        """
+        assert console == None or isinstance(console, basestring)
+        #
+        # Provide line-based iteration on the last match in the
+        # console, as given by information on the buffers.
+        #
+        target = self.target
+        # Open as binary so we don't alter the offset counts if it
+        # happens to fix up characters
+        with io.open(target.console.capture_filename(console), "rb") as f:
+            f.seek(offset_from)
+            return f.read()
+
+
     def generator_factory(self, console, offset_from = 0, offset_to = 0):
         """
         Return a generator factory that creates iterators to dump
@@ -1333,9 +1365,9 @@ WARNING: This is a very limited interactive console
     class _done_c(Exception):
         pass
 
+    _flags_old = termios.tcgetattr(sys.stdin.fileno())
     if sys.stdin.isatty():
         _flags_set = True
-        _flags_old = termios.tcgetattr(sys.stdin.fileno())
     else:
         _flags_set = False
     try:
@@ -1344,6 +1376,15 @@ WARNING: This is a very limited interactive console
             tty.setraw(sys.stdin.fileno())
             flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFD)
             fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        # ask the terminal what does it consider a line feed
+        if _flags_old[0] & termios.ICRNL:
+            nl = '\r'
+        else:
+            nl = '\n'
+        if 'INSIDE_EMACS' in os.environ:
+            # I've given up -- I can't figure out how to ask stty to
+            # tell me emacs does \n
+            nl = '\n'
         while True and console_read_thread.is_alive():
             try:
                 chars = sys.stdin.read()
@@ -1353,7 +1394,7 @@ WARNING: This is a very limited interactive console
                 for char in chars:
                     # if the terminal sends a \r (user hit enter),
                     # translate to crlf
-                    if crlf and char == "\r":
+                    if crlf and char == nl:
                         _chars += crlf
                     else:
                         _chars += char
@@ -1392,8 +1433,8 @@ def _cmdline_console_write(args):
         if args.crlf == None:
             # get the CRLF the server says, otherwise default to \n,
             # which seems to work best for most
-            args.crlf = target.rt.get(
-                "interfaces.console." + args.console + ".crlf", "\n")
+            args.crlf = target.rt['interfaces']['console']\
+                [args.console].get('crlf', "\n")
         if args.interactive:
             _cmdline_console_write_interactive(target, args.console,
                                                args.crlf, args.offset)

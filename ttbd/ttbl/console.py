@@ -926,7 +926,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
                            chunk_size = chunk_size,
                            interchunk_wait = interchunk_wait,
                            command_sequence = command_sequence,
-                           crlf = '\n')
+                           crlf = '\r')
         ttbl.power.socat_pc.__init__(
             self,
             "PTY,link=console-%(component)s.write,rawer"
