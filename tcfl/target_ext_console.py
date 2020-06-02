@@ -256,9 +256,12 @@ class expect_text_on_console_c(tc.expectation_c):
             # Note we get the new_offset straight() from the read
             # call, which is the most accurate from the server standpoint
             of.flush()
+            # the capture must be raw, no translations -- otherwise it
+            # is going to be a mess to keep offsets right
+            newline = ''
             generation, new_offset, total_bytes = \
                 target.console.read_full(self.console, read_offset,
-                                         self.max_size, of)
+                                         self.max_size, of, newline = newline)
             generation_prev = buffers_poll.get('generation', None)
             if generation_prev == None:
                 buffers_poll['generation'] = generation
@@ -273,7 +276,8 @@ class expect_text_on_console_c(tc.expectation_c):
                     dlevel = 5)
                 generation, new_offset, total_bytes = \
                     target.console.read_full(self.console, 0,
-                                             self.max_size, of)
+                                             self.max_size, of,
+                                             newline = newline)
                 buffers_poll['generation'] = generation
             ts_end = time.time()
             of.flush()
@@ -1422,7 +1426,8 @@ def _cmdline_console_read(args):
             backoff_wait = 0.1
             while True:
                 generation, offset, data_len = \
-                    target.console.read_full(console, offset, max_size, fd)
+                    target.console.read_full(console, offset,
+                                             max_size, fd, newline = '')
                 if generation_prev != None and generation_prev != generation:
                     sys.stderr.write(
                         "\n\r\r\nWARNING: target power cycled\r\r\n\n")
