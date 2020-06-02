@@ -624,8 +624,7 @@ for e in sorted(l, key = lambda e: e[0], reverse = True):
             os.unlink(e[2])
 
 
-exit()
-""" % dict(path = path, max_bytes = max_kbytes * 1024))
+exit()""" % dict(path = path, max_bytes = max_kbytes * 1024))
     finally:
         target.shell.shell_prompt_regex = prompt_original
         testcase.expect_tls_remove(python_error_ex)
