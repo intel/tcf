@@ -32,6 +32,14 @@ import ttbl
 class impl_c(ttbl.tt_interface_impl_c):
     """Driver interface for flashing with :class:`interface`
 
+    Power control on different components can be done before and after
+    flashing; the process is executed in the folowing order:
+
+    - pre power off components
+    - pre power cycle components
+    - flash
+    - post power off components
+    - power power cycle components
 
     :param list(str) power_cycle_pre: (optional) before flashing,
       power cycle the target. Argument is a list of power rail
@@ -222,8 +230,8 @@ class interface(ttbl.tt_interface):
 
 
     def _impl_flash(self, impl, target, img_type, subimages):
-        self._power_cycle(target, impl.power_cycle_pre, impl.power_exclude)
         self._power_off(target, impl.power_off_pre, impl.power_exclude)
+        self._power_cycle(target, impl.power_cycle_pre, impl.power_exclude)
         try:
             # in some flashers, the flashing occurs over a
             # serial console we might be using, so we can
