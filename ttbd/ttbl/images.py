@@ -30,8 +30,7 @@ import ttbl
 
 
 class impl_c(ttbl.tt_interface_impl_c):
-    """
-    Driver interface for flashing with :class:`interface`
+    """Driver interface for flashing with :class:`interface`
 
 
     :param list(str) power_cycle_pre: (optional) before flashing,
@@ -66,6 +65,12 @@ class impl_c(ttbl.tt_interface_impl_c):
     :param list(str) console_disable: (optional) before flashing,
       disable consoles and then re-enable them. Argument is a list of
       console names that need disabling and then re-enabling.
+
+    :param int estimated_duration: (optional; default 60) seconds the
+      imaging process is believed to take. This can let the client
+      know how long to wait for before declaring it took too long due
+      to other issues out of server's control (eg: client to server
+      problems).
     """
     def __init__(self,
                  power_cycle_pre = None,
@@ -73,7 +78,9 @@ class impl_c(ttbl.tt_interface_impl_c):
                  power_cycle_post = None,
                  power_off_post = None,
                  power_exclude = None,
-                 consoles_disable = None):
+                 consoles_disable = None,
+                 estimated_duration = 60):
+        assert isinstance(estimated_duration, int)
         commonl.assert_none_or_list_of_strings(
             power_cycle_pre, "power_cycle_pre", "power component name")
 
@@ -100,6 +107,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         if consoles_disable == None:
             consoles_disable = []
         self.consoles_disable = consoles_disable
+        self.estimated_duration = estimated_duration
         ttbl.tt_interface_impl_c.__init__(self)
 
     def flash(self, target, images):
@@ -170,7 +178,10 @@ class interface(ttbl.tt_interface):
         self.impls_set(impls, kwimpls, impl_c)
 
     def _target_setup(self, target, iface_name):
-        pass
+        for name, impl in self.impls.iteritems():
+            target.fsdb.set(
+                "interfaces.images." + name + ".estimated_duration",
+                impl.estimated_duration)
 
     def _release_hook(self, target, _force):
         pass
@@ -298,7 +309,7 @@ class arduino_cli_c(impl_c):
       program the board (will be passed on the *--fqbn* arg to
       *arduino-cli upload*).
 
-    Other parameteres are described :class:impl_c.
+    Other parameters described in :class:ttbl.images.impl_c.
 
     *Requirements*
 
@@ -454,6 +465,8 @@ class bossac_c(impl_c):
        to the serial port; this is needed to disable it so this can
        flash. Defaults to *serial0*.
 
+    Other parameters described in :class:ttbl.images.impl_c.
+
     *Requirements*
 
     - Needs a connection to the USB programming port, represented as a
@@ -494,10 +507,10 @@ class bossac_c(impl_c):
     port to 1200bps, wait a wee bit and then call bossac.
 
     """
-    def __init__(self, serial_port = None, console = None):
+    def __init__(self, serial_port = None, console = None, **kwargs):
         assert serial_port == None or isinstance(serial_port, basestring)
         assert console == None or isinstance(console, basestring)
-        impl_c.__init__(self)
+        impl_c.__init__(self, **kwargs)
         self.serial_port = serial_port
         self.console = console
         self.upid_set("bossac jtag", serial_port = serial_port)
@@ -580,6 +593,8 @@ class dfu_c(impl_c):
     >>> )
 
     :param str usb_serial_number: target's USB Serial Number
+
+    Other parameters described in :class:ttbl.images.impl_c.
 
     *Requirements*
 
@@ -696,10 +711,10 @@ class dfu_c(impl_c):
     >>> )
     """
 
-    def __init__(self, usb_serial_number):
+    def __init__(self, usb_serial_number, **kwargs):
         assert usb_serial_number == None \
             or isinstance(usb_serial_number, basestring)
-        impl_c.__init__(self)
+        impl_c.__init__(self, **kwargs)
         self.usb_serial_number = usb_serial_number
         self.upid_set("USB DFU flasher", usb_serial_number = usb_serial_number)
 
@@ -759,6 +774,35 @@ class dfu_c(impl_c):
         target.log.info("flashed image")
 
 
+class fake_c(impl_c):
+    """
+    Fake flashing driver (mainly for testing the interfaces)
+
+    >>> flasher = ttbl.images.fake_c()
+    >>> target.interface_add(
+    >>>     "images",
+    >>>     ttbl.images.interface(**{
+    >>>         "kernel-BSP1": flasher,
+    >>>         "kernel-BSP2": flasher,
+    >>>         "kernel": "kernel-BSPNAME"
+    >>>     })
+    >>> )
+
+    Parameters like :class:ttbl.images.impl_c.
+    """
+    def __init__(self, **kwargs):
+        impl_c.__init__(self, **kwargs)
+        self.upid_set("Fake test flasher", _id = str(id(self)))
+
+    def flash(self, target, images):
+        for image_type, image in images.items():
+            target.log.info("%s: flashing %s" % (image_type, image))
+            time.sleep(self.estimated_duration)
+            target.log.info("%s: flashed %s" % (image_type, image))
+        target.log.info("%s: flashing succeeded" % image_type)
+
+
+
 class esptool_c(impl_c):
     """
     Flash a target using Tensilica's *esptool.py*
@@ -778,6 +822,8 @@ class esptool_c(impl_c):
     :param str console: (optional) name of the target's console tied
        to the serial port; this is needed to disable it so this can
        flash. Defaults to *serial0*.
+
+    Other parameters described in :class:ttbl.images.impl_c.
 
     *Requirements*
 
@@ -809,10 +855,10 @@ class esptool_c(impl_c):
     *bin* image using the ``esptool.py`` script. Then it will
     flash it via the serial port.
     """
-    def __init__(self, serial_port = None, console = None):
+    def __init__(self, serial_port = None, console = None, **kwargs):
         assert serial_port == None or isinstance(serial_port, basestring)
         assert console == None or isinstance(console, basestring)
-        impl_c.__init__(self)
+        impl_c.__init__(self, **kwargs)
         self.serial_port = serial_port
         self.console = console
         self.upid_set("ESP JTAG flasher", serial_port = serial_port)
@@ -947,7 +993,7 @@ class sf100linux_c(impl_c):
              'dediprog:id': 435,
          }
 
-    Other parameters documented in :meth:`ttbl.images.impl_c`
+    Other parameters described in :class:ttbl.images.impl_c.
 
     **System setup**
 
@@ -970,8 +1016,7 @@ class sf100linux_c(impl_c):
        path of *dpcmd* by setting :data:`path`.
     """
     def __init__(self, dediprog_id, args = None, name = None, timeout = 60,
-                 mode = "--batch",
-                 **kwargs):
+                 mode = "--batch", **kwargs):
         assert isinstance(dediprog_id, basestring)
         assert isinstance(timeout, int)
         assert mode in [ "--batch", "--auto", "--prog", "--erase" ]

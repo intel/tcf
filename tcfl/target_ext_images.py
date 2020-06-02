@@ -56,7 +56,7 @@ class extension(tc.target_extension_c):
         return r['result']
 
 
-    def flash(self, images, upload = True, timeout = 80):
+    def flash(self, images, upload = True, timeout = None):
         """Flash images onto target
 
         >>> target.images.flash({
@@ -82,7 +82,9 @@ class extension(tc.target_extension_c):
           command line *tcf images-ls TARGETNAME*).
 
         :param int timeout: (optional) seconds to wait for the
-          operation to complete; defaults to 80s.
+          operation to complete; defaults to whatever the interface
+          declares in property
+          *interfaces.images.IMAGETYPE.estimated_duration*.
 
           This is very tool and file specific, a bigger file with a
           slow tool is going to take way longer than a bigfer file on
@@ -108,6 +110,15 @@ class extension(tc.target_extension_c):
         target = self.target
         images_str = " ".join("%s:%s" % (k, v) for k, v in images.items())
 
+        if timeout == None:
+            timeout = 0
+            for image_type, image in images.items():
+                _timeout = target.rt['interfaces']['images']\
+                    [image_type].get("estimated_duration", 60)
+                timeout += _timeout
+        else:
+            assert isinstance(timeout, int)
+        
         # if we have to upload them, then we'll transform the names to
         # point to the names we got when uploading
         if upload:
@@ -186,6 +197,7 @@ def _cmdline_setup(arg_subparser):
                     action = "store_true", default = False,
                     help = "upload FILENAME first and then flash")
     ap.add_argument("-t", "--timeout",
-                    action = "store", default = 80, type = int,
-                    help = "timeout in seconds [%(default)ss]")
+                    action = "store", default = None, type = int,
+                    help = "timeout in seconds [default taken from"
+                    " what the server declares or 1m if none]")
     ap.set_defaults(func = _cmdline_images_flash)
