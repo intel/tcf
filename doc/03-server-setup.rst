@@ -748,6 +748,33 @@ Once a target is configured in, run a quick healthcheck::
       place links to configuration of network infrastructure (switches
       and interfaces)
 
+
+      
+.. _pos_setup:
+
+Configuring support information
+-------------------------------
+
+The server exports a target called *local* (disabled by default) that
+is used to export information about the server; two important fields
+in there are the owner and information to request login, to direct
+users to the right place.
+
+In any :ref:`server configuration file <ttbd_configuration>` named
+*conf_NN_ANYTHING.py* (with NN sorting higher than 06, where we define
+default targets) add:
+
+>>> server = ttbl.test_target.get('local')
+>>> server.tags_update(dict(
+>>> support = dict(
+>>>        owner = "some person/list <automation.admins@some.place.com>",
+>>>         auth_help = "request access at http://automation.place.com/request-access"
+>>>    ))
+>>> )
+
+when the user tries to login and they fail, they are presented this
+information so they know where to go for help.
+
 .. _pos_setup:
 
 Configuring Provisioning OS support

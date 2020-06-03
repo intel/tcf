@@ -264,10 +264,25 @@ def login():
             # Try next authenticator
 
     if not 'user' in token_roles:
-        message = "user %s: not allowed, no 'user' role (roles: %s)" % (
-            username,
-            " ".join(token_roles) if token_roles
-            else "<empty, meaning no permissions>")
+        message = "user %s: not allowed" % username
+        if token_roles:
+            message += " (no 'user' role; roles: %s)" % ",".join(token_roles)
+        _help = ""
+        local_target = ttbl.test_target.get('local')
+        if local_target:
+            support_login_help = \
+                local_target.tags.get('support', {}).get('auth_help', None)
+            support_owner = \
+                local_target.tags.get('support', {}).get('owner', None)
+            if support_login_help:
+                # login help is assumed to be more detailed
+                _help += " (login help: " + support_login_help + ")"
+            elif support_owner:
+                # fall back to the server's owenr
+                _help += " (login help: " + support_owner + ")"
+            if _help == "":
+                _help += " (no login help configured by admin)"
+        message += _help
         logging.info(message)
         flask.abort(404, message)
 
