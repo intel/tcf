@@ -18,6 +18,7 @@ drivers implemented subclassing :class:`ttbl.images.impl_c <impl_c>`.
 
 import codecs
 import collections
+import hashlib
 import json
 import os
 import subprocess
@@ -142,8 +143,7 @@ class impl_c(ttbl.tt_interface_impl_c):
 
 
 class interface(ttbl.tt_interface):
-    """
-    Interface to flash a list of images (OS, BIOS, Firmware...) that
+    """Interface to flash a list of images (OS, BIOS, Firmware...) that
     can be uploaded to the target server and flashed onto a target.
 
     Any image type can be supported, it is up to the configuration to
@@ -179,6 +179,13 @@ class interface(ttbl.tt_interface):
     to call (in the client) :meth:`target.power.cycle
     <tcfl.target_ext_power.extension.cycle>` to ensure the right
     state.
+
+    Whenever an image is flashed in a target's flash destination, a
+    SHA512 hash of the file flashed is exposed in metadata
+    *interfaces.images.DESTINATION.last_sha512*. This can be used to
+    determine if we really want to flash (if you want to assume the
+    flash doesn't change) or to select where do we want to run
+    (because you want an specific image flashed).
 
     """
     def __init__(self, *impls, **kwimpls):
@@ -247,6 +254,22 @@ class interface(ttbl.tt_interface):
                     dict(component = console_name),
                     None, None)
             impl.flash(target, subimages)
+            for image_type, name in subimages.items():
+                # if succesful, update MD5s of the images we flashed,
+                # so we can use this to select where we want to run
+                #
+                # Why not the name? because the name can change, but
+                # the content never
+                #
+                # note this gives the same result as:
+                #
+                ## $ sha512sum FILENAME
+                ho = commonl.hash_file(hashlib.sha512(), name)
+                target.fsdb.set(
+                    "interfaces.images." + image_type + ".last_sha512",
+                    ho.hexdigest()
+                )
+
             # note in case of flashing failure we don't
             # necessarily power on the components, since
             # things might be a in a bad state--we let the
