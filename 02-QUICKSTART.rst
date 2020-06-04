@@ -19,12 +19,9 @@
    that still support it, we are in the process of porting to Python3;
    see branch *pyv3*).
      
-   now clone install Python dependencies and install the TCF client::
+   now clone install Python dependencies and install the TCF client
 
-     $ git clone http://github.com/intel/tcf tcf.git
-     $ cd tcf.git
-     $ pip2 install --user -r requirements.txt	# dependencies
-     $ python2 setup.py install --user
+   .. include:: doc/02-client-setup-LL-02.rst
 
    (see :ref:`installation
    troubleshooting<tcf_client_install_troubleshooting>` for things
@@ -50,8 +47,9 @@
      
    .. include:: doc/02-client-setup-LL-01.rst
 
-2. :ref:`Configure it <tcf_guide_configuration>`, adding to
-   `~/.tcf/conf_servers.py` or `/etc/tcf/conf_servers.py`::
+2. :ref:`Configure it <tcf_guide_configuration>`, access to remote HW
+   servers, adding to `~/.tcf/conf_servers.py` or
+   `/etc/tcf/conf_servers.py`::
 
      $ mkdir -p ~/.tcf
      $ vi ~/.tcf/conf_servers.py

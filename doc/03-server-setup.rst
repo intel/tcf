@@ -768,7 +768,7 @@ default targets) add:
 >>> server.tags_update(dict(
 >>> support = dict(
 >>>        owner = "some person/list <automation.admins@some.place.com>",
->>>         auth_help = "request access at http://automation.place.com/request-access"
+>>>        auth_help = "request access at http://automation.place.com/request-access"
 >>>    ))
 >>> )
 
