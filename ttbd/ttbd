@@ -270,13 +270,13 @@ def login():
         _help = ""
         local_target = ttbl.test_target.get('local')
         if local_target:
-            support_login_help = \
+            support_auth_help = \
                 local_target.tags.get('support', {}).get('auth_help', None)
             support_owner = \
                 local_target.tags.get('support', {}).get('owner', None)
-            if support_login_help:
+            if support_auth_help:
                 # login help is assumed to be more detailed
-                _help += " (login help: " + support_login_help + ")"
+                _help += " (login help: " + support_auth_help + ")"
             elif support_owner:
                 # fall back to the server's owenr
                 _help += " (login help: " + support_owner + ")"
