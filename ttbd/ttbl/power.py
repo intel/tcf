@@ -786,6 +786,88 @@ class interface(ttbl.tt_interface):
         self.put_cycle(target, who, args, _files, _user_path)
 
 
+    def sequence(self, target, sequence):
+        """
+        Execute a sequence of actions on a target
+
+        The sequence argument has to be a list of pairs:
+
+        >>> ( OPERATION, ARGUMENT )
+
+        *OPERATION* is a string that can be:
+
+        - *on*, *off* or *cycle*; *ARGUMENT* is a string being:
+
+          - *all*: do the operation on all the components except
+            :ref:`explicit <ttbd_power_explicit>` ones
+
+          - *full*: perform the operation on all the components
+            including the :ref:`explicit <ttbd_power_explicit>` ones
+
+          - *COMPONENT NAME*: perform the operation only on the given
+            component
+
+        - *wait*: *ARGUMENT* is a number describing how many seconds
+          to wait
+        """
+        target.timestamp()
+        count = 0
+        for s in sequence:
+            # we verify for correctness on the run, which means if the
+            # sequence is wrong it might be left in a weird
+            # state. ok. that's the caller's problem.
+            if not isinstance(s, (list, tuple)):
+                raise ValueError("%s: sequence #%d: invalid type:"
+                                 " expected list; got %s"
+                                 % (target.id, count, type(s)))
+            if len(s) != 2:
+                raise ValueError("%s: sequence #%d: invalid list length; "
+                                 " expected 2; got %s"
+                                 % (target.id, count, len(s)))
+            action = s[0]
+            if action == 'wait':
+                time_to_wait = s[1]
+                assert isinstance(time_to_wait, numbers.Real), \
+                    "%s: sequence #%d: invalid time length; " \
+                    "expected float, got %s" \
+                    % (target.id, count, type(time_to_wait))
+                time.sleep(s[1])
+                continue
+
+            if action not in [ 'on', 'off', 'cycle' ]:
+                raise ValueError("%s: sequence #%d: invalid action spec; "
+                                 " expected on|off|cycle; got %s"
+                                 % (target.id, count, action))
+
+            component = s[1]
+            if not isinstance(component, basestring):
+                raise ValueError("%s: sequence #%d: invalid component spec; "
+                                 " expected str; got %s"
+                                 % (target.id, count, type(component)))
+            # We have an action and a component to act on; None/[]
+            # means act on all components in an explicit/non-explicit
+            # way, so decode the component list
+            explicit = False
+            if component == 'full':
+                impls, _all = self.args_impls_get(dict())
+                explicit = True
+            elif component == 'all':
+                impls, _all = self.args_impls_get(dict())
+            else:
+                impls, _all = self.args_impls_get(dict(component = component))
+            # and now act
+            if action == True:
+                self._on(target, impls, "", _all, explicit)
+            else:   # action == False:
+                self._off(target, impls, "", _all, explicit)
+
+
+    def put_sequence(self, target, who, args, _files, _user_path):
+        sequence = self.arg_get(args, 'sequence', list)
+        with target.target_owned_and_locked(who):
+            self.sequence(target, sequence)
+            return {}
+
 
 class fake_c(impl_c):
     """Fake power component which stores state in disk

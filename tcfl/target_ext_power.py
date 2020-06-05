@@ -15,6 +15,7 @@ command line.
 
 import collections
 import json
+import re
 
 import tc
 from . import msgid_c
@@ -203,6 +204,45 @@ class extension(tc.target_extension_c):
         if hasattr(self.target, "console"):
             self.target.console._set_default()
 
+    def sequence(self, sequence, timeout = None):
+        """
+        Execute a sequence of power actions on a target
+
+        :param str component: (optional) name of component to
+          power-cycle, defaults to whole target's power rail
+
+          The sequence argument has to be a list of pairs:
+
+          >>> ( OPERATION, ARGUMENT )
+
+          *OPERATION* is a string that can be:
+
+          - *on*, *off* or *cycle*; *ARGUMENT* is a string being:
+
+            - *all*: do the operation on all the components except
+              :ref:`explicit <ttbd_power_explicit>` ones
+
+            - *full*: perform the operation on all the components
+              including the :ref:`explicit <ttbd_power_explicit>` ones
+
+            - *COMPONENT NAME*: perform the operation only on the given
+              component
+
+          - *wait*: *ARGUMENT* is a number describing how many seconds
+            to wait
+
+        :param float timeout: (optional) maximum seconds to wait
+          before giving up; default is whatever calculated based on
+          how many *wait* operations are given or if none, whatever
+          the default is set in
+          :meth:`tcfl.tc.target_c.ttbd_iface_call`.
+        """
+        self.target.report_info("running sequence: %s" % sequence, dlevel = 1)
+        self.target.ttbd_iface_call("power", "sequence", method = "PUT",
+                                    sequence = sequence, timeout = timeout)
+        self.target.report_info("ran sequence: %s" % sequence)
+
+
     def _healthcheck(self):
         target = self.target
         print "Powering off"
@@ -325,6 +365,39 @@ def _cmdline_power_get(args):
         print "%s: %s" % (target.id, 'on' if r == True else 'off')
 
 
+# this is a very loose match in the format, so we can easily support
+# new functionailities in the server
+_sequence_valid_regex = re.compile(
+    r"^("
+    r"(?P<wait>wait):(?P<time>[\.0-9]+)"
+    r"|"
+    r"(?P<action>\w+):(?P<component>\w+)"
+    r")$")
+
+def _cmdline_power_sequence(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args)
+        sequence = []
+        total_wait = 0
+        for s in args.sequence:
+            m = _sequence_valid_regex.match(s)
+            if not m:
+                raise ValueError("%s: invalid specification, see --help" % s)
+            gd = m.groupdict()
+            if gd['wait'] == 'wait':
+                time_to_wait = float(gd['time'])
+                sequence.append(( 'wait', time_to_wait))
+                total_wait += time_to_wait
+            else:
+                sequence.append(( gd['action'], gd['component']))
+        if args.timeout:
+            timeout = args.timeout
+        if total_wait == 0:	# no waits in the sequence, defaults rule
+            timeout = None
+        else:
+            timeout = total_wait * 1.5
+        print "DEBUG timeout %s" % timeout, total_wait
+        target.power.sequence(sequence, timeout = timeout)
 
 def _cmdline_setup(arg_subparser):
     ap = arg_subparser.add_parser(
@@ -390,6 +463,25 @@ def _cmdline_setup(arg_subparser):
         metavar = "TARGET", action = "store", nargs = "+", default = None,
         help = "Names of targets to power cycle")
     ap.set_defaults(func = _cmdline_power_cycle)
+
+    ap = arg_subparser.add_parser(
+        "power-sequence",
+        help = "Execute a power sequence")
+    ap.add_argument(
+        "target",
+        metavar = "TARGET", action = "store",
+        help = "Names of target to execute the sequence on")
+    ap.add_argument(
+        "sequence",
+        metavar = "STEP", action = "store", nargs = "+",
+        help = "sequence steps (list {on,off,cycle}:{COMPONENT,all,full}"
+        " or wait:SECONDS; *all* means all components except explicit ones,"
+        " *full* means all components including explicit ones")
+    ap.add_argument("-t", "--timeout",
+                    action = "store", default = None, type = int,
+                    help = "timeout in seconds [default will be"
+                    " all the waits +50%%]")
+    ap.set_defaults(func = _cmdline_power_sequence)
 
     ap = arg_subparser.add_parser(
         "power-ls",
