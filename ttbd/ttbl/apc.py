@@ -121,6 +121,7 @@ class pci(ttbl.power.impl_c):
             "outlet number '%s' invalid or out of range (1-%d)" \
             % (outlet, self.outlets)
         self.pdu_outlet_ctl = self.pdu_outlet_ctl_prefix + [ outlet ]
+        self.upid_set("APC PDU", hostname = hostname, outlet = outlet)
 
     def _outlet_count(self):
         ( _errors, _status, _index, varl ) = \
