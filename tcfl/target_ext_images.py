@@ -145,17 +145,21 @@ class extension(tc.target_extension_c):
                     hd[:10] \
                     + "-" + commonl.file_name_make_safe(os.path.abspath(img_name))
                 last_sha512 = target.rt['interfaces']['images']\
-                    [image_type].get('last_sha512', None)
+                    [img_type].get('last_sha512', None)
                 if soft and last_sha512 == hd:
                     # soft mode -- don't flash again if the last thing
                     # flashed has the same hash as what we want to flash
                     target.report_info(
                         "%s:%s: skipping (soft flash: SHA512 match %s)"
-                        % (img_type, img_name, hd), level = 0)
+                        % (img_type, img_name, hd), dlevel = 1)
                     continue
+                target.report_info("uploading: %s %s" %
+                                   (img_type, img_name), dlevel = 3)
                 target.store.upload(img_name_remote, img_name)
                 _images[img_type] = img_name_remote
-                target.report_info("uploaded: " + images_str, level = 0)
+                target.report_info("uploaded: %s %s" %
+                                   (img_type, img_name), dlevel = 2)
+            target.report_info("uploaded: " + images_str, dlevel = 1)
         else:
             _images = images
 
@@ -166,7 +170,7 @@ class extension(tc.target_extension_c):
                                    timeout = timeout)
             target.report_info("flashed: " + images_str, dlevel = 1)
         else:
-            target.report_info("flash: all images soft flashed", level = 0)
+            target.report_info("flash: all images soft flashed", dlevel = 1)
             
 
 def _cmdline_images_list(args):
@@ -187,7 +191,7 @@ def _image_list_to_dict(image_list):
 
 def _cmdline_images_flash(args):
     tc.report_driver_c.add(		# FIXME: hack console driver
-        tc.report_console.driver(0, None))
+        tc.report_console.driver(4, None))
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "images")
         target.images.flash(_image_list_to_dict(args.images),
