@@ -1258,7 +1258,7 @@ class tt_interface(object):
         assert isinstance(call, basestring)
         assert isinstance(args, dict)
         assert user_path != None and isinstance(user_path, basestring)
-        raise NotImplementedError("%s|%s: unsuported" % (method, call))
+        raise NotImplementedError("%s|%s: unsupported" % (method, call))
         # Note that upon return, the calling layer will add a field
         # 'diagnostics', so don't use that
         #
