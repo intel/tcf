@@ -983,6 +983,7 @@ def _maintain_released_target(target, calling_user):
     skip_cleanup = target.tags.get('skip_cleanup', False)
     if skip_cleanup:
         target.log.debug("ALLOC: skiping powering off, skip_cleanup defined")
+        return
 
     idle_poweroff = target.tags.get('idle_poweroff',
                                     ttbl.config.target_max_idle)
