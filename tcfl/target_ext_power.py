@@ -17,6 +17,7 @@ import collections
 import json
 import re
 
+import commonl
 import tc
 from . import msgid_c
 
@@ -354,8 +355,12 @@ def _cmdline_power_list(args):
                 else:
                     explicit = " (explicit/" + explicit + ")"
                 print "  %s: %s%s" % (component, _state, explicit)
-
+        elif args.verbosity == 2:
+            r = dict(state = state, substate = substate, components = components)
+            commonl.data_dump_recursive(r, prefix = target.fullid)
+            
         else:  # args.verbosity >= 2:
+            r = dict(state = state, substate = substate, components = components)
             print json.dumps(r, skipkeys = True, indent = 4)
 
 def _cmdline_power_get(args):
