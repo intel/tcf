@@ -1191,8 +1191,8 @@ General Linux system
 
 .. _setup_wsl:
 
-Setup: install Windows Services for Linux
------------------------------------------
+Setup: install Windows Services for Linux (WSL)
+-----------------------------------------------
 
 The TCF client can be installed in Windows Services for Linux, which
 can be setup following these instructions (applies to WSL v1,
@@ -1211,7 +1211,7 @@ untested on v2):
 2. Wait for Windows to boot
 
 3. Press left Windows key, type *Microsoft store* > search for *Ubuntu
-   18.08 LTS*, press on *Get*; wait for Ubuntu 18.04 LTS to download.
+   18.04 LTS*, press on *Get*; wait for Ubuntu 18.04 LTS to download.
 
 4. Click 'Launch" for the install process to start; opens a Ubuntu
    18.04 LTS black window that works for a while.
@@ -1752,6 +1752,52 @@ Methods to find the serial number of an YKUSH hub:
           connected to its downstream port number 4 does have the
           *YK34567* serial number.
 
+
+.. _howto_fog_ipxe:
+
+iPXE: sharing bootloader with a Fog installation
+------------------------------------------------
+
+TCF can use the services provided by a `Fog installation
+<http://fogproject.org>`_; however, to be able to use effectively,
+Fog's iPXE Ctrl-B prompt has to be enabled.
+
+By default, the Fog setup process creates their own iPXE binary and
+disable the Ctrl-B prompt that allows to break into the console to do
+manual configuration.
+
+This does not change the process work workflow, it just enables the
+targets to be able to use Ctrl-B while booting. TCF uses that to drive
+its own provisioning mechanism.
+
+To enable back the Ctrl-B prompt:
+
+1. login to your Fog server, and locate file
+   */tftpboot/default.ipxe*; we need to add a line::
+
+    prompt --key 0x02 --timeout 2000 Press Ctrl-B for the iPXE command line... && shell ||
+
+2. Edit the */tftpboot/default.ipxe* file and add said line after the first line::
+
+     #!ipxe
+     <<<<===== HERE ===>>>>
+     cpuid --ext 29 && set arch x86_64 || set arch ${buildarch}
+     params
+     param mac0 ${net0/mac}
+     param arch ${arch}
+     param platform ${platform}
+     param product ${product}
+     ...
+
+   so it ends up looking as::
+
+     #!ipxe
+     prompt --key 0x02 --timeout 2000 Press Ctrl-B for the iPXE command line... && shell ||
+     cpuid --ext 29 && set arch x86_64 || set arch ${buildarch}
+     params
+     param mac0 ${net0/mac}
+     ...
+
 *ttbd*: TCF server configuration and tricks
 ===========================================
 
@@ -1850,7 +1896,7 @@ Other options:
 
   - use the command line switch *--config-path* to force a different
     configuration path.
-    
+
 Configuration files are called *conf_NN_WHATEVER.py* and imported in
 **alphabetical** order from each directory before proceeding to the
 next one. They are written in plain Python code, so you can do
@@ -1871,9 +1917,9 @@ convention establishes the following levels:
   source distribution, some might be specific to the site, etc.
 
 - *conf_09_\*.py*: configuration of :term:`site` specifics
-  
+
 - *conf_10_SERVERNAME.py*: configuration of the server's targets
-  
+
 The module :mod:`ttbl.config` provides access to the top functions to
 set TTBD's configuration.
 
@@ -2835,7 +2881,7 @@ Updating the FPGA image in Synopsys EMSK boards
    ===== ==== =============
 
 .. _pos_image_creation:
-   
+
 Creating images for the Provisioning OS
 =======================================
 
