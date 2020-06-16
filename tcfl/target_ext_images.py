@@ -56,7 +56,8 @@ class extension(tc.target_extension_c):
         return r['result']
 
 
-    def flash(self, images, upload = True, timeout = None, soft = False):
+    def flash(self, images, upload = True, timeout = None, soft = False,
+              hash_target_name = True):
         """Flash images onto target
 
         >>> target.images.flash({
@@ -137,13 +138,18 @@ class extension(tc.target_extension_c):
             for img_type, img_name in images.iteritems():
                 # the remote name will be NAME-DIGEST, so if multiple
                 # testcases for the same user are uploading files with
-                # the same name but different context, they don't
+                # the same name but different content / target, they don't
                 # collide
                 ho = commonl.hash_file(hashlib.sha512(), img_name)
                 hd = ho.hexdigest()
                 img_name_remote = \
                     hd[:10] \
                     + "-" + commonl.file_name_make_safe(os.path.abspath(img_name))
+                if hash_target_name:
+                    # put the target name first, otherwise we might
+                    # alter the extension that the server relies on to
+                    # autodecompress if need to
+                    img_name_remote = target.id + "-" + img_name_remote
                 last_sha512 = target.rt['interfaces']['images']\
                     [img_type].get('last_sha512', None)
                 if soft and last_sha512 == hd:
@@ -190,9 +196,10 @@ def _image_list_to_dict(image_list):
     return images
 
 def _cmdline_images_flash(args):
+    tc.tc_global = tc.tc_c("cmdline", "", "builtin")
     tc.report_driver_c.add(		# FIXME: hack console driver
         tc.report_console.driver(4, None))
-    with msgid_c("cmdline"):
+    with msgid_c(""):
         target = tc.target_c.create_from_cmdline_args(args, iface = "images")
         target.images.flash(_image_list_to_dict(args.images),
                             upload = args.upload, timeout = args.timeout,
