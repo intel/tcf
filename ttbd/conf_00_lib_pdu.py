@@ -20,7 +20,12 @@ def target_pdu_socket_add(name, pc, tags = None, power = True):
         tags = {}
     target = ttbl.test_target(name, _tags = tags)
     target.interface_add("power", ttbl.power.interface(pc))
-    ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+    ttbl.config.target_add(
+        target, tags = dict(
+            idle_poweroff = 0,
+            idle_power_fully_off = 0
+        )
+    )
     if power:
         # FIXME: untested
         target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
@@ -258,7 +263,7 @@ def dlwps7_add(hostname, powered_on_start = None,
         pc_url = "http://%s:%s@%s/%d" % (user, password, hostname, i)
         target = target_pdu_socket_add(
             name,
-            ttbl.pc.dlwps7(pc_url), 
+            ttbl.pc.dlwps7(pc_url),
             power = powered_on_start,
             # Always keep them on, unless we decide otherwise--we need
             # them to control other components
