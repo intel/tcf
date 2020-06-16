@@ -515,6 +515,27 @@ def linux_wait_online(ic, target, loops = 20, wait_s = 0.5):
         timeout = (loops + 1) * wait_s)
 
 
+def linux_wait_host_online(target, hostname, loops = 20):
+    """
+    Wait on the console until the given hostname is pingable
+
+    We make the assumption that once the system is assigned the IP
+    that is expected on the configuration, the system has upstream
+    access and thus is online.
+    """
+    assert isinstance(target, tcfl.tc.target_c)
+    assert isinstance(hostname, basestring)
+    assert loops > 0
+    target.shell.run(
+        "for i in {1..%d}; do"
+        " ping -c 3 %s && break;"
+        "done; "
+        "# block until the hostname pongs"
+        % (loops, hostname),
+        # three pings at one second each
+        timeout = (loops + 1) * 3 * 1)
+
+
 def linux_rsync_cache_lru_cleanup(target, path, max_kbytes):
     """Cleanup an LRU rsync cache in a path in the target
 
