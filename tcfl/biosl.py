@@ -283,12 +283,24 @@ def menu_scroll_to_entry(
     seen_entries = collections.defaultdict(int)
     last_seen_entry = None
     last_seen_entry_count = 0
+    # we have either a bug or a feature, not clear and we miss the
+    # first line that has the first entry selected; so the first time
+    # we just go back and go fo
+    first_scroll = True
     for _ in range(max_scrolls):
-        if _direction:
-            # FIXME: use get_key() -- how do we pass the terminal encoding?
-            target.console_tx("\x1b[A")			# press arrow up
+        if first_scroll != True:
+            if _direction:
+                # FIXME: use get_key() -- how do we pass the terminal encoding?
+                target.console_tx("\x1b[A")			# press arrow up
+            else:
+                target.console_tx("\x1b[B")			# press arrow down
         else:
-            target.console_tx("\x1b[B")			# press arrow down
+            if _direction:
+                # FIXME: use get_key() -- how do we pass the terminal encoding?
+                target.console_tx("\x1b[B")			# press arrow up
+            else:
+                target.console_tx("\x1b[A")			# press arrow down
+            first_scroll = False
 
         skips = 4
         while skips > 0:
