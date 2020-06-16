@@ -278,8 +278,7 @@ class extension(tc.target_extension_c):
         except RuntimeError as e:
             print "Power components: not supported"
         else:
-            print "Power components: listed %s" \
-                % " ".join("%s:%s" % (k, v) for k, v in components)
+            print "Power components: listed", components
 
         print "Querying power status"
         power = target.power.get()
