@@ -674,7 +674,8 @@ def multiple_entry_select_one(
                 % (level, retry_top))
 
         key = r['highlight']['groupdict']['key']
-        if key == select_entry:
+        select_entry_regex = re.compile(select_entry)
+        if select_entry_regex.search(key):
             target.report_info("BIOS: %s: entry '%s' found"
                                % (level, select_entry))
             return key, r['highlight']['groupdict']
@@ -824,7 +825,8 @@ def menu_config_network_enable(target):
 
     entry = 'EFI Network'
     value = r['EFI Network']['value']
-    if value != '<Disable>':	# sic, no typo there, missing a 'd'
+    # sic, different versions have differnt values, Disable vs Disabled vs ...
+    if "Disable" not in value:
         target.report_info("BIOS: %s: already enabled (%s)" % (entry, value))
         target.console_tx("\x1b")	# ESC one menu up
         return False
@@ -832,7 +834,8 @@ def menu_config_network_enable(target):
     target.report_info("BIOS: %s: enabling (was: %s)" % (entry, value))
     # it's disabled, let's enable
     target.console_tx("\r")			# select it
-    multiple_entry_select_one(target, "Enable")
+    # geee ... some do Enable, some Enabled (see the missing d)
+    multiple_entry_select_one(target, "Enabled?")
     target.console_tx("\r")			# select it
     # Need to hit ESC twice to get the "save" menu
     target.console_tx("\x1b\x1b")
