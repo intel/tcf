@@ -3,5 +3,11 @@ dosfstools
 efibootmgr
 wget
 python3-cryptography
+# for diagnosing serial ports
+minicom
 # for some utilities that still need this after this many years
 ncurses-compat-libs
+# for diagnosing serial ports
+statserial
+# for diagnosing misc issues
+strace
