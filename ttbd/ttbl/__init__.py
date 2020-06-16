@@ -1589,8 +1589,8 @@ class test_target(object):
                     if ic_net != net:
                         raise ValueError(
                             "%s: IP address %s for interconnect %s is outside "
-                            "of the interconnect's network %s" %(
-                                self.id, val, name, ic_net))
+                            "of the interconnect's network %s (vs %s)" %(
+                                self.id, val, name, ic_net, net))
             if key == "ipv4_prefix_len":
                 val = int(val)
                 assert val > 0 and val < 32, \
