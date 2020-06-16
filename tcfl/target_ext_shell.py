@@ -305,7 +305,8 @@ class shell(tc.target_extension_c):
                 try:
                     if console.startswith("ssh"):
                         action = "enable console %s" % console
-                        target.console.setup(console, user = user)
+                        target.console.setup(console,
+                                             user = user, password = password)
                         target.console.enable(console = console)
                         ts = time.time()
                         target.report_info(
