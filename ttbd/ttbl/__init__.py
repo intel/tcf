@@ -1170,7 +1170,11 @@ class tt_interface(object):
         for key, val in upid.iteritems():
             if val:
                 # there might be empty values, as defaults, so we ignore them
-                target.property_set(prefix + "." + key, val % kws)
+                if isinstance(val, basestring):
+                    # if it is a string, it is a template
+                    target.property_set(prefix + "." + key, val % kws)
+                else:
+                    target.property_set(prefix + "." + key, val)
         if components:
             target.property_set(prefix + ".functions." + iface_name,
                                 ":".join(components))
