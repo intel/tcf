@@ -1117,7 +1117,7 @@ def boot_network_http(target, entry, url,
         if main_boot_select_entry(target, entry):
             target.console_tx("\r")			# select it
             break
-        target.report_info("BIOS: can't find network boot entry '%s';"
+        target.report_info("BIOS: can't find HTTP network boot entry '%s';"
                            " attempting to enable EFI network support"
                            % entry)
         # Ensure EFI networking is on
@@ -1158,8 +1158,9 @@ def boot_network_http(target, entry, url,
         menu_escape_to_main(target, esc_first = False)
         assume_in_main_menu = True
     else:
-        raise tcfl.tc.error_e("BIOS: network boot failed %s/%s; giving up"
-                              % (cnt, top))
+        raise tcfl.tc.error_e(
+            "BIOS: HTTP network boot failed %s/%s; giving up"
+            % (cnt, top))
 
 def boot_network_pxe(target, entry = "UEFI PXEv4.*",
                      assume_in_main_menu = False):
@@ -1190,16 +1191,17 @@ def boot_network_pxe(target, entry = "UEFI PXEv4.*",
         if main_boot_select_entry(target, entry):
             target.console_tx("\r")			# select it
             break
-        target.report_info("BIOS: can't find network boot entry '%s';"
+        target.report_info("BIOS: can't find PXE network boot entry '%s';"
                            " attempting to enable EFI network support"
                            % entry)
+        menu_escape_to_main(target)
         menu_config_network_enable(target)
         menu_escape_to_main(target, esc_first = False)
         menu_reset(target)
-        target.report_info("BIOS: network boot failed %s/%s; retrying"
+        target.report_info("BIOS: PXE network boot failed %s/%s; retrying"
                            % (cnt, top))
     else:
-        raise tcfl.tc.error_e("BIOS: network boot failed %s/%s; giving up"
+        raise tcfl.tc.error_e("BIOS: PXE network boot failed %s/%s; giving up"
                               % (cnt, top))
 
 def boot_efi_shell(target):
