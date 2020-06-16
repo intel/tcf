@@ -62,12 +62,16 @@ import pprint
 import random
 import re
 import traceback
+import socket
+import string
 import subprocess
 import time
+import urlparse
 
 import distutils.version
 import Levenshtein
 
+import biosl
 import commonl
 import commonl.yamll
 import tc
@@ -368,6 +372,7 @@ def target_power_cycle_to_normal_pxe(target):
     target.report_info("POS: setting target not to PXE boot Provisioning OS")
     target.property_set("pos_mode", "local")
     target.power.cycle()
+
 
 #: Name of the directory created in the target's root filesystem to
 #: cache test content
@@ -2137,6 +2142,30 @@ class tc_pos0_base(tc.tc_c):
     #: the image that was selected.
     image = "image-not-deployed"
 
+    #: Images to flash into different parts of the system with the
+    #: images interface
+    #:
+    #: This is a dictionary keyed by image type, value being the file
+    #: to upload to the server and then flash.
+    #:
+    #: If empty, it will be initialized from the contents of the first
+    #: of the following environment variables that is non empty
+    #:
+    #: - *IMAGE_FLASH_<FULLID>*
+    #: - *IMAGE_FLASH_<ID>*
+    #: - *IMAGE_FLASH_<TYPE>*
+    #: - *IMAGE_FLASH*
+    #:
+    #: where *<FULLID>*, *<ID>*, *<TYPE>* are the full name
+    #: (*SERVER/NAME*), the name and the type of the target with any
+    #: non-alphanumeric character replaced with an underscore (*_*).
+    #:
+    #: The format of the environment variables is a space separated
+    #: list of image types and file names::
+    #:
+    #:   export IMAGE_FLASH_server_target1="bios:FILE1 bmc:FILE2"
+    image_flash = {}
+
     #: extra parameters to the image deployment function
     #: :func:`target.pos.deploy_image
     #: <tcfl.pos.extension.deploy_image>`
@@ -2160,6 +2189,51 @@ class tc_pos0_base(tc.tc_c):
     #: How many seconds to delay before login in once the login prompt
     #: is detected
     delay_login = 0
+
+    _image_flash_regex = re.compile(r"\S+:\S+( \S+:\S+)*")
+
+    def deploy_10_flash(self, target):
+        """
+        Flash anything specified in :data:image_flash or IMAGE_FLASH*
+        environment variables
+        """
+        image_flash = self.image_flash
+        if not image_flash:
+            # empty, load from environment
+            target_id_safe = commonl.name_make_safe(
+                target.id, string.ascii_letters + string.digits)
+            target_fullid_safe = commonl.name_make_safe(
+                target.fullid, string.ascii_letters + string.digits)
+            target_type_safe = commonl.name_make_safe(
+                target.type, string.ascii_letters + string.digits)
+
+            source = None	# keep pylint happy
+            for source in [
+                    "IMAGE_FLASH_%s" % target_type_safe,
+                    "IMAGE_FLASH_%s" % target_fullid_safe,
+                    "IMAGE_FLASH_%s" % target_id_safe,
+                    "IMAGE_FLASH",
+                ]:
+                flash_image_s = os.environ.get(source, None)
+                if flash_image_s:
+                    break
+            else:
+                self.report_info(
+                    "skipping image flashing (no environment IMAGE_FLASH*)")
+                return
+
+            if not self._image_flash_regex.search(flash_image_s):
+                raise tc.blocked_e(
+                    "image specification in %s does not conform to the form"
+                    " IMAGE:NAME[ IMAGE:NAME[..]]]" % source)
+            image_flash = {}
+            for entry in flash_image_s.split(" "):
+                name, value = entry.split(":", 1)
+                image_flash[name] = value
+
+        if image_flash:
+            target.report_info("uploading flash images to remoting server")
+            target.images.flash(image_flash, upload = True)
 
     def deploy_50(self, ic, target):
         # ensure network, DHCP, TFTP, etc are up and deploy
