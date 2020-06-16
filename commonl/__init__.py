@@ -1787,12 +1787,18 @@ decompress_handlers = {
     ".xz": "xz -fkd",
 }
 
-def maybe_decompress(filename):
+def maybe_decompress(filename, force = False):
     """
     Decompress a file if it has a compressed file extension and return
-    the name
+    the decompressed name
+
+    If the decompressed file already exists, assume it is the
+    decompressed version already and do not decompress.
 
     :param str filename: a filename to maybe decompress
+
+    :params bool force: (optional, default *False*) if *True*,
+      decompress even if the decompressed file already exists
 
     :returns str: the name of the file; if it was compressed. If it
       is *file.ext*, where *ext* is a compressed file extension, then
@@ -1801,12 +1807,16 @@ def maybe_decompress(filename):
 
     The compressed extensions are registered in
     :data:`decompress_handlers`.
+
     """
     assert isinstance(filename, basestring)
     basename, ext = os.path.splitext(filename)
     if ext not in decompress_handlers:	# compressed logfile support
         return filename
-    command = decompress_handlers[ext]
-    subprocess.check_call(command.split() + [ filename ],
-                          stdin = subprocess.PIPE)
+    if force or not os.path.exist(basename):
+        # FIXME: we need a lock in case we have multiple
+        # processes doing this
+        command = decompress_handlers[ext]
+        subprocess.check_call(command.split() + [ filename ],
+                              stdin = subprocess.PIPE)
     return basename
