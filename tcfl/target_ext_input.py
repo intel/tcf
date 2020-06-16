@@ -272,7 +272,7 @@ class extension(tc.target_extension_c):
         raise tc.error_e(
             "%s: failed %d times to create input device" % (did, tries))
 
-    def evemu_target_setup(self, ic):
+    def evemu_target_setup(self, ic = None):
         """
         Setup a target to use the input subsystem with EVEMU
 
@@ -291,7 +291,7 @@ class extension(tc.target_extension_c):
           able to get this content. The server install instructions
           provide for this to be the case.
         """
-        assert isinstance(ic, tc.target_c)
+        assert ic == None or isinstance(ic, tc.target_c)
         target = self.target
 
         # Download the new evemu binaries with statically linked
