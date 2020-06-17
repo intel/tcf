@@ -827,7 +827,7 @@ class extension(tc.target_extension_c):
                         continue
                     # Ok, we have a console that seems to be
                     # ready...so setup the shell.
-                    target.shell.up(timeout = timeout)
+                    target.shell.up(timeout = timeout, login_regex = None)
                 except ( tc.error_e, tc.failed_e ) as e:
                     tc.result_c.report_from_exception(target.testcase, e)
                     # if we are here, we got no console output because
