@@ -1647,6 +1647,12 @@ EOF""")
                 # mount_fs() below.
                 target.pos.fsinfo_read(raise_on_not_found = False)
 
+                # wait until the rsync server is up; sometimes it
+                # takes the target time to setup networking
+                tl.linux_wait_online(ic, target)
+                tl.linux_wait_host_online(
+                    target, kws['rsync_server'].split("::", 1)[0])
+
                 # List the available images and decide if we have the
                 # one we are asked to install, autocomplete missing
                 # fields and get us a good match if there is any.
