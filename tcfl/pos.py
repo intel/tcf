@@ -2082,6 +2082,9 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
                 "POS: cannot determine what provisioning image is to be used"
                 "; (no pos_image provided and target doesn't provide"
                 " *pos_image* to indicate it")
+        pos_kernel_image = target.kws.get('pos_kernel_image', pos_image)
+        if 'pos_kernel_image' not in kws:
+            kws['pos_kernel_image'] = pos_kernel_image
         kws['pos_cmdline_opts'] = \
             " ".join(pos_cmdline_opts[pos_image]) % kws
         if url == None:
@@ -2095,15 +2098,15 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
             "set cmdline %(pos_cmdline_opts)s" % kws)
         target.shell.run(
             "kernel"
-            " ${base}vmlinuz-%(pos_image)s"
-            " initrd=initramfs-%(pos_image)s"
+            " ${base}vmlinuz-%(pos_kernel_image)s"
+            " initrd=initramfs-%(pos_kernel_image)s"
             " console=tty0 console=%(linux_serial_console_default)s,115200"
             " ${cmdline}"
             % kws,
             # .*because there are a lot of ANSIs that can come
             re.compile(r"\.\.\..* ok"))
         target.shell.run(
-            "initrd ${base}initramfs-%(pos_image)s"
+            "initrd ${base}initramfs-%(pos_kernel_image)s"
             % kws,
             # .*because there are a lot of ANSIs that can come
             re.compile(r"\.\.\..* ok"))
