@@ -1009,7 +1009,7 @@ class inverter_c(impl_c):
             self.pc.off(target, component)
 
     def off(self, target, component):
-        if welf.when_off:
+        if self.when_off:
             self.pc.on(target, component)
 
     def get(self, target, component):
