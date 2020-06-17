@@ -238,10 +238,10 @@ class extension(tc.target_extension_c):
           the default is set in
           :meth:`tcfl.tc.target_c.ttbd_iface_call`.
         """
-        self.target.report_info("running sequence: %s" % sequence, dlevel = 1)
+        self.target.report_info("running sequence: %s" % (sequence, ), dlevel = 1)
         self.target.ttbd_iface_call("power", "sequence", method = "PUT",
                                     sequence = sequence, timeout = timeout)
-        self.target.report_info("ran sequence: %s" % sequence)
+        self.target.report_info("ran sequence: %s" % (sequence, ))
 
 
     def _healthcheck(self):

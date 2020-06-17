@@ -327,10 +327,12 @@ class interface(ttbl.tt_interface):
         # Called when the interface is added to a target to initialize
         # the needed target aspect (such as adding tags/metadata)
         for name, impl in self.impls.iteritems():
+            assert name not in ( 'all', 'full' ), \
+                "power component '%s': cannot be called '%s'; name reserved" \
+                % (name, name)
             assert impl.explicit in ( None, 'on', 'off', 'both' ), \
-                "power %s: impls' explicit value is %s; expected " \
-                "None, 'on', 'off' or 'both'" % (name, impl.implicit)
-
+                "power component '%s': impls' explicit value is %s;" \
+                " expected None, 'on', 'off' or 'both'" % (name, impl.implicit)
 
     def _release_hook(self, target, _force):
         # nothing to do on target release
@@ -856,10 +858,77 @@ class interface(ttbl.tt_interface):
             else:
                 impls, _all = self.args_impls_get(dict(component = component))
             # and now act
-            if action == True:
-                self._on(target, impls, "", _all, explicit)
-            else:   # action == False:
-                self._off(target, impls, "", _all, explicit)
+            if action == 'on':
+                self._on(target, impls, " (because sequenced on)",
+                         _all, explicit)
+            elif action == 'off':
+                self._off(target, impls, " (because sequenced off)",
+                          _all, explicit)
+            elif action == 'cycle':
+                wait = float(target.tags.get('power_cycle_wait', 2))
+                self._off(target, impls, " (because sequenced cycle)",
+                          _all, explicit)
+                if wait:
+                    time.sleep(wait)
+                self._on(target, impls, " (because sequneced cycle)",
+                         _all, explicit)
+            else:
+                raise RuntimeError(
+                    "%s: unknown action (expected on|off|cycle)" % action)
+
+
+
+    def sequence_verify(self, target, sequence):
+        """
+        Verify a sequence is correct
+
+        See :meth:sequence for parameters
+
+        :returns: nothing if ok, raises an exceptin on error
+        """
+        count = 0
+        for s in sequence:
+            # we verify for correctness on the run, which means if the
+            # sequence is wrong it might be left in a weird
+            # state. ok. that's the caller's problem.
+            if not isinstance(s, (list, tuple)):
+                raise ValueError("%s: sequence #%d: invalid type:"
+                                 " expected list; got %s"
+                                 % (target.id, count, type(s)))
+            if len(s) != 2:
+                raise ValueError("%s: sequence #%d: invalid list length; "
+                                 " expected 2; got %s"
+                                 % (target.id, count, len(s)))
+            action = s[0]
+            if action == 'wait':
+                time_to_wait = s[1]
+                assert isinstance(time_to_wait, numbers.Real), \
+                    "%s: sequence #%d: invalid time length; " \
+                    "expected float, got %s" \
+                    % (target.id, count, type(time_to_wait))
+                continue
+
+            if action not in [ 'on', 'off', 'cycle' ]:
+                raise ValueError("%s: sequence #%d: invalid action spec; "
+                                 " expected on|off|cycle; got %s"
+                                 % (target.id, count, action))
+
+            component = s[1]
+            if not isinstance(component, basestring):
+                raise ValueError("%s: sequence #%d: invalid component spec; "
+                                 " expected str; got %s"
+                                 % (target.id, count, type(component)))
+            # We have an action and a component to act on; None/[]
+            # means act on all components in an explicit/non-explicit
+            # way, so decode the component list
+            explicit = False
+            if component == 'full':
+                impls, _all = self.args_impls_get(dict())
+                explicit = True
+            elif component == 'all':
+                impls, _all = self.args_impls_get(dict())
+            else:
+                impls, _all = self.args_impls_get(dict(component = component))
 
 
     def put_sequence(self, target, who, args, _files, _user_path):
