@@ -281,21 +281,21 @@ class impl_c(ttbl.tt_interface_impl_c):
                              % (console, expect.after))
 
     def _response(self, target, console, expect, response, timeout,
-                  response_str):
+                  response_str, count):
         ts0 = time.time()
         ts = ts0
         while ts - ts0 < timeout:
             try:
                 r = expect.expect(response, timeout = timeout - (ts - ts0))
                 ts = time.time()
-                target.log.error("%s: found response: [+%.1fs] #%s: %s"
-                                 % (console, ts - ts0, r, response_str))
+                target.log.info("%s: found response: [+%.1fs] #%d r %s: %s"
+                                % (console, ts - ts0, count, r, response_str))
                 return
             except pexpect_TIMEOUT as e:
                 self._log_expect_error(target, console, expect, "timeout")
-                raise self.timeout_e(
-                    "%s: timeout [+%.1fs] waiting for response: %s"
-                    % (console, timeout, response_str))
+                # let's try again, if we full timeout, it will be raised below
+                time.sleep(0.5)
+                continue
             except pexpect_EOF as e:
                 ts = time.time()
                 offset = os.lseek(expect.fileno(), 0, os.SEEK_CUR)
@@ -328,9 +328,10 @@ class impl_c(ttbl.tt_interface_impl_c):
             fcntl.fcntl(rfd, fcntl.F_SETFL, flag | os.O_NONBLOCK)
             expect = pexpect.fdpexpect.fdspawn(rf, logfile = logf,
                                                timeout = timeout)
+            count = 0
             for command, response in self.command_sequence:
                 if command:
-                    target.log.debug(
+                    target.log.info(
                         "%s: writing command: %s"
                         % (component, command.encode('unicode-escape',
                                                      errors = 'replace')))
@@ -343,7 +344,9 @@ class impl_c(ttbl.tt_interface_impl_c):
                     target.log.debug("%s: expecting response: %s"
                                      % (component, response_str))
                     self._response(target, component,
-                                   expect, response, timeout, response_str)
+                                   expect, response, timeout, response_str,
+                                   count)
+                count += 1
         # now that the handshake has been done, kill whatever has been
         # read for it so we don't confuse it as console input
         with codecs.open(read_file_name, "w", encoding = 'utf-8') as rf:
