@@ -913,8 +913,13 @@ class inverter_c(impl_c):
 
     Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, pc, **kwargs):
+    def __init__(self, pc, when_on = True, when_off = True, when_get = True,
+                 **kwargs):
         assert isinstance(pc, impl_c)
+        assert isinstance(when_on, bool)
+        assert isinstance(when_off, bool)
+        assert isinstance(when_get, bool)
+
         impl_c.__init__(self, **kwargs)
         self.pc = pc
         # These have to be the same set of default properties in
@@ -924,14 +929,21 @@ class inverter_c(impl_c):
         self.timeout = pc.timeout
         self.wait = pc.wait
         self.paranoid_get_samples = pc.paranoid_get_samples
+        self.when_on = when_on
+        self.when_off = when_off
+        self.when_get = when_get
 
     def on(self, target, component):
-        self.pc.off(target, component)
+        if self.when_on:
+            self.pc.off(target, component)
 
     def off(self, target, component):
-        self.pc.on(target, component)
+        if welf.when_off:
+            self.pc.on(target, component)
 
     def get(self, target, component):
+        if not self.when_get:
+            return None
         state = self.pc.get(target, component)
         if state == None:
             return state
