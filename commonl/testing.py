@@ -698,6 +698,13 @@ host = '127.0.0.1'
         line = line.strip()
         for bad_string in self.bad_strings:
             if bad_string in line:
+                for exclude in self.errors_ignore + self.warnings_ignore:
+                    if isinstance(exclude, re._pattern_type) \
+                       and exclude.search(line):
+                        return False
+                    elif isinstance(exclude, basestring) \
+                         and exclude in line:
+                        return False
                 return True
         if self.error_regex.search(line):
             for exclude in self.errors_ignore:
