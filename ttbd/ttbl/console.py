@@ -486,8 +486,10 @@ class interface(ttbl.tt_interface):
     def put_setup(self, target, who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         parameters = dict()
-        for k, v in args.iteritems():
-            parameters[k] = v
+        for k in args.keys():
+            # get the argument with arg_get, since some of it might be
+            # JSON encoded
+            parameters[k] = self.arg_get(args, k, arg_type = None)
         if 'ticket' in parameters:
             del parameters['ticket']
         del parameters['component']
