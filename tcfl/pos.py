@@ -1275,10 +1275,12 @@ EOF""")
         # there was a way to sync partprobe?
         # WARNING: don't print anything other than lsblk's output!
         # will confuse the json loader
+        self.target.shell.run("sync; partprobe; sleep 3s; ")
+        # split in two commands so that output from partprobe doesn't
+        # mess up the JSON. Happens and it is very annoying; we can't
+        # just redirect because we want to see the messages in case
+        # something is wrong to diagnose
         output = self.target.shell.run(
-            "sync;"
-            " partprobe;"
-            " sleep 3s; "
             " lsblk --json -bni -o NAME,SIZE,TYPE,FSTYPE,UUID,PARTLABEL,LABEL,MOUNTPOINT 2> /dev/null",
             output = True, trim = True)
         if not output.strip():
