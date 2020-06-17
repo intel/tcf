@@ -39,7 +39,9 @@ Also power components are able to:
 
 - wait for some particular conditions to happen: a file
   :class:`dissapearing <ttbl.pc.delay_til_file_gone>` or
-  :class:`appearing <ttbl.pc.delay_til_file_appears>`, a USB device is
+  :class:`appearing <ttbl.pc.delay_til_file_appears>`,
+  :class:`a shell command running and returning a value
+  <ttbl.power.delay_til_shell_cmd_c>` or a USB device is
   :class:`detected <ttbl.pc.delay_til_usb_device>` in the system
 
 .. _ttbd_power_explicit:
@@ -1242,6 +1244,138 @@ class daemon_c(impl_c):
         kws.update(target.fsdb.get_as_dict())
         kws['component'] = component
         return commonl.process_alive(self.pidfile % kws, self.path) != None
+
+
+class delay_til_shell_cmd_c(impl_c):
+    """
+    Delay until a shell commands returns an specific value
+
+    This is meant to be used in a power rail to delay until a certain
+    shell command evaluates as succesful (return 0).
+
+    Usage models:
+
+    - look for USB devices whose serial number has to be dug from a
+      deeper protocol than USB
+
+    Other parameters as to :class:ttbl.power.impl_c.
+
+    """
+    def __init__(self, cmdline,
+                 condition_msg = None,
+                 cwd = "/tmp", env = None,
+                 expected_retval = 0, when_on = True, when_off = False,
+                 poll_period = 0.25, timeout = 25, **kwargs):
+        commonl.assert_list_of_strings(cmdline, "cmdline",
+                                       "command line components")
+        assert condition_msg == None or isinstance(condition_msg, basestring)
+        assert isinstance(cwd, basestring)
+        commonl.assert_none_or_dict_of_strings(env, "env")
+        assert isinstance(expected_retval, int)
+        assert isinstance(when_on, bool)
+        assert isinstance(when_off, bool)
+        assert isinstance(poll_period, numbers.Real)
+        assert isinstance(timeout, numbers.Real)
+
+        impl_c.__init__(self, **kwargs)
+        self.cmdline = cmdline
+        if condition_msg == None:
+            self.condition_msg = "'%s' returns %d" % (
+                " ".join(self.cmdline), expected_retval)
+        else:
+            self.condition_msg = condition_msg
+        self.cwd = cwd
+        self.env = env
+        self.expected_retval = expected_retval
+        self.when_on = when_on
+        self.when_off = when_off
+        self.poll_period = poll_period
+        self.timeout = timeout
+
+    def _cmdline_format(self, target, component):
+        kws = dict(target.kws)
+        cmdline = []
+        count = 0
+        try:
+            for i in self.cmdline:
+                # some older Linux distros complain if this string is unicode
+                cmdline.append(str(i % kws))
+            count += 1
+        except KeyError as e:
+            message = "%s: configuration error?" \
+                " can't template command line #%d," \
+                " missing field or target property: %s" % (
+                    component, count, e)
+            target.log.error(message)
+            raise self.power_on_e(message)
+        return cmdline, kws
+
+    def _test(self, _target, _component, cmdline):
+        r = subprocess.call(cmdline,
+                            env = self.env, cwd = self.cwd,
+                            stdin = None, stderr = subprocess.STDOUT)
+        return r == self.expected_retval
+
+
+    def on(self, target, component):
+        if self.when_on == False:
+            return
+        cmdline, kws = self._cmdline_format(target, component)
+        condition_msg = self.condition_msg % kws
+        ts0 = time.time()
+        ts = ts0
+        while ts - ts0 < self.timeout:
+            if self._test(target, component, cmdline):
+                break
+            target.log.debug(
+                "%s: delaying power-on %.fs until %s" % (
+                    component, self.poll_period, condition_msg,
+                ))
+            time.sleep(self.poll_period)
+        else:
+            raise RuntimeError(
+                "%s: timeout (%.1fs) on power-on delay "
+                "waiting for %s" % (
+                    component, self.timeout, condition_msg
+                ))
+        target.log.info(
+            "%s: delayed power-on %.1fs (max %.1fs) until %s"
+            % (
+                component, ts - ts0, self.timeout, condition_msg
+            ))
+
+
+    def off(self, target, component):
+        if self.when_off == False:
+            return
+        cmdline, kws = self._cmdline_format(target, component)
+        condition_msg = self.condition_msg % kws
+        ts0 = time.time()
+        ts = ts0
+        while ts - ts0 < self.timeout:
+            if not self._test(target, component, cmdline):
+                break
+            target.log.debug(
+                "%s: delaying power-off %.fs until (not) %s" % (
+                    component, self.poll_period, condition_msg
+                ))
+            time.sleep(self.poll_period)
+        else:
+            raise RuntimeError(
+                "%s: timeout (%.1fs) on power-off delay waiting"
+                " until (not) %s" % (
+                    component, self.timeout, condition_msg
+                ))
+        target.log.info(
+            "%s: delayed power-off %.1fs (max %.1fs)"
+            " until (not) %s" % (
+                component, ts - ts0, self.timeout, condition_msg
+            ))
+
+
+    def get(self, target, component):
+        cmdline, _kws = self._cmdline_format(target, component)
+        return self._test(target, component, cmdline)
 
 
 class socat_pc(daemon_c):
