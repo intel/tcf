@@ -878,7 +878,7 @@ class interface(ttbl.tt_interface):
 
 
 
-    def sequence_verify(self, target, sequence):
+    def sequence_verify(self, target, sequence, qualifier = ""):
         """
         Verify a sequence is correct
 
@@ -892,32 +892,32 @@ class interface(ttbl.tt_interface):
             # sequence is wrong it might be left in a weird
             # state. ok. that's the caller's problem.
             if not isinstance(s, (list, tuple)):
-                raise ValueError("%s: sequence #%d: invalid type:"
+                raise ValueError("%s%s: sequence #%d: invalid type:"
                                  " expected list; got %s"
-                                 % (target.id, count, type(s)))
+                                 % (target.id, qualifier, count, type(s)))
             if len(s) != 2:
-                raise ValueError("%s: sequence #%d: invalid list length; "
+                raise ValueError("%s%s: sequence #%d: invalid list length; "
                                  " expected 2; got %s"
-                                 % (target.id, count, len(s)))
+                                 % (target.id, qualifier, count, len(s)))
             action = s[0]
             if action == 'wait':
                 time_to_wait = s[1]
                 assert isinstance(time_to_wait, numbers.Real), \
                     "%s: sequence #%d: invalid time length; " \
                     "expected float, got %s" \
-                    % (target.id, count, type(time_to_wait))
+                    % (target.id, qualifier, count, type(time_to_wait))
                 continue
 
             if action not in [ 'on', 'off', 'cycle' ]:
-                raise ValueError("%s: sequence #%d: invalid action spec; "
+                raise ValueError("%s%s: sequence #%d: invalid action spec; "
                                  " expected on|off|cycle; got %s"
-                                 % (target.id, count, action))
+                                 % (target.id, qualifier, count, action))
 
             component = s[1]
             if not isinstance(component, basestring):
-                raise ValueError("%s: sequence #%d: invalid component spec; "
+                raise ValueError("%s%s: sequence #%d: invalid component spec; "
                                  " expected str; got %s"
-                                 % (target.id, count, type(component)))
+                                 % (target.id, qualifier, count, type(component)))
             # We have an action and a component to act on; None/[]
             # means act on all components in an explicit/non-explicit
             # way, so decode the component list
