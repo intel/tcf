@@ -721,7 +721,7 @@ host = '127.0.0.1'
                     return False
                 elif exclude in line:
                     return False
-                return True
+            return True
 
     def _log_report(self, fd, fd_name, issues, testcase):
         if testcase:
