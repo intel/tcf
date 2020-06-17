@@ -2347,6 +2347,7 @@ def cmdline_setup(argsp):
     ap.set_defaults(func = cmdline_pos_capability_list)
 
 
+# FIXME: this should be moved somewhere else, it is a mess
 import pos_multiroot	# pylint: disable = wrong-import-order,wrong-import-position,relative-import
 import pos_uefi		# pylint: disable = wrong-import-order,wrong-import-position,relative-import
 capability_register('mount_fs', 'multiroot', pos_multiroot.mount_fs)
@@ -2354,3 +2355,84 @@ capability_register('boot_to_pos', 'pxe', target_power_cycle_to_pos_pxe)
 capability_register('boot_to_normal', 'pxe', target_power_cycle_to_normal_pxe)
 capability_register('boot_config', 'uefi', pos_uefi.boot_config_multiroot)
 capability_register('boot_config_fix', 'uefi', pos_uefi.boot_config_fix)
+
+
+def edkii_pxe_ipxe_target_power_cycle_to_pos(target):
+    """
+    Boot an EDKII based system to Provisioning OS using PXE into an iPXE loader
+
+    This boots the first entry called *PXE* in the EFI
+    bootloader. Once iPXE starts, the script seixes control by issuing
+    Ctrl-B characters, which takes us to the iPXE console so we can
+    drive the process to boot the Provisioning OS served by the POS
+    server.
+
+    If the the entry is not found, the scripting tries to enable EFI
+    networking.
+
+    Assumptions:
+
+    - the BIOS is accessible via the serial port and follows default
+      EDKII format from http://tianocore.org.
+
+    - The BIOS provides a boot target called *UEFI PXEv4
+      (MAC:<MACADDR>)*, where MACADDR is the MAC address of the
+      interface on which to boot (we use the address declared in
+      *interconnects.POS_BOOT_INTERCONNECT.mac_addr*).
+
+    - the target is in an environment where a PXE request will send it
+      to a boot server that provides an iPXE bootloader
+
+    - the iPXE bootloader default is configured to allow Ctrl-B to
+      interrupt into a console. If using a Fog enabled iPXE
+      bootloader, follow :ref:`these instructions <howto_fog_ipxe>`
+      to make sure TCF can use it
+
+    - a TCF/POS server and the target's metadata configured to point
+      to it
+
+    """
+    # resolve locally, since the iPXE environment has a harder time
+    # resolving
+    url = urlparse.urlparse(target.kws['pos_http_url_prefix'])
+    url_resolved = url._replace(
+        netloc = url.hostname.replace(url.hostname,
+                                      socket.gethostbyname(url.hostname)))
+    target.report_info("POS: setting target to boot Provisioning OS")
+    target.power.cycle()
+
+    boot_ic = target.kws['pos_boot_interconnect']
+    mac_addr = target.rt.get('interconnects', {})\
+                        .get(boot_ic, {}).get('mac_addr', None)
+    if mac_addr == None:
+        raise tc.blocked_e(
+            "can't find MAC address for interconnect %s" % boot_ic)
+    biosl.boot_network_pxe(
+        target,
+        # Eg: UEFI PXEv4 (MAC:A4BF015598A1)
+        r"UEFI PXEv4 \(MAC:%s\)" % mac_addr.replace(":", "").upper())
+    # this will make it boot the iPXE bootloader and then we seize it
+    # and direct it to our POS provide
+    target.report_info("POS: seizing iPXE boot", )
+    ipxe_seize_and_boot(target, dhcp = False, url = url_resolved.geturl())
+
+capability_register('boot_to_pos', 'edkii+pxe+ipxe',
+                    edkii_pxe_ipxe_target_power_cycle_to_pos)
+
+
+def edkii_pxe_ipxe_target_power_cycle_to_normal(target):
+    """
+    Boot an EDKII based system to default
+    """
+    target.report_info("POS: setting target not to boot Provisioning OS")
+    # The boot configuration has been set so that unattended boot
+    # means boot to localdisk
+    target.power.cycle()
+    target.expect("to enter setup and select boot options",
+                  timeout = 60 + int(target.kws.get("bios_boot_time", 0)),
+                  # For a verbose system, don't report it all
+                  report = 300)
+
+# Register capabilities
+capability_register('boot_to_normal', 'edkii+pxe+ipxe',
+                    edkii_pxe_ipxe_target_power_cycle_to_normal)
