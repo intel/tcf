@@ -928,14 +928,14 @@ def main_menu_expect(target):
 
     bios_boot_expect(target)
     # let's just go to the BIOS menu, F7 is not working
-    target.console.write(ansi_key_code("F2", "vt100"))
-    target.console.write(ansi_key_code("F2", "vt100"))
-    target.console.write(ansi_key_code("F2", "vt100"))
+    for _ in range(5):
+        time.sleep(0.3)
+        target.console.write(ansi_key_code("F2", "vt100"))
 
     # This means we have reached the BIOS main menu
     target.report_info("BIOS: confirming we are at toplevel menu")
     for entry in main_level_entries:
-        target.expect(entry, name = "BIOS-toplevel/" + entry)
+        target.expect(entry, name = "BIOS-toplevel/" + entry, timeout = 120)
 
 def _paced_send(target, text):
     # FIXME: remove this, use pacing
@@ -1083,9 +1083,12 @@ def main_boot_select_entry(target, boot_entry):
     if not r:
         raise tcfl.tc.error_e("BIOS: can't find boot manager menu")
     target.console_tx("\r")			# select it
-    submenu_header_expect(target, "Boot Manager Menu")
+    submenu_header_expect(target, "Boot Manager Menu",
+                          canary_end_menu_redrawn = None)
     r = menu_scroll_to_entry(target, boot_entry,
-                             level = "Boot Manager Menu")
+                             level = "Boot Manager Menu",
+                             # yeah, some destinations have a lot...
+                             max_scrolls = 60)
     if r:
         return True			# DONE!
     return False
