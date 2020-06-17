@@ -977,6 +977,20 @@ ForwardX11 = no
 ForwardAgent = no
 EscapeChar = none
 %s""" % (target.state_dir, component, _extra_opts))
+        ssh_user = target.fsdb.get(
+            "interfaces.console." + component + ".parameter_user", None)
+        ssh_port = target.fsdb.get(
+            "interfaces.console." + component + ".parameter_port", None)
+        ssh_password = target.fsdb.get(
+            "interfaces.console." + component + ".parameter_password", None)
+        # FIXME: validate port, username basic format
+        if ssh_user:
+            self.kws['username'] = ssh_user
+        if ssh_port:
+            self.kws['port'] = ssh_port
+        if ssh_password:
+            # if one was specified, use it
+            self.env_add['SSHPASS'] = ssh_password
         ttbl.power.socat_pc.on(self, target, component)
         generation_set(target, component)
         generic_c.enable(self, target, component)
@@ -987,12 +1001,16 @@ EscapeChar = none
 
     # console interface; state() is implemented by generic_c
     def setup(self, target, component, parameters):
+        # For SSH, all the paremeters are in FSDB
         if parameters == {}:		# reset
-            self.parameters = dict(self.parameters_default)
-                # SSHPASS always has to be defined
-            self.env_add['SSHPASS'] = self.password if self.password else ""
-            self.kws['username'] = self.parameters['user']
-            return dict(result = self.parameters)
+            # wipe existing parameters
+            for param_key in target.fsdb.keys("interfaces.console."
+                                              + component + ".parameter_*"):
+                target.fsdb.set(param_key, None, True)
+            for key, value in self.parameters_default.iteritems():
+                target.fsdb.set("interfaces.console."
+                                + component + ".parameter_" + key, value, True)
+            return {}
 
         # things we allow
         allowed_keys = [ 'user', 'password' ]
@@ -1008,14 +1026,9 @@ EscapeChar = none
 
         # ok, all verify, let's set it
         for key, value in parameters.iteritems():
-            if key == 'user':
-                self.kws['username'] = value
-            elif key == 'password':
-                # SSHPASS always has to be defined
-                self.env_add['SSHPASS'] = value if value else ""
-            else:
-                self.parameters[key] = value
-        return dict(result = self.parameters)
+            target.fsdb.set("interfaces.console."
+                            + component + ".parameter_" + key, value, True)
+        return {}
 
     def enable(self, target, component):
         self.on(target, component)
