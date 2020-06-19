@@ -1813,7 +1813,7 @@ def maybe_decompress(filename, force = False):
     basename, ext = os.path.splitext(filename)
     if ext not in decompress_handlers:	# compressed logfile support
         return filename
-    if force or not os.path.exist(basename):
+    if force or not os.path.exists(basename):
         # FIXME: we need a lock in case we have multiple
         # processes doing this
         command = decompress_handlers[ext]
