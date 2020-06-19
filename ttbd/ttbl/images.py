@@ -1644,7 +1644,7 @@ class sf100linux_c(flash_shell_cmd_c):
 
         Looks further in the log file to ensure that is the case
         """
-        if len(images.values) > 1:
+        if len(images) != 1:
             # yeah, this shoul dbe done in flash_start() but
             # whatever...I don't feel like overriding it.
             raise RuntimeError(
