@@ -22,7 +22,7 @@ def target_pdu_socket_add(name, pc, tags = None, power = True):
     target.interface_add("power", ttbl.power.interface(pc))
     ttbl.config.target_add(
         target, tags = dict(
-            idle_poweroff = 0,
+            idle_power_off = 0, idle_poweroff = 0,
             idle_power_fully_off = 0
         )
     )
