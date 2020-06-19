@@ -1525,7 +1525,7 @@ class flash_shell_cmd_c(impl2_c):
                     raise RuntimeError(msg)
 
 
-class sf100linux_c(impl_c):
+class sf100linux_c(flash_shell_cmd_c):
     """Flash Dediprog SF100 and SF600 with *dpcmd* from
     https://github.com/DediProgSW/SF100Linux
 
@@ -1593,24 +1593,35 @@ class sf100linux_c(impl_c):
        path of *dpcmd* by setting :data:`path`.
     """
     def __init__(self, dediprog_id, args = None, name = None, timeout = 60,
+                 path = None,
                  mode = "--batch", **kwargs):
         assert isinstance(dediprog_id, basestring)
         assert isinstance(timeout, int)
+        assert path == None or isinstance(path, basestring)
         assert mode in [ "--batch", "--auto", "--prog", "--erase" ]
         commonl.assert_none_or_dict_of_strings(args, "args")
 
-        if args:
-            self.args = args
-        else:
-            self.args = {}
-        self.dediprog_id = dediprog_id
         self.timeout = timeout
-        self.mode = mode
-        impl_c.__init__(self, **kwargs)
+        if path:
+            self.path = path
+        # FIXME: verify path works +x
+        cmdline = [
+            self.path,
+            "--device", dediprog_id,
+            "--silent",
+            "--log", "%(image.#0)s.log",
+            mode, "%(image.#0)s.log",
+        ]
+        if args:
+            for arg, value in args.items():
+                cmdline += [ arg, value ]
+
+        flash_shell_cmd_c.__init__(self, cmdline, **kwargs)
         if name == None:
             name = "Dediprog SF[16]00 " + dediprog_id
         self.upid_set(name, dediprog_id = dediprog_id)
 
+        
     #: Path to *dpcmd*
     #:
     #: We need to use an ABSOLUTE PATH, as *dpcmd* relies on it to
@@ -1627,45 +1638,23 @@ class sf100linux_c(impl_c):
     #: >>> imager.path =  "/opt/bin/dpcmd"
     path = "/usr/local/bin/dpcmd"
 
-    def flash(self, target, images):
-        assert len(images) == 1, \
-            "only one image suported, got %d: %s" \
-            % (len(images), " ".join("%s:%s" % (k, v)
-                                     for k, v in images.iteritems()))
+    def flash_post_check(self, target, images, context):
+        """
+        Checks the process returned with no errors
+
+        Looks further in the log file to ensure that is the case
+        """
+        if len(images.values) > 1:
+            # yeah, this shoul dbe done in flash_start() but
+            # whatever...I don't feel like overriding it.
+            raise RuntimeError(
+                "%s: Configuration BUG: %s flasher supports only one image"
+                " but it has been called to flash %d images (%s)" % (
+                    target.id, type(self),
+                    len(images), ", ".join(images.keys())))
+        flash_shell_cmd_c.flash_post_check(self, target, images, context)
+
         image_name = images.values()[0]
-        cmdline = [
-            self.path,
-            "--device", self.dediprog_id,
-            "--silent",
-            "--log", image_name + ".log",
-            self.mode, image_name,
-        ]
-        for key, value in self.args.iteritems():
-            cmdline += [ key, value % target.kws ]
-        target.log.info("flashing image with: %s" % " ".join(cmdline))
-        ts0 = time.time()
-        ts = ts0
-        try:
-            p = subprocess.Popen(cmdline, stdin = None, cwd = "/tmp",
-                                 stderr = subprocess.STDOUT)
-            while ts - ts0 < self.timeout:
-                returncode = p.poll()
-                if returncode != None:
-                    break		# process completed
-                target.timestamp()	# timestamp so we don't idle...
-                time.sleep(5)		# ...snooze
-            else:
-                msg = "flashing with %s failed: timedout after %ds" \
-                    % (" ".join(cmdline), self.timeout)
-                p.kill()
-                raise RuntimeError(msg)
-            target.log.info("ran %s" % (" ".join(cmdline)))
-        except subprocess.CalledProcessError as e:
-            target.log.error("flashing with %s failed: (%d) %s"
-                             % (" ".join(cmdline),
-                                e.returncode, e.output))
-            raise
-        # verify the logfile
         with codecs.open(image_name + ".log", errors = 'ignore') as logf:
             for line in logf:
                 if 'Fail' in line:
@@ -1674,4 +1663,3 @@ class sf100linux_c(impl_c):
                         % (" ".join(cmdline), logf.read())
                     target.log.error(msg)
                     raise RuntimeError(msg)
-        target.log.info("flashed image")
