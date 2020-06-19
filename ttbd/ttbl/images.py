@@ -1506,8 +1506,9 @@ class flash_shell_cmd_c(impl2_c):
         commonl.process_terminate(context['pidfile'], path = self.path)
 
 
-    def flash_post_check(self, target, images, context):
-        if self.p.returncode != 0:
+    def flash_post_check(self, target, images, context,
+                         expected_returncode = 0):
+        if self.p.returncode != expected_returncode:
             msg = "flashing with %s failed, returned %s: %s" % (
                 context['cmdline_s'], self.p.returncode, "<n/a>")
             target.log.error(msg)
