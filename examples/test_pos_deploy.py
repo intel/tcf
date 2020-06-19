@@ -78,6 +78,7 @@ class _test(tcfl.tc.tc_c):
     # format for specifying images to flash is IMAGE:NAME[ IMAGE:NAME[..]]]
     _image_flash_regex = re.compile(r"\S+:\S+( \S+:\S+)*")
 
+    @tcfl.tc.serially()			# otherwise it runs out of order
     def deploy_10_flash(self, target):
         """
         Flash anything specified in IMAGE_FLASH* environment variables

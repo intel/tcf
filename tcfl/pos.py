@@ -2203,6 +2203,7 @@ class tc_pos0_base(tc.tc_c):
 
     _image_flash_regex = re.compile(r"\S+:\S+( \S+:\S+)*")
 
+    @tc.serially()			# make sure it executes in order
     def deploy_10_flash(self, target):
         """
         Flash anything specified in :data:image_flash or IMAGE_FLASH*
