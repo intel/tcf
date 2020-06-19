@@ -1377,6 +1377,12 @@ class flash_shell_cmd_c(impl2_c):
       - *image.TYPE*: *NAME* (for all the images to be flashed, the
          file we are flashing)
 
+      - *image.#<N>*: *NAME* (for all the images to be flashed, the
+         file we are flashing), indexed by number in declaration order.
+
+        This is mostly used when there is only one image, so we do not
+        need to know the name of the image (*image.#0*).
+
       - *image_types*: all the image types being flashed separated
          with "-".
 
@@ -1411,8 +1417,11 @@ class flash_shell_cmd_c(impl2_c):
         kws['image_types'] = image_types
         context['kws'] = kws
 
+        count = 0
         for image_name, image in images.items():
             kws['image.' + image_name] = image
+            kws['image.#%d' % count ] = image
+            count += 1
 
         pidfile = "%(path)s/flash-%(image_types)s.pid" % kws
         context['pidfile'] = kws['pidfile'] = pidfile
