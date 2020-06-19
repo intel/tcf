@@ -562,10 +562,8 @@ class interface(ttbl.tt_interface):
                     dict(component = console_name),
                     None, None)
             impl.flash(target, subimages)
-            target.log.error("DEBUG dlashed")
             self._hash_record(target, subimages)
 
-            target.log.error("DEBUG hashed")
             # note in case of flashing failure we don't
             # necessarily power on the components, since
             # things might be a in a bad state--we let the
@@ -583,7 +581,6 @@ class interface(ttbl.tt_interface):
         # note this might seem counterintuitive; the
         # configuration might specify some components are
         # switched off while others are power cycled, or none
-        target.log.error("DEBUG post sequence %s" % impl.power_sequence_post)
         if impl.power_sequence_post:
             target.power.sequence(target, impl.power_sequence_post)
 
@@ -682,14 +679,12 @@ class interface(ttbl.tt_interface):
                 else:
                     serial[impl][img_type_real] = real_file_name
             target.timestamp()
-            target.log.error("DEBUG flashing serial")
             # iterate over the real implementations only
             for impl, subimages in serial.iteritems():
                 self._impl_flash(impl, target, subimages)
             # FIXME: collect diagnostics here of what failed only if
             # 'admin' or some other role?
             if parallel:
-                target.log.error("DEBUG flashing parallel")
                 self._flash_parallel(target, parallel)
             return {}
 
