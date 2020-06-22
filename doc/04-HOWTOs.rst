@@ -1257,27 +1257,10 @@ If your network requires proxy support:
      .. include:: 04-HOWTOs-LL-proxy-1.rst
 
 - From the terminal, (when remotedly logged in, optional) add to
-  ``~/.bashrc`` or to ``/etc/bashrc`` (for system wide, headless
-  machines):
+  ``/etc/environment`` (for system wide, headless machines):
 
     .. literalinclude:: 04-HOWTOs-LL-proxy-2.sh
        :language: shell
-
-  (note the ``${VAR:-DEFAULT}`` syntax is so to avoid these settings
-  to interfere with those that might be set when you login via the GUI).
-
-Configure *sudo* to pass proxy configuration::
-
-  # cat <<EOF > /etc/sudoers.d/proxy
-  # Keep proxy configuration through sudo, so we don't need to specify -E
-  # to carry it
-  Defaults env_keep += "ALL_PROXY FTP_PROXY HTTP_PROXY HTTPS_PROXY NO_PROXY"
-  Defaults env_keep += "all_proxy ftp_proxy http_proxy https_proxy no_proxy"
-  EOF
-
-This ensures the proxy configuration is kept by *sudo* (versus having
-to run *sudo -E*) so tools that use the network don't get stuck with
-network access.
 
 Why?
 
