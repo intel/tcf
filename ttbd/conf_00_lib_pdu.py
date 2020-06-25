@@ -22,7 +22,7 @@ def target_pdu_socket_add(name, pc, tags = None, power = True):
     target.interface_add("power", ttbl.power.interface(pc))
     ttbl.config.target_add(
         target, tags = dict(
-            idle_power_off = 0, idle_poweroff = 0,
+            idle_power_off = 0, idle_poweroff = 0,     # COMPAT
             idle_power_fully_off = 0
         )
     )
@@ -79,7 +79,10 @@ def apc_pdu_add(name, powered_on_start = None, hostname = None):
         target.interface_add(
             "power",
             ttbl.power.interface(ttbl.apc.pci(hostname, i)))
-        ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+        ttbl.config.target_add(target, tags = dict(
+            idle_power_off = 0, idle_poweroff = 0,	# COMPAT
+            idle_power_fully_off = 0
+        ))
         target.disable("")
         if powered_on_start:
             target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
@@ -267,7 +270,10 @@ def dlwps7_add(hostname, powered_on_start = None,
             power = powered_on_start,
             # Always keep them on, unless we decide otherwise--we need
             # them to control other components
-            tags = dict(idle_poweroff = 0))
+            tags = dict(
+                idle_power_off = 0, idle_poweroff = 0, # COMPAT
+                idle_power_fully_off = 0
+            ))
         target.disable("")
 
 
@@ -343,7 +349,10 @@ try:
                 power = powered_on_start,
                 # Always keep them on, unless we decide otherwise--we need
                 # them to control other components
-                tags = dict(idle_poweroff = 0))
+                tags = dict(
+                    idle_power_off = 0, idle_poweroff = 0, # COMPAT
+                    idle_power_fully_off = 0
+                ))
             target.disable("")
 
 except ImportError as e:
@@ -441,7 +450,10 @@ def usbrly08b_targets_add(serial_number, target_name_prefix = None,
             power = powered_on_start,
             # Always keep them on, unless we decide otherwise--we need
             # them to control other components
-            tags = dict(idle_poweroff = 0))
+            tags = dict(
+                idle_power_off = 0, idle_poweroff = 0, # COMPAT
+                idle_power_fully_off = 0
+            ))
         target.disable("")
 
 
@@ -544,7 +556,10 @@ def ykush_targets_add(ykush_serial, pc_url = None, powered_on_start = None):
     target.interface_add("power", ttbl.power.interface(*pcl))
     # Always keep them on, unless we decide otherwise--we need
     # them to control other components
-    ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+    ttbl.config.target_add(target, tags = dict(
+        idle_power_off = 0, idle_poweroff = 0, # COMPAT
+        idle_power_fully_off = 0
+    ))
     target.disable("")
     if powered_on_start:
         target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
@@ -556,7 +571,10 @@ def ykush_targets_add(ykush_serial, pc_url = None, powered_on_start = None):
             ttbl.power.interface(ttbl.pc_ykush.ykush(ykush_serial, i)))
         # Always keep them on, unless we decide otherwise--we need
         # them to control other components
-        ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+        ttbl.config.target_add(target, tags = dict(
+            idle_power_off = 0, idle_poweroff = 0, # COMPAT
+            idle_power_fully_off = 0
+        ))
         target.disable("")
         if powered_on_start:
             target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
