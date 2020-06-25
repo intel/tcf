@@ -134,8 +134,8 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
         self.https_verify = https_verify
         self._outlet_rpc = None
         url_no_password = "%s://%s" % (self.url.scheme, self.url.hostname)
-        self.upid_set("Raritan PDU", url = url_no_password,
-                      outlet = outlet_number)
+        self.upid_set("Raritan PDU %s #%d" % (url_no_password, outlet_number),
+                      url = url_no_password, outlet = outlet_number)
 
 
     @property
