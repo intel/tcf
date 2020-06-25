@@ -324,8 +324,9 @@ class impl2_c(impl_c):
         assert isinstance(parallel, bool), \
             "parallel must be a bool; got %s" % type(parallel)
         self.check_period = check_period
-        self.parallel = parallel
         impl_c.__init__(self, **kwargs)
+        # otherwise it is overriden
+        self.parallel = parallel
 
     def flash_start(self, target, images, context):
         """
