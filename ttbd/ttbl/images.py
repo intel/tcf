@@ -1611,7 +1611,7 @@ class sf100linux_c(flash_shell_cmd_c):
             "--device", dediprog_id,
             "--silent",
             "--log", "%(image.#0)s.log",
-            mode, "%(image.#0)s.log",
+            mode, "%(image.#0)s",
         ]
         if args:
             for arg, value in args.items():
