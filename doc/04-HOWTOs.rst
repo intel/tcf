@@ -1233,6 +1233,7 @@ From the Linux environment, you can access your Windows files:
 - `/mnt/c/Users/USERNAME/Desktop`
 - `/mnt/c/Users/USERNAME/Documents`
 
+From here, you can :ref:`install the client <install_tcf_client>`.
 
 .. _setup_proxies:
 
