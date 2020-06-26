@@ -1661,6 +1661,6 @@ class sf100linux_c(flash_shell_cmd_c):
                 if 'Fail' in line:
                     logf.seek(0)
                     msg = "flashing with %s failed, issues in logfile: %s" \
-                        % (" ".join(cmdline), logf.read())
+                        % (context['cmdline_s'], logf.read())
                     target.log.error(msg)
                     raise RuntimeError(msg)
