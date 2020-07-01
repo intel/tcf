@@ -393,7 +393,8 @@ class impl2_c(impl_c):
         """
         Flashes in serial mode a parallel-capable flasher
         """
-        context = dict()
+        context = dict()		# setup as interface._flash_parallel()
+        context['ts0'] = time.time()
         self.flash_start(target, images, context)
         ts = ts0 = time.time()
         while ts - ts0 < self.estimated_duration:
@@ -1382,7 +1383,9 @@ class flash_shell_cmd_c(impl2_c):
 
         image_types = "-".join(images.keys())
         kws['image_types'] = image_types
-        context['kws'] = kws
+        # this allows a class inheriting this to set kws before calling us
+        context.setdefault('kws', {}).update(kws)
+        kws = context['kws']
 
         count = 0
         for image_name, image in images.items():
