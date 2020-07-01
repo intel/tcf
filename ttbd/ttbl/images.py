@@ -1561,6 +1561,43 @@ class sf100linux_c(flash_shell_cmd_c):
 
     2. (optionally, if installed in another location) configure the
        path of *dpcmd* by setting :data:`path`.
+
+    **Detecting a Dediprog**
+
+    Dediprogs' USB serial numbers are often all the same, so for a
+    power-on sequence to wait until the device is detected by the
+    system after it has been plugged in (eg: with a
+    :class:`ttbl.pc_ykush.pc` connector)
+    :class:`ttbl.pc.delay_til_usb_device` is usually not enough. In
+    such case, we can use *dpmcd* to do the detection for us:
+
+    .. code-block:: python
+
+       connector = ttbl.pc_ykush.ykush(ykush, port, explicit = 'on')
+       detector = ttbl.power.delay_til_shell_cmd_c(
+           [
+               # run over timeout, so if the command gets stuck due
+               # to HW, we can notice it and not get stuck -- so if
+               # it can't detect in five seconds--slice it
+               "/usr/bin/timeout", "--kill-after=1", "5",
+               ttbl.images.sf100linux_c.path,
+               "--detect", "--device", dediprog_id
+           ],
+           "dediprog %s is detected" % dediprog_id,
+           explicit = 'on')
+
+    and then the power rail must include both:
+
+    .. code-block:: python
+
+       target.interface_add("power", ttbl.power.interface([
+           ( "flasher connect", connector ),
+           ( "flasher detected", detector ),
+           ...
+       ])
+
+
+
     """
     def __init__(self, dediprog_id, args = None, name = None, timeout = 60,
                  path = None,
