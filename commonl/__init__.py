@@ -1769,6 +1769,15 @@ def assert_dict_of_strings(d, d_name):
             "'%s' needs to be a dict of strings keyed by string;" \
             " for key '%s' got a value type '%s'" % (d_name, k, type(v))
 
+def assert_dict_of_ints(d, d_name):
+    for k, v in d.items():
+        assert isinstance(k, basestring), \
+            "'%s' needs to be a dict of ints keyed by string;" \
+            " got a key type '%s'; expected string" % (d_name, type(k))
+        assert isinstance(v, int), \
+            "'%s' needs to be a dict of ints keyed by string;" \
+            " for key '%s' got a value type '%s'" % (d_name, k, type(v))
+
 def assert_none_or_dict_of_strings(d, d_name):
     if d == None:
         return
