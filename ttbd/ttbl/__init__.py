@@ -19,6 +19,7 @@ import contextlib
 import errno
 import fcntl
 import fnmatch
+import glob
 import ipaddress
 import json
 import logging
@@ -2258,3 +2259,41 @@ def usb_serial_number(d):
     else:
         raise AssertionError("%s: don't know how to find USB device serial number" % d)
     return serial_number
+
+def _sysfs_read(filename):
+    try:
+        with open(filename) as fr:
+            return fr.read().strip()
+    except IOError as e:
+        if e.error != errno.ENOENT:
+            raise
+
+def usb_serial_to_path(arg_serial):
+    """
+    Given a USB serial number, return it's USB path
+
+    Given, eg the serial number *4cb7b886a6b0*, it would return *1-9*,
+    as what *lsusb.py* would report::
+
+      $ lsusb.py
+      ...
+       1-9      06cb:009a ff  2.00   12MBit/s 100mA 1IF  (Synaptics, Inc. 4cb7b886a6b0)
+       1-7      8087:0a2b e0  2.00   12MBit/s 100mA 2IFs (Intel Corp.)
+       1-10     2386:4328 00  2.01   12MBit/s 96mA 1IF  (Raydium Corporation Raydium Touch System)
+       1-3      0bda:5411 09  2.10  480MBit/s 0mA 1IF  (Realtek Semiconductor Corp.) hub
+        1-3.4   0bda:5400 11  2.01   12MBit/s 0mA 1IF  (Realtek BillBoard Device 123456789ABCDEFGH)
+      ....
+
+    :param str arg_serial: USB serial number
+    :return: tuple with USB path, vendor, product name for the given serial
+      number or *None, None, None* if not found
+
+    """
+    for fn_serial in glob.glob("/sys/bus/usb/devices/*/serial"):
+        serial = _sysfs_read(fn_serial)
+        if serial == arg_serial:
+            devpath = os.path.dirname(fn_serial)
+            return os.path.basename(devpath), \
+                _sysfs_read(os.path.join(devpath, "vendor")), \
+                _sysfs_read(os.path.join(devpath, "product"))
+    return None, None, None
