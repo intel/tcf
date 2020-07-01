@@ -492,40 +492,6 @@ class interface(ttbl.tt_interface):
     def _release_hook(self, target, _force):
         pass
 
-    @staticmethod
-    def _power_cycle(target, components, exclude):
-        # power cycle the power rail components needed to flash
-        #
-        # Only if the implementation says it needs it and it supports
-        # the power interface.
-        if components == None:
-            return
-        if not hasattr(target, "power"):
-            return
-        args = {}
-        if components:
-            args['components'] = components
-        if exclude:
-            args['components_exclude'] = exclude
-        target.power.put_cycle(target, ttbl.who_daemon(), args, None, None)
-
-    @staticmethod
-    def _power_off(target, components, exclude):
-        # power off the power rail components needed to flash
-        #
-        # Only if the implementation says it needs it and it supports
-        # the power interface.
-        if components == None:
-            return
-        if not hasattr(target, "power"):
-            return
-        args = {}
-        if components:
-            args['components'] = components
-        if exclude:
-            args['components_exclude'] = exclude
-        target.power.put_off(target, ttbl.who_daemon(), args, None, None)
-
     def _hash_record(self, target, images):
         # if update MD5s of the images we flashed (if succesful)
         # so we can use this to select where we want to run
