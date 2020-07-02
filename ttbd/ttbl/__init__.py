@@ -2265,7 +2265,7 @@ def _sysfs_read(filename):
         with open(filename) as fr:
             return fr.read().strip()
     except IOError as e:
-        if e.error != errno.ENOENT:
+        if e.errno != errno.ENOENT:
             raise
 
 def usb_serial_to_path(arg_serial):
