@@ -13,6 +13,7 @@
 
      $ sudo dnf install -y python2-devel python2-pip  # Fedora <= 30
      $ sudo yum install -y python2-devel python2-pip  # CentOS/RHEL 7
+     $ sudo apt-get update                            # Ubuntu <= 18
      $ sudo apt install -y python-dev python-pip      # Ubuntu <= 18
 
    (TCF is still using python2, hence the limitation to older ditros
