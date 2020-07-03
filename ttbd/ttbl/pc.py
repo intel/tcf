@@ -421,7 +421,10 @@ class dlwps7(ttbl.power.impl_c):
             raise Exception("%s: outlet number '%d' has to be 1 >= outlet >= 8"
                             % (_url, self.outlet))
         self.url = self.url
-        self.upid_set("DLI Web Power Switch", url = self.url_no_password)
+        self.upid_set(
+            "DLI Web Power Switch %s #%d" % (
+                self.url_no_password, self.outlet),
+            url = self.url_no_password, outlet = self.outlet)
 
     def on(self, target, component):
         r = requests.get(self.url + "/outlet?%d=ON" % self.outlet)
