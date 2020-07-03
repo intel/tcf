@@ -478,6 +478,7 @@ class interface(ttbl.tt_interface):
             target.power.sequence_verify(target, self.power_sequence_post,
                                          "flash post power sequence")
         for name, impl in self.impls.iteritems():
+            commonl.verify_str_safe(name)
             target.fsdb.set(
                 "interfaces.images." + name + ".estimated_duration",
                 impl.estimated_duration)

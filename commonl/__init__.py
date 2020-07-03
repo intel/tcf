@@ -263,8 +263,6 @@ def mkid(something, l = 10):
     h = hashlib.sha512(something)
     return base64.b32encode(h.digest())[:l].lower()
 
-
-
 def trim_trailing(s, trailer):
     """
     Trim *trailer* from the end of *s* (if present) and return it.
@@ -277,6 +275,22 @@ def trim_trailing(s, trailer):
         return s[:-tl]
     else:
         return s
+
+def verify_str_safe(s, safe_chars = None):
+    """
+    Raise an exception if string contains unsafe chars
+
+    :param str s: string to check
+    :param str safe_chars: (optional) list/set of valid chars
+      (defaults to ASCII letters, digits, - and _)
+    """
+    if safe_chars == None:
+        safe_chars = set('-_' + string.ascii_letters + string.digits)
+    s_set = set(s)
+    s_unsafe = s_set - s_set.intersection(safe_chars)
+    assert not s_unsafe, \
+        "%s: contains invalid characters: %s (valid are: %s)" % (
+            s, "".join(s_unsafe), "".join(safe_chars))
 
 
 def name_make_safe(name, safe_chars = None):
