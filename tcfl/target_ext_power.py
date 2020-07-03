@@ -375,7 +375,7 @@ _sequence_valid_regex = re.compile(
     r"^("
     r"(?P<wait>wait):(?P<time>[\.0-9]+)"
     r"|"
-    r"(?P<action>\w+):(?P<component>\w+)"
+    r"(?P<action>\w+):(?P<component>[ /\w]+)"
     r")$")
 
 def _cmdline_power_sequence(args):
@@ -394,14 +394,8 @@ def _cmdline_power_sequence(args):
                 total_wait += time_to_wait
             else:
                 sequence.append(( gd['action'], gd['component']))
-        if args.timeout:
-            timeout = args.timeout
-        if total_wait == 0:	# no waits in the sequence, defaults rule
-            timeout = None
-        else:
-            timeout = total_wait * 1.5
-        print "DEBUG timeout %s" % timeout, total_wait
-        target.power.sequence(sequence, timeout = timeout)
+        target.power.sequence(sequence,
+                              timeout = args.timeout + 1.5 * total_wait)
 
 def _cmdline_setup(arg_subparser):
     ap = arg_subparser.add_parser(
@@ -482,8 +476,8 @@ def _cmdline_setup(arg_subparser):
         " or wait:SECONDS; *all* means all components except explicit ones,"
         " *full* means all components including explicit ones")
     ap.add_argument("-t", "--timeout",
-                    action = "store", default = None, type = int,
-                    help = "timeout in seconds [default will be"
+                    action = "store", default = 60, type = int,
+                    help = "timeout in seconds [%(default)d, plus "
                     " all the waits +50%%]")
     ap.set_defaults(func = _cmdline_power_sequence)
 
