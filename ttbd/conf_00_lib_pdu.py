@@ -88,7 +88,7 @@ def apc_pdu_add(name, powered_on_start = None, hostname = None):
             target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
 
 
-def dlwps7_add(hostname, powered_on_start = None,
+def dlwps7_add(hostname, powered_on_start = None, basename = None,
                user = "admin", password = "1234"):
     """Add test targets to individually control each of a DLWPS7's sockets
 
@@ -129,6 +129,10 @@ def dlwps7_add(hostname, powered_on_start = None,
     :param str user: User name for HTTP Basic authentication
 
     :param str password: password for HTTP Basic authentication
+
+    :param str basename: (optional) use something else to generate the
+      target names if we want it different than the hostname. Defaults
+      to *hostname*.
 
     :param bool powered_on_start: what to do with the power on the
       downstream ports:
@@ -261,8 +265,13 @@ def dlwps7_add(hostname, powered_on_start = None,
          192.168.4.X	spM
 
     """
+    if basename == None:
+        basename = hostname
+    else:
+        isinstance(basename, basestring)
+
     for i in range(1, 9):
-        name = "%s-%d" % (hostname, i)
+        name = "%s-%d" % (basename, i)
         pc_url = "http://%s:%s@%s/%d" % (user, password, hostname, i)
         target = target_pdu_socket_add(
             name,
