@@ -120,9 +120,13 @@ class extension(tc.target_extension_c):
         if timeout == None:
             timeout = 0
             for image_type, image in images.items():
-                _timeout = target.rt['interfaces']['images']\
-                    [image_type].get("estimated_duration", 60)
-                timeout += _timeout
+                images_data = target.rt['interfaces']['images']
+                image_data = images_data.get(image_type, None)
+                if image_data == None:
+                    raise tc.blocked_e("%s: image type '%s' not available"
+                                       % (target.id, image_type),
+                                       dict(target = target))
+                timeout += image_data.get("estimated_duration", 60)
         else:
             assert isinstance(timeout, int)
         
