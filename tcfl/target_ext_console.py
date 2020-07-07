@@ -1061,12 +1061,13 @@ def _console_read_thread_fn(target, console, fd, offset):
     # read in the background the target's console output and print it
     # to stdout
     with msgid_c("cmdline"):
-        if offset == -1:
-            offset = target.console.size(console)
-            if offset == None:	# disabled console? fine
+        if offset < 0:
+            current_size = target.console.size(console)
+            if current_size == None:	# disabled console? fine
+                current_size = 0
+            offset = current_size - offset
+            if offset < 0:
                 offset = 0
-        else:
-            offset = 0
         generation = 0
         generation_prev = None
         backoff_wait = 0.1
