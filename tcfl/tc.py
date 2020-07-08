@@ -115,7 +115,7 @@ import threading
 import time
 import traceback
 import types
-
+import typing
 
 # FIXME: rename want_name to role
 
@@ -188,6 +188,9 @@ import commonl.expr_parser
 from . import ttb_client
 from . import __init__ as tcfl
 from . import msgid_c
+
+# discovered by the importer
+version = None
 
 # For debugging, levels are D2: 9, D3: 8, D4:7 ...
 logging.addLevelName(50, "C")
@@ -1224,7 +1227,7 @@ class target_c(reporter_c):
             if not kw in list(self.kws.keys()):
                 missing.append(kw)
         if missing:
-            raise tcfl.tc.blocked_e(
+            raise blocked_e(
                 'target does not export needed keywords: %s'
                 % ', '.join(missing))
 
@@ -1246,7 +1249,7 @@ class target_c(reporter_c):
         >>>                      % (target2.addr_get(ic, 'ipv4'),
         >>>                         target2.ic_field_get(ic, 'ipv4_addr_len'))
         """
-        assert isinstance(ic, tcfl.tc.target_c)
+        assert isinstance(ic, target_c)
         assert isinstance(field, str)
 
         if not 'interconnects' in self.rt:
@@ -2021,7 +2024,7 @@ class target_c(reporter_c):
         if not twapp:
             if noraise:
                 return (None, None)
-            raise tcfl.tc.blocked_e("%sNo App builders defined for "
+            raise blocked_e("%sNo App builders defined for "
                                     "target '%s', can't figure out "
                                     "what to do" % (what, self.want_name))
         elif bsp in list(twapp.keys()):
@@ -2031,7 +2034,7 @@ class target_c(reporter_c):
             _app = twapp["*"][0]
             app_src = twapp["*"][1]
         else:
-            raise tcfl.tc.blocked_e("%sCan't figure out which "
+            raise blocked_e("%sCan't figure out which "
                                     "app to use" % what)
         return _app, app_src
 
@@ -2222,14 +2225,14 @@ class result_c():
         # dictionary are attachments passed to report_*()
         # functions. In said case, update the attachments and
         # return the message. See :py:class:`exception`.
-        if isinstance(e, tcfl.tc.exception):
+        if isinstance(e, exception):
             attachments.update(e.attachments_get())
             return e.args[0]
         return e
 
     def report(self, tc, message, attachments = None,
                level = None, dlevel = 0, alevel = 2):
-        assert isinstance(tc, tcfl.tc.tc_c)
+        assert isinstance(tc, tc_c)
         assert isinstance(message, str)
         if attachments:
             assert isinstance(attachments, dict)
@@ -2246,7 +2249,7 @@ class result_c():
             # spec, use it as reporter.
             attachments = dict(attachments)
             attachments.pop('target')
-            assert isinstance(reporter, tcfl.tc.target_c), \
+            assert isinstance(reporter, target_c), \
                 "attachment 'target' does not point to a " \
                 "tcfl.tc.target_c but to a type %s" % type(reporter).__name__
         else:
@@ -3773,7 +3776,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
         :param str command: command line to run (will be run a shell command)
 
-        :param str,re._pattern_type expect: (optional) if defined, a
+        :param str,typing.Pattern expect: (optional) if defined, a
           string or regular expression that shall be found in the output
           of the command, raising :exc:`tcfl.tc.failed_e` otherwise.
 
@@ -3791,16 +3794,16 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         if expect:
             if isinstance(expect, str):
                 if expect not in output:
-                    raise tcfl.tc.failed_e(
+                    raise failed_e(
                         "can't find '%s' in output" % expect,
                         dict(output = output))
-            elif isinstance(expect, re._pattern_type):
+            elif isinstance(expect, typing.Pattern):
                 if not expect.search(output):
-                    raise tcfl.tc.failed_e(
+                    raise failed_e(
                         "can't find '%s' in output" % expect.pattern,
                         dict(output = output))
             else:
-                raise tcfl.tc.blocked_e(
+                raise blocked_e(
                     "can't handle expect of type %s;"
                     " can do strings or compiled regex" % expect)
         self.report_info("command ran: " + command,
@@ -5082,7 +5085,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             if skip_duplicate:
                 return
             else:
-                raise tcfl.tc.blocked_e(
+                raise blocked_e(
                     "expectation '%s' already exists in testcase "
                     "global list" % exp.name)
         self._expectations_global.append(exp)
@@ -5501,7 +5504,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                 # args[-1] is always kwargs
                 parent_msgid = kwargs.pop('parent_msgid', None)
                 parent_tls = kwargs.pop('parent_tls', None)
-                with tcfl.msgid_c(parent = parent_msgid, l = 2) as msgid:
+                with msgid_c(parent = parent_msgid, l = 2) as msgid:
                     msgid._depth -= 1
                     self.__thread_init__(parent_tls)
                     result = fn(*args, **kwargs)
@@ -5611,11 +5614,11 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         if kwargs == None:
             kwargs = {}
 
-        thread_pool = tcfl.tc._multiprocessing_method_pool_c(processes = processes)
+        thread_pool = _multiprocessing_method_pool_c(processes = processes)
         for target_role in targets:
             target = self.target_group.targets[target_role]
-            kwargs['parent_tls'] = tcfl.tc._simple_namespace(self.tls.__dict__)
-            kwargs['parent_msgid'] = tcfl.msgid_c(l = 2)
+            kwargs['parent_tls'] = _simple_namespace(self.tls.__dict__)
+            kwargs['parent_msgid'] = msgid_c(l = 2)
             threads[target_role] = \
                 thread_pool.apply_async(function, (target, ) + args, kwargs, )
 
@@ -5753,7 +5756,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
         # FIXME: move to a multiple server model
         if len(rtbs) > 1:
-            raise tcfl.tc.blocked_e(
+            raise blocked_e(
                 "Targets span more than one server",
                 dict(
                     targets = [ target.fullid for target in pending ],
@@ -5784,7 +5787,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         if state != 'active':
             # FIXME: this need sto carry more data, we've lost a lot
             # on the way here
-            raise tcfl.tc.blocked_e("allocation failed, state %s" % state)
+            raise blocked_e("allocation failed, state %s" % state)
         self.report_info(
             "acquired %s" % allocid,
             dict(
@@ -6695,7 +6698,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                             bsp_model = ""
                         else:
                             bsp_model = _target.bsp_model
-                        _target.kw_set('tg_hash', tcfl.msgid_c.encode(
+                        _target.kw_set('tg_hash', msgid_c.encode(
                             self.ticket + _target.fullid + bsp_model, 4))
                         _target._ident = msgid_c.ident()
                     result += self._run_on_target_group(msgid)
@@ -6724,7 +6727,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         results = [ (type(self), result.summary()) ]
 
         # run the list of sub testcases and the post tcs added
-        for tc in self.subtc.values() + self._tcs_post:
+        for tc in list(self.subtc.values()) + self._tcs_post:
             # Well, this is quite a hack -- for reporting to work ok,
             # rebind each's target's testcase pointer to this
             # subtestcase.
@@ -7488,9 +7491,9 @@ class subtc_c(tc_c):
         assert isinstance(name, str)
         assert isinstance(tc_file_path, str)
         assert isinstance(origin, str)
-        assert isinstance(parent, tcfl.tc.tc_c)
+        assert isinstance(parent, tc_c)
 
-        tcfl.tc.tc_c.__init__(self, name, tc_file_path, origin)
+        tc_c.__init__(self, name, tc_file_path, origin)
         self.parent = parent
         self.result = None	# FIXME: already there?
         self.summary = None
@@ -7505,7 +7508,7 @@ class subtc_c(tc_c):
         :param tcfl.tc.result_c result: result to be reported
         :param str summary: one liner summary of the execution report
         """
-        assert isinstance(result, tcfl.tc.result_c)
+        assert isinstance(result, result_c)
         assert isinstance(summary, str)
         assert isinstance(output, str)
         self.result = result
@@ -7552,7 +7555,7 @@ def find(args):
             # find more
             tcd_find_in_path = getattr(tcd, "find_in_path", None)
             if tcd_find_in_path is not None and\
-               id(getattr(tcd_find_in_path, "im_func", tcd_find_in_path)) \
+               id(getattr(tcd_find_in_path, "__func__", tcd_find_in_path)) \
                != id(tc_c.find_in_path.__func__):
                 tcd.find_in_path(tcs, tc_path)
     if len(tcs) == 0:
@@ -7632,8 +7635,8 @@ def testcases_discover(tcs_filtered, args):
             # find more
             tcd_find_in_path = getattr(tcd, "find_in_path", None)
             if tcd_find_in_path is not None and\
-               id(getattr(tcd_find_in_path, "im_func", tcd_find_in_path)) \
-               != id(tc_c.find_in_path.im_func):
+               id(getattr(tcd_find_in_path, "__func__", tcd_find_in_path)) \
+               != id(tc_c.find_in_path.__func__):
                 result += tcd.find_in_path(tcs, tc_path, subcases_cmdline)
     if len(tcs) == 0:
         logger.error("WARNING! No testcases found")
@@ -7976,8 +7979,7 @@ def _run(args):
         tc_c._phases_skip["clean"].add('command line')
 
     with msgid_c(root = tc_c.runid, s = ""):
-        tc_global.report_info("version %s"
-                              % commonl.version_get(tcfl, "tcf"), dlevel = 3)
+        tc_global.report_info("version %s" % version, dlevel = 3)
 
         tcs_filtered = {}
         result = testcases_discover(tcs_filtered, args)

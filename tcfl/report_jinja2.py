@@ -63,6 +63,7 @@ import jinja2
 import jinja2.filters
 
 import commonl
+import tcfl
 from . import config
 from . import tc
 
@@ -292,8 +293,7 @@ class driver(tc.report_driver_c):
         # reassign the stream so we use the prefix printing
         # capabilities
         return commonl.io_tls_prefix_lines_c(
-            self.tls, f.detach(),
-            encoding = 'utf-8', errors = 'replace')
+            self.tls, f.detach())
 
     def _log_iterator(self, code):
         # Read the temporary log file

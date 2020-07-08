@@ -44,7 +44,6 @@ setattr(logging, "logd", logging.root.debug)
 setattr(logging, "logdl", logging.root.log)
 from logging import logc, loge, logx, logw, logi, logd, logdl
 
-
 def join_args_for_make_shell_command(args):
     """
     Given a list of arguments to a shell command, escape them to run
@@ -188,6 +187,7 @@ def _cookies(args):
 
 
 if __name__ == "__main__":
+    tcfl.version = commonl.version_get(tcfl, "tcf")
     arg_parser = argparse.ArgumentParser()
     commonl.cmdline_log_options(arg_parser)
     # FIXME: should be in cmdline_log_options() but it does not work :/
@@ -243,7 +243,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         '-V', '--version',
         action = 'version', default = argparse.SUPPRESS,
-        version = commonl.version_get(tcfl, "tcf"),
+        version = tcfl.version,
         help = "show program's version number and exit")
 
     arg_parser.add_argument(

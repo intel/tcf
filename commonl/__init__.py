@@ -1374,13 +1374,16 @@ def flat_keys_to_dict(d):
 class tls_prefix_c(object):
 
     def __init__(self, tls, prefix):
+        assert isinstance(tls, threading.local)
         assert isinstance(prefix, str)
         self.tls = tls
-        self.prefix = unicode(prefix)
+        # repr the prefix as bytes, so when we write there is no
+        # conversion needed
+        self.prefix = prefix.encode('utf-8')
         self.prefix_old = None
 
     def __enter__(self):
-        self.prefix_old = getattr(self.tls, "prefix_c", u"")
+        self.prefix_old = getattr(self.tls, "prefix_c", b"")
         self.tls.prefix_c = self.prefix_old + self.prefix
         return self
 
@@ -1517,7 +1520,7 @@ def data_dump_recursive_tls(d, tls, separator = u".", of = sys.stdout,
     elif isinstance(d, generator_factory_c) \
          or type(d).__name__ == "generator_factory_c":
         of.writelines(d.make_generator())
-    elif isinstance(d, file):
+    elif isinstance(d, io.IOBase):
         # not recommended, prefer generator_factory_c so it reopens the file
         d.seek(0, 0)
         of.writelines(d)
@@ -1527,7 +1530,7 @@ def data_dump_recursive_tls(d, tls, separator = u".", of = sys.stdout,
         of.write(mkutf8(d) + u"\n")
 
 
-class io_tls_prefix_lines_c(io.TextIOWrapper):
+class io_tls_prefix_lines_c(io.BufferedWriter):
     """
     Write lines to a stream with a prefix obtained from a thread local
     storage variable.
@@ -1574,7 +1577,7 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
     """
     def __init__(self, tls, *args, **kwargs):
         assert isinstance(tls, threading.local)
-        io.TextIOWrapper.__init__(self, *args, **kwargs)
+        io.BufferedWriter.__init__(self, *args, **kwargs)
         self.tls = tls
         self.data = u""
 
@@ -1587,16 +1590,16 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
         #   (unicode-escape encoded)
         # - newline (since the one in s was unicode-escaped)
         substr = s[offset:pos]
-        io.TextIOWrapper.write(self, prefix)
+        io.BufferedWriter.write(self, prefix)
         if self.data:
-            io.TextIOWrapper.write(
-                self, unicode(self.data.encode('unicode-escape')))
-            self.data = u""
-        io.TextIOWrapper.write(self, unicode(substr.encode('unicode-escape')))
-        io.TextIOWrapper.write(self, u"\n")
+            io.BufferedWriter.write(
+                self, self.data.encode('unicode-escape'))
+            self.data = ""
+        io.BufferedWriter.write(self, substr.encode('unicode-escape'))
+        io.BufferedWriter.write(self, "\n".encode('utf-8'))
         # flush after writing one line to avoid corruption from other
         # threads/processes printing to the same FD
-        io.TextIOWrapper.flush(self)
+        io.BufferedWriter.flush(self)
         return pos + 1
 
     def _write(self, s, prefix, acc_offset = 0):
@@ -1622,12 +1625,12 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
         """
         prefix = getattr(self.tls, "prefix_c", None)
         if prefix == None:
-            io.TextIOWrapper.write(
-                self, unicode(self.data.encode('unicode-escape')))
+            io.BufferedWriter.write(
+                self, self.data.encode('unicode-escape'))
         else:
             # flush whatever is accumulated
             self._write(u"", prefix)
-        io.TextIOWrapper.flush(self)
+        io.BufferedWriter.flush(self)
 
     def write(self, s):
         """
@@ -1636,7 +1639,7 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
         """
         prefix = getattr(self.tls, "prefix_c", None)
         if prefix == None:
-            io.TextIOWrapper.write(self, s)
+            io.BufferedWriter.write(self, s)
             return
         self._write(s, prefix, 0)
 
@@ -1647,7 +1650,7 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
         """
         prefix = getattr(self.tls, "prefix_c", None)
         if prefix == None:
-            io.TextIOWrapper.writelines(self, itr)
+            io.BufferedWriter.writelines(self, itr)
             return
         offset = 0
         for data in itr:
@@ -1655,22 +1658,13 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
 
 def mkutf8(s):
     #
-    # We need a generic 'just write this and heck with encodings', but
-    # we don't know how the data is coming to us.
+    # Python2 left over FIXME: see all the call sites and fix them
     #
-    # If already unicode, pass it through; if str, assume is UTF-8 and
-    # try to safely decode it it to UTF-8. If anything else, rep() it into unicode.
-    #
-    # I am still so confused by Python's string / unicode / encoding /
-    # decoding rules
-    #
-    if isinstance(s, unicode):
+    if isinstance(s, str):
         return s
-    elif isinstance(s, str):
-        return s.decode('utf-8', errors = 'replace')
     else:
         # represent it in unicode, however the object says
-        return unicode(s)
+        return str(s)
 
 class generator_factory_c(object):
     """

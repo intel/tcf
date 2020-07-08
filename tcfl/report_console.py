@@ -142,8 +142,7 @@ class driver(tc.report_driver_c):
         consolef = io.open("/dev/stdout", "w",
                            encoding = 'utf-8', errors = 'replace')
         self.consolef = commonl.io_tls_prefix_lines_c(
-            self.tls, consolef.detach(),
-            encoding = 'utf-8', errors = 'replace')
+            self.tls, consolef.detach())
         self.verbosity = verbosity
         self.verbosity_logf = verbosity_logf
 

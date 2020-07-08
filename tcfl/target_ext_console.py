@@ -84,6 +84,7 @@ import threading
 import time
 import traceback
 import tty
+import typing
 
 import requests
 
@@ -122,7 +123,7 @@ class expect_text_on_console_c(tc.expectation_c):
                  target = None,
                  detect_context = ""):
         assert isinstance(target, tc.target_c)	# mandatory
-        assert isinstance(text_or_regex, (str, re._pattern_type))
+        assert isinstance(text_or_regex, (bytes, str, typing.Pattern))
         assert console == None or isinstance(console, str)
         assert timeout == None or timeout >= 0
         assert poll_period > 0
@@ -133,8 +134,18 @@ class expect_text_on_console_c(tc.expectation_c):
         assert name == None or isinstance(name, str)
 
         if isinstance(text_or_regex, str):
+            # we do out work in bytes, since we don't really know what
+            # we get the consoles
+            text_or_regex = text_or_regex.encode('utf-8')
             self.regex = re.compile(re.escape(text_or_regex), re.MULTILINE)
-        elif isinstance(text_or_regex, re._pattern_type):
+        elif isinstance(text_or_regex, bytes):
+            self.regex = re.compile(re.escape(text_or_regex), re.MULTILINE)
+        elif isinstance(text_or_regex, typing.Pattern):
+            if isinstance(text_or_regex.pattern, str):
+                # see above for isinstance(, str) on why we do this
+                pattern = text_or_regex.pattern.encode(	# convert to bytes
+                    'utf-8', errors = 'surrogatencode')
+                text_or_regex = re.compile(pattern, text_or_regex.flags)
             self.regex = text_or_regex
         else:
             raise AssertionError(
@@ -145,7 +156,10 @@ class expect_text_on_console_c(tc.expectation_c):
         else:
             # this might get hairy when a regex is just regex that all
             # gets escaped out (looking like _______________). oh well
-            self.name = commonl.name_make_safe(self.regex.pattern)
+            try:
+                self.name = commonl.name_make_safe(self.regex.pattern.decode())
+            except AttributeError as e:
+                raise
 
         self._console = console
         self.previous_max = previous_max
@@ -196,7 +210,9 @@ class expect_text_on_console_c(tc.expectation_c):
         testcase.collateral.add(filename)
         # rename any existing file, we are starting from scratch
         commonl.rm_f(filename)
-        of = open(filename, "a+", 0)
+        # for opening we open in binary mode, since we read from
+        # interfaces that are bytes
+        of = open(filename, "ba+")
         # Initialize the offset
         # how much do we care on previous history? no good way to
         # tell, so we set a sensible default we can alter
@@ -730,7 +746,8 @@ class extension(tc.target_extension_c):
                     while True:
                         try:
                             # we want to write verbatim, no encodings
-                            fd.buffer.write(chunk)
+                            # console is bytes, chunk is bytes
+                            fd.write(chunk)
                             break
                         except IOError as e:
                             # for those files opened in O_NONBLOCK
@@ -1013,8 +1030,8 @@ class extension(tc.target_extension_c):
                     offset += len(line)
                     if offset_to > 0 and offset >= offset_to:
                         # read only until the final offset, more or less
-                        if not line.endswith("\n"):
-                            yield u"\n"
+                        if not line.endswith(b"\n"):
+                            yield b"\n"
                         break
         except IOError as e:
             if e.errno != errno.ENOENT:
