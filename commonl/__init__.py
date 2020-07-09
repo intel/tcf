@@ -263,6 +263,7 @@ def mkid(something, l = 10):
     h = hashlib.sha512(something)
     return base64.b32encode(h.digest())[:l].lower()
 
+
 def trim_trailing(s, trailer):
     """
     Trim *trailer* from the end of *s* (if present) and return it.
@@ -451,13 +452,13 @@ def makedirs_p(dirname, mode = None, reason = None):
         # threads and processes.
         if mode:
             os.chmod(dirname, mode)
-    except OSError:
+    except OSError as e:
         if not os.path.isdir(dirname):
-            raise RuntimeError("%s: path for %s is not a directory"
-                               % (dirname, reason))
+            raise RuntimeError("%s: path for %s is not a directory: %s"
+                               % (dirname, reason, e))
         if not os.access(dirname, os.W_OK):
-            raise RuntimeError("%s: path for %s does not allow writes"
-                               % (dirname, reason))
+            raise RuntimeError("%s: path for %s does not allow writes: %s"
+                               % (dirname, reason, e))
 
 def symlink_f(source, dest):
     """
