@@ -149,20 +149,19 @@ running locally on your machine:
    - pure PIP2 dependencies::
 
          $ pip2 install --user \
-            Flask              
-            Flask-Login        
-            Flask-Principal    
-            Jinja2             
-            Werkzeug           
-            keyring            
-            ply                
-            prctl              
-            pykwalify          
-            python-Levenshtein 
-            pyusb              
-            setuptools         
-            tornado            
-
+            Flask              \
+            Flask-Login        \
+            Flask-Principal    \
+            Jinja2             \
+            Werkzeug           \
+            keyring            \ 
+            ply                \
+            prctl              \
+            pykwalify          \
+            python-Levenshtein \
+            pyusb              \
+            setuptools         \
+            tornado
        
 1. Disable SELinux::
 
