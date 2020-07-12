@@ -5300,6 +5300,10 @@ class tc_c(reporter_c):
 
           >>> timeout = 4
 
+         if no timeout is given it is taken from a testcase specific
+         default stored int he thread specific variable
+         ``testcase.tls.expect_timeout`` (60s).
+
         :param str name: a name for this execution, used for reporting
           and generation of collateral; it defaults to a test-specific
           monotonically increasing number shared amongst all the
@@ -5317,6 +5321,11 @@ class tc_c(reporter_c):
           or something as:
 
           >>> "somefilename:43"
+
+        If no expectations are given, then this just waits the given
+        timeout. Likewise, if all the individual expectations are
+        given with *timeout = 0* (meaning if we don't get it, it is ok
+        too), this will wait the given timeout.
 
         """
         origin = exps_kws.pop('origin', None)
@@ -5370,6 +5379,8 @@ class tc_c(reporter_c):
         # read in all the expectations without name from *exps_args, the
         # ones with names in **exps_kws
         for exp in exps_args:
+            assert isinstance(exp, expectation_c), \
+                "%s: expected type expectation_c, got %s" % (exp, type(exp))
             if exp.origin == None:
                 exp.origin = origin
             self._expect_append(run_name, expectations_required, exps,
@@ -5378,6 +5389,8 @@ class tc_c(reporter_c):
         # kws is at this point just a named list of expectations and
         # their implementation
         for exp_name, exp in exps_kws.iteritems():
+            assert isinstance(exp, expectation_c), \
+                "%s: expected type expectation_c, got %s" % (exp_name, type(exp))
             if exp.origin == None:
                 exp.origin = origin
             self._expect_append(run_name, expectations_required, exps,
@@ -5390,10 +5403,17 @@ class tc_c(reporter_c):
         time_ts = time_ts0
         time_out = time_ts0 + timeout
         detect_ts = dict()
-        min_poll_period = min(poll_period.values())
+        if poll_period:
+            min_poll_period = min(poll_period.values())
+        else:
+            min_poll_period = 0.25	# yeah, in case we get an empty list
         self.report_info('%s: poll_period %.2f, timeout %.2f'
                          % (run_name, min_poll_period, timeout), dlevel = 5)
         try:
+            # if we have no expectations or the ones we have have
+            # timeout == 0, then we want to make sure the outer
+            # timeout rules
+            expectations_present = len(expectations_required)
             while time_ts <= time_out:
                 # iterate over this copy, we'll remove from the original,
                 # so next iteration doesn't take the original; respect
@@ -5516,7 +5536,7 @@ class tc_c(reporter_c):
                             dlevel = 3)
 
                 # if all the required expectations are done, get out!
-                if not expectations_required:
+                if expectations_present and not expectations_required:
                     break
                 time.sleep(min_poll_period)
                 time_ts += min_poll_period
