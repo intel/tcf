@@ -70,3 +70,5 @@ attr
 libselinux-utils
 # to ask the BIOS for settings and such when discovering HW
 dmidecode
+lshw
+bluez

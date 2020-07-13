@@ -5,7 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 import logging
+import pprint
 import os
+import re
 import struct
 
 import serial
@@ -91,14 +93,40 @@ class rly08b(object):
         ports = serial.tools.list_ports.comports()
         port = None
         for port in ports:
-            if port.vid == 0x04d8 and port.pid == 0xffee \
-               and port.serial_number == self.serial_number:
+            if not hasattr(port, "vid"):
+                # old library compat, list looks like:
+                # [
+                #     ('/dev/ttyACM2', 'ttyACM2', 'USB VID:PID=2341:0042 SNR=95730333937351308131'),
+                #     ('/dev/ttyACM0', 'ttyACM0', 'USB VID:PID=2341:0042 SNR=957303339373517172D1'),
+                #     ('/dev/ttyACM1', 'ttyACM1', 'USB VID:PID=04d8:ffee SNR=00026189')
+                # ]
+                device = port[0]
+                tty = port[1]
+                extra = port[2]
+                r = re.compile(
+                    "USB VID:PID=(?P<vid>[0-9a-fA-F]+):(?P<pid>[0-9a-fA-F]+)"
+                    " SNR=(?P<snr>.*)$")
+                m = r.match(extra)
+                if not m:
+                    continue
+                d = m.groupdict()
+                vid = int(d['vid'], 16)
+                pid = int(d['pid'], 16)
+                serial_number = d['snr']                    
+            else:
+                device = port.device
+                vid = port.vid
+                pid = port.pid
+                serial_number = port.serial_number
+            
+            if vid == 0x04d8 and pid == 0xffee \
+               and serial_number == self.serial_number:
                 break
         else:
             raise self.not_found_e("Cannot find USB-RLY8B with serial %s"
                                    % self.serial_number)
 
-        with serial.Serial(port.device, baudrate = 9600,
+        with serial.Serial(device, baudrate = 9600,
                            bytesize = serial.EIGHTBITS,
                            parity = serial.PARITY_NONE,
                            stopbits = serial.STOPBITS_ONE,
@@ -136,11 +164,13 @@ class pc(rly08b, ttbl.power.impl_c):
     """
     Power control implementation that uses a relay to close/open a
     circuit on on/off
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, serial_number, relay):
+    def __init__(self, serial_number, relay, **kwargs):
         self.relay = relay
         rly08b.__init__(self, serial_number)
-        ttbl.power.impl_c.__init__(self)
+        ttbl.power.impl_c.__init__(self, **kwargs)
 
     def on(self, target, _component):
         cmd = 0x64 + self.relay

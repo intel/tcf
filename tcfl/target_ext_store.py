@@ -11,6 +11,7 @@ Copy files from and to the server's user storage area
 """
 
 import contextlib
+import hashlib
 import io
 
 import pprint
@@ -53,13 +54,25 @@ class extension(tc.target_extension_c):
 
     """
 
-    def upload(self, remote, local):
+    def upload(self, remote, local, force = False):
         """
         Upload a local file to the store
 
         :param str remote: name in the server
         :param str local: local file name
+
+        :param bool force: (default *False*) if the file already
+          exists and has the same digest, do not re-upload it.
         """
+        fl = self.list([ remote ])
+        if force == False and remote in fl:
+            remote_hash = fl[remote]
+            h = hashlib.sha256()
+            commonl.hash_file(h, local)
+            if remote_hash == h.hexdigest():
+                # remote hash is the same, no need to upload
+                return
+
         with io.open(local, "rb") as inf:
             self.target.ttbd_iface_call("store", "file", method = "POST",
                                         file_path = remote,
@@ -95,11 +108,13 @@ class extension(tc.target_extension_c):
                                     file_path = remote)
 
 
-    def list(self):
+    def list(self, filenames = None):
         """
         List available files and their MD5 sums
         """
-        r = self.target.ttbd_iface_call("store", "list", method = "GET")
+        commonl.assert_none_or_list_of_strings(filenames, "filenames", "filename")
+        r = self.target.ttbd_iface_call("store", "list",
+                                        filenames = filenames, method = "GET")
         return r['result']
 
 

@@ -26,6 +26,7 @@ Examples:
 
 """
 
+import errno
 import hashlib
 import os
 import re
@@ -55,19 +56,32 @@ class interface(ttbl.tt_interface):
         file_path_final = os.path.join(user_path, file_path_normalized)
         return file_path_final
 
-    @staticmethod
-    def get_list(_target, _who, _args, _files, user_path):
+    def get_list(self, _target, _who, args, _files, user_path):
+        filenames = self.arg_get(args, 'filenames', list,
+                                 allow_missing = True, default = [ ])
         file_data = {}
-        for path, _dirnames, filenames in os.walk(user_path):
-            for filename in filenames:
-                file_path = path + "/" + filename
+        def _list_filename(filename):
+            file_path = os.path.join(user_path, filename)
+            try:
                 h = hashlib.sha256()
                 commonl.hash_file(h, file_path)
                 file_data[file_path[len(user_path) + 1:]] = h.hexdigest()
+            except IOError as e:
+                if e.errno != errno.ENOENT:
+                    raise
+                # the file does not exist, ignore it
+        if filenames:
+            for filename in filenames:
+                if isinstance(filename, basestring):
+                    _list_filename(filename)
+        else:
+            for _path, _dirnames, filenames in os.walk(user_path):
+                for filename in filenames:
+                    _list_filename(filename)
         return dict(result = file_data)
 
     def post_file(self, target, _who, args, files, user_path):
-        file_path = self._arg_get(args, 'file_path')
+        file_path = self.arg_get(args, 'file_path', basestring)
         file_object = files['file']
         file_path_final = self._validate_file_path(file_path, user_path)
         commonl.makedirs_p(user_path)
@@ -76,7 +90,7 @@ class interface(ttbl.tt_interface):
         return dict()
 
     def get_file(self, _target, _who, args, _files, user_path):
-        file_path = self._arg_get(args, 'file_path')
+        file_path = self.arg_get(args, 'file_path', basestring)
         file_path_final = self._validate_file_path(file_path, user_path)
         # interface core has file streaming support builtin
         # already, it will take care of streaming the file to the
@@ -84,7 +98,7 @@ class interface(ttbl.tt_interface):
         return dict(stream_file = file_path_final)
 
     def delete_file(self, _target, _who, args, _files, user_path):
-        file_path = self._arg_get(args, 'file_path')
+        file_path = self.arg_get(args, 'file_path', basestring)
         file_path_final = self._validate_file_path(file_path, user_path)
         commonl.rm_f(file_path_final)
         return dict()

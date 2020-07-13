@@ -59,7 +59,9 @@ machines any time for any reason from the command line.
 
 import os
 import re
+import string
 
+import commonl
 import tcfl.tc
 import tcfl.tl
 import tcfl.pos
@@ -73,7 +75,50 @@ class _test(tcfl.tc.tc_c):
     image_requested = None
     image = "not deployed"
 
-    def deploy(self, ic, target):
+    # format for specifying images to flash is IMAGE:NAME[ IMAGE:NAME[..]]]
+    _image_flash_regex = re.compile(r"\S+:\S+( \S+:\S+)*")
+
+    @tcfl.tc.serially()			# otherwise it runs out of order
+    def deploy_10_flash(self, target):
+        """
+        Flash anything specified in IMAGE_FLASH* environment variables
+        """
+        # this also in tcfl/pos.tc_pos0_base.deploy_10-flash
+        target_id_safe = commonl.name_make_safe(
+            target.id, string.ascii_letters + string.digits)
+        target_fullid_safe = commonl.name_make_safe(
+            target.fullid, string.ascii_letters + string.digits)
+        target_type_safe = commonl.name_make_safe(
+            target.type, string.ascii_letters + string.digits)
+
+        source = None	# keep pylint happy
+        for source in [
+                "IMAGE_FLASH_%s" % target_type_safe,
+                "IMAGE_FLASH_%s" % target_fullid_safe,
+                "IMAGE_FLASH_%s" % target_id_safe,
+                "IMAGE_FLASH",
+            ]:
+            flash_image_s = os.environ.get(source, None)
+            if flash_image_s:
+                break
+        else:
+            self.report_info(
+                "skipping image flashing (no environment IMAGE_FLASH*)")
+            return
+
+        if not self._image_flash_regex.search(flash_image_s):
+            raise tcfl.tc.blocked_e(
+                "image specification in %s does not conform to the form"
+                " IMAGE:NAME[ IMAGE:NAME[..]]]" % source)
+        flash_images = {}
+        for entry in flash_image_s.split(" "):
+            name, value = entry.split(":", 1)
+            flash_images[name] = value
+        target.report_info("uploading flash images to remoting server")
+        target.images.flash(flash_images, upload = True)
+
+    def deploy_50_os(self, ic, target):
+
         if self.image_requested == None:
             if not 'IMAGE' in os.environ:
                 raise tcfl.tc.blocked_e(

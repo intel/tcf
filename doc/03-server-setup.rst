@@ -748,6 +748,33 @@ Once a target is configured in, run a quick healthcheck::
       place links to configuration of network infrastructure (switches
       and interfaces)
 
+
+      
+.. _pos_setup:
+
+Configuring support information
+-------------------------------
+
+The server exports a target called *local* (disabled by default) that
+is used to export information about the server; two important fields
+in there are the owner and information to request login, to direct
+users to the right place.
+
+In any :ref:`server configuration file <ttbd_configuration>` named
+*conf_NN_ANYTHING.py* (with NN sorting higher than 06, where we define
+default targets) add:
+
+>>> server = ttbl.test_target.get('local')
+>>> server.tags_update(dict(
+>>> support = dict(
+>>>        owner = "some person/list <automation.admins@some.place.com>",
+>>>        auth_help = "request access at http://automation.place.com/request-access"
+>>>    ))
+>>> )
+
+when the user tries to login and they fail, they are presented this
+information so they know where to go for help.
+
 .. _pos_setup:
 
 Configuring Provisioning OS support
@@ -831,7 +858,7 @@ been tested yet, shall be similar.
      # firewall-cmd --permanent \
         --add-service=dhcp \
         --add-service=dhcpv6 \
-        --add-services=dns \
+        --add-service=dns \
         --add-service=http \
         --add-service=https \
         --add-service=mountd \
@@ -858,17 +885,10 @@ been tested yet, shall be similar.
 
 5. Enable required services:
 
-   - Apache: to serve the POS Linux kernel and initrd::
-
-       # tee /etc/httpd/conf.d/ttbd.conf <<EOF
-       Alias "/ttbd-pos" "/home/ttbd/public_html"
-
-       <Directory "/home/ttbd/public_html">
-       AllowOverride FileInfo AuthConfig Limit Indexes
-       Options MultiViews Indexes SymLinksIfOwnerMatch IncludesNoExec
-       Require method GET POST OPTIONS
-       </Directory>
-       EOF
+   - Apache: to serve the POS Linux kernel/initrd and bootloaders that
+     might be serve over HTTP (eg using UEFI HTTP boot to bring in
+     iPXE) the installation will install Apache configuration file
+     */etc/httpd/conf.d/ttbd.conf*.
 
      SELinux requires setting a few more things to enable serving from
      home directories::
@@ -889,16 +909,13 @@ been tested yet, shall be similar.
      from any other browser try to access
      http://YOURSERVERNAME/ttbd-pos/testfile and check it succeeds.
 
-     FIXME: move ttbd.conf file as a config file in package
-     ``ttbd-pos``.
-
    - NFS server: provides the POS root filesystem.
 
-     Ensure UDP support is enabled (not for RHEL >= 7.6)::
+     Ensure UDP support is enabled (not for RHEL >= 7.6 or CentOS 7)::
 
        # sed -i 's|RPCNFSDARGS="|RPCNFSDARGS="--udp |' /etc/sysconfig/nfs
-       # systemctl enable nfs-server
-       # systemctl restart nfs-server
+       # systemctl enable --now nfs-server
+
 
 POS: deploy PXE boot image to HTTP and NFS server locations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -972,7 +989,7 @@ c. Make the kernel and initrd for POS available via Apache for
 
    i. Copy the kernel::
 
-        # ln /home/ttbd/images/tcf-live/x86_64/boot/vmlinuz-* \
+        # cp /home/ttbd/images/tcf-live/x86_64/boot/vmlinuz-* \
             /home/ttbd/public_html/x86_64/vmlinuz-tcf-live
 
    ii. Regenerate the *initrd* with nfs-root support, as the initrd
@@ -1013,18 +1030,35 @@ c. Make the kernel and initrd for POS available via Apache for
          # install -m 0644 -o ttbd -g ttbd /home/ttbd/public_html/x86_64/* \
               /var/lib/tftpboot/ttbd-production/efi-x86_64
 
-       This allows targets to get the boot kernel/initrd over TFTP.
+       This allows targets to get the boot kernel/initrd over
+       TFTP. Let's do the same for iPXE for HTTP boot::
+
+         # install -o ttbd -g ttbd /usr/share/ipxe/ipxe-x86_64.efi \
+              /home/ttbd/public_html/x86_64/
+
+       CentOS 7::
+
+         # install -o ttbd -g ttbd /usr/share/ipxe/ipxe.efi \
+              /home/ttbd/public_html/x86_64/ipxe-x86_64.efi
+
+       Note the name changes; as well, there is no need to copy it to
+       the TFTP directory as new code paths do it for us.
+
 
    Ensure those two files work by pointing a browser to
    http://YOURSERVERNAME/ttbd-pos/ and verifying they can be downloaded.
 
-d. Make the POS root image available over NFS as read-only (note we
-   only export those images only, not all)::
+d. Make the POS root image available over NFS as read-only; verify
+   file ``/etc/exports.d/ttbd-pos.exports`` has been installed. This
+   tells the NFS subsystem to export the POS images for the different
+   architectures.
+
+   Manually, it can be created with::
 
      # tee /etc/exports.d/ttbd-pos.exports <<EOF
      /home/ttbd/images/tcf-live/x86_64 *(ro,no_root_squash)
      EOF
-     # systemctl reload nfs-server	# use 'nfs' for RHEL / CentOS
+     # systemctl reload nfs-server		# use 'nfs' for RHEL
 
      
    Verify the directory is exported::
@@ -1061,9 +1095,8 @@ e. Perform final image setup:
 
 f. Deploy content to the server that test content can / will use::
 
-     $ mkdir -p /home/ttbd/images/tcf-live/misc
-
-     $ cp /usr/share/tcf/content/evemu.bin.tar.gz /home/ttbd/images/tcf-live/misc
+     $ install -m 0775 -d /home/ttbd/images/misc
+     $ cp /usr/share/tcf/content/evemu.bin.*.tar.gz /home/ttbd/images/misc
      
 .. _ttbd_pos_deploying_images:
 

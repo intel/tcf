@@ -1506,46 +1506,59 @@ class target_c(reporter_c):
         return r
 
 
-    def console_tx(self, data, console = None):
-        """
-        Transmits the data over the given console
+    def console_tx(self, data, console = None, detect_context = ""):
+        """Transmits the data over the given console doing a
+        synchronization point with the expect sequences engine.
+
+        This function does not append a newline not translates newline
+        characters, see :meth:send for that.
+
+        Synchronization point with the expect sequences engine means
+        that after calling this function to send anything to a
+        console, :meth:`target.expect <tcfl.tc.target_c.expect>` or
+        :meth:`testcase.expect <tcfl.tc.tc_c.expect>` can be used to
+        expect only anything received after sending:
+
+        >>> target.console_tx("echo hello1")
+        >>> target.console_tx("echo hello2")
+        >>> target.console_tx("echo hello3")
+        >>> target.expect("hello")		# will match only hello3
+
+        but then:
+
+        >>> target.console_tx("echo hello1")
+        >>> target.console_tx("echo hello2")
+        >>> target.console_tx("echo hello3")
+        >>> target.expect("hello1")		# will not match
 
         :param data: data to be sent; data can be anything that can be
            transformed into a sequence of bytes
+
         :param str console: (optional) name of console over which to
            send the data (otherwise use the default one).
 
+        :param str detect_context: (optional) the detection context is
+          a string which is used to help identify how to keep track of
+          where we are looking for things (detecting) in a console's
+          output. Further info :ref:`here
+          <console_expectation_detect_context>`
+
         Note this function is equivalent to
         :meth:`target.console.write
-        <tcfl.target_ext_console.console.write>`, which is the raw
+        <tcfl.target_ext_console.extension.write>`, which is the raw
         version of this function.
 
-        See :meth:`send` for a version that works with the expect sequence
-
+        See :meth:`send` for a version that also translates newline
+        conventions and appends a newline
         """
         # the console member is only present if the member extension has
         # been loaded for the target (determined at runtime), hence
         # pylint gets confused
+        self.console.send_expect_sync(console, detect_context)
         self.console.write(data, console)	# pylint: disable = no-member
 
-    _crlf = '\n'
-
-    @property
-    def crlf(self):
-        """
-        What will :meth:`target_c.send` use for CR/LF when sending data
-        to the target's consoles. Defaults to ``\\r\\n``, but it can be
-        set to any string, even ``""`` for an empty string.
-        """
-        return self._crlf
-
-    @crlf.setter
-    def crlf(self, __crlf):
-        assert isinstance(__crlf, str)
-        self._crlf = __crlf
-        return self._crlf
-
-    def send(self, data, console = None, crlf = None, detect_context = ""):
+    def send(self, data, crlf = None, crlf_replace = "\n",
+             console = None, detect_context = ""):
         """Like :py:meth:`console_tx`, transmits the string of data
         over the given console.
 
@@ -1556,31 +1569,56 @@ class target_c(reporter_c):
         received after we called this function (so we'll expect to see
         even the sending of the command).
 
-        :param str data: string of data to send
-        :param str console: (optional) name of console over which to
-           send the data (otherwise use the default one).
-        :param str ctlf: (optional) CRLF technique to use, or what to
-          append to the string as a CRLF:
+        Arguments are the same as :meth:`console_tx` plus:
 
-          - None: use whatever is in :attr:`target_c.crlf`
+        :param str crlf: (optional) CRLF end-of-line convention to
+          use:
+
+          - *None*: [**default**] use whatever is in or
+            :attr:`target.console.crlf
+            <tcfl.target_ext_console.extension.crlf>` for the current
+            console; if it all resolves to *None*, no replacement will
+            be done.
+
+          - ``""``: (empty string) do not append anything
+
           - ``\\r``: use carriage return
+
           - ``\\r\\n``: use carriage return and line feed
+
           - ``\\n``: use line feed
+
           - ``ANYSTRING``: append *ANYSTRING*
 
+        :param str crlf_replace: (optional; default *\\n*)
+          string/character that denotes and end of line convention to
+          replace with *crlf*
 
-        :param str detect_context: (optional) the detection context is
-          a string which is used to help identify how to keep track of
-          where we are looking for things (detecting) in a console's
-          output. Further info :ref:`here
-          <console_expectation_detect_context>`
         """
         assert isinstance(data, str)
         if crlf == None:
-            crlf = self._crlf
-        self.console.send_expect_sync(console, detect_context)
-        self.console.write(str(data) + crlf, console)
+            if console == None:
+                console = self.console.default
+            # note that target_ext_console.extension.__init__ might
+            # have initialized this from server info
+            crlf = self.console.crlf.get(console, None)
 
+        # FIXME: all this is very inneficient--python3 has better
+        # facilities for it
+        def _chunk_crlf(chunk, crlf):
+            # convert \n to @crlf
+            _chars = ""
+            for char in chunk:
+                if char == crlf_replace:
+                    _chars += crlf
+                else:
+                    _chars += char
+            return _chars
+        self.console.send_expect_sync(console, detect_context)
+        if crlf:
+            self.console.write(_chunk_crlf(data, crlf) + crlf, console)
+        else:
+            self.console.write(data, console)
 
     def on_console_rx(self, regex_or_str, timeout = None, console = None,
                       result = "pass"):
@@ -1591,9 +1629,9 @@ class target_c(reporter_c):
         Note this does not wait for said string; you need to run the
         testcase's *expecter* loop with::
 
-        >>>  self.tls.expecter.run()
+        >>> self.expect()
 
-        Als well, those actions will be performed when running
+        As well, those actions will be performed when running
         :meth:`expect` or :meth:`wait` for blocking versions.
 
         This allows you to specify many different things you are
@@ -1625,7 +1663,7 @@ class target_c(reporter_c):
           actions are added indicating they are expected to pass, the
           seven of them must have raised a pass exception (or
           indicated passage somehow) before the loop will consider it
-          a full pass. See :py:meth:`tcfl.expecter.expecter_c.run`.
+          a full pass. See :py:meth:`tcfl.tc.tc_c.expect`.
 
         :raises: :py:exc:`tcfl.tc.pass_e`,
           :py:exc:`tcfl.tc.blocked_e`, :py:exc:`tcfl.tc.failed_e`,
@@ -1694,7 +1732,8 @@ class target_c(reporter_c):
 
     def expect(self, regex_or_str, timeout = None, console = None,
                name = None, raise_on_timeout = failed_e,
-               origin = None, detect_context = ""):
+               previous_max = 4096,
+               origin = None, detect_context = "", report = None):
         """
         Wait for a particular regex/string to be received on a given
         console of this target before a given timeout.
@@ -1745,8 +1784,9 @@ class target_c(reporter_c):
                 regex_or_str,
                 console = console, timeout = timeout, name = name,
                 raise_on_timeout = raise_on_timeout,
-                detect_context = detect_context),
-            origin = origin,
+                previous_max = previous_max,
+                detect_context = detect_context, report = report),
+            origin = origin, timeout = timeout,
         )
 
     def stub_app_add(self, bsp, _app, app_src, app_src_options = ""):
@@ -1871,14 +1911,32 @@ class target_c(reporter_c):
         assert method.upper() in ( "PUT", "GET", "DELETE", "POST" ), \
             "method must be PUT|GET|DELETE|POST; got %s" % method
 
+        if self.rtb.server_json_capable:
+            all_json = True
+        else:
+            all_json = False
+
         for k, v in kwargs.items():
-            if isinstance(v, str):
-                continue
-            if isinstance(v, (collections.Sequence, collections.Mapping)):
+            if all_json:
+                # We need None  passed verbatim so it is not really
+                # passed, so we don't encode it as JSON here--this needs
+                # some cleanup, is quite confusing, to be fair.
+                if v == None: # or isinstance(v, basestring):
+                    continue
                 kwargs[k] = json.dumps(v)
+            else:
+                if isinstance(v, str):
+                    continue
+                if isinstance(v, (collections.Sequence, collections.Mapping)):
+                    kwargs[k] = json.dumps(v)
+
         if component:
-            kwargs['component'] = component
-        if self.ticket:
+            if all_json == True:
+                kwargs['component'] = json.dumps(component)
+            else:
+                kwargs['component'] = component
+
+        if self.ticket:		# almost deprecated
             kwargs['ticket'] = self.ticket
         try:
             return self.rtb.send_request(
@@ -2399,6 +2457,18 @@ class result_c():
                     return r
             # Some exceptions that are common and we know about, so we
             # can print some more info that will be helpful
+            except AssertionError as e:
+                if isinstance(e.args, tuple) and len(e.args) > 0 \
+                   and len(e.args[0]) == 2:
+                    # if you raise AssertionError and the second
+                    # expression is a tupple (str, dict), we convert
+                    # that to a blocke_d(str, attachments = dict)
+                    if isinstance(e.args[0][1], dict):
+                        newe = tcfl.tc.blocked_e(e.args[0][0], e.args[0][1])
+                        return result_c.report_from_exception(_tc, newe)
+                # not something we recognize we can easily convert to
+                # blocked_e, so just pass it along
+                raise
             except subprocess.CalledProcessError as e:
                 return result_c.from_exception_cpe(_tc, e)
             except OSError as e:
@@ -2894,8 +2964,7 @@ def interconnect(spec = None, name = None, **kwargs):
     return decorate_class
 
 class expectation_c(object):
-    '''
-    Expectations are something we expect to find in the data polled
+    '''Expectations are something we expect to find in the data polled
     from a source.
 
     An object implementing this interface can be given to
@@ -2914,8 +2983,10 @@ class expectation_c(object):
     an error), or if not found, timeout exceptions can be raised.
 
     See :meth:`tcfl.tc.tc_c.expect` for more details and
-    :class:`tcfl.target_ext_console.expect_text_on_console_c` and
-    :class:`tcfl.target_ext_capture._expect_image_on_screenshot_c` for
+    :class:`target.console.text
+    <tcfl.target_ext_console.expect_text_on_console_c>` and
+    :class:`target.capture.image_on_screenshot
+    <tcfl.target_ext_capture.extension.image_on_screenshot>` for
     implementation examples.
 
     .. note:: the :meth:`poll` and :meth:`detect` methods will be
@@ -2948,13 +3019,17 @@ class expectation_c(object):
       such as *if I see this image in the screen, bail out*:
 
       >>> self.expect("wait for boot",
-      >>>             crash = image_on_screenshot(
-      >>>                 target, 'screen', 'icon-crash.png',
+      >>>             crash = target.capture.image_on_screenshot(
+      >>>                 'screen', 'icon-crash.png',
       >>>                 raise_on_found = tcfl.tc.error_e("Crash found"),
       >>>                 timeout = 0),
-      >>>             login_prompt = image_on_screenshot(
-      >>>                 target, 'screen', 'canary-login-prompt.png',
+      >>>             login_prompt = target.capture.image_on_screenshot(
+      >>>                 'screen', 'canary-login-prompt.png',
       >>>                 timeout = 4),
+      >>>             login_prompt_serial = target.console.text(
+      >>>                 "login: ",
+      >>>                 name = "login prompt",
+      >>>             ),
       >>> )
 
       Note you need to tell it also *zero* timeout, otherwise it will
@@ -3389,9 +3464,21 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     #: exports.
     reason = None
 
+    #: Priority to use to allocate targets when running testcases
+    priority = 500
+
+    #: Allocate targets with preemption rights
+    preempt = False
+
+    #: Allocate on behalf of another user
+    obo = None
+
     #: List of places where we declared this testcase is build only
     build_only = []
 
+    #: Force to use an specific allocid (already obtained)
+    allocid = None
+    
     def __init__(self, name, tc_file_path, origin):
         reporter_c.__init__(self)
         for hook_pre in self.hook_pre:
@@ -3402,6 +3489,41 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
         self.__init_shallow__(None)
         self.name = name
+
+        #: Keywords for *%(KEY)[sd]* substitution specific to this
+        #: testcase.
+        #:
+        #: Note these do not include values gathered from remote
+        #: targets (as they would collide with each other). Look at
+        #: data:`target.kws <tcfl.tc.target_c.kws>` for that.
+        #:
+        #: These can be used to generate strings based on information,
+        #: as:
+        #:
+        #:   >>>  print "Something %(FIELD)s" % target.kws
+        #:   >>>  target.shcmd_local("cp %(FIELD)s.config final.config")
+        #:
+        #: Fields available:
+        #:
+        #:   - `runid`: string specified by the user that applies to
+        #:     all the testcases
+        #:
+        #:   - `srcdir` and `srcdir_abs`: directory where this
+        #:     testcase was found
+        #:
+        #:   - `thisfile`: file where this testscase as found
+        #:
+        #:   - `tc_hash`: unique four letter ID assigned to this
+        #:     testcase instance. Note that this is the same for all
+        #:     the targets it runs on. A unique ID for each target of
+        #:     the same testcase instance is the field *tg_hash* in the
+        #:     target's keywords :data:`target.kws
+        #:     <tcfl.tc.target_c.kws>` (FIXME: generate, currently
+        #:     only done by app builders)
+        #:
+        #: (this will actually be fully initialzied in *__init_shallow__()*)
+        self.kws = {}
+
         self.kw_set('pid', str(os.getpid()))
         self.kw_set('tid', "%x" % threading.current_thread().ident)
         # use instead of getfqdn(), since it does a DNS lookup and can
@@ -3574,51 +3696,22 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         #: cases, they do not.
         self.do_acquire = True
 
+        #: Lock to access :attr:`buffers` safely from multiple threads
+        #: at the same time for the same testcase.
+        self.lock = None	# initialized by __init_shallow__()
+
 
     def __init_shallow__(self, other):
         # Called by clone() to initialize those things that are
         # different in shallow clones (instances that are almost
         # identical except for ... a few things)
 
-        #: Lock to access :attr:`buffers` safely from multiple threads
-        #: at the same time for the same testcase.
         self.lock = threading.Lock()
 
 	#: For use during execution of phases; testcase drivers can
         #: store anything they need during the execution of each phase.
         #: It will be, however, deleted when the phase is completed.
         self.buffers = {}
-        #: Keywords for *%(KEY)[sd]* substitution specific to this
-        #: testcase.
-        #:
-        #: Note these do not include values gathered from remote
-        #: targets (as they would collide with each other). Look at
-        #: data:`target.kws <tcfl.tc.target_c.kws>` for that.
-        #:
-        #: These can be used to generate strings based on information,
-        #: as:
-        #:
-        #:   >>>  print "Something %(FIELD)s" % target.kws
-        #:   >>>  target.shcmd_local("cp %(FIELD)s.config final.config")
-        #:
-        #: Fields available:
-        #:
-        #:   - `runid`: string specified by the user that applies to
-        #:     all the testcases
-        #:
-        #:   - `srcdir` and `srcdir_abs`: directory where this
-        #:     testcase was found
-        #:
-        #:   - `thisfile`: file where this testscase as found
-        #:
-        #:   - `tc_hash`: unique four letter ID assigned to this
-        #:     testcase instance. Note that this is the same for all
-        #:     the targets it runs on. A unique ID for each target of
-        #:     the same testcase instance is the field *tg_hash* in the
-        #:     target's keywords :data:`target.kws
-        #:     <tcfl.tc.target_c.kws>` (FIXME: generate, currently
-        #:     only done by app builders)
-        #:
         if other:
             self.kws = dict(other.kws)
         else:
@@ -3770,13 +3863,13 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     def run_local(self, command, expect = None, cwd = None):
         """
         Run a command on the local system with an interface similar to
-        :meth:`target.shell.run <tcfl.target_ext_shell.extension.run>`.
+        :meth:`target.shell.run <tcfl.target_ext_shell.shell.run>`.
 
         This is similar to :meth:`shcmd_local`.
 
         :param str command: command line to run (will be run a shell command)
 
-        :param str,typing.Pattern expect: (optional) if defined, a
+        :param str or re._pattern_type expect: (optional) if defined, a
           string or regular expression that shall be found in the output
           of the command, raising :exc:`tcfl.tc.failed_e` otherwise.
 
@@ -5171,13 +5264,14 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         message. If not found, nothing happens.
 
         The second will default to be called whatever the
-        :class:`image_on_screenshot` calls it (*icon-power.png*),
-        while the second will have it's name overriden to
-        *config_button*. These last two will capture an screenshot
-        from the target's screenshot capturer called *screen* and the
-        named icons need to be found for the call to be
-        succesful. Otherwise, error exceptions due to timeout will be
-        raised.
+        :class:`target.capture.image_on_screenshot
+        <tcfl.target_ext_capture.extension.image_on_screenshot>`
+        calls it (*icon-power.png*), while the second will have it's
+        name overriden to *config_button*. These last two will capture
+        an screenshot from the target's screenshot capturer called
+        *screen* and the named icons need to be found for the call to
+        be succesful. Otherwise, error exceptions due to timeout will
+        be raised.
 
         The list of expectations that will be always scanned is in
         this order:
@@ -5228,6 +5322,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
           or something as:
 
           >>> "somefilename:43"
+
         """
         origin = exps_kws.pop('origin', None)
         if origin == None:
@@ -5567,10 +5662,10 @@ class tc_c(reporter_c, metaclass=_tc_mc):
           The rest of the arguments will be the ones supplied with
           *args* and *kwargs*.
 
-        :param tuple args: (optional, default none) extra arguments to
+        :param args: (optional, default none) extra arguments to
           pass to each function call
 
-        :param tuple kwargs: (optional, default none) extra keyword
+        :param dict kwargs: (optional, default none) extra keyword
           arguments to pass to each function call
 
         :param list(str) targets: (optional, default all testcase's
@@ -5733,6 +5828,13 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     # FIXME: add phase "assign"
     @contextlib.contextmanager
     def _targets_assign(self):
+
+        # targets have been already assigned, there is an allocid that
+        # can be used
+        if self.allocid:
+            yield
+            return
+
         timeout = self.assign_timeout
         period = assign_period
 
@@ -5780,8 +5882,9 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         allocid, state, targetids = target_ext_alloc._alloc_targets(
             rtb,
             { "group": [ target.id for target in pending ] },
-            # FIXME: do we want to do OBO here? how?
-            obo = None,
+            obo = self.obo,
+            preempt = self.preempt,
+            priority = self.priority,
             queue_timeout = timeout,
             reason = self.reason % commonl.dict_missing_c(self.kws))
         if state != 'active':
@@ -7538,29 +7641,6 @@ class subtc_c(tc_c):
         pass
 
 
-def find(args):
-    """
-    Discover test cases in a list of paths
-    """
-    # discover test cases
-    tcs = {}
-    if len(args.testcase) == 0:
-        logger.warning("No testcases specified, searching in "
-                       "current directory, %s", os.getcwd())
-        args.testcase = [ '.' ]
-    for tc_path in args.testcase:
-        tc_c.find_in_path(tcs, tc_path)
-        for tcd in tc_c._tc_drivers:
-            # If a driver has a different find function, use it to
-            # find more
-            tcd_find_in_path = getattr(tcd, "find_in_path", None)
-            if tcd_find_in_path is not None and\
-               id(getattr(tcd_find_in_path, "__func__", tcd_find_in_path)) \
-               != id(tc_c.find_in_path.__func__):
-                tcd.find_in_path(tcs, tc_path)
-    if len(tcs) == 0:
-        logger.warning("No testcases found")
-
 #: Global testcase reporter
 #:
 #: Used to report top-level progress and messages beyond the actual
@@ -7920,7 +8000,11 @@ def _run(args):
     report_driver_c.add(report_file_impl)
 
     # Setup defaults in the base testcase class
+    tc_c.preempt = args.preempt
+    tc_c.priority = args.priority
     tc_c.reason = args.reason
+    tc_c.obo = args.obo
+
     global ticket
     if args.ticket == '':	# default for tcf run means generate a ticket
         ticket = None
@@ -7928,6 +8012,8 @@ def _run(args):
         ticket = ""
     else:
         ticket = args.ticket	# Or use this ticket
+    if args.allocid:			# Meaning I have them allocated ... 
+        tc_c.allocid = args.allocid	# ... use this allocid
     tc_c.release = args.release
     tc_c._dry_run = args.dry_run
     tc_c.eval_repeat = args.repeat_evaluation
@@ -8082,19 +8168,6 @@ def _run(args):
         return 0
 
 def argp_setup(arg_subparsers):
-    ap = arg_subparsers.add_parser("find",
-                                   help = "List testcases")
-    ap.add_argument(
-        "-v", dest = "verbosity", action = "count", default = 0,
-        help = "Increase information to display about the tests")
-    ap.add_argument("-t", "--target", metavar = "TARGET",
-                    help = "Test target on which to run the "
-                    "test cases--if none, if will be autodetermined")
-    ap.add_argument("testcase", metavar = "TEST-CASE",
-                    nargs = "*",
-                    help = "Test cases files or directories "
-                    "where to find test cases")
-    ap.set_defaults(func = find)
 
     ap = arg_subparsers.add_parser("run",
                                    help = "Run testcases")
@@ -8266,6 +8339,17 @@ def argp_setup(arg_subparsers):
         "testcase's hash ID; useful when multiple runs of the same "
         "cases and targets are going to be run with different external "
         "variations, such as different compiler or library versions")
+    ap.add_argument(
+        "-p", "--priority", action = "store", type = int, default = 500,
+        help = "Priority (0 highest, 999 lowest, %(default)s);"
+        " policy might restrict the highest priority")
+    ap.add_argument(
+        "-o", "--obo", action = "store", default = None,
+        help = "User to allocate on behalf of; policy might disallow")
+    ap.add_argument(
+        "--preempt", action = "store_true", default = False,
+        help = "Enable allocation preemption (disabled by default);"
+        " server policy might restrict if allowed or not.")
     ap.add_argument("testcase", metavar = "TEST-CASE",
                     nargs = "*",
                     help = "Files describing testcases")

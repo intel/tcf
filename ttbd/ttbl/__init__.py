@@ -19,6 +19,7 @@ import contextlib
 import errno
 import fcntl
 import fnmatch
+import glob
 import ipaddress
 import json
 import logging
@@ -179,7 +180,7 @@ class fsdb_c(object):
 
     def get_as_slist(self, *patterns):
         """
-        Return a sorted list of tuples *(KEY, VALUE)*s available in the
+        Return a sorted list of tuples *(KEY, VALUE)*\s available in the
         database.
 
         :param list(str) patterns: (optional) list of patterns of fields
@@ -194,7 +195,7 @@ class fsdb_c(object):
 
     def get_as_dict(self, *patterns):
         """
-        Return a dictionary of *KEY/VALUE*s available in the
+        Return a dictionary of *KEY/VALUE*\s available in the
         database.
 
         :param str pattern: (optional) pattern against the key names
@@ -411,7 +412,7 @@ class process_posix_file_lock_c(object):
     """
     Very simple interprocess file-based spinning lock
 
-    .. warnings::
+    .. warning::
 
        - Won't work between threads of a process
 
@@ -772,7 +773,7 @@ class tt_interface(object):
 
        - *stream_file*: (string) the named file will be streamed to the client
        - *stream_offset*: (positive integer) the file *steam_file*
-         *will be streamed starting at the given offset.
+         will be streamed starting at the given offset.
        - *stream-generation*: (positive monotonically increasing
          integer) a number that describes the current iteration of
          this file that might be reset [and thus bringing its apparent
@@ -979,6 +980,67 @@ class tt_interface(object):
             raise RuntimeError("missing '%s' argument" % name)
         return args[name]
 
+    @staticmethod
+    def arg_get(args, arg_name, arg_type,
+                allow_missing = False, default = None):
+        """Return the value of an argument passed to the call
+
+        Given the arguments passed with an HTTP request check if one
+        called ARG_NAME of type ARG_TYPE is present, return whatever
+        value it has.
+
+        Now, some values can be passed JSON encoded, some not -- this
+        is done for making it easy on the client side, so it can do
+        calls with curl/wget without having to mess it up too much:
+
+        :returns: the value
+        """
+        assert isinstance(args, dict)
+        assert isinstance(arg_name, str)
+        assert arg_type == None or isinstance(arg_type, type)\
+            or isinstance(arg_type, tuple) and all(isinstance(i, type)
+                                                   for i in arg_type)
+        assert isinstance(allow_missing, bool)
+        if not arg_name in args:
+            if allow_missing:
+                return default
+            raise RuntimeError("missing '%s' argument" % arg_name)
+        try:
+            # support direct calling inside the daemon; if it is a
+            # basestring, we consider it might be JSON and decode it 
+            arg = args[arg_name]
+            if isinstance(arg, str):
+                arg = json.loads(arg)
+        except ValueError as e:
+            # so let's assume is not properly JSON encoded and it is
+            # just a string to pass along
+            arg = args[arg_name]
+            # all this is backwards compat..... fugly, yes; but early clients
+            # failed to properly json encode args; also, when calling
+            # from curl with -d it becomes more ellaborate, so let's
+            # keep it.
+            if arg in ( "none", "None", "null" ):
+                arg = None
+            elif arg in ( "True", "true" ):
+                arg = True
+            elif arg in ( "False", "false" ):
+                arg = False
+            else:
+                # if we are expecting another type, let's try to
+                # convert it
+                if arg_type and arg_type != str:
+                    try:
+                        arg = arg_type(arg)
+                    except ValueError:
+                        raise ValueError(
+                            "%s: can't convert expected type %s; value: %s"
+                            % (arg_name, arg_type.__name__, arg))
+        if arg_type != None and not isinstance(arg, arg_type):
+            raise RuntimeError(
+                "%s: argument must be a %s; got '%s'"
+                % (arg_name, arg_type.__name__, type(arg).__name__))
+        return arg
+
     def impl_get_by_name(self, arg, arg_name = "component"):
         """
         Return an interface's component implementation by name
@@ -1001,14 +1063,9 @@ class tt_interface(object):
         :returns: the implementation in *self.impls* for the component
           specified in the args
         """
-        if not arg_name in args:
-            if allow_missing:
-                return None, None
-            raise RuntimeError("missing '%s' argument" % arg_name)
-        arg = args[arg_name]
-        if not isinstance(arg, str):
-            raise RuntimeError("%s: argument must be a string; got '%s'"
-                               % (arg_name, type(arg).__name__))
+        arg = self.arg_get(args, arg_name, str, allow_missing)
+        if arg == None:
+            return None, None
         return self.impl_get_by_name(arg, arg_name)
 
 
@@ -1022,21 +1079,48 @@ class tt_interface(object):
         (internal interface)
 
         :params dict args: dictionary of arguments keyed by argument
-          name
-        :returns: a list of *(NAME, IMPL)* based on if we got an
-          instance to run on (only execute that one) or on all the
-          components
+          name:
+
+          - *component*: a  component name to consider, if none, all
+          - *components*: list of component names to consider, if none, all
+          - *components_exclude*: (optional) list of components to exclude
+
+        :returns: a tuple of *(list, bool)*; list of a list of
+          implementations that need to be operated on; bool is *True*
+          if the list refers to all the components because the user
+          specified no *component* or *components* argument in the
+          call. *False* means only specific implementations are being
+          refered.
         """
         impl, component = self.arg_impl_get(args, 'component',
                                             allow_missing = True)
+        components_exclude = args.get('components_exclude', [])
+        components = args.get('components', [])
         if impl == None:
-            # no component was specified, so we operate over all the components
+            # no component was specified, so we operate over all the
+            # components unless components was given
             # KEEP THE ORDER
-            impls = list(self.impls.items())
-            _all = True
+            if components:
+                impls = []
+                for component in components:
+                    impl, name = self.impl_get_by_name(
+                        component, arg_name = "component")
+                    impls.append(( name, impl ))
+                # even if it might be all, we don't now for sure
+                _all = False
+            else:
+                impls = list(self.impls.items())
+                _all = True
         else:
             impls = [ ( component, impl ) ]
             _all = False
+        if components_exclude:
+            # if we are excluding components, then we need to reset
+            # the list and also the _all flag
+            new_impls = [ i for i in impls if i[0] not in components_exclude ]
+            if len(new_impls) < len(impls):
+                _all = False
+                impls = new_impls
         return impls, _all
 
 
@@ -1091,7 +1175,11 @@ class tt_interface(object):
         for key, val in upid.items():
             if val:
                 # there might be empty values, as defaults, so we ignore them
-                target.property_set(prefix + "." + key, val % kws)
+                if isinstance(val, str):
+                    # if it is a string, it is a template
+                    target.property_set(prefix + "." + key, val % kws)
+                else:
+                    target.property_set(prefix + "." + key, val)
         if components:
             target.property_set(prefix + ".functions." + iface_name,
                                 ":".join(components))
@@ -1159,7 +1247,7 @@ class tt_interface(object):
           to the call, some might be JSON encoded.
         :param dict files: dictionary of key/value with the files
           uploaded via forms
-        (https://flask.palletsprojects.com/en/1.1.x/api/#flask.Request.form)
+          (https://flask.palletsprojects.com/en/1.1.x/api/#flask.Request.form)
         :param str user_path: Path to where user files are located
 
         :returns: dictionary of results, call specific
@@ -1180,7 +1268,7 @@ class tt_interface(object):
         assert isinstance(call, str)
         assert isinstance(args, dict)
         assert user_path != None and isinstance(user_path, str)
-        raise NotImplementedError("%s|%s: unsuported" % (method, call))
+        raise NotImplementedError("%s|%s: unsupported" % (method, call))
         # Note that upon return, the calling layer will add a field
         # 'diagnostics', so don't use that
         #
@@ -1198,11 +1286,11 @@ import ttbl.config
 
 class test_target(object):
 
-    #! Path where the runtime state is stored
-    state_path = "/var/run/ttbd"
+    #: Path where the runtime state is stored
+    state_path = None
 
     #: Path where files are stored
-    files_path = "__undefined__"
+    files_path = None
 
     #: Properties that normal users (non-admins) can set when owning a
     #: target and that will be reset when releasing a target (except
@@ -1255,9 +1343,12 @@ class test_target(object):
 
         # Create the directory where we'll keep the target's state
         self.state_dir = os.path.join(self.state_path, self.id)
+        commonl.makedirs_p(self.state_dir, 0o2770,
+                           "target %s's state" % self.id)
+        commonl.makedirs_p(os.path.join(self.state_dir, "queue"), 0o2770,
+                           "target %s's allocation queue" % self.id)
         self.lock = process_posix_file_lock_c(
-            os.path.join(self.state_path, "lockfile"))
-        commonl.makedirs_p(os.path.join(self.state_dir, "queue"), 0o2770)
+            os.path.join(self.state_dir, "lockfile"))
         #: filesystem database of target state; the multiple daemon
         #: processes use this to store information that reflect's the
         #: target's state.
@@ -1377,7 +1468,7 @@ class test_target(object):
 
           Field names can use periods to dig into dictionaries.
 
-          Field names can match :mod:`python.fnmatch` regular
+          Field names can match :mod:`fnmatch` regular
           expressions.
         """
 
@@ -1504,8 +1595,8 @@ class test_target(object):
                     if ic_net != net:
                         raise ValueError(
                             "%s: IP address %s for interconnect %s is outside "
-                            "of the interconnect's network %s" %(
-                                self.id, val, name, ic_net))
+                            "of the interconnect's network %s (vs %s)" %(
+                                self.id, val, name, ic_net, net))
             if key == "ipv4_prefix_len":
                 val = int(val)
                 assert val > 0 and val < 32, \
@@ -2171,3 +2262,41 @@ def usb_serial_number(d):
     else:
         raise AssertionError("%s: don't know how to find USB device serial number" % d)
     return serial_number
+
+def _sysfs_read(filename):
+    try:
+        with open(filename) as fr:
+            return fr.read().strip()
+    except IOError as e:
+        if e.errno != errno.ENOENT:
+            raise
+
+def usb_serial_to_path(arg_serial):
+    """
+    Given a USB serial number, return it's USB path
+
+    Given, eg the serial number *4cb7b886a6b0*, it would return *1-9*,
+    as what *lsusb.py* would report::
+
+      $ lsusb.py
+      ...
+       1-9      06cb:009a ff  2.00   12MBit/s 100mA 1IF  (Synaptics, Inc. 4cb7b886a6b0)
+       1-7      8087:0a2b e0  2.00   12MBit/s 100mA 2IFs (Intel Corp.)
+       1-10     2386:4328 00  2.01   12MBit/s 96mA 1IF  (Raydium Corporation Raydium Touch System)
+       1-3      0bda:5411 09  2.10  480MBit/s 0mA 1IF  (Realtek Semiconductor Corp.) hub
+        1-3.4   0bda:5400 11  2.01   12MBit/s 0mA 1IF  (Realtek BillBoard Device 123456789ABCDEFGH)
+      ....
+
+    :param str arg_serial: USB serial number
+    :return: tuple with USB path, vendor, product name for the given serial
+      number or *None, None, None* if not found
+
+    """
+    for fn_serial in glob.glob("/sys/bus/usb/devices/*/serial"):
+        serial = _sysfs_read(fn_serial)
+        if serial == arg_serial:
+            devpath = os.path.dirname(fn_serial)
+            return os.path.basename(devpath), \
+                _sysfs_read(os.path.join(devpath, "vendor")), \
+                _sysfs_read(os.path.join(devpath, "product"))
+    return None, None, None

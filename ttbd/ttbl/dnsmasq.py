@@ -15,10 +15,15 @@ same hosts, but it will *only* serve in the interface it is associated
 to the interconnect target it is made a power rail of.
 
 Pending:
+
 - IPv6 support not very tested.
+
 - allow to switch which functionalities are needed
+
   - tftp on/off
+
   - default route on/off
+
 - allowing adding more names/IP-addresses to the database at will
 """
 import collections
@@ -68,7 +73,8 @@ class pc(ttbl.power.daemon_c):
     Use in the cpower rail to an interconnect, it won't work with a
     target that does not define tags *ipv4_addr*.
 
-    .. code-block::
+    .. code-block:: python
+
        interconnect.interface_add(
            "power",
            ttbl.power.interface(

@@ -267,14 +267,6 @@ class interface(ttbl.tt_interface):
                 impl.stop_and_get(target, name)
 
 
-    def _args_check(self, target, args):
-        if not 'capturer' in args:
-            raise RuntimeError("missing 'capturer' arguments")
-        capturer = args['capturer']
-        assert isinstance(capturer, str)
-        return capturer
-
-
     def request_process(self, target, who, method, call, args, _files,
                         _user_path):
         # called by the daemon when a METHOD request comes to the HTTP path
@@ -282,11 +274,11 @@ class interface(ttbl.tt_interface):
         self.user_path = _user_path
         ticket = args.get('ticket', "")
         if call == "start" and method == "POST":
-            capturer = self._args_check(target, args)
+            capturer = self.arg_get(args, "capturer", str)
             self.start(who, target, capturer)
             r = {}
         elif call == "stop_and_get" and method == "POST":
-            capturer = self._args_check(target, args)
+            capturer = self.arg_get(args, "capturer", str)
             r = self.stop_and_get(who, target, capturer)
         elif method == "GET" and call == "list":
             r = self.list(target)

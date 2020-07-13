@@ -291,7 +291,7 @@ class app_c(object):
     - will be cleaned in between evaluation runs
 
     - is not multi-threaded protected; take
-      :py:meth:`tc.tc_c.buffers_lock` if you need to access it
+      :py:meth:`tcfl.tc.tc_c.lock` if you need to access it
       from different paralell execution methods
       (setup/start/eval/test/teardown methods are *always* executed
       serially).

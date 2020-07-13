@@ -185,8 +185,12 @@ def setup_tftp_root(tftp_rootdir):
                           os.path.join(tftp_arch_dir, "pxelinux.cfg"))
 
 
-#: List of string with Linux kernel command options to be passed by
+#: List of strings with Linux kernel command options to be passed by
 #: the bootloader
+#:
+#: These are mapped to the *pos_image* attribute on a target; this is
+#: configured by the system administrator as different targets might
+#: need different command line arguments.
 pos_cmdline_opts = {
     'tcf-live':  [
         # no 'single' so it force starts getty on different ports

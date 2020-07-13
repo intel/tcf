@@ -880,13 +880,9 @@ Note how now, you can acquire the target and interact with it::
    Make sure it is on and it is not taken away from you in the middle
    due to inactivity, a trick for that is to run::
 
-     $ while true; do tcf acquire qz36a-arm || true; sleep 30s; done &
+     tcf acquire qz36a-arm --hold
 
-   this is a loop, in the background, that is twice a minute
-   refreshing your acquisition of the target, while you interact with
-   it.
-
-   *Kill it* when you are done, otherwise others won't be able to use
+   *cancel it* when you are done, otherwise others won't be able to use
    it.
 
 .. note:: the interactive console is quite limited; plus some targets

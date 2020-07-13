@@ -6,11 +6,13 @@ release = 1
 packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
 # FIXME: document why each somewhere
 # CentOS has just syslinux
+# mod_ssl -> https URLs
 requires =
          @@Fedora@@dhcp-server
          @@CentOS|RHEL@@dhcp
          dnsmasq 
          httpd
+         mod_ssl
          nfs-utils
          rsync
          syslinux
@@ -18,6 +20,7 @@ requires =
          syslinux-extlinux
          @@Fedora@@syslinux-nonlinux
          @@Fedora@@syslinux-extlinux-nonlinux
+         ipxe-bootimgs
          syslinux-tftpboot
          tftp-server
          ttbd == %{version}-%{release}

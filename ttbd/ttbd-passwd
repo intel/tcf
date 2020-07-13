@@ -1,0 +1,72 @@
+#! /usr/bin/python3
+"""
+Generate passwords that ttbl.auth_passwd can authenticate
+
+This generates passwords in different algorithms for a given user,
+listing also the roles given to the user.
+
+These can be then set in an FSDB database (using -p) or appended to a
+password file
+"""
+import argparse
+import errno
+import getpass
+import hashlib
+import os
+import random
+import sys
+
+main_ap = argparse.ArgumentParser(
+    description = __doc__,
+    formatter_class = argparse.RawDescriptionHelpFormatter,)
+main_ap.add_argument("-a", "--algorithm",
+                     action = "store",
+                     default = 'sha256',
+                     choices = hashlib.algorithms_guaranteed,
+                     help = "algorithm for hashing the password [%(default)s]")
+main_ap.add_argument("--digest-len",
+                     action = "store", type = int,
+                     default = 64,
+                     help = "length of the hex digest [%(default)s]")
+main_ap.add_argument("-r", "--role",
+                     action = "append", default = [ 'user' ], type = str,
+                     help = "roles to give the user besides the basic "
+                     " 'user' role (eg: 'admin', 'category1', etc...)")
+main_ap.add_argument("-s", "--salt",
+                     action = "store", default = None, type = int,
+                     help = "salt value to use [random]")
+main_ap.add_argument("-p", "--path",
+                     action = "store", type = str,
+                     default = None,
+                     help = "path to the user database to generate a"
+                     " database record [by default the password line is"
+                     " printed to stdout]")
+main_ap.add_argument("username", action = "store", type = str,
+                     help = "User's name")
+main_ap.add_argument("password", action = "store", type = str, nargs = '?',
+                     help = "password for the user"
+                     " [asked on console by default]")
+
+args = main_ap.parse_args()
+
+if args.password == None:
+    args.password = getpass.getpass("Password for %s: " % args.username)
+if args.salt == None:
+    args.salt = random.randrange(1000000)
+
+password_hashed = hashlib.new(
+    args.algorithm,
+    ("%s" % args.salt + args.username + args.password).encode("utf-8"))
+
+record = "%s:%s:%d:%s:%s" % (
+    ",".join(args.role),
+    args.algorithm, args.salt,
+    args.digest_len,
+    password_hashed.hexdigest()[:args.digest_len])
+if args.path:
+    path = os.path.join(args.path, args.username)
+    os.umask(0o037)	# remove write perms for group/others
+    with open(path, "w") as f:
+        f.write(record + "\n")
+else:
+    print(args.username + ":" + record)

@@ -70,7 +70,7 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
     if state not in ( 'queued', 'active'):
         raise RuntimeError(
             "allocation failed: %s: %s"
-            % (state, r.get('message', 'message n/a')))
+            % (state, r.get('_message', 'message n/a')))
     allocid = r['allocid']
     data = { allocid: state }
     if state == 'active':			# got it
@@ -170,21 +170,27 @@ def _cmdline_alloc_targets(args):
             rtbs.add(rt['rtb'])
 
         if len(rtbs) > 1:
-            logging.error("Targets span more than one server")
+            logging.error("Targets span more than one server: %s", rtbs)
             sys.exit(1)
         rtb = list(rtbs)[0]
-        allocid = None
+        allocid = args.allocid
         try:
             groups = { "group": list(targets) }
             ts0 = time.time()
-            allocid, state, group_allocated = \
-                _alloc_targets(rtb, groups, obo = args.obo,
-                               preempt = args.preempt,
-                               queue = args.queue, priority = args.priority,
-                               reason = args.reason)
-            ts = time.time()
-            print("allocation ID %s: [+%.1fs] allocated: %s" % (
-                allocid, ts - ts0, " ".join(group_allocated)))
+            if allocid == None:
+                allocid, state, group_allocated = \
+                    _alloc_targets(rtb, groups, obo = args.obo,
+                                   preempt = args.preempt,
+                                   queue = args.queue, priority = args.priority,
+                                   reason = args.reason)
+                ts = time.time()
+                print("allocation ID %s: [+%.1fs] allocated: %s" % (
+                    allocid, ts - ts0, " ".join(group_allocated)))
+            else:
+                print("%s: NOT ALLOCATED! Holdin allocation ID given with -a" \
+                    % allocid)
+                state = 'unknown'	# wild guess
+                ts = time.time()
             if args.hold == None:	# user doesn't want us to ...
                 return			# ... keepalive while active
             _alloc_hold(rtb, allocid, state, ts0, args.hold)
@@ -398,6 +404,12 @@ def _alloc_ls(verbosity):
             user = data.get('user', None)
             creator = data['creator']
             guests = data.get('guests', [])
+            if 'priority' in data:
+                prio = str(data['priority'])
+                if data['preempt']:
+                    prio += ":P"
+            else:
+                prio = "n/a"
             userl = [ user ]
             if user != creator:
                 userl.append(creator + " (creator)")
@@ -406,7 +418,8 @@ def _alloc_ls(verbosity):
             if verbosity == 0:
                 table.append([
                     allocid,
-                    data['state'],
+                    # put state/prio/preempt together
+                    data['state'] + " " + prio,
                     "\n".join(userl),
                     len(data.get('target_group', [])),
                     data.get('reason', "n/a"),
@@ -419,6 +432,7 @@ def _alloc_ls(verbosity):
                     allocid,
                     rtb,
                     data['state'],
+                    prio,
                     data.get('timestamp', 'n/a'),
                     "\n".join(userl),
                     "\n".join(tgs),
@@ -440,6 +454,7 @@ def _alloc_ls(verbosity):
             "AllocID",
             "Server",
             "State",
+            "Priority",
             "Timestamp",
             "Users",
             "Groups",

@@ -11,6 +11,7 @@ Test library (utilities for testcases)
 --------------------------------------
 
 .. automodule:: tcfl.tl
+.. automodule:: tcfl.biosl
 
 Provisioning/deploying/flashing PC-class devices with a Provisioning OS
 -----------------------------------------------------------------------
@@ -61,9 +62,7 @@ See :ref:`report reference <tcf_guide_report_driver>`.
 ======================
 
 .. automodule:: tcfl
-.. automodule:: tcfl.expecter
 .. automodule:: tcfl.ttb_client
-.. automodule:: tcfl.util
 
 .. automodule:: tcfl.tc_zephyr_sanity
 .. automodule:: tcfl.tc_clear_bbt
@@ -353,10 +352,13 @@ Provisioning OS specific metadata
 - *pos_image*: string describing the image used to boot the target in
   POS mode; defaults to *tcf-live*.
 
-  For each image, in the server, :data:`ttbl.dhcp.pos_cmdline_opts`
-  describes the kernel options to append to the kernel image, which is
-  expected to be found in *http://:data:`POS_HTTP_URL_PREFIX
-  <pos_http_url_prefix>`/vmlinuz-POS_IMAGE*
+  For each image, in the server, :data:`ttbl.pxe.pos_cmdline_opts
+  <ttbl.pxe.pos_cmdline_opts>` describes the kernel options to append
+  to the kernel image, which is expected to be found in
+  *http://:data:`POS_HTTP_URL_PREFIX
+  <pos_http_url_prefix>`/vmlinuz-POS_IMAGE* for HTTP boot. For other
+  boot methods (eg: TFTP) the driver shall copy the files around as
+  needed.
 
 .. _pos_partscan_timeout:
 
@@ -365,7 +367,7 @@ Provisioning OS specific metadata
   before we consider it is really empty (some HW takes a long time).
 
   This is used in :func:`tcfl.pos.fsinfo_read
-  <tcfl.target_ext_pos.extension.fsinfo_read>`.
+  <tcfl.pos.extension.fsinfo_read>`.
   
 .. _pos_reinitialize:
 
@@ -376,7 +378,7 @@ Provisioning OS specific metadata
     $ tcf property-set TARGET pos_reinitialize True
     $ tcf run -t TARGETs <something that deploys>
 
-.. __roles_required:
+.. _roles_required:
 
 - *_roles_required*: list of strings describing roles.
 
@@ -384,7 +386,7 @@ Provisioning OS specific metadata
   been granted one of the roles in the list by the authentication
   module. See :ref:`access control <target_access_control>`.
 
-.. __roles_excluded:
+.. _roles_excluded:
 
 - *_roles_excluded*: list of strings describing roles.
 
@@ -417,7 +419,7 @@ Provisioning OS specific metadata
 
 .. include:: 09-api-http.rst
 
-.. _ttbd_conf_api::
+.. _ttbd_conf_api:
              
 *ttbd* Configuration API for targets
 ====================================
@@ -452,9 +454,8 @@ Provisioning OS specific metadata
 ================
 
 .. automodule:: ttbl
-.. automodule:: ttbl.fsdb
 
-.. _target_control:
+.. _target_access_control:
 
 User access control and authentication
 --------------------------------------
@@ -463,9 +464,10 @@ TTBD provides for means for users to authenticate themselves to the
 system and to decide which users can see and use what targets.
 
 TTBD, however, does not implement the authentication; that is
-delegated to :ref:`*authentication drivers* <ttbl.authenticator_c>`
-which can authenticate a user agains LDAP, a local database, any
-remote service, etc.
+delegated to :class:`authentication drivers <ttbl.authenticator_c>`
+which can authenticate a user agains :class:`LDAP
+<ttbl.auth_ldap.authenticator_ldap_c>`, a :class:`local database
+<ttbl.auth_userdb.driver>`, any remote service, etc.
 
 When a user succesfully *logs in*, the authentication drivers, based
 on their configuration, provide a list of roles the user has, each
@@ -480,9 +482,9 @@ represented by a string, which minimally are defined as:
 
 any other roles are deployment specific and can be used to control
 access to targets, since the targets can define tags
-:ref:`_roles_required` and :ref:`_roles_excluded` to require users
-have a role or to exclude users with a certain role. For example, a
-target defined such as:
+:ref:`roles_required <roles_required>` and :ref:`roles_excluded
+<roles_excluded>` to require users have a role or to exclude users
+with a certain role. For example, a target defined such as:
 
 >>> ttbl.config.target_add(
 >>>     ttbl.test_target(TARGETNAME),
@@ -499,6 +501,7 @@ authentication system and would exclude anyone with the role *guest*.
 .. automodule:: ttbl.auth_ldap
 .. automodule:: ttbl.auth_localdb
 .. automodule:: ttbl.auth_party
+.. automodule:: ttbl.auth_userdb
 
 Console Management Interface
 ----------------------------

@@ -240,8 +240,6 @@ class allocation_c(ttbl.fsdb_symlink_c):
         if ttl > 0:
             ts_start = int(self.get('_alloc.ts_start'))
             if ts_now - ts_start > ttl:
-                logging.error("DEBUG: %s: allocation expired",
-                              self.allocid)
                 self.delete('overtime')
                 return
 
@@ -386,6 +384,8 @@ class allocation_c(ttbl.fsdb_symlink_c):
             "state": self.state_get(),
             "user": self.get("user"),
             "creator": self.get("creator"),
+            "priority": self.get('priority'),
+            "preempt": self.get('preempt'),
         }
         reason = self.get("reason", None)
         if reason:
@@ -685,7 +685,7 @@ def request(groups, calling_user, obo_user, guests,
             if not target:
                 return {
                     "state": "rejected",
-                    "message": "target %s in group '%s' does not exist" % (
+                    "_message": "target %s in group '%s' does not exist" % (
                         target_name, group_name
                     )
                 }
@@ -698,7 +698,7 @@ def request(groups, calling_user, obo_user, guests,
             duplicates = target_set.difference(target_list)
             return {
                 "state": "rejected",
-                "message": "targets %s in group '%s' are duplicated" % (
+                "_message": "targets %s in group '%s' are duplicated" % (
                     ",".join(duplicates), group_name
                 )
             }
@@ -710,7 +710,7 @@ def request(groups, calling_user, obo_user, guests,
         if original_group != None:
             return {
                 "state": "rejected",
-                "message": "targets in group '%s' are the same as in '%s'" % (
+                "_message": "targets in group '%s' are the same as in '%s'" % (
                     group_name, original_group
                 )
             }
@@ -731,7 +731,7 @@ def request(groups, calling_user, obo_user, guests,
         if not isinstance(guest, str):
             return {
                 "state": "rejected",
-                "message": "guest #%d in the guest lists must" \
+                "_message": "guest #%d in the guest lists must" \
                            " described by a string; got %s" \
                            % (count, type(guest).__name__)
             }
@@ -743,7 +743,7 @@ def request(groups, calling_user, obo_user, guests,
         if priority < priority_min or priority > priority_max:
             return {
                 "state": "rejected",
-                "message": "invalid priority %d (expected %d-%d)" % (
+                "_message": "invalid priority %d (expected %d-%d)" % (
                     priority, priority_min, priority_max)
             }
         # FIXME: verify calling user has this priority
@@ -759,10 +759,13 @@ def request(groups, calling_user, obo_user, guests,
     # Create an allocation record and from there, get the ID -- we
     # abuse python's tempdir making abilities for it
     allocid_path = tempfile.mkdtemp(dir = path, prefix = "")
+    # we allow ttbd group (admins) to look into these dirs
+    os.chmod(allocid_path, 02770)
     allocid = os.path.basename(allocid_path)
 
     allocdb = get_from_cache(allocid)
 
+    allocdb.set("preempt", preempt)
     allocdb.set("priority", priority)
     allocdb.set("user", obo_user)
     allocdb.set("creator", calling_user.get_id())
@@ -839,7 +842,7 @@ def request(groups, calling_user, obo_user, guests,
     result = {
         "state": state,
         "allocid": allocid,
-        "message": states[state],
+        "_message": states[state],
     }
     if queue == False:
         if state == 'active':		# we got it
@@ -848,7 +851,7 @@ def request(groups, calling_user, obo_user, guests,
             allocdb.delete(None)
             return  {
                 "state": "busy",
-                "message": states['busy']
+                "_message": states['busy']
             }
         else:			     	# something wong
             allocdb.delete(None)
@@ -879,7 +882,7 @@ def get(allocid, calling_user):
     if not allocdb.check_query_permission(calling_user):
         return {
             # could also just return invalid
-            "message": "not allowed to read allocation"
+            "_message": "not allowed to read allocation"
         }
     return allocdb.to_dict()
 
@@ -898,10 +901,10 @@ def keepalive(allocid, expected_state, _pressure, calling_user):
     try:
         allocdb = get_from_cache(allocid)
     except allocation_c.invalid_e:
-        return dict(state = "invalid", message = states['invalid'])
+        return dict(state = "invalid", _message = states['invalid'])
     if not allocdb.check_user_is_creator_admin(calling_user):
         # guests are *NOT* allowed to keepalive
-        return dict(state = "rejected", message = states['rejected'])
+        return dict(state = "rejected", _message = states['rejected'])
 
     allocdb.timestamp()				# first things first
     state = allocdb.state_get()
@@ -910,6 +913,57 @@ def keepalive(allocid, expected_state, _pressure, calling_user):
         # set in calculate_stuff()
         r['group_allocated'] = allocdb.get("group_allocated")
     return r
+
+def _idle_power_off(target, calling_user,
+                    idle_power_off, idle_power_fully_off):
+    assert isinstance(target, ttbl.test_target)
+    assert isinstance(idle_power_off, int)
+    assert isinstance(idle_power_fully_off, int)
+
+    # get the target's timestamp before allocating it, since
+    # allocating it will update the timestamp; then allocate it and
+    # get its power state; turn it off it it has been on for too
+    # long
+    ts = target.timestamp_get()
+
+    r = request(
+        { "target": [ target.id ] },
+        calling_user, calling_user.get_id(), [], queue = False,
+        reason = "checking if need to power off due to idleness")
+    if r['state'] != "active":
+        # someone else got it, that's fine, means they are using it
+        return
+    allocdb = get_from_cache(r['allocid'])
+    try:
+        # the power interface is defined in ttbl.power
+        power_state, _, power_substate = target.power._get(target)
+
+        # calculate the idle time once we own the target, to be sure
+        # none came in the middle and we are killing it for them...
+        ts_now = datetime.datetime.now()
+        idle_time = ts_now - datetime.datetime.strptime(ts, "%Y%m%d%H%M%S")
+
+        if idle_time.seconds > idle_power_fully_off:
+            # if it is already fully off or we fully power it off,
+            # then we can exit, as it is automatically normal off
+            if power_state == False and power_substate == 'full':
+                return		# already fully off, so normal too
+            target.log.info("powering fully off, idle for %ss (max %ss)",
+                            idle_time, idle_power_fully_off)
+            target.power.put_off(target, calling_user.get_id(),
+                                 dict(explicit = True), {}, None)
+            return
+
+        if idle_time.seconds > idle_power_off:
+            if power_state == False \
+               and power_substate in [ 'normal', 'full' ]:
+                return		            	# already off
+            target.log.info("powering off, idle for %ss (max %ss)",
+                            idle_time, idle_power_off)
+            target.power.put_off(target, calling_user.get_id(),
+                                 dict(explicit = False), {}, None)
+    finally:
+        allocdb.delete("removed")
 
 def _maintain_released_target(target, calling_user):
     # a target that is released is not being used, so we power it all
@@ -921,41 +975,17 @@ def _maintain_released_target(target, calling_user):
     skip_cleanup = target.tags.get('skip_cleanup', False)
     if skip_cleanup:
         target.log.debug("ALLOC: skiping powering off, skip_cleanup defined")
+        return
+
     idle_poweroff = target.tags.get('idle_poweroff',
                                     ttbl.config.target_max_idle)
-    if idle_poweroff == 0:
-        target.log.debug("ALLOC: skiping powering off, idle_poweroff is 0")
-        return
+    idle_power_fully_off = target.tags.get(
+        'idle_power_fully_off',
+        ttbl.config.target_max_idle_power_fully_off)
+    if idle_poweroff > 0 or idle_power_fully_off > 0:
+        _idle_power_off(target, calling_user,
+                        idle_poweroff, idle_power_fully_off)
 
-    # get the target's timestamp before allocating it, since
-    # allocating it will update the timestamp; then allocate it and
-    # get its power state; turn it off it it has been on for too
-    # long
-    ts = target.timestamp_get()
-    # by default the allocation is inmediate, not queued
-    r = request({ "target": [ target.id ] },
-                calling_user, calling_user.get_id(), [],
-                reason = "powering off because it is idle")
-    if r['state'] != "active":
-        # someone else got it, that's fine, means they are using it
-        return
-    allocdb = get_from_cache(r['allocid'])
-    try:
-        # the power interface is defined in ttbl.power
-        any_powered_on = target.power._get_any(target)
-        if any_powered_on == False:		# Is it off? pass
-            return
-
-        # calculate the idle time once we own the target, to be sure
-        # none came in the middle and we are killing it for them...
-        ts_now = datetime.datetime.now()
-        idle_time = ts_now - datetime.datetime.strptime(ts, "%Y%m%d%H%M%S")
-        if idle_time.seconds > idle_poweroff:
-            target.log.info("powering off, idle for %ss (max %ss)",
-                            idle_time, idle_poweroff)
-            target.power.put_off(target, calling_user.get_id(), {}, {}, None)
-    finally:
-        allocdb.delete("removed")
 
 def maintenance(ts_now, calling_user, keepalive_fn = None):
     # this will be called by a parallel thread / process to run
@@ -1005,19 +1035,19 @@ def delete(allocid, calling_user):
         allocdb.delete("removed")
         return {
             "state": "removed",
-            "message": states['removed']
+            "_message": states['removed']
         }
 
     if allocdb.check_userid_is_guest(userid):
         allocdb.guest_remove(userid)
         return {
             "state": "removed",
-            "message": "%s: guest removed from allocation" % userid
+            "_message": "%s: guest removed from allocation" % userid
         }
 
     return {
         "state": "rejected",
-        "message": "no permission to remove other's allocation"
+        "_message": "no permission to remove other's allocation"
     }
 
 
@@ -1026,14 +1056,14 @@ def guest_add(allocid, calling_user, guest):
     if not isinstance(guest, str):
         return {
             "state": "rejected",
-            "message": "guest must be described by a string; got %s" \
+            "_message": "guest must be described by a string; got %s" \
             % type(guest).__name__
         }
     assert isinstance(allocid, str)
     allocdb = get_from_cache(allocid)
     # verify user is owner/creator
     if not allocdb.check_user_is_creator_admin(calling_user):
-        return { "message": "guests not allowed to set guests in allocation" }
+        return { "_message": "guests not allowed to set guests in allocation" }
     allocdb.guest_add(guest)
     return {}
 
@@ -1043,7 +1073,7 @@ def guest_remove(allocid, calling_user, guest):
     if not isinstance(guest, str):
         return {
             "state": "rejected",
-            "message": "guest must be described by a string;"
+            "_message": "guest must be described by a string;"
                        " got %s" % type(guest)
         }
     assert isinstance(allocid, str)
@@ -1051,7 +1081,7 @@ def guest_remove(allocid, calling_user, guest):
     guestid = commonl.mkid(guest, l = 4)
     if calling_user.get_id() != guest \
        and not allocdb.check_user_is_creator_admin(calling_user):
-        return { "message": "not allowed to remove guests from allocation" }
+        return { "_message": "not allowed to remove guests from allocation" }
     allocdb.guest_remove(guest)
     return {}
 

@@ -54,12 +54,14 @@ class pci(ttbl.power.impl_c):
     >>>     'http_proxy': 'http://192.168.98.1:8080',
     >>>     'https_proxy': 'http://192.168.98.1:8080',
     >>> })
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
 
     def __init__(self, proto,
                  local_addr, local_port,
-                 remote_addr, remote_port):
-        ttbl.power.impl_c.__init__(self)
+                 remote_addr, remote_port, **kwargs):
+        ttbl.power.impl_c.__init__(self, **kwargs)
         assert proto in [ 'udp', 'tcp', 'sctp',
                           'udp4', 'tcp4', 'sctp4',
                           'udp6', 'tcp6', 'sctp6' ]

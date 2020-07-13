@@ -27,11 +27,12 @@ requires =
          python3-werkzeug
          python3-flask
          python3-flask-login
+         @@Fedora@@python3-ipaddress
+         @@CentOS|RHEL@@python3-ipaddress
          python3-keyring
-         python3-ldap
+         @@Fedora@@python3-netifaces
+         @@CentOS|RHEL@@python3-netifaces
          python3-pexpect
-         python3-pyusb
-         python3-tornado
          python3-pyusb
          @@CentOS|RHEL@@OVMF
          @@Fedora@@edk2-ovmf
@@ -43,7 +44,8 @@ requires =
          @@Fedora@@python3-pysnmp
          @@CentOS|RHEL@@pysnmp
          qemu
-         sdnotify
+         openssh-clients
+         sshpass
          socat
          sshpass
          tcf == %{version}-%{release}

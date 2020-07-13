@@ -18,7 +18,7 @@ Text expectations
 consoles and look for text on them.
 
 
-.. _console_expectation_detect_context::
+.. _console_expectation_detect_context:
 
 Console Expectation: Detect context
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -56,8 +56,7 @@ would need a different context:
 - a global detector in the same number of threads as above looking for
   signs of a shell command that caused an error in the console; this
   also uses the *detect_context* and is done by
-  :meth:`target.shell.setup
-  <tcfl.tc.target_ext_shell.extension.setup>`.
+  :meth:`target.shell.setup <tcfl.target_ext_shell.shell.setup>`.
 
 - another detector in any number of threads looking for telltale signs
   of a Kernel Crash message; this would have its own context as it is
@@ -76,6 +75,7 @@ import io
 import logging
 import math
 import mmap
+import numbers
 import os
 import re
 import sys
@@ -103,13 +103,13 @@ def _poll_context(target, console):
 
 
 class expect_text_on_console_c(tc.expectation_c):
-    """
-    Object that expects to find a string or regex in a target's
+    """Object that expects to find a string or regex in a target's
     serial console.
 
-    See parameter description in builder :meth:`console.expect_text`,
-    as this is meant to be used with the expecter engine,
-    :meth:`tcfl.tc.tc_c.expect`.
+    See parameter description in builder :meth:`target.console.text
+    <tcfl.target_ext_console.extension.text>`, as this is meant to be
+    used with the expecter engine, :meth:`tcfl.tc.tc_c.expect`.
+
     """
     def __init__(self,
                  text_or_regex,
@@ -121,7 +121,7 @@ class expect_text_on_console_c(tc.expectation_c):
                  raise_on_found = None,
                  name = None,
                  target = None,
-                 detect_context = ""):
+                 detect_context = "", report = None):
         assert isinstance(target, tc.target_c)	# mandatory
         assert isinstance(text_or_regex, (bytes, str, typing.Pattern))
         assert console == None or isinstance(console, str)
@@ -164,6 +164,7 @@ class expect_text_on_console_c(tc.expectation_c):
         self._console = console
         self.previous_max = previous_max
         self.detect_context = detect_context
+        self.report = report
 
     @property
     def console(self):
@@ -271,9 +272,12 @@ class expect_text_on_console_c(tc.expectation_c):
             # Note we get the new_offset straight() from the read
             # call, which is the most accurate from the server standpoint
             of.flush()
+            # the capture must be raw, no translations -- otherwise it
+            # is going to be a mess to keep offsets right
+            newline = ''
             generation, new_offset, total_bytes = \
                 target.console.read_full(self.console, read_offset,
-                                         self.max_size, of)
+                                         self.max_size, of, newline = newline)
             generation_prev = buffers_poll.get('generation', None)
             if generation_prev == None:
                 buffers_poll['generation'] = generation
@@ -288,7 +292,8 @@ class expect_text_on_console_c(tc.expectation_c):
                     dlevel = 5)
                 generation, new_offset, total_bytes = \
                     target.console.read_full(self.console, 0,
-                                             self.max_size, of)
+                                             self.max_size, of,
+                                             newline = newline)
                 buffers_poll['generation'] = generation
             ts_end = time.time()
             of.flush()
@@ -338,10 +343,12 @@ class expect_text_on_console_c(tc.expectation_c):
 
     def detect(self, testcase, run_name, buffers_poll, _buffers):
         """
-        See :meth:`expectation_c.detect` for reference on the arguments
+        See :meth:`tcfl.tc.expectation_c.detect` for reference on the
+        arguments
 
         :returns: dictionary of data describing the match, including
           an interator over the console output
+
         """
 
         target = self.target
@@ -392,14 +399,29 @@ class expect_text_on_console_c(tc.expectation_c):
                     _name = ""
                 else:
                     _name = "/" + self.name
-                match_data = {
-                    # this allows an exception raised when found to
-                    # include this iterator as an attachment that can
-                    # be reported
-                    "console output": target.console.generator_factory(
-                        self.console,
-                        search_offset, search_offset + match.end()),
-                }
+                if self.report == 0:
+                    console_output = None
+                elif isinstance(self.report, int):
+                    _search_offset = search_offset + match.end() - self.report
+                    search_offset = max(search_offset, _search_offset)
+                    console_output = "console output (partial)"
+                elif self.report == None:
+                    console_output = "console output"
+                else:
+                    raise AssertionError(
+                        "self.report: invalid type '%s' or value (%s)"
+                        % (type(self.report), self.report))
+                if console_output != None:
+                    match_data = {
+                        # this allows an exception raised when found to
+                        # include this iterator as an attachment that can
+                        # be reported
+                        console_output: target.console.generator_factory(
+                            self.console,
+                            search_offset, search_offset + match.end()),
+                    }
+                else:
+                    match_data = {}
                 target.report_info(
                     "%s%s: found '%s' at @%d-%d on console %s:%s [%s]"
                     % (run_name, _name, self.regex.pattern,
@@ -412,6 +434,7 @@ class expect_text_on_console_c(tc.expectation_c):
                 match_data["origin"] = self.origin
                 match_data["console"] = self.console
                 match_data["pattern"] = self.regex.pattern
+                match_data["groupdict"] = match.groupdict()
                 match_data["offset"] = search_offset
                 match_data["offset_match_start"] = \
                     search_offset + match.start()
@@ -509,6 +532,40 @@ class extension(tc.target_extension_c):
         r = self.target.ttbd_iface_call("console", "list", method = "GET")
         self.aliases = r['aliases']
         self._set_default()
+        #: Default end of line for the different consoles
+        #:
+        #: Dictionary keyed by console name that specifies the end-of-string
+        #: for the console; if there is no entry for a console.
+        #:
+        #: See :meth:tcfl.tc.target_c.send.
+        #:
+        #: This can be set with::
+        #:
+        #:    >> target.console.crlf['my consolename'] = '\r'
+        #:
+        #: If nothing is specified, it will default to '\n' or no
+        #: translation, depending on what needs to be done. Different
+        #: consoles of the same machine might have different needs
+        #: depending on their transport.
+        self.crlf = {}
+
+        # See if the servr declares any CRLF convention to default to;
+        # we do this now because this info doesn't change, makes no
+        # sense to keep udpating it in tcfl.tc.target_c.send() [main
+        # user of it]
+        console_iface = target.rt['interfaces']['console']
+        for console in self.console_list:
+            # Maybe the server declares in the inventory which
+            # CRLF convention to use in interfaces.console.CONSOLENAME.crlf
+            console_info = console_iface.get(console, {})
+            if isinstance(console_info, str):
+                # alias for something else, ignore
+                continue
+            if 'crlf' in console_info:
+                self.crlf[console] = console_info['crlf']
+            else:
+                # for those who don't declare anything, we default to \r
+                self.crlf[console] = '\r'
 
     def _set_default(self):
         # Which is the default console that was set in the server?
@@ -574,7 +631,7 @@ class extension(tc.target_extension_c):
             "new default console %s is not an existing console (%s)" \
             % (new_console, " ".join(console_list))
         if new_console == None:
-            new_console = self.aliases['default']
+            new_console = self.aliases.get('default', console_list[0])
         if self._default != new_console:
             self.target.report_info("default console changed from %s to %s"
                                     % (self._default, new_console))
@@ -706,7 +763,43 @@ class extension(tc.target_extension_c):
         r = self.target.ttbd_iface_call("console", "list", method = "GET")
         return r['result']
 
-    def _read(self, console = None, offset = 0, max_size = 0, fd = None):
+    @staticmethod
+    def offset_calc(target, console, offset):
+        """
+        Calculate offset based on current console size
+
+        :param int offset: if negative, it is calculated relative to
+          the end of the console output
+        """
+        if offset >= 0:
+            return offset
+        # negative offset, calculate from current size
+        size = target.console.size(console)
+        if size == None:
+            return 0	# disabled console
+        # offset larger than current size?
+        offset = max(0, size + offset + 1)
+        return offset
+
+    # \r+\n is because some transports pile \rs on top of each other...
+    _crlf_regex_universal = re.compile("(\r+\n|\r|\n)")
+
+    @classmethod
+    def _newline_convert(cls, data, newline):
+        if newline == '':
+            return data
+        if newline == None:
+            return re.sub(cls._crlf_regex_universal, "\n", data)
+        if isinstance(newline, re._pattern_type):
+            return re.sub(newline, "\n", data)
+        if isinstance(newline, str):
+            return data.replace(newline, "\n")
+        raise AssertionError(
+            "can't understand newline of type %s; expected none, '',"
+            " regex or string" % type(newline))
+
+    def _read(self, console = None, offset = 0, max_size = 0, fd = None,
+              newline = None):
         """
         Read data received on the target's console
 
@@ -745,9 +838,9 @@ class extension(tc.target_extension_c):
                 for chunk in r.iter_content(chunk_size):
                     while True:
                         try:
-                            # we want to write verbatim, no encodings
-                            # console is bytes, chunk is bytes
-                            fd.write(chunk)
+                            # calc len before EOL conversion
+                            chunk_len = len(chunk)
+                            fd.write(self._newline_convert(chunk, newline))
                             break
                         except IOError as e:
                             # for those files opened in O_NONBLOCK
@@ -762,7 +855,7 @@ class extension(tc.target_extension_c):
                             raise
 
                     # don't use chunk_size, as it might be less
-                    total += len(chunk)
+                    total += chunk_len
                     if max_size > 0 and total >= max_size:
                         break
                 fd.flush()
@@ -775,6 +868,7 @@ class extension(tc.target_extension_c):
                                        raw = True)
             ret = r.text
             l = len(ret)
+            ret = self._newline_convert(ret, newline)
         target.report_info("%s: read %dB from console @%d"
                            % (console, l, offset), dlevel = 3)
         generation_s, offset_s = \
@@ -785,23 +879,41 @@ class extension(tc.target_extension_c):
             + int(r.headers.get('Content-Length', 0))
         return generation, new_offset, ret
 
-    def read(self, console = None, offset = 0, max_size = 0, fd = None):
+    def read(self, console = None, offset = 0, max_size = 0, fd = None,
+             newline = None):
         """
         Read data received on the target's console
 
         :param str console: (optional) console to read from
-        :param int offset: (optional) offset to read from (defaults to zero)
+
+        :param int offset: (optional) offset to read from (defaults to
+          zero)
+
         :param int fd: (optional) file descriptor to which to write
           the output (in which case, it returns the bytes read).
+
         :param int max_size: (optional) if *fd* is given, maximum
           amount of data to read
+
+        :param newline: (optional, defaults to *None*, universal)
+          convention for end-of-line characters.
+          - *None* any of *\\r*, *\\n*, *\\r\\n* or multile *\\r* followed
+            by a *\\n* are considered a newline and replaced with *\\n*
+          - *''* (empty string): no translation is done
+          - a string: the string is considered an end of line
+            character and replaced by a *\\n*. Most common characters
+            would be *\\r*, *\\n* or *\\r\\n*.
+          - a regular expresion: whatever matches the regular
+            expression is replaced with a *\\n*.
+
         :returns: data read (or if written to a file descriptor,
           amount of bytes read)
         """
         return self._read(console = console, offset = offset,
-                          max_size = max_size, fd = fd)[2]
+                          max_size = max_size, fd = fd, newline = newline)[2]
 
-    def read_full(self, console = None, offset = 0, max_size = 0, fd = None):
+    def read_full(self, console = None, offset = 0, max_size = 0, fd = None,
+                  newline = None):
         """
         Like :meth:`read`, reads data received on the target's console
         returning also the stream generation and offset at which to
@@ -821,14 +933,29 @@ class extension(tc.target_extension_c):
         :param int max_size: (optional) if *fd* is given, maximum
           amount of data to read
 
+        :param newline: (optional, defaults to *None*, universal)
+          convention for end-of-line characters.
+          - *None* any of *\\r*, *\\n*, *\\r\\n* or multile *\\r* followed
+            by a *\\n* are considered a newline and replaced with *\\n*
+          - *''* (empty string): no translation is done
+          - a string: the string is considered an end of line
+            character and replaced by a *\\n*. Most common characters
+            would be *\\r*, *\\n* or *\\r\\n*.
+          - a regular expresion: whatever matches the regular
+            expression is replaced with a *\\n*.
+
         :returns: tuple consisting of:
+
           - stream generation
+
           - stream size after reading
+
           - data read (or if written to a file descriptor,
             amount of bytes read)
+
         """
         return self._read(console = console, offset = offset,
-                          max_size = max_size, fd = fd)
+                          max_size = max_size, fd = fd, newline = newline)
 
     def size(self, console = None):
         """
@@ -843,14 +970,72 @@ class extension(tc.target_extension_c):
             return None			# console disabled
         return int(r['result'])
 
-    def write(self, data, console = None):
-        """
-        Write data to a console
+    #: Default chunk sizes for the different consoles
+    #:
+    #: Dictionary keyed by console name that specifies the chunk size
+    #: for the console; if there is no entry for a console, it means
+    #: no chunking is to be done for it.
+    #:
+    #: See :meth:write.
+    #:
+    #: This can be set with::
+    #:
+    #:    >> target.console.chunk_size['my consolename'] = 32
+    chunk_size = {}
+
+
+    #: Default interchunk wait times (in seconds) for the different consoles
+    #:
+    #: Dictionary keyed by console name that specifies the time to
+    #: wait between sending chunks for each console when chunking is enabled.
+    #:
+    #: See :meth:write.
+    #:
+    #: This can be set with::
+    #:
+    #:    >> target.console.interchunk_wait['my consolename'] = 3.4
+    interchunk_wait = {}
+
+    def write(self, data, console = None,
+              chunk_size = None, interchunk_wait = None):
+        """Write data to a console
 
         :param data: data to write (string or bytes)
 
+        :param int chunk_size: (optional) break the transimission into
+          chunks of this size, with a possible wait of
+          *interchunk_wait* seconds between. By default no chunking
+          occurs.
+
+          This is useful when the receiving end doesn't have good flow
+          control and needs breathers or we want to simulate some
+          timing. The server in theory can implement it better, but
+          when the server configuration doesn't offer it, this offers
+          a way to force it from the client side.
+
+          Global chunking per console can be set in :data:chunk_size.
+
+        :param float interchunk_wait: (optional; default 0) seconds to
+          wait in between transmitting chunks when *chunk_size* is
+          enabled.
+
+          Note the lag of making the remote request has to be
+          considered; thus interchunk waits of less than one second
+          might be impractical. Look at doing chunk in the server side
+          for those timing needs.
+
+          Global interchunk waits per console can be set in
+          :data:interchunk_wait.
+
         :param str console: (optional) console to write to
+
+        .. warning:: this function does no end-of-line conversions (eg
+           \\r to \\r\\n or \\n to \\r\\n, etc). For that, look into
+           :meth:`target.send <tcfl.tc.target_c.send>`.
         """
+        assert chunk_size == None or isinstance(chunk_size, int)
+        assert interchunk_wait == None \
+            or isinstance(interchunk_wait, numbers.Real)
         # the reporting of unprintable is left to the report driver;
         # however, for readability in the reporting, we'll replace \n
         # (0x0d) with <N>
@@ -864,8 +1049,21 @@ class extension(tc.target_extension_c):
         testcase = self.target.testcase
         self.target.report_info("%s: writing %dB to console"
                                 % (console, len(data)), dlevel = 3)
-        self.target.ttbd_iface_call("console", "write",
-                                    component = console, data = data)
+        if chunk_size == None:
+            chunk_size = self.chunk_size.get(console, None)
+        if interchunk_wait == None:
+            interchunk_wait = self.interchunk_wait.get(console, None)
+
+        if chunk_size == None:
+            self.target.ttbd_iface_call("console", "write",
+                                        component = console, data = data)
+        else:
+            for i in range((len(data) + chunk_size - 1) / chunk_size):
+                chunk = data[chunk_size * i : chunk_size * i + chunk_size]
+                self.target.ttbd_iface_call("console", "write",
+                                            component = console, data = chunk)
+                if interchunk_wait:
+                    time.sleep(interchunk_wait)
         self.target.report_info("%s: wrote %dB (%s) to console"
                                 % (console, len(data), data_report))
 
@@ -938,6 +1136,12 @@ class extension(tc.target_extension_c):
           where we are looking for things (detecting) in a console's
           output. Further info :ref:`here
           <console_expectation_detect_context>`
+
+        :param int report: (optional) how much data to report; when we
+          find a match, the report will include all data received until
+          the match; sometimes it is too much and uneeded. This allows
+          to specify how many bytes of data before the match are going
+          to be reported at most. Defaults to *None* (all).
 
         (other parameters are the same as described in
         :class:`tcfl.tc.expectation_c`.)
@@ -1038,6 +1242,38 @@ class extension(tc.target_extension_c):
                 raise
             yield u""
 
+    def captured_chunk(self, console, offset_from = 0, size = -1):
+        """
+        Iterate over the captured contents of the console
+
+        :class:`expect_text_on_console_c.poll` has created a file
+        where it has written all the contents read from the console;
+        this function is a generator that iterates over it, yielding
+        safe UTF-8 strings.
+
+        Note these are not reseteable, so to use in
+        attachments with multiple report drivers, use instead a
+        :meth:generator_factory.
+
+        :param str console: name of console on which to operate
+        :param int offset_from: (optional) offset where to start
+          (default from beginning)
+        :param int len: (optional) how much to read; if negative
+          (default), read the whole file since the offset
+        """
+        assert console == None or isinstance(console, str)
+        #
+        # Provide line-based iteration on the last match in the
+        # console, as given by information on the buffers.
+        #
+        target = self.target
+        # Open as binary so we don't alter the offset counts if it
+        # happens to fix up characters
+        with io.open(target.console.capture_filename(console), "rb") as f:
+            f.seek(offset_from)
+            return f.read()
+
+
     def generator_factory(self, console, offset_from = 0, offset_to = 0):
         """
         Return a generator factory that creates iterators to dump
@@ -1070,17 +1306,14 @@ def f_write_retry_eagain(fd, data):
                 continue
             raise
 
+_flags_set = None
+_flags_old = None
 
 def _console_read_thread_fn(target, console, fd, offset):
     # read in the background the target's console output and print it
     # to stdout
+    offset = target.console.offset_calc(target, console, int(offset))
     with msgid_c("cmdline"):
-        if offset == -1:
-            offset = target.console.size(console)
-            if offset == None:	# disabled console? fine
-                offset = 0
-        else:
-            offset = 0
         generation = 0
         generation_prev = None
         backoff_wait = 0.1
@@ -1120,9 +1353,14 @@ def _console_read_thread_fn(target, console, fd, offset):
             except Exception as e:	# pylint: disable = broad-except
                 logging.exception(e)
                 raise
+            finally:
+                if _flags_set:
+                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN,
+                                      _flags_old)
 
 
 def _cmdline_console_write_interactive(target, console, crlf, offset):
+
     #
     # Poor mans interactive console
     #
@@ -1130,8 +1368,8 @@ def _cmdline_console_write_interactive(target, console, crlf, offset):
     # capture user's keyboard input and send it to the target.
     print("""\
 WARNING: This is a very limited interactive console
-         Escape character twice ^[^[ to exit; CRLF is '%s'
-""" % crlf.encode('unicode-escape'))
+         Escape character twice ^[^[ to exit; using console '%s' with CRLF '%s'
+""" % (console, crlf.encode('unicode-escape')))
     time.sleep(1)
     fd = os.fdopen(sys.stdout.fileno(), "w+")
     console_read_thread = threading.Thread(
@@ -1143,12 +1381,26 @@ WARNING: This is a very limited interactive console
     class _done_c(Exception):
         pass
 
+    _flags_old = termios.tcgetattr(sys.stdin.fileno())
+    if sys.stdin.isatty():
+        _flags_set = True
+    else:
+        _flags_set = False
     try:
         one_escape = False
-        old_flags = termios.tcgetattr(sys.stdin.fileno())
-        tty.setraw(sys.stdin.fileno())
-        flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFD)
-        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        if _flags_set:
+            tty.setraw(sys.stdin.fileno())
+            flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFD)
+            fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        # ask the terminal what does it consider a line feed
+        if _flags_old[0] & termios.ICRNL:
+            nl = '\r'
+        else:
+            nl = '\n'
+        if 'INSIDE_EMACS' in os.environ:
+            # I've given up -- I can't figure out how to ask stty to
+            # tell me emacs does \n
+            nl = '\n'
         while True and console_read_thread.is_alive():
             try:
                 chars = sys.stdin.read()
@@ -1158,7 +1410,7 @@ WARNING: This is a very limited interactive console
                 for char in chars:
                     # if the terminal sends a \r (user hit enter),
                     # translate to crlf
-                    if crlf and char == "\r":
+                    if crlf and char == nl:
                         _chars += crlf
                     else:
                         _chars += char
@@ -1168,6 +1420,7 @@ WARNING: This is a very limited interactive console
                         one_escape = True
                     else:
                         one_escape = False
+                # force no crlf, we already translated it
                 target.console.write(_chars, console = console)
             except _done_c:
                 break
@@ -1177,12 +1430,27 @@ WARNING: This is a very limited interactive console
                 # If no data ready, wait a wee, try again
                 time.sleep(0.25)
     finally:
-        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_flags)
-
+        if _flags_set:
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN,
+                              _flags_old)
 
 def _cmdline_console_write(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args)
+        if args.offset == None:
+            # if interactive, default the offset to the last that
+            # comes up; otherwise it gets confusing
+            if args.interactive:
+                args.offset = -1
+            else:
+                args.offset = 0
+        if args.console == None:
+            args.console = target.console.default
+        if args.crlf == None:
+            # get the CRLF the server says, otherwise default to \n,
+            # which seems to work best for most
+            args.crlf = target.rt['interfaces']['console']\
+                [args.console].get('crlf', "\n")
         if args.interactive:
             _cmdline_console_write_interactive(target, args.console,
                                                args.crlf, args.offset)
@@ -1191,6 +1459,7 @@ def _cmdline_console_write(args):
                 line = getpass.getpass("")
                 if line:
                     target.console.write(line.strip() + args.crlf,
+                                         crlf = args.crlf,
                                          console = args.console)
         else:
             for line in args.data:
@@ -1202,7 +1471,7 @@ def _cmdline_console_read(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args)
         console = args.console
-        offset = int(args.offset)
+        offset = target.console.offset_calc(target, args.console, int(args.offset))
         max_size = int(args.max_size)
         if args.output == None:
             fd = sys.stdout
@@ -1214,7 +1483,8 @@ def _cmdline_console_read(args):
             backoff_wait = 0.1
             while True:
                 generation, offset, data_len = \
-                    target.console.read_full(console, offset, max_size, fd)
+                    target.console.read_full(console, offset,
+                                             max_size, fd, newline = '')
                 if generation_prev != None and generation_prev != generation:
                     sys.stderr.write(
                         "\n\r\r\nWARNING: target power cycled\r\r\n\n")
@@ -1484,13 +1754,15 @@ def _cmdline_setup(arg_subparser):
                     help = "Do not local echo (%(default)s)")
     ap.add_argument("-r", dest = "crlf",
                     action = "store_const", const = "\r",
-                    help = "CRLF lines with \\r")
+                    help = "end lines with \\r")
     ap.add_argument("-n", dest = "crlf",
                     action = "store_const", const = "\n",
-                    help = "CRLF lines with \\n (default)")
+                    help = "end lines with \\n"
+                    " (defaults to this if the server does not declare "
+                    " the interfaces.console.CONSOLE.crlf property)")
     ap.add_argument("-R", dest = "crlf",
                     action = "store_const", const = "\r\n",
-                    help = "CRLF lines with \\r\\n")
+                    help = "end lines with \\r\\n")
     ap.add_argument("-N", dest = "crlf",
                     action = "store_const", const = "",
                     help = "Don't add any CRLF to lines")
@@ -1499,10 +1771,11 @@ def _cmdline_setup(arg_subparser):
                     help = "Data to write; if none given, "
                     "read from stdin")
     ap.add_argument("-s", "--offset", action = "store",
-                    dest = "offset", type = int, default = 0,
-                    help = "(for interfactive) read the console "
-                    "output starting from (-1 for last)")
-    ap.set_defaults(func = _cmdline_console_write, crlf = "\n")
+                    dest = "offset", type = int, default = None,
+                    help = "read the console from the given offset, "
+                    " negative to start from the end, -1 for last"
+                    " (defaults to 0 or -1 if -i is active)")
+    ap.set_defaults(func = _cmdline_console_write, crlf = None)
 
 
     ap = arg_subparser.add_parser("console-setup",

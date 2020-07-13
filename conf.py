@@ -54,7 +54,7 @@ intersphinx_mapping = {
     'pexpect': ('http://pexpect.readthedocs.io/en/stable', None ),
     'pymongo': ('http://api.mongodb.com/python/current/', None ),
     'python': ( 'https://docs.python.org/2.7', None ),
-    'requests': ( 'http://docs.python-requests.org/en/master/', None ),
+    'requests': ( 'https://requests.readthedocs.io/en/master/', None ),
     'serial': ('http://pythonhosted.org/pyserial/', None ),
 }
 

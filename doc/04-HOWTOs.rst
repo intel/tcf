@@ -224,109 +224,95 @@ Run::
 
 .. _howto_target_keep_acquired:
 
+How do I keep a target acquired
+-------------------------------
+
+The server will release targets it considers idle.
+
+The server considers activity, once acquired
+
+ - running server commands (such as power control, console
+   reading/writing, accessing buttons, etc)
+
+ - script execution (since those run commands)
+
+The server can't detect as activity:
+
+ - accessing the target via a tunnel (eg: an SSH session)
+
+ - accessing the target via the network or instrumentation not
+   abstracted by the server (eg: a KVM)
+
+When the server doesn't detect activity, it will release the target to
+make it available to others. If the system is being actively used, but
+you find the server making it available because you are using
+interfaces that the server doesn't know about, you can run::
+
+  $ tcf acquire TARGETs --hold
+
+``--hold`` takes the *acquire* command to send keep alives to the
+server indicating the machine is under active use. It will keep
+sending commands until you cancel it (or give it a time length for
+which to send keep alives).
+
+
 How do I keep a target acquired/reserved after *tcf run* is done?
 -----------------------------------------------------------------
 
 Giving *--no-release* to *tcf run* will keep the target acquired after
 the scrip execution concludes. Note however that it will be acquired
-by *USERNAME\::term:`HASHID`* (:term:`what's a hashid? <hash>`).
+by *USERNAME\::term:`ALLOCID`* (:term:`what's an ALLOCID? <allocid>`).
 
 For example, if we were using targets *nwa* and *qu04a* to :ref:`boot
-in provisioning mode <example_pos_boot>`, the hashid could be
-*ormorh*::
+in provisioning mode <example_pos_boot>`:
 
   $ tcf run --no-release -vvt 'nwa or qu04a' /usr/share/examples/test_pos_boot.py
   ...
   INFO1/ormorh	  ..../test_pos_boot.py#_test @3hyt-uo3g: will run on target group 'ic=localhost/nwa target=localhost/qu04a:x86_64'
   ...
 
-note how the hashid is *ormorh* in this case and thus, upon completion::
+to find the allocation ID, upon completion::
 
   $ tcf list -v owner
-  localhost/nwa [USERNAME:ormorh] ON
-  localhost/qu04a [USERNAME:ormorh] ON
+  localhost/nwa [USERNAME:ALLOCID] ON
+  localhost/qu04a [USERNAME:ALLOCID] ON
 
 to maintain the target acquired and powered while potentially
-debugging or testing other things, use a *while loop* which keeps
-acquiring with the same hashid. This tells the daemon we are actively
-using the target and won't release for us. In a separate console, run::
+debugging or testing other things, run in a separate console, run::
 
-  $ while tcf -t ormorh acquire nwa or qu04a; do sleep 10s; done
-
-.. warning: remember to cancel the job when done with the target so
-            other users can acquire it and use it.
+  $ tcf -a ALLOCID nwa qu04a --hold
+  OoOWEa: NOT ALLOCATED! Holdin allocation ID given with -a
+  allocation ID OoOWEa: [+224.5s] keeping alive during state 'active'
 
 now you can access the console, do captures or interact with the
 target in any other way, remembering to specify the ticket::
 
-  $ tcf -t ormorh console-write -i qu04a
-  $ tcf -t ormorh capture-get qu04a screen screencap.png
+  $ tcf console-write -i qu04a
+  $ tcf capture-get qu04a screen screencap.png
   ...
 
 or via SSH, first we have to ask the server to create a tunnel for us
 from to the target's SSH port::
 
-  $ tcf list -vv qu04a | grep ipv4_addr
-  interconnects.nwa.ipv4_addr: 192.168.97.4
-  $ tcf tunnel-add qu04a 22 tcp 192.168.97.4
+  $ tcf tunnel-add qu04a 22
   SERVERNAME:19893
   $ ssh -p 19893 root@SERVERNAME
 
 .. note:: make sure you specify the user to login as; it likely won't
           be the same as in your client machine.
 
-Release the target so it can be used by someone else::
+.. warning: remember to cancel the *tcf acquire* command when done
+            with the target so other users can acquire it and use it.
 
-  $ kill -9 %1               # kill the while loop that keeps it acquired
-  $ tcf release -f $(tcf list 'owner:"YOURNAME"')
+You can also run either of::
+
+  $ tcf release nwa qu04a
+  $ tcf alloc-rm ALLOCID
 
 Some details:
 
- - use *while tcf acquire* vs *while true; do tcf acquire* because
-   that way, if the server fails, connection drops (eg: you close your
-   laptop), then the process tops and won't restart unless you do it
-   manually.
-
  - if you depend on the network, do not forget to also acquire the
    network, otherwise it will be powered off and routing won't work.
-
-Alternative method without hashids
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-First make sure you are not blocking anyone::
-
-  $ while tcf acquire TARGET1 TARGET2 TARGET3...; do sleep 15s; done &
-  $ tcf_pid=$!
-
-this keeps acquiring the target every 10 seconds, which tells the
-server you are actively using it, so it won't release them nor power
-them off.
-
-When done::
-
-  $ kill $tcf_pid
-  $ tcf release TARGET1 TARGET2 TARGET3...
-
-You can *tcf run* without releasing them::
-
-  $ tcf -t " " run --no-release -vvt "TARGET1 or TARGET2 or TARGET3 ..." test_mytc.py
-
-Note the following:
-
--  ``-t " "`` tells TCF to *use no ticket*, as we have made the reservation
-   with no ticket
-
-- ``--no-release`` tells TCF to not release the targets when done
-
-this way, once the test completes (let's say, with failure), we can
-log in via the serial console to do some debugging::
-
-  $ tcf console-write -i TARGET2
-
-Do not forget to kill the *while* process and release the targets when
-done, otherwise others won't be able to use them. If someone has left
-a target taken, it can be released following :ref:`these instructions
-<howto_release_target>`
 
 How can I debug a target?
 -------------------------
@@ -360,7 +346,7 @@ Find more:
 - the :class:`debug extension API <tcfl.target_ext_debug.extension>` to
   :class:`target objects <tcfl.tc.target_c>` for use inside Python testcases
 
-- the :class:`*ttbd*\'s Debug interface <ttbl.tt_debug_mixin>`
+- the server level debug interface :class:`ttbl.debug`
 
 Zephyr debugging with TCF run
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -915,7 +901,7 @@ How do I change the default timeout in my test scripts
 
 The default timeout different parts of the *tcf run* engines wait for
 the target to respond can be changed by setting the variable
-*self.tls.expecter.timeout* (note *self* is a testcase class):
+*self.tls.expect_timeout* (note *self* is a testcase class):
 
 .. code-block:: python
 
@@ -923,19 +909,19 @@ the target to respond can be changed by setting the variable
        ...
        def eval_some(self):
            # wait a max of 40 seconds
-           self.tls.expecter.timeout = 40
+           self.tls.expect_timeout = 40
            ...
 
 It is a bit awkward and we'll make a better way to do it. Other places
 that take a *timeout* parameter that has to be less than
-*self.tls.expecter.timeout*:
+*self.tls.expect_timeout*:
 
 - :func:`target.shell.up <tcfl.target_ext_shell.shell.up>`
 - :func:`target.on_console_rx <tcfl.tc.target_c.on_console_rx>`
-  and :func:`target.on_console_rx_cm <tcfl.tc.target_c.on_console_rx_cm>`
 - :func:`target.wait <tcfl.tc.target_c.wait>`
 - :func:`target.expect <tcfl.tc.target_c.expect>`
 
+and others
 
 .. _report_always:
 
@@ -1203,6 +1189,52 @@ output we are getting is *SOMEPATH\\n*. So :func:`strip
 General Linux system
 ====================
 
+.. _setup_wsl:
+
+Setup: install Windows Services for Linux (WSL)
+-----------------------------------------------
+
+The TCF client can be installed in Windows Services for Linux, which
+can be setup following these instructions (applies to WSL v1,
+untested on v2):
+
+1. Enable Windows Services for Linux (summary of
+   https://docs.microsoft.com/en-us/windows/wsl/install-win10):
+
+   A. Open PowerShell as Administrator and run (press left Windows
+      key, type *PowerShell* and click on *Run as administrator*)::
+
+        Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
+
+   B. Restart your computer when prompted.
+
+2. Wait for Windows to boot
+
+3. Press left Windows key, type *Microsoft store* > search for *Ubuntu
+   18.04 LTS*, press on *Get*; wait for Ubuntu 18.04 LTS to download.
+
+4. Click 'Launch" for the install process to start; opens a Ubuntu
+   18.04 LTS black window that works for a while.
+
+   Install process will ask to *Enter new Unix name*, this is your
+   Unix account name.
+
+   Install process will ask for a *Unix password*: enter a password
+   for the Unix machine that will run inside your Windows machine; you
+   can use the same as in Windows
+
+5. The install process now goes into a Linux shell; it can be closed.
+
+6. Click the Windows search box, type *Ubuntu*, select *Ubuntu
+   18.04 LTS*; a terminal window opens.
+
+From the Linux environment, you can access your Windows files:
+
+- `/mnt/c/Users/USERNAME/Desktop`
+- `/mnt/c/Users/USERNAME/Documents`
+
+From here, you can :ref:`install the client <install_tcf_client>`.
+
 .. _setup_proxies:
 
 Setup proxies
@@ -1226,27 +1258,10 @@ If your network requires proxy support:
      .. include:: 04-HOWTOs-LL-proxy-1.rst
 
 - From the terminal, (when remotedly logged in, optional) add to
-  ``~/.bashrc`` or to ``/etc/bashrc`` (for system wide, headless
-  machines):
+  ``/etc/environment`` (for system wide, headless machines):
 
     .. literalinclude:: 04-HOWTOs-LL-proxy-2.sh
        :language: shell
-
-  (note the ``${VAR:-DEFAULT}`` syntax is so to avoid these settings
-  to interfere with those that might be set when you login via the GUI).
-
-Configure *sudo* to pass proxy configuration::
-
-  # cat <<EOF > /etc/sudoers.d/proxy
-  # Keep proxy configuration through sudo, so we don't need to specify -E
-  # to carry it
-  Defaults env_keep += "ALL_PROXY FTP_PROXY HTTP_PROXY HTTPS_PROXY NO_PROXY"
-  Defaults env_keep += "all_proxy ftp_proxy http_proxy https_proxy no_proxy"
-  EOF
-
-This ensures the proxy configuration is kept by *sudo* (versus having
-to run *sudo -E*) so tools that use the network don't get stuck with
-network access.
 
 Why?
 
@@ -1721,6 +1736,52 @@ Methods to find the serial number of an YKUSH hub:
           connected to its downstream port number 4 does have the
           *YK34567* serial number.
 
+
+.. _howto_fog_ipxe:
+
+iPXE: sharing bootloader with a Fog installation
+------------------------------------------------
+
+TCF can use the services provided by a `Fog installation
+<http://fogproject.org>`_; however, to be able to use effectively,
+Fog's iPXE Ctrl-B prompt has to be enabled.
+
+By default, the Fog setup process creates their own iPXE binary and
+disable the Ctrl-B prompt that allows to break into the console to do
+manual configuration.
+
+This does not change the process work workflow, it just enables the
+targets to be able to use Ctrl-B while booting. TCF uses that to drive
+its own provisioning mechanism.
+
+To enable back the Ctrl-B prompt:
+
+1. login to your Fog server, and locate file
+   */tftpboot/default.ipxe*; we need to add a line::
+
+    prompt --key 0x02 --timeout 2000 Press Ctrl-B for the iPXE command line... && shell ||
+
+2. Edit the */tftpboot/default.ipxe* file and add said line after the first line::
+
+     #!ipxe
+     <<<<===== HERE ===>>>>
+     cpuid --ext 29 && set arch x86_64 || set arch ${buildarch}
+     params
+     param mac0 ${net0/mac}
+     param arch ${arch}
+     param platform ${platform}
+     param product ${product}
+     ...
+
+   so it ends up looking as::
+
+     #!ipxe
+     prompt --key 0x02 --timeout 2000 Press Ctrl-B for the iPXE command line... && shell ||
+     cpuid --ext 29 && set arch x86_64 || set arch ${buildarch}
+     params
+     param mac0 ${net0/mac}
+     ...
+
 *ttbd*: TCF server configuration and tricks
 ===========================================
 
@@ -1819,7 +1880,7 @@ Other options:
 
   - use the command line switch *--config-path* to force a different
     configuration path.
-    
+
 Configuration files are called *conf_NN_WHATEVER.py* and imported in
 **alphabetical** order from each directory before proceeding to the
 next one. They are written in plain Python code, so you can do
@@ -1840,9 +1901,9 @@ convention establishes the following levels:
   source distribution, some might be specific to the site, etc.
 
 - *conf_09_\*.py*: configuration of :term:`site` specifics
-  
+
 - *conf_10_SERVERNAME.py*: configuration of the server's targets
-  
+
 The module :mod:`ttbl.config` provides access to the top functions to
 set TTBD's configuration.
 
@@ -1884,26 +1945,7 @@ Configure simple authentication / for Jenkins jobs (optional)
 -------------------------------------------------------------
 
 You can setup static accounts for users or Jenkins autobuilders with
-hardcoded passwords by creating a file
-``/etc/ttbd-production/conf_00_auth_localdb.py`` with the contents:
-
-.. code-block:: python
-
-   import ttbl.auth_localdb
-
-   ttbl.config.add_authenticator(ttbl.auth_localdb.authenticator_localdb_c(
-        "Jenkins and other",
-        [
-            [ 'usera', 'PASSWORDA', 'user', ],
-            [ 'superuserB', 'PASSWORDB', 'user', 'admin', ],
-            [ 'jenkins1', 'PASSWORD1', 'user', ],
-            [ 'jenkins2', 'PASSWORD2', 'user', ],
-            ...
-        ]))
-
-Restart to read the configuration::
-
-  # systemctl restart ttbd@production
+passwords by following the instructions in :class:`ttbl.auth_userdb.driver`
 
 .. _ttbd_config_auth_ldap:
 
@@ -1943,14 +1985,10 @@ Configuring a target for just controlling power to something
 
 In your *ttbd*'s `conf_SOMETHING.py` config file, add::
 
-  ttbl.config.target_add(
-      ttbl.tt.tt_power(
-        "TARGETNAME",
-        power_control = PC_OBJECT,
-        power = True
-      ),
-      tags = dict(idle_poweroff = 0)
-  )
+  target_pdu_socket_add("TARGETNAME",
+        pc = POWER_CONTROLLER,
+        tags = dict(idle_poweroff = 0),
+        power = True)
 
 this creates a target called *TARGETNAME* that you can power on, off
 or cycle. The *power* argument indicates what do do with the power at
@@ -1968,14 +2006,10 @@ This would make *TARGETNAME*'s power be controlled by plug #5 of the
 instructions <conf_00_lib_pdu.dlwps7_add>`). Because this is a normal,
 120V plug, if a light bulb were connected to it::
 
-    ttbl.config.target_add(
-      ttbl.tt.tt_power(
-        "Entrance_light",
-        power_control = ttbl.pc.dlwps7("http://admin:1234@sp3/5"),
-        power = True
-      ),
-      tags = dict(idle_poweroff = 0)
-    )
+  target_pdu_socket_add("Entrance_light",
+        pc = ttbl.pc.dlwps7("http://admin:1234@sp3/5"),
+        tags = dict(idle_poweroff = 0),
+        power = True)
 
 and like this, the target *Entrance_light* can be switched on or off
 with *tcf power-on Entrance_light* and *tcf power-off Entrance_light*.
@@ -1990,17 +2024,19 @@ serial number *YK21080* (:py:func:`setup instructions
 <conf_00_lib_pdu.ykush_targets_add>`).
 
 Other power controller implementations are possible, of course, by
-subclassing :py:class:`ttbl.tt_power_control_impl`.
+subclassing :py:class:`ttbl.power.impl_c`; currently there are
+multiple power control drivers listed here FIXME.
 
 .. _tt_linux_simple:
 
 Configuring a Linux target to power on/off with serial console
 --------------------------------------------------------------
 
-Building on the previous example, we can use the :class:`ttbl.tt.tt_serial`
-object to create a target that provides serial consoles, can be
-powered on or off and we can interact with the target over the serial
-console.
+FIXME: old documentation, needs updating
+
+Building on the previous example, we can create a target that provides
+serial consoles, can be powered on or off and we can interact with the
+target over the serial console.
 
 If we have a Linux machine which is installed with a distro that
 provides serial console access, then this will work:
@@ -2049,131 +2085,7 @@ provides serial console access, then this will work:
 
    .. code:: python
 
-      ttbl.config.target_add(
-           ttbl.tt.tt_serial(
-               "linux-NN",
-               power_control = [
-                      ttbl.cm_serial.pc(),
-                      ttbl.pc.dlwps7("http://admin:1234@POWERSWITCH/PORT"),
-                      ttbl.pc.delay(5),
-               ],
-               serial_ports = [
-                   "pc",
-                   { "port": "/dev/tty-linux-NN", "baudrate": 115200 }
-               ]),
-           tags = {
-               'linux': True,
-               'bsp_models': { 'x86_64': None },
-               'bsps': {
-                   'x86_64': {
-                       'linux': True,
-                       'console': 'x86_64',
-                   }
-               }
-           },
-           target_type = "linux-DISTRONAME-VERSION")
-
-   where of course, ``DISTRONAME-VERSION`` matches the linux
-   distribution and verison installed.
-
-.. _ttbd_config_phys_linux_live:
-
-
-Configure physical Linux targets with a fixed Live filesystem
--------------------------------------------------------------
-
-A physical Linux machine can be booted with the TCF-live image that
-will always boot fresh to the same state.
-
-This builds on the :ref:`previous section <tt_linux_simple>`.
-
-**Bill of materials**
-
-- a Linux machine w at least 2G RAM (harddrive optional, but recommended)
-- a USB drive (at least 2G)
-- a serial console to the physical Linux machine (if your machine
-  doesn't have serial ports, a `USB null modem
-  <https://www.serialgear.com/Serial-Adapters-USBG-NULL-30.html>`_ or
-  two USB serial dongles with a NULL modem adapter will do.
-- one available port on a power switch, to turn the physical machine
-  on/off (eg, a :func:`DLWPS7 <conf_00_lib_pdu.dlwps7_add>`)
-
-**Connecting the test target fixture**
-
-0. Generate a TCF Live ISO image :ref:`following these steps
-   <generate_tcf_live_iso>`
-
-1. Initialize the USB drive with the image (assuming
-   it is at */dev/sdb*)::
-
-     # livecd-iso-to-disk --format --reset-mbr tcf-live/tcf-live.iso /dev/sdb
-
-2. Plug the USB drive to the physical Linux target, make sure it boots
-
-3. Configure the Linux machine to:
-
-   - boot USB first
-
-   - always power on when AC power is on
-
-4. Create two physical partitions for large file storage during tests
-   and swap:
-
-   - boot the image, connect via standard console or serial console
-
-   - partition the disk::
-
-       $ parted DEVICE -s mklabel gpt	             # make a new partition table
-       $ parted DEVICE -s mkpart logical linux-swap 0% 10G # make a partition
-       $ parted DEVICE -s name 1 TCF-swap            # name it
-       $ parted DEVICE -s mkpart logical btrfs 10G 100% # make a partition
-       $ parted DEVICE -s name 2 TCF-home            # name it
-
-   *TCF-home* will be always cleaned up and mounted as */home* and the
-   swap will be activated.
-
-5. Connect the serial dongle cables to the physical target and to the
-   server
-
-6. Connect the physical target to port PORT of power switch
-   POWERSWITCH
-
-**Configuring the system for the fixture**
-
-1. Choose a name for the target: *linux-NN* (where NN is a number)
-
-2. Configure *udev* to add a name for the serial device for the
-   board's serial console so it can be easily found at
-   ``/dev/tty-TARGETNAME``. Follow :ref:`these instructions
-   <usb_tty_serial>` using the board's *serial number*.
-
-3. Add a configuration block to the server configuration file:
-
-   .. code:: python
-
-      ttbl.config.target_add(
-           ttbl.tt.tt_serial(
-               "linux-NN",
-               power_control = [
-                      ttbl.cm_serial.pc(),
-                      ttbl.pc.dlwps7("http://admin:1234@POWERSWITCH/PORT"),
-                      ttbl.pc.delay(5),
-               ],
-               serial_ports = [
-                   "pc",
-                   { "port": "/dev/tty-linux-NN", "baudrate": 115200 }
-               ]),
-           tags = {
-               'linux': True,
-               'bsp_models': { 'x86_64': None },
-               'bsps': {
-                   'x86_64': {
-                       'linux': True,
-                       'console': 'x86_64',
-                   }
-               }
-           },
-           target_type = "linux-fedora-x86_64")
+      FIXME: needs reformulating
 
 .. _target_tag:
 
@@ -2953,7 +2865,7 @@ Updating the FPGA image in Synopsys EMSK boards
    ===== ==== =============
 
 .. _pos_image_creation:
-   
+
 Creating images for the Provisioning OS
 =======================================
 

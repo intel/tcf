@@ -92,6 +92,7 @@ targets over HTTP to be controlled by the TCF client.
     ],
     scripts = [
         "ttbd",
+        "ttbd-passwd",
         'hw-healthmonitor/ttbd-hw-healthmonitor.py',
         "usb-sibling-by-serial"
     ],

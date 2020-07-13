@@ -24,8 +24,8 @@ Supported implementations:
 
 Please see each driver for the intrinsic limitations they suffer.
 
-*evemu  driver*
-^^^^^^^^^^^^^^^
+*evemu driver*
+^^^^^^^^^^^^^^
 
 This driver injects input events directly into the Linux input layer
 by creating a fake input device with *evemu-device* and then injecting
@@ -55,8 +55,8 @@ What can be sent to devices?
 This driver uses as reference standard what *evemu* can do, as it is
 believed to be the most complete platform-independent input device
 reference. This in turn is using the input event codes from the Linux
-kernel; a summary from the  :ref:`libevdev's authoritative
-<https://github.com/freedesktop/libevdev/blob/master/include/linux/input-event-codes.h>`:
+kernel; a summary from the `libevdev's authoritative
+<https://github.com/freedesktop/libevdev/blob/master/include/linux/input-event-codes.h>`_:
 
 - Event types (EV_*):
 
@@ -149,7 +149,8 @@ B: 15 00 00 00 00 00 00 00 00
 #: Default mouse descriptor (touchpad)
 #:
 #: This is an absolute mouse whose axes go from 0 to 65535;
-#: note we are making that assumption in mouse_move_to()
+#: note we are making that assumption in
+#: :meth:`target.input.mouse_move_to <extension.mouse_move_to>`.
 descriptor_mouse = """
 # EVEMU 1.3
 N: Generic Mouse
@@ -193,6 +194,20 @@ class extension(tc.target_extension_c):
         self.evemu_event_fifo = None
         self.evemu_device = None
 
+    _evemu_device_regex = re.compile(
+        r"(?P<name>[^:]+\s*)(?P<devname>\/dev\/input\/event.*)$")
+
+    def _evemu_device_log_extract(self, output):
+        # evemu-device prints something like
+        ## NAME: /dev/input/eventX
+        # we extract with this regex
+        m = self._evemu_device_regex.search(output)
+        if not m:
+            return None
+        # take only the basename; /dev/input will be added by the FIFO
+        # itself, it is less chars to print
+        return os.path.basename(m.groupdict()['devname'])
+
     def evemu_create_device(self, did, descriptor):
         """
         Create a new input device
@@ -229,24 +244,35 @@ class extension(tc.target_extension_c):
                 target.ssh.copy_to(f.name, "/tmp/input-dev.desc")
         else:
             target.shell.string_copy_to_file(descriptor, "/tmp/input-dev.desc")
-        output = target.shell.run(
-            "%s /tmp/input-dev.desc & sleep 1s" % self.evemu_device,
-            output = True, trim = True)
-        # this prints
-        ## NAME: /dev/input/eventX, so get it
-        input_regex = re.compile(
-            r"(?P<name>[^:]+\s*)(?P<devname>\/dev\/input\/event.*)$")
-        m = input_regex.search(output)
-        if not m:
-            raise tc.error_e(
-                "can't locate /dev/input/event* name in output to"
-                " create new input device", dict(output = output))
-        # take only the basename; /dev/input will be added by the FIFO
-        # itself, it is less chars to print
-        self.devices[did] = os.path.basename(m.groupdict()['devname'])
+        tries = 4
+        for cnt in range(tries):
+            # Note the /tmp/evemu-%s.log file is also checked by
+            # _device_get() below.
+            output = target.shell.run(
+                "nohup %s /tmp/input-dev.desc >& /tmp/evemu-%s.log"
+                " & sleep 1s;"
+                " cat /tmp/evemu-%s.log"
+                % (self.evemu_device, did, did),
+                output = True, trim = True)
+            # this prints
+            ## NAME: /dev/input/eventX, so get it
+            eventX = self._evemu_device_log_extract(output)
+            if not eventX:
+                self.target.report_error(
+                    "%s: can't locate /dev/input/event* name in output to"
+                    " create new input device; retrying %d/%d"
+                    % (did, cnt, tries),
+                    dict(output = output))
+                continue
+            # take only the basename; /dev/input will be added by the FIFO
+            # itself, it is less chars to print
+            self.devices[did] = eventX
+            return
 
+        raise tc.error_e(
+            "%s: failed %d times to create input device" % (did, tries))
 
-    def evemu_target_setup(self, ic):
+    def evemu_target_setup(self, ic = None):
         """
         Setup a target to use the input subsystem with EVEMU
 
@@ -263,9 +289,9 @@ class extension(tc.target_extension_c):
           a client accessing
           *http://SERVERIP/ttbd-images-misc/evemu.bin.tar.gz* will be
           able to get this content. The server install instructions
-        provide for this to be the case.
+          provide for this to be the case.
         """
-        assert isinstance(ic, tc.target_c)
+        assert ic == None or isinstance(ic, tc.target_c)
         target = self.target
 
         # Download the new evemu binaries with statically linked
@@ -275,19 +301,19 @@ class extension(tc.target_extension_c):
         ## Usage: evemu-event [--sync] <device> --type <type> --code <code> --value <value>
         #
         # if the --fifo extensions are installed, there will be a
-        # --fifo in there
+        # --fifo=<file_name> in there
         if '<device>' in output:
             # evemu-event is installed
             self.evemu_event = "evemu-event"
             self.evemu_device = "evemu-device"
-            if '--fifo' in output:
+            if '--fifo=<file_name>' in output:
                 # evemu-event has --fifo support
                 self.evemu_event_fifo = "evemu-event --fifo="
                 target.report_info("INPUT/evemu: distro's with --fifo")
             else:
                 # upload helper
                 with msgid_c():
-                    target.shell.string_to_file(
+                    target.shell.string_copy_to_file(
                         # Each line is in the format:
                         #
                         # - <DEVICE> <TYPE> <CODE> <VALUE> [SYNC]
@@ -313,6 +339,8 @@ class extension(tc.target_extension_c):
 
         else:
             with msgid_c():
+                arch = target.shell.run("uname -m", output = True,
+                                        trim = True).strip()
                 # There is no evemu in the system, so let's upload our
                 # semistatic build from the POS cache.
                 rsync_server = target.kws.get(
@@ -321,14 +349,14 @@ class extension(tc.target_extension_c):
                 if rsync_server == None:
                     raise tc.error_e(
                         "INPUT/evemu: there is no place where to download"
-                        " evemu.bin.tar.gz for, need the"
+                        " evemu.bin.%s.tar.gz for, need the"
                         " target or interconnect to export"
-                        " *pos_rsync_server* with the location")
+                        " *pos_rsync_server* with the location" % arch)
                 http_server = "http://" \
                     + rsync_server.replace("::images", "/ttbd-images-misc")
                 target.shell.run(
-                    "curl --noproxy '*' -sk %s/evemu.bin.tar.gz"
-                    " --output /tmp/evemu.bin.tar.gz" % http_server)
+                    "curl --noproxy '*' -sk %s/evemu.bin.%s.tar.gz"
+                    " --output /tmp/evemu.bin.tar.gz" % (http_server, arch))
                 target.shell.run(
                     "tar xvvf /tmp/evemu.bin.tar.gz --overwrite -C /")
             self.evemu_event = "/opt/evemu/bin/evemu-event"
@@ -342,6 +370,7 @@ class extension(tc.target_extension_c):
         # start the FIFO pipe
         target.shell.run("nohup %s/tmp/evemu.fifo >& /tmp/evemu.log &"
                          % self.evemu_event_fifo)
+        target.shell.run("chmod a+rw /tmp/evemu.fifo")
 
     device_regex_valid = re.compile("^[0-9A-Za-z]+$")
     evtype_regex_valid = re.compile("^EV_[0-9A-Z]+$")
@@ -463,15 +492,15 @@ class extension(tc.target_extension_c):
             devcmd = entry[0]
             if devcmd == "WAIT":
                 try:
-                    _ = float(entry[1])
+                    wait_time = float(entry[1])
                     self.target.send(
-                        "WAIT %s\n" % entry[1])
+                        # WAIT takes milliseconds
+                        "WAIT %s\n" % wait_time)
                 except ValueError as e:
                     raise tc.error_e(
                         "INPUT sequence #%d: WAIT:"
                         " missing or invalid seconds field;"
                         " can't convert to float: %s" % (count, e))
-                self.target.console.write("WAIT %s\n" % entry[1])
                 continue
             if len(entry) != 4 and len(entry) == 5:
                 raise tc.error_e(
@@ -513,9 +542,18 @@ class extension(tc.target_extension_c):
         self.target.shell.run("cat /tmp/evemu.data > /tmp/evemu.fifo")
 
     def _device_get(self, did):
-        if did not in self.devices:
-            raise tc.error_e("INPUT: device ID %s does not exist" % did)
-        return self.devices[did]
+        if did in self.devices:
+            return self.devices[did]
+        # if this is an evemu-device (syntehtic) that is already
+        # running but we don't really know about it, let's try to find
+        # it. File /tmp/evemu-DID.log was created
+        output = self.target.shell.run("cat /tmp/evemu-%s.log || true" % did,
+                                       output = True, trim = True)
+        eventX = self._evemu_device_log_extract(output)
+        if eventX:
+            self.devices[did] = eventX
+            return eventX
+        raise tc.error_e("INPUT: device ID %s does not exist" % did)
 
     def mouse_move_to(self, x, y, did = "default_mouse"):
         """
@@ -523,15 +561,15 @@ class extension(tc.target_extension_c):
 
         The coordinates are given in an absolute form and require the
         mouse to support absolute addressing. The default mouse created
-        by :meth:`setup_target_evemu` can do this (axes range from
+        by :meth:`evemu_target_setup` can do this (axes range from
         0-65536).
 
-        :param int|float x: X coordinate where to click; if integer,
+        :param int or float x: X coordinate where to click; if integer,
           it is considered to be an absolute coordinate. If float
           between 0 and 1, a relative coordinate (0 leftmost edge, 1
           rightmost) If *None*, don't move the mouse on the X axis.
 
-        :param int|float y: Y coordinate where to click, same typing a
+        :param int or float y: Y coordinate where to click, same typing a
           X.  If *None*, don't move the mouse on the Y axis.
 
         :param str did: (optional) name of mouse to use; defaults
@@ -584,12 +622,12 @@ class extension(tc.target_extension_c):
 
         >>> self.input.mouse_click(0.5, 0.5)
 
-        :param int|float x: X coordinate where to click; if integer,
+        :param int or float x: X coordinate where to click; if integer,
           it is considered to be an absolute coordinate. If float
           between 0 and 1, a relative coordinate (0 leftmost edge, 1
           rightmost) If *None*, don't move the mouse on the X axis.
 
-        :param int|float y: Y coordinate where to click,same typing a X.
+        :param int or float y: Y coordinate where to click,same typing a X.
           If *None*, don't move the mouse on the Y axis.
 
         :param str did: (optional) name of mouse to use; defaults
@@ -676,7 +714,7 @@ class extension(tc.target_extension_c):
                     times = 1, interclick_time = 0.35):
         """
         Given the square where an image is detected (by the likes of
-        :ref:`target.capture.image_on_screenshot
+        :class:`target.capture.image_on_screenshot
         <tcfl.target_ext_capture.extension.image_on_screenshot>`),
         double click on that icon:
 
@@ -687,7 +725,7 @@ class extension(tc.target_extension_c):
         >>> self.input.image_click(r['icon-firefox_png'])
 
         :param dict detection: square where the image was detected by
-          :ref:`target.capture.image_on_screenshot
+          :class:`target.capture.image_on_screenshot
           <tcfl.target_ext_capture.extension.image_on_screenshot>`
 
         For info on other parameters, see :meth:`mouse_click`

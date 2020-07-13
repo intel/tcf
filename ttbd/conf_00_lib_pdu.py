@@ -20,7 +20,12 @@ def target_pdu_socket_add(name, pc, tags = None, power = True):
         tags = {}
     target = ttbl.test_target(name, _tags = tags)
     target.interface_add("power", ttbl.power.interface(pc))
-    ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+    ttbl.config.target_add(
+        target, tags = dict(
+            idle_power_off = 0, idle_poweroff = 0,     # COMPAT
+            idle_power_fully_off = 0
+        )
+    )
     if power:
         # FIXME: untested
         target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
@@ -74,13 +79,16 @@ def apc_pdu_add(name, powered_on_start = None, hostname = None):
         target.interface_add(
             "power",
             ttbl.power.interface(ttbl.apc.pci(hostname, i)))
-        ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+        ttbl.config.target_add(target, tags = dict(
+            idle_power_off = 0, idle_poweroff = 0,	# COMPAT
+            idle_power_fully_off = 0
+        ))
         target.disable("")
         if powered_on_start:
             target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
 
 
-def dlwps7_add(hostname, powered_on_start = None,
+def dlwps7_add(hostname, powered_on_start = None, basename = None,
                user = "admin", password = "1234"):
     """Add test targets to individually control each of a DLWPS7's sockets
 
@@ -121,6 +129,10 @@ def dlwps7_add(hostname, powered_on_start = None,
     :param str user: User name for HTTP Basic authentication
 
     :param str password: password for HTTP Basic authentication
+
+    :param str basename: (optional) use something else to generate the
+      target names if we want it different than the hostname. Defaults
+      to *hostname*.
 
     :param bool powered_on_start: what to do with the power on the
       downstream ports:
@@ -253,16 +265,24 @@ def dlwps7_add(hostname, powered_on_start = None,
          192.168.4.X	spM
 
     """
+    if basename == None:
+        basename = hostname
+    else:
+        isinstance(basename, basestring)
+
     for i in range(1, 9):
-        name = "%s-%d" % (hostname, i)
+        name = "%s-%d" % (basename, i)
         pc_url = "http://%s:%s@%s/%d" % (user, password, hostname, i)
         target = target_pdu_socket_add(
             name,
-            ttbl.pc.dlwps7(pc_url), 
+            ttbl.pc.dlwps7(pc_url),
             power = powered_on_start,
             # Always keep them on, unless we decide otherwise--we need
             # them to control other components
-            tags = dict(idle_poweroff = 0))
+            tags = dict(
+                idle_power_off = 0, idle_poweroff = 0, # COMPAT
+                idle_power_fully_off = 0
+            ))
         target.disable("")
 
 
@@ -338,7 +358,10 @@ try:
                 power = powered_on_start,
                 # Always keep them on, unless we decide otherwise--we need
                 # them to control other components
-                tags = dict(idle_poweroff = 0))
+                tags = dict(
+                    idle_power_off = 0, idle_poweroff = 0, # COMPAT
+                    idle_power_fully_off = 0
+                ))
             target.disable("")
 
 except ImportError as e:
@@ -346,7 +369,7 @@ except ImportError as e:
 
 
 def usbrly08b_targets_add(serial_number, target_name_prefix = None,
-                          power = False):
+                          powered_on_start = None):
     """Set up individual power control targets for each relay of a
     `Devantech USB-RLY08B
     <https://www.robot-electronics.co.uk/htm/usb_rly08btech.htm>`_
@@ -358,6 +381,15 @@ def usbrly08b_targets_add(serial_number, target_name_prefix = None,
 
     :param str target_name_prefix: (optional) Prefix for the target
       names (which defaults to *usbrly08b-SERIALNUMBER-*)
+
+    :param bool powered_on_start: what to do with the power on the
+      downstream ports:
+
+      - *None*: leave them as they are
+
+      - *False*: power them off
+
+      - *True*: power them on
 
     **Bill of materials**
 
@@ -427,11 +459,14 @@ def usbrly08b_targets_add(serial_number, target_name_prefix = None,
             power = powered_on_start,
             # Always keep them on, unless we decide otherwise--we need
             # them to control other components
-            tags = dict(idle_poweroff = 0))
+            tags = dict(
+                idle_power_off = 0, idle_poweroff = 0, # COMPAT
+                idle_power_fully_off = 0
+            ))
         target.disable("")
 
 
-def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
+def ykush_targets_add(ykush_serial, pc_url = None, powered_on_start = None):
     """Given the :ref:`serial number <ykush_serial_number>` for an YKUSH
     hub connected to the system, set up a number of targets to
     manually control it.
@@ -466,15 +501,15 @@ def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
     :param str ykush_serial: USB Serial Number of the hub
       (:ref:`finding <ykush_serial_number>`).
 
-    :param str pc_url: Power Control URL
+    :param str pc_url: (optional) Power Control URL
 
      - A DLPWS7 URL (:py:class:`ttbl.pc.dlwps7`), if given, will create a
        target *YKNNNNN* to power on or off the whole hub and wait for it
        to connect to the system.
 
-     - If None, no power control targets for the whole hub will be
-       created. It will just be expected the hub is connected permanently
-       to the system.
+     - If *None* (default) no power control targets for the whole hub
+       will be created. It will just be expected the hub is connected
+       permanently to the system.
 
     :param bool powered_on_start: what to do with the power on the
       downstream ports:
@@ -530,7 +565,10 @@ def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
     target.interface_add("power", ttbl.power.interface(*pcl))
     # Always keep them on, unless we decide otherwise--we need
     # them to control other components
-    ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+    ttbl.config.target_add(target, tags = dict(
+        idle_power_off = 0, idle_poweroff = 0, # COMPAT
+        idle_power_fully_off = 0
+    ))
     target.disable("")
     if powered_on_start:
         target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
@@ -542,7 +580,10 @@ def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
             ttbl.power.interface(ttbl.pc_ykush.ykush(ykush_serial, i)))
         # Always keep them on, unless we decide otherwise--we need
         # them to control other components
-        ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+        ttbl.config.target_add(target, tags = dict(
+            idle_power_off = 0, idle_poweroff = 0, # COMPAT
+            idle_power_fully_off = 0
+        ))
         target.disable("")
         if powered_on_start:
             target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)

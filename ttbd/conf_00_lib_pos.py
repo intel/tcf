@@ -617,17 +617,39 @@ def pos_target_add(
     assert isinstance(mac_addr, str), \
         "mac_addr must be a string HH:HH:HH:HH:HH:HH; got: %s %s" \
         % (type(name).__name__, name)
-    assert power_rail \
-        and (
-            # a single power rail or a char spec of it
-            isinstance(power_rail, (ttbl.power.impl_c, str))
-            or (
-                # a power rail list
-                isinstance(power_rail, list)
-                and all(isinstance(i, ttbl.power.impl_c)
-                        for i in power_rail))
-        ), \
-        "power_rail must be a power rail spec, see doc; got %s" % power_rail
+    if power_rail:
+        # FIXME: move to ttlb.power.validate_spec
+        if isinstance(power_rail, ttbl.power.impl_c):
+            pass
+        elif isinstance(power_rail, str):
+            # compat, a descriptor that gets transformed to a pc_dlwps7
+            pass
+        elif isinstance(power_rail, list):
+            count = -1
+            for pc in power_rail:
+                count += 1
+                if isinstance(pc, ttbl.power.impl_c):
+                    continue
+                if isinstance(pc, (tuple, list)):
+                    # list of NAME, IMPL
+                    if len(pc) != 2:
+                        raise AssertionError(
+                            "power rail #%d: list of %d items given;"
+                            " expect 2 (NAME, IMPL)" % (count, len(pc)))
+                    pc_name = pc[0]
+                    pc_impl = pc[1]
+                    if not isinstance(pc_name, str):
+                        raise AssertionError(
+                            "power rail #%d: first element must be a string; got %s"
+                            % (count, type(pc_name)))
+                    if not isinstance(pc_impl, ttbl.power.impl_c):
+                        raise AssertionError(
+                            "power rail #%d: second element must be a ttbl.power.impl_c; got %s"
+                            % (count, type(pc_impl)))
+        else:
+            raise AssertionError(
+                "power rail must be a power rail spec (ttbl.power.impl_c"
+                " or list of them), see doc; got %s" % power_rail)
     assert isinstance(boot_disk, str) \
         and not '/' in boot_disk, \
         'boot_disk is the base name of the disk from which ' \
@@ -986,6 +1008,7 @@ def target_qemu_pos_add(target_name,
     # STATE_DIR/console-NAME.{read,write}
     console_pc = ttbl.console.generic_c(chunk_size = 8,
                                         interchunk_wait = 0.15)
+    console_pc.crlf = "\r"
     console_pc.upid_set(qemu_pc.name, **qemu_pc.upid)
     ssh_pc = ttbl.console.ssh_pc("root@" + ipv4_addr)
     ssh_pc.upid_set(qemu_pc.name, **qemu_pc.upid)

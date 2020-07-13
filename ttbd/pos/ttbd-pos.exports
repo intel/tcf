@@ -1,0 +1,2 @@
+# NFS configuration file for TCF's Provisioning services
+/home/ttbd/images/tcf-live/x86_64 *(ro,no_root_squash)

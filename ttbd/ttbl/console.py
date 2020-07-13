@@ -62,12 +62,12 @@ class impl_c(ttbl.tt_interface_impl_c):
       >>> serial0_pc = ttbl.console.ssh_pc(
       >>>     "USER:PASSWORD@LANTRONIXHOSTNAME",
       >>>     command_sequence = [
-      >>>       ## Welcome to the Lantronix SLSLP^M$
-      >>>       ## Firmware: version 030031, build 38120^M$
-      >>>       ## Last login: Thu Jan  1 00:04:20 1970 from 10.24.11.35^M$
-      >>>       ## Current time: Thu Jan  1 00:02:03 1970^M$
-      >>>       ## For a list of commands, type 'help'^M$
-
+      >>>       ## Welcome to the Lantronix SLSLP
+      >>>       ## Firmware: version 030031, build 38120
+      >>>       ## Last login: Thu Jan  1 00:04:20 1970 from 10.24.11.35
+      >>>       ## Current time: Thu Jan  1 00:02:03 1970
+      >>>       ## For a list of commands, type 'help'
+      >>>
       >>>       # command prompt, 'CR[USERNAME@IP]> '... or not, so just
       >>>       # look for 'SOMETHING> '
       >>>       # ^ will not match because we are getting a Carriage
@@ -75,14 +75,14 @@ class impl_c(ttbl.tt_interface_impl_c):
       >>>       (
       >>>           # send a disconnect just in case it is connected
       >>>           # and wait for the command prompt
-      >>>           "\x1bexit\r\n",
+      >>>           "\\x1bexit\\r\\n",
       >>>           # command prompt, 'CR[USERNAME@IP]> '... or not, so just
       >>>           # look for 'SOMETHING> '
       >>>           # ^ will not match because we are getting a CR
       >>>           re.compile("[^>]+> ")
       >>>       ),
       >>>       (
-      >>>           "connect serial\r\n",
+      >>>           "connect serial\\r\\n",
       >>>           "To exit serial port connection, type 'ESC exit'."
       >>>       ),
       >>>     ],
@@ -112,8 +112,19 @@ class impl_c(ttbl.tt_interface_impl_c):
 
     :param int command_timeout: (optional) number of seconds to wait
       for a response ot a command before declaring a timeout
+
+    :param str crlf: (optional; default *None*) newline convention for
+      this console; this is informational for the clients, to know which
+      string they need to use as end of line; the only practical
+      choices are:
+
+      - ``\\r``: one carriage return
+      - ``\\n``: one new line
+      - ``\\r\\n``: one carriage return followed by a new line
+
     """
-    def __init__(self, command_sequence = None, command_timeout = 5):
+    def __init__(self, command_sequence = None, command_timeout = 5,
+                 crlf = '\r'):
         assert command_sequence == None \
             or isinstance(command_sequence, list), \
             "command_sequence: expected list of tuples; got %s" \
@@ -122,6 +133,9 @@ class impl_c(ttbl.tt_interface_impl_c):
         self.command_sequence = command_sequence
         self.command_timeout = command_timeout
         self.parameters = {}
+        assert crlf == None or isinstance(crlf, str), \
+            "console implementation declares CRLF with" \
+            " a type %s; expected string" % type(crlf)
         ttbl.tt_interface_impl_c.__init__(self)
         #: Check if the implementation's link died and it has to be
         #: re-enabled
@@ -133,6 +147,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         #: reports is disabled because the link died but it should be
         #: enabled, it will be automatically re-enabled.
         self.re_enable_if_dead = False
+        self.crlf = crlf
 
     class exception(Exception):
         """
@@ -266,21 +281,21 @@ class impl_c(ttbl.tt_interface_impl_c):
                              % (console, expect.after))
 
     def _response(self, target, console, expect, response, timeout,
-                  response_str):
+                  response_str, count):
         ts0 = time.time()
         ts = ts0
         while ts - ts0 < timeout:
             try:
                 r = expect.expect(response, timeout = timeout - (ts - ts0))
                 ts = time.time()
-                target.log.error("%s: found response: [+%.1fs] #%s: %s"
-                                 % (console, ts - ts0, r, response_str))
+                target.log.info("%s: found response: [+%.1fs] #%d r %s: %s"
+                                % (console, ts - ts0, count, r, response_str))
                 return
             except pexpect_TIMEOUT as e:
                 self._log_expect_error(target, console, expect, "timeout")
-                raise self.timeout_e(
-                    "%s: timeout [+%.1fs] waiting for response: %s"
-                    % (console, timeout, response_str))
+                # let's try again, if we full timeout, it will be raised below
+                time.sleep(0.5)
+                continue
             except pexpect_EOF as e:
                 ts = time.time()
                 offset = os.lseek(expect.fileno(), 0, os.SEEK_CUR)
@@ -313,9 +328,10 @@ class impl_c(ttbl.tt_interface_impl_c):
             fcntl.fcntl(rfd, fcntl.F_SETFL, flag | os.O_NONBLOCK)
             expect = pexpect.fdpexpect.fdspawn(rf, logfile = logf,
                                                timeout = timeout)
+            count = 0
             for command, response in self.command_sequence:
                 if command:
-                    target.log.debug(
+                    target.log.info(
                         "%s: writing command: %s"
                         % (component, command.encode('unicode-escape',
                                                      errors = 'replace')))
@@ -328,7 +344,9 @@ class impl_c(ttbl.tt_interface_impl_c):
                     target.log.debug("%s: expecting response: %s"
                                      % (component, response_str))
                     self._response(target, component,
-                                   expect, response, timeout, response_str)
+                                   expect, response, timeout, response_str,
+                                   count)
+                count += 1
         # now that the handshake has been done, kill whatever has been
         # read for it so we don't confuse it as console input
         with codecs.open(read_file_name, "w", encoding = 'utf-8') as rf:
@@ -359,9 +377,10 @@ class interface(ttbl.tt_interface):
       Names have to be valid python symbol names following the
       following convention:
 
-      - *serial\**  RS-232C compatible physical Serial port
-      - *sol\**     IPMI Serial-Over-Lan
-      - *ssh\**     SSH session (may require setup before enabling)
+      - *serial\**: RS-232C compatible physical Serial port
+      - *sol\**: IPMI Serial-Over-Lan
+      - *ssh\**: SSH session (may require setup before enabling and
+        *enabling* before using)
 
     A *default* console is set by declaring an alias as in the example
     above; otherwise the first one listed in
@@ -407,6 +426,16 @@ class interface(ttbl.tt_interface):
         # matter what, and we want it to fail early and not seem there
         # is something odd.
         target.power_off_pre_fns.append(self._pre_off_disable_all)
+        for console, impl in self.impls.items():
+            if impl.crlf:
+                # if it declares a CRLF string, publish it
+                assert isinstance(impl.crlf, str), \
+                    "%s: target declares CRLF for console %s with" \
+                    " a type %s; expected string" % (
+                        target.id, console, type(impl.crlf))
+                target.fsdb.set("interfaces.console." + console + ".crlf",
+                                impl.crlf)
+
 
     def _release_hook(self, target, _force):
         # nothing to do on target release
@@ -438,7 +467,7 @@ class interface(ttbl.tt_interface):
           default console's name
 
         :returns str: the name of the default console
-        :raises RuntimeError: if there are no consoles
+        :raises: *RuntimeError* if there are no consoles
         """
         console_default = target.property_get("interfaces.console.default", None)
         try:
@@ -460,8 +489,10 @@ class interface(ttbl.tt_interface):
     def put_setup(self, target, who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         parameters = dict()
-        for k, v in args.items():
-            parameters[k] = v
+        for k in list(args.keys()):
+            # get the argument with arg_get, since some of it might be
+            # JSON encoded
+            parameters[k] = self.arg_get(args, k, arg_type = None)
         if 'ticket' in parameters:
             del parameters['ticket']
         del parameters['component']
@@ -564,7 +595,7 @@ class interface(ttbl.tt_interface):
             while True:
                 try:
                     impl.write(target, component,
-                               self._arg_get(args, 'data'))
+                               self.arg_get(args, 'data', str, False))
                     break
                 except OSError:
                     # sometimes many of these errors happen because the
@@ -618,7 +649,7 @@ class generic_c(impl_c):
       If given, this is a dictionary of characters to strings, eg:
 
       >>> escape_chars = {
-      >>>   '\x1b': '\x1b',
+      >>>   '\\x1b': '\\x1b',
       >>>   '~': '\\',
       >>> }
 
@@ -629,14 +660,16 @@ class generic_c(impl_c):
 
     """
     def __init__(self, chunk_size = 0, interchunk_wait = 0.2,
-                 command_sequence = None, escape_chars = None):
+                 command_sequence = None, escape_chars = None,
+                 crlf = '\r'):
         assert chunk_size >= 0
         assert interchunk_wait > 0
         assert escape_chars == None or isinstance(escape_chars, dict)
 
         self.chunk_size = chunk_size
         self.interchunk_wait = interchunk_wait
-        impl_c.__init__(self, command_sequence = command_sequence)
+        impl_c.__init__(self, command_sequence = command_sequence,
+                        crlf = crlf)
         if escape_chars == None:
             self.escape_chars = {}
         else:
@@ -897,7 +930,8 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
         generic_c.__init__(self,
                            chunk_size = chunk_size,
                            interchunk_wait = interchunk_wait,
-                           command_sequence = command_sequence)
+                           command_sequence = command_sequence,
+                           crlf = '\r')
         ttbl.power.socat_pc.__init__(
             self,
             "PTY,link=console-%(component)s.write,rawer"
@@ -946,6 +980,20 @@ ForwardX11 = no
 ForwardAgent = no
 EscapeChar = none
 %s""" % (target.state_dir, component, _extra_opts))
+        ssh_user = target.fsdb.get(
+            "interfaces.console." + component + ".parameter_user", None)
+        ssh_port = target.fsdb.get(
+            "interfaces.console." + component + ".parameter_port", None)
+        ssh_password = target.fsdb.get(
+            "interfaces.console." + component + ".parameter_password", None)
+        # FIXME: validate port, username basic format
+        if ssh_user:
+            self.kws['username'] = ssh_user
+        if ssh_port:
+            self.kws['port'] = ssh_port
+        if ssh_password:
+            # if one was specified, use it
+            self.env_add['SSHPASS'] = ssh_password
         ttbl.power.socat_pc.on(self, target, component)
         generation_set(target, component)
         generic_c.enable(self, target, component)
@@ -956,12 +1004,16 @@ EscapeChar = none
 
     # console interface; state() is implemented by generic_c
     def setup(self, target, component, parameters):
+        # For SSH, all the paremeters are in FSDB
         if parameters == {}:		# reset
-            self.parameters = dict(self.parameters_default)
-                # SSHPASS always has to be defined
-            self.env_add['SSHPASS'] = self.password if self.password else ""
-            self.kws['username'] = self.parameters['user']
-            return dict(result = self.parameters)
+            # wipe existing parameters
+            for param_key in target.fsdb.keys("interfaces.console."
+                                              + component + ".parameter_*"):
+                target.fsdb.set(param_key, None, True)
+            for key, value in self.parameters_default.items():
+                target.fsdb.set("interfaces.console."
+                                + component + ".parameter_" + key, value, True)
+            return {}
 
         # things we allow
         allowed_keys = [ 'user', 'password' ]
@@ -977,14 +1029,9 @@ EscapeChar = none
 
         # ok, all verify, let's set it
         for key, value in parameters.items():
-            if key == 'user':
-                self.kws['username'] = value
-            elif key == 'password':
-                # SSHPASS always has to be defined
-                self.env_add['SSHPASS'] = value if value else ""
-            else:
-                self.parameters[key] = value
-        return dict(result = self.parameters)
+            target.fsdb.set("interfaces.console."
+                            + component + ".parameter_" + key, value, True)
+        return {}
 
     def enable(self, target, component):
         self.on(target, component)

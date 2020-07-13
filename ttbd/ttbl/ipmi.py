@@ -40,10 +40,14 @@ class pci(ttbl.power.impl_c):
       passed to *ipmitool*'s *-N* option
     :param int ipmi_retries: times to retry the IPMI operation (will be
       passed to *ipmitool*'s *-R* option.
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, hostname, ipmi_timeout = 10, ipmi_retries = 3):
-        ttbl.power.impl_c.__init__(self, paranoid = True)
-        user, password, hostname = commonl.split_user_pwd_hostname(hostname)
+    def __init__(self, bmc_hostname, ipmi_timeout = 10, ipmi_retries = 3,
+                 **kwargs):
+        ttbl.power.impl_c.__init__(self, paranoid = True, **kwargs)
+        user, password, hostname \
+            = commonl.split_user_pwd_hostname(bmc_hostname)
         self.hostname = hostname
         self.user = user
         self.bmc = None
@@ -150,12 +154,15 @@ class pos_mode_c(ttbl.power.impl_c):
       passed to *ipmitool*'s *-N* option
     :param int ipmi_retries: times to retry the IPMI operation (will be
       passed to *ipmitool*'s *-R* option.
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, hostname, ipmi_timeout = 10, ipmi_retries = 3):
+    def __init__(self, hostname, ipmi_timeout = 10, ipmi_retries = 3,
+                 **kwargs):
         assert isinstance(hostname, str)
         assert isinstance(ipmi_timeout, numbers.Real)
         assert isinstance(ipmi_retries, int)
-        ttbl.power.impl_c.__init__(self, paranoid = True)
+        ttbl.power.impl_c.__init__(self, paranoid = True, **kwargs)
         self.power_on_recovery = True
         self.paranoid_get_samples = 1
         user, password, hostname = commonl.split_user_pwd_hostname(hostname)
@@ -198,7 +205,6 @@ class pos_mode_c(ttbl.power.impl_c):
         # better, because we seem not to be able to get the system to
         # acknowledge the BIOS boot order
         if target.fsdb.get("pos_mode") == 'pxe':
-            target.log.error("DEBUG POS boot: telling system to boot network")
             # self._run(target, [ "chassis", "bootdev", "pxe" ])
             self._run(target, [ "chassis", "bootparam",
                                 "set", "bootflag", "force_pxe" ])
@@ -286,7 +292,8 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
         assert isinstance(ipmi_timeout, numbers.Real)
         assert isinstance(ipmi_retries, int)
         ttbl.console.generic_c.__init__(self, chunk_size = chunk_size,
-                                        interchunk_wait = interchunk_wait)
+                                        interchunk_wait = interchunk_wait,
+                                        crlf = "\n")
         ttbl.power.socat_pc.__init__(
             self,
             "PTY,link=console-%(component)s.write,rawer"
@@ -335,7 +342,7 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
         ttbl.console.generic_c.enable(self, target, component)
 
     def off(self, target, component):
-        generic_c.disable(self, target, component)
+        ttbl.console.generic_c.disable(self, target, component)
         ttbl.power.socat_pc.off(self, target, component)
 
     # console interface; state() implemented by generic_c
@@ -375,9 +382,9 @@ class sol_ssh_console_pc(ttbl.console.ssh_pc):
                  ipmi_timeout = 10, ipmi_retries = 3):
         assert isinstance(ipmi_timeout, numbers.Real)
         assert isinstance(ipmi_retries, int)
-        ttbl.console.ssh_pc.__init__(self, hostname,
-                                     port = ssh_port, chunk_size = chunk_size,
-                                     interchunk_wait = interchunk_wait)
+        ttbl.console.ssh_pc.__init__(
+            self, hostname, port = ssh_port,
+            chunk_size = chunk_size, interchunk_wait = interchunk_wait)
         _user, password, _hostname = commonl.split_user_pwd_hostname(hostname)
         self.ipmi_timeout = ipmi_timeout
         self.ipmi_retries = ipmi_retries

@@ -298,6 +298,12 @@ class driver(tcfl.tc.report_driver_c):
                     elif isinstance(attachment, str):
                         # MongoDB doesn't like bad UTF8, so filter a wee bit
                         result["attachment"][key] = commonl.mkutf8(attachment)
+                    elif isinstance(attachment, Exception):
+                        # We can't really encode everyhing, so we'll take
+                        # the message and be done
+                        result["attachment"][key] = str(attachment)
+                    elif isinstance(attachment, tcfl.tc.target_c):
+                        result["attachment"][key] = attachment.fullid
                     else:
                         result["attachment"][key] = attachment
 

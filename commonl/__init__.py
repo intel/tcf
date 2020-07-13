@@ -265,8 +265,6 @@ def mkid(something, l = 10):
         h = hashlib.sha512(something)
     return base64.b32encode(h.digest())[:l].lower().decode('utf-8', 'ignore')
 
-
-
 def trim_trailing(s, trailer):
     """
     Trim *trailer* from the end of *s* (if present) and return it.
@@ -279,6 +277,22 @@ def trim_trailing(s, trailer):
         return s[:-tl]
     else:
         return s
+
+def verify_str_safe(s, safe_chars = None):
+    """
+    Raise an exception if string contains unsafe chars
+
+    :param str s: string to check
+    :param str safe_chars: (optional) list/set of valid chars
+      (defaults to ASCII letters, digits, - and _)
+    """
+    if safe_chars == None:
+        safe_chars = set('-_' + string.ascii_letters + string.digits)
+    s_set = set(s)
+    s_unsafe = s_set - s_set.intersection(safe_chars)
+    assert not s_unsafe, \
+        "%s: contains invalid characters: %s (valid are: %s)" % (
+            s, "".join(s_unsafe), "".join(safe_chars))
 
 
 def name_make_safe(name, safe_chars = None):
@@ -338,8 +352,13 @@ def request_response_maybe_raise(response):
     if not response:
         try:
             json = response.json()
-            if json != None and 'message' in json:
-                message = json['message']
+            if json != None:
+                if '_message' in json:
+                    message = json['_message']
+                elif 'message' in json:	# COMPAT: older daemons
+                    message = json['message']
+                else:
+                    message = "no specific error text available"
             else:
                 message = "no specific error text available"
         except ValueError as e:
@@ -421,7 +440,7 @@ def rm_f(filename):
         if e.errno != errno.ENOENT:
             raise
 
-def makedirs_p(dirname, mode = None):
+def makedirs_p(dirname, mode = None, reason = None):
     """
     Create a directory tree, ignoring an error if it already exists
 
@@ -437,7 +456,11 @@ def makedirs_p(dirname, mode = None):
             os.chmod(dirname, mode)
     except OSError:
         if not os.path.isdir(dirname):
-            raise
+            raise RuntimeError("%s: path for %s is not a directory"
+                               % (dirname, reason))
+        if not os.access(dirname, os.W_OK):
+            raise RuntimeError("%s: path for %s does not allow writes"
+                               % (dirname, reason))
 
 def symlink_f(source, dest):
     """
@@ -1429,7 +1452,7 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
     :param str prefix: prefix to start with (defaults to nothing)
     :param str separator: used to separate dictionary keys from the
       prefix (defaults to ".")
-    :param FILE of: output stream where to print (defaults to
+    :param :python:file of: output stream where to print (defaults to
       *sys.stdout*)
     :param int depth_limit: maximum nesting levels to go deep in the
       data structure (defaults to 10)
@@ -1562,14 +1585,15 @@ class io_tls_prefix_lines_c(io.BufferedWriter):
        import io
        import commonl
        import threading
-   
+
        tls = threading.local()
-   
+
        f = io.open("/dev/stdout", "w")
        with commonl.tls_prefix_c(tls, "PREFIX"), \
             commonl.io_tls_prefix_lines_c(tls, f.detach()) as of:
-   
+
            of.write(u"line1\nline2\nline3\n")
+
 
     Limitations:
 
@@ -1727,3 +1751,100 @@ def file_iterator(filename, chunk_size = 4096):
                 break
             yield data
 
+def assert_list_of_strings(l, list_name, item_name):
+    assert isinstance(l, list), \
+        "'%s' needs to be None or a list of strings (%s); got %s" % (
+            list_name, item_name, type(l))
+    count = -1
+    for i in l:
+        count += 1
+        assert isinstance(i, basestring), \
+            "items in '%s' needs to be strings (%s); got %s on #%d"  % (
+                list_name, item_name, type(i), count)
+
+def assert_list_of_types(l, list_name, item_name, item_types):
+    assert isinstance(l, list), \
+        "'%s' needs to be None or a list of strings (%s); got %s" % (
+            list_name, item_name, type(l))
+    count = -1
+    for i in l:
+        count += 1
+        assert isinstance(i, item_types), \
+            "items in '%s' needs to be %s (%s); got %s on #%d"  % (
+                list_name, "|".join(i.__name__ for i in item_types),
+                item_name, type(i), count)
+
+def assert_none_or_list_of_strings(l, list_name, item_name):
+    if l == None:
+        return
+    assert_list_of_strings(l, list_name, item_name)
+
+def assert_dict_of_strings(d, d_name):
+    for k, v in d.items():
+        assert isinstance(k, basestring), \
+            "'%s' needs to be a dict of strings keyed by string;" \
+            " got a key type '%s'; expected string" % (d_name, type(k))
+        assert isinstance(v, basestring), \
+            "'%s' needs to be a dict of strings keyed by string;" \
+            " for key '%s' got a value type '%s'" % (d_name, k, type(v))
+
+def assert_dict_of_ints(d, d_name):
+    for k, v in d.items():
+        assert isinstance(k, basestring), \
+            "'%s' needs to be a dict of ints keyed by string;" \
+            " got a key type '%s'; expected string" % (d_name, type(k))
+        assert isinstance(v, int), \
+            "'%s' needs to be a dict of ints keyed by string;" \
+            " for key '%s' got a value type '%s'" % (d_name, k, type(v))
+
+def assert_none_or_dict_of_strings(d, d_name):
+    if d == None:
+        return
+    assert_dict_of_strings(d, d_name)
+
+#: List of known compressed extensions and ways to decompress them
+#: without removing the input file
+#:
+#: To add more:
+#:
+#: >>> commonl.decompress_handlers[".gz"] = "gz -fkd"
+decompress_handlers = {
+    # keep compressed files
+    ".gz": "gz -fkd",
+    ".bz2": "bzip2 -fkd",
+    ".xz": "xz -fkd",
+}
+
+def maybe_decompress(filename, force = False):
+    """
+    Decompress a file if it has a compressed file extension and return
+    the decompressed name
+
+    If the decompressed file already exists, assume it is the
+    decompressed version already and do not decompress.
+
+    :param str filename: a filename to maybe decompress
+
+    :params bool force: (optional, default *False*) if *True*,
+      decompress even if the decompressed file already exists
+
+    :returns str: the name of the file; if it was compressed. If it
+      is *file.ext*, where *ext* is a compressed file extension, then
+      it decompresses the file to *file* and returns *file*, without
+      removing the original *file.ext*.
+
+    The compressed extensions are registered in
+    :data:`decompress_handlers`.
+
+    """
+    assert isinstance(filename, basestring)
+    basename, ext = os.path.splitext(filename)
+    if ext not in decompress_handlers:	# compressed logfile support
+        return filename
+    if force or not os.path.exists(basename):
+        # FIXME: we need a lock in case we have multiple
+        # processes doing this
+        command = decompress_handlers[ext]
+        subprocess.check_call(command.split() + [ filename ],
+                              stdin = subprocess.PIPE)
+    return basename

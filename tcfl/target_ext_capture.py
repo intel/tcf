@@ -350,7 +350,7 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
             self.template_image_filename, self.template_img,
             min_width = self.min_width, min_height = self.min_height)
         if self.in_area:
-            r_in_area = []
+            r_in_area = {}
             ax0 = self.in_area[0]
             ay0 = self.in_area[1]
             ax1 = self.in_area[2]
@@ -608,9 +608,8 @@ class extension(tc.target_extension_c):
         target = self.target
 
         capture_spec = {}
-        for capture in target.rt['capture'].split():	# gather types
-            capturer, streaming, mimetype = capture.split(":", 2)
-            capture_spec[capturer] = (streaming, mimetype)
+        for name, data in target.rt['interfaces'].get('capture', {}).items():
+            capture_spec[name] = ( data['type'], data['mimetype'] )
         capturers = target.capture.list()		# gather states
 
         target.report_info("capturers: listed %s" \
