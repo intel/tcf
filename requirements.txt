@@ -1,13 +1,11 @@
 Jinja2
 PyYAML
 asciimatics
-functools32
 imutils
 ipaddress
 junit_xml
 keyring
 numpy
-opencv-python
 opencv-python
 ply
 pykwalify
