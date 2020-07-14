@@ -119,8 +119,8 @@ def ansi_key_code(key, term):
 
     :return str: ANSI sequence for that key in that terminal
     """
-    assert isinstance(key, basestring)
-    assert isinstance(term, basestring)
+    assert isinstance(key, str)
+    assert isinstance(term, str)
 
     if key not in ansi_key_codes:
         return key
@@ -227,14 +227,14 @@ def menu_scroll_to_entry(
       this would also include an entry called *macaddr*
     """
     assert isinstance(target, tcfl.tc.target_c)
-    assert isinstance(entry_string, basestring)
+    assert isinstance(entry_string, str)
     assert isinstance(has_value, bool), \
         "has_value: expected bool; got %s: %s" % (type(has_value), has_value)
     assert isinstance(max_scrolls, int) and max_scrolls > 0
-    assert isinstance(highlight_string, basestring)
-    assert isinstance(normal_string, basestring)
+    assert isinstance(highlight_string, str)
+    assert isinstance(normal_string, str)
     assert direction in [ 'up', 'down' ]
-    assert isinstance(level, basestring)
+    assert isinstance(level, str)
     assert isinstance(timeout, int) and timeout > 0
 
     if direction == 'up':
@@ -458,11 +458,11 @@ def menu_dig_to(
     """
     assert isinstance(target, tcfl.tc.target_c)
     commonl.assert_list_of_types(entries, "entries", "entry",
-                                 ( basestring, tuple))
-    assert isinstance(canary_end_menu_redrawn, basestring)
-    assert isinstance(highlight_string, basestring)
+                                 ( str, tuple))
+    assert isinstance(canary_end_menu_redrawn, str)
+    assert isinstance(highlight_string, str)
     assert isinstance(dig_last, bool)
-    assert isinstance(level, basestring)
+    assert isinstance(level, str)
 
     cnt = 0
     rs = collections.OrderedDict()
@@ -557,13 +557,13 @@ def submenu_header_expect(
 
     """
     assert isinstance(target, tcfl.tc.target_c)
-    assert isinstance(menu_title, basestring)
+    assert isinstance(menu_title, str)
     assert canary_end_menu_redrawn == None \
-        or isinstance(canary_end_menu_redrawn, basestring)
+        or isinstance(canary_end_menu_redrawn, str)
     if menu_name == None:
         menu_name = menu_title
     else:
-        assert isinstance(menu_title, basestring)
+        assert isinstance(menu_title, str)
     start_of_menu = re.compile(r"/-+\\")
     end_of_menu = re.compile(r"\-+/")
     target.expect(start_of_menu,
@@ -638,11 +638,11 @@ def multiple_entry_select_one(
     and scroll until what we want is selected
     """
     assert isinstance(target, tcfl.tc.target_c)
-    assert isinstance(select_entry, basestring)
+    assert isinstance(select_entry, str)
     assert isinstance(max_scrolls, int) and max_scrolls > 0
     assert isinstance(wait, numbers.Real) and wait > 0
     assert isinstance(timeout, numbers.Real) and timeout > 0
-    assert isinstance(level, basestring)
+    assert isinstance(level, str)
 
     _direction = False
     entry_highlighted_regex = re.compile(
@@ -1003,8 +1003,8 @@ def boot_network_http_boot_add_entry(target, entry, url):
     :returns: *True* if enabled, *False* if it was already enabled.
     """
     assert isinstance(target, tcfl.tc.target_c)
-    assert isinstance(entry, basestring)
-    assert isinstance(url, basestring)
+    assert isinstance(entry, str)
+    assert isinstance(url, str)
 
     r = menu_scroll_to_entry(target, "Input the description",
                              level = "HTTP Boot Menu",
@@ -1073,7 +1073,7 @@ def main_boot_select_entry(target, boot_entry):
     """
     # FIXME: do straight from the boot menu
     assert isinstance(target, tcfl.tc.target_c)
-    assert isinstance(boot_entry, basestring)
+    assert isinstance(boot_entry, str)
 
     # Now we are in the Boot Manager Menu; we need to check if
     # there is a UEFI PXEv4 entry -- if not, it means the network
@@ -1117,8 +1117,8 @@ def boot_network_http(target, entry, url,
     """
     # FIXME: do straight from the boot menu with the hot key
     assert isinstance(target, tcfl.tc.target_c)
-    assert isinstance(entry, basestring)
-    assert isinstance(url, basestring)
+    assert isinstance(entry, str)
+    assert isinstance(url, str)
     assert isinstance(assume_in_main_menu, bool)
 
     top = 4
@@ -1195,7 +1195,7 @@ def boot_network_pxe(target, entry = "UEFI PXEv4.*",
       it to arrive.
     """
     assert isinstance(target, tcfl.tc.target_c)
-    assert isinstance(entry, basestring)
+    assert isinstance(entry, str)
     assert isinstance(assume_in_main_menu, bool)
     top = 4
     for cnt in range(top):

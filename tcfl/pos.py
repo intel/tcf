@@ -256,7 +256,7 @@ def mount_root_part(target, root_part_dev, repartition):
     Mount a root partition on target's */mnt*, maybe repartitioning
     """
     assert isinstance(target, tc.target_c)
-    assert isinstance(root_part_dev, basestring)
+    assert isinstance(root_part_dev, str)
     assert callable(repartition)
     root_part_dev_base = os.path.basename(root_part_dev)
     # save for other functions called later
@@ -883,7 +883,7 @@ class extension(tc.target_extension_c):
 
         mount_fs_fn = self.cap_fn_get("mount_fs")
         root_part_dev = mount_fs_fn(self.target, image, boot_dev)
-        assert isinstance(root_part_dev, basestring), \
+        assert isinstance(root_part_dev, str), \
             "cap 'mount_fs' by %s:%s(): did not return a string with the" \
             " name of the root partition device, but %s" % (
                 inspect.getsourcefile(mount_fs_fn), mount_fs_fn.__name__,

@@ -524,7 +524,7 @@ def linux_wait_host_online(target, hostname, loops = 20):
     access and thus is online.
     """
     assert isinstance(target, tcfl.tc.target_c)
-    assert isinstance(hostname, basestring)
+    assert isinstance(hostname, str)
     assert loops > 0
     target.shell.run(
         "for i in {1..%d}; do"

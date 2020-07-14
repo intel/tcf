@@ -493,7 +493,7 @@ class vlan_pci(ttbl.power.impl_c):
                     % (iface_name, target.kws['ipv4_addr']))
                 return False	                # IPv4 address mismatch
             prefixlen = ipaddress.IPv4Network(
-                unicode('0.0.0.0/' + addr['netmask'])).prefixlen
+                str('0.0.0.0/' + addr['netmask'])).prefixlen
             if prefixlen != target.kws['ipv4_prefix_len']:
                 target.log.info(
                     "vlan_pci/%s: off because ipv4 prefix is %s; expected %s"
@@ -513,7 +513,7 @@ class vlan_pci(ttbl.power.impl_c):
                     "vlan_pci/%s: off because ipv6 address %s not assigned"
                     % (iface_name, target.kws['ipv6_addr']))
                 return False	                # IPv6 address mismatch
-            prefixlen = ipaddress.IPv6Network(unicode(addr['netmask'])).prefixlen
+            prefixlen = ipaddress.IPv6Network(str(addr['netmask'])).prefixlen
             if prefixlen != target.kws['ipv6_prefix_len']:
                 target.log.info(
                     "vlan_pci/%s: off because ipv6 prefix is %s; expected %s"

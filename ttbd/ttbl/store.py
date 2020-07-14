@@ -72,7 +72,7 @@ class interface(ttbl.tt_interface):
                 # the file does not exist, ignore it
         if filenames:
             for filename in filenames:
-                if isinstance(filename, basestring):
+                if isinstance(filename, str):
                     _list_filename(filename)
         else:
             for _path, _dirnames, filenames in os.walk(user_path):
@@ -81,7 +81,7 @@ class interface(ttbl.tt_interface):
         return dict(result = file_data)
 
     def post_file(self, target, _who, args, files, user_path):
-        file_path = self.arg_get(args, 'file_path', basestring)
+        file_path = self.arg_get(args, 'file_path', str)
         file_object = files['file']
         file_path_final = self._validate_file_path(file_path, user_path)
         commonl.makedirs_p(user_path)
@@ -90,7 +90,7 @@ class interface(ttbl.tt_interface):
         return dict()
 
     def get_file(self, _target, _who, args, _files, user_path):
-        file_path = self.arg_get(args, 'file_path', basestring)
+        file_path = self.arg_get(args, 'file_path', str)
         file_path_final = self._validate_file_path(file_path, user_path)
         # interface core has file streaming support builtin
         # already, it will take care of streaming the file to the
@@ -98,7 +98,7 @@ class interface(ttbl.tt_interface):
         return dict(stream_file = file_path_final)
 
     def delete_file(self, _target, _who, args, _files, user_path):
-        file_path = self.arg_get(args, 'file_path', basestring)
+        file_path = self.arg_get(args, 'file_path', str)
         file_path_final = self._validate_file_path(file_path, user_path)
         commonl.rm_f(file_path_final)
         return dict()

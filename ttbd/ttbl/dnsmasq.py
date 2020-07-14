@@ -219,7 +219,7 @@ class pc(ttbl.power.daemon_c):
                 # FIXME: while this is working, it is still not giving
                 # the IPv6 address we hardcoded in the doc :/
                 ipv6_prefix_len = ic.kws['ipv6_prefix_len']
-                network = ipaddress.IPv6Network(unicode(
+                network = ipaddress.IPv6Network(str(
                     ic_ipv6_addr + "/" + str(ipv6_prefix_len)), strict = False)
                 configl.append("dhcp-range=%s,%s,%s" % (
                     ic_ipv6_addr, network.broadcast_address, ipv6_prefix_len))

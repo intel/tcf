@@ -117,9 +117,9 @@ class interface(ttbl.tt_interface):
           *local_port* where to TCP connect to reach the tunnel.
         """
         ip_addr, port, protocol, tunnel_id = self._check_args(
-            self.arg_get(args, 'ip_addr', basestring),
+            self.arg_get(args, 'ip_addr', str),
             self.arg_get(args, 'port', int),
-            self.arg_get(args, 'protocol', basestring),
+            self.arg_get(args, 'protocol', str),
         )
         self._ip_addr_validate(target, ip_addr)
         with target.target_owned_and_locked(who):
@@ -193,9 +193,9 @@ class interface(ttbl.tt_interface):
 
         """
         _ip_addr, _port, _protocol, tunnel_id = self._check_args(
-            self.arg_get(args, 'ip_addr', basestring),
+            self.arg_get(args, 'ip_addr', str),
             self.arg_get(args, 'port', int),
-            self.arg_get(args, 'protocol', basestring),
+            self.arg_get(args, 'protocol', str),
         )
         with target.target_owned_and_locked(who):
             self._delete_tunnel(target, "tunnel-id-" + tunnel_id)

@@ -49,7 +49,7 @@ def template_rexpand(text, kws):
 
     Stop after ten iterations
     """
-    assert isinstance(text, basestring)
+    assert isinstance(text, str)
     assert isinstance(kws, dict)
     count = 0
     while '%(' in text:

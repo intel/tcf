@@ -83,7 +83,7 @@ class driver(ttbl.authenticator_c):
         :param str userdb: path to directory where the user database
           is stored (one file per user)
         """
-        assert isinstance(userdb, basestring)
+        assert isinstance(userdb, str)
 
         if not os.path.isdir(userdb):
             raise AssertionError(
@@ -120,8 +120,8 @@ class driver(ttbl.authenticator_c):
         :raises: :exc:`ttbl.authenticator_c.error_e` if any kind of error
           during the process happens
         """
-        assert isinstance(username, basestring)
-        assert isinstance(password, basestring)
+        assert isinstance(username, str)
+        assert isinstance(password, str)
 
         data_path = os.path.join(self.userdb_path, username)
         try:

@@ -580,16 +580,16 @@ def arduino_add(name, usb_serial_number, fqbn,
        <usb_tty_serial>` using the boards' *serial number*.
 
     """
-    assert isinstance(name, basestring)
+    assert isinstance(name, str)
     assert fqbn in arduino_fqbns, \
         "FQBN %s not known in conf_00_lib_mcu.arduino_fqbns" % fqbn
 
     if usb_serial_number:
-        assert isinstance(usb_serial_number, basestring)
+        assert isinstance(usb_serial_number, str)
     else:
         serial_port = name
     if serial_port:
-        assert isinstance(serial_port, basestring)
+        assert isinstance(serial_port, str)
     else:
         serial_port = "/dev/tty-" + name
 

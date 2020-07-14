@@ -704,7 +704,7 @@ host = '127.0.0.1'
                     if isinstance(exclude, re._pattern_type) \
                        and exclude.search(line):
                         return False
-                    elif isinstance(exclude, basestring) \
+                    elif isinstance(exclude, str) \
                          and exclude in line:
                         return False
                 return True
@@ -735,13 +735,12 @@ host = '127.0.0.1'
                         commonl.generator_factory_c(open, fd.name)
                 })
         else:
-            print >> sys.stderr, \
-                "issues found on server's %s: %s" \
-                % (fd_name, " ".join(issues))
+            print("issues found on server's %s: %s" \
+                % (fd_name, " ".join(issues)), file=sys.stderr)
             fd.seek(0, 0)
             count = 0
             for line in fd:
-                print >> sys.stderr, "  %d: %s" % (count, line),
+                print("  %d: %s" % (count, line), file=sys.stderr)
                 count += 1
 
     def check_log_for_issues(self, testcase = None):

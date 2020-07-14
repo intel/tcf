@@ -1758,7 +1758,7 @@ def assert_list_of_strings(l, list_name, item_name):
     count = -1
     for i in l:
         count += 1
-        assert isinstance(i, basestring), \
+        assert isinstance(i, str), \
             "items in '%s' needs to be strings (%s); got %s on #%d"  % (
                 list_name, item_name, type(i), count)
 
@@ -1781,16 +1781,16 @@ def assert_none_or_list_of_strings(l, list_name, item_name):
 
 def assert_dict_of_strings(d, d_name):
     for k, v in d.items():
-        assert isinstance(k, basestring), \
+        assert isinstance(k, str), \
             "'%s' needs to be a dict of strings keyed by string;" \
             " got a key type '%s'; expected string" % (d_name, type(k))
-        assert isinstance(v, basestring), \
+        assert isinstance(v, str), \
             "'%s' needs to be a dict of strings keyed by string;" \
             " for key '%s' got a value type '%s'" % (d_name, k, type(v))
 
 def assert_dict_of_ints(d, d_name):
     for k, v in d.items():
-        assert isinstance(k, basestring), \
+        assert isinstance(k, str), \
             "'%s' needs to be a dict of ints keyed by string;" \
             " got a key type '%s'; expected string" % (d_name, type(k))
         assert isinstance(v, int), \
@@ -1837,7 +1837,7 @@ def maybe_decompress(filename, force = False):
     :data:`decompress_handlers`.
 
     """
-    assert isinstance(filename, basestring)
+    assert isinstance(filename, str)
     basename, ext = os.path.splitext(filename)
     if ext not in decompress_handlers:	# compressed logfile support
         return filename

@@ -440,9 +440,9 @@ if __name__ == "__main__":
     logging.basicConfig(format = log_format, level = args.level)
 
     if args.debug:
-        import httplib
+        import http.client
         # Debug logging
-        httplib.HTTPConnection.debuglevel = 1
+        http.client.HTTPConnection.debuglevel = 1
         logging.getLogger().setLevel(logging.DEBUG)
         req_log = logging.getLogger('requests.packages.urllib3')
         req_log.setLevel(logging.DEBUG)

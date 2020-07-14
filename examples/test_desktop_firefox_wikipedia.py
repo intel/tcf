@@ -92,7 +92,7 @@ the server <pos_list_images>`) [output edited for clarity]::
 """
 
 import os
-import urlparse
+import urllib.parse
 import time
 
 import tcfl.pos
@@ -116,7 +116,7 @@ class _test(tcfl.pos.tc_pos0_base):
 
         # Do we need a proxy? extract it
         if 'http_proxy' in ic.kws:
-            self.proxy_url = urlparse.urlparse(ic.kws['http_proxy'])
+            self.proxy_url = urllib.parse.urlparse(ic.kws['http_proxy'])
         else:
             self.proxy_url = None
 

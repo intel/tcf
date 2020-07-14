@@ -268,7 +268,7 @@ def dlwps7_add(hostname, powered_on_start = None, basename = None,
     if basename == None:
         basename = hostname
     else:
-        isinstance(basename, basestring)
+        isinstance(basename, str)
 
     for i in range(1, 9):
         name = "%s-%d" % (basename, i)
