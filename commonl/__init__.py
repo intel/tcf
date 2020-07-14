@@ -1487,7 +1487,7 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
     elif isinstance(d, types.GeneratorType):
         of.write(prefix)
         of.writelines(d)
-    elif isinstance(d, file):
+    elif isinstance(d, io.IOBase):
         # not recommended, prefer generator_factory_c so it reopens the file
         d.seek(0, 0)
         of.write(prefix)
