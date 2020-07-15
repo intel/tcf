@@ -402,6 +402,7 @@ def _user_role(userid, action, role):
     if userid == "self":
         # if specified and it is the current user, proceed
         user = flask_login.current_user._get_current_object()
+        userid = user.userid
     elif userid == flask_login.current_user.get_id():
         # if specified and it is the current user, proceed
         user = flask_login.current_user._get_current_object()
