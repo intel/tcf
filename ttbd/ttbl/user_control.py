@@ -178,7 +178,7 @@ class User(object):
         """
         Return *True* if the user has the *admin* role gained.
         """
-        return self.role_present('admin')
+        return self.fsdb.get('roles.admin', False) == True
 
     @staticmethod
     def load_user(userid):
