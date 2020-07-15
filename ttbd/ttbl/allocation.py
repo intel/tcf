@@ -679,14 +679,17 @@ def request(groups, calling_user, obo_user, guests,
     #
     # Verify the groups argument
     #
-    assert isinstance(groups, dict)		# gotta be a dict
+    assert isinstance(groups, dict), \
+        "groups: argument needs to be a dictionary, got %s" % type(groups)
     targets_all = {}
     groups_by_target_set = {}
     groups_clean = {}
     groups_clean_str = {}
     for group_name, target_list in groups.items():
         assert isinstance(group_name, basestring)	# name typing
-        assert isinstance(target_list, list)		# target list...
+        assert isinstance(target_list, list), \
+            "group '%s': value to be a list of target names, got %s" % (
+                group_name, type(target_list))
         for target_name in target_list:			# ... of valid ones
             assert isinstance(target_name, basestring)
             target = ttbl.test_target.get(target_name)
