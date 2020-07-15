@@ -255,10 +255,7 @@ class fsdb_symlink_c(fsdb_c):
     if the link already exists. Same to read it. Thus, for small
     values, it is very efficient.
     """
-    class exception(Exception):
-        pass
-
-    class invalid_e(exception):
+    class invalid_e(fsdb_c.exception):
         pass
 
     def __init__(self, dirname, use_uuid = None, concept = "directory"):
