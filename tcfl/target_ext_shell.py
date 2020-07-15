@@ -44,6 +44,7 @@ import binascii
 import collections
 import re
 import time
+import typing
 
 from . import commonl
 from . import tc
