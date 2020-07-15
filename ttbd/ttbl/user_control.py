@@ -80,7 +80,7 @@ class User(object):
             commonl.makedirs_p(path)
         try:
             self.fsdb = ttbl.fsdb_symlink_c(path)
-        except AssertionError:	# FIXME: replace with invalid_e
+        except ( AssertionError, ttbl.fsdb_c.exception ) as e:
             if fail_if_new:
                 raise self.user_not_existant_e("%s: no such user" % userid)
         self.fsdb.set('userid', userid)
