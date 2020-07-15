@@ -340,8 +340,6 @@ def validate_session():
 def _users(userid = None):
     r = {}
     calling_user = flask_login.current_user._get_current_object()
-    # FIXME: move to ttbl.check_user_is_admin(calling_user), no ifs,
-    # it raises exceptions on its own?
     if calling_user.is_admin():
         if userid == None:
             userl = ttbl.user_control.known_user_list()
@@ -352,13 +350,10 @@ def _users(userid = None):
         if userid == None:
             userl = [ calling_id ]
         elif userid != calling_id:
-            # admins can list'em all FIXME: check user-elevate
-            r[userid]  = {
-                "_message": "user '%s' needs admin role to query"
-                         " users other than themselves" %
-                         calling_user.userid
-            }
-            userl = []
+            flask_logi_abort(
+                403,
+                "user '%s' needs admin role to query"
+                " users other than themselves" % calling_user.userid)
         else:
             userl = [ calling_user.userid ]
 
@@ -367,7 +362,13 @@ def _users(userid = None):
             user = ttbl.user_control.User(userid, fail_if_new = True)
             r[user.userid] = user.to_dict()
         except ttbl.user_control.User.user_not_existant_e as e:
-            logging.warning("user '%s' does not exist: %s", userid, e)
+            # when the caller was querying about an specific user,
+            # complain about if not found; otherwise just skip since
+            # it might mean a user that dropped/logged out since we
+            # called for the known_user_list()
+            if userid:
+                flask_logi_abort(404, "user '%s' does not exist" % userid)
+                
     return flask.jsonify(r)
 
 @app.route(API_PREFIX + 'users/', methods = [ 'DELETE' ])
