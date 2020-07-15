@@ -49,6 +49,7 @@ import multiprocessing
 import hashlib
 import ssl
 import werkzeug
+import werkzeug.exceptions
 import werkzeug.serving
 import flask
 # Change from flask 0.10 -> 0.11
@@ -114,26 +115,35 @@ API_PREFIX = API_PATH + str(API_VERSION) + "/"
 
 codec_utf8 = codecs.lookup("utf8")
 
-def flask_loge_abort(http_code, *args, **kwargs):
-    loge(*args, **kwargs)
-    flask.abort(http_code, *args)
+def flask_loge_abort(http_code, message, **kwargs):
+    loge(message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
 
-def flask_logw_abort(http_code, *args, **kwargs):
-    logw(*args, **kwargs)
-    flask.abort(http_code, *args)
+def flask_logw_abort(http_code, message, **kwargs):
+    logw(message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
+    
+def flask_logi_abort(http_code, message, **kwargs):
+    logi(message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
 
-def flask_logi_abort(http_code, *args, **kwargs):
-    logi(*args, **kwargs)
-    flask.abort(http_code, *args)
+def flask_logd_abort(http_code, message, **kwargs):
+    logd(message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
 
-def flask_logd_abort(http_code, *args, **kwargs):
-    logd(*args, **kwargs)
-    flask.abort(http_code, *args)
-
-def flask_log_abort(l, http_code, *args, **kwargs):
-    logdl(l, *args, **kwargs)
-    flask.abort(http_code, *args)
-
+def flask_log_abort(l, http_code, message, **kwargs):
+    logdl(l, message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
 
 #
 # FIXME: Can't figure out a way how to just handle all with this one,
@@ -299,13 +309,15 @@ def login():
     logi("user %s: authenticated with roles: %s",
          username, " ".join(token_roles))
     return flask.jsonify({
-        'login': "user %s: authenticated with roles: %s" \
+        '_message': "user %s: authenticated with roles: %s" \
         % (username, " ".join(token_roles))
     })
 
 @app.route(API_PREFIX + 'logout', methods = [ 'PUT' ])
 @flask_login.login_required
 def logout():
+    # FIXME: _user_delete() has to do the same as this, doing the
+    # logout_user() and the popping of IDs
     flask_login.current_user.wipe()
     flask_login.logout_user()
     for key in ('identity.name', 'identity.auth_type'):
@@ -313,7 +325,7 @@ def logout():
         flask_principal.identity_changed.send(
             flask.current_app._get_current_object(),
             identity = flask_principal.AnonymousIdentity())
-    return flask.jsonify({'ok': "Session closed"})
+    return flask.jsonify({'_message': "Session closed"})
 
 
 @app.route(API_PREFIX + "validate_session", methods = ['GET'])
@@ -342,7 +354,7 @@ def _users(userid = None):
         elif userid != calling_id:
             # admins can list'em all FIXME: check user-elevate
             r[userid]  = {
-                "error": "user '%s' needs admin role to query"
+                "_message": "user '%s' needs admin role to query"
                          " users other than themselves" %
                          calling_user.userid
             }
@@ -377,6 +389,7 @@ def _user_delete(userid = None):
     else:
         flask_logi_abort(
             403, "not enough privilege to remove user %s" % userid)
+    # FIXME: this has to do the same as logout()
     user.wipe()
     return flask.jsonify({'_message': "session closed"})
 
@@ -973,7 +986,7 @@ def unauthorized():
     Called by the login manager when a user is no authorized to
     do an operation
     """
-    flask_logi_abort(400, "User unauthorized; please login")
+    flask_logi_abort(401, "User unauthorized; please login")
 
 def auth_init(app):
     principals = flask_principal.Principal()
