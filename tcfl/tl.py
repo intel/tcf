@@ -15,7 +15,7 @@ import os
 import re
 import time
 
-from . import tc
+import tcfl.tc
 from tcfl import target_ext_shell
 
 #! Place where the Zephyr tree is located
@@ -72,7 +72,7 @@ def console_dump_on_failure(testcase):
     >>>     def teardown_SOMETHING(self):
     >>>         tcfl.tl.console_dump_on_failure(self)
     """
-    assert isinstance(testcase, tc.tc_c)
+    assert isinstance(testcase, tcfl.tc.tc_c)
     if not testcase.result_eval.failed \
        and not testcase.result_eval.errors \
        and not testcase.result_eval.blocked:
@@ -122,8 +122,8 @@ def setup_verify_slip_feature(zephyr_client, zephyr_server, _ZEPHYR_BASE):
     Look for a complete example in
     :download:`../examples/test_network_linux_zephyr_echo.py`.
     """
-    assert isinstance(zephyr_client, tc.target_c)
-    assert isinstance(zephyr_server, tc.target_c)
+    assert isinstance(zephyr_client, tcfl.tc.target_c)
+    assert isinstance(zephyr_server, tcfl.tc.target_c)
     client_cfg = zephyr_client.zephyr.config_file_read()
     server_cfg = zephyr_server.zephyr.config_file_read()
     slip_mac_addr_found = False
@@ -138,7 +138,7 @@ def setup_verify_slip_feature(zephyr_client, zephyr_server, _ZEPHYR_BASE):
 
     if ('CONFIG_SLIP' in client_cfg or 'CONFIG_SLIP' in server_cfg) \
        and not slip_mac_addr_found:
-        raise tc.blocked_e(
+        raise tcfl.tc.blocked_e(
             "Can't test: your Zephyr kernel in %s lacks support for "
             "setting the SLIP MAC address via configuration "
             "(CONFIG_SLIP_MAC_ADDR) -- please upgrade"
@@ -167,7 +167,7 @@ def teardown_targets_power_off(testcase):
     the targets when cleaning them up; usually when a testcase fails,
     you want to keep them on to be able to inspect them.
     """
-    assert isinstance(testcase, tc.tc_c)
+    assert isinstance(testcase, tcfl.tc.tc_c)
     for dummy_twn, target  in reversed(list(testcase.targets.items())):
         target.power.off()
 
@@ -188,7 +188,7 @@ def tcpdump_enable(ic):
     >>>    ic.power.cycle()
     >>>    ...
     """
-    assert isinstance(ic, tc.target_c)
+    assert isinstance(ic, tcfl.tc.target_c)
     ic.property_set('tcpdump', ic.kws['tc_hash'] + ".cap")
 
 
@@ -204,7 +204,7 @@ def tcpdump_collect(ic, filename = None):
         *report-RUNID:HASHID-REP.tcpdump* (where REP is the repetition
         count)
     """
-    assert isinstance(ic, tc.target_c)
+    assert isinstance(ic, tcfl.tc.target_c)
     assert filename == None or isinstance(filename, str)
     if filename == None:
         filename = \
@@ -398,7 +398,7 @@ def linux_ipv4_addr_get_from_console(target, ifname):
     regex = re.compile(r"^    inet (?P<name>([0-9\.]+){4})/", re.MULTILINE)
     matches = regex.search(output)
     if not matches:
-        raise tc.error_e("can't find IP addr")
+        raise tcfl.tc.error_e("can't find IP addr")
     return matches.groupdict()['name']
 
 # common linux root prompts
@@ -497,8 +497,8 @@ def linux_wait_online(ic, target, loops = 20, wait_s = 0.5):
     that is expected on the configuration, the system has upstream
     access and thus is online.
     """
-    assert isinstance(target, tc.target_c)
-    assert isinstance(ic, tc.target_c) \
+    assert isinstance(target, tcfl.tc.target_c)
+    assert isinstance(ic, tcfl.tc.target_c) \
         and "interconnect_c" in ic.kws['interfaces'], \
         "argument 'ic' shall be an interconnect/network target"
     assert loops > 0
@@ -554,7 +554,7 @@ def linux_rsync_cache_lru_cleanup(target, path, max_kbytes):
     starts removing files.
 
     """
-    assert isinstance(target, tc.target_c)
+    assert isinstance(target, tcfl.tc.target_c)
     assert isinstance(path, str)
     assert max_kbytes > 0
 
@@ -567,7 +567,7 @@ def linux_rsync_cache_lru_cleanup(target, path, max_kbytes):
         re.compile("^(.*Error|Exception):.*^>>> ", re.MULTILINE | re.DOTALL),
         name = "python error",
         timeout = 0, poll_period = 1,
-        raise_on_found = tc.error_e("error detected in python"))
+        raise_on_found = tcfl.tc.error_e("error detected in python"))
     testcase.expect_tls_append(python_error_ex)
     try:
         target.send("TTY=dumb python || python2 || python3")	 # launch python!
@@ -807,8 +807,8 @@ def swupd_bundle_add(ic, target, bundle_list,
     testcase = target.testcase
 
     # gather parameters / defaults & verify
-    assert isinstance(ic, tc.target_c)
-    assert isinstance(target, tc.target_c)
+    assert isinstance(ic, tcfl.tc.target_c)
+    assert isinstance(target, tcfl.tc.target_c)
     if isinstance(bundle_list, str):
         bundle_list = [ bundle_list ]
     else:
@@ -925,7 +925,7 @@ def swupd_bundle_add(ic, target, bundle_list,
                 df = target.shell.run("df -h", output = True, trim = True)
                 du = target.shell.run("du -hsc /persistent.tcf.d/*",
                                       output = True, trim = True)
-                raise tc.blocked_e(
+                raise tcfl.tc.blocked_e(
                     "swupd reports rootfs out of space to"
                     " install bundle %(bundle)s" % kws,
                     dict(output = output, df = df, du = du))
@@ -936,14 +936,14 @@ def swupd_bundle_add(ic, target, bundle_list,
             # match below's
             target.report_data("swupd bundle-add retries",
                                bundle, count)
-            raise tc.error_e("bundle-add failed too many times")
+            raise tcfl.tc.error_e("bundle-add failed too many times")
 
         # see above on time -p
         kpi_regex = re.compile(r"^real[ \t]+(?P<seconds>[\.0-9]+)$",
                                re.MULTILINE)
         m = kpi_regex.search(output)
         if not m:
-            raise tc.error_e(
+            raise tcfl.tc.error_e(
                 "Can't find regex %s in output" % kpi_regex.pattern,
                 dict(output = output))
         # maybe domain shall include the top level image type
@@ -992,8 +992,8 @@ def linux_package_add(ic, target, *packages, **kws):
        like su/sudo support, ability to setup proxy, fix date and pass
        distro-specific setups (like URLs, etc)
     """
-    assert isinstance(ic, tc.target_c)
-    assert isinstance(target, tc.target_c)
+    assert isinstance(ic, tcfl.tc.target_c)
+    assert isinstance(target, tcfl.tc.target_c)
     assert all(isinstance(package, str) for package in packages), \
             "package list must be a list of strings;" \
             " some items in the list are not"
@@ -1037,6 +1037,6 @@ def linux_package_add(ic, target, *packages, **kws):
             "DEBIAN_FRONTEND=noninteractive"
             " apt-get install -qy " +  " ".join(_packages))
     else:
-        raise tc.error_e("unknown OS: %s %s (from /etc/os-release)"
+        raise tcfl.tc.error_e("unknown OS: %s %s (from /etc/os-release)"
                               % (distro, distro_version))
     return distro, distro_version
