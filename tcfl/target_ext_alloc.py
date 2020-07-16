@@ -95,18 +95,20 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
         except requests.exceptions.RequestException:
             # FIXME: tolerate N failures before giving up
             pass
-        if r.get('result', {}):
-            commonl.progress(
-                "allocation ID %s: [+%.1fs] keeping alive during state '%s': %s"
-                % (allocid, ts - ts0, state, r))
-        else:
-            commonl.progress(
-                "allocation ID %s: [+%.1fs] keeping alive during state '%s'"
-                % (allocid, ts - ts0, state))
 
-        if allocid not in r['result']:
+        # COMPAT: old version packed the info in the 'result' field,
+        # newer have it in the first level dictionary
+        if 'result' in r:
+            result = r.pop('result')
+            r.update(result)
+        # COMPAT: end        
+        commonl.progress(
+            "allocation ID %s: [+%.1fs] keeping alive during state '%s': %s"
+            % (allocid, ts - ts0, state, r))
+
+        if allocid not in r:
             continue # no news
-        alloc = r['result'][allocid]
+        alloc = r[allocid]
         new_state = alloc['state']
         if new_state == 'active':
             r = rtb.send_request("GET", "allocation/%s" % allocid)
@@ -131,19 +133,20 @@ def _alloc_hold(rtb, allocid, state, ts0, max_hold_time):
             break
         data = { allocid: state }
         r = rtb.send_request("PUT", "keepalive", json = data)
-        if r.get('result', {}):
-            commonl.progress(
-                "allocation ID %s: [+%.1fs] keeping alive during state '%s': %s"
-                % (allocid, ts - ts0, state, r))
-        else:
-            commonl.progress(
-                "allocation ID %s: [+%.1fs] keeping alive during state '%s'"
-                % (allocid, ts - ts0, state))
-        # r is a dict, with a dict in 'result' that has a
-        # list of allocids that changed state of the ones
+
+        # COMPAT: old version packed the info in the 'result' field,
+        # newer have it in the first level dictionary
+        if 'result' in r:
+            result = r.pop('result')
+            r.update(result)
+        # COMPAT: end        
+        commonl.progress(
+            "allocation ID %s: [+%.1fs] keeping alive during state '%s': %s"
+            % (allocid, ts - ts0, state, r))
+        # r is a dict, allocids that changed state of the ones
         # we told it in 'data'
         ## { ALLOCID1: STATE1, ALLOCID2: STATE2 .. }
-        new_data = r['result'].get(allocid, None)
+        new_data = r.get(allocid, None)
         if new_data == None:
             continue			# no new info
         new_state = new_data['state']
