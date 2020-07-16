@@ -291,6 +291,8 @@ target in any other way, remembering to specify the ticket::
   $ tcf capture-get qu04a screen screencap.png
   ...
 
+.. _howto_access_target_via_ssh:
+
 or via SSH, first we have to ask the server to create a tunnel for us
 from to the target's SSH port::
 
