@@ -637,7 +637,7 @@ class zephyr(tcfl.tc.target_extension_c):
         except OSError as e:
             if e.errno != errno.EEXIST:
                 raise RuntimeError("%s: Cannot create outdir directory: %s"
-                                   % (outdir, e.message))
+                                   % (outdir, str(e)))
 
         # Now create a .new file
         if not name.endswith(".conf"):

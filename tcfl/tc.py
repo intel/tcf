@@ -4485,7 +4485,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             return commonl.origin_get_object(fn)
         except IOError as e:
             fname = fn.__name__
-            if e.message == 'source code not available':
+            if str(e) == 'source code not available':
                 if fname.startswith("__" + cls.__name__) \
                    and any("_%s_for_" % phase in fname \
                            for phase in [ "configure", "build",
@@ -4986,8 +4986,8 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                     # is not available in every target; or a static vs
                     # dynamic test, in which there are keys for static
                     # that are not there for dynamic
-                    # e.message is the key that we failed to find
-                    kws[e.message] = "n/a"
+                    # str(e) is the key that we failed to find
+                    kws[str(e)] = "n/a"
                     continue
                 except Exception as e:
                     self.log.error("extra-report error: %s", e)

@@ -586,7 +586,7 @@ def process_terminate(pid, pidfile = None, tag = None,
             return
         else:
             raise RuntimeError("%scan't %s: %s"
-                               % (tag, signal_name, e.message))
+                               % (tag, signal_name, str(e)))
     finally:
         if _pidfile:
             rm_f(_pidfile)

@@ -1329,7 +1329,7 @@ class tc_zephyr_sanity_c(tcfl.tc.tc_c):
             except KeyError as e:
                 raise tcfl.tc.blocked_e(
                     "%s/%s: can't find field '%s' to expand (@%s)"
-                    % (domain, name, e.message, origin))
+                    % (domain, name, str(e), origin))
             except re.error as e:
                 raise tcfl.tc.blocked_e(
                     "%s/%s: bad regex (@%s): %s"
@@ -1445,7 +1445,7 @@ class tc_zephyr_sanity_c(tcfl.tc.tc_c):
                         results[testname]['end'] = m.start()
                         results[testname]['result'] = mgd['result']
         except ValueError as e:
-            if 'cannot mmap an empty file' in e.message:
+            if 'cannot mmap an empty file' in str(e):
                 return	# *shrug* no output to parse
             raise
 
