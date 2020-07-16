@@ -6933,7 +6933,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         if self.is_static():
             if self._dry_run:
                 self.report_info("will run")
-            rt_selected = { 'local': rt_all['local']['bsp_models'].keys() }
+            rt_selected = { 'local': list(rt_all['local']['bsp_models'].keys()) }
             ic_selected = { }
 
         # This will be now testcase-specific, so make a deep copy
