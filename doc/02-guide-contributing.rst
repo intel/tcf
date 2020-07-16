@@ -158,6 +158,7 @@ running locally on your machine:
             ply                \
             prctl              \
             pykwalify          \
+            pyserial           \
             python-Levenshtein \
             pyusb              \
             setuptools         \
