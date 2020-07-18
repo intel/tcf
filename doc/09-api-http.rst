@@ -1775,7 +1775,7 @@ target's state and:
 - it is bound to a specific target that exposes said capability
 
 - it is published under the HTTP namespace
-  *http[s]://SERVERNAME/PREFIX[vVERSION]/targets/TARGETID/INTERFACENAME/OPERATIONAME*.
+  *http[s]://SERVERNAME:PORT/PREFIX[vVERSION]/targets/TARGETID/INTERFACENAME/OPERATIONAME*.
 
   For example, to manage power control
 
