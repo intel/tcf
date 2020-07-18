@@ -209,10 +209,7 @@ class extension(tc.target_extension_c):
         """
         Execute a sequence of power actions on a target
 
-        :param str component: (optional) name of component to
-          power-cycle, defaults to whole target's power rail
-
-          The sequence argument has to be a list of pairs:
+        :param str sequence: a list of pairs:
 
           >>> ( OPERATION, ARGUMENT )
 

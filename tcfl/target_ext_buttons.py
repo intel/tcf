@@ -27,12 +27,12 @@ class extension(tc.target_extension_c):
     >>> target.tunnel.press('button1')
     >>> target.tunnel.release('button2')
     >>> target.tunnel.sequence([
-    >>>     ( 'button1', 'press' ),
-    >>>     ( 'button2', 'release' ),
-    >>>     ( 'wait 1', 0.25 ),
-    >>>     ( 'button2', 'press' ),
-    >>>     ( 'wait 2', 1 ),
-    >>>     ( 'button1', 'release' ),
+    >>>     ( 'on', 'button1' ),	# press
+    >>>     ( 'off', 'button2' ),	# release
+    >>>     ( 'wait', 0.25 ),
+    >>>     ( 'off', 'button2', ),
+    >>>     ( 'wait', 1 ),
+    >>>     ( 'off', 'button1' ),
     >>> ])
 
     Note that for this interface to work, the target has to expose a
@@ -46,97 +46,172 @@ class extension(tc.target_extension_c):
     manipulate from the command line.
     """
 
+    # allows quick setting of the interface name for testing
+    iface_name = "buttons"
+
     def __init__(self, target):
-        if not 'buttons' in target.rt.get('interfaces', []):
+        if not self.iface_name in target.rt.get('interfaces', []):
             raise self.unneeded
         tc.target_extension_c.__init__(self, target)
 
-    def _sequence(self, sequence):
-        self.target.ttbd_iface_call("buttons", "sequence", method = "PUT",
-                                    sequence = sequence)
+    def _sequence(self, sequence, timeout = None):
+        self.target.ttbd_iface_call(self.iface_name, "sequence",
+                                    method = "PUT",
+                                    sequence = sequence, timeout = timeout)
 
     def press(self, button_name):
+        """
+        Press a given button
+
+        :param str button_name: name of the button
+        """
         self.target.report_info("%s: pressing" % button_name, dlevel = 1)
-        self._sequence([ [ 'press', button_name ] ])
+        self._sequence([ [ 'on', button_name ] ])
         self.target.report_info("%s: pressed" % button_name)
 
     def release(self, button_name):
+        """
+        Release a given button
+
+        :param str button_name: name of the button
+        """
         self.target.report_info("%s: releasing" % button_name, dlevel = 1)
-        self._sequence([ [ 'release', button_name ] ])
+        self._sequence([ [ 'off', button_name ] ])
         self.target.report_info("%s: released" % button_name)
 
-    def sequence(self, sequence):
+    def sequence(self, sequence, timeout = None):
+        """
+        Run a sequence of events on buttons
+
+        :param str sequence: a list of pairs:
+
+          >>> ( OPERATION, ARGUMENT )
+
+          *OPERATION* is a string that can be:
+
+          - *on* or *off* to *press* / *release* a button named
+             *ARGUMENT* (another string)
+
+          - *wait*: *ARGUMENT* is a number describing how many seconds
+            to wait
+
+        :param float timeout: (optional) maximum seconds to wait
+          before giving up; default is whatever calculated based on
+          how many *wait* operations are given or if none, whatever
+          the default is set in
+          :meth:`tcfl.tc.target_c.ttbd_iface_call`.
+        """
         self.target.report_info("running sequence: %s" % sequence, dlevel = 1)
-        self._sequence(sequence)
+        if timeout == None:
+            total_wait = 0
+            for operation, argument in sequence:
+                if operation == "wait":
+                    total_wait += float(argument)
+        self._sequence(sequence, timeout = 30 + total_wait * 1.5)
         self.target.report_info("ran sequence: %s" % sequence)
 
-    def click(self, button_name, duration = 0.25):
+    def click(self, button_name, click_time = 0.25):
+        """
+        Click (press/wait/release) a given button
+
+        :param str button_name: name of the button
+        :param float click_time: (seconds) how long to keep the click
+        """
         self.target.report_info("clicking: %s for %.02f"
-                                % (button_name, duration), dlevel = 1)
+                                % (button_name, click_time), dlevel = 1)
         self._sequence([
-            [ 'press', button_name ],
-            [ 'wait', duration ],
-            [ 'release', button_name ]
+            [ 'on', button_name ],
+            [ 'wait', click_time ],
+            [ 'off', button_name ]
         ])
         self.target.report_info("clicked: %s for %.02f"
-                                % (button_name, duration))
+                                % (button_name, click_time))
 
     def double_click(self, button_name,
-                     duration_click = 0.25, duration_release = 0.25):
+                     click_time = 0.25, interclick_time = 0.25):
+        """
+        Double click (press/wait/release/wait/press/wait/release) a
+        given button
+
+        :param str button_name: name of the button
+        :param float click_time: (seconds) how long to keep the click
+        :param float interclick_time: (seconds) how long to wait in
+          between clicks
+        """
         self.target.report_info("double-clicking: %s for %.02f/%.2fs"
-                                % (button_name, duration_click,
-                                   duration_release),
+                                % (button_name, click_time, interclick_time),
                                 dlevel = 1)
         self._sequence([
-            [ 'press', button_name ],
-            [ 'wait', duration_click ],
-            [ 'release', button_name ],
-            [ 'wait', duration_release ],
-            [ 'press', button_name ],
-            [ 'wait', duration_click ],
-            [ 'release', button_name ],
+            [ 'on', button_name ],
+            [ 'wait', click_time ],
+            [ 'off', button_name ],
+            [ 'wait', interclick_time ],
+            [ 'on', button_name ],
+            [ 'wait', click_time ],
+            [ 'off', button_name ],
         ])
         self.target.report_info("double-clicked: %s for %.02f/%.2fs"
-                                % (button_name, duration_click,
-                                   duration_release))
+                                % (button_name, click_time, interclick_time))
 
     def list(self):
+        """
+        List available buttons and their corresponding state
+
+        :returns: dictionary keyed by button name listing its current state:
+
+          - *True*: pressed
+          - *False*: released
+          - *None*: unknown / unavailable (might be an error condition)
+
+        """
         self.target.report_info("listing", dlevel = 1)
-        r = self.target.ttbd_iface_call("buttons", "list", method = "GET")
-        self.target.report_info("listed: %s" % r['result'])
-        return r['result']
+        r = self.target.ttbd_iface_call(self.iface_name, "list",
+                                        method = "GET")
+        self.target.report_info("listed: %s" % r)
+        l = {}
+        for name, data in r.get('components', {}).iteritems():
+            # this will be True/False/None
+            l[name] = data.get('state', None)
+        return l
 
         
 def _cmdline_button_press(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "buttons")
+        target = tc.target_c.create_from_cmdline_args(
+            args, iface = extension.iface_name)
         target.button.press(args.button_name)
 
 def _cmdline_button_release(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "buttons")
+        target = tc.target_c.create_from_cmdline_args(
+            args, iface = extension.iface_name)
         target.button.release(args.button_name)
 
 def _cmdline_button_click(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "buttons")
+        target = tc.target_c.create_from_cmdline_args(
+            args, iface = extension.iface_name)
         target.button.click(args.button_name, args.click_time)
 
 def _cmdline_button_double_click(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "buttons")
+        target = tc.target_c.create_from_cmdline_args(
+            args, iface = extension.iface_name)
         target.button.double_click(args.button_name,
                                    args.click_time, args.wait_time)
 
 def _cmdline_button_list(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "buttons")
-        data = target.button.list()
-        for name, state in data.iteritems():
-            if state:
+        target = tc.target_c.create_from_cmdline_args(
+            args, iface = extension.iface_name)
+        r = target.button.list()
+        for name, state in r.iteritems():
+            if state == True:
                 _state = 'pressed'
-            else:
+            elif state == False:
                 _state = 'released'
+            else:
+                _state = 'n/a'
             print name + ": " + _state
 
 def _cmdline_setup(argsp):

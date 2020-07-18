@@ -15,7 +15,6 @@ import serial.tools.list_ports
 
 import ttbl
 import ttbl.things
-import ttbl.buttons
 
 class rly08b(object):
     """
@@ -222,23 +221,6 @@ class pc(rly08b, ttbl.power.impl_c):
                            "#%d powered off"
                            % (self.serial_number, self.relay))
             return False
-
-
-class button_c(pc, ttbl.buttons.impl_c):
-    """
-    Implement a button press by closing/opening a relay circuit
-    """
-    def __init__(self, serial_number, relay):
-        ttbl.buttons.impl_c.__init__(self)
-        pc.__init__(self, serial_number, relay)
-
-    def press(self, target, button):
-        self.on(target, button)
-
-    def release(self, target, button):
-        self.off(target, button)
-
-    # get implemented by pc.get()
 
 
 class plugger(rly08b,		 # pylint: disable = abstract-method

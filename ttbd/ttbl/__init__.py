@@ -1251,7 +1251,7 @@ class tt_interface(object):
           >>>    value = 43
           >>> )
 
-        For an example, see :class:`ttbl.buttons.interface`.
+        For an example, see :class:`ttbl.power.interface`.
         """
         assert isinstance(target, test_target)
         assert isinstance(who, basestring)

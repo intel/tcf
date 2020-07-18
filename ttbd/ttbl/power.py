@@ -3,8 +3,9 @@
 # Copyright (c) 2019 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
-"""Control power to targets
-------------------------
+"""
+Control power to targets and general control for relays, buttons and jumpers
+----------------------------------------------------------------------------
 
 This interface provides means to power on/off targets and the invidual
 components that compose the power rail of a target.
@@ -13,14 +14,43 @@ The interface is implemented by :class:`ttbl.power.interface` needs to
 be attached to a target with :meth:`ttbl.test_target.interface_add`::
 
 >>> ttbl.test_target.get(NAME).interface_add(
->>>     "INTERFACENAME",
+>>>     "power",
 >>>     ttbl.power.interface(
 >>>         component0,
 >>>         component1,
 >>>         ...
 >>>     )
 
-each component is an instance of a subclass of
+Generally, this interface can also be used to control any
+instrumentation that has binary states (on/off, true/false,
+connected/disconnected, pressed/released, etc..) such as:
+
+- relays
+- buttons
+- jumpers (controlled by a relay)
+
+by convention, the *buttons* and *jumpers* interfaces are exposed with
+those names; thus, in a configuration :ref:`configuration file
+<ttbd_configuration>`::
+
+>>> ttbl.test_target.get(NAME).interface_add(
+>>>     "buttons",
+>>>     ttbl.power.interface(
+>>>         power = ttbl.usbrly08b.pc("24234", 3),
+>>>         reset = ttbl.usbrly08b.pc("24234", 4),
+>>>         ...
+>>>     )
+
+would add two buttons, power and reset, controlled by a
+:ref:`USBRLY08B <ttbl.usbrly08b.pc>` relay bank (by wiring the NO and
+NC lines through the button so that turning on/closing the relay
+effectively presses the button).
+
+Any other mechanism (and driver) to act on jumpers or buttons can be
+implemented to provide the on/off operation that translates into
+button press/release or jumper close/open.
+
+Each component is an instance of a subclass of
 :class:`ttbl.power.impl_c`, which implements the actual control over
 the power unit, such as:
 
