@@ -346,12 +346,21 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
         ttbl.console.generic_c.disable(self, target, component)
         ttbl.power.socat_pc.off(self, target, component)
 
-    # console interface; state() implemented by generic_c
+    # console interface
     def enable(self, target, component):
         self.on(target, component)
 
     def disable(self, target, component):
         return self.off(target, component)
+
+    def state(self, target, component):
+        # we want to use this to gather state, since the generic_c
+        # implementation relies on the console-NAME.write file
+        # existing; this can linger if a process dies or not...
+        # but the ttbl.power.socat_pc.get() implementation checks if
+        # the process is alive looking at the PIDFILE
+        # COMPONENT-socat.pid and verifying that thing is still running
+        return ttbl.power.socat_pc.get(self, target, component)
 
 
 class sol_ssh_console_pc(ttbl.console.ssh_pc):
