@@ -256,13 +256,18 @@ class impl_c(ttbl.tt_interface_impl_c):
       component shall be only turned on or off when explicitly named in
       a power rail. See :ref:ttbd_power_explicit.
 
-      - *None*: for normal behaviour
+      - *None*: for normal behaviour; component will be
+         powered-on/started with the whole power rail
 
-      - *both*: explicit for both powering on and off
+      - *both*: explicit for both powering on and off: only
+        power-on/start and power-off/stop if explicity called by
+        name
 
-      - *on*: explicit for powering on
+      - *on*: explicit for powering on: only power-on/start if explicity
+        powered on by name, power off normally
 
-      - *off*: explicit for powering off
+      - *off*: explicit for powering off: only power-off/stop if explicity
+        powered off by name, power on normally
 
     """
     def __init__(self, paranoid = False, explicit = None):
@@ -1052,8 +1057,7 @@ class inverter_c(impl_c):
 
 
 class daemon_c(impl_c):
-    """
-    Generic power controller to start daemons in the server machine
+    """Generic power controller to start daemons in the server machine
 
     FIXME: document
 
@@ -1066,7 +1070,26 @@ class daemon_c(impl_c):
       expansion, where each field comes either from the *kws*
       dictionary or the target's metadata.
 
+
+    :param str name: (optional) name of this component; defaults to
+      the basename of the path to run.
+
+      eg: if calling */usr/bin/somedaemon*, name would be *daemon*.
+
+    :param bool mkpidfile: (optional; default *True*) create a pidfile
+      when the process starts, using as name/template the value of
+      *pidfile*.
+
+    :param str pidfile: (optional) pidfile name (template); defaults
+      to "PATH/COMPONENT-NAME.pid". *PATH* is the state directory for
+      the given target (usually
+      */var/lib/ttbd/instance/targets/TARGETNAME*). *COMPONENT* is the
+      component under which this driver has been registered when
+      adding to the interface. *NAME* is the name of this driver
+      instance, see above.
+
     Other parameters as to :class:ttbl.power.impl_c.
+
     """
     #: KEY=VALUE to add to the environment
     #: Keywords to add for templating the arguments
