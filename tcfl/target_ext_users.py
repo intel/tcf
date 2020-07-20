@@ -19,6 +19,7 @@ import commonl
 import ttb_client
 from . import msgid_c
 
+
 def _user_list(rtb, userids):
     result = {}
     if userids:
@@ -123,7 +124,7 @@ def _cmdline_setup(arg_subparsers):
         help = "Log user out of the servers brokers")
     ap.add_argument(
         "username", nargs = '?', action = "store", default = None,
-        help = "User to logout (defaults to current); to logout outhers "
+        help = "User to logout (defaults to current); to logout others "
         "*admin* role is needed")
     ap.set_defaults(func = _cmdline_logout)
 

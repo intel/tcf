@@ -343,7 +343,11 @@ def validate_session():
 def _users(userid = None):
     r = {}
     calling_user = flask_login.current_user._get_current_object()
-    if calling_user.is_admin():
+    if userid == "self":
+        # this is used as a reflector, to know who are we logged in as
+        calling_id = calling_user.get_id()
+        userl = [ calling_id ]
+    elif calling_user.is_admin():
         if userid == None:
             userl = ttbl.user_control.known_user_list()
         else:

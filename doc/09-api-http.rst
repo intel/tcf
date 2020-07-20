@@ -221,6 +221,13 @@ Get information about a specific user
 
 - Any *admin* user can call to get other user's
 
+**Arguments**
+
+If *USERNAME* is *self*, then the server will return the information
+for the currently logged in user according to the *COOKIES*. This is
+useful for the clients to find which user their cookies loged them
+as.
+
 **Returns** JSON dictionary with user information
 
 - if the calling user has administrative privilege: information about
