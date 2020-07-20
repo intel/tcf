@@ -664,12 +664,20 @@ class tt_interface_impl_c(object):
         #: >>>     location = "USB port #4 front"))
         self.upid = kwargs
 
-    def upid_set(self, name, **kwargs):
+    def upid_set(self, name_long, **kwargs):
         """
         Set :data:`upid` information in a single shot
 
-        :param str name: Name of the physical component that
-          implements this interface functionality
+        :param str name_long: Long name of the physical component that
+          implements this interface functionality.
+
+          This gets registered as instrument property *name_long* and
+          if the instrument has defined no short *name* property, it
+          will be registered as such.
+
+          The short *name* has more restrictions, thus it is
+          recommended implementations set it.
+
         :param dict kwargs: fields and values (strings) to report for
           the physical component that implements this interface's
           functionality; it is important to specify here a unique
@@ -684,13 +692,16 @@ class tt_interface_impl_c(object):
         This is normally called from the *__init__()* function of a
         component driver, that must inherit :class:`tt_interface_impl_c`.
         """
-        assert name == None or isinstance(name, basestring)
+        assert isinstance(name_long, basestring), \
+            "name_long: expected a string; got %s" % type(name_long)
         for key, val in kwargs.iteritems():
             assert val == None or isinstance(val, (basestring, int,
                                                    float, bool)), \
                 "UPID field '%s' must be string|number|bool; got %s" \
                 % (key, type(val))
-        self.name = name
+        if not self.name:
+            self.name = name_long
+        kwargs['name_long'] = name_long
         self.upid = kwargs
 
 
