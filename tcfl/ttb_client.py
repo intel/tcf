@@ -422,7 +422,7 @@ class rest_target_broker(object):
 
         :returns: name of the user we are logged in as
         """
-        r = self.send_request("GET", "users/self"))
+        r = self.send_request("GET", "users/self")
         # this call returns a dictionary with the user name in the
         # key name, because we asked for "self", the server will
         # return only one, but maybe also fields with diagnostics, that
