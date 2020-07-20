@@ -744,7 +744,7 @@ def _put_keepalive():
             result[allocid] = r
     except Exception as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
-    return flask.jsonify(dict(result = result))
+    return flask.jsonify(dict(result))
 
 
 @app.route(API_PREFIX + 'allocation/<string:allocid>/<string:guestname>',
