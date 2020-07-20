@@ -1,4 +1,4 @@
-#! /usr/bin/python2
+#! /usr/bin/python
 #
 # Copyright (c) 2017 Intel Corporation
 #
@@ -83,6 +83,7 @@ Note the columns and the messages:
 import io
 import os
 import subprocess
+import sys
 import threading
 
 import commonl
@@ -139,8 +140,7 @@ class driver(tc.report_driver_c):
                     encoding = 'utf-8', errors = 'replace')
         else:
             self.logf = None
-        consolef = io.open("/dev/stdout", "w",
-                           encoding = 'utf-8', errors = 'replace')
+        consolef = io.open(sys.stdout.fileno(), "wb")
         self.consolef = commonl.io_tls_prefix_lines_c(
             self.tls, consolef.detach())
         self.verbosity = verbosity
