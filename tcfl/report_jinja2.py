@@ -1,4 +1,4 @@
-#! /usr/bin/python2
+#! /usr/bin/python
 #
 # Copyright (c) 2017-20 Intel Corporation
 #
@@ -285,11 +285,10 @@ class driver(tc.report_driver_c):
         if not code in self.fs:
             f = io.open(
                 os.path.join(tmpdir, "report-" + code + ".txt"),
-                "w", encoding = 'utf-8', errors = 'replace')
+                "wb")
             self.fs[code] = f.name
         else:
-            f = io.open(self.fs[code], "a+",
-                        encoding = 'utf-8', errors = 'replace')
+            f = io.open(self.fs[code], "a+")
         # reassign the stream so we use the prefix printing
         # capabilities
         return commonl.io_tls_prefix_lines_c(
@@ -303,8 +302,7 @@ class driver(tc.report_driver_c):
         # don't care for.
         #
         # FIXME: maybe this should just pickle tuples and be done
-        with codecs.open(self.fs[code], "a+b",
-                         encoding = 'utf-8', errors = 'replace') as fi:
+        with codecs.open(self.fs[code], "r") as fi:
             for line in fi:
                 if line == "":
                     break
@@ -351,11 +349,6 @@ class driver(tc.report_driver_c):
                 # filter to automatically escape anything that might
                 # not be *ML kosher...but 0x00. So as we only need
                 # this for reporting, we'll make an ugly exception.
-                if not isinstance(message, unicode):
-                    # ugly hack until we move to Pyv3 so we have no
-                    # conversion error if the message contains non
-                    # ASCII chars
-                    message = message.decode('utf-8', errors = 'replace')
                 yield ident, tgname, message.replace("\x00", "<NULL>")
 
     def _mkreport(self, msg_tag, code, _tc, message):
