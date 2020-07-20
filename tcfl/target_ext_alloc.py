@@ -378,21 +378,43 @@ def _cmdline_alloc_monitor(args):
                 last_scene = e.scene
 
 
-def _allocs_get(rtb):
-    return rtb.send_request("GET", "allocation/")
+def _allocs_get(rtb, username):
+    r = rtb.send_request("GET", "allocation/")
+    if username:
+        # filter here, as we can translate the username 'self' to the
+        # user we are logged in as in the server
+        _r = {}
+        if username == "self":
+            username = rtb.logged_in_username()
+
+        def _alloc_filter(allocdata, username):
+            if username != None \
+               and username != allocdata.get('creator', None) \
+               and username != allocdata.get('user', None):
+                return False
+            return True
+
+        for allocid, allocdata in r.items():
+            if _alloc_filter(allocdata, username):
+                _r[allocid] = allocdata
+
+        return _r
+    else:
+        return r
 
 
-def _alloc_ls(verbosity):
+def _alloc_ls(verbosity, username = None):
     allocs = {}
     tp = ttb_client._multiprocessing_pool_c(
         processes = len(ttb_client.rest_target_brokers))
     threads = {}
     for rtb in sorted(ttb_client.rest_target_brokers.itervalues()):
-        threads[rtb] = tp.apply_async(_allocs_get, (rtb,))
+        threads[rtb] = tp.apply_async(_allocs_get, (rtb, username))
     tp.close()
     tp.join()
     for rtb, thread in threads.iteritems():
         allocs[rtb.aka] = thread.get()
+
     if verbosity < 0:
         # just print the list of alloc ids for each server, one per line
         for _, data in allocs.iteritems():
@@ -499,7 +521,7 @@ def _cmdline_alloc_ls(args):
                     if clear:
                         print "\x1b[2J"	# clear whole screen
                         clear = False
-                    _alloc_ls(args.verbosity - args.quietosity)
+                    _alloc_ls(args.verbosity - args.quietosity, args.username)
                     ts0 = time.time()
                 except requests.exceptions.RequestException as e:
                     ts = time.time()
@@ -511,7 +533,7 @@ def _cmdline_alloc_ls(args):
                 sys.stdout.flush()
                 time.sleep(args.refresh)
         else:
-            _alloc_ls(args.verbosity - args.quietosity)
+            _alloc_ls(args.verbosity - args.quietosity, args.username)
 
 def _cmdline_alloc_delete(args):
     with msgid_c("cmdline"):
@@ -707,6 +729,10 @@ def _cmdline_setup(arg_subparsers):
     ap.add_argument(
         "-a", "--all", action = "store_true", default = False,
         help = "Consider also disabled targets")
+    ap.add_argument(
+        "-u", "--username", action = "store", default = None,
+        help = "ID of user whose allocs are to be displayed"
+        " (optional, defaults to anyone visible)")
     ap.add_argument(
         "-r", "--refresh", action = "store",
         type = float, nargs = "?", const = 1, default = 0,
