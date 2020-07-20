@@ -393,7 +393,13 @@ def _alloc_ls(verbosity):
     tp.join()
     for rtb, thread in threads.iteritems():
         allocs[rtb.aka] = thread.get()
-    if verbosity == 3:
+    if verbosity < 0:
+        # just print the list of alloc ids for each server, one per line
+        for _, data in allocs.iteritems():
+            if data:
+                print "\n".join(data.keys())
+        return
+    elif verbosity == 3:
         pprint.pprint(allocs)
         return
     elif verbosity == 4:
@@ -493,7 +499,7 @@ def _cmdline_alloc_ls(args):
                     if clear:
                         print "\x1b[2J"	# clear whole screen
                         clear = False
-                    _alloc_ls(args.verbosity)
+                    _alloc_ls(args.verbosity - args.quietosity)
                     ts0 = time.time()
                 except requests.exceptions.RequestException as e:
                     ts = time.time()
@@ -505,7 +511,7 @@ def _cmdline_alloc_ls(args):
                 sys.stdout.flush()
                 time.sleep(args.refresh)
         else:
-                _alloc_ls(args.verbosity)
+            _alloc_ls(args.verbosity - args.quietosity)
 
 def _cmdline_alloc_delete(args):
     with msgid_c("cmdline"):
@@ -688,6 +694,11 @@ def _cmdline_setup(arg_subparsers):
         "in all the servers or the servers where the named "
         "targets are")
     commonl.argparser_add_aka(arg_subparsers, "alloc-ls", "alloc-list")
+    ap.add_argument(
+        "-q", dest = "quietosity", action = "count", default = 0,
+        help = "Decrease verbosity of information to display "
+        "(none is a table, -q or more just the list of allocations,"
+        " one per line")
     ap.add_argument(
         "-v", dest = "verbosity", action = "count", default = 0,
         help = "Increase verbosity of information to display "
