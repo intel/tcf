@@ -205,9 +205,12 @@ def _bad_version(version, any_route):
         action = "upgrade"
     else:
         action = "downgrade"
+    # FIXME: make this come only when ttb-vX -- catch ttb-v2 so we say
+    # bad path or bad method
     return flask.abort(404,
                        "your client is asking for protocol v%s to call %s;"
-                       " this server supports %d; please %s"
+                       " this server supports %d OR you specified the "
+                       "wrong path or method; please %s"
                        % (version, any_route, API_VERSION, action))
 
 @app.route(API_PREFIX + 'login', methods = ['PUT'])
@@ -640,7 +643,6 @@ def _put_allocation():
         else:
             raise NotImplementedError("no way to specify OBO user yet")
 
-        #logging.error("DEBUG args: %s" % pprint.pformat(data))
         result = ttbl.allocation.request(
             data['groups'],
             calling_user = flask_login.current_user._get_current_object(),
