@@ -1332,9 +1332,10 @@ class delay_til_shell_cmd_c(impl_c):
 
         impl_c.__init__(self, **kwargs)
         self.cmdline = cmdline
+        cmdline_s = " ".join(self.cmdline)
         if condition_msg == None:
             self.condition_msg = "'%s' returns %d" % (
-                " ".join(self.cmdline), expected_retval)
+                cmdline_s, expected_retval)
         else:
             self.condition_msg = condition_msg
         self.cwd = cwd
@@ -1344,6 +1345,14 @@ class delay_til_shell_cmd_c(impl_c):
         self.when_off = when_off
         self.poll_period = poll_period
         self.timeout = timeout
+        self.upid_set(
+            "Delayer until command '%s' returns %d,"
+            " checking every %.2fs timing out at %.1fs" % (
+                cmdline_s, expected_retval, poll_period, timeout),
+            command = cmdline_s,
+            expected_retval = expected_retval,
+            poll_period = poll_period,
+            timeout = timeout)
 
     def _cmdline_format(self, target, component):
         kws = dict(target.kws)

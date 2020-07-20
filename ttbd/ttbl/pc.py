@@ -43,6 +43,9 @@ class delay(ttbl.power.impl_c):
         ttbl.power.impl_c.__init__(self, **kwargs)
         self.on_delay = float(on)
         self.off_delay = float(off)
+        self.upid_set(
+            "Delays on power on (%.fs) / off (%.fs)" % (on, off),
+            on = on, off = off)
 
     def on(self, target, component):
         target.log.debug("%s: on delay %f", component, self.on_delay)
@@ -74,6 +77,18 @@ class delay_til_file_gone(ttbl.power.impl_c):
         self.get_file = get
         self.poll_period = poll_period
         self.timeout = timeout
+        l = []
+        if on:
+            l.append("'%s' disappears when power-on" % on)
+        if off:
+            l.append("'%s' disappears when power-off" % off)
+        self.upid_set(
+            "Delayer until %s, checking every %.2fs timing out at %.1fs" % (
+                ", ".join(l), poll_period, timeout),
+            on_file = on,
+            off_file = off,
+            poll_period = poll_period,
+            timeout = timeout)
 
     def on(self, target, component):
         if self.on_file == None:
@@ -137,6 +152,13 @@ class delay_til_file_appears(ttbl.power.impl_c):
             "action '%s' has to be an exception type or callable" % action
         self.action = action
         self.action_args = action_args
+        self.upid_set(
+            "Delayer until file '%s' appears during power-on,"
+            " checking every %.2fs timing out at %.1fs" % (
+                filename, poll_period, timeout),
+            filename = filename,
+            poll_period = poll_period,
+            timeout = timeout)
 
     def on(self, target, component):
         if self.filename == None:
@@ -214,6 +236,17 @@ class delay_til_usb_device(ttbl.power.impl_c):
         if action != None:
             assert hasattr(action, "__call__")
         self.log = None			# filled out in _on/_off/_get
+        when = "powering-on" if when_powering_on else "powering-off"
+        what = "connected" if want_connected else "disconnected"
+        self.upid_set(
+            "Delayer until USB device with serial number '%s' is %s when %s,"
+            " checking every %.2fs timing out at %.1fs" % (
+                serial, what, when, poll_period, timeout),
+            serial = serial,
+            when_powering_on = when_powering_on,
+            want_connected = want_connected,
+            poll_period = poll_period,
+            timeout = timeout)
 
     class not_found_e(Exception):
         "Exception raised when a USB device is not found"
