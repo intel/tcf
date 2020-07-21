@@ -255,7 +255,7 @@ class extension(tc.target_extension_c):
         if power != False:
             msg = "Power should be False, reported %s" % power
             raise Exception(msg)
-        print(("Power is reported correctly as %s" % power))
+        print("Power is reported correctly as %s" % power)
 
         print("Powering on")
         target.power.on()
@@ -266,7 +266,7 @@ class extension(tc.target_extension_c):
         if power != True:
             msg = "Power should be True, reported %s" % power
             raise Exception(msg)
-        print(("Power is reported correctly as %s" % power))
+        print("Power is reported correctly as %s" % power)
 
         print("Power cycling")
         target.power.cycle()
@@ -285,7 +285,7 @@ class extension(tc.target_extension_c):
         if power != True:
             msg = "Power should be True, reported %s" % power
             raise Exception(msg)
-        print(("Power is reported correctly as %s" % power))
+        print("Power is reported correctly as %s" % power)
 
         print("Powering off")
         target.power.off()
@@ -296,7 +296,7 @@ class extension(tc.target_extension_c):
         if power != False:
             msg = "Power should be False, reported %s" % power
             raise Exception(msg)
-        print(("Power is reported correctly as %s" % power))
+        print("Power is reported correctly as %s" % power)
         print("Power test passed")
 
 
@@ -366,7 +366,7 @@ def _cmdline_power_get(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args)
         r = target.power.get()
-        print(("%s: %s" % (target.id, 'on' if r == True else 'off')))
+        print("%s: %s" % (target.id, 'on' if r == True else 'off'))
 
 
 # this is a very loose match in the format, so we can easily support
