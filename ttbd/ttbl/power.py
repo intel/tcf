@@ -1,4 +1,4 @@
-#! /usr/bin/python2
+#! /usr/bin/python
 #
 # Copyright (c) 2019 Intel Corporation
 #
@@ -731,6 +731,8 @@ class interface(ttbl.tt_interface):
             for f in target.power_on_post_fns:
                 f(target)
             target.log.debug("power post-on%s: done" % why)
+        if not isinstance(why, str):
+            raise TypeError(type(why))
         target.log.info("powered on%s" % why)
         target.fsdb.set('powered', 'On')
 
@@ -964,6 +966,8 @@ class fake_c(impl_c):
         target.fsdb.set('power-fake-%s' % component, None)
 
     def get(self, target, component):
+        if not isinstance(component, str):
+            raise TypeError(type(component))
         state = target.fsdb.get('power-fake-%s' % component) == 'True'
         target.log.info("power-fake-%s get: %s" % (component, state))
         return state
