@@ -710,17 +710,17 @@ host = '127.0.0.1'
                 return True
         if self.error_regex.search(line):
             for exclude in self.errors_ignore:
-                if isinstance(exclude, Pattern) \
-                   and exclude.search(line):
-                    return False
+                if isinstance(exclude, Pattern):
+                    if exclude.search(line):
+                        return False
                 elif exclude in line:
                     return False
             return True
         if self.warning_regex.search(line):
             for exclude in self.warnings_ignore:
-                if isinstance(exclude, Pattern) \
-                   and exclude.search(line):
-                    return False
+                if isinstance(exclude, Pattern):
+                    if exclude.search(line):
+                        return False
                 elif exclude in line:
                     return False
             return True
