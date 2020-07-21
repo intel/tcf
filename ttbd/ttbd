@@ -51,7 +51,6 @@ try:
 except ImportError as e:
     import flask.ext.login as flask_login
     import flask.ext.principal as flask_principal
-import ttbl
 import traceback
 import argparse
 import re
@@ -770,7 +769,7 @@ def _target_interface(target_id, interface, call):
         flask.abort(404, "%s: unknown target" % target_id)
     ticket = ttbl.tt_interface.arg_get(
         flask.request.form, 'ticket', str, True, "")
-    iostr = StringIO.StringIO()
+    iostr = io.StringIO()
     iostr_wrapper = codecs.StreamReaderWriter(
         iostr, codec_utf8.streamreader,
         codec_utf8.streamwriter, errors = 'replace')
