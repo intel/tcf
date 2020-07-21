@@ -760,7 +760,7 @@ def request(groups, calling_user, obo_user, guests,
     # abuse python's tempdir making abilities for it
     allocid_path = tempfile.mkdtemp(dir = path, prefix = "")
     # we allow ttbd group (admins) to look into these dirs
-    os.chmod(allocid_path, 02770)
+    os.chmod(allocid_path, 0o2770)
     allocid = os.path.basename(allocid_path)
 
     allocdb = get_from_cache(allocid)
