@@ -2293,10 +2293,18 @@ def usb_serial_to_path(arg_serial):
       ....
 
     :param str arg_serial: USB serial number
-    :return: tuple with USB path, vendor, product name for the given serial
-      number or *None, None, None* if not found
+    :return: tuple with USB path, vendor product name for the given serial
+      number, *None, None, None* if not found
 
     """
+    def _sysfs_read(filename):
+        try:
+            with open(filename) as fr:
+                return fr.read().strip()
+        except IOError as e:
+            if e.errno != errno.ENOENT:
+                raise
+
     for fn_serial in glob.glob("/sys/bus/usb/devices/*/serial"):
         serial = _sysfs_read(fn_serial)
         if serial == arg_serial:
