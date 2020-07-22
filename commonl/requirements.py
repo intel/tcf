@@ -12,7 +12,7 @@ import pkg_resources
 def verify_python_version():
     vi = sys.version_info
     return pkg_resources.parse_version("%d.%d" % (vi[0], vi[1])) \
-        >= pkg_resources.parse_version("2.7")
+        >= pkg_resources.parse_version("3.6")
 
 def verify_flask_version():
     import flask
