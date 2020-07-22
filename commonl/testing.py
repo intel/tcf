@@ -621,7 +621,7 @@ host = '127.0.0.1'
         #: message check
         self.warnings_ignore = [ re.compile('daemon lacks CAP_NET_ADMIN') ]
         if warnings_ignore:
-            self.warnings_ignore =+ warnings_ignore
+            self.warnings_ignore += warnings_ignore
 
         def _preexec_fn():
             stdout_fd = os.open(self.stdout,
