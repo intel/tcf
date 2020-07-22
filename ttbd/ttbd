@@ -25,7 +25,6 @@ FIXME: write up in progress
 # https://blog.al4.co.nz/2016/01/streaming-json-with-flask/
 
 import base64
-import codecs
 import contextlib
 import io
 import pickle
@@ -100,8 +99,6 @@ app = flask.Flask(__name__)
 API_VERSION = 2
 API_PATH = "/ttb-v"
 API_PREFIX = API_PATH + str(API_VERSION) + "/"
-
-codec_utf8 = codecs.lookup("utf8")
 
 def flask_loge_abort(http_code, *args, **kwargs):
     loge(*args, **kwargs)
@@ -770,9 +767,6 @@ def _target_interface(target_id, interface, call):
     ticket = ttbl.tt_interface.arg_get(
         flask.request.form, 'ticket', str, True, "")
     iostr = io.StringIO()
-    iostr_wrapper = codecs.StreamReaderWriter(
-        iostr, codec_utf8.streamreader,
-        codec_utf8.streamwriter, errors = 'replace')
     try:
         if not interface in target.tags['interfaces']:
             flask_logi_abort(400, "%s: unavailable interface" % interface)
@@ -784,7 +778,7 @@ def _target_interface(target_id, interface, call):
         user_path = os.path.join(ttbl.test_target.files_path, username)
         # make sure the directory exists
         commonl.makedirs_p(user_path)
-        with log_to_str_too(target.log, iostr_wrapper):
+        with log_to_str_too(target.log, iostr):
             method_name = flask.request.method.lower() + "_" + call
             method = getattr(iface, method_name, None)
             component = flask.request.form.get('component', None)
