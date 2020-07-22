@@ -55,7 +55,7 @@ class _test(tcfl.tc.tc_c):
         state, substate, components = r
         assert state == False and substate == 'normal', \
             "after power off, power state is not normal off: %s" % (r, )
-        for c, d in components.iteritems():
+        for c, d in components.items():
             explicit = d.get('explicit', None)
             if explicit == 'both':
                 assert d['state'] == True, \
