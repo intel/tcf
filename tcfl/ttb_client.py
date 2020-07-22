@@ -437,7 +437,7 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
             return r
         rdata = r.json(object_pairs_hook = collections.OrderedDict)
         if '_diagnostics' in rdata:
-            diagnostics = rdata.pop('_diagnostics').encode("utf-8", 'replace')
+            diagnostics = rdata.pop('_diagnostics')
             # this is not very...memory efficient
             for line in diagnostics.split("\n"):
                 logger.warning("diagnostics: " + line)
