@@ -719,6 +719,8 @@ class generic_c(impl_c):
 
 
     def _write(self, fd, data):
+        # os.write expects a byestring, so convert data to bytes
+        data = data.encode('utf-8')
         if self.escape_chars:
             data = self._escape(data)
         if self.chunk_size:
