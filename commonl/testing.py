@@ -753,24 +753,26 @@ host = '127.0.0.1'
         """
         try:
             issues = []
-            with open(self.stdout) as stdout:
-                cnt = 0
-                for line in stdout:
-                    if self._check_log_line_for_issues(line):
-                        issues.append(str(cnt))
-                    cnt += 1
-                if issues:
-                    self._log_report(stdout, "stdout", issues, testcase)
+            if os.path.isfile(self.stdout):
+                with open(self.stdout, 'a+') as stdout:
+                    cnt = 0
+                    for line in stdout:
+                        if self._check_log_line_for_issues(line):
+                            issues.append(str(cnt))
+                        cnt += 1
+                    if issues:
+                        self._log_report(stdout, "stdout", issues, testcase)
 
             issues = []
-            with open(self.stderr) as stderr:
-                cnt = 0
-                for line in stderr:
-                    if self._check_log_line_for_issues(line):
-                        issues.append(str(cnt))
-                    cnt += 1
-                if issues:
-                    self._log_report(stderr, "stderr", issues, testcase)
+            if os.path.isfile(self.stderr):
+                with open(self.stderr, 'a+') as stderr:
+                    cnt = 0
+                    for line in stderr:
+                        if self._check_log_line_for_issues(line):
+                            issues.append(str(cnt))
+                        cnt += 1
+                    if issues:
+                        self._log_report(stderr, "stderr", issues, testcase)
         except OSError as e:
             if e.errno != errno.ENOENT:
                 raise
