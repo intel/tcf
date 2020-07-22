@@ -1632,6 +1632,8 @@ class io_tls_prefix_lines_c(io.BufferedWriter):
         # first. Accumulate anything left over after the last newline
         # so we can flush it next time we find one.
         offset = 0
+        if not isinstance(s, str):
+            s = str(s)
         while offset < len(s):
             pos = s.find('\n', offset)
             if pos >= 0:
