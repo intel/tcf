@@ -145,7 +145,7 @@ class expect_text_on_console_c(tc.expectation_c):
                 # see above for isinstance(, str) on why we do this
                 pattern = text_or_regex.pattern.encode(	# convert to bytes
                     'utf-8', errors = 'surrogatencode')
-                text_or_regex = re.compile(pattern, text_or_regex.flags)
+                text_or_regex = re.compile(pattern, re.MULTILINE)
             self.regex = text_or_regex
         else:
             raise AssertionError(
