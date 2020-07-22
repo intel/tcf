@@ -1306,9 +1306,6 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
         elif field_needed(field_flat, projections):
             _add(field_flat, val)
 
-    if len(d) == 0 and empty_dict == True:
-        # empty dict, insert it if we want them
-        _add(field_flat, val)
     for key, _val in d.items():
         __update_recursive(d[key], key, key, projections, 10, sort = sort,
                            empty_dict = empty_dict)
