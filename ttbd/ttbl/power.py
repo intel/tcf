@@ -526,7 +526,7 @@ class interface(ttbl.tt_interface):
         #  state: True (on) or False (off)
         #  substate: 'normal', 'full', 'partial'
         #
-        if all(i == True for i in normal.values() + explicit_off.values()):
+        if all(i in [ True, None ] for i in normal.values() + explicit_off.values()):
             state = True
             if all(i['state'] in (True, None) for i in data.values()):
                 substate = 'full'
