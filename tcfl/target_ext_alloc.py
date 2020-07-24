@@ -50,7 +50,7 @@ def _delete(rtb, allocid):
 # FIXME: what happens if the conn
 def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
                    queue_timeout = None, priority = 700, preempt = False,
-                   queue = True, reason = None):
+                   queue = True, reason = None, wait_in_queue = True):
     assert isinstance(groups, dict)
 
     data = dict(
@@ -78,11 +78,12 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
     if queue_timeout == 0:
         return allocid, state, {}
     ts = time.time()
-    group_allocated = None
+    group_allocated = []
     commonl.progress(
         "allocation ID %s: [+%.1fs] keeping alive during state '%s'" % (
             allocid, ts - ts0, state))
-    while True:
+    new_state = state		# in case we don't wait
+    while wait_in_queue:
         if queue_timeout and ts - ts0 > queue_timeout:
             raise tc.blocked_e(
                 "can't acquire targets, still busy after %ds"
@@ -185,10 +186,15 @@ def _cmdline_alloc_targets(args):
                     _alloc_targets(rtb, groups, obo = args.obo,
                                    preempt = args.preempt,
                                    queue = args.queue, priority = args.priority,
-                                   reason = args.reason)
+                                   reason = args.reason,
+                                   wait_in_queue = args.wait_in_queue)
                 ts = time.time()
-                print "allocation ID %s: [+%.1fs] allocated: %s" % (
-                    allocid, ts - ts0, " ".join(group_allocated))
+                if args.wait_in_queue:
+                    print "allocation ID %s: [+%.1fs] allocated: %s" % (
+                        allocid, ts - ts0, " ".join(group_allocated))
+                else:
+                    print "allocation ID %s: [+%.1fs] registered" % (
+                        allocid, ts - ts0)
             else:
                 print "%s: NOT ALLOCATED! Holdin allocation ID given with -a" \
                     % allocid
@@ -678,6 +684,10 @@ def _cmdline_setup(arg_subparsers):
     ap.add_argument(
         "-w", "--wait", action = "store_true", dest = 'queue', default = True,
         help = "(default) Wait until targets are assigned")
+    ap.add_argument(
+        "--dont-wait", action = "store_false", dest = 'wait_in_queue',
+        default = True,
+        help = "Do not wait until targets are assigned")
     ap.add_argument(
         "-i", "--inmediate", action = "store_false", dest = 'queue',
         help = "Fail if target's can't be allocated inmediately")
