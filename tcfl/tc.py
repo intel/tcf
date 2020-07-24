@@ -1957,6 +1957,49 @@ class target_c(reporter_c):
                         )),
                 e)
 
+    def instrument_name_get(self, interface_name, component = None):
+        """
+        Given a component in an interface, return the name of the
+        instrument that implements it
+
+        In the inventory metadata, every interface exposes components
+        and each component declares the unique instrument ID of the HW
+        piece that implements it in
+        *interfaces.INTERFACENAME.COMPONENT.INSTRUMENTID*.
+
+        This function then goes to the instrumentation inventory in
+        *instrumentation.INSTRUMENTID* and returns the value of thef
+        first one found:
+
+         - *instrumentation.INSTRUMENTID.name_long*
+
+         - *instrumentation.INSTRUMENTID.name*
+
+        :returns str:* name of the instrument that implements the
+          function or *instrument:INSTRUMENTID* if not found.
+
+        """
+        if component:
+            instrument_hash = self.kws[
+                'interfaces.' + interface_name + '.' + component + '.instrument']
+        else:
+            instrument_hash = self.kws[
+                'interfaces.' + interface_name + '.instrument']
+        # get the long name (more human friendly, otherwise the short one)
+        instrument = self.kws.get(
+            "instrumentation." + instrument_hash + ".name_long",
+            self.kws.get(
+                "instrumentation." + instrument_hash + ".name",
+                None))
+        if instrument == None:
+            self.report_info(
+                "WARNING! cannot find instrument name for instrument %s" % (
+                    instrument_hash),
+                dict(target = self, interface_name = interface_name,
+                     component = component))
+            instrument = "instrument:" + instrument_hash
+        return instrument
+
     #
     # Private API
     #
@@ -3467,7 +3510,7 @@ class tc_c(reporter_c):
 
     #: Force to use an specific allocid (already obtained)
     allocid = None
-    
+
     def __init__(self, name, tc_file_path, origin):
         reporter_c.__init__(self)
         for hook_pre in self.hook_pre:
@@ -7822,7 +7865,7 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
         rt_all[rt['fullid']] = rt
         if rt.get('disabled', None) != None \
            and tc_c._targets_disabled_too == False:
-            continue            
+            continue
         if 'interconnect_c' in rt.get('interfaces', {}):
             ic_selected_all[rt['fullid']] = set(rt.get('bsp_models', {}).keys())
         else:
