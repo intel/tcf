@@ -57,6 +57,7 @@ class extension(tc.target_extension_c):
         return state
 
     def list(self):
+        # FIXME: add component to make it faster when we only need one component
         """
         Return a list of a target's power rail components and their status
 
@@ -96,7 +97,7 @@ class extension(tc.target_extension_c):
               - *both*: only powered on/off if explicitly named
 
         """
-        self.target.report_info("listing", dlevel = 1)
+        self.target.report_info("listing", dlevel = 2)
         r = self.target.ttbd_iface_call(
             "power", "list", method = "GET",
             # extra time, since power ops can take long
@@ -130,7 +131,7 @@ class extension(tc.target_extension_c):
             data = r['components']
         else:
             raise AssertionError("can't parse response")
-        self.target.report_info("listed")
+        self.target.report_info("listed", dlevel = 2)
         return state, substate, data
 
     def off(self, component = None, explicit = False):
