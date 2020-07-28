@@ -62,23 +62,36 @@ deriving from :class:ttbl.images.impl_c) to drive the flashing of each
 target type:
 
 - image is an aka of imageA
+
 - imageA done by implA
+
 - imageB done by implB
+
 - imageC and imageD done by implCD (parallel capable)
+
 - imageE done by implE (parallel capable)
+
 - imageF done by implF (parallel capable)
+
 - imageG and imageH done by implGH
 
 this will flash:
 
 - serially:
+
   - fileA and fileX in imageA using driver implA, so one will get
     overriden and not even flashed depending on the specification order
+
   - fileB in imageB using driver implB
+
   - fileG in imageG and fileh in imageH using implGH
+
 - in parallel:
+
    - fileC in imageC and fileD in imageD using driver implCD
+
    - fileE in imageE using implE
+
    - fileF in imageF using implF
 
 Power control sequences before flashing
@@ -113,7 +126,7 @@ components needed to do the flashing operation after a short wait
 a power component called *flasher/image0 connector* that
 powers-on/connects the flasher for *image0* (a Dediprog in the example):
 
-.. code-block::
+.. code-block:: python
 
    target.interface_add(
        "images", ttbl.images.interface(
@@ -138,7 +151,7 @@ The flashers are usually defined as explicit/on components, so they
 are only turned on if explicitly named and stay off otherwise; for
 example, to control connectivity with a USB YKush Power switcher
 
-.. code-block::
+.. code-block:: python
 
    target.interface_add(
        "power", ttbl.power.interface(
@@ -155,7 +168,7 @@ example, to control connectivity with a USB YKush Power switcher
         ))
 
 for parallel flashers, it'd be similar, but it would turn on all the
-flashers:
+flashers::
 
    target.interface_add(
        "images", ttbl.images.interface(
@@ -1800,7 +1813,7 @@ class sf100linux_c(flash_shell_cmd_c):
     Dediprogs' USB serial numbers are often all the same, so for a
     power-on sequence to wait until the device is detected by the
     system after it has been plugged in (eg: with a
-    :class:`ttbl.pc_ykush.pc` connector)
+    :class:`ttbl.pc_ykush.ykush` connector)
     :class:`ttbl.pc.delay_til_usb_device` is usually not enough. In
     such case, we can use *dpmcd* to do the detection for us:
 
