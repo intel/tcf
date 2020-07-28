@@ -176,7 +176,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
             target_names_all |= target_names_group
         for target_name in target_names_all:
             try:
-                self.targets_all[target_name] = ttbl.test_target(target_name)
+                self.targets_all[target_name] = ttbl.test_target.get(target_name)
             except KeyError:
                 raise self.invalid_e(
                     "%s: target no longer available" % target_name)
