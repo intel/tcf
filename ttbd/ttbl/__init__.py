@@ -1777,8 +1777,9 @@ class test_target(object):
             allocdb = ttbl.allocation.get_from_cache(_allocid)
             return _allocid	# alloc-ID is valid, return it
         except ttbl.allocation.allocation_c.invalid_e:
-            logging.error("%s: wiping ownership by invalid allocation %s",
-                          self.id, _allocid)
+            logging.info("%s: wiping ownership by invalid allocation/id %s",
+                         self.id, _allocid)
+            self._state_cleanup(False)
             self._allocid_wipe()
             return None
 
@@ -1791,8 +1792,9 @@ class test_target(object):
         try:
             return allocation.get_from_cache(_allocid)
         except allocation.allocation_c.invalid_e:
-            logging.error("%s: wiping ownership by invalid allocation %s",
-                          self.id, _allocid)
+            logging.info("%s: wiping ownership by invalid allocation/get %s",
+                         self.id, _allocid)
+            self._state_cleanup(False)
             self._allocid_wipe()
             return None
 
