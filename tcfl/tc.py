@@ -3508,8 +3508,12 @@ class tc_c(reporter_c):
     #: List of places where we declared this testcase is build only
     build_only = []
 
-    #: Force to use an specific allocid (already obtained)
+    
+    #: Allocation ID this testcase is using
+    #:
     allocid = None
+    # (internally: setting this forces the testcase to use the given
+    # allocation ID)
 
     def __init__(self, name, tc_file_path, origin):
         reporter_c.__init__(self)
@@ -5948,6 +5952,7 @@ class tc_c(reporter_c):
             # FIXME: this need sto carry more data, we've lost a lot
             # on the way here
             raise tcfl.tc.blocked_e("allocation failed, state %s" % state)
+        self.allocid = allocid
         self.report_info(
             "acquired %s" % allocid,
             dict(
