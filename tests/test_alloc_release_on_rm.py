@@ -16,7 +16,8 @@ ttbd = commonl.testing.test_ttbd(config_files = [
     os.path.join(srcdir, "conf_%s" % os.path.basename(__file__.rstrip('cd')))
 ])
 
-@tcfl.tc.target("t0")
+
+@tcfl.tc.target(ttbd.url_spec + ' and t0')
 class _test(tcfl.tc.tc_c):
 
     def eval(self, target):
@@ -33,10 +34,12 @@ class _test(tcfl.tc.tc_c):
 
         self.report_info("removing allocation ID %s" % self.allocid)
         tcfl.target_ext_alloc._delete(target.rtb, self.allocid)
-        release_hook_called = target.property_get("release hook called")
+        release_hook_called = target.property_get("release_hook_called")
         assert release_hook_called == True, \
             "seems the release hook was not called, since the field " \
-            "release_hookcalled is not True; got '%s'" % release_hook_called
+            "release_hook_called is not True; got '%s'" % release_hook_called
+        target.report_pass("release hook was called when"
+                           " allocation ID %s was removed" % self.allocid)
 
     def teardown_90_scb(self):
         ttbd.check_log_for_issues(self)

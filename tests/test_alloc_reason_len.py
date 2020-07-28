@@ -20,13 +20,14 @@ ttbd = commonl.testing.test_ttbd(config_files = [
 ])
 
 
-@tcfl.tc.target()	# we have only one target
+@tcfl.tc.target(ttbd.url_spec + ' and local_test')
 class _test(commonl.testing.shell_client_base):
     """
     Test allocations longer then the limit set by the server get chopped
     """
 
     def eval_00(self, target):
+
         self.ttbd = ttbd
         self.mk_tcf_config()
 
