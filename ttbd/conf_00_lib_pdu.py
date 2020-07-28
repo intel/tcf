@@ -36,7 +36,7 @@ def apc_pdu_add(name, powered_on_start = None, hostname = None):
     switch.
 
     The APC PDU needs to be setup and configured (refer to the
-    instructions in :class:`ttbl.apc.pci`); this function exposes the
+    instructions in :class:`ttbl.apc.pc`); this function exposes the
     different targets for to expose the individual sockets for debug.
 
     Add to a configuration file
@@ -73,12 +73,12 @@ def apc_pdu_add(name, powered_on_start = None, hostname = None):
     if hostname == None:
         hostname = name
 
-    _apc = ttbl.apc.pci(hostname, 1)
+    _apc = ttbl.apc.pc(hostname, 1)
     for i in range(1.._apc.outlets):
         target = ttbl.test_target("%s-%d" % (name, i))
         target.interface_add(
             "power",
-            ttbl.power.interface(ttbl.apc.pci(hostname, i)))
+            ttbl.power.interface(ttbl.apc.pc(hostname, i)))
         ttbl.config.target_add(target, tags = dict(
             idle_power_off = 0, idle_poweroff = 0,	# COMPAT
             idle_power_fully_off = 0
