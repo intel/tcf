@@ -191,6 +191,7 @@ flashers:
 
 import codecs
 import collections
+import copy
 import hashlib
 import json
 import numbers
@@ -1517,6 +1518,33 @@ class quartus_pgm_c(flash_shell_cmd_c):
     cable is plugged to another port or might be enumerated in a
     different number).
 
+    :param str device_id: USB serial number of the USB device to use
+      (USB-BlasterII or similar)
+
+    :param dict image_map:
+
+    :param str name: (optiona; default 'Intel Quartus PGM #<DEVICEID>')
+      instrument's name.
+
+    :param dict args: (optional) dictionary of extra command line options to
+      *quartus_pgm*; these are expanded with the target keywords with
+      *%(FIELD)s* templates, with fields being the target's
+      :ref:`metadata <finding_testcase_metadata>`:
+
+      FIXME: move to common flash_shell_cmd_c
+
+    :param dict jtagconfig: (optional) jtagconfig --setparam commands
+      to run before starting.
+
+      These are expanded with the target keywords with
+      *%(FIELD)s* templates, with fields being the target's
+      :ref:`metadata <finding_testcase_metadata>` and then run as::
+
+        jtagconfig --setparam CABLENAME KEY VALUE
+
+    Other parameters described in :class:ttbl.images.impl_c.
+
+
     **Command line reference**
 
     https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/manual/tclscriptrefmnl.pdf
@@ -1601,16 +1629,20 @@ class quartus_pgm_c(flash_shell_cmd_c):
     #: >>> imager = ttbl.images.quartus_pgm_c(...)
     #: >>> imager.path =  "/opt/quartus/qprogrammer/bin/quartus_pgm"
     path = "/opt/quartus/qprogrammer/bin/quartus_pgm"
+    path_jtagconfig = "/opt/quartus/qprogrammer/bin/jtagconfig"
 
 
     def __init__(self, device_id, image_map, args = None, name = None,
+                 jtagconfig = None,
                  **kwargs):
         assert isinstance(device_id, basestring)
         commonl.assert_dict_of_ints(image_map, "image_map")
+        commonl.assert_none_or_dict_of_strings(jtagconfig, "jtagconfig")
         assert name == None or isinstance(name, basestring)
 
         self.device_id = device_id
         self.image_map = image_map
+        self.jtagconfig = jtagconfig
         if args:
             commonl.assert_dict_of_strings(args, "args")
             self.args = args
@@ -1671,15 +1703,28 @@ class quartus_pgm_c(flash_shell_cmd_c):
 
         # for each image we are burning, map it to a target name in
         # the cable (@NUMBER)
-        self.cmdline = self.cmdline_orig
+        # make sure we don't modify the originals
+        cmdline = copy.deepcopy(self.cmdline_orig)
         for image_type, filename in images.items():
             target_index = self.image_map.get(image_type, None)
             # pass only the realtive filename, as we are going to
             # change working dir into the path (see above in
             # context[kws][file_path]
-            self.cmdline.append("--operation=PVB;%s@%d" % (
+            cmdline.append("--operation=PVB;%s@%d" % (
                 os.path.basename(filename), target_index))
+        # now set it for flash_shell_cmd_c.flash_start()
+        self.cmdline = cmdline
 
+        if self.jtagconfig:
+            for option, value in self.jtagconfig.items():
+                cmdline = [
+                    self.path_jtagconfig,
+                    "--setparam", "%s [%s]" % (product, usb_path),
+                    option, value
+                ]
+                target.log.info("running per-config: %s" % " ".join(cmdline))
+                subprocess.check_output(
+                    cmdline, shell = False, stderr = subprocess.STDOUT)
         flash_shell_cmd_c.flash_start(self, target, images, context)
 
 
