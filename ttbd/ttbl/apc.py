@@ -6,6 +6,8 @@
 #
 # pylint: disable = missing-docstring
 
+import sys
+
 import ttbl.power
 try:
     import pysnmp.entity.rfc3413.oneliner.cmdgen
