@@ -1807,6 +1807,9 @@ class test_target(object):
         # This is to be used only when we have taken the target but
         # then have not used it, so there is no need for state clean
         # up.
+        #
+        # NOTE: ttbl.allocation.allocdb_c.delete() does the same as
+        # this because we know it to be the case
         assert self.lock.locked()	    # Must have target.lock taken!
         current_allocid = self.fsdb.get("_alloc.id")
         if current_allocid and current_allocid == allocid:
@@ -1824,6 +1827,9 @@ class test_target(object):
     #
     # fold _deallocate_forced() to have a state argument that if set,
     # sets the reservation's state to that one
+    #
+    # NOTE: ttbl.allocation.allocdb_c.delete() does the same as
+    # this because we know it to be the case
     def _deallocate(self, allocdb, new_state = None):
         # deallocate verifying the current allocation is valid
         if self._deallocate_simple(allocdb.allocid):

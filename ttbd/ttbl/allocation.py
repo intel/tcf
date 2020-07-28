@@ -186,10 +186,18 @@ class allocation_c(ttbl.fsdb_symlink_c):
             # if the reservation DB is messed up, this might fail --
             # it is fine, we will then just wipe it
             with self.lock:
-                if self.state_get == 'active':
+                if self.state_get() == 'active':
                     targets = {}
                     for target_name in self.get("group_allocated").split(","):
-                        targets[target_name] = ttbl.test_target.get(target_name)
+                        target = ttbl.test_target.get(target_name)
+                        targets[target_name] = target
+                        # cleanup each of the involved targets when
+                        # active; this is a sum up of
+                        # ttbl.test_target._deallocate()+
+                        # _deallocate_simple(), since we know the
+                        # steps are the same
+                        target._state_cleanup(True)
+                        target._allocid_wipe()
                 else:
                     targets = self.targets_all
         finally:
@@ -236,7 +244,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
                                                        "%Y%m%d%H%M%S")
         seconds_idle = (ts_now - ts_last_keepalive).seconds
         if seconds_idle > ttbl.config.target_max_idle:
-            logging.error(
+            logging.info(
                 "ALLOC: allocation %s timedout (idle %s/%s), deleting",
                 self.allocid, seconds_idle, ttbl.config.target_max_idle)
             self.delete('timedout')
@@ -498,8 +506,7 @@ def _target_queue_load(target):
     return waiters, preempt
 
 def _target_starvation_recalculate(allocdb, target, score):
-    logging.error("FIXME: %s: %s: %s",
-                  allocdb, target.id, score)
+    logging.info("FIXME: %s: %s: %s", allocdb, target.id, score)
 
 def _target_allocate_locked(target, current_allocdb, waiters, preempt):
     # return: allocdb from waiter that succesfully took it
