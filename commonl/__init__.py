@@ -1425,10 +1425,15 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
       [3]: <open file '<stdout>', mode 'w' at 0x7f13ba2861e0>
 
     - in a list/set/tuple, each item is printed prefixing *[INDEX]*
+
     - in a dictionary, each item is prefixed with it's key
+
     - strings and cardinals are printed as such
+
     - others are printed as what their representation as a string produces
+
     - if an attachment is a generator, it is iterated to gather the data.
+
     - if an attachment is of :class:generator_factory_c, the method
       for creating the generator is called and then the generator
       iterated to gather the data.
@@ -1436,11 +1441,15 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
     See also :func:`data_dump_recursive_tls`
 
     :param d: data to print
+
     :param str prefix: prefix to start with (defaults to nothing)
+
     :param str separator: used to separate dictionary keys from the
       prefix (defaults to ".")
+
     :param :python:file of: output stream where to print (defaults to
       *sys.stdout*)
+
     :param int depth_limit: maximum nesting levels to go deep in the
       data structure (defaults to 10)
     """
@@ -1579,12 +1588,12 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
        with commonl.tls_prefix_c(tls, "PREFIX"), \
             commonl.io_tls_prefix_lines_c(tls, f.detach()) as of:
 
-           of.write(u"line1\nline2\nline3\n")
-
+           of.write(u"line1\\nline2\\nline3\\n")    
 
     Limitations:
 
-    - hack, only works ok if full lines are being printed; eg:
+      - hack, only works ok if full lines are being printed
+
     """
     def __init__(self, tls, *args, **kwargs):
         assert isinstance(tls, thread._local)
