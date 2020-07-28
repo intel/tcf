@@ -99,7 +99,7 @@ class driver(tc.report_driver_c):
     Report results of testcase execution into a MongoDB database
 
     The records are written to a database pointed to by MongoDB URL :attr:`url`,
-    database name :attr:`db_name`, collection :attr:`collection name`.
+    database name :attr:`db_name`, collection :attr:`collection_name`.
 
     **Usage**
 
@@ -171,8 +171,11 @@ class driver(tc.report_driver_c):
         # _mongo_setup() again, we also do it if we are in a different PID.
         self.made_in_pid = None
 
+        #: URL for the databsae
         self.url = url
+        #: Name of the database in :attr:url
         self.db_name = db_name
+        #: Name of the collection in :attr:url and :attr:db_name
         self.collection_name = collection_name
         self.extra_params = extra_params if extra_params else dict()
 

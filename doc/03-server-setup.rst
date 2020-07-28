@@ -447,6 +447,8 @@ follow are configuration examples.
 Configure physical Linux (or other) targets
 -------------------------------------------
 
+.. warning:: this section is old and needs rewriting
+
 There are multiple ways a Linux target can be connected as a target to
 a TCF server. However, dependending on the intended use, different
 configuration steps can be followed:
@@ -458,8 +460,7 @@ configuration steps can be followed:
   This provides no control over the OS installed in the target
 
 - A Linux target can be setup to boot off a read-only live filesystem
-  (to avoid modifications to the root filesystem) following
-  :ref:`these steps <ttbd_config_phys_linux_live>`.
+  (to avoid modifications to the root filesystem).
 
   Serial access to a console can be provided and through it networking
   can be configured.
@@ -750,8 +751,6 @@ Once a target is configured in, run a quick healthcheck::
 
 
       
-.. _pos_setup:
-
 Configuring support information
 -------------------------------
 

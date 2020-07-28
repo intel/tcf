@@ -5,7 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
-""".. _example_qemu_bios:
+"""
+
+.. _example_qemu_bios:
 
 Build, install and boot a QEMU target with modified BIOS, verify the changes
 ============================================================================

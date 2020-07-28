@@ -260,7 +260,7 @@ Make it always start automatically with::
 
 
 Manual installation of rsync server for Provisioning OS
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-------------------------------------------------------
 
 To setup a system wide rsync server, along other services, instead of
 relying on ttbd starting a specific instance for each network, follow

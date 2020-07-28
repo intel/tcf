@@ -96,9 +96,9 @@ The *tcf run* testcase (`tcfl.tc._run()`) will:
   For evaluation, the system relies on the concept of expectations
   (things that have to happen to pass, things that don't have to
   happen else it fails), implemented by a
-  per-testcase/group-of-targets object (the :mod:`expecter
-  <tcfl.expecter>`), a loop which ensures what is expected to
-  happen happens.
+  per-testcase/group-of-targets object (the
+  :meth:`tcfl.tc.tc_c.expect`), a loop which ensures what is expected
+  to happen happens.
 
 .. _testcase_driver_impromptu:
 

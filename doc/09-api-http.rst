@@ -2100,7 +2100,7 @@ Old documentation, pending rewrite/update
 -----------------------------------------
 
 Console
-"""""""
+^^^^^^^
 
 - ``/ttb/v1/targets/TARGETNAME/console/setup`` *PUT*
 - ``/ttb/v1/targets/TARGETNAME/console/list`` *GET*
@@ -2112,38 +2112,38 @@ Console
 - ``/ttb/v1/targets/TARGETNAME/console/write`` *PUT*
 
 Capture
-"""""""
+^^^^^^^
 
 - ``/ttb/v1/targets/TARGETNAME/capture/start`` *POST*
 - ``/ttb/v1/targets/TARGETNAME/capture/stop_and_get`` *POST*
 - ``/ttb/v1/targets/TARGETNAME/capture/list`` *GET*
 
 Buttons
-"""""""
+^^^^^^^
 
 - ``/ttb/v1/targets/TARGETNAME/buttons/sequence`` *PUT*
 - ``/ttb/v1/targets/TARGETNAME/buttons/list`` *GET*
 
 Fastboot
-""""""""
+^^^^^^^^
 
 - ``/ttb/v1/targets/TARGETNAME/fastboot/run`` *PUT*
 - ``/ttb/v1/targets/TARGETNAME/fastboot/list`` *GET*
 
 Images
-""""""
+^^^^^^
 
 - ``/ttb/v1/targets/TARGETNAME/images/flash`` *PUT*
 - ``/ttb/v1/targets/TARGETNAME/images/list`` *GET*
 
 
 IOC_flash_server_app
-""""""""""""""""""""
+^^^^^^^^^^^^^^^^^^^^
 
 - ``/ttb/v1/targets/TARGETNAME/ioc_flash_server_app/run`` *GET*
 
 Things
-""""""
+^^^^^^
 
 - ``/ttb/v1/targets/TARGETNAME/things/list`` *GET*
 - ``/ttb/v1/targets/TARGETNAME/things/get`` *GET*
@@ -2154,7 +2154,7 @@ Examples
 --------
 
 Example: listing targets over HTTP
-""""""""""""""""""""""""""""""""""
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 What the command line tool would be::
 
@@ -2199,7 +2199,7 @@ In Python::
 
 
 Example: Reading the console(s) from HTTP
-"""""""""""""""""""""""""""""""""""""""""
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You can see which consoles are available with either or::
 
