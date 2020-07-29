@@ -1474,7 +1474,7 @@ def _cmdline_console_read(args):
         offset = target.console.offset_calc(target, args.console, int(args.offset))
         max_size = int(args.max_size)
         if args.output == None:
-            fd = sys.stdout
+            fd = sys.stdout.buffer
         else:
             fd = open(args.output, "wb")
         try:
@@ -1500,7 +1500,7 @@ def _cmdline_console_read(args):
 
                 time.sleep(backoff_wait)	# no need to bombard the server..
         finally:
-            if fd != sys.stdout:
+            if fd != sys.stdout.buffer:
                 fd.close()
 
 
