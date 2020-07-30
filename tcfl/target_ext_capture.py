@@ -548,7 +548,7 @@ class extension(tc.target_extension_c):
         """
         self.target.report_info("%s: stopping capture" % capturer, dlevel = 3)
         if local_filename != None:
-            with open(local_filename, "w") as of, \
+            with open(local_filename, "wb") as of, \
                  contextlib.closing(
                      self.target.ttbd_iface_call(
                          "capture", "stop_and_get", method = "POST",
