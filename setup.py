@@ -47,6 +47,7 @@ class _build_py(distutils.command.build_py.build_py):
         if not self.dry_run:
             target_dir = os.path.join(self.build_lib, 'tcfl')
             self.mkpath(target_dir)
+            setupl.mk_version_py(target_dir, self.distribution.get_version())
 
         # distutils uses old-style classes, so no super()
         distutils.command.build_py.build_py.run(self)
