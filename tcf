@@ -528,7 +528,6 @@ tcf-jobserver-run:
         try:
             retval = args.func(args)
         except Exception as e:
-            raise e
             if args.traces:
                 logging.exception(e)
             else:
