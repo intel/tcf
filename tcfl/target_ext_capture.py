@@ -385,7 +385,7 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
         if r and self.merge_similar:	# merge similar detections
             start_idx = 0
             while start_idx < len(r):
-                squarel = r.keys()
+                squarel = list(r.keys())
                 r0 = r[squarel[0]]['relative']
                 for r_name in squarel[start_idx+1:]:
                     rx = r[r_name]['relative']
