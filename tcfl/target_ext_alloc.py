@@ -384,7 +384,7 @@ def _alloc_ls(verbosity):
     tp = tcfl.ttb_client._multiprocessing_pool_c(
         processes = len(tcfl.ttb_client.rest_target_brokers))
     threads = {}
-    for rtb in sorted(tcfl.ttb_client.rest_target_brokers.values()):
+    for rtb in sorted(tcfl.ttb_client.rest_target_brokers.values(), key = str):
         threads[rtb] = tp.apply_async(_allocs_get, (rtb,))
     tp.close()
     tp.join()
