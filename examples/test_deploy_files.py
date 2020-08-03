@@ -1,4 +1,4 @@
-#! /usr/bin/python2
+#! /usr/bin/python
 #
 # Copyright (c) 2019 Intel Corporation
 #
@@ -88,7 +88,7 @@ class _test(tcfl.pos.tc_pos0_base):
             output = True, trim = True).strip()
         local = subprocess.check_output(
             "md5sum < %s" % self.kws['srcdir'] + "/data/beep.wav",
-            shell = True).strip()
+            shell = True, encoding='utf-8').strip()
         if remote != local:
             raise tcfl.tc.failed_e("MD5 mismatch (local %s remote %s)"
                                    % (local, remote))
