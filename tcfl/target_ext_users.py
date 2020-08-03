@@ -39,7 +39,7 @@ def _cmdline_user_list(args):
         if not ttb_client.rest_target_brokers:
             logging.error("E: no servers available, did you configure?")
             return
-        for rtb in sorted(ttb_client.rest_target_brokers.values()):
+        for rtb in sorted(ttb_client.rest_target_brokers.values(), key = str):
             threads[rtb] = tp.apply_async(_user_list, (rtb, args.userid))
         tp.close()
         tp.join()
