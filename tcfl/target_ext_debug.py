@@ -55,7 +55,7 @@ class extension(tc.target_extension_c):
           :meth:`ttbl.debug.impl_c.debug_list`.
         """
         r = self.target.ttbd_iface_call("debug", "list", method = "GET",
-                                        components = json.dumps(components))
+                                        components = components)
         return r['result']
 
     def start(self, components = None):
@@ -73,7 +73,7 @@ class extension(tc.target_extension_c):
           whose debugging support shall start (defaults to all)
         """
         self.target.ttbd_iface_call("debug", "start", method = "PUT",
-                                    components = json.dumps(components))
+                                    components = components)
 
     def stop(self, components = None):
         """
@@ -86,7 +86,7 @@ class extension(tc.target_extension_c):
           whose debugging support shall stop (defaults to all)
         """
         self.target.ttbd_iface_call("debug", "stop", method = "PUT",
-                                    components = json.dumps(components))
+                                    components = components)
 
     def halt(self, components = None):
         """
@@ -96,7 +96,7 @@ class extension(tc.target_extension_c):
           where to operate (defaults to all)
         """
         self.target.ttbd_iface_call("debug", "halt", method = "PUT",
-                                    components = json.dumps(components))
+                                    components = components)
 
     def reset(self, components = None):
         """
@@ -106,7 +106,7 @@ class extension(tc.target_extension_c):
           where to operate (defaults to all)
         """
         self.target.ttbd_iface_call("debug", "reset", method = "PUT",
-                                    components = json.dumps(components))
+                                    components = components)
 
     def reset_halt(self, components = None):
         """
@@ -116,7 +116,7 @@ class extension(tc.target_extension_c):
           where to operate (defaults to all)
         """
         self.target.ttbd_iface_call("debug", "reset_halt", method = "PUT",
-                                    components = json.dumps(components))
+                                    components = components)
 
     def resume(self, components = None):
         """
@@ -129,7 +129,7 @@ class extension(tc.target_extension_c):
           where to operate (defaults to all)
         """
         self.target.ttbd_iface_call("debug", "resume", method = "PUT",
-                                    components = json.dumps(components))
+                                    components = components)
 
 def _cmdline_debug_list(args):
     with msgid_c("cmdline"):
