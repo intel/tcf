@@ -868,8 +868,10 @@ class bossac_c(impl_c):
     - (for Arduino Due) uses the bossac utility built on the *arduino*
       branch from https://github.com/shumatech/BOSSA/tree/arduino::
 
+        # sudo dnf install -y gcc-c++ wxGTK-devel
         $ git clone https://github.com/shumatech/BOSSA.git bossac.git
         $ cd bossac.git
+        $ git checkout -f 1.6.1-arduino-19-gae08c63
         $ make -k
         $ sudo install -o root -g root bin/bossac /usr/local/bin
 
@@ -1623,6 +1625,25 @@ class quartus_pgm_c(flash_shell_cmd_c):
       This case has been found to be because the **--bgp** option is
       needed (which seems to map to the *Enable Realtime ISP
       programming* in the Quartus UI, *quartus_pgmw*)
+
+    - *Warning (16328): The real-time ISP option for Max 10 is
+      selected. Ensure all Max 10 devices being programmed are in user
+      mode when requesting this programming option* 
+
+      Followed by:
+
+        *Error (209012): Operation failed*
+
+      This case comes when a previous flashing process was interrupted
+      half way or the target is corrupted.
+
+      It needs a special one-time recovery; currently the
+      workaround seems to run the flashing with out the *--bgp* switch
+      that as of now is hardcoded.
+    
+      FIXME: move the --bgp and --mode=JTAG switches to the args (vs
+      hardcoded) so a recovery target can be implemented as
+      NAME-nobgp
 
     """
 
