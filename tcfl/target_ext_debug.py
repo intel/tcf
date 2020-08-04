@@ -37,7 +37,7 @@ class extension(tc.target_extension_c):
         if 'debug' not in target.rt.get('interfaces', []):
             raise self.unneeded
 
-    def list(self, components = None):
+    def list(self, components = []):
         """
         Return a debugging information about each component
 
@@ -58,7 +58,7 @@ class extension(tc.target_extension_c):
                                         components = components)
         return r['result']
 
-    def start(self, components = None):
+    def start(self, components = []):
         """
         Start debugging support on the target or individual components
 
@@ -75,7 +75,7 @@ class extension(tc.target_extension_c):
         self.target.ttbd_iface_call("debug", "start", method = "PUT",
                                     components = components)
 
-    def stop(self, components = None):
+    def stop(self, components = []):
         """
         Stop debugging support on the target
 
@@ -88,7 +88,7 @@ class extension(tc.target_extension_c):
         self.target.ttbd_iface_call("debug", "stop", method = "PUT",
                                     components = components)
 
-    def halt(self, components = None):
+    def halt(self, components = []):
         """
         Halt the target's CPUs
 
@@ -98,7 +98,7 @@ class extension(tc.target_extension_c):
         self.target.ttbd_iface_call("debug", "halt", method = "PUT",
                                     components = components)
 
-    def reset(self, components = None):
+    def reset(self, components = []):
         """
         Reset the target's CPUs
 
@@ -108,7 +108,7 @@ class extension(tc.target_extension_c):
         self.target.ttbd_iface_call("debug", "reset", method = "PUT",
                                     components = components)
 
-    def reset_halt(self, components = None):
+    def reset_halt(self, components = []):
         """
         Reset and halt the target's CPUs
 
@@ -118,7 +118,7 @@ class extension(tc.target_extension_c):
         self.target.ttbd_iface_call("debug", "reset_halt", method = "PUT",
                                     components = components)
 
-    def resume(self, components = None):
+    def resume(self, components = []):
         """
         Resume the target's CPUs
 
