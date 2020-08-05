@@ -19,9 +19,9 @@ TCF client
 Missing *redhat-hardened-cc1*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-During installation with pip2::
+During installation with pip3::
 
-  $ pip2 install --user -r requirements.txt
+  $ pip3 install --user -r requirements.txt
   ...
   creating build/temp.linux-x86_64-2.7
   creating build/temp.linux-x86_64-2.7/Levenshtein

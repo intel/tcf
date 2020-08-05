@@ -8,18 +8,14 @@
 
 .. include:: doc/02-client-setup-LL-00.rst
 
-1. Install the client software from source; install Python2
+1. Install the client software from source; install Python3
    development support::
 
-     $ sudo dnf install -y python2-devel python2-pip  # Fedora <= 30
-     $ sudo yum install -y python2-devel python2-pip  # CentOS/RHEL 7
+     $ sudo dnf install -y python3-devel python3-pip  # Fedora <= 30
+     $ sudo yum install -y python3-devel python3-pip  # CentOS/RHEL 7
      $ sudo apt-get update                            # Ubuntu <= 18
-     $ sudo apt install -y python-dev python-pip      # Ubuntu <= 18
+     $ sudo apt install -y python3-dev python3-pip    # Ubuntu <= 18
 
-   (TCF is still using python2, hence the limitation to older ditros
-   that still support it, we are in the process of porting to Python3;
-   see branch *pyv3*).
-     
    now clone install Python dependencies and install the TCF client
 
    .. include:: doc/02-client-setup-LL-02.rst
