@@ -127,7 +127,7 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
 
 def _alloc_hold(rtb, allocid, state, ts0, max_hold_time):
     while True:
-        time.sleep(5)
+        time.sleep(2)
         ts = time.time()
         if max_hold_time > 0 and ts - ts0 > max_hold_time:
             # maximum hold time reached, release it
@@ -673,14 +673,14 @@ def _cmdline_setup(arg_subparsers):
         help = "Reason to pass to the server (default: %(default)s)"
         " [LOGNAME:HOSTNAME:PARENTPID]")
     ap.add_argument(
-        "-d", "--hold", action = "store",
-        nargs = "?", type = int, const = 0, default = None,
-        help = "Keep the reservation alive for this many seconds"
-        " (default for ever)")
+        "--hold", action = "store_const",
+        const = 0, dest = "hold", default = None,
+        help = "Keep the reservation alive until cancelled with Ctrl-C")
     ap.add_argument(
-        "-u", "--duration", action = "store", type = int, default = 0,
-        help = "Keep the reservation alive for this seconds,"
-        " then release it")
+        "-d", "--hold-for", dest = "hold", action = "store",
+        nargs = "?", type = int, default = None,
+        help = "Keep the reservation alive for this many seconds, "
+        "then release it")
     ap.add_argument(
         "-w", "--wait", action = "store_true", dest = 'queue', default = True,
         help = "(default) Wait until targets are assigned")
