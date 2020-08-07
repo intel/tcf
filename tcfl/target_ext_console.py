@@ -881,12 +881,16 @@ class extension(tc.target_extension_c):
 
         :param newline: (optional, defaults to *None*, universal)
           convention for end-of-line characters.
+        
           - *None* any of *\\r*, *\\n*, *\\r\\n* or multile *\\r* followed
             by a *\\n* are considered a newline and replaced with *\\n*
+
           - *''* (empty string): no translation is done
+
           - a string: the string is considered an end of line
             character and replaced by a *\\n*. Most common characters
             would be *\\r*, *\\n* or *\\r\\n*.
+
           - a regular expresion: whatever matches the regular
             expression is replaced with a *\\n*.
 
@@ -919,12 +923,16 @@ class extension(tc.target_extension_c):
 
         :param newline: (optional, defaults to *None*, universal)
           convention for end-of-line characters.
+
           - *None* any of *\\r*, *\\n*, *\\r\\n* or multile *\\r* followed
             by a *\\n* are considered a newline and replaced with *\\n*
+
           - *''* (empty string): no translation is done
+
           - a string: the string is considered an end of line
             character and replaced by a *\\n*. Most common characters
             would be *\\r*, *\\n* or *\\r\\n*.
+
           - a regular expresion: whatever matches the regular
             expression is replaced with a *\\n*.
 
@@ -1800,7 +1808,7 @@ def _cmdline_setup(arg_subparser):
     ap = arg_subparser.add_parser(
         "console-wall",
         help = "Display multiple serial consoles in a tiled terminal"
-        " window using GNU screen (type 'Ctrl-a : quit' to stop it)") 
+        " window using GNU screen (type 'Ctrl-a : quit' to stop it)")
     ap.add_argument(
         "-a", "--all", action = "store_true", default = False,
         help = "List also disabled targets")
