@@ -1596,9 +1596,9 @@ class test_target(object):
                                 + str(ic.tags[proto + "_prefix_len"])),
                         strict = False)
                     if ic_net != net:
-                        raise ValueError(
+                        logging.warning(
                             "%s: IP address %s for interconnect %s is outside "
-                            "of the interconnect's network %s (vs %s)" %(
+                            "of the interconnect's network %s (vs %s)" % (
                                 self.id, val, name, ic_net, net))
             if key == "ipv4_prefix_len":
                 val = int(val)
