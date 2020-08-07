@@ -103,7 +103,8 @@ roles are predefined:
 
 other roles are created and given at the system administrators
 discretion to use for access control to targets (see
-:ref:`roles_required` and :ref:`roles_excluded`).
+:ref:`roles_required <roles_required>` and :ref:`roles_excluded
+<roles_excluded>`).
 
 
 PUT /login username=USERNAME password=PASSWORD -> DICTIONARY + COOKIES
@@ -111,7 +112,7 @@ PUT /login username=USERNAME password=PASSWORD -> DICTIONARY + COOKIES
 
 Authenticate a user to be able to use the system.
 
-Login is implemented by :func:`ttbd.login` and if successful, it will
+Login is implemented by *ttbd.login()* and if successful, it will
 return a set of cookies which are later to be used to authenticate
 with the system.
 
