@@ -1162,6 +1162,11 @@ and on another, just the byte stream::
 interacting with it on the first console will give you an idea of what
 is actually printed that can be used to latch on.
 
+Hints on disabling coloured output in Linux commands::
+
+  $ grep --color=never ...
+  $ ls --color=never ...
+
 Newlines when reading output of a command
 -----------------------------------------
 
@@ -2311,40 +2316,48 @@ Manual installation of support packages
 These are dependencies needed when certain kind of test hardware is
 going to be connected or certain OSes / testcases are to be used:
 
-- Arduino Due boards: :ref:`Bossa command line <bossac>`
-- Zephyr SDK for Arduino 101, Intel Quark, FRDM, SAM e70, others:
-  :ref:`Zephyr SDK <zephyr_sdk>`
-- :ref:`ESP32 <xtensa_esp32>`
-- NiosII on Altera MAX10: :data:`Quartus programmer
-  <ttbl.tt.tt_max10.quartus_path>` and :data:`NiosII CPU image
-  <ttbl.tt.tt_max10.input_sof>`
+- Bossac: Arduino Due flasher: see :class:ttbl.images.bossac_c's
+  documentation
 
-.. _bossac:
+- Arduino CLI: The Arduino CLI will be needed by the TCF client to
+  build *.ino* files into appplications that can be flashed into targets
+  for test and for flashing them. Follow the instructions in
+  :class:ttbl.images.arduino_cli_c.
 
-Bossac: Arduino Due flasher
----------------------------
+.. _xtensa_esp32:
 
-If Arduino Due is going to be used, a special tool for flashing has to
-be installed--this has to be built from source as the branch that
-supports the Arduino Due hasn't been merged into mainline as of
-writing these instructions:
+- Xtensa ESP32: In order to build (TCF client) and deploy/flash (ttbd
+  server) for ESP32 boards, you will need the *xtensa-esp32* SDK and the ESP-IDF
+  libraries:
 
-1. Get the requiements and the code::
+  - to only provide flashing support with *esptool.py*, follow the
+    instructions in :class:ttbl.images.esptool_c.
 
-     # sudo dnf install -y gcc-c++ wxGTK-devel
-     $ git clone https://github.com/shumatech/BOSSA.git bossac.git
-     $ cd bossac.git
-     $ git checkout -f 1.6.1-arduino-19-gae08c63
+  - to provide build support too, install the *xtensa-esp32 SDK*:
 
-2. Build and install::
+    1. Download from
+       https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-59.tar.gz
 
-     $ make bin/bossac
-     $ sudo install -o root -g root -m 0755 bin/bossac /usr/local/bin
+    2. Extract to */opt/xtensa-esp32-elf*::
+       
+         # tar xf xtensa-esp32-elf-linux64-1.22.0-59.tar.gz -C /opt
 
-3. (optional) Create a fast RPM with :ref:`FPM <fpm>`::
+    3. Add to */etc/environment*::
 
-     $ chmod 0755 bin/bossac
-     $ fpm  -n bossac -v $(git describe --tags) -s dir -t rpm bin/bossac
+         ESPRESSIF_TOOLCHAIN_PATH=/opt/xtensa-esp32-elf
+
+- *ESP-IDF*: This is Xtensa's IOT framework that is used by Zephyr and others
+
+  1. Clone to */opt/esp-idf.git*::
+
+       $ rm -rf /opt/esp-idf.git
+       $ git clone --recursive https://github.com/espressif/esp-idf.git /opt/esp-idf.git
+       $ (cd /opt/esp-idf.git && git checkout -f $(ESP_IDF_REV))
+
+  2. Add to */etc/environment*::
+
+       ESP_IDF_PATH=/opt/esp-idf.git
+
 
 .. _zephyr_sdk:
 
@@ -2362,7 +2375,7 @@ you will need this SDK:
      # chmod a+x zephyr-sdk-0.9.5-setup.run
      # ./zephyr-sdk-0.9.5-setup.run -- -y -d /opt/zephyr-sdk-0.9.5
 
-3. (optional) Create a fast RPM with :ref:`FPM <fpm>`::
+3. (optional) Create a fast RPM with::
 
      $ fpm -n zephyr-sdk-0.9.5 -v 0.9.5 \
      >     --rpm-rpmbuild-define '_build_id_links alldebug' \
@@ -2373,25 +2386,6 @@ you will need this SDK:
    files that are similar/identical to those present in the system, it
    will conflict.
 
-.. _arduino_builder:
-
-Arduino Builder 1.6.13
-----------------------
-
-The Arduino Builder will be needed by the TCF client to build *.ino*
-files into appplications that can be flashed into targets for test.
-
-
-1. Download the Arduino IDE package from
-   https://www.arduino.cc/download_handler.php?f=/arduino-1.6.13-linux64.tar.xz
-
-2. Extract::
-
-   # tar xf arduino-1.6.13-linux64.tar.xz -C /opt
-
-3. (optional) Create a fast RPM with :ref:`FPM <fpm>`::
-
-   $ fpm -n tcf-arduino-builder-1.6.13 -v 1.6.13 -s dir -C / -t rpm opt/arduino-1.6.13/
 
 
 tunslip6
@@ -2422,44 +2416,10 @@ conditions.
      $ make tunslip6
      # make install
 
-3. (optional) Create a fast RPM with :ref:`FPM <fpm>`::
+3. (optional) Create a fast RPM with::
 
      $ install -m 0755 tunslip6 -D root/usr/bin/tunslip6
      $ fpm -n tunslip6 -v $(git describe --always) -s dir -C root -t rpm usr/bin
-
-.. _xtensa_esp32:
-
-Xtensa ESP32
-------------
-
-In order to build (TCF client) and deploy/flash (ttbd server) for
-ESP32 boards, you will need the *xtensa-esp32* SDK and the ESP-IDF
-libraries:
-
-- *xtensa-esp32 SDK*
-
-  1. Download from
-     https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-59.tar.gz
-
-  2. Extract to */opt/xtensa-esp32-elf*
-
-     # tar xf xtensa-esp32-elf-linux64-1.22.0-59.tar.gz -C /opt
-
-  3. Add to */etc/environment*::
-
-       ESPRESSIF_TOOLCHAIN_PATH=/opt/xtensa-esp32-elf
-
-- *ESP-IDF*: This is Xtensa's IOT framework that is used by Zephyr and others
-
-  1. Clone to */opt/esp-idf.git*::
-
-       $ rm -rf /opt/esp-idf.git
-       $ git clone --recursive https://github.com/espressif/esp-idf.git /opt/esp-idf.git
-       $ (cd /opt/esp-idf.git && git checkout -f $(ESP_IDF_REV))
-
-  2. Add to */etc/environment*::
-
-       ESP_IDF_PATH=/opt/esp-idf.git
 
 
 libcoap
@@ -2493,19 +2453,6 @@ Invoke as::
   $ ./mklibcoap.sh
 
 
-.. _fpm:
-
-FPM, fast package manager
--------------------------
-
-.. note:: this is only optional and only needed if you are building
-          RPMs for distribution; please ignore otherwise
-
-1. Install dependencies, clone the code, build and install::
-
-     $ sudo dnf install -y ruby-devel rpm-build
-     $ git clone https://github.com/jordansissel/fpm fpm.git
-     $ make -C fpm.git install
 
 Platform firmware / BIOS update procedures
 ==========================================

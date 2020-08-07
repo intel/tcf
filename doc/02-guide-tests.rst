@@ -305,7 +305,7 @@ the *interconnect* target that defines said test network.
 
 Using in the server the :class:`conf_00_lib.vlan_pci` to bring up the
 network, like with the configuration functions
-:func:`conf_00_lib.nw_default_targets_add` to create networks, those
+:func:`conf_00_lib_pos.nw_pos_add` to create networks, those
 targets will have the tcpdump capability.
 
 To use, you would, declare a test that uses an interconnect and before
