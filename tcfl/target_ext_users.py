@@ -104,6 +104,41 @@ def _cmdline_role_drop(args):
     for rtb in ttb_client.rest_target_brokers.itervalues():
         _user_role(rtb, args.username, "drop", args.role)
 
+
+def _cmdline_servers(args):
+    # collect data in two structures, makes it easier to print at
+    # different verbosity levels...yah, lazy
+    r = []
+    d = {}
+    for name, rtb in ttb_client.rest_target_brokers.items():
+        try:
+            username = rtb.logged_in_username()
+        # FIXME: we need a base exception for errors from the API
+        except ( ttb_client.requests.HTTPError, RuntimeError):
+            username = "n/a"
+        r.append(( rtb.aka, name, username ))
+        d[rtb.aka] = dict(url = name, username = username)
+
+    verbosity = args.verbosity - args.quietosity
+
+    if verbosity <= 0:
+        for aka, url, username in r:
+            print aka, url, username
+    elif verbosity == 1:
+        headers = [
+            "Server",
+            "URL",
+            "UserID",
+        ]
+        print tabulate.tabulate(r, headers = headers)
+    elif verbosity == 2:
+        commonl.data_dump_recursive(d)
+    elif verbosity == 3:
+        pprint.pprint(d)
+    elif verbosity >= 4:
+        print json.dumps(d, skipkeys = True, indent = 4)
+
+
 def _cmdline_setup(arg_subparsers):
     ap = arg_subparsers.add_parser(
         "user-ls",
@@ -147,3 +182,19 @@ def _cmdline_setup(arg_subparsers):
     ap.add_argument("role", action = "store",
                     help = "Role to drop")
     ap.set_defaults(func = _cmdline_role_drop)
+
+    ap = arg_subparsers.add_parser(
+        "servers",
+        help = "List configured servers")
+    commonl.argparser_add_aka(arg_subparsers, "servers", "server-ls")
+    ap.add_argument(
+        "-q", dest = "quietosity", action = "count", default = 0,
+        help = "Decrease verbosity of information to display "
+        "(none is a table, -q or more just the list of allocations,"
+        " one per line")
+    ap.add_argument(
+        "-v", dest = "verbosity", action = "count", default = 1,
+        help = "Increase verbosity of information to display "
+        "(none is a table, -v table with more details, "
+        "-vv hierarchical, -vvv Python format, -vvvv JSON format)")
+    ap.set_defaults(func = _cmdline_servers)
