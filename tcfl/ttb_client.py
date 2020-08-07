@@ -427,7 +427,7 @@ class rest_target_broker(object):
         # key name, because we asked for "self", the server will
         # return only one, but maybe also fields with diagnostics, that
         # start with _; filter them
-        for username in ur:
+        for username in r:
             if not username.startswith("_"):
                 break
             else:
