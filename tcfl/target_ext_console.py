@@ -1292,7 +1292,7 @@ class extension(tc.target_extension_c):
 def f_write_retry_eagain(fd, data):
     while True:
         try:
-            fd.buffer.write(data)
+            fd.write(data)
             return
         except IOError as e:
             # for those files opened in O_NONBLOCK
@@ -1368,10 +1368,10 @@ def _cmdline_console_write_interactive(target, console, crlf, offset):
     # capture user's keyboard input and send it to the target.
     print("""\
 WARNING: This is a very limited interactive console
-         Escape character twice ^[^[ to exit; using console '%s' with CRLF '%s'
-""" % (console, crlf.encode('unicode-escape')))
+         Escape character twice ^[^[ to exit; using console '%s' with CRLF %s
+""" % (console, repr(crlf)))
     time.sleep(1)
-    fd = os.fdopen(sys.stdout.fileno(), "w+")
+    fd = os.fdopen(sys.stdout.fileno(), "w")
     console_read_thread = threading.Thread(
         target = _console_read_thread_fn,
         args = (target, console, fd, offset))
@@ -1403,7 +1403,7 @@ WARNING: This is a very limited interactive console
             nl = '\n'
         while True and console_read_thread.is_alive():
             try:
-                chars = sys.stdin.read()
+                chars = os.read(sys.stdin.fileno(), 4096).decode('utf-8')
                 if not chars:
                     continue
                 _chars = ''
