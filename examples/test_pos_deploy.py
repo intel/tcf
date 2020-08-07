@@ -112,6 +112,8 @@ class _test(tcfl.tc.tc_c):
                 " IMAGE:NAME[ IMAGE:NAME[..]]]" % source)
         flash_images = {}
         for entry in flash_image_s.split(" "):
+            if not entry:	# empty spaces...welp
+                continue
             name, value = entry.split(":", 1)
             flash_images[name] = value
         target.report_info("uploading flash images to remoting server")

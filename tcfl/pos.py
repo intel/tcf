@@ -2240,6 +2240,8 @@ class tc_pos0_base(tc.tc_c):
                     " IMAGE:NAME[ IMAGE:NAME[..]]]" % source)
             image_flash = {}
             for entry in flash_image_s.split(" "):
+                if not entry:	# empty spaces...welp
+                    continue
                 name, value = entry.split(":", 1)
                 image_flash[name] = value
 
