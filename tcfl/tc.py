@@ -1448,6 +1448,37 @@ class target_c(reporter_c):
                               json = d)
         self.report_info("set %d properties" % (len(d)), dlevel = 2)
 
+    def properties_get(self, *projections):
+        """
+        Get a dictionary of properties from the server
+
+        :param str projections: (optional: default all) zero or more
+          name of fields to ask for
+
+          Field names can use periods to dig into dictionaries.
+
+          Field names can match :mod:`fnmatch` regular
+          expressions.
+
+          >>> target.properties_get("interfaces.tunnel", "instrumentation")
+
+          would return the tree:
+
+          >>> {
+          >>>     interfaces: {
+          >>>         tunnel: { ... },
+          >>>         instrumentation: { ... }
+          >>> }
+
+        """
+        commonl.assert_none_or_list_of_strings(projections, "projections", "projection")
+        if projections:
+            data = { 'projections': json.dumps(projections) }
+        else:
+            data = None
+        return self.rtb.send_request("GET", "targets/" + self.id, data = data)
+
+
     def disable(self, reason = 'disabled by the administrator'):
         """
         Disable a target, setting an optional reason
