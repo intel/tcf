@@ -1,12 +1,12 @@
 asciimatics
 Jinja2
 PyYAML
-opencv-python
+opencv-python==4.1.2.30
 functools32
 imutils
 junit_xml
 keyring
-numpy
+numpy==1.7.1
 ply
 pykwalify
 pymongo
