@@ -792,7 +792,7 @@ class driver(tcfl.pos.tc_pos0_base):
     # if the file has a comment @test, being .sh or .java, chances are
     # it is a java test, this has to match:
     _test_regex = re.compile(
-        r"^\s*("
+        rb"^\s*("
         # This tries to match all the combinations of @test inside
         # some Java or Shell comment block:
         # # @test
@@ -806,12 +806,12 @@ class driver(tcfl.pos.tc_pos0_base):
         #   @test
         # ...
         # usually to this there can be some name following
-        r"(#+|/\*+|\*+|\s)\s*@test\s.*"
-        r"|"
+        rb"(#+|/\*+|\*+|\s)\s*@test\s.*"
+        rb"|"
         # this matches the @Test tag in the NG testcases, which
         # standalone as part of code, not comments
-        r"@Test"
-        r")\s*$",
+        rb"@Test"
+        rb")\s*$",
         re.MULTILINE)
 
     # Dictionary of testsuites and the testcases they declare, as
