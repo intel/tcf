@@ -130,14 +130,12 @@ class driver(tc.report_driver_c):
                     shell = True, stdin = subprocess.PIPE)
                 logf = pipe.stdin
                 self.logf = commonl.io_tls_prefix_lines_c(
-                    self.tls, io.open(pipe.stdin.fileno(), "w"),
-                    encoding = 'utf-8', errors = 'replace')
+                    self.tls, io.open(pipe.stdin.fileno(), "w"))
             else:
                 logf = io.open(log_file, "w+", encoding = 'utf-8',
                                errors = 'replace')
                 self.logf = commonl.io_tls_prefix_lines_c(
-                    self.tls, logf.detach(),
-                    encoding = 'utf-8', errors = 'replace')
+                    self.tls, logf.detach())
         else:
             self.logf = None
         consolef = io.open(sys.stdout.fileno(), "wb")
