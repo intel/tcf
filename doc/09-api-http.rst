@@ -1830,8 +1830,8 @@ Instrumentation interface: IP tunneling
 Creates tunnels to internal test networks so they can be accessed from
 the client side; tunnels are all removed upon target release.
 
-PUT /targets/TARGETID/ip/tunnel ARGUMENTSS -> LOCALPORT
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PUT /targets/TARGETID/tunnel/tunnel ARGUMENTS -> LOCALPORT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Set up an IP tunnel to an internal network from the API server
 
@@ -1841,20 +1841,28 @@ allocation that has this target allocated.
 **Arguments:** as a JSON dictionary or forms in the request
 
 - *IP-ADDR*: IPv4 or IPv6 address of the target in the internal
-  network.
+  network. Note this normally has to match an IP address for
+  *TARGETID*.
 
 - *PORT*: (number) port in the target to which to tunnel to
 
 - *PROTOCOL*: name of the protocol which to tunnel (*tcp*, *udp*,
   *sctp*)
 
-**Returns:** a dictionary with a value *result* containing the local
-TCP port on the server to which a client can connect.
+**Returns:**
 
-DELETE /targets/TARGETID/ip/tunnel ARGUMENTS -> DICTIONARY
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+On succes: a JSON dictionary with a value *result* containing the local
+TCP port on the server to which a client can connect to reach the
+target's port.
 
-Remove an existing IP tunnel created with *PUT /targets/TARGETID/ip/tunnel*
+On error: non-200 HTTP status code and JSON dictionary describing the
+error condition.
+
+
+DELETE /targets/TARGETID/tunnel/tunnel ARGUMENTS -> DICTIONARY
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Remove an existing IP tunnel created with *PUT /targets/TARGETID/tunnel/tunnel*
 
 **Access control:** the user, creator or guests of an
 allocation that has this target allocated.
@@ -1869,27 +1877,47 @@ allocation that has this target allocated.
 - *PROTOCOL*: name of the protocol which to tunnel (*tcp*, *udp*,
   *sctp*)
 
-**Returns:** empty dictionary on success or with an error message on
-failure
+**Returns:**
+
+On succes: empty JSON dictionary
+
+On error: non-200 HTTP status code and JSON dictionary describing the
+error condition
 
 
-GET /targets/TARGETID/ip/tunnel -> DICT
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Listing active tunnels
+^^^^^^^^^^^^^^^^^^^^^^
 
-List existing IP tunnels to the target created with *PUT /targets/TARGETID/ip/tunnel*
+Currently active tunnels are available from the inventory under the
+*interfaces.tunnel* hierachy::
 
-**Access control:** the user, creator or guests of an
-allocation that has this target allocated.
-
-**Returns:** a list of lists describing each existing tunnel and where
-it points to::
-
+  $ curl -sk -b cookies.txt \
+    -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETID \
+    -d projections='["interfaces.tunnel"]'
+    | python -m json.tool
   {
-      [ PROTOCOL, IPADDR, PORT , LOCALPORT ],
-      [ PROTOCOL, IPADDR, PORT , LOCALPORT ],
-      ...
+      "interfaces": {
+          "tunnel": {
+              "6455": {
+                  "id": 235036,
+                  "ip_addr": "192.168.100.85",
+                  "port": 40,
+                  "protocol": "tcp"
+              },
+              "9565": {
+                  "id": 235047,
+                  "ip_addr": "192.168.100.85",
+                  "port": 80,
+                  "protocol": "tcp"
+              }
+          }
+      }
   }
 
+this target has two redirections configured:
+
+- tcp:SERVERNAME:6455 to tcP:192.168.100.85:40
+- tcp:SERVERNAME:9565 to tcP:192.168.100.85:80
 
 Instrumentation interface: local storage
 ----------------------------------------
@@ -1917,23 +1945,32 @@ The data shall be available over:
 Authentication mechanism for accessing the data is still TBD.
 
 
-PUT /store/FILENAME CONTENT
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+POST /store/FILENAME CONTENT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Upload a file to user’s storage
 
 **Access control:** only the logged in user can call this to access
 their own storage area.
 
-**Arguments:**
+**Arguments:** arguments are given a form post arguments
 
-- *FILENAME*: name to give the file in the storage area; can contain
+- *file_path*: name to give the file in the storage area; can contain
   directory separators (Unix's ``/``); cannot contain ``..``.
 
-- *CONTENT*: file's content in the HTTP request body.
+- *data*: file's content in the HTTP request body.
 
 **Returns:** empty dictionary on success or with an error message on
 failure
+
+**Example**
+
+::
+
+  $ curl -sk -b cookies.txt -X POST \
+    https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/store/file \
+    --form-string file_path=REMOTEFILENAME  -F file=@LOCALFILENAME
+
 
 GET /store  -> LIST
 ^^^^^^^^^^^^^^^^^^^
@@ -2037,7 +2074,7 @@ state
 allocation that has this target allocated.
 
 **Returns:** dictionary of information::
-  
+
   {
       COMPONENT1: STATE1,	# true, false, none
       COMPONENT2: STATE2,
@@ -2069,22 +2106,34 @@ not published and must be assumed as *off* or *fully off*.
 
 PUT /targets/TARGETID/power/on COMPONENTS -> DICT
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 Turn on the components in the power rail in the given order.
+
+**Access control:** the user, creator or guests of an
+allocation that has this target allocated.
+
 
     components:LIST: list of components to power up on that order
     (optional) defaults to all the components of the power rail
 
 PUT /targets/TARGETID/power/off components = [ LIST ]
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Turn off the components in the power rail in REVERSE of the given order.
+
+**Access control:** the user, creator or guests of an
+allocation that has this target allocated.
 
     components:LIST: list of components to power up on that order
     (optional) defaults to all the components of the power rail
 
 PUT /targets/TARGETID/power/cycle [wait = X]
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Power cycle the target
+
+**Access control:** the user, creator or guests of an
+allocation that has this target allocated.
+
 
 Note: A power cycle can be left to the user (power off, then power on)--however, since it is a very common case and the implementation has data readily available on the state, it is more efficient to implement it here.
 
@@ -2095,6 +2144,175 @@ Note: A power cycle can be left to the user (power off, then power on)--however,
 FIXME: on power off of whole rail, all consoles have to be disabled
 
 
+Instrumentation interface: image flashing
+-----------------------------------------
+
+This interface provides means to program/write/burn/flash
+data/binaries/images to one or more permanent storages in the
+platform.
+
+For example, firmwares, BIOSes which are flashed via a JTAG, an EEPROM
+interface, fastboot or similar interfaces.
+
+A target can any number of flashing destinations (eg: BIOS1,
+BIOS.recovery, microcontroller3) and the user may request flashing of
+them all with a single call. How the target is configured, and based
+on its capabilities and/or limitations will dictate if they all can be
+flashed/programmed/burnt in parallel or serially.
+
+The process for flashing anything is to first upload the data file to
+the server using the storage interface described above, and then
+commanding this interface to burn said file into a given location.
+
+Listing possible flashing targets
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Use the inventory to obtain the list of possible flashing targets::
+
+  GET /targets/TARGETID projection=["interfaces.images"]
+
+**Access control:** any logged in user can call
+
+**Returns:** dictionary of information containing an entry per
+destination and:
+
+- the estimated amount of seconds the flash operation will
+  last
+
+- the unique identity (UPID) of the instrument that implements
+  the flashing operation (more information about the instrument can be
+  found in the inventory in the field *instrumentation.<UPID>*)
+
+- if something has been already flashed, the SHA512 signature of the
+  last file flashed
+
+::
+
+  {
+      "interfaces": {
+          "images": {
+              "bios": {
+                  "estimated_duration": 930,
+                  "instrument": "u62a",
+                  "last_sha512": "301f5e61fec5a260b2fabbc38d89d637d3aebd77e0b61398427658eece82ee028dfb5730a14ddad3c51e37afacc8c05c5a238d2c8e4cedd009a0c317124cd748"
+              },
+              "bmc": {
+                  "estimated_duration": 930,
+                  "instrument": "z4hn",
+                  "last_sha512": "ab4598eb3d64817340ea869a6d7581ee1cebb2c9d5346d72dc603fead7659911be58dd5fa674739c0ea967ca03e2cd2eee5dd3deabe9a7e9b00b9ac5047d10bd"
+              },
+              "microcontroller1": {
+                  "estimated_duration": 930,
+                  "instrument": "rgde"
+              },
+              "microcontroller2": {
+                  "estimated_duration": 930,
+                  "instrument": "rgde"
+              }
+          }
+      }
+  }
+
+In this example, the target offers four destinations (one for the BIOS,
+another one for a BMC and two microcontrollers).
+
+Wit the TCF client, use *tcf images-ls TARGETNAME*
+
+
+PUT /targets/TARGETID/images/flash IMAGES -> DICTIONARY
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Flash images onto their targets.
+
+This is a synchronous operation; user must query the inventory (see
+above) to find how long each destination takes to flash and keep the
+connection open for as long as indicated waiting for the system to
+provide a reply.
+
+While the flashing operation is going on, the system considers the
+target is being used, so it won't be idled.
+
+After flashing, the inventory is updated to reflect the SHA 512
+signature of the image flashed on each destination; this can be used
+by the client to, before flashing, check if the signature will be the
+same and thus avoid re-flashing (*soft flash*).
+
+Images must have been uploaded first to the storage area using the
+*store* interface. The client shall first list files in the storage
+area to verify a file with the same signature is present and skip the
+upload if already available in the server (*soft upload*).
+
+The server will recognize image files compressed with the tools *gz*,
+*xz* and *bz2* (because their name ends in *.gz*, *.bz* or *.xz*) and
+decompress them before flashing. The SHA 512 recorded will be that of
+the decompressed files. It is recommended to compress large files,
+since upload to the server will be significantly faster.
+
+**Access control:** the user, creator or guests of an
+allocation that has this target allocated.
+
+**Returns**
+
+- on success, a 200 HTTP code and a JSON dictionary, or optionally
+  with diagnostics fields.
+
+- on error, a non 200 error code and a JSON dictionary with details,
+  which will vary.
+
+**Example**::
+
+Compress and upload files *bios.bin.xz* and *bmc.bin.xz*::
+
+  $ xz bios.bin bmc.bin
+  $ curl -sk -b cookies.txt -X POST \
+    https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/store/file \
+    --form-string file_path=bios.bin.xz  -F file=@bios.bin.xz
+  $ curl -sk -b cookies.txt -X POST \
+    https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/store/file \
+    --form-string file_path=bmc.bin.xz  -F file=@bmc.bin.xz
+
+flash files; from the inventory report we have seen destinations
+*bios* and *bmc* report a duration of 400 each, so we set the timeout
+to 800::
+
+  $ curl -sk -b cookies.txt --max-time 800 -X PUT \
+    https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/images/flash \
+    -d images='{"bios":"bios.bin.xz", "bmc":"bmc.bin.xz"}' \
+    | python -m json.tool
+  {
+      "_diagnostics": "..."
+  }
+
+
+With the TCF client, use *tcf images-flash TARGETNAME bios:bios.image.xz*.
+
+
+
+GET /targets/TARGETID/images/list
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Deprecated** use the inventory method described above
+
+Return a list of the possible flashing destinations the target
+offers.
+
+**Access control:** any logged in user can call
+
+**Returns:** dictionary of information::
+
+  {
+      "aliases": {},
+      "result": [
+          "microcontroller1",
+          "microcontroller2",
+          "bmc",
+          "bios"
+      ]
+  }
+
+In this example, the target offer four destinations (one for the BIOS,
+another one for a BMC and two microcontrollers). No aliases are
+specified.
 
 
 Old documentation, pending rewrite/update
@@ -2131,11 +2349,6 @@ Fastboot
 - ``/ttb/v1/targets/TARGETNAME/fastboot/run`` *PUT*
 - ``/ttb/v1/targets/TARGETNAME/fastboot/list`` *GET*
 
-Images
-^^^^^^
-
-- ``/ttb/v1/targets/TARGETNAME/images/flash`` *PUT*
-- ``/ttb/v1/targets/TARGETNAME/images/list`` *GET*
 
 
 IOC_flash_server_app
