@@ -699,26 +699,25 @@ host = '127.0.0.1'
         for bad_string in self.bad_strings:
             if bad_string in line:
                 for exclude in self.errors_ignore + self.warnings_ignore:
-                    if isinstance(exclude, re._pattern_type) \
-                       and exclude.search(line):
-                        return False
-                    elif isinstance(exclude, basestring) \
-                         and exclude in line:
+                    if isinstance(exclude, re._pattern_type):
+                        if exclude.search(line):
+                            return False
+                    elif exclude in line:
                         return False
                 return True
         if self.error_regex.search(line):
             for exclude in self.errors_ignore:
-                if isinstance(exclude, re._pattern_type) \
-                   and exclude.search(line):
-                    return False
+                if isinstance(exclude, re._pattern_type):
+                    if exclude.search(line):
+                        return False
                 elif exclude in line:
                     return False
             return True
         if self.warning_regex.search(line):
             for exclude in self.warnings_ignore:
-                if isinstance(exclude, re._pattern_type) \
-                   and exclude.search(line):
-                    return False
+                if isinstance(exclude, type(self.warning_regex)):
+                    if exclude.search(line):
+                        return False
                 elif exclude in line:
                     return False
             return True
