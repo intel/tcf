@@ -284,9 +284,9 @@ def login():
         local_target = ttbl.test_target.get('local')
         if local_target:
             support_auth_help = \
-                local_target.tags.get('support', {}).get('auth_help', None)
+                local_target.tags.get('support', dict()).get('auth_help', None)
             support_owner = \
-                local_target.tags.get('support', {}).get('owner', None)
+                local_target.tags.get('support', dict()).get('owner', None)
             if support_auth_help:
                 # login help is assumed to be more detailed
                 _help += " (login help: " + support_auth_help + ")"
@@ -341,7 +341,7 @@ def validate_session():
 @app.route(API_PREFIX + 'users/<userid>', methods = [ 'GET' ])
 @flask_login.login_required
 def _users(userid = None):
-    r = {}
+    r = dict()
     calling_user = flask_login.current_user._get_current_object()
     if userid == "self":
         # this is used as a reflector, to know who are we logged in as
@@ -444,8 +444,8 @@ def _user_role(userid, action, role):
 @flask_login.login_required
 def _targets_gets():
     projections = ttbl.tt_interface.arg_get(
-        flask.request.form, 'projections', list, True, [])
-    result = {}
+        flask.request.form, 'projections', list, True, list())
+    result = dict()
     calling_user = flask_login.current_user._get_current_object()
     for target in ttbl.test_target.known_targets():
         if not target.check_user_allowed(calling_user):
@@ -462,7 +462,7 @@ def _targets_gets():
 @flask_login.login_required
 def _target_get(target_id):
     projections = ttbl.tt_interface.arg_get(
-        flask.request.form, 'projections', list, True, [])
+        flask.request.form, 'projections', list, True, list())
     calling_user = flask_login.current_user._get_current_object()
     target = ttbl.test_target.get_for_user(target_id, calling_user)
     if target == None:
@@ -577,7 +577,7 @@ def _target_active(target_id):
         flask_logi_abort(400, "%s" % e, exc_info = True)
     except Exception as e:
         flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({})
+    return flask.jsonify(dict())
 
 
 @app.route(API_PREFIX + 'targets/<string:target_id>/release', methods = ['PUT'])
@@ -602,7 +602,7 @@ def _target_release(target_id):
         flask_logi_abort(400, "%s" % e, exc_info = True)
     except Exception as e:
         flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({})
+    return flask.jsonify(dict())
 
 
 @app.route(API_PREFIX + 'allocation', methods = [ 'PUT' ])
@@ -634,7 +634,7 @@ def _put_allocation():
         data = flask.request.get_json()
         if data == None:
             # get from form encoding
-            data = {}
+            data = dict()
             for key in flask.request.form.keys():
                 data[key] = ttbl.tt_interface.arg_get(flask.request.form,
                                                       key, None)
@@ -653,7 +653,7 @@ def _put_allocation():
             obo_user = data.get(
                 'obo_user',
                 flask_login.current_user._get_current_object().get_id()),
-            guests = data.get('guests', []),
+            guests = data.get('guests', list()),
             priority = data.get('priority', None),
             preempt = data.get('preempt', False),
             queue = data.get('queue', False),
@@ -726,7 +726,7 @@ def _put_keepalive():
         data = flask.request.get_json()
         if data == None:
             # get from from encoding
-            data = {}
+            data = dict()
             for key in flask.request.form.keys():
                 #logging.error("DEBUG args key %s value %s", key, value)
                 data[key] = ttbl.tt_interface.arg_get(flask.request.form,
@@ -740,7 +740,7 @@ def _put_keepalive():
                 "pressure needs to be an number" # FIXME: range?
         else:
             pressure = 0
-        result = {}
+        result = dict()
         for allocid, expected_state in data.iteritems():
             r = ttbl.allocation.keepalive(
                 allocid, expected_state, pressure,
@@ -1033,7 +1033,7 @@ def auth_init(app):
             for role in flask_login.current_user.roles:
                 identity.provides.add(flask_principal.RoleNeed(role))
 
-local_auth = []
+local_auth = list()
 
 #
 # Main
@@ -1106,7 +1106,7 @@ if __name__ == "__main__":
         help = "Port on which to listen [%d]" % port)
     arg_parser.add_argument(
         "--local-auth", metavar = "IP-ADDR", nargs = "?",
-        action = "append", default = [],
+        action = "append", default = list(),
         help = "Allow users as admins from the given IP "
         "addresses without caring; if no IP address is given, "
         "127.0.0.1 is assumed. Can be given multiple times with "
