@@ -1261,7 +1261,6 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
     fl = []
 
     def _add(field_flat, val):
-        # empty dict, insert it if we want them
         if sort:
             bisect.insort(fl, ( field_flat, val ))
         else:
@@ -1286,7 +1285,11 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
 
         if isinstance(val, collections.Mapping):
             if len(val) == 0 and empty_dict == True and field_needed(field_flat, projections):
-                _add(field_flat, val)
+                # append an empty dictionary; do not append VAL --
+                # why? because otherwise it might be modified later by
+                # somebody else and modify our SOURCE dictionary, and
+                # we do not want that.
+                _add(field_flat, dict())
             elif depth_limit > 0:	# dict to dig in
                 for key, value in val.iteritems():
                     __update_recursive(value, key, field_flat + "." + str(key),
@@ -1298,7 +1301,11 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
 
     if len(d) == 0 and empty_dict == True:
         # empty dict, insert it if we want them
-        _add(field_flat, val)
+        # append an empty dictionary; do not append VAL --
+        # why? because otherwise it might be modified later by
+        # somebody else and modify our SOURCE dictionary, and
+        # we do not want that.
+        _add(field_flat, dict())
     for key, _val in d.iteritems():
         __update_recursive(d[key], key, key, projections, 10, sort = sort,
                            empty_dict = empty_dict)
@@ -1757,7 +1764,7 @@ def file_iterator(filename, chunk_size = 4096):
             yield data
 
 def assert_list_of_strings(l, list_name, item_name):
-    assert isinstance(l, list), \
+    assert isinstance(l, ( tuple, list )), \
         "'%s' needs to be None or a list of strings (%s); got %s" % (
             list_name, item_name, type(l))
     count = -1
