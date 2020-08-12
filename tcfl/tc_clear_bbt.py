@@ -787,7 +787,7 @@ EOF
         target.shell.run("cd /opt/bbt.git/any-bundle")
         for any_t_file_path in glob.glob(os.path.join(
                 os.path.dirname(self.kws['thisfile']),
-                "..", "..", "any-bundle", "*.t")):
+                "..", "..", "any-bundle", "*.bats")):
             any_t_file = os.path.basename(any_t_file_path)
             result += self._eval_one(target, any_t_file, srcdir + "/any#")
 
@@ -811,7 +811,7 @@ EOF
     ignore_stress = True
 
     paths = {}
-    filename_regex = re.compile(r"^.*\.t$")
+    filename_regex = re.compile(r"^.*\.bats$")
 
     # the initial ['"] has to be part of the name, as otherwise it
     # mite strip parts that bats (the program) does consider...
@@ -850,7 +850,7 @@ EOF
             subcase_name = t_file_name + "." + _name
             self.subtc[subcase_name] = tcfl.tc.subtc_c(
                 # testcase full name / unique ID
-                prefix + t_file_name.replace(".t", "") + "." + _name,
+                prefix + t_file_name.replace(".bats", "") + "." + _name,
                 self.kws['thisfile'], self.origin,
                 # parent
                 self)
@@ -912,7 +912,7 @@ EOF
             # any_bundle's are at ../../any-bundle from the
             # per-bundle directories where the .ts are.
             any_bundle_path = os.path.join(_srcdir, "..", "..", "any-bundle",
-                                           "*.t")
+                                           "*.bats")
             for any_t_file_path in glob.glob(any_bundle_path):
                 tc._scan_t_subcases(any_t_file_path, srcdir + "##any-bundle/")
 
