@@ -2142,6 +2142,10 @@ Each component might be queried for individual power status:
  - *none*: components that are not really implementing a power control
    but things like a delay
 
+Note the same implementation of this interface is used to expose
+button and jumper control, but under the endpoint
+*/PREFIX/targets/TARGETID/buttons* -- as buttons / jumpers are
+generally controlled with binary states actuated with a relay.
 
 
 GET /targets/TARGETID/power/list
