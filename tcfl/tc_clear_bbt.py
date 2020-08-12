@@ -9,7 +9,7 @@
 #
 # Not yet working ok with bundles/os-clr-on-clr, but the thing is not even printing anything, can't tell?
 #
-# BBT_IGNORE_TS=bbt.git/bundles/os-core-update/bat-clr-boot-manager.t bundles/os-core-update/bat-clr-boot-manager.t
+# BBT_IGNORE_TS=bbt.git/bundles/os-core-update/bat-clr-boot-manager.bat bundles/os-core-update/bat-clr-boot-manager.bat
 #
 # 
 """
@@ -18,9 +18,9 @@ Driver to run Clear Linux BBT test suite
 
 The main TCF testcase scanner walks files looking for automation
 scripts / testcase scripts and will call
-:meth:`tc_clear_bbt_c.is_testcase` for each ``*.t`` files on a
+:meth:`tc_clear_bbt_c.is_testcase` for ``*.t`` or ``*.bat`` files on a
 directory. The driver will generate one testcase per directory which
-will execute all the ``.t`` in there and then execute all the ``.t``
+will execute all the ``.bat`` in there and then execute all the ``.bat``
 in the any-bundle subdirectory.
 
 The testcases created are instances of :class:`tc_clear_bbt_c`; this
@@ -30,12 +30,12 @@ install Clear OS (from an image server in the interconnect) during the
 *deploy* phase.
 
 Once then installation is done, it will install any required bundles
-and execute all the ``.t`` files in the directory followed by all the
-``.t`` in the *any-bundle* top level directory.
+and execute all the ``.bat`` files in the directory followed by all the
+``.bat`` in the *any-bundle* top level directory.
 
-The output of each ``.t`` execution is parsed with
+The output of each ``.bat`` execution is parsed with
 :func:`tap_parse_output` to generate for each a subcase (an instance
-of :class:`subcases <tcfl.tc.subtc_c>`) which will report the
+of :class:`subcases <tcfl.batc.subtc_c>`) which will report the
 individual result of that subcase execution.
 
 **Setup steps**
@@ -52,7 +52,7 @@ the server::
 #
 # - specify which clear image version to install
 #
-# - how do we specify dependencies in .ts? (target requirements) as in
+# - how do we specify dependencies in .bats? (target requirements) as in
 #   it has to run in a machine this type with this much RAM, etc
 #
 #   something we can feed to @tcfl.tc.target()'s spec
@@ -811,7 +811,8 @@ EOF
     ignore_stress = True
 
     paths = {}
-    filename_regex = re.compile(r"^.*\.t$")
+    # files can be .t or .bat
+    filename_regex = re.compile(r"^.*\.(t|bat)$")
 
     # the initial ['"] has to be part of the name, as otherwise it
     # mite strip parts that bats (the program) does consider...
