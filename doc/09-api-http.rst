@@ -1935,18 +1935,8 @@ This storage tree is then made available to the clients via:
 so test scripts can pull data from the targets or other locations (as
 the targets and clients might not be in direct network access).
 
-The data shall be available over:
-
-- HTTP GET requests
-- rsync
-- SSH/SCP, rsync over SSH
-- Samba / WINS protocol
-
-Authentication mechanism for accessing the data is still TBD.
-
-
-POST /store/FILENAME CONTENT
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+POST /store/file file_path=FILENAME CONTENT -> DICTIONARY
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Upload a file to user’s storage
 
@@ -1960,8 +1950,13 @@ their own storage area.
 
 - *data*: file's content in the HTTP request body.
 
-**Returns:** empty dictionary on success or with an error message on
-failure
+**Returns:**
+
+- On success, 200 HTTP code and a JSON dictionary with optional
+  diagnostics
+
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
+
 
 **Example**
 
@@ -1971,27 +1966,66 @@ failure
     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/store/file \
     --form-string file_path=REMOTEFILENAME  -F file=@LOCALFILENAME
 
+With the TCF client, use the *tcf store-upload TARGETNAME
+REMOTEFILENAME LOCALFILENAME* command.
 
-GET /store  -> LIST
-^^^^^^^^^^^^^^^^^^^
+
+GET /store/list [ARGUMENTS] -> DICTIONARY
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 List files in user’s storage
 
 **Access control:** only the logged in user can call this to access
 their own storage area.
 
-**Returns** Dictionary keyed by filename containing the MD5 digest of
-each file.
+**Arguments**
 
-.. note:: implementations are allowed to delay rate this call, since
-          MD5 computation can be costly.
+- *filenames*: (optional) list of filenames to list; defaults to all
+  if not specified. This is useful when the caller wants to check the
+  existence of certain files and their signatures and is not
+  interested in the rest.
+
+**Returns**
+
+- On success, 200 HTTP code and a JSON dictionary keyed by filename
+  containing the MD5 digest of each file.
+
+  .. admonition:: deprecation notice
+
+     Older servers might return the data wrapped inside a field called
+     *result*; this is now deprecated and being replaced towards
+     returning the data at the top level.
+
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
+
+.. note:: implementations are allowed to rate limit this call, since
+          MD5 computation can be costly to avoid denial of service
+          attacks.
 
           Eg: allowing a user to call this only once every five minutes
           and delaying the execution of the next if it came before
           five minutes.
 
-GET /store/FILENAME  -> CONTENT
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Example**
+
+::
+
+   $ curl -sk -b cookies.txt -X GET \
+     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/store/list \
+     | python -m json.tool
+   {
+       "_diagnostics": "",
+       ...
+       "bios.bin.xz": "50c3c3ed1e54deddfe831198883af91ad6e9112f8f1487214cdd789125f737f0",
+       "bmc.bin.xz": "5d12bddb65567e9cb74b6a0d72ed1ecac2bbb629f167d10e496d535461f8fd54",
+       ...
+   }
+
+With the TCF client, use the *tcf store-ls TARGETNAME* command.
+
+
+GET /store/file ARGUMENTS -> CONTENT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Download a file from user’s storage
 
@@ -2000,14 +2034,30 @@ their own storage area.
 
 **Arguments:**
 
-- *FILENAME*: name of the file to read from the storage area
+- *file_path*: name of the file to read from the storage area
 
 **Returns:**
 
-File content's in the response body or an HTTP error code if missing.
+- On success, 200 HTTP code and the file contents on the response
+  body.
 
-DELETE /store/FILENAME
-^^^^^^^^^^^^^^^^^^^^^^
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
+
+**Example**
+
+::
+
+   $ curl -sk -b cookies.txt -X GET \
+     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/store/file \
+     -d file_path="bios.bin.xz" > bios.bin.xz
+   $ file bios.bin.xz
+   bios.bin.xz: XZ compressed data
+
+With the TCF client, use the *tcf store-dnload TARGETNAME
+REMOTEFILENAME LOCALFILENAME* command.
+
+DELETE /store/file file_path=FILENAME -> DICTIONARY
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Delete a file from user’s  storage
 
@@ -2018,8 +2068,23 @@ their own storage area.
 
 - *FILENAME*: name to give the file in the storage area
 
-**Returns:** empty dictionary on success or with an error message on
-failure
+**Returns:**
+
+- On success, 200 HTTP code and a JSON dictionary with optional
+  diagnostics
+
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
+
+**Example**
+
+::
+
+   $ curl -sk -b cookies.txt -X DELETE \
+     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/store/file \
+     -d file_path="bios.bin.xz"
+
+With the TCF client, use the *tcf store-rm TARGETNAME REMOTEFILENAME*
+command.
 
 
 Instrumentation interface: power control
@@ -2158,7 +2223,7 @@ The global target power state is described by the *state* field:
 
 For each component, its state is described in the field *state* along
 with its explicitness.
-    
+
 As a convenience, the system publishes in the target's inventory:
 
 - *interfaces.power.state*: last power state recorded on the last
@@ -2175,7 +2240,7 @@ so it shall not be used for hard evaluation.
 **Example**
 
 ::
-   
+
   $ curl -sk -b cookies.txt --max-time 800 -X GET \
     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/power/list \
     | python -m json.tool
