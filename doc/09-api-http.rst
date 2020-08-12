@@ -124,8 +124,22 @@ header to identify as a logged in user.
 
 - Any user with a valid username and password can call to login
 
-**Returns** An JSON dictionary with a *login* key in case of
-success, a *_message* in case of error.
+**Arguments**
+
+- *username*: name of the user
+
+- *password*: authentication token for *username*
+
+Note in both of these fields, any special character must be properly
+HTTP encoded
+  
+**Returns**
+
+- on success, a 200 HTTP code and a JSON dictionary, or optionally
+  with diagnostics fields.
+
+- on error, a non 200 error code and a JSON dictionary with details,
+  which will vary with the cause of the error.
 
 **Example** success case::
 
