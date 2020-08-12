@@ -2156,6 +2156,9 @@ The global target power state is described by the *state* field:
     idleness, after a configured time it will be brought to *full*
     power off.
 
+For each component, its state is described in the field *state* along
+with its explicitness.
+    
 As a convenience, the system publishes in the target's inventory:
 
 - *interfaces.power.state*: last power state recorded on the last
@@ -2169,6 +2172,36 @@ external actors might take actions that would affect the true value of
 this state (eg: a PDU self-powering off an outlet due to overcurrent),
 so it shall not be used for hard evaluation.
 
+**Example**
+
+::
+   
+  $ curl -sk -b cookies.txt --max-time 800 -X GET \
+    https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/power/list \
+    | python -m json.tool
+  {
+      "_diagnostics": "..."
+      "components": {
+          "AC1": {
+              "state": false
+          },
+          "AC2": {
+              "state": false
+          },
+          "jtag": {
+              "explicit": "off",
+              "state": false
+          },
+          ...
+          "serial0": {
+              "state": false
+          }
+      },
+      "state": false,
+      "substate": "full"
+  }
+
+With the TCF client, use the *tcf power-ls [-v] TARGETNAME* command.
 
 PUT /targets/TARGETID/power/on [ARGUMENTS] -> DICT
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -2214,6 +2247,25 @@ allocation that has this target allocated.
 Before powering on a the whole power rail, the targets' default console
 is reset; as well, any hooks defined in the server to be executed
 before power on (and after power on, on success) are executed.
+
+**Example**
+
+::
+
+   $ curl -sk -b cookies.txt -X PUT \
+     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/power/on
+   {
+       "_diagnostics": ...
+   }
+
+   $ curl -sk -b cookies.txt -X PUT \
+     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/power/on \
+     -d component="AC1"
+   {
+       "_diagnostics": ...
+   }
+
+With the TCF client, use the *tcf power-on [-v] TARGETNAME* command.
 
 PUT /targets/TARGETID/power/off [ARGUMENTS] -> DICT
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -2261,6 +2313,17 @@ Before powering off the whole power rail, the targets' pre execution
 hooks are run, as well as post-off hooks. This is specially relevant
 in that the consoles are all disabled.
 
+**Example**
+
+::
+
+   $ curl -sk -b cookies.txt -X PUT \
+     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/power/off
+   {
+       "_diagnostics": ...
+   }
+
+With the TCF client, use the *tcf power-off TARGETNAME -c COMPONENT]* command.
 
 PUT /targets/TARGETID/power/cycle [ARGUMENT] -> DICTIONARY
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -2302,6 +2365,62 @@ allocation that has this target allocated.
 
 - On error, non-200 HTTP code and a JSON dictionary with diagnostics
 
+With the TCF client, use the *tcf power-cycle [-v] TARGETNAME* command.
+
+
+PUT /targets/TARGETID/power/sequence -> DICT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Execute a sequence of power on/off/cycle events for different
+components.
+
+**Access control:** the user, creator or guests of an
+allocation that has this target allocated.
+
+**Arguments**
+
+- *sequence*: JSON list of pairs *[ OPERATION, ARGUMENT ]* describing
+  the events to execute; *OPERATION* can be:
+
+  - *on*, *off* or *cycle*: in this case *ARGUMENT* becomes:
+
+    - *all*: perform the operation on all the components except
+      explicit ones
+
+    - *full*: perform the operation on all the components
+      including the explicit ones
+
+    - *COMPONENT NAME*: perform the operation only on the given
+      component
+
+  - *wait*: *ARGUMENT* is a positive number describing how many
+    seconds to wait
+
+**Returns:**
+
+- On success, 200 HTTP code and a JSON dictionary with optional
+  diagnostics
+
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
+
+**Linkage to other subsystems**
+
+When powering on/off the whole target, the same events described for
+the ON or OFF operations will happen.
+
+**Example**
+
+::
+
+   $ curl -sk -b cookies.txt -X PUT \
+       https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/power/sequence \
+       -d sequence='[ [ "off", "AC1" ], [ "wait", 2 ], [ "on", "AC1"] ]'
+   {
+       "_diagnostics": ...
+   }
+
+With the TCF client, use the *tcf power-sequence [-v] TARGETNAME
+OP:ARG [OP:ARG [OP:ARG [...]]]* command.
 
 Instrumentation interface: image flashing
 -----------------------------------------
@@ -2441,7 +2560,6 @@ to 800::
   {
       "_diagnostics": "..."
   }
-
 
 With the TCF client, use *tcf images-flash TARGETNAME bios:bios.image.xz*.
 
