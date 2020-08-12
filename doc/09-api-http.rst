@@ -2025,20 +2025,33 @@ failure
 Instrumentation interface: power control
 ----------------------------------------
 
-Means to set power to a target; implements a power rail of multiple
-power components that have to be powered on in a sequence defined by
-the administrator and powered off in reverse order.
+This interface provides means to power on/off targets or the invidual
+components that compose the power rail of a target.
 
-Allows to control power individually to each component in the
-sequence.
+When powering on/off the whole target, the order in which the
+different components of the power rail were specified is followed
+(reverse when off); this allows enforce strict ordering needed by
+some platforms.
 
-FIXME: this section needs update
+Power rail components might not necessarily be something that turns on
+or off, but they can also be:
+
+- delays: delay for some time, delay until something happens (eg: a
+  USB device is detected in the server, a file appears, a certain
+  program returns a certain value when executed)
+
+- service management: a program is started when powered on, killed
+  when powered off (for example, a bridge to a JTAG)
+
+- setup of network tunnels, reconfiguration of hardware for propert
+  power on conditions, ensuring buttons are released (eg: reset)...
 
 Allows to specify certain components as *explicit* so that they be
 only be powered off or on if they are specifically named, but never by
-default. Extends to *explicit_off* (only power off if explicitly named
-when turning off) and *explicit_on* (only power off if explicitly
-named when turning on).
+default (when then whole target is powered on/off). Extends to
+*explicit_off* (only power off if explicitly named when turning off)
+and *explicit_on* (only power off if explicitly named when turning
+on).
 
 .. admonition:: Rationale
 
@@ -2049,7 +2062,7 @@ named when turning on).
    BMC; for turning it on, the default (implicit) sequence is to power
    on the PDU, then on the BMC. To power off, the default (implicit)
    sequence is to just power off via the BMC and leave AC on. This
-   sometimes is needed to avoid hardware damage.
+   could be needed, for example, to avoid hardware damage.
 
    If the user wants to implement a sequence where even the AC power
    is removed, they explicitly indicate to power AC off after the
@@ -2064,6 +2077,8 @@ Each component might be queried for individual power status:
  - *none*: components that are not really implementing a power control
    but things like a delay
 
+
+
 GET /targets/TARGETID/power/list
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -2073,75 +2088,219 @@ state
 **Access control:** the user, creator or guests of an
 allocation that has this target allocated.
 
-**Returns:** dictionary of information::
+**Returns:** dictionary with information::
 
   {
-      COMPONENT1: STATE1,	# true, false, none
-      COMPONENT2: STATE2,
-      ...
-      COMPONENTN: STATEN,
+      "state": false,		# true, false
+      "substate": "full",	# full, normal, partial
+      "components": {           # power state for each component
+          COMPONENT1: STATE1,	# true, false, none
+          COMPONENT2: STATE2,
+          ...
+          COMPONENTN: STATEN,
+      }
   }
 
-The target is:
+The global target power state is described by the *state* field:
 
-- *on* when **all** the power components are reporting *on* or *n/a*
+- *on* the target is powered on
 
-- *off*: when **any** power components reports *off*
+  *substate* can be:
 
-- fully *off*: when **all** the power components report *off*
-  (excluding those marked as *explicit* and *explicit_off*)
+  - *normal*: all the non-explicit power components and those marked
+    *explicit/off* report *on* or *n/a*.  The components marked
+    *explicit* and *explicit/on* report *off* or *n/a*.
 
-Note the computation of *is the target* off depends on the context:
+    This is the state in which a target can be used as per the usual
+    usage pattern.
 
-- for a remote user, any component off likely means the target is in
-  an inconsistent state, thus it shall be power cycled (take to fully
-  off, then power on).
+  - *partial*: same as *normal*, but one or more of those marked
+    *explicit* or *explicity/on* report *on* or *n/a*.
 
-- for a daemon powering off unused infrastructure, it should take to
-  *fully off* anything on *on* and *off*.
+    Same *normal*, however extra components being powered on for
+    non-usual usage patterns might or not affect the operation of the
+    target.
 
-As a convenience, the system publishes in the inventory the data
-*interfaces.power.state* as *true* if *on*. Otherwise, the state is
-not published and must be assumed as *off* or *fully off*.
+  - *full*: all the power components (including those marked
+    *explicit*, *expliciy/off* and *explicty/on*) are *on* or *n/a*.
 
-PUT /targets/TARGETID/power/on COMPONENTS -> DICT
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Turn on the components in the power rail in the given order.
+    Same *normal*, however all the extra components being powered on
+    for non-usual usage patterns might or not affect the operation of
+    the target.
+
+- *off*: the target is powered off
+
+  - *normal*: all the non-explicit power components and those marked
+    *explicit/on* report *off* or *n/a*. The components marked
+    *explicit* and *explicit/off* report *on* or *n/a*.
+
+    This is the state in which a target can be considered off as per
+    the usual usage pattern.
+
+    When the target is idle, the system will power it off to this state.
+
+  - *partial*: some of the non-explicit power components or those
+    marked *explicit/on* report *off* or *n/a*.
+
+    This is an inconsistent power state in which the target is off but
+    not all the components that should be off are off.
+
+    To use normally, it is adviced to do a power cycle, which will
+    power everything off and power on to the right state.
+
+  - *full*: all the power components (including those marked
+    *explicit*, *explicit/on* and *explicty/off*) are *off* or *n/a*.
+
+    This is a full power off where the system consumes the least power
+    (ideally zero). When the target has been in power off *normal* due to
+    idleness, after a configured time it will be brought to *full*
+    power off.
+
+As a convenience, the system publishes in the target's inventory:
+
+- *interfaces.power.state*: last power state recorded on the last
+  *list()* call.
+- *interfaces.power.substate*: last power substate recorded on the
+  last *list()* call.
+
+this can be used for caching purposes, since quering the power state
+can be a time consuming operation. However, it must be noted that
+external actors might take actions that would affect the true value of
+this state (eg: a PDU self-powering off an outlet due to overcurrent),
+so it shall not be used for hard evaluation.
+
+
+PUT /targets/TARGETID/power/on [ARGUMENTS] -> DICT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Turn on the target (the whole power rail) or specific components of
+the power rail.
+
+If no components are specified, turns on in sequence the elements of
+the power rail (list subject to the *explicit* argument).
+
+If one or more components are specified, turn on those components.
+
+This operation can be lengthy if the power rail is very long and the
+components take a long time to operate--this is implementation
+specific and there is no way to predict how long is going to
+take. However, as an implementation convention, no power rail shall
+take longer than sixty seconds to power on.
 
 **Access control:** the user, creator or guests of an
 allocation that has this target allocated.
 
+**Arguments**
 
-    components:LIST: list of components to power up on that order
-    (optional) defaults to all the components of the power rail
+- *component*: (optional; defaults to all) name of a component to turn
+  on
 
-PUT /targets/TARGETID/power/off components = [ LIST ]
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+- *components*: (optional; defaults to all) JSON encoded list of
+  components to turn on
 
-Turn off the components in the power rail in REVERSE of the given order.
+- *explicit*: boolean; when no components are specified, if *True*
+  this indicates also the components marked *explicit* and
+  *explicit/on* shall be powered on.
+
+**Returns:**
+
+- On success, 200 HTTP code and a JSON dictionary with optional
+  diagnostics
+
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
+
+**Linkage to other subsystems**
+
+Before powering on a the whole power rail, the targets' default console
+is reset; as well, any hooks defined in the server to be executed
+before power on (and after power on, on success) are executed.
+
+PUT /targets/TARGETID/power/off [ARGUMENTS] -> DICT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Turn off the target (the whole power rail) or specific components of
+the power rail.
+
+If no components are specified, turns off in sequence the elements of
+the power rail (list subject to the *explicit* argument).
+
+If one or more components are specified, turn off those components.
+
+This operation can be lengthy if the power rail is very long and the
+components take a long time to operate--this is implementation
+specific and there is no way to predict how long is going to
+take. However, as an implementation convention, no power rail shall
+take longer than sixty seconds to power off.
 
 **Access control:** the user, creator or guests of an
 allocation that has this target allocated.
 
-    components:LIST: list of components to power up on that order
-    (optional) defaults to all the components of the power rail
+**Arguments**
 
-PUT /targets/TARGETID/power/cycle [wait = X]
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+- *component*: (optional; defaults to all) name of a component to turn
+  off
 
-Power cycle the target
+- *components*: (optional; defaults to all) JSON encoded list of
+  components to turn off
+
+- *explicit*: boolean; when no components are specified, if *True*
+  this indicates also the components marked *explicit* and
+  *explicit/off* shall be powered off.
+
+**Returns:**
+
+- On success, 200 HTTP code and a JSON dictionary with optional
+  diagnostics
+
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
+
+
+**Linkage to other subsystems**
+
+Before powering off the whole power rail, the targets' pre execution
+hooks are run, as well as post-off hooks. This is specially relevant
+in that the consoles are all disabled.
+
+
+PUT /targets/TARGETID/power/cycle [ARGUMENT] -> DICTIONARY
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Power cycle (turn off, then on) the target (the whole power rail) or a
+specific component of the power rail.
+
+.. note: A power cycle can be left to the user (power off, then power
+   on)--however, since it is a very common case and the implementation
+   has data readily available on the state, it is more efficient to
+   implement it here.
+
 
 **Access control:** the user, creator or guests of an
 allocation that has this target allocated.
 
+**Arguments**
 
-Note: A power cycle can be left to the user (power off, then power on)--however, since it is a very common case and the implementation has data readily available on the state, it is more efficient to implement it here.
+- *component*: (optional; defaults to all) name of a component to turn
+  off
 
-    wait = X: number of seconds to wait between power off and power on; cannot be less than what is specified in target parameter power_cycle_wait.
-    (optional), defaults to target’s parameter power_cycle_wait (if specified), otherwise 2 (TBD)
+- *components*: (optional; defaults to all) JSON encoded list of
+  components to turn off
 
+- *explicit*: boolean; when no components are specified, if *True*
+  this indicates also the components marked *explicit* and
+  *explicit/off* shall be powered off. Likewise with the *explicit/on*
+  components on the power on path.
 
-FIXME: on power off of whole rail, all consoles have to be disabled
+- *wait* (optional; > 0 integer): number of seconds to wait between
+  power off and power on; cannot be less than what is specified in
+  target parameter power_cycle_wait.  (optional), defaults to target’s
+  parameter power_cycle_wait (if specified), otherwise two seconds.
+
+**Returns:**
+
+- On success, 200 HTTP code and a JSON dictionary with optional
+  diagnostics
+
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
 
 
 Instrumentation interface: image flashing
@@ -2259,7 +2418,7 @@ allocation that has this target allocated.
 - on error, a non 200 error code and a JSON dictionary with details,
   which will vary.
 
-**Example**::
+**Example**
 
 Compress and upload files *bios.bin.xz* and *bmc.bin.xz*::
 
