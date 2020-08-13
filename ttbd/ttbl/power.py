@@ -1569,3 +1569,128 @@ class socat_pc(daemon_c):
         # this is the log file name, that has been expanded already by
         # the daemon_c class calling start
         return os.path.exists(cmdline_expanded[2])
+
+
+def _check_has_iface_buttons(target):
+    buttons_iface = getattr(target, "buttons", None)
+    if not buttons_iface or not isinstance(buttons_iface, interface):
+        raise RuntimeError("%s: target has no buttons interface" % target.id)
+
+
+class button_sequence_pc(impl_c):
+    """Power control implementation that executest a button sequence on
+    power on, another on power off.
+
+    Requires a target that supports the *buttons* interface.
+
+    :param list sequence_on: (optional; list of events) sequence of
+      events to do on power on (see :func:ttbl.power.intrface.sequence
+      for sequence reference).
+
+    :param list sequence_off: (optional; list of events) sequence of
+      events to do on power off (see :func:ttbl.power.intrface.sequence
+      for sequence reference).
+
+
+    Other parameters as to :class:ttbl.power.impl_c.
+
+    For example, to click a power button one second to power on, one
+    would add to the power rail:
+
+    >>> target.interface_add("power", ttbl.power.interface(
+    >>>     (
+    >>>         "release buttons",
+    >>>         ttbl.power.buttons_released_pc("power", "reset")
+    >>>     ),
+    >>>     ...
+    >>>     (
+    >>>         "power button",
+    >>>         ttbl.power.button_sequence_pc(sequence_on = [
+    >>>             # click BUTTONNAME 1 second to power on
+    >>>             ( 'press', 'BUTTONNAME' ),		# press the button
+    >>>             ( 'wait', 1 ),			# hold pressed 1 sec
+    >>>             ( 'release', 'BUTTONNAME' ),	# release the button
+    >>>         ])
+    >>>     ),
+    >>>     ...
+    >>> )
+
+    When having buttons instrumented, it is always a good idea to
+    include a :class:buttons_released_pc also (as described), to
+    ensure all the buttons are released when powering on (to for
+    example make sure the *reset* button is not pressed while trying
+    to turn on a machine).
+
+    """
+    def __init__(self, sequence_on = None, sequence_off = None, **kwargs):
+        impl_c.__init__(self, **kwargs)
+        self.sequence_on = sequence_on
+        self.sequence_off = sequence_off
+        l = []
+        if sequence_on:
+            lon = [ ]
+            for operation, argument in sequence_on:
+                lon.append("%s:%s" % (operation, argument))
+            l.append("OFF:" + ",".join(lon))
+        if sequence_off:
+            loff = [ ]
+            for operation, argument in sequence_off:
+                loff.append("%s:%s" % (operation, argument))
+            l.append("ON:" + ",".join(loff))
+        self.upid_set(
+            "Button/jumper sequence %s" % " ".join(l),
+            sequence_on = ",".join("%s:%s" % (operation, argument)
+                                   for operation, argument in sequence_on),
+            sequence_off = ",".join("%s:%s" % (operation, argument)
+                                    for operation, argument in sequence_off)
+        )
+
+    def on(self, target, _component):
+        _check_has_iface_buttons(target)
+        if self.sequence_on:
+            target.buttons.sequence(target, self.sequence_on)
+
+    def off(self, target, _component):
+        _check_has_iface_buttons(target)
+        if self.sequence_off:
+            target.buttons.sequence(target, self.sequence_off)
+
+    def get(self, target, _component):
+        # no real press status, so can't tell
+        return None
+
+
+class buttons_released_pc(impl_c):
+    """
+    Power control implementation that ensures a list of buttons
+    are released (not pressed) before powering on a target.
+
+    :param str buttons: names of buttons that must be released upon
+      power on
+
+    >>> ttbl.power.buttons_released_pc("reset", "test", "overdrive")
+
+    Other parameters as to :class:ttbl.power.impl_c.
+
+    """
+    def __init__(self, *buttons, **kwargs):
+        commonl.assert_list_of_strings(buttons, "buttons", "button")
+        impl_c.__init__(self, **kwargs)
+        self.sequence = [
+            ( 'off', button )
+            for button in buttons
+        ]
+        self.upid_set(
+            "Button %s releaser" % "/".join(buttons),
+            buttons = " ".join(buttons)
+        )
+
+    def on(self, target, _component):
+        _check_has_iface_buttons(target)
+        target.buttons.sequence(target, self.sequence)
+
+    def off(self, target, _component):
+        pass
+
+    def get(self, target, _component):
+        return None			# no real press status, so can't tell

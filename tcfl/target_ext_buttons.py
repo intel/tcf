@@ -89,8 +89,8 @@ class extension(tc.target_extension_c):
 
           *OPERATION* is a string that can be:
 
-          - *on* or *off* to *press* / *release* a button named
-             *ARGUMENT* (another string)
+          - *on*/*press*/*close* or *off*/*release*/*open* to *press*
+             *release* a button named ARGUMENT* (another string)
 
           - *wait*: *ARGUMENT* is a number describing how many seconds
             to wait
@@ -100,6 +100,7 @@ class extension(tc.target_extension_c):
           how many *wait* operations are given or if none, whatever
           the default is set in
           :meth:`tcfl.tc.target_c.ttbd_iface_call`.
+
         """
         self.target.report_info("running sequence: %s" % sequence, dlevel = 1)
         if timeout == None:
