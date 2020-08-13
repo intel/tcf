@@ -873,10 +873,13 @@ class interface(ttbl.tt_interface):
                 time.sleep(s[1])
                 continue
 
-            if action not in [ 'on', 'off', 'cycle' ]:
-                raise ValueError("%s: sequence #%d: invalid action spec; "
-                                 " expected on|off|cycle; got %s"
-                                 % (target.id, count, action))
+            if action not in [ 'on', 'press', 'close',
+                               'off', 'release', 'open',
+                               'cycle' ]:
+                raise ValueError(
+                    "%s: sequence #%d: invalid action spec; "
+                    " expected on|press|close|off|release|open|cycle; got %s"
+                    % (target.id, count, action))
 
             component = s[1]
             if not isinstance(component, basestring):
@@ -895,11 +898,11 @@ class interface(ttbl.tt_interface):
             else:
                 impls, _all = self.args_impls_get(dict(component = component))
             # and now act
-            if action == 'on':
-                self._on(target, impls, " (because sequenced on)",
+            if action in ( 'on', 'press', 'close' ):
+                self._on(target, impls, " (because sequenced '%s')" % action,
                          _all, explicit)
-            elif action == 'off':
-                self._off(target, impls, " (because sequenced off)",
+            elif action in ( 'off', 'release', 'open' ):
+                self._off(target, impls, " (because sequenced '%s')" % action,
                           _all, explicit)
             elif action == 'cycle':
                 wait = float(target.tags.get('power_cycle_wait', 2))
@@ -907,11 +910,13 @@ class interface(ttbl.tt_interface):
                           _all, explicit)
                 if wait:
                     time.sleep(wait)
-                self._on(target, impls, " (because sequneced cycle)",
+                self._on(target, impls, " (because sequenced cycle)",
                          _all, explicit)
             else:
                 raise RuntimeError(
-                    "%s: unknown action (expected on|off|cycle)" % action)
+                    "%s: unknown action"
+                    " (expected on|press|close|off|release|open|cycle)"
+                    % action)
 
 
 
@@ -945,10 +950,13 @@ class interface(ttbl.tt_interface):
                     % (target.id, qualifier, count, type(time_to_wait))
                 continue
 
-            if action not in [ 'on', 'off', 'cycle' ]:
-                raise ValueError("%s%s: sequence #%d: invalid action spec; "
-                                 " expected on|off|cycle; got %s"
-                                 % (target.id, qualifier, count, action))
+            if action not in [ 'on', 'press', 'close',
+                               'off', 'release', 'open',
+                               'cycle' ]:
+                raise ValueError(
+                    "%s%s: sequence #%d: invalid action spec; "
+                    " expected on|press|close|off|release|open|cycle; got %s"
+                    % (target.id, qualifier, count, action))
 
             component = s[1]
             if not isinstance(component, basestring):
