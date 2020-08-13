@@ -286,6 +286,8 @@ class driver(tcfl.tc.report_driver_c):
                         continue
                     if isinstance(attachment, commonl.generator_factory_c):
                         for data in attachment.make_generator():
+                            if isinstance(data, bytes):
+                                data = data.decode('utf-8')
                             if not key in result["attachment"]:
                                 result["attachment"][key] = data
                             else:
