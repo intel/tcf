@@ -994,8 +994,13 @@ class fake_c(impl_c):
 
     Parameters are the same as for :class:impl_c.
     """
-    def __init__(self, **kwargs):
+    def __init__(self, name = None, **kwargs):
         impl_c.__init__(self, **kwargs)
+        if name == None:
+            name = "%x" % id(self)
+        self.name = name
+        self.upid_set("Fake power controller #%s" % name,
+                      id = "%s" % name)
 
     def on(self, target, component):
         target.log.info("power-fake-%s on" % component)
@@ -1046,6 +1051,7 @@ class inverter_c(impl_c):
         self.when_on = when_on
         self.when_off = when_off
         self.when_get = when_get
+        # FIXME: upid set from pc, negating
 
     def on(self, target, component):
         if self.when_on:
