@@ -1408,6 +1408,7 @@ class delay_til_shell_cmd_c(impl_c):
                     component, self.poll_period, condition_msg,
                 ))
             time.sleep(self.poll_period)
+            ts = time.time()
         else:
             raise RuntimeError(
                 "%s: timeout (%.1fs) on power-on delay "
@@ -1436,6 +1437,7 @@ class delay_til_shell_cmd_c(impl_c):
                     component, self.poll_period, condition_msg
                 ))
             time.sleep(self.poll_period)
+            ts = time.time()
         else:
             raise RuntimeError(
                 "%s: timeout (%.1fs) on power-off delay waiting"
