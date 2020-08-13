@@ -64,6 +64,9 @@ logging.addLevelName(8, "D3")
 logging.addLevelName(7, "D4")
 logging.addLevelName(6, "D5")
 
+if sys.version_info.minor > 6:
+    re._pattern_type = re.Pattern
+
 def config_import_file(filename, namespace = "__main__",
                        raise_on_fail = True):
     """Import a Python [configuration] file.
