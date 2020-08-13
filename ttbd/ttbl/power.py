@@ -42,7 +42,7 @@ those names; thus, in a configuration :ref:`configuration file
 >>>     )
 
 would add two buttons, power and reset, controlled by a
-:ref:`USBRLY08B <ttbl.usbrly08b.pc>` relay bank (by wiring the NO and
+:class:`USBRLY08B <ttbl.usbrly08b.pc>` relay bank (by wiring the NO and
 NC lines through the button so that turning on/closing the relay
 effectively presses the button).
 
