@@ -50,7 +50,7 @@ def _delete(rtb, allocid):
 # FIXME: what happens if the conn
 def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
                    queue_timeout = None, priority = 700, preempt = False,
-                   queue = True, reason = None):
+                   queue = True, reason = None, wait_in_queue = True):
     assert isinstance(groups, dict)
 
     data = dict(
@@ -78,11 +78,12 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
     if queue_timeout == 0:
         return allocid, state, {}
     ts = time.time()
-    group_allocated = None
+    group_allocated = []
     commonl.progress(
         "allocation ID %s: [+%.1fs] keeping alive during state '%s'" % (
             allocid, ts - ts0, state))
-    while True:
+    new_state = state       # in case we don't wait 
+    while wait_in_queue:
         if queue_timeout and ts - ts0 > queue_timeout:
             raise tcfl.tc.blocked_e(
                 "can't acquire targets, still busy after %ds"
@@ -95,18 +96,20 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
         except requests.exceptions.RequestException:
             # FIXME: tolerate N failures before giving up
             pass
-        if r.get('result', {}):
-            commonl.progress(
-                "allocation ID %s: [+%.1fs] keeping alive during state '%s': %s"
-                % (allocid, ts - ts0, state, r))
-        else:
-            commonl.progress(
-                "allocation ID %s: [+%.1fs] keeping alive during state '%s'"
-                % (allocid, ts - ts0, state))
 
-        if allocid not in r['result']:
+        # COMPAT: old version packed the info in the 'result' field,
+        # newer have it in the first level dictionary
+        if 'result' in r:
+            result = r.pop('result')
+            r.update(result)
+        # COMPAT: end
+        commonl.progress(
+            "allocation ID %s: [+%.1fs] keeping alive during state '%s': %s"
+            % (allocid, ts - ts0, state, r))
+        
+        if allocid not in r:
             continue # no news
-        alloc = r['result'][allocid]
+        alloc = r[allocid]
         new_state = alloc['state']
         if new_state == 'active':
             r = rtb.send_request("GET", "allocation/%s" % allocid)
@@ -131,19 +134,20 @@ def _alloc_hold(rtb, allocid, state, ts0, max_hold_time):
             break
         data = { allocid: state }
         r = rtb.send_request("PUT", "keepalive", json = data)
-        if r.get('result', {}):
-            commonl.progress(
-                "allocation ID %s: [+%.1fs] keeping alive during state '%s': %s"
-                % (allocid, ts - ts0, state, r))
-        else:
-            commonl.progress(
-                "allocation ID %s: [+%.1fs] keeping alive during state '%s'"
-                % (allocid, ts - ts0, state))
-        # r is a dict, with a dict in 'result' that has a
-        # list of allocids that changed state of the ones
+
+        # COMPAT: old version packed the info in the 'result' field,
+        # newer have it in the first level dictionary
+        if 'result' in r:
+            result = r.pop('result')
+            r.update(result)
+        # COMPAT: end
+        commonl.progress(
+            "allocation ID %s: [+%.1fs] keeping alive during state '%s': %s"
+            % (allocid, ts - ts0, state, r))
+        # r is a dict, allocids that changed state of the ones
         # we told it in 'data'
         ## { ALLOCID1: STATE1, ALLOCID2: STATE2 .. }
-        new_data = r['result'].get(allocid, None)
+        new_data = r.get(allocid, None)
         if new_data == None:
             continue			# no new info
         new_state = new_data['state']
@@ -182,10 +186,15 @@ def _cmdline_alloc_targets(args):
                     _alloc_targets(rtb, groups, obo = args.obo,
                                    preempt = args.preempt,
                                    queue = args.queue, priority = args.priority,
-                                   reason = args.reason)
+                                   reason = args.reason,
+                                   wait_in_queue = args.wait_in_queue)
                 ts = time.time()
-                print("allocation ID %s: [+%.1fs] allocated: %s" % (
-                    allocid, ts - ts0, " ".join(group_allocated)))
+                if args.wait_in_queue:
+                    print("allocation ID %s: [+%.1fs] allocated: %s" % (
+                        allocid, ts - ts0, " ".join(group_allocated)))
+                else:
+                    print("allocation ID %s: [+%.1fs] registered" % (
+                        allocid, ts - ts0))
             else:
                 print("%s: NOT ALLOCATED! Holdin allocation ID given with -a" \
                     % allocid)
@@ -375,22 +384,51 @@ def _cmdline_alloc_monitor(args):
                 last_scene = e.scene
 
 
-def _allocs_get(rtb):
-    return rtb.send_request("GET", "allocation/")
+def _allocs_get(rtb, username):
+    r = rtb.send_request("GET", "allocation/")
+    if username:
+        # filter here, as we can translate the username 'self' to the
+        # user we are logged in as in the server
+        _r = {}
+        if username == "self":
+            username = rtb.logged_in_username()
+
+        def _alloc_filter(allocdata, username):
+            if username != None \
+               and username != allocdata.get('creator', None) \
+               and username != allocdata.get('user', None):
+                return False
+            return True
+        
+        for allocid, allocdata in r.items():
+            if _alloc_filter(allocdata, username):
+                _r[allocid] = allocdata
+        
+        return _r
+    else:
+        return r
 
 
-def _alloc_ls(verbosity):
+
+def _alloc_ls(verbosity, username = None):
     allocs = {}
     tp = tcfl.ttb_client._multiprocessing_pool_c(
         processes = len(tcfl.ttb_client.rest_target_brokers))
     threads = {}
     for rtb in sorted(tcfl.ttb_client.rest_target_brokers.values(), key = str):
-        threads[rtb] = tp.apply_async(_allocs_get, (rtb,))
+        threads[rtb] = tp.apply_async(_allocs_get, (rtb, username))
     tp.close()
     tp.join()
     for rtb, thread in threads.items():
         allocs[rtb.aka] = thread.get()
-    if verbosity == 3:
+
+    if verbosity < 0:
+        # just print the list of alloc ids for each server, one per line
+        for _, data in allocs.items():
+            if data:
+                print("\n".join(data.keys()))
+        return
+    elif verbosity == 3:
         pprint.pprint(allocs)
         return
     elif verbosity == 4:
@@ -490,7 +528,7 @@ def _cmdline_alloc_ls(args):
                     if clear:
                         print("\x1b[2J")	# clear whole screen
                         clear = False
-                    _alloc_ls(args.verbosity)
+                    _alloc_ls(args.verbosity - args.quietosity, args.username)
                     ts0 = time.time()
                 except requests.exceptions.RequestException as e:
                     ts = time.time()
@@ -502,7 +540,7 @@ def _cmdline_alloc_ls(args):
                 sys.stdout.flush()
                 time.sleep(args.refresh)
         else:
-                _alloc_ls(args.verbosity)
+            _alloc_ls(args.verbosity - args.quietosity, args.username)
 
 def _cmdline_alloc_delete(args):
     with msgid_c("cmdline"):
@@ -648,6 +686,10 @@ def _cmdline_setup(arg_subparsers):
         "-w", "--wait", action = "store_true", dest = 'queue', default = True,
         help = "(default) Wait until targets are assigned")
     ap.add_argument(
+        "--dont-wait", action = "store_false", dest = 'wait_in_queue',
+        default = True,
+        help = "Do not wait until targets are assigned")
+    ap.add_argument(
         "-i", "--inmediate", action = "store_false", dest = 'queue',
         help = "Fail if target's can't be allocated inmediately")
     ap.add_argument(
@@ -686,6 +728,11 @@ def _cmdline_setup(arg_subparsers):
         "targets are")
     commonl.argparser_add_aka(arg_subparsers, "alloc-ls", "alloc-list")
     ap.add_argument(
+        "-q", dest = "quietosity", action = "count", default = 0,
+        help = "Decrease verbosity of information to display "
+        "(none is a table, -q or more just the list of allocations,"
+        " one per line")
+    ap.add_argument(
         "-v", dest = "verbosity", action = "count", default = 0,
         help = "Increase verbosity of information to display "
         "(none is a table, -v table with more details, "
@@ -693,6 +740,10 @@ def _cmdline_setup(arg_subparsers):
     ap.add_argument(
         "-a", "--all", action = "store_true", default = False,
         help = "Consider also disabled targets")
+    ap.add_argument(
+        "-u", "--username", action = "store", default = None,
+        help = "ID of user whose allocs are to be displayed"
+        " (optional, defaults to anyone visible)")
     ap.add_argument(
         "-r", "--refresh", action = "store",
         type = float, nargs = "?", const = 1, default = 0,
