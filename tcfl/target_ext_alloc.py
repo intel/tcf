@@ -39,6 +39,10 @@ except ImportError as e:
 def _delete(rtb, allocid):
     try:
         rtb.send_request("DELETE", "allocation/%s" % allocid)
+    except requests.ConnectionError as e:
+        # this server is out
+        logging.warning(e)
+        return
     except requests.HTTPError as e:
         if 'invalid allocation' not in str(e):
             raise
