@@ -1148,7 +1148,7 @@ POS; for example:
 
 - Fedora::
 
-    $ https://mirrors.rit.edu/fedora/fedora/linux/releases/29/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-29-1.2.iso
+    $ wget https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/29/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-29-1.2.iso
     $ /usr/share/tcf/tcf-image-setup.sh fedora:workstation:29::x86_64 Fedora-Workstation-Live-x86_64-29-1.2.iso
 
 - RHEL::
