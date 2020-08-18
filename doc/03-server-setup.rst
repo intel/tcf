@@ -1159,8 +1159,8 @@ POS; for example:
 
 - Ubuntu::
 
-    $ wget http://releases.ubuntu.com/18.04/ubuntu-18.04.3-desktop-amd64.iso
-    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/ubuntu:desktop:18.04:3:x86_64 ubuntu-18.04.3-desktop-amd64.iso 
+    $ wget http://releases.ubuntu.com/18.04/ubuntu-18.04.5-desktop-amd64.iso
+    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/ubuntu:desktop:18.04:5:x86_64 ubuntu-18.04.5-desktop-amd64.iso 
     
 - Yocto::
 
