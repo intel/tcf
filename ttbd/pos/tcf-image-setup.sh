@@ -534,7 +534,7 @@ EOF
 esac
 
 # Boot stuff
-if 'clear' in $image_type; then
+if echo $image_type | grep -q 'clear'; then
     if [ -r $destdir/boot/loader/entries/iso-checksum.conf ]; then
         # we do not use this file when booting and it is confusing the
         # bootloader configurer in
