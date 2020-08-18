@@ -385,7 +385,11 @@ def _cmdline_alloc_monitor(args):
 
 
 def _allocs_get(rtb, username):
-    r = rtb.send_request("GET", "allocation/")
+    try:
+        r = rtb.send_request("GET", "allocation/")
+    except (Exception, ttb_client.requests.HTTPError) as e:
+        logging.error("%s", e)
+        return {}
     if username:
         # filter here, as we can translate the username 'self' to the
         # user we are logged in as in the server
