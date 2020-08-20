@@ -62,23 +62,36 @@ deriving from :class:ttbl.images.impl_c) to drive the flashing of each
 target type:
 
 - image is an aka of imageA
+
 - imageA done by implA
+
 - imageB done by implB
+
 - imageC and imageD done by implCD (parallel capable)
+
 - imageE done by implE (parallel capable)
+
 - imageF done by implF (parallel capable)
+
 - imageG and imageH done by implGH
 
 this will flash:
 
 - serially:
+
   - fileA and fileX in imageA using driver implA, so one will get
     overriden and not even flashed depending on the specification order
+
   - fileB in imageB using driver implB
+
   - fileG in imageG and fileh in imageH using implGH
+
 - in parallel:
+
    - fileC in imageC and fileD in imageD using driver implCD
+
    - fileE in imageE using implE
+
    - fileF in imageF using implF
 
 Power control sequences before flashing
@@ -113,7 +126,7 @@ components needed to do the flashing operation after a short wait
 a power component called *flasher/image0 connector* that
 powers-on/connects the flasher for *image0* (a Dediprog in the example):
 
-.. code-block::
+.. code-block:: python
 
    target.interface_add(
        "images", ttbl.images.interface(
@@ -138,7 +151,7 @@ The flashers are usually defined as explicit/on components, so they
 are only turned on if explicitly named and stay off otherwise; for
 example, to control connectivity with a USB YKush Power switcher
 
-.. code-block::
+.. code-block:: python
 
    target.interface_add(
        "power", ttbl.power.interface(
@@ -155,7 +168,7 @@ example, to control connectivity with a USB YKush Power switcher
         ))
 
 for parallel flashers, it'd be similar, but it would turn on all the
-flashers:
+flashers::
 
    target.interface_add(
        "images", ttbl.images.interface(
@@ -191,6 +204,7 @@ flashers:
 
 import codecs
 import collections
+import copy
 import hashlib
 import json
 import numbers
@@ -854,8 +868,10 @@ class bossac_c(impl_c):
     - (for Arduino Due) uses the bossac utility built on the *arduino*
       branch from https://github.com/shumatech/BOSSA/tree/arduino::
 
+        # sudo dnf install -y gcc-c++ wxGTK-devel
         $ git clone https://github.com/shumatech/BOSSA.git bossac.git
         $ cd bossac.git
+        $ git checkout -f 1.6.1-arduino-19-gae08c63
         $ make -k
         $ sudo install -o root -g root bin/bossac /usr/local/bin
 
@@ -1496,6 +1512,256 @@ class flash_shell_cmd_c(impl2_c):
                     raise RuntimeError(msg)
 
 
+class quartus_pgm_c(flash_shell_cmd_c):
+    """
+    Flash using Intel's Quartus PGM tool
+
+    This allows to flash images to an Altera MAX10, using the Quartus
+    tools, freely downloadable from http://dl.altera.com.
+
+    Exports the following interfaces:
+
+    - power control (using any AC power switch, such as the
+      :class:`Digital Web Power Switch 7 <ttbl.pc.dlwps7>`)
+    - serial console
+    - image (in hex format) flashing (using the Quartus Prime tools
+      package)
+
+    Multiple instances at the same time are supported; however, due to
+    the JTAG interface not exporting a serial number, addressing has
+    to be done by USB path, which is risky (as it will change when the
+    cable is plugged to another port or might be enumerated in a
+    different number).
+
+    :param str device_id: USB serial number of the USB device to use
+      (USB-BlasterII or similar)
+
+    :param dict image_map:
+
+    :param str name: (optiona; default 'Intel Quartus PGM #<DEVICEID>')
+      instrument's name.
+
+    :param dict args: (optional) dictionary of extra command line options to
+      *quartus_pgm*; these are expanded with the target keywords with
+      *%(FIELD)s* templates, with fields being the target's
+      :ref:`metadata <finding_testcase_metadata>`:
+
+      FIXME: move to common flash_shell_cmd_c
+
+    :param dict jtagconfig: (optional) jtagconfig --setparam commands
+      to run before starting.
+
+      These are expanded with the target keywords with
+      *%(FIELD)s* templates, with fields being the target's
+      :ref:`metadata <finding_testcase_metadata>` and then run as::
+
+        jtagconfig --setparam CABLENAME KEY VALUE
+
+    Other parameters described in :class:ttbl.images.impl_c.
+
+
+    **Command line reference**
+
+    https://www.intel.com/content/dam/www/programmable/us/en/pdfs/literature/manual/tclscriptrefmnl.pdf
+
+    Section Quartus_PGM (2-50)
+
+    **System setup**
+
+    -  Download and install Quartus Programmer::
+
+         $ wget http://download.altera.com/akdlm/software/acdsinst/20.1std/711/ib_installers/QuartusProgrammerSetup-20.1.0.711-linux.run
+         # chmod a+x QuartusProgrammerSetup-20.1.0.711-linux.run
+         # ./QuartusProgrammerSetup-20.1.0.711-linux.run --unattendedmodeui none --mode unattended --installdir /opt/quartus --accept_eula 1
+
+    - if installing to a different location than */opt/quartus*,
+      adjust the value of :data:`path` in a FIXME:ttbd configuration
+      file.
+
+
+    **Troubleshooting**
+
+    When it fails to flash, the error log is reported in the server in
+    a file called *flash-COMPONENTS.log* in the target's state
+    directory (FIXME: we need a better way for this--the admin shall
+    be able to read it, but not the users as it might leak sensitive
+    information?).
+
+    Common error messages:
+
+    - *Error (213019): Can't scan JTAG chain. Error code 87*
+
+      Also seen when manually running in the server::
+
+        $ /opt/quartus/qprogrammer/bin/jtagconfig
+        1) USB-BlasterII [3-1.4.4.3]
+          Unable to read device chain - JTAG chain broken
+
+      In many cases this has been:
+
+      - a powered off main board: power it on
+
+      - a misconnected USB-BlasterII: reconnect properly
+
+      - a broken USB-BlasterII: replace unit
+
+    - *Error (209012): Operation failed*
+
+      this usually happens when flashing one component of a multiple
+      component chain; the log might read something like::
+
+        Info (209060): Started Programmer operation at Mon Jul 20 12:05:22 2020
+        Info (209017): Device 2 contains JTAG ID code 0x038301DD
+        Info (209060): Started Programmer operation at Mon Jul 20 12:05:22 2020
+        Info (209016): Configuring device index 2
+        Info (209017): Device 2 contains JTAG ID code 0x018303DD
+        Info (209007): Configuration succeeded -- 1 device(s) configured
+        Info (209011): Successfully performed operation(s)
+        Info (209061): Ended Programmer operation at Mon Jul 20 12:05:22 2020
+        Error (209012): Operation failed
+        Info (209061): Ended Programmer operation at Mon Jul 20 12:05:22 2020
+        Error: Quartus Prime Programmer was unsuccessful. 1 error, 0 warnings
+
+      This case has been found to be because the **--bgp** option is
+      needed (which seems to map to the *Enable Realtime ISP
+      programming* in the Quartus UI, *quartus_pgmw*)
+
+    - *Warning (16328): The real-time ISP option for Max 10 is
+      selected. Ensure all Max 10 devices being programmed are in user
+      mode when requesting this programming option* 
+
+      Followed by:
+
+        *Error (209012): Operation failed*
+
+      This case comes when a previous flashing process was interrupted
+      half way or the target is corrupted.
+
+      It needs a special one-time recovery; currently the
+      workaround seems to run the flashing with out the *--bgp* switch
+      that as of now is hardcoded.
+    
+      FIXME: move the --bgp and --mode=JTAG switches to the args (vs
+      hardcoded) so a recovery target can be implemented as
+      NAME-nobgp
+
+    """
+
+
+    #: Path to *quartus_pgm*
+    #:
+    #: We need to use an ABSOLUTE PATH if the tool is not in the
+    #: normal search path (which usually won't).
+    #:
+    #: Change by setting, in a :ref:`server configuration file
+    #: <ttbd_configuration>`:
+    #:
+    #: >>> ttbl.images.quartus_pgm_c.path = "/opt/quartus/qprogrammer/bin/quartus_pgm"
+    #:
+    #: or for a single instance that then will be added to config:
+    #:
+    #: >>> imager = ttbl.images.quartus_pgm_c(...)
+    #: >>> imager.path =  "/opt/quartus/qprogrammer/bin/quartus_pgm"
+    path = "/opt/quartus/qprogrammer/bin/quartus_pgm"
+    path_jtagconfig = "/opt/quartus/qprogrammer/bin/jtagconfig"
+
+
+    def __init__(self, device_id, image_map, args = None, name = None,
+                 jtagconfig = None,
+                 **kwargs):
+        assert isinstance(device_id, basestring)
+        commonl.assert_dict_of_ints(image_map, "image_map")
+        commonl.assert_none_or_dict_of_strings(jtagconfig, "jtagconfig")
+        assert name == None or isinstance(name, basestring)
+
+        self.device_id = device_id
+        self.image_map = image_map
+        self.jtagconfig = jtagconfig
+        if args:
+            commonl.assert_dict_of_strings(args, "args")
+            self.args = args
+        else:
+            self.args = {}
+
+        cmdline = [
+            self.path,
+            # FIXME: move this to args, enable value-less args (None)
+            "--bgp",		# Real time background programming
+            "--mode=JTAG",	# this is a JTAG
+            "-c", "%(device_path)s",	# will resolve in flash_start()
+            # in flash_start() call we'll map the image names to targets
+            # to add these
+            #
+            #'--operation=PVB;%(image.NAME)s@1',
+            #'--operation=PVB;%(image.NAME)s@2',
+            #...
+            # (P)rogram (V)erify, (B)lank-check
+            #
+            # note like this we can support burning multiple images into the
+            # same chain with a single call
+        ]
+        if args:
+            for arg, value in args.items():
+                cmdline += [ arg, value ]
+        # we do this because in flash_start() we need to add
+        # --operation as we find images we are supposed to flash
+        self.cmdline_orig = cmdline
+
+        flash_shell_cmd_c.__init__(self, cmdline, cwd = '%(file_path)s',
+                                   **kwargs)
+
+        if name == None:
+            name = "Intel Quartus PGM %s" % device_id
+        self.upid_set(name, device_id = device_id)
+
+
+    def flash_start(self, target, images, context):
+        # Finalize preparing the command line for flashing the images
+
+        # find the device path; quartus_pgm doesn't seem to be able to
+        # address by serial and expects a cable name as 'PRODUCT NAME
+        # [PATH]', like 'USB BlasterII [1-3.3]'; we can't do this on
+        # object creation because the USB path might change when we power
+        # it on/off (rare, but could happen).
+        usb_path, _vendor, product = ttbl.usb_serial_to_path(self.device_id)
+        context['kws'] = {
+            # HACK: we assume all images are in the same directory, so
+            # we are going to cwd there (see in __init__ how we set
+            # cwd to %(file_path)s. Reason is some of our paths might
+            # include @, which the tool considers illegal as it uses
+            # it to separate arguments--see below --operation
+            'file_path': os.path.dirname(images.values()[0]),
+            'device_path': "%s [%s]" % (product, usb_path)
+            # flash_shell_cmd_c.flash_start() will add others
+        }
+
+        # for each image we are burning, map it to a target name in
+        # the cable (@NUMBER)
+        # make sure we don't modify the originals
+        cmdline = copy.deepcopy(self.cmdline_orig)
+        for image_type, filename in images.items():
+            target_index = self.image_map.get(image_type, None)
+            # pass only the realtive filename, as we are going to
+            # change working dir into the path (see above in
+            # context[kws][file_path]
+            cmdline.append("--operation=PVB;%s@%d" % (
+                os.path.basename(filename), target_index))
+        # now set it for flash_shell_cmd_c.flash_start()
+        self.cmdline = cmdline
+
+        if self.jtagconfig:
+            for option, value in self.jtagconfig.items():
+                cmdline = [
+                    self.path_jtagconfig,
+                    "--setparam", "%s [%s]" % (product, usb_path),
+                    option, value
+                ]
+                target.log.info("running per-config: %s" % " ".join(cmdline))
+                subprocess.check_output(
+                    cmdline, shell = False, stderr = subprocess.STDOUT)
+        flash_shell_cmd_c.flash_start(self, target, images, context)
+
+
 class sf100linux_c(flash_shell_cmd_c):
     """Flash Dediprog SF100 and SF600 with *dpcmd* from
     https://github.com/DediProgSW/SF100Linux
@@ -1568,7 +1834,7 @@ class sf100linux_c(flash_shell_cmd_c):
     Dediprogs' USB serial numbers are often all the same, so for a
     power-on sequence to wait until the device is detected by the
     system after it has been plugged in (eg: with a
-    :class:`ttbl.pc_ykush.pc` connector)
+    :class:`ttbl.pc_ykush.ykush` connector)
     :class:`ttbl.pc.delay_til_usb_device` is usually not enough. In
     such case, we can use *dpmcd* to do the detection for us:
 

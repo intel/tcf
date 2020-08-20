@@ -5,20 +5,16 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-import ttbl.debug
-
 target = ttbl.test_target("t0")
 ttbl.config.target_add(
     target,
     tags = {
-        # trick for the tunneling system
         'ipv4_addr': "127.0.0.1",
-        'bsp_models': {
-            'bsp1': None,
+        "interconnects": {
+            # this is just to trick target_ext_tunel.extension._healtcheck()
+            "fake": {
+                "ipv4_addr": "127.0.0.1",
+                "ipv4_prefix_len": 8
+            },
         },
-        'bsps' : {
-            "bsp1": dict(val = 1),
-        },
-        'skip_cleanup' : True,
-    }
-)
+    })

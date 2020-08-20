@@ -5,8 +5,8 @@ imutils
 ipaddress
 junit_xml
 keyring
-numpy
-opencv-python
+numpy=1.7.1
+opencv-python==4.1.2.30
 ply
 pykwalify
 pylint

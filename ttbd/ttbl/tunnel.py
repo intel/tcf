@@ -39,13 +39,21 @@ class interface(ttbl.tt_interface):
         ttbl.tt_interface.__init__(self)
 
     def _target_setup(self, target, iface_name):
+        # wipe all leftover tunnels info, when we start there shall be none
+        for tunnel_id in target.fsdb.keys("interfaces.tunnel.*.protocol"):
+            prefix = tunnel_id[:-len(".protocol")]
+            target.fsdb.set(prefix + ".__id", None)
+            target.fsdb.set(prefix + ".ip_addr", None)
+            target.fsdb.set(prefix + ".protocol", None)
+            target.fsdb.set(prefix + ".port", None)
         pass
 
 
     def _release_hook(self, target, _force):
         # remove all active tunnels
-        for tunnel_id in target.fsdb.keys("tunnel-id-*"):
-            self._delete_tunnel(target, tunnel_id)
+        for tunnel_id in target.fsdb.keys("interfaces.tunnel.*.protocol"):
+            local_port = tunnel_id[len("interfaces.tunnel."):-len(".protocol")]
+            self._delete_tunnel(target, local_port)
 
 
     def _ip_addr_validate(self, target, _ip_addr):
@@ -94,7 +102,8 @@ class interface(ttbl.tt_interface):
         assert protocol in self.valid_protocols, \
             "unsupported protocol '%s' (must be " % protocol \
             + " ".join(self.valid_protocols) + ")"
-        tunnel_id = "%s__%s__%d" % (protocol, ip_addr, port)
+        # this format is also used down in get() # COMPAT
+        tunnel_id = "%s__%s__%d" % (protocol, ip_addr.replace(".", "_"), port)
         return ( ip_addr, port, protocol, tunnel_id )
 
 
@@ -123,13 +132,20 @@ class interface(ttbl.tt_interface):
         )
         self._ip_addr_validate(target, ip_addr)
         with target.target_owned_and_locked(who):
-            port_pid = target.fsdb.get("tunnel-id-%s" % tunnel_id)
-            if port_pid != None:
-                local_ports, pids = port_pid.split(" ", 2)
-                local_port = int(local_ports)
-                pid = int(pids)
-                if commonl.process_alive(pid, "/usr/bin/socat"):
-                    return dict(result = local_port)
+            for tunnel_id in target.fsdb.keys("interfaces.tunnel.*.protocol"):
+                prefix = tunnel_id[:-len(".protocol")]
+                _ip_addr = target.fsdb.get(prefix + ".ip_addr")
+                _protocol = target.fsdb.get(prefix + ".protocol")
+                _port = target.fsdb.get(prefix + ".port")
+                _pid = target.fsdb.get(prefix + ".__id")
+                _lport = prefix[len("interfaces.tunnel."):]
+                if _ip_addr == ip_addr \
+                   and _protocol == protocol \
+                   and _port == port \
+                   and commonl.process_alive(_pid, "/usr/bin/socat"):
+                    # there is already an active tunnel for this port
+                    # and it is alive, so use that
+                    return dict(result = _lport)
 
             local_port = commonl.tcp_port_assigner(
                 port_range = ttbl.config.tcp_port_range)
@@ -153,26 +169,34 @@ class interface(ttbl.tt_interface):
                 p.pid, "/usr/bin/socat",
                 verification_f = commonl.tcp_port_busy,
                 verification_f_args = ( local_port, ),
-                tag = "socate-" + tunnel_id, log = target.log)
+                tag = "socat-" + tunnel_id, log = target.log)
             if p.returncode != None:
                 raise RuntimeError("TUNNEL %s: socat exited with %d"
                                    % (tunnel_id, p.returncode))
-            ttbl.daemon_pid_add(p.pid)	# FIXME: race condition if it died?
-            target.fsdb.set("tunnel-id-%s" % tunnel_id, "%d %d" %
-                            (local_port, p.pid))
+            ttbl.daemon_pid_add(p.pid)	# FIXME: race condition if it # died?
+            target.fsdb.set("interfaces.tunnel.%s.__id" % local_port, p.pid)
+            target.fsdb.set("interfaces.tunnel.%s.ip_addr" % local_port, str(ip_addr))
+            target.fsdb.set("interfaces.tunnel.%s.protocol" % local_port, protocol)
+            target.fsdb.set("interfaces.tunnel.%s.port" % local_port, port)
             return dict(result = local_port)
 
     @staticmethod
-    def _delete_tunnel(target, tunnel_id):
-        # tunnel_id is the name of the property that holds the tunnel name
-        port_pid = target.fsdb.get(tunnel_id)
-        if port_pid != None:
-            _, pids = port_pid.split(" ", 2)
-            pid = int(pids)
-            if commonl.process_alive(pid, "/usr/bin/socat"):
-                commonl.process_terminate(
-                    pid, tag = "socat's tunnel [%s]: " % tunnel_id)
-            target.fsdb.set(tunnel_id, None)
+    def _delete_tunnel(target, local_port, pid = None):
+        if pid == None:
+            pid = target.fsdb.get("interfaces.tunnel.%s.__id" % local_port)
+        try:
+            if isinstance(pid, int):
+                if commonl.process_alive(pid, "/usr/bin/socat"):
+                    commonl.process_terminate(
+                        pid, tag = "socat's tunnel [%s]: " % local_port)
+        finally:
+            # whatever happens, just wipe all info about it because
+            # this might be a corrupted entry
+            prefix = "interfaces.tunnel.%s" % local_port
+            target.fsdb.set(prefix + ".__id", None)
+            target.fsdb.set(prefix + ".ip_addr", None)
+            target.fsdb.set(prefix + ".protocol", None)
+            target.fsdb.set(prefix + ".port", None)
 
     def delete_tunnel(self, target, who, args, _files, _user_path):
         """
@@ -192,18 +216,28 @@ class interface(ttbl.tt_interface):
         :returns dict: emtpy dictionary
 
         """
-        _ip_addr, _port, _protocol, tunnel_id = self._check_args(
+        ip_addr, port, protocol, tunnel_id = self._check_args(
             self.arg_get(args, 'ip_addr', str),
             self.arg_get(args, 'port', int),
             self.arg_get(args, 'protocol', str),
         )
         with target.target_owned_and_locked(who):
-            self._delete_tunnel(target, "tunnel-id-" + tunnel_id)
+            for tunnel_id in target.fsdb.keys("interfaces.tunnel.*.protocol"):
+                prefix = tunnel_id[:-len(".protocol")]
+                _ip_addr = target.fsdb.get(prefix + ".ip_addr")
+                _protocol = target.fsdb.get(prefix + ".protocol")
+                _port = target.fsdb.get(prefix + ".port")
+                _pid = target.fsdb.get(prefix + ".__id")
+                _lport = prefix[len("interfaces.tunnel."):]
+                if _ip_addr == ip_addr \
+                   and _protocol == protocol \
+                   and _port == port:
+                    self._delete_tunnel(target, _lport, _pid)
         return dict()
 
 
     @staticmethod
-    def get_list(target, who, _args, _files, _user_path):
+    def get_list(target, who, _args, _files, _user_path):	# COMPAT
         """
         List existing tunnels
 
@@ -214,12 +248,11 @@ class interface(ttbl.tt_interface):
         """
         with target.target_owned_and_locked(who):
             tunnels = []
-            for tunnel_desc in target.fsdb.keys("tunnel-id-*"):
-                port_pid = target.fsdb.get(tunnel_desc)
-                if port_pid == None:
-                    continue
-                lport, _pid = port_pid.split(" ", 2)
-                tunnel_id = tunnel_desc[len("tunnel-id-"):]
-                protocol, ip_addr, port = tunnel_id.split("__", 3)
-                tunnels.append(( protocol, ip_addr, int(port), int(lport) ))
+            for tunnel_id in target.fsdb.keys("interfaces.tunnel.*.protocol"):
+                local_port = tunnel_id[len("interfaces.tunnel."):-len(".protocol")]
+                ip_addr = target.fsdb.get("interfaces.tunnel.%s.ip_addr" % local_port)
+                protocol = target.fsdb.get("interfaces.tunnel.%s.protocol" % local_port)
+                port = target.fsdb.get("interfaces.tunnel.%s.port" % local_port)
+                ip_addr = ip_addr.replace("_", ".")
+                tunnels.append(( protocol, ip_addr, port, local_port ))
             return dict(result = tunnels)

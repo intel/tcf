@@ -533,6 +533,17 @@ EOF
         ;;
 esac
 
+# Boot stuff
+if echo $image_type | grep -q 'clear'; then
+    if [ -r $destdir/boot/loader/entries/iso-checksum.conf ]; then
+        # we do not use this file when booting and it is confusing the
+        # bootloader configurer in
+        # tcf.git/tcfl/pos_uefi.py:_linux_boot_guess_from_lecs()
+        sudo mv $destdir/boot/loader/entries/iso-checksum.conf \
+           $destdir/boot/loader/entries/iso-checksum.conf.disabled
+    fi
+fi
+
 
 #
 # .tcf.metadata.yaml generation

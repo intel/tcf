@@ -1448,6 +1448,37 @@ class target_c(reporter_c):
                               json = d)
         self.report_info("set %d properties" % (len(d)), dlevel = 2)
 
+    def properties_get(self, *projections):
+        """
+        Get a dictionary of properties from the server
+
+        :param str projections: (optional: default all) zero or more
+          name of fields to ask for
+
+          Field names can use periods to dig into dictionaries.
+
+          Field names can match :mod:`fnmatch` regular
+          expressions.
+
+          >>> target.properties_get("interfaces.tunnel", "instrumentation")
+
+          would return the tree:
+
+          >>> {
+          >>>     interfaces: {
+          >>>         tunnel: { ... },
+          >>>         instrumentation: { ... }
+          >>> }
+
+        """
+        commonl.assert_none_or_list_of_strings(projections, "projections", "projection")
+        if projections:
+            data = { 'projections': json.dumps(projections) }
+        else:
+            data = None
+        return self.rtb.send_request("GET", "targets/" + self.id, data = data)
+
+
     def disable(self, reason = 'disabled by the administrator'):
         """
         Disable a target, setting an optional reason
@@ -1954,6 +1985,49 @@ class target_c(reporter_c):
                             error = str(e)
                         )),
                 e)
+
+    def instrument_name_get(self, interface_name, component = None):
+        """
+        Given a component in an interface, return the name of the
+        instrument that implements it
+
+        In the inventory metadata, every interface exposes components
+        and each component declares the unique instrument ID of the HW
+        piece that implements it in
+        *interfaces.INTERFACENAME.COMPONENT.INSTRUMENTID*.
+
+        This function then goes to the instrumentation inventory in
+        *instrumentation.INSTRUMENTID* and returns the value of thef
+        first one found:
+
+         - *instrumentation.INSTRUMENTID.name_long*
+
+         - *instrumentation.INSTRUMENTID.name*
+
+        :returns str:* name of the instrument that implements the
+          function or *instrument:INSTRUMENTID* if not found.
+
+        """
+        if component:
+            instrument_hash = self.kws[
+                'interfaces.' + interface_name + '.' + component + '.instrument']
+        else:
+            instrument_hash = self.kws[
+                'interfaces.' + interface_name + '.instrument']
+        # get the long name (more human friendly, otherwise the short one)
+        instrument = self.kws.get(
+            "instrumentation." + instrument_hash + ".name_long",
+            self.kws.get(
+                "instrumentation." + instrument_hash + ".name",
+                None))
+        if instrument == None:
+            self.report_info(
+                "WARNING! cannot find instrument name for instrument %s" % (
+                    instrument_hash),
+                dict(target = self, interface_name = interface_name,
+                     component = component))
+            instrument = "instrument:" + instrument_hash
+        return instrument
 
     #
     # Private API
@@ -3476,9 +3550,13 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     #: List of places where we declared this testcase is build only
     build_only = []
 
-    #: Force to use an specific allocid (already obtained)
-    allocid = None
     
+    #: Allocation ID this testcase is using
+    #:
+    allocid = None
+    # (internally: setting this forces the testcase to use the given
+    # allocation ID)
+
     def __init__(self, name, tc_file_path, origin):
         reporter_c.__init__(self)
         for hook_pre in self.hook_pre:
@@ -5305,6 +5383,10 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
           >>> timeout = 4
 
+         if no timeout is given it is taken from a testcase specific
+         default stored int he thread specific variable
+         ``testcase.tls.expect_timeout`` (60s).
+
         :param str name: a name for this execution, used for reporting
           and generation of collateral; it defaults to a test-specific
           monotonically increasing number shared amongst all the
@@ -5322,6 +5404,11 @@ class tc_c(reporter_c, metaclass=_tc_mc):
           or something as:
 
           >>> "somefilename:43"
+
+        If no expectations are given, then this just waits the given
+        timeout. Likewise, if all the individual expectations are
+        given with *timeout = 0* (meaning if we don't get it, it is ok
+        too), this will wait the given timeout.
 
         """
         origin = exps_kws.pop('origin', None)
@@ -5375,6 +5462,8 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         # read in all the expectations without name from *exps_args, the
         # ones with names in **exps_kws
         for exp in exps_args:
+            assert isinstance(exp, expectation_c), \
+                "%s: expected type expectation_c, got %s" % (exp, type(exp))
             if exp.origin == None:
                 exp.origin = origin
             self._expect_append(run_name, expectations_required, exps,
@@ -5383,6 +5472,8 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         # kws is at this point just a named list of expectations and
         # their implementation
         for exp_name, exp in exps_kws.items():
+            assert isinstance(exp, expectation_c), \
+                "%s: expected type expectation_c, got %s" % (exp_name, type(exp))
             if exp.origin == None:
                 exp.origin = origin
             self._expect_append(run_name, expectations_required, exps,
@@ -5395,10 +5486,17 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         time_ts = time_ts0
         time_out = time_ts0 + timeout
         detect_ts = dict()
-        min_poll_period = min(poll_period.values())
+        if poll_period:
+            min_poll_period = min(poll_period.values())
+        else:
+            min_poll_period = 0.25	# yeah, in case we get an empty list
         self.report_info('%s: poll_period %.2f, timeout %.2f'
                          % (run_name, min_poll_period, timeout), dlevel = 5)
         try:
+            # if we have no expectations or the ones we have have
+            # timeout == 0, then we want to make sure the outer
+            # timeout rules
+            expectations_present = len(expectations_required)
             while time_ts <= time_out:
                 # iterate over this copy, we'll remove from the original,
                 # so next iteration doesn't take the original; respect
@@ -5521,7 +5619,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                             dlevel = 3)
 
                 # if all the required expectations are done, get out!
-                if not expectations_required:
+                if expectations_present and not expectations_required:
                     break
                 time.sleep(min_poll_period)
                 time_ts += min_poll_period
@@ -5891,6 +5989,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             # FIXME: this need sto carry more data, we've lost a lot
             # on the way here
             raise blocked_e("allocation failed, state %s" % state)
+        self.allocid = allocid
         self.report_info(
             "acquired %s" % allocid,
             dict(
@@ -7807,7 +7906,7 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
         rt_all[rt['fullid']] = rt
         if rt.get('disabled', None) != None \
            and tc_c._targets_disabled_too == False:
-            continue            
+            continue
         if 'interconnect_c' in rt.get('interfaces', {}):
             ic_selected_all[rt['fullid']] = set(rt.get('bsp_models', {}).keys())
         else:

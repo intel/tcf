@@ -149,20 +149,20 @@ running locally on your machine:
    - pure PIP2 dependencies::
 
          $ pip2 install --user \
-            Flask              
-            Flask-Login        
-            Flask-Principal    
-            Jinja2             
-            Werkzeug           
-            keyring            
-            ply                
-            prctl              
-            pykwalify          
-            python-Levenshtein 
-            pyusb              
-            setuptools         
-            tornado            
-
+            Flask              \
+            Flask-Login        \
+            Flask-Principal    \
+            Jinja2             \
+            Werkzeug           \
+            keyring            \ 
+            ply                \
+            prctl              \
+            pykwalify          \
+            pyserial           \
+            python-Levenshtein \
+            pyusb              \
+            setuptools         \
+            tornado
        
 1. Disable SELinux (to be able to run from your home directory)::
 
@@ -256,7 +256,7 @@ Make it always start automatically with::
 
 
 Manual installation of rsync server for Provisioning OS
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-------------------------------------------------------
 
 To setup a system wide rsync server, along other services, instead of
 relying on ttbd starting a specific instance for each network, follow

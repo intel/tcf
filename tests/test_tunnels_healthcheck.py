@@ -7,7 +7,6 @@
 # pylint: disable = missing-docstring
 
 import os
-import socket
 
 import commonl.testing
 import tcfl
@@ -21,15 +20,14 @@ ttbd = commonl.testing.test_ttbd(config_files = [
 
 
 @tcfl.tc.target(ttbd.url_spec)
-class release_hooks(tcfl.tc.tc_c):
+class _test(tcfl.tc.tc_c):
     """
-    We allocate a target, create tunnels and then we release it; when
-    released, the tunnels are destroyed.
+    Run the tunnel basic healthcheck
     """
 
-    def eval(self, target):
-        target.tunnel.add(22, "127.0.0.1", 'tcp')
-        self.report_pass("release hooks were called on target release")
+    @staticmethod
+    def eval(target):
+        target.tunnel._healthcheck()
 
     def teardown_90_scb(self):
         ttbd.check_log_for_issues(self)

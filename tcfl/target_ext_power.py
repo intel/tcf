@@ -57,6 +57,7 @@ class extension(tc.target_extension_c):
         return state
 
     def list(self):
+        # FIXME: add component to make it faster when we only need one component
         """
         Return a list of a target's power rail components and their status
 
@@ -96,7 +97,7 @@ class extension(tc.target_extension_c):
               - *both*: only powered on/off if explicitly named
 
         """
-        self.target.report_info("listing", dlevel = 1)
+        self.target.report_info("listing", dlevel = 2)
         r = self.target.ttbd_iface_call(
             "power", "list", method = "GET",
             # extra time, since power ops can take long
@@ -130,7 +131,7 @@ class extension(tc.target_extension_c):
             data = r['components']
         else:
             raise AssertionError("can't parse response")
-        self.target.report_info("listed")
+        self.target.report_info("listed", dlevel = 2)
         return state, substate, data
 
     def off(self, component = None, explicit = False):
@@ -209,10 +210,7 @@ class extension(tc.target_extension_c):
         """
         Execute a sequence of power actions on a target
 
-        :param str component: (optional) name of component to
-          power-cycle, defaults to whole target's power rail
-
-          The sequence argument has to be a list of pairs:
+        :param str sequence: a list of pairs:
 
           >>> ( OPERATION, ARGUMENT )
 
@@ -375,7 +373,7 @@ _sequence_valid_regex = re.compile(
     r"^("
     r"(?P<wait>wait):(?P<time>[\.0-9]+)"
     r"|"
-    r"(?P<action>\w+):(?P<component>\w+)"
+    r"(?P<action>\w+):(?P<component>[ /\w]+)"
     r")$")
 
 def _cmdline_power_sequence(args):
@@ -394,14 +392,8 @@ def _cmdline_power_sequence(args):
                 total_wait += time_to_wait
             else:
                 sequence.append(( gd['action'], gd['component']))
-        if args.timeout:
-            timeout = args.timeout
-        if total_wait == 0:	# no waits in the sequence, defaults rule
-            timeout = None
-        else:
-            timeout = total_wait * 1.5
-        print("DEBUG timeout %s" % timeout, total_wait)
-        target.power.sequence(sequence, timeout = timeout)
+        target.power.sequence(sequence,
+                              timeout = args.timeout + 1.5 * total_wait)
 
 def _cmdline_setup(arg_subparser):
     ap = arg_subparser.add_parser(
@@ -482,8 +474,8 @@ def _cmdline_setup(arg_subparser):
         " or wait:SECONDS; *all* means all components except explicit ones,"
         " *full* means all components including explicit ones")
     ap.add_argument("-t", "--timeout",
-                    action = "store", default = None, type = int,
-                    help = "timeout in seconds [default will be"
+                    action = "store", default = 60, type = int,
+                    help = "timeout in seconds [%(default)d, plus "
                     " all the waits +50%%]")
     ap.set_defaults(func = _cmdline_power_sequence)
 

@@ -3,8 +3,9 @@
 # Copyright (c) 2019 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
-"""Control power to targets
-------------------------
+"""
+Control power to targets and general control for relays, buttons and jumpers
+----------------------------------------------------------------------------
 
 This interface provides means to power on/off targets and the invidual
 components that compose the power rail of a target.
@@ -13,14 +14,43 @@ The interface is implemented by :class:`ttbl.power.interface` needs to
 be attached to a target with :meth:`ttbl.test_target.interface_add`::
 
 >>> ttbl.test_target.get(NAME).interface_add(
->>>     "INTERFACENAME",
+>>>     "power",
 >>>     ttbl.power.interface(
 >>>         component0,
 >>>         component1,
 >>>         ...
 >>>     )
 
-each component is an instance of a subclass of
+Generally, this interface can also be used to control any
+instrumentation that has binary states (on/off, true/false,
+connected/disconnected, pressed/released, etc..) such as:
+
+- relays
+- buttons
+- jumpers (controlled by a relay)
+
+by convention, the *buttons* and *jumpers* interfaces are exposed with
+those names; thus, in a configuration :ref:`configuration file
+<ttbd_configuration>`::
+
+>>> ttbl.test_target.get(NAME).interface_add(
+>>>     "buttons",
+>>>     ttbl.power.interface(
+>>>         power = ttbl.usbrly08b.pc("24234", 3),
+>>>         reset = ttbl.usbrly08b.pc("24234", 4),
+>>>         ...
+>>>     )
+
+would add two buttons, power and reset, controlled by a
+:class:`USBRLY08B <ttbl.usbrly08b.pc>` relay bank (by wiring the NO and
+NC lines through the button so that turning on/closing the relay
+effectively presses the button).
+
+Any other mechanism (and driver) to act on jumpers or buttons can be
+implemented to provide the on/off operation that translates into
+button press/release or jumper close/open.
+
+Each component is an instance of a subclass of
 :class:`ttbl.power.impl_c`, which implements the actual control over
 the power unit, such as:
 
@@ -227,13 +257,18 @@ class impl_c(ttbl.tt_interface_impl_c):
       component shall be only turned on or off when explicitly named in
       a power rail. See :ref:ttbd_power_explicit.
 
-      - *None*: for normal behaviour
+      - *None*: for normal behaviour; component will be
+         powered-on/started with the whole power rail
 
-      - *both*: explicit for both powering on and off
+      - *both*: explicit for both powering on and off: only
+        power-on/start and power-off/stop if explicity called by
+        name
 
-      - *on*: explicit for powering on
+      - *on*: explicit for powering on: only power-on/start if explicity
+        powered on by name, power off normally
 
-      - *off*: explicit for powering off
+      - *off*: explicit for powering off: only power-off/stop if explicity
+        powered off by name, power on normally
 
     """
     def __init__(self, paranoid = False, explicit = None):
@@ -492,7 +527,7 @@ class interface(ttbl.tt_interface):
         #  state: True (on) or False (off)
         #  substate: 'normal', 'full', 'partial'
         #
-        if all(i == True for i in list(normal.values()) + list(explicit_off.values())):
+        if all(i in [ True, None ] for i in normal.values() + explicit_off.values()):
             state = True
             if all(i['state'] in (True, None) for i in list(data.values())):
                 substate = 'full'
@@ -841,10 +876,13 @@ class interface(ttbl.tt_interface):
                 time.sleep(s[1])
                 continue
 
-            if action not in [ 'on', 'off', 'cycle' ]:
-                raise ValueError("%s: sequence #%d: invalid action spec; "
-                                 " expected on|off|cycle; got %s"
-                                 % (target.id, count, action))
+            if action not in [ 'on', 'press', 'close',
+                               'off', 'release', 'open',
+                               'cycle' ]:
+                raise ValueError(
+                    "%s: sequence #%d: invalid action spec; "
+                    " expected on|press|close|off|release|open|cycle; got %s"
+                    % (target.id, count, action))
 
             component = s[1]
             if not isinstance(component, str):
@@ -863,11 +901,11 @@ class interface(ttbl.tt_interface):
             else:
                 impls, _all = self.args_impls_get(dict(component = component))
             # and now act
-            if action == 'on':
-                self._on(target, impls, " (because sequenced on)",
+            if action in ( 'on', 'press', 'close' ):
+                self._on(target, impls, " (because sequenced '%s')" % action,
                          _all, explicit)
-            elif action == 'off':
-                self._off(target, impls, " (because sequenced off)",
+            elif action in ( 'off', 'release', 'open' ):
+                self._off(target, impls, " (because sequenced '%s')" % action,
                           _all, explicit)
             elif action == 'cycle':
                 wait = float(target.tags.get('power_cycle_wait', 2))
@@ -875,11 +913,13 @@ class interface(ttbl.tt_interface):
                           _all, explicit)
                 if wait:
                     time.sleep(wait)
-                self._on(target, impls, " (because sequneced cycle)",
+                self._on(target, impls, " (because sequenced cycle)",
                          _all, explicit)
             else:
                 raise RuntimeError(
-                    "%s: unknown action (expected on|off|cycle)" % action)
+                    "%s: unknown action"
+                    " (expected on|press|close|off|release|open|cycle)"
+                    % action)
 
 
 
@@ -913,10 +953,13 @@ class interface(ttbl.tt_interface):
                     % (target.id, qualifier, count, type(time_to_wait))
                 continue
 
-            if action not in [ 'on', 'off', 'cycle' ]:
-                raise ValueError("%s%s: sequence #%d: invalid action spec; "
-                                 " expected on|off|cycle; got %s"
-                                 % (target.id, qualifier, count, action))
+            if action not in [ 'on', 'press', 'close',
+                               'off', 'release', 'open',
+                               'cycle' ]:
+                raise ValueError(
+                    "%s%s: sequence #%d: invalid action spec; "
+                    " expected on|press|close|off|release|open|cycle; got %s"
+                    % (target.id, qualifier, count, action))
 
             component = s[1]
             if not isinstance(component, str):
@@ -954,8 +997,13 @@ class fake_c(impl_c):
 
     Parameters are the same as for :class:impl_c.
     """
-    def __init__(self, **kwargs):
+    def __init__(self, name = None, **kwargs):
         impl_c.__init__(self, **kwargs)
+        if name == None:
+            name = "%x" % id(self)
+        self.name = name
+        self.upid_set("Fake power controller #%s" % name,
+                      id = "%s" % name)
 
     def on(self, target, component):
         target.log.info("power-fake-%s on" % component)
@@ -1008,6 +1056,7 @@ class inverter_c(impl_c):
         self.when_on = when_on
         self.when_off = when_off
         self.when_get = when_get
+        # FIXME: upid set from pc, negating
 
     def on(self, target, component):
         if self.when_on:
@@ -1027,8 +1076,7 @@ class inverter_c(impl_c):
 
 
 class daemon_c(impl_c):
-    """
-    Generic power controller to start daemons in the server machine
+    """Generic power controller to start daemons in the server machine
 
     FIXME: document
 
@@ -1041,7 +1089,26 @@ class daemon_c(impl_c):
       expansion, where each field comes either from the *kws*
       dictionary or the target's metadata.
 
+
+    :param str name: (optional) name of this component; defaults to
+      the basename of the path to run.
+
+      eg: if calling */usr/bin/somedaemon*, name would be *daemon*.
+
+    :param bool mkpidfile: (optional; default *True*) create a pidfile
+      when the process starts, using as name/template the value of
+      *pidfile*.
+
+    :param str pidfile: (optional) pidfile name (template); defaults
+      to "PATH/COMPONENT-NAME.pid". *PATH* is the state directory for
+      the given target (usually
+      */var/lib/ttbd/instance/targets/TARGETNAME*). *COMPONENT* is the
+      component under which this driver has been registered when
+      adding to the interface. *NAME* is the name of this driver
+      instance, see above.
+
     Other parameters as to :class:ttbl.power.impl_c.
+
     """
     #: KEY=VALUE to add to the environment
     #: Keywords to add for templating the arguments
@@ -1284,9 +1351,10 @@ class delay_til_shell_cmd_c(impl_c):
 
         impl_c.__init__(self, **kwargs)
         self.cmdline = cmdline
+        cmdline_s = " ".join(self.cmdline)
         if condition_msg == None:
             self.condition_msg = "'%s' returns %d" % (
-                " ".join(self.cmdline), expected_retval)
+                cmdline_s, expected_retval)
         else:
             self.condition_msg = condition_msg
         self.cwd = cwd
@@ -1296,6 +1364,14 @@ class delay_til_shell_cmd_c(impl_c):
         self.when_off = when_off
         self.poll_period = poll_period
         self.timeout = timeout
+        self.upid_set(
+            "Delayer until command '%s' returns %d,"
+            " checking every %.2fs timing out at %.1fs" % (
+                cmdline_s, expected_retval, poll_period, timeout),
+            command = cmdline_s,
+            expected_retval = expected_retval,
+            poll_period = poll_period,
+            timeout = timeout)
 
     def _cmdline_format(self, target, component):
         kws = dict(target.kws)
@@ -1337,6 +1413,7 @@ class delay_til_shell_cmd_c(impl_c):
                     component, self.poll_period, condition_msg,
                 ))
             time.sleep(self.poll_period)
+            ts = time.time()
         else:
             raise RuntimeError(
                 "%s: timeout (%.1fs) on power-on delay "
@@ -1365,6 +1442,7 @@ class delay_til_shell_cmd_c(impl_c):
                     component, self.poll_period, condition_msg
                 ))
             time.sleep(self.poll_period)
+            ts = time.time()
         else:
             raise RuntimeError(
                 "%s: timeout (%.1fs) on power-off delay waiting"
@@ -1498,3 +1576,128 @@ class socat_pc(daemon_c):
         # this is the log file name, that has been expanded already by
         # the daemon_c class calling start
         return os.path.exists(cmdline_expanded[2])
+
+
+def _check_has_iface_buttons(target):
+    buttons_iface = getattr(target, "buttons", None)
+    if not buttons_iface or not isinstance(buttons_iface, interface):
+        raise RuntimeError("%s: target has no buttons interface" % target.id)
+
+
+class button_sequence_pc(impl_c):
+    """Power control implementation that executest a button sequence on
+    power on, another on power off.
+
+    Requires a target that supports the *buttons* interface.
+
+    :param list sequence_on: (optional; list of events) sequence of
+      events to do on power on (see :func:ttbl.power.intrface.sequence
+      for sequence reference).
+
+    :param list sequence_off: (optional; list of events) sequence of
+      events to do on power off (see :func:ttbl.power.intrface.sequence
+      for sequence reference).
+
+
+    Other parameters as to :class:ttbl.power.impl_c.
+
+    For example, to click a power button one second to power on, one
+    would add to the power rail:
+
+    >>> target.interface_add("power", ttbl.power.interface(
+    >>>     (
+    >>>         "release buttons",
+    >>>         ttbl.power.buttons_released_pc("power", "reset")
+    >>>     ),
+    >>>     ...
+    >>>     (
+    >>>         "power button",
+    >>>         ttbl.power.button_sequence_pc(sequence_on = [
+    >>>             # click BUTTONNAME 1 second to power on
+    >>>             ( 'press', 'BUTTONNAME' ),		# press the button
+    >>>             ( 'wait', 1 ),			# hold pressed 1 sec
+    >>>             ( 'release', 'BUTTONNAME' ),	# release the button
+    >>>         ])
+    >>>     ),
+    >>>     ...
+    >>> )
+
+    When having buttons instrumented, it is always a good idea to
+    include a :class:buttons_released_pc also (as described), to
+    ensure all the buttons are released when powering on (to for
+    example make sure the *reset* button is not pressed while trying
+    to turn on a machine).
+
+    """
+    def __init__(self, sequence_on = None, sequence_off = None, **kwargs):
+        impl_c.__init__(self, **kwargs)
+        self.sequence_on = sequence_on
+        self.sequence_off = sequence_off
+        l = []
+        if sequence_on:
+            lon = [ ]
+            for operation, argument in sequence_on:
+                lon.append("%s:%s" % (operation, argument))
+            l.append("OFF:" + ",".join(lon))
+        if sequence_off:
+            loff = [ ]
+            for operation, argument in sequence_off:
+                loff.append("%s:%s" % (operation, argument))
+            l.append("ON:" + ",".join(loff))
+        self.upid_set(
+            "Button/jumper sequence %s" % " ".join(l),
+            sequence_on = ",".join("%s:%s" % (operation, argument)
+                                   for operation, argument in sequence_on),
+            sequence_off = ",".join("%s:%s" % (operation, argument)
+                                    for operation, argument in sequence_off)
+        )
+
+    def on(self, target, _component):
+        _check_has_iface_buttons(target)
+        if self.sequence_on:
+            target.buttons.sequence(target, self.sequence_on)
+
+    def off(self, target, _component):
+        _check_has_iface_buttons(target)
+        if self.sequence_off:
+            target.buttons.sequence(target, self.sequence_off)
+
+    def get(self, target, _component):
+        # no real press status, so can't tell
+        return None
+
+
+class buttons_released_pc(impl_c):
+    """
+    Power control implementation that ensures a list of buttons
+    are released (not pressed) before powering on a target.
+
+    :param str buttons: names of buttons that must be released upon
+      power on
+
+    >>> ttbl.power.buttons_released_pc("reset", "test", "overdrive")
+
+    Other parameters as to :class:ttbl.power.impl_c.
+
+    """
+    def __init__(self, *buttons, **kwargs):
+        commonl.assert_list_of_strings(buttons, "buttons", "button")
+        impl_c.__init__(self, **kwargs)
+        self.sequence = [
+            ( 'off', button )
+            for button in buttons
+        ]
+        self.upid_set(
+            "Button %s releaser" % "/".join(buttons),
+            buttons = " ".join(buttons)
+        )
+
+    def on(self, target, _component):
+        _check_has_iface_buttons(target)
+        target.buttons.sequence(target, self.sequence)
+
+    def off(self, target, _component):
+        pass
+
+    def get(self, target, _component):
+        return None			# no real press status, so can't tell

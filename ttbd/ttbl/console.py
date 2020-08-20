@@ -851,6 +851,14 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
     def disable(self, target, component):
         return self.off(target, component)
 
+    def state(self, target, component):
+        # we want to use this to gather state, since the generic_c
+        # implementation relies on the console-NAME.write file
+        # existing; this can linger if a process dies or not...
+        # but the ttbl.power.socat_pc.get() implementation checks if
+        # the process is alive looking at the PIDFILE
+        # COMPONENT-socat.pid and verifying that thing is still running
+        return ttbl.power.socat_pc.get(self, target, component)
 
 class ssh_pc(ttbl.power.socat_pc, generic_c):
     """Implement a serial port over an SSH connection
@@ -1004,7 +1012,7 @@ EscapeChar = none
         generic_c.disable(self, target, component)
         ttbl.power.socat_pc.off(self, target, component)
 
-    # console interface; state() is implemented by generic_c
+    # console interface
     def setup(self, target, component, parameters):
         # For SSH, all the paremeters are in FSDB
         if parameters == {}:		# reset
@@ -1040,6 +1048,15 @@ EscapeChar = none
 
     def disable(self, target, component):
         return self.off(target, component)
+
+    def state(self, target, component):
+        # we want to use this to gather state, since the generic_c
+        # implementation relies on the console-NAME.write file
+        # existing; this can linger if a process dies or not...
+        # but the ttbl.power.socat_pc.get() implementation checks if
+        # the process is alive looking at the PIDFILE
+        # COMPONENT-socat.pid and verifying that thing is still running
+        return ttbl.power.socat_pc.get(self, target, component)
 
 
 class netconsole_pc(ttbl.power.socat_pc, generic_c):
@@ -1114,7 +1131,6 @@ class netconsole_pc(ttbl.power.socat_pc, generic_c):
             "CREATE:console-%(component)s.read",
             extra_cmdline = [ "-u" ])	# unidirectional, UDP:6666 -> file
 
-    # console interface; state() is implemented by generic_c
     def on(self, target, component):
         ttbl.power.socat_pc.on(self, target, component)
         generation_set(target, component)
@@ -1124,6 +1140,7 @@ class netconsole_pc(ttbl.power.socat_pc, generic_c):
         generic_c.disable(self, target, component)
         ttbl.power.socat_pc.off(self, target, component)
 
+    # console interface)
     def write(self, target, component, data):
         raise RuntimeError("%s: (net)console is read only" % component)
 
@@ -1132,3 +1149,12 @@ class netconsole_pc(ttbl.power.socat_pc, generic_c):
 
     def disable(self, target, component):
         return self.off(target, component)
+
+    def state(self, target, component):
+        # we want to use this to gather state, since the generic_c
+        # implementation relies on the console-NAME.write file
+        # existing; this can linger if a process dies or not...
+        # but the ttbl.power.socat_pc.get() implementation checks if
+        # the process is alive looking at the PIDFILE
+        # COMPONENT-socat.pid and verifying that thing is still running
+        return ttbl.power.socat_pc.get(self, target, component)

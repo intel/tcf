@@ -168,7 +168,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
             target_names_all |= target_names_group
         for target_name in target_names_all:
             try:
-                self.targets_all[target_name] = ttbl.test_target(target_name)
+                self.targets_all[target_name] = ttbl.test_target.get(target_name)
             except KeyError:
                 raise self.invalid_e(
                     "%s: target no longer available" % target_name)
@@ -178,10 +178,18 @@ class allocation_c(ttbl.fsdb_symlink_c):
             # if the reservation DB is messed up, this might fail --
             # it is fine, we will then just wipe it
             with self.lock:
-                if self.state_get == 'active':
+                if self.state_get() == 'active':
                     targets = {}
                     for target_name in self.get("group_allocated").split(","):
-                        targets[target_name] = ttbl.test_target.get(target_name)
+                        target = ttbl.test_target.get(target_name)
+                        targets[target_name] = target
+                        # cleanup each of the involved targets when
+                        # active; this is a sum up of
+                        # ttbl.test_target._deallocate()+
+                        # _deallocate_simple(), since we know the
+                        # steps are the same
+                        target._state_cleanup(True)
+                        target._allocid_wipe()
                 else:
                     targets = self.targets_all
         finally:
@@ -228,7 +236,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
                                                        "%Y%m%d%H%M%S")
         seconds_idle = (ts_now - ts_last_keepalive).seconds
         if seconds_idle > ttbl.config.target_max_idle:
-            logging.error(
+            logging.info(
                 "ALLOC: allocation %s timedout (idle %s/%s), deleting",
                 self.allocid, seconds_idle, ttbl.config.target_max_idle)
             self.delete('timedout')
@@ -490,8 +498,7 @@ def _target_queue_load(target):
     return waiters, preempt
 
 def _target_starvation_recalculate(allocdb, target, score):
-    logging.error("FIXME: %s: %s: %s",
-                  allocdb, target.id, score)
+    logging.info("FIXME: %s: %s: %s", allocdb, target.id, score)
 
 def _target_allocate_locked(target, current_allocdb, waiters, preempt):
     # return: allocdb from waiter that succesfully took it
@@ -671,14 +678,17 @@ def request(groups, calling_user, obo_user, guests,
     #
     # Verify the groups argument
     #
-    assert isinstance(groups, dict)		# gotta be a dict
+    assert isinstance(groups, dict), \
+        "groups: argument needs to be a dictionary, got %s" % type(groups)
     targets_all = {}
     groups_by_target_set = {}
     groups_clean = {}
     groups_clean_str = {}
     for group_name, target_list in groups.items():
         assert isinstance(group_name, str)	# name typing
-        assert isinstance(target_list, list)		# target list...
+        assert isinstance(target_list, list), \
+            "group '%s': value to be a list of target names, got %s" % (
+                group_name, type(target_list))
         for target_name in target_list:			# ... of valid ones
             assert isinstance(target_name, str)
             target = ttbl.test_target.get(target_name)

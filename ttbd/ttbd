@@ -41,6 +41,7 @@ import multiprocessing
 import hashlib
 import ssl
 import werkzeug
+import werkzeug.exceptions
 import werkzeug.serving
 import flask
 # Change from flask 0.10 -> 0.11
@@ -100,28 +101,36 @@ API_VERSION = 2
 API_PATH = "/ttb-v"
 API_PREFIX = API_PATH + str(API_VERSION) + "/"
 
-def flask_loge_abort(http_code, *args, **kwargs):
-    loge(*args, **kwargs)
-    flask.abort(http_code, *args)
+def flask_loge_abort(http_code, message, **kwargs):
+    loge(message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
 
-def flask_logw_abort(http_code, *args, **kwargs):
-    logw(*args, **kwargs)
-    flask.abort(http_code, *args)
+def flask_logw_abort(http_code, message, **kwargs):
+    logw(message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
+    
+def flask_logi_abort(http_code, message, **kwargs):
+    logi(message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
 
-def flask_logi_abort(http_code, *args, **kwargs):
-    logi(*args, **kwargs)
-    flask.abort(http_code, *args)
+def flask_logd_abort(http_code, message, **kwargs):
+    logd(message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
 
-def flask_logd_abort(http_code, *args, **kwargs):
-    logd(*args, **kwargs)
-    flask.abort(http_code, *args)
+def flask_log_abort(l, http_code, message, **kwargs):
+    logdl(l, message, **kwargs)
+    response = flask.jsonify({ "_message": message })
+    response.status_code = http_code
+    raise werkzeug.exceptions.HTTPException(response = response)
 
-def flask_log_abort(l, http_code, *args, **kwargs):
-    logdl(l, *args, **kwargs)
-    flask.abort(http_code, *args)
-
-
-#
 # FIXME: Can't figure out a way how to just handle all with this one,
 # so I need to link each
 #
@@ -181,9 +190,12 @@ def _bad_version(version, any_route):
         action = "upgrade"
     else:
         action = "downgrade"
+    # FIXME: make this come only when ttb-vX -- catch ttb-v2 so we say
+    # bad path or bad method
     return flask.abort(404,
                        "your client is asking for protocol v%s to call %s;"
-                       " this server supports %d; please %s"
+                       " this server supports %d OR you specified the "
+                       "wrong path or method; please %s"
                        % (version, any_route, API_VERSION, action))
 
 @app.route(API_PREFIX + 'login', methods = ['PUT'])
@@ -257,9 +269,9 @@ def login():
         local_target = ttbl.test_target.get('local')
         if local_target:
             support_auth_help = \
-                local_target.tags.get('support', {}).get('auth_help', None)
+                local_target.tags.get('support', dict()).get('auth_help', None)
             support_owner = \
-                local_target.tags.get('support', {}).get('owner', None)
+                local_target.tags.get('support', dict()).get('owner', None)
             if support_auth_help:
                 # login help is assumed to be more detailed
                 _help += " (login help: " + support_auth_help + ")"
@@ -285,13 +297,15 @@ def login():
     logi("user %s: authenticated with roles: %s",
          username, " ".join(token_roles))
     return flask.jsonify({
-        'login': "user %s: authenticated with roles: %s" \
+        '_message': "user %s: authenticated with roles: %s" \
         % (username, " ".join(token_roles))
     })
 
 @app.route(API_PREFIX + 'logout', methods = [ 'PUT' ])
 @flask_login.login_required
 def logout():
+    # FIXME: _user_delete() has to do the same as this, doing the
+    # logout_user() and the popping of IDs
     flask_login.current_user.wipe()
     flask_login.logout_user()
     for key in ('identity.name', 'identity.auth_type'):
@@ -299,7 +313,7 @@ def logout():
         flask_principal.identity_changed.send(
             flask.current_app._get_current_object(),
             identity = flask_principal.AnonymousIdentity())
-    return flask.jsonify({'ok': "Session closed"})
+    return flask.jsonify({'_message': "Session closed"})
 
 
 @app.route(API_PREFIX + "validate_session", methods = ['GET'])
@@ -312,11 +326,13 @@ def validate_session():
 @app.route(API_PREFIX + 'users/<userid>', methods = [ 'GET' ])
 @flask_login.login_required
 def _users(userid = None):
-    r = {}
+    r = dict()
     calling_user = flask_login.current_user._get_current_object()
-    # FIXME: move to ttbl.check_user_is_admin(calling_user), no ifs,
-    # it raises exceptions on its own?
-    if calling_user.is_admin():
+    if userid == "self":
+        # this is used as a reflector, to know who are we logged in as
+        calling_id = calling_user.get_id()
+        userl = [ calling_id ]
+    elif calling_user.is_admin():
         if userid == None:
             userl = ttbl.user_control.known_user_list()
         else:
@@ -326,13 +342,10 @@ def _users(userid = None):
         if userid == None:
             userl = [ calling_id ]
         elif userid != calling_id:
-            # admins can list'em all FIXME: check user-elevate
-            r[userid]  = {
-                "error": "user '%s' needs admin role to query"
-                         " users other than themselves" %
-                         calling_user.userid
-            }
-            userl = []
+            flask_logi_abort(
+                403,
+                "user '%s' needs admin role to query"
+                " users other than themselves" % calling_user.userid)
         else:
             userl = [ calling_user.userid ]
 
@@ -341,7 +354,13 @@ def _users(userid = None):
             user = ttbl.user_control.User(userid, fail_if_new = True)
             r[user.userid] = user.to_dict()
         except ttbl.user_control.User.user_not_existant_e as e:
-            logging.warning("user '%s' does not exist: %s", userid, e)
+            # when the caller was querying about an specific user,
+            # complain about if not found; otherwise just skip since
+            # it might mean a user that dropped/logged out since we
+            # called for the known_user_list()
+            if userid:
+                flask_logi_abort(404, "user '%s' does not exist" % userid)
+                
     return flask.jsonify(r)
 
 @app.route(API_PREFIX + 'users/', methods = [ 'DELETE' ])
@@ -363,6 +382,7 @@ def _user_delete(userid = None):
     else:
         flask_logi_abort(
             403, "not enough privilege to remove user %s" % userid)
+    # FIXME: this has to do the same as logout()
     user.wipe()
     return flask.jsonify({'_message': "session closed"})
 
@@ -374,6 +394,7 @@ def _user_role(userid, action, role):
     if userid == "self":
         # if specified and it is the current user, proceed
         user = flask_login.current_user._get_current_object()
+        userid = user.userid
     elif userid == flask_login.current_user.get_id():
         # if specified and it is the current user, proceed
         user = flask_login.current_user._get_current_object()
@@ -408,8 +429,8 @@ def _user_role(userid, action, role):
 @flask_login.login_required
 def _targets_gets():
     projections = ttbl.tt_interface.arg_get(
-        flask.request.form, 'projections', list, True, [])
-    result = {}
+        flask.request.form, 'projections', list, True, list())
+    result = dict()
     calling_user = flask_login.current_user._get_current_object()
     for target in ttbl.test_target.known_targets():
         if not target.check_user_allowed(calling_user):
@@ -426,7 +447,7 @@ def _targets_gets():
 @flask_login.login_required
 def _target_get(target_id):
     projections = ttbl.tt_interface.arg_get(
-        flask.request.form, 'projections', list, True, [])
+        flask.request.form, 'projections', list, True, list())
     calling_user = flask_login.current_user._get_current_object()
     target = ttbl.test_target.get_for_user(target_id, calling_user)
     if target == None:
@@ -541,7 +562,7 @@ def _target_active(target_id):
         flask_logi_abort(400, "%s" % e, exc_info = True)
     except Exception as e:
         flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({})
+    return flask.jsonify(dict())
 
 
 @app.route(API_PREFIX + 'targets/<string:target_id>/release', methods = ['PUT'])
@@ -566,7 +587,7 @@ def _target_release(target_id):
         flask_logi_abort(400, "%s" % e, exc_info = True)
     except Exception as e:
         flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({})
+    return flask.jsonify(dict())
 
 
 @app.route(API_PREFIX + 'allocation', methods = [ 'PUT' ])
@@ -598,8 +619,8 @@ def _put_allocation():
         data = flask.request.get_json()
         if data == None:
             # get from form encoding
-            data = {}
-            for key in list(flask.request.form.keys()):
+            data = dict()
+            for key in flask.request.form.keys():
                 data[key] = ttbl.tt_interface.arg_get(flask.request.form,
                                                       key, None)
         assert isinstance(data, dict), \
@@ -611,14 +632,13 @@ def _put_allocation():
         else:
             raise NotImplementedError("no way to specify OBO user yet")
 
-        #logging.error("DEBUG args: %s" % pprint.pformat(data))
         result = ttbl.allocation.request(
             data['groups'],
             calling_user = flask_login.current_user._get_current_object(),
             obo_user = data.get(
                 'obo_user',
                 flask_login.current_user._get_current_object().get_id()),
-            guests = data.get('guests', []),
+            guests = data.get('guests', list()),
             priority = data.get('priority', None),
             preempt = data.get('preempt', False),
             queue = data.get('queue', False),
@@ -691,8 +711,8 @@ def _put_keepalive():
         data = flask.request.get_json()
         if data == None:
             # get from from encoding
-            data = {}
-            for key in list(flask.request.form.keys()):
+            data = dict()
+            for key in flask.request.form.keys():
                 #logging.error("DEBUG args key %s value %s", key, value)
                 data[key] = ttbl.tt_interface.arg_get(flask.request.form,
                                                       key, None)
@@ -705,7 +725,7 @@ def _put_keepalive():
                 "pressure needs to be an number" # FIXME: range?
         else:
             pressure = 0
-        result = {}
+        result = dict()
         for allocid, expected_state in data.items():
             r = ttbl.allocation.keepalive(
                 allocid, expected_state, pressure,
@@ -715,7 +735,7 @@ def _put_keepalive():
             result[allocid] = r
     except Exception as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
-    return flask.jsonify(dict(result = result))
+    return flask.jsonify(dict(result))
 
 
 @app.route(API_PREFIX + 'allocation/<string:allocid>/<string:guestname>',
@@ -957,7 +977,7 @@ def unauthorized():
     Called by the login manager when a user is no authorized to
     do an operation
     """
-    flask_logi_abort(400, "User unauthorized; please login")
+    flask_logi_abort(401, "User unauthorized; please login")
 
 def auth_init(app):
     principals = flask_principal.Principal()
@@ -996,7 +1016,7 @@ def auth_init(app):
             for role in flask_login.current_user.roles:
                 identity.provides.add(flask_principal.RoleNeed(role))
 
-local_auth = []
+local_auth = list()
 
 #
 # Main
@@ -1069,7 +1089,7 @@ if __name__ == "__main__":
         help = "Port on which to listen [%d]" % port)
     arg_parser.add_argument(
         "--local-auth", metavar = "IP-ADDR", nargs = "?",
-        action = "append", default = [],
+        action = "append", default = list(),
         help = "Allow users as admins from the given IP "
         "addresses without caring; if no IP address is given, "
         "127.0.0.1 is assumed. Can be given multiple times with "

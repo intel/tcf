@@ -256,10 +256,7 @@ class fsdb_symlink_c(fsdb_c):
     if the link already exists. Same to read it. Thus, for small
     values, it is very efficient.
     """
-    class exception(Exception):
-        pass
-
-    class invalid_e(exception):
+    class invalid_e(fsdb_c.exception):
         pass
 
     def __init__(self, dirname, use_uuid = None, concept = "directory"):
@@ -671,12 +668,20 @@ class tt_interface_impl_c(object):
         #: >>>     location = "USB port #4 front"))
         self.upid = kwargs
 
-    def upid_set(self, name, **kwargs):
+    def upid_set(self, name_long, **kwargs):
         """
         Set :data:`upid` information in a single shot
 
-        :param str name: Name of the physical component that
-          implements this interface functionality
+        :param str name_long: Long name of the physical component that
+          implements this interface functionality.
+
+          This gets registered as instrument property *name_long* and
+          if the instrument has defined no short *name* property, it
+          will be registered as such.
+
+          The short *name* has more restrictions, thus it is
+          recommended implementations set it.
+
         :param dict kwargs: fields and values (strings) to report for
           the physical component that implements this interface's
           functionality; it is important to specify here a unique
@@ -691,13 +696,16 @@ class tt_interface_impl_c(object):
         This is normally called from the *__init__()* function of a
         component driver, that must inherit :class:`tt_interface_impl_c`.
         """
-        assert name == None or isinstance(name, str)
+        assert isinstance(name_long, str), \
+            "name_long: expected a string; got %s" % type(name_long)
         for key, val in kwargs.items():
             assert val == None or isinstance(val, (str, int,
                                                    float, bool)), \
                 "UPID field '%s' must be string|number|bool; got %s" \
                 % (key, type(val))
-        self.name = name
+        if not self.name:
+            self.name = name_long
+        kwargs['name_long'] = name_long
         self.upid = kwargs
 
 
@@ -1259,7 +1267,7 @@ class tt_interface(object):
           >>>    value = 43
           >>> )
 
-        For an example, see :class:`ttbl.buttons.interface`.
+        For an example, see :class:`ttbl.power.interface`.
         """
         assert isinstance(target, test_target)
         assert isinstance(who, str)
@@ -1593,9 +1601,9 @@ class test_target(object):
                                 + str(ic.tags[proto + "_prefix_len"])),
                         strict = False)
                     if ic_net != net:
-                        raise ValueError(
+                        logging.warning(
                             "%s: IP address %s for interconnect %s is outside "
-                            "of the interconnect's network %s (vs %s)" %(
+                            "of the interconnect's network %s (vs %s)" % (
                                 self.id, val, name, ic_net, net))
             if key == "ipv4_prefix_len":
                 val = int(val)
@@ -1774,8 +1782,9 @@ class test_target(object):
             allocdb = ttbl.allocation.get_from_cache(_allocid)
             return _allocid	# alloc-ID is valid, return it
         except ttbl.allocation.allocation_c.invalid_e:
-            logging.error("%s: wiping ownership by invalid allocation %s",
-                          self.id, _allocid)
+            logging.info("%s: wiping ownership by invalid allocation/id %s",
+                         self.id, _allocid)
+            self._state_cleanup(False)
             self._allocid_wipe()
             return None
 
@@ -1788,8 +1797,9 @@ class test_target(object):
         try:
             return allocation.get_from_cache(_allocid)
         except allocation.allocation_c.invalid_e:
-            logging.error("%s: wiping ownership by invalid allocation %s",
-                          self.id, _allocid)
+            logging.info("%s: wiping ownership by invalid allocation/get %s",
+                         self.id, _allocid)
+            self._state_cleanup(False)
             self._allocid_wipe()
             return None
 
@@ -1802,6 +1812,9 @@ class test_target(object):
         # This is to be used only when we have taken the target but
         # then have not used it, so there is no need for state clean
         # up.
+        #
+        # NOTE: ttbl.allocation.allocdb_c.delete() does the same as
+        # this because we know it to be the case
         assert self.lock.locked()	    # Must have target.lock taken!
         current_allocid = self.fsdb.get("_alloc.id")
         if current_allocid and current_allocid == allocid:
@@ -1819,6 +1832,9 @@ class test_target(object):
     #
     # fold _deallocate_forced() to have a state argument that if set,
     # sets the reservation's state to that one
+    #
+    # NOTE: ttbl.allocation.allocdb_c.delete() does the same as
+    # this because we know it to be the case
     def _deallocate(self, allocdb, new_state = None):
         # deallocate verifying the current allocation is valid
         if self._deallocate_simple(allocdb.allocid):
@@ -2288,10 +2304,18 @@ def usb_serial_to_path(arg_serial):
       ....
 
     :param str arg_serial: USB serial number
-    :return: tuple with USB path, vendor, product name for the given serial
-      number or *None, None, None* if not found
+    :return: tuple with USB path, vendor product name for the given serial
+      number, *None, None, None* if not found
 
     """
+    def _sysfs_read(filename):
+        try:
+            with open(filename) as fr:
+                return fr.read().strip()
+        except IOError as e:
+            if e.errno != errno.ENOENT:
+                raise
+
     for fn_serial in glob.glob("/sys/bus/usb/devices/*/serial"):
         serial = _sysfs_read(fn_serial)
         if serial == arg_serial:

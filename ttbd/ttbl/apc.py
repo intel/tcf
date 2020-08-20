@@ -6,15 +6,22 @@
 #
 # pylint: disable = missing-docstring
 
-import ttbl.power
-import pysnmp.entity.rfc3413.oneliner.cmdgen
-import pysnmp.proto.rfc1902
+import sys
 
-class pci(ttbl.power.impl_c):
+import ttbl.power
+try:
+    import pysnmp.entity.rfc3413.oneliner.cmdgen
+    import pysnmp.proto.rfc1902
+except ImportError as e:
+    # if building doc, it's ok not to have the dependencies
+    if 'sphinx.cmd' not in sys.modules:
+        raise
+
+class pc(ttbl.power.impl_c):
     """
     Power control driver for APC PDUs using SNMP
 
-    This is a very hackish implementation that attempts to reuqire the
+    This is a very hackish implementation that attempts to require the
     least setup possible. It hardcodes the OIDs and MIBs because APC's
     MIBs are not publicly available and the setup
     becomes...complicated (please contribute a better one if you can help)
@@ -24,7 +31,7 @@ class pci(ttbl.power.impl_c):
     >>> import ttbl.apc
     >>>
     >>> ...
-    >>>     ttbl.apc.pci("HOSTNAME", 4)
+    >>>     ttbl.apc.pc("HOSTNAME", 4)
     >>>
 
     for doing power control on APC PDU *HOSTNAME* on outlet *4*.

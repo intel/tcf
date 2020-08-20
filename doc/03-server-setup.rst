@@ -447,6 +447,8 @@ follow are configuration examples.
 Configure physical Linux (or other) targets
 -------------------------------------------
 
+.. warning:: this section is old and needs rewriting
+
 There are multiple ways a Linux target can be connected as a target to
 a TCF server. However, dependending on the intended use, different
 configuration steps can be followed:
@@ -458,8 +460,7 @@ configuration steps can be followed:
   This provides no control over the OS installed in the target
 
 - A Linux target can be setup to boot off a read-only live filesystem
-  (to avoid modifications to the root filesystem) following
-  :ref:`these steps <ttbd_config_phys_linux_live>`.
+  (to avoid modifications to the root filesystem).
 
   Serial access to a console can be provided and through it networking
   can be configured.
@@ -750,8 +751,6 @@ Once a target is configured in, run a quick healthcheck::
 
 
       
-.. _pos_setup:
-
 Configuring support information
 -------------------------------
 
@@ -916,9 +915,15 @@ been tested yet, shall be similar.
        # sed -i 's|RPCNFSDARGS="|RPCNFSDARGS="--udp |' /etc/sysconfig/nfs
        # systemctl enable --now nfs-server
 
+   - tftp-server provides TFTP boot services (not in all
+     installations)::
+     
+       # systemctl enable --now tftp		# CentOS7
 
 POS: deploy PXE boot image to HTTP and NFS server locations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. _generate_tcf_live_iso:
 
 Currently the Provisioning OS is implemented with a derivative of
 Fedora Linux.
@@ -927,7 +932,10 @@ Fedora Linux.
              to be run in such. Steps for x86 (32-bits) or other
              platforms need to be documented.
 
-.. _generate_tcf_live_iso:
+.. warning:: it is only possible to run these steps now in a Fedora
+             platform; need to document steps to do it from another
+             one.
+             
 
 a. Generate TCF-live on the fly::
 
@@ -1035,11 +1043,15 @@ c. Make the kernel and initrd for POS available via Apache for
 
          # install -o ttbd -g ttbd /usr/share/ipxe/ipxe-x86_64.efi \
               /home/ttbd/public_html/x86_64/
+         # install -o ttbd -g ttbd /usr/share/ipxe/ipxe-x86_64.efi \
+              /var/lib/tftpboot
 
        CentOS 7::
 
          # install -o ttbd -g ttbd /usr/share/ipxe/ipxe.efi \
               /home/ttbd/public_html/x86_64/ipxe-x86_64.efi
+         # install -o ttbd -g ttbd /usr/share/ipxe/ipxe.efi \
+              /var/lib/tftpboot
 
        Note the name changes; as well, there is no need to copy it to
        the TFTP directory as new code paths do it for us.
@@ -1136,7 +1148,7 @@ POS; for example:
 
 - Fedora::
 
-    $ https://mirrors.rit.edu/fedora/fedora/linux/releases/29/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-29-1.2.iso
+    $ wget https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/29/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-29-1.2.iso
     $ /usr/share/tcf/tcf-image-setup.sh fedora:workstation:29::x86_64 Fedora-Workstation-Live-x86_64-29-1.2.iso
 
 - RHEL::
@@ -1147,8 +1159,8 @@ POS; for example:
 
 - Ubuntu::
 
-    $ wget http://releases.ubuntu.com/18.04/ubuntu-18.04.3-desktop-amd64.iso
-    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/ubuntu:desktop:18.04:3:x86_64 ubuntu-18.04.3-desktop-amd64.iso 
+    $ wget http://releases.ubuntu.com/18.04/ubuntu-18.04.5-desktop-amd64.iso
+    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/ubuntu:desktop:18.04:5:x86_64 ubuntu-18.04.5-desktop-amd64.iso 
     
 - Yocto::
 

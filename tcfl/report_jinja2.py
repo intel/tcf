@@ -283,6 +283,7 @@ class driver(tc.report_driver_c):
     def _get_fd(self, code, tmpdir):
         # FIXME: document the decorator
         if not code in self.fs:
+            # open truncating because this is a new entry
             f = io.open(
                 os.path.join(tmpdir, "report-" + code + ".txt"),
                 "wb")

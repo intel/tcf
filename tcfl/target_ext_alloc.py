@@ -39,6 +39,10 @@ except ImportError as e:
 def _delete(rtb, allocid):
     try:
         rtb.send_request("DELETE", "allocation/%s" % allocid)
+    except requests.ConnectionError as e:
+        # this server is out
+        logging.warning(e)
+        return
     except requests.HTTPError as e:
         if 'invalid allocation' not in str(e):
             raise
@@ -82,7 +86,7 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
     commonl.progress(
         "allocation ID %s: [+%.1fs] keeping alive during state '%s'" % (
             allocid, ts - ts0, state))
-    new_state = state       # in case we don't wait 
+    new_state = state		# in case we don't wait
     while wait_in_queue:
         if queue_timeout and ts - ts0 > queue_timeout:
             raise tcfl.tc.blocked_e(
@@ -102,11 +106,11 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
         if 'result' in r:
             result = r.pop('result')
             r.update(result)
-        # COMPAT: end
+        # COMPAT: end        
         commonl.progress(
             "allocation ID %s: [+%.1fs] keeping alive during state '%s': %s"
             % (allocid, ts - ts0, state, r))
-        
+
         if allocid not in r:
             continue # no news
         alloc = r[allocid]
@@ -127,7 +131,7 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
 
 def _alloc_hold(rtb, allocid, state, ts0, max_hold_time):
     while True:
-        time.sleep(5)
+        time.sleep(2)
         ts = time.time()
         if max_hold_time > 0 and ts - ts0 > max_hold_time:
             # maximum hold time reached, release it
@@ -140,7 +144,7 @@ def _alloc_hold(rtb, allocid, state, ts0, max_hold_time):
         if 'result' in r:
             result = r.pop('result')
             r.update(result)
-        # COMPAT: end
+        # COMPAT: end        
         commonl.progress(
             "allocation ID %s: [+%.1fs] keeping alive during state '%s': %s"
             % (allocid, ts - ts0, state, r))
@@ -385,7 +389,11 @@ def _cmdline_alloc_monitor(args):
 
 
 def _allocs_get(rtb, username):
-    r = rtb.send_request("GET", "allocation/")
+    try:
+        r = rtb.send_request("GET", "allocation/")
+    except (Exception, tcfl.ttb_client.requests.HTTPError) as e:
+        logging.error("%s", e)
+        return {}
     if username:
         # filter here, as we can translate the username 'self' to the
         # user we are logged in as in the server
@@ -399,15 +407,14 @@ def _allocs_get(rtb, username):
                and username != allocdata.get('user', None):
                 return False
             return True
-        
+
         for allocid, allocdata in r.items():
             if _alloc_filter(allocdata, username):
                 _r[allocid] = allocdata
-        
+
         return _r
     else:
         return r
-
 
 
 def _alloc_ls(verbosity, username = None):
@@ -674,14 +681,14 @@ def _cmdline_setup(arg_subparsers):
         help = "Reason to pass to the server (default: %(default)s)"
         " [LOGNAME:HOSTNAME:PARENTPID]")
     ap.add_argument(
-        "-d", "--hold", action = "store",
-        nargs = "?", type = int, const = 0, default = None,
-        help = "Keep the reservation alive for this many seconds"
-        " (default for ever)")
+        "--hold", action = "store_const",
+        const = 0, dest = "hold", default = None,
+        help = "Keep the reservation alive until cancelled with Ctrl-C")
     ap.add_argument(
-        "-u", "--duration", action = "store", type = int, default = 0,
-        help = "Keep the reservation alive for this seconds,"
-        " then release it")
+        "-d", "--hold-for", dest = "hold", action = "store",
+        nargs = "?", type = int, default = None,
+        help = "Keep the reservation alive for this many seconds, "
+        "then release it")
     ap.add_argument(
         "-w", "--wait", action = "store_true", dest = 'queue', default = True,
         help = "(default) Wait until targets are assigned")

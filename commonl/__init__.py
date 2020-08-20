@@ -268,6 +268,7 @@ def mkid(something, l = 10):
         h = hashlib.sha512(something)
     return base64.b32encode(h.digest())[:l].lower().decode('utf-8', 'ignore')
 
+
 def trim_trailing(s, trailer):
     """
     Trim *trailer* from the end of *s* (if present) and return it.
@@ -457,13 +458,13 @@ def makedirs_p(dirname, mode = None, reason = None):
         # threads and processes.
         if mode:
             os.chmod(dirname, mode)
-    except OSError:
+    except OSError as e:
         if not os.path.isdir(dirname):
-            raise RuntimeError("%s: path for %s is not a directory"
-                               % (dirname, reason))
+            raise RuntimeError("%s: path for %s is not a directory: %s"
+                               % (dirname, reason, e))
         if not os.access(dirname, os.W_OK):
-            raise RuntimeError("%s: path for %s does not allow writes"
-                               % (dirname, reason))
+            raise RuntimeError("%s: path for %s does not allow writes: %s"
+                               % (dirname, reason, e))
 
 def symlink_f(source, dest):
     """
@@ -1274,7 +1275,6 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
     fl = []
 
     def _add(field_flat, val):
-        # empty dict, insert it if we want them
         if sort:
             bisect.insort(fl, ( field_flat, val ))
         else:
@@ -1299,7 +1299,11 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
 
         if isinstance(val, collections.Mapping):
             if len(val) == 0 and empty_dict == True and field_needed(field_flat, projections):
-                _add(field_flat, val)
+                # append an empty dictionary; do not append VAL --
+                # why? because otherwise it might be modified later by
+                # somebody else and modify our SOURCE dictionary, and
+                # we do not want that.
+                _add(field_flat, dict())
             elif depth_limit > 0:	# dict to dig in
                 for key, value in val.items():
                     __update_recursive(value, key, field_flat + "." + str(key),
@@ -1309,6 +1313,13 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
         elif field_needed(field_flat, projections):
             _add(field_flat, val)
 
+    if len(d) == 0 and empty_dict == True:
+        # empty dict, insert it if we want them
+        # append an empty dictionary; do not append VAL --
+        # why? because otherwise it might be modified later by
+        # somebody else and modify our SOURCE dictionary, and
+        # we do not want that.
+        _add(field_flat, dict())
     for key, _val in d.items():
         __update_recursive(d[key], key, key, projections, 10, sort = sort,
                            empty_dict = empty_dict)
@@ -1438,10 +1449,15 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
       [3]: <open file '<stdout>', mode 'w' at 0x7f13ba2861e0>
 
     - in a list/set/tuple, each item is printed prefixing *[INDEX]*
+
     - in a dictionary, each item is prefixed with it's key
+
     - strings and cardinals are printed as such
+
     - others are printed as what their representation as a string produces
+
     - if an attachment is a generator, it is iterated to gather the data.
+
     - if an attachment is of :class:generator_factory_c, the method
       for creating the generator is called and then the generator
       iterated to gather the data.
@@ -1449,11 +1465,15 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
     See also :func:`data_dump_recursive_tls`
 
     :param d: data to print
+
     :param str prefix: prefix to start with (defaults to nothing)
+
     :param str separator: used to separate dictionary keys from the
       prefix (defaults to ".")
+
     :param :python:file of: output stream where to print (defaults to
       *sys.stdout*)
+
     :param int depth_limit: maximum nesting levels to go deep in the
       data structure (defaults to 10)
     """
@@ -1592,12 +1612,12 @@ class io_tls_prefix_lines_c(io.BufferedWriter):
        with commonl.tls_prefix_c(tls, "PREFIX"), \
             commonl.io_tls_prefix_lines_c(tls, f.detach()) as of:
 
-           of.write(u"line1\nline2\nline3\n")
-
+           of.write(u"line1\\nline2\\nline3\\n")    
 
     Limitations:
 
-    - hack, only works ok if full lines are being printed; eg:
+      - hack, only works ok if full lines are being printed
+
     """
     def __init__(self, tls, *args, **kwargs):
         assert isinstance(tls, threading.local)
@@ -1754,7 +1774,7 @@ def file_iterator(filename, chunk_size = 4096):
             yield data
 
 def assert_list_of_strings(l, list_name, item_name):
-    assert isinstance(l, list), \
+    assert isinstance(l, ( tuple, list )), \
         "'%s' needs to be None or a list of strings (%s); got %s" % (
             list_name, item_name, type(l))
     count = -1
