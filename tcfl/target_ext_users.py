@@ -123,20 +123,20 @@ def _cmdline_servers(args):
 
     if verbosity <= 0:
         for aka, url, username in r:
-            print aka, url, username
+            print(aka, url, username)
     elif verbosity == 1:
         headers = [
             "Server",
             "URL",
             "UserID",
         ]
-        print tabulate.tabulate(r, headers = headers)
+        print(tabulate.tabulate(r, headers = headers))
     elif verbosity == 2:
         commonl.data_dump_recursive(d)
     elif verbosity == 3:
         pprint.pprint(d)
     elif verbosity >= 4:
-        print json.dumps(d, skipkeys = True, indent = 4)
+        print(json.dumps(d, skipkeys = True, indent = 4))
 
 
 def _cmdline_setup(arg_subparsers):
