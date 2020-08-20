@@ -1235,7 +1235,7 @@ class extension(tc.target_extension_c):
                     if offset_to > 0 and offset >= offset_to:
                         # read only until the final offset, more or less
                         if not line.endswith(b"\n"):
-                            yield b"\n"
+                            yield "\n"
                         break
         except IOError as e:
             if e.errno != errno.ENOENT:
