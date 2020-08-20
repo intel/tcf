@@ -172,7 +172,7 @@ class extension(tc.target_extension_c):
                                         method = "GET")
         self.target.report_info("listed: %s" % r)
         l = {}
-        for name, data in r.get('components', {}).iteritems():
+        for name, data in r.get('components', {}).items():
             # this will be True/False/None
             l[name] = data.get('state', None)
         return l
