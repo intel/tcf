@@ -1380,8 +1380,12 @@ class flash_shell_cmd_c(impl2_c):
 
     :param str path: (optional, defaults to *cmdline[0]*) path to the
       flashing program
+
+    :param dict env_add: (optional) variables to add to the environment when
+      running the command
     """
-    def __init__(self, cmdline, cwd = "/tmp", path = None, **kwargs):
+    def __init__(self, cmdline, cwd = "/tmp", path = None, env_add = None,
+                 **kwargs):
         commonl.assert_list_of_strings(cmdline, "cmdline", "arguments")
         assert cwd == None or isinstance(cwd, basestring)
         assert path == None or isinstance(path, basestring)
@@ -1391,6 +1395,11 @@ class flash_shell_cmd_c(impl2_c):
         self.path = path
         self.cmdline = cmdline
         self.cwd = cwd
+        if env_add:
+            commonl.assert_dict_of_strings(env_add, "env_add")
+            self.env_add = env_add
+        else:
+            self.env_add = {}
         impl2_c.__init__(self, **kwargs)
 
     def flash_start(self, target, images, context):
@@ -1436,13 +1445,19 @@ class flash_shell_cmd_c(impl2_c):
         context['cmdline'] = cmdline
         context['cmdline_s'] = cmdline_s
 
+        if self.env_add:
+            env = dict(os.environ)
+            env.update(self.env_add)
+        else:
+            env = os.environ
+
         ts0 = time.time()
         context['ts0'] = ts0
         try:
             target.log.info("flashing image with: %s" % " ".join(cmdline))
             with open(logfile_name, "w+") as logf:
                 self.p = subprocess.Popen(
-                    cmdline, stdin = None, cwd = cwd,
+                    cmdline, env = env, stdin = None, cwd = cwd,
                     stderr = subprocess.STDOUT, stdout = logf)
             with open(pidfile, "w+") as pidf:
                 pidf.write("%s" % self.p.pid)
