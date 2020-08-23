@@ -191,28 +191,27 @@ evaluate as True; other symboles added are the active :term:`BSP
 model` and (if any) active BSP are also made symbols, so for given a
 target named *z3* with the following tags::
 
-  $ tcf list -vvv z3
+  $ tcf list -vv z3
     https://SERVER:5000/ttb-v0/targets/z3
       ...
-      fullid: SERVER/z3
+      server: https://SERVER/z3
       id: z3
-      consoles: [u'arm']
-      fullid: https://SERVER:5000/z3
-      owner: None
-      bsps: {
-        u'arm': {
-          u'console': u'arm',
-          u'zephyr_board': u'qemu_cortex_m3',
-          u'zephyr_kernelname': u'zephyr.elf',
-        }
-      }
+      fullid: SERVER/z3
+      owner: SOMEUSER:ALLOCID
+      bsps.arm.zephyr_board: qemu_cortex_m3
+      bsps.arm.zephyr_kernelname: zephyr.elf
       ....
+      interfaces.power.DC.state: False
+      ...
 
 The following expressions could be used to match it::
 
 - ``bsp == 'arm'``
 - ``z3 or z1``
+- ``bsps.arm.zephyr_board in [ 'qemu_cortex_m3', 'frdm_k64f' ]`
 - ``zephyr_board in [ 'qemu_cortex_m3', 'frdm_k64f' ]``
+  This one works special because symbols in ``bsps.*`` are also
+  considered as high level symbols for pattern matching.
 
 The same system applies for tag; the tag itself is a symbol that
 evaluates to true if available. It's contents are available for
