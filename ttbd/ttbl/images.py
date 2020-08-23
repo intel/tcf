@@ -205,6 +205,7 @@ flashers::
 import codecs
 import collections
 import copy
+import errno
 import hashlib
 import json
 import numbers
@@ -1508,11 +1509,23 @@ class flash_shell_cmd_c(impl2_c):
         commonl.process_terminate(context['pidfile'], path = self.path)
 
 
+    def _log_file_read(self, context, max_bytes = 2000):
+        with codecs.open(context['logfile_name'], errors = 'ignore') as logf:
+            try:
+                # SEEK to -MAX_BYTES or if EINVAL (too big), leave it
+                # at beginning of file
+                logf.seek(-max_bytes, 2)
+            except IOError as e:
+                if e.errno != errno.EINVAL:
+                    raise
+            return logf.read()
+
     def flash_post_check(self, target, images, context,
                          expected_returncode = 0):
         if self.p.returncode != expected_returncode:
             msg = "flashing with %s failed, returned %s: %s" % (
-                context['cmdline_s'], self.p.returncode, "<n/a>")
+                context['cmdline_s'], self.p.returncode,
+                self._log_file_read(context))
             target.log.error(msg)
             raise RuntimeError(msg)
         return
