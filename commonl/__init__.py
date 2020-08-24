@@ -50,8 +50,12 @@ import time
 import traceback
 import types
 
-import keyring
-import requests
+try:
+    import keyring
+    keyring_available = True
+except ImportError as e:
+    logging.warning("can't import keyring, functionality disabled")
+    keyring_available = False
 
 from . import expr_parser
 
@@ -1157,11 +1161,19 @@ def password_get(domain, user, password):
     assert isinstance(user, basestring)
     assert password == None or isinstance(password, basestring)
     if password == "KEYRING":
+        if keyring_available == False:
+            raise RuntimeError(
+                "keyring: functionality to load passwords not available,"
+                " please install keyring support")
         password = keyring.get_password(domain, user)
         if password == None:
             raise RuntimeError("keyring: no password for user %s @ %s"
                                % (user, domain))
     elif password and password.startswith("KEYRING:"):
+        if keyring_available == False:
+            raise RuntimeError(
+                "keyring: functionality to load passwords not available,"
+                " please install keyring support")
         _, domain = password.split(":", 1)
         password = keyring.get_password(domain, user)
         if password == None:

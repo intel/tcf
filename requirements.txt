@@ -11,7 +11,6 @@ opencv-python==4.1.2.30
 functools32==3.2.3.post2
 imutils==0.5.3
 junit_xml==1.9
-keyring==18.0.1
 numpy==1.7.1
 # ascimatics will pull this and 
 Pillow==6.2.2
