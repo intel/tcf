@@ -78,7 +78,7 @@ class interface(ttbl.tt_interface):
             for _path, _dirnames, filenames in os.walk(user_path):
                 for filename in filenames:
                     _list_filename(filename)
-        file_data['result'] = file_data	# COMPAT
+        file_data['result'] = dict(file_data)	# COMPAT
         return file_data
 
     def post_file(self, target, _who, args, files, user_path):
