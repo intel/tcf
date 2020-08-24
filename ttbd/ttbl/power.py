@@ -992,28 +992,41 @@ class fake_c(impl_c):
     It can rely on the *target* and *component* parameters to
     each method to derive where to act.
 
+    :param str iface_name: (optional; default *power*) name of the
+      interface where this is being used.
+
+      Implementations have no way to know which interface they are
+      being used for (needing for setting state in the right
+      location), so if used in other interface than *power* (default),
+      use paramer *iface_name*.
+
     Parameters are the same as for :class:impl_c.
+
     """
-    def __init__(self, name = None, **kwargs):
+    def __init__(self, name = None, iface_name = "power", **kwargs):
         impl_c.__init__(self, **kwargs)
         if name == None:
             name = "%x" % id(self)
         self.name = name
+        self.iface_name = iface_name
         self.upid_set("Fake power controller #%s" % name,
-                      id = "%s" % name)
+                      name = name, iface_name = iface_name)
 
+    # State is stored in interfaces.power.COMPONENT, so it in the
+    # right inventory in the namespace and it doesn't collide with
+    # *state*, which is set by the upper layers.
     def on(self, target, component):
-        target.log.info("power-fake-%s on" % component)
-        target.fsdb.set('power-fake-%s' % component, 'True')
+        target.fsdb.set(
+            'interfaces.%s.%s.fake-state' % (self.iface_name, component), True)
 
     def off(self, target, component):
-        target.log.info("power-fake-%s off" % component)
-        target.fsdb.set('power-fake-%s' % component, None)
+        target.fsdb.set(
+            'interfaces.%s.%s.fake-state' % (self.iface_name, component), None)
 
     def get(self, target, component):
-        state = target.fsdb.get('power-fake-%s' % component) == 'True'
-        target.log.info("power-fake-%s get: %s" % (component, state))
-        return state
+        state = target.fsdb.get(
+            'interfaces.%s.%s.fake-state' % (self.iface_name, component))
+        return state == True
 
 
 class inverter_c(impl_c):
