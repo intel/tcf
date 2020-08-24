@@ -36,6 +36,7 @@ import numbers
 import os
 import random
 import re
+import requests
 import signal
 import socket
 import string
@@ -367,7 +368,7 @@ def request_response_maybe_raise(response):
         except ValueError as e:
             message = "no specific error text available"
         logging.debug("HTTP Error: %s", response.text)
-        e = requests.HTTPError(
+        e = requests.exceptions.HTTPError(
             "%d: %s" % (response.status_code, message))
         e.status_code = response.status_code
         raise e

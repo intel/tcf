@@ -43,6 +43,7 @@ import os
 import pprint
 import re
 import requests
+import requests.exceptions
 import struct
 import sys
 import termios
