@@ -50,7 +50,6 @@ Limitations:
   out, unresolved fields left as fields and then a second pass during
   COMPLETION resolves the missing fields.
 """
-import codecs
 import io
 import logging
 import os
@@ -289,7 +288,7 @@ class driver(tc.report_driver_c):
                 "wb")
             self.fs[code] = f.name
         else:
-            f = io.open(self.fs[code], "a+")
+            f = io.open(self.fs[code], "a+b")
         # reassign the stream so we use the prefix printing
         # capabilities
         return commonl.io_tls_prefix_lines_c(
@@ -303,7 +302,7 @@ class driver(tc.report_driver_c):
         # don't care for.
         #
         # FIXME: maybe this should just pickle tuples and be done
-        with codecs.open(self.fs[code], "r") as fi:
+        with io.open(self.fs[code], "r", encoding = 'utf-8', errors = 'replace') as fi:
             for line in fi:
                 if line == "":
                     break
@@ -488,7 +487,7 @@ class driver(tc.report_driver_c):
             # the template might specify a new directory path that
             # still does not exist
             commonl.makedirs_p(os.path.dirname(file_name), 0o750)
-            with codecs.open(file_name, "w", encoding = 'utf-8',
+            with io.open(file_name, "w", encoding = 'utf-8',
                              errors = 'replace') as fo:
                 for text in template.generate(**kws):	# and render!
                     fo.write(text)
