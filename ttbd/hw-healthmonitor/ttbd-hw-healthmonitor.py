@@ -25,8 +25,6 @@ import select
 import subprocess
 import time
 
-from typing import Pattern
-
 import systemd.journal
 import systemd.daemon
 import commonl
@@ -336,7 +334,7 @@ def config_watch_add(bus_name, driver_name, device_name, actions):
     if device_name:
         if isinstance(device_name, str):
             _device_name = "/" + device_name
-        elif isinstance(device_name, Pattern):
+        elif isinstance(device_name, re.Pattern):
             _device_name = "/" + device_name.pattern
         else:
             raise AssertionError(
@@ -413,7 +411,7 @@ def _entry_matched(entry, bus_name, driver_name, devname, actions, origin):
            and driver_name == _driver_name:
             logging.debug("%s/%s: match on driver name @%s",
                           driver_name, devname, origin)
-        elif isinstance(driver_name, Pattern) \
+        elif isinstance(driver_name, re.Pattern) \
              and driver_name.match(_driver_name):
             logging.debug("%s/%s: match on driver name @%s",
                           driver_name, devname, origin)
@@ -515,7 +513,7 @@ def _check_entry(entry):
                 _entry_matched(entry, bus_name, driver_name,
                                devname, actions, origin)
                 continue
-            elif isinstance(device_name, Pattern) \
+            elif isinstance(device_name, re.Pattern) \
                  and device_name.match(_device_name):
                 logging.debug("%s: match on device name @%s",
                               _device_name, origin)
@@ -534,7 +532,7 @@ def _check_entry(entry):
                 _entry_matched(entry, bus_name, driver_name,
                                devname, actions, origin)
                 continue
-            elif isinstance(device_name, Pattern) \
+            elif isinstance(device_name, re.Pattern) \
                  and device_name.match(_kernel_name):
                 logging.debug("%s: match on kernel name @%s",
                               _kernel_name, origin)

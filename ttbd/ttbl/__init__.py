@@ -41,8 +41,6 @@ import traceback
 import types
 import urllib.parse
 
-from typing import Pattern
-
 import __main__
 import requests
 import usb.util
@@ -1977,7 +1975,7 @@ class test_target(object):
                 if prop == name:
                     return True
                 continue
-            if isinstance(prop, Pattern):
+            if isinstance(prop, re.Pattern):
                 if prop.match(name):
                     return True
                 continue
@@ -1994,7 +1992,7 @@ class test_target(object):
                 if prop == name:
                     return True
                 continue
-            if isinstance(prop, Pattern):
+            if isinstance(prop, re.Pattern):
                 if prop.match(name):
                     return True
                 continue

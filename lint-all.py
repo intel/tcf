@@ -25,8 +25,6 @@ import traceback
 import typing
 import urllib.parse
 
-from typing import Pattern
-
 import git
 import github
 import gitlab

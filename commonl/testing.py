@@ -25,8 +25,6 @@ import time
 
 import requests
 
-from typing import Pattern
-
 import commonl
 import tcfl.config
 import tcfl.tc

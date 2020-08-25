@@ -371,11 +371,11 @@ class shell(tc.target_extension_c):
             assert isinstance(cmd, str)
         assert expect == None \
             or isinstance(expect, str) \
-            or isinstance(expect, Pattern) \
+            or isinstance(expect, typing.Pattern) \
             or isinstance(expect, list)
         assert prompt_regex == None \
             or isinstance(prompt_regex, str) \
-            or isinstance(prompt_regex, Pattern)
+            or isinstance(prompt_regex, typing.Pattern)
 
         if origin == None:
             origin = commonl.origin_get(3)
