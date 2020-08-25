@@ -115,6 +115,9 @@ class tunnel(tc.target_extension_c):
                                         port = port,
                                         method = "PUT")
         server_port = r['result']
+        if isinstance(server_port, str):
+            # COMPAT: work around server with unfixed bug
+            server_port = int(server_port)
         self.target.report_info(
             "%s tunnel added from %s:%d to %s:%d" % (
                 protocol,
