@@ -1187,9 +1187,9 @@ if __name__ == "__main__":
     # the configuration, as we'll use ttbl._who_daemon
     key_filename = os.path.join(args.var_state_path, "session.key")
     try:
-        with open(key_filename) as f:
+        with open(key_filename, 'rb') as f:
             sk = pickle.load(f)
-            if not isinstance(sk, str):
+            if not isinstance(sk, bytes):
                 raise Exception("Bad type in saved key")
             if len(sk) != 24:
                 raise Exception("Bad length in saved key")
