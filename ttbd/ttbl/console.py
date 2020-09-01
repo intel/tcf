@@ -832,7 +832,14 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
             "PTY,link=console-%(component)s.write,rawer"
             "!!CREATE:console-%(component)s.read",
             "%s,creat=0,rawer,b115200,parenb=0,cs8,bs1" % serial_file_name)
-
+        self.upid_set("RS-232C serial port @%s" % serial_file_name,
+                      name = "RS-232C serial port",
+                      baud_rate = 115200,
+                      data_bits = 8,
+                      stop_bits = 1,
+                      serial_port = serial_file_name,
+        )
+        
     # console interface; state() is implemented by generic_c
     def on(self, target, component):
         ttbl.power.socat_pc.on(self, target, component)
