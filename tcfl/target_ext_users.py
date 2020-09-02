@@ -113,8 +113,12 @@ def _cmdline_servers(args):
     d = {}
     rtbs = {}
     for name, rtb in ttb_client.rest_target_brokers.items():
+        username = "n/a"
         try:
-            username = rtb.logged_in_username()
+            if args.verbosity >= 0:
+                # FIXME: this should be parallelized
+                # we don't need this if verbosity < 0 and it takes time
+                username = rtb.logged_in_username()
         # FIXME: we need a base exception for errors from the API
         except ( ttb_client.requests.HTTPError, RuntimeError):
             username = "n/a"
@@ -133,18 +137,18 @@ def _cmdline_servers(args):
     elif verbosity == 0:
         for aka, url, username in r:
             print(aka, url, username)
-    elif verbosity == 1:
+    elif verbosity in ( 1, 2 ):
         headers = [
             "Server",
             "URL",
             "UserID",
         ]
         print(tabulate.tabulate(r, headers = headers))
-    elif verbosity == 2:
-        commonl.data_dump_recursive(d)
     elif verbosity == 3:
+        commonl.data_dump_recursive(d)
+    elif verbosity == 4:
         pprint.pprint(d)
-    elif verbosity >= 4:
+    elif verbosity >= 5:
         print(json.dumps(d, skipkeys = True, indent = 4))
 
 
