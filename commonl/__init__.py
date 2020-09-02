@@ -64,8 +64,10 @@ logging.addLevelName(8, "D3")
 logging.addLevelName(7, "D4")
 logging.addLevelName(6, "D5")
 
-if sys.version_info.minor > 6:
-    re._pattern_type = re.Pattern
+# Ensure compatibility with python versions before 3.7 since older
+# versions use re._pattern_type instead of re.Pattern
+if sys.version_info.major == 3 and sys.version_info.minor < 7:
+    re.Pattern = re._pattern_type
 
 def config_import_file(filename, namespace = "__main__",
                        raise_on_fail = True):

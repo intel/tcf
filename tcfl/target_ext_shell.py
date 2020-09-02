@@ -256,7 +256,7 @@ class shell(tc.target_extension_c):
         """
         assert tempt == None or isinstance(tempt, str)
         assert user == None or isinstance(user, str)
-        assert login_regex == None or isinstance(login_regex, ( str, re._pattern_type ))
+        assert login_regex == None or isinstance(login_regex, ( str, re.Pattern ))
         assert delay_login >= 0
         assert password == None or isinstance(password, str)
         assert isinstance(password_regex, ( str, typing.Pattern ))

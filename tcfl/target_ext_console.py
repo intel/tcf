@@ -790,7 +790,7 @@ class extension(tc.target_extension_c):
             return data
         if newline == None:
             return re.sub(cls._crlf_regex_universal, "\n", data)
-        if isinstance(newline, re._pattern_type):
+        if isinstance(newline, re.Pattern):
             return re.sub(newline, "\n", data)
         if isinstance(newline, str):
             return data.replace(newline, "\n")
