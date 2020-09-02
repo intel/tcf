@@ -111,11 +111,15 @@ class extension(tc.target_extension_c):
     def list(self, filenames = None):
         """
         List available files and their MD5 sums
+
+        :return: dictionary keyed by filename of file's MD5 sums.
         """
         commonl.assert_none_or_list_of_strings(filenames, "filenames", "filename")
         r = self.target.ttbd_iface_call("store", "list",
                                         filenames = filenames, method = "GET")
-        return r['result']
+        if 'result' in r:
+            return r['result']	# COMPAT
+        return r
 
 
     def _healthcheck(self):

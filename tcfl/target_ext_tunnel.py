@@ -307,12 +307,13 @@ def _cmdline_tunnel_remove(args):
 def _cmdline_tunnel_list(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "tunnel")
-        for proto, ip_addr, port, local_port in  target.tunnel.list():
-            print("%s %s:%s %s:%s" % (
-                proto,
+        for local_port, data in  target.tunnel.list().items():
+            print "%s %s:%s %s:%s" % (
+                data['protocol'],
                 target.rtb.parsed_url.hostname, local_port,
-                ip_addr, port
-            ))
+                data['ip_addr'], data['port']
+            )
+
 
 def cmdline_setup(argsp):
     ap = argsp.add_parser("tunnel-add", help = "create an IP tunnel")

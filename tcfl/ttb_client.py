@@ -42,6 +42,8 @@ import math
 import os
 import pprint
 import re
+import requests
+import requests.exceptions
 import struct
 import sys
 import termios
@@ -369,7 +371,7 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
     # for the target to flash, which we know from the tags
     def send_request(self, method, url,
                      data = None, json = None, files = None,
-                     stream = False, raw = False, timeout = 60):
+                     stream = False, raw = False, timeout = 160):
         """
         Send request to server using url and data, save the cookies
         generated from request, search for issues on connection and
@@ -400,24 +402,24 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
         if method == 'GET':
             r = session.get(url_request, cookies = cookies, json = json,
                             data = data, verify = self.verify_ssl,
-                            stream = stream, timeout = timeout)
+                            stream = stream, timeout = (timeout, timeout))
         elif method == 'PATCH':
             r = session.patch(url_request, cookies = cookies, json = json,
                               data = data, verify = self.verify_ssl,
-                              stream = stream, timeout = timeout)
+                              stream = stream, timeout = ( timeout, timeout ))
         elif method == 'POST':
             r = session.post(url_request, cookies = cookies, json = json,
                              data = data, files = files,
                              verify = self.verify_ssl,
-                             stream = stream, timeout = timeout)
+                             stream = stream, timeout = ( timeout, timeout ))
         elif method == 'PUT':
             r = session.put(url_request, cookies = cookies, json = json,
                             data = data, verify = self.verify_ssl,
-                            stream = stream, timeout = timeout)
+                            stream = stream, timeout = ( timeout, timeout ))
         elif method == 'DELETE':
             r = session.delete(url_request, cookies = cookies, json = json,
                                data = data, verify = self.verify_ssl,
-                               stream = stream, timeout = timeout)
+                               stream = stream, timeout = ( timeout, timeout ))
         else:
             raise Exception("Unknown method '%s'" % method)
 

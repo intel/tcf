@@ -6,7 +6,7 @@ ipaddress
 junit_xml
 keyring
 numpy
-opencv-python==4.1.2.30
+opencv-python
 ply
 pykwalify
 pylint

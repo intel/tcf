@@ -1011,31 +1011,35 @@ def linux_package_add(ic, target, *packages, **kws):
 
     packages = list(packages)
     if distro.startswith('clear'):
-        tcfl.tl.swupd_bundle_add(
-            ic, target, packages + kws.get("any", []) + kws.get("clear", []),
-            fix_time = True, set_proxy = True)
+        _packages = packages + kws.get("any", []) + kws.get("clear", [])
+        if _packages:
+            tcfl.tl.swupd_bundle_add(ic, target, _packages,
+                                     fix_time = True, set_proxy = True)
     elif distro == 'centos':
         _packages = packages + kws.get("any", []) + kws.get("centos", [])
-        target.shell.run(
-            "dnf install -qy " +  " ".join(_packages))
+        if _packages:
+            target.shell.run("dnf install -qy " +  " ".join(_packages))
     elif distro == 'fedora':
         _packages = packages + kws.get("any", []) + kws.get("fedora", [])
-        target.shell.run(
-            "dnf install -qy " +  " ".join(_packages))
+        if _packages:
+            target.shell.run(
+                "dnf install --releasever %s -qy " % distro_version
+                +  " ".join(_packages))
     elif distro == 'rhel':
         _packages = packages + kws.get("any", []) + kws.get("rhel", [])
-        target.shell.run(
-            "dnf install -qy " +  " ".join(_packages))
+        if _packages:
+            target.shell.run("dnf install -qy " +  " ".join(_packages))
     elif distro == 'ubuntu':
-        # FIXME: add needed repos [ubuntu|debian]_extra_repos
-        target.shell.run(
-            "sed -i 's/main restricted/main restricted universe multiverse/'"
-            " /etc/apt/sources.list")
-        target.shell.run("apt-get -qy update", timeout = 200)
         _packages = packages + kws.get("any", []) + kws.get("ubuntu", [])
-        target.shell.run(
-            "DEBIAN_FRONTEND=noninteractive"
-            " apt-get install -qy " +  " ".join(_packages))
+        if _packages:
+            # FIXME: add needed repos [ubuntu|debian]_extra_repos
+            target.shell.run(
+                "sed -i 's/main restricted/main restricted universe multiverse/'"
+                " /etc/apt/sources.list")
+            target.shell.run("apt-get -qy update", timeout = 200)
+            target.shell.run(
+                "DEBIAN_FRONTEND=noninteractive"
+                " apt-get install -qy " +  " ".join(_packages))
     else:
         raise tcfl.tc.error_e("unknown OS: %s %s (from /etc/os-release)"
                               % (distro, distro_version))

@@ -630,7 +630,14 @@ EOF
             bundles += open(requirements_fname).read().split()
         self.report_info("Bundle requirements: %s" % " ".join(bundles),
                          dlevel = 1)
-        tcfl.tl.swupd_bundle_add(ic, target, bundles)
+        try:
+            tcfl.tl.swupd_bundle_add(ic, target, bundles)
+        except tcfl.tc.failed_e as e:
+            # dirty trick -- all these shall be errors, not failures
+            # --since we are installing dependencies and we hae no
+            # easy way to pass down the chain of
+            # swupd_bundle_add()->run() that we want an error
+            raise tcfl.tc.error_e(*e.args)
 
         # once the os-test-suite thing has been installed, then we can
         # test if bats supports parallelism

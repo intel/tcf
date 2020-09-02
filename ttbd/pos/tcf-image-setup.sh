@@ -496,7 +496,7 @@ case $image_type in
 InitialSetupEnable=false
 EOF
             info $image_type: disabled GNOME initial setup
-            selinux_relabel["/etc/gdm3/custom.conf"]=1
+            selinux_relabel["etc/gdm3/custom.conf"]=1
         fi
         ;;
     fedoralive|qcow2)
@@ -506,7 +506,7 @@ EOF
 InitialSetupEnable=false
 EOF
             info $image_type: disabled GNOME initial setup
-            selinux_relabe["/etc/gdm/custom.conf"]=1
+            selinux_relabel["etc/gdm/custom.conf"]=1
         fi
         ;;
     *)

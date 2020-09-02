@@ -36,6 +36,7 @@ import numbers
 import os
 import random
 import re
+import requests
 import signal
 import socket
 import string
@@ -49,8 +50,12 @@ import time
 import traceback
 import types
 
-import keyring
-import requests
+try:
+    import keyring
+    keyring_available = True
+except ImportError as e:
+    logging.warning("can't import keyring, functionality disabled")
+    keyring_available = False
 
 from . import expr_parser
 
@@ -370,7 +375,7 @@ def request_response_maybe_raise(response):
         except ValueError as e:
             message = "no specific error text available"
         logging.debug("HTTP Error: %s", response.text)
-        e = requests.HTTPError(
+        e = requests.exceptions.HTTPError(
             "%d: %s" % (response.status_code, message))
         e.status_code = response.status_code
         e.message = response.reason
@@ -1173,11 +1178,19 @@ def password_get(domain, user, password):
     assert isinstance(user, str)
     assert password == None or isinstance(password, str)
     if password == "KEYRING":
+        if keyring_available == False:
+            raise RuntimeError(
+                "keyring: functionality to load passwords not available,"
+                " please install keyring support")
         password = keyring.get_password(domain, user)
         if password == None:
             raise RuntimeError("keyring: no password for user %s @ %s"
                                % (user, domain))
     elif password and password.startswith("KEYRING:"):
+        if keyring_available == False:
+            raise RuntimeError(
+                "keyring: functionality to load passwords not available,"
+                " please install keyring support")
         _, domain = password.split(":", 1)
         password = keyring.get_password(domain, user)
         if password == None:

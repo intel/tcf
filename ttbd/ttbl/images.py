@@ -205,6 +205,7 @@ flashers::
 import codecs
 import collections
 import copy
+import errno
 import hashlib
 import json
 import numbers
@@ -1380,8 +1381,12 @@ class flash_shell_cmd_c(impl2_c):
 
     :param str path: (optional, defaults to *cmdline[0]*) path to the
       flashing program
+
+    :param dict env_add: (optional) variables to add to the environment when
+      running the command
     """
-    def __init__(self, cmdline, cwd = "/tmp", path = None, **kwargs):
+    def __init__(self, cmdline, cwd = "/tmp", path = None, env_add = None,
+                 **kwargs):
         commonl.assert_list_of_strings(cmdline, "cmdline", "arguments")
         assert cwd == None or isinstance(cwd, str)
         assert path == None or isinstance(path, str)
@@ -1391,6 +1396,11 @@ class flash_shell_cmd_c(impl2_c):
         self.path = path
         self.cmdline = cmdline
         self.cwd = cwd
+        if env_add:
+            commonl.assert_dict_of_strings(env_add, "env_add")
+            self.env_add = env_add
+        else:
+            self.env_add = {}
         impl2_c.__init__(self, **kwargs)
 
     def flash_start(self, target, images, context):
@@ -1436,13 +1446,19 @@ class flash_shell_cmd_c(impl2_c):
         context['cmdline'] = cmdline
         context['cmdline_s'] = cmdline_s
 
+        if self.env_add:
+            env = dict(os.environ)
+            env.update(self.env_add)
+        else:
+            env = os.environ
+
         ts0 = time.time()
         context['ts0'] = ts0
         try:
             target.log.info("flashing image with: %s" % " ".join(cmdline))
             with open(logfile_name, "w+") as logf:
                 self.p = subprocess.Popen(
-                    cmdline, stdin = None, cwd = cwd,
+                    cmdline, env = env, stdin = None, cwd = cwd,
                     stderr = subprocess.STDOUT, stdout = logf)
             with open(pidfile, "w+") as pidf:
                 pidf.write("%s" % self.p.pid)
@@ -1493,11 +1509,23 @@ class flash_shell_cmd_c(impl2_c):
         commonl.process_terminate(context['pidfile'], path = self.path)
 
 
+    def _log_file_read(self, context, max_bytes = 2000):
+        with codecs.open(context['logfile_name'], errors = 'ignore') as logf:
+            try:
+                # SEEK to -MAX_BYTES or if EINVAL (too big), leave it
+                # at beginning of file
+                logf.seek(-max_bytes, 2)
+            except IOError as e:
+                if e.errno != errno.EINVAL:
+                    raise
+            return logf.read()
+
     def flash_post_check(self, target, images, context,
                          expected_returncode = 0):
         if self.p.returncode != expected_returncode:
             msg = "flashing with %s failed, returned %s: %s" % (
-                context['cmdline_s'], self.p.returncode, "<n/a>")
+                context['cmdline_s'], self.p.returncode,
+                self._log_file_read(context))
             target.log.error(msg)
             raise RuntimeError(msg)
         return

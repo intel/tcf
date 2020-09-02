@@ -145,7 +145,7 @@ class interface(ttbl.tt_interface):
                    and commonl.process_alive(_pid, "/usr/bin/socat"):
                     # there is already an active tunnel for this port
                     # and it is alive, so use that
-                    return dict(result = _lport)
+                    return dict(result = int(_lport))
 
             local_port = commonl.tcp_port_assigner(
                 port_range = ttbl.config.tcp_port_range)
