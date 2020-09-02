@@ -308,7 +308,7 @@ def _cmdline_tunnel_list(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "tunnel")
         for local_port, data in  target.tunnel.list().items():
-            print "%s %s:%s %s:%s" % (
+            print("%s %s:%s %s:%s") % (
                 data['protocol'],
                 target.rtb.parsed_url.hostname, local_port,
                 data['ip_addr'], data['port']
