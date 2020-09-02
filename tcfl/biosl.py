@@ -125,7 +125,7 @@ def ansi_key_code(key, term):
     if key not in ansi_key_codes:
         return key
     key_map = ansi_key_codes[key]
-    for seq, terms in key_map.iteritems():
+    for seq, terms in key_map.items():
         if term in terms:
             return seq
     raise unknown_key_code_e("unknown key code %s for term %s"
@@ -252,34 +252,34 @@ def menu_scroll_to_entry(
     if has_value:
         # takes care of (2) in the function doc
         selected_regex = re.compile(
-            highlight_string
-            + "\x1b\[(?P<row>[0-9]+);(?P<column_value>[0-9]+)H"
+            highlight_string.encode('utf-8')
+            + b"\x1b\[(?P<row>[0-9]+);(?P<column_value>[0-9]+)H"
             # value is anything that is not an ANSI escape char
-            + "(?P<value>[^\x1b]+)"
+            + b"(?P<value>[^\x1b]+)"
             # the rest for us is fluf until the entry name(key) comes
-            + normal_string
+            + normal_string.encode('utf-8')
             # not sure if these two space sequences are optional
             # note we force with (?P=row) that they are all in the
             # same column; this will cause problem for multiline
             # entries...
-            + "\x1b\[(?P=row);[0-9]+H\s+"
-            + "\x1b\[(?P=row);[0-9]+H\s+"
-            + "\x1b\[(?P=row);(?P<column_key>[0-9]+)H"
+            + b"\x1b\[(?P=row);[0-9]+H\s+"
+            + b"\x1b\[(?P=row);[0-9]+H\s+"
+            + b"\x1b\[(?P=row);(?P<column_key>[0-9]+)H"
             # Some entries do start with a space, but it is not *all* spaces
-            + "(?P<key>[^\x1b]*[^ \x1b][^\x1b]*)")
+            + b"(?P<key>[^\x1b]*[^ \x1b][^\x1b]*)")
     else:
         # takes care of (1) in the function doc
         selected_regex = re.compile(
             # This won't work when we have multi line values in key/values
             # :/
-            highlight_string
-            + "\x1b\[(?P<row>[0-9]+);(?P<column_key>[0-9]+)H"
+            highlight_string.encode('utf-8')
+            + b"\x1b\[(?P<row>[0-9]+);(?P<column_key>[0-9]+)H"
             # Some entries do start with a space, but it is not *all*
             # spaces; they might finish with a string of spaces, but
             # definitely in a escape sequence
-            + "(?P<key>[^\x1b]*[^ \x1b][^\x1b]*) *\x1b")
+            + b"(?P<key>[^\x1b]*[^ \x1b][^\x1b]*) *\x1b")
 
-    entry_regex = re.compile(entry_string)
+    entry_regex = re.compile(entry_string.encode('utf-8'))
     seen_entries = collections.defaultdict(int)
     last_seen_entry = None
     last_seen_entry_count = 0
@@ -564,8 +564,8 @@ def submenu_header_expect(
         menu_name = menu_title
     else:
         assert isinstance(menu_title, str)
-    start_of_menu = re.compile(r"/-+\\")
-    end_of_menu = re.compile(r"\-+/")
+    start_of_menu = re.compile(br"/-+\\")
+    end_of_menu = re.compile(br"\-+/")
     target.expect(start_of_menu,
                   name = menu_name + ":menu-box-start")
     target.expect(menu_title,
@@ -646,9 +646,9 @@ def multiple_entry_select_one(
 
     _direction = False
     entry_highlighted_regex = re.compile(
-        r"/-+\\"
+        b"/-+\\"
         + ".*"
-        + highlight_string
+        + highlight_string.encode('utf-8')
         + "\x1b\[[0-9]+;[0-9]+H"
         + "(?P<key>[^\x1b]+)"
         + ".*"
@@ -686,7 +686,7 @@ def multiple_entry_select_one(
                 % (level, retry_top))
 
         key = r['highlight']['groupdict']['key']
-        select_entry_regex = re.compile(select_entry)
+        select_entry_regex = re.compile(select_entry.encode('utf-8'))
         if select_entry_regex.search(key):
             target.report_info("BIOS: %s: entry '%s' found"
                                % (level, select_entry))
@@ -746,7 +746,7 @@ def menu_escape_to_main(target, esc_first = True):
     # paranoid makes the main menu detection go out of synch
     regexl = []
     for entry in main_level_entries:
-        regexl.append("\[[0-9]+;[0-9]+H" + entry)
+        regexl.append(b"\[[0-9]+;[0-9]+H" + entry.encode('utf-8'))
     main_menu_regex = re.compile(".*".join(regexl))
     for level in range(max_levels):
         offset = target.console.size()
@@ -904,7 +904,7 @@ def bios_boot_expect(target):
     assert isinstance(target, tcfl.tc.target_c)
 
     target.report_info("BIOS: waiting for main menu after power on")
-    target.expect(re.compile("Press\s+\[F7\]\s+to show boot menu options"),
+    target.expect(re.compile(b"Press\s+\[F7\]\s+to show boot menu options"),
                   # this prints a lot, so when reporting, report
                   # only the previous 500 or per spend so much
                   # time reporting we miss the rest
