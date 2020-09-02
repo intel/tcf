@@ -301,19 +301,25 @@ class extension(tc.target_extension_c):
 def _cmdline_power_off(args):
     with msgid_c("cmdline"):
         for target_name in args.targets:
-            target = tc.target_c.create_from_cmdline_args(args, target_name)
+            target = tc.target_c.create_from_cmdline_args(
+                args, target_name, iface = "power",
+                extensions_only = [ 'power' ])
             target.power.off(args.component, explicit = args.explicit)
 
 def _cmdline_power_on(args):
     with msgid_c("cmdline"):
         for target_name in args.targets:
-            target = tc.target_c.create_from_cmdline_args(args, target_name)
+            target = tc.target_c.create_from_cmdline_args(
+                args, target_name, iface = "power",
+                extensions_only = [ 'power' ])
             target.power.on(args.component, explicit = args.explicit)
 
 def _cmdline_power_cycle(args):
     with msgid_c("cmdline"):
         for target_name in args.targets:
-            target = tc.target_c.create_from_cmdline_args(args, target_name)
+            target = tc.target_c.create_from_cmdline_args(
+                args, target_name, iface = "power",
+                extensions_only = [ 'power' ])
             target.power.cycle(
                 wait = float(args.wait) if args.wait else None,
                 component = args.component, explicit = args.explicit)
@@ -321,12 +327,14 @@ def _cmdline_power_cycle(args):
 def _cmdline_power_reset(args):
     with msgid_c("cmdline"):
         for target_name in args.targets:
-            target = tc.target_c.create_from_cmdline_args(args, target_name)
+            target = tc.target_c.create_from_cmdline_args(
+                args, iface = "power", extensions_only = [ 'power' ])
             target.power.reset()
 
 def _cmdline_power_list(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args)
+        target = tc.target_c.create_from_cmdline_args(
+            args, iface = "power", extensions_only = [ 'power' ])
         state, substate, components = target.power.list()
 
         def _state_to_str(state):
@@ -362,7 +370,8 @@ def _cmdline_power_list(args):
 
 def _cmdline_power_get(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args)
+        target = tc.target_c.create_from_cmdline_args(
+            args, iface = "power", extensions_only = [ 'power' ])
         r = target.power.get()
         print("%s: %s" % (target.id, 'on' if r == True else 'off'))
 
@@ -378,7 +387,8 @@ _sequence_valid_regex = re.compile(
 
 def _cmdline_power_sequence(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args)
+        target = tc.target_c.create_from_cmdline_args(
+            args, iface = "power", extensions_only = [ 'power' ])
         sequence = []
         total_wait = 0
         for s in args.sequence:
