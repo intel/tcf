@@ -9,6 +9,7 @@ Utilities to see user's information
 -----------------------------------
 
 """
+from __future__ import print_function
 import json
 import logging
 import pprint
@@ -82,7 +83,7 @@ def _cmdline_user_list(args):
     elif args.verbosity == 3:
         pprint.pprint(result)
     elif args.verbosity >= 4:
-        print json.dumps(result, skipkeys = True, indent = 4)
+        print(json.dumps(result, skipkeys = True, indent = 4))
 
 
 def _cmdline_logout(args):
@@ -110,6 +111,7 @@ def _cmdline_servers(args):
     # different verbosity levels...yah, lazy
     r = []
     d = {}
+    rtbs = {}
     for name, rtb in ttb_client.rest_target_brokers.items():
         try:
             username = rtb.logged_in_username()
@@ -118,25 +120,32 @@ def _cmdline_servers(args):
             username = "n/a"
         r.append(( rtb.aka, name, username ))
         d[rtb.aka] = dict(url = name, username = username)
+        rtbs[rtb.aka] = rtb
 
     verbosity = args.verbosity - args.quietosity
 
-    if verbosity <= 0:
+    if verbosity < -1:
+        for aka in d:
+            print(aka)
+    elif verbosity == -1:
+        for rtb in rtbs.values():
+            print(rtb.parsed_url.hostname)
+    elif verbosity == 0:
         for aka, url, username in r:
-            print aka, url, username
+            print(aka, url, username)
     elif verbosity == 1:
         headers = [
             "Server",
             "URL",
             "UserID",
         ]
-        print tabulate.tabulate(r, headers = headers)
+        print(tabulate.tabulate(r, headers = headers))
     elif verbosity == 2:
         commonl.data_dump_recursive(d)
     elif verbosity == 3:
         pprint.pprint(d)
     elif verbosity >= 4:
-        print json.dumps(d, skipkeys = True, indent = 4)
+        print(json.dumps(d, skipkeys = True, indent = 4))
 
 
 def _cmdline_setup(arg_subparsers):
@@ -190,8 +199,9 @@ def _cmdline_setup(arg_subparsers):
     ap.add_argument(
         "-q", dest = "quietosity", action = "count", default = 0,
         help = "Decrease verbosity of information to display "
-        "(none is a table, -q or more just the list of allocations,"
-        " one per line")
+        "(none is a table, -q list of shortname, url and username, "
+        "-qq the hostnames, -qqq the shortnames"
+        "; all one per line")
     ap.add_argument(
         "-v", dest = "verbosity", action = "count", default = 1,
         help = "Increase verbosity of information to display "
