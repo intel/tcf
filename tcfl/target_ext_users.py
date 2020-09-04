@@ -17,6 +17,7 @@ import pprint
 import tabulate
 
 import commonl
+import tc
 import ttb_client
 from . import msgid_c
 
@@ -112,7 +113,20 @@ def _cmdline_servers(args):
     r = []
     d = {}
     rtbs = {}
-    for name, rtb in ttb_client.rest_target_brokers.items():
+
+    if args.targets:
+        rtb_list = {}
+        for target_name in args.targets:
+            try:
+                target = tc.target_c.create_from_cmdline_args(
+                    args, target_name, extensions_only = [])
+                rtb_list[target.rtb.aka] = target.rtb
+            except IndexError as e:
+                logging.error("%s: invalid target" % target_name)
+    else:
+        rtb_list = ttb_client.rest_target_brokers
+
+    for name, rtb in rtb_list.items():
         username = "n/a"
         try:
             if args.verbosity >= 0:
@@ -211,4 +225,9 @@ def _cmdline_setup(arg_subparsers):
         help = "Increase verbosity of information to display "
         "(none is a table, -v table with more details, "
         "-vv hierarchical, -vvv Python format, -vvvv JSON format)")
+    ap.add_argument(
+        "targets", metavar = "TARGETNAMES", nargs = "*",
+        action = "store", default = None,
+        help = "List of targets for which we want to find server"
+        " information (optional; defaults to all)")
     ap.set_defaults(func = _cmdline_servers)
