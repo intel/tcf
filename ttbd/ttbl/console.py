@@ -57,7 +57,8 @@ class impl_c(ttbl.tt_interface_impl_c):
       connection has to be established. For example, for some
       Lantronix KVM serial servers, when accessing the console over
       SSH we need to wait for the prompt and then issue a *connect
-      serial* command:
+      serial* command; see :class:ttbl.lantronix.console_spider_duo_pc;
+      it looks like:
 
       >>> serial0_pc = ttbl.console.ssh_pc(
       >>>     "USER:PASSWORD@LANTRONIXHOSTNAME",
