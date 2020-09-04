@@ -1270,7 +1270,7 @@ class logfile_c(impl_c):
     def enable(self, _target, _component):
         pass
 
-    def disable(self, _target, _component):
+    def disable(self, target, _component):
         if not os.path.isabs(self.logfile_name):
             file_name = os.path.join(target.state_dir, self.logfile_name)
         else:
