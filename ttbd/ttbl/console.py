@@ -909,6 +909,8 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
     See :class:`generic_c` for descriptions on *chunk_size* and
     *interchunk_wait*, :class:`impl_c` for *command_sequence*.
 
+    Other parameters as to :class:ttbl.console.generic_c
+
     For example:
 
     >>> ssh0_pc = ttbl.console.ssh_pc("USERNAME:PASSWORD@HOSTNAME")
@@ -931,9 +933,10 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
      - pass password via agent? file descriptor?
 
     """
-    def __init__(self, hostname, port = 22,
+    def __init__(self, hostname, port = 22, crlf = '\r',
                  chunk_size = 0, interchunk_wait = 0.1,
-                 extra_opts = None, command_sequence = None):
+                 extra_opts = None, command_sequence = None,
+                 **kwargs):
         assert isinstance(hostname, basestring)
         assert port > 0
         assert extra_opts == None \
@@ -947,7 +950,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
                            chunk_size = chunk_size,
                            interchunk_wait = interchunk_wait,
                            command_sequence = command_sequence,
-                           crlf = '\r')
+                           crlf = crlf, **kwargs)
         ttbl.power.socat_pc.__init__(
             self,
             "PTY,link=console-%(component)s.write,rawer"

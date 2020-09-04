@@ -32,7 +32,9 @@ class console_spider_duo_pc(ttbl.console.ssh_pc):
       For values the PASSWORD field can have (to eg: store the
       password in a file or in a keyring) see
       :func:commonl.password_get.
-
+    
+    :param str crlf: (optional, default *\\r*) character to use for
+      line ending; see :class:ttbl.console.impl_c.
 
     If the serial console is set to no flow control, it is advisable
     to chunk the input to avoid dropping characters, adding
@@ -104,7 +106,7 @@ class console_spider_duo_pc(ttbl.console.ssh_pc):
 
         flip the configuration from RTS/CTS to None or viceversa
     """
-    def __init__(self, kvm_hostname, **kwargs):
+    def __init__(self, kvm_hostname, crlf = '\r', **kwargs):
         ttbl.console.ssh_pc.__init__(
             self,
             kvm_hostname,
@@ -138,8 +140,6 @@ class console_spider_duo_pc(ttbl.console.ssh_pc):
                 "KexAlgorithms": "diffie-hellman-group1-sha1",
                 "Ciphers" : "aes128-cbc,3des-cbc",
             },
-            chunk_size = 5, interchunk_wait = 0.2,
-            crlf = "\r",
             **kwargs)
         # it is reliable on reporting state
         self.get_samples = 1
