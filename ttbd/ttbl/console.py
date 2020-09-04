@@ -247,7 +247,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         :returns: number of bytes read from the console since the last
           power up.
         """
-        raise NotImplementedError("%s/%s: console control not implemented"
+        raise NotImplementedError("%s/%s: console size not implemented"
                                   % (target.id, component))
 
     def write(self, target, component, data):
@@ -1163,3 +1163,125 @@ class netconsole_pc(ttbl.power.socat_pc, generic_c):
         # the process is alive looking at the PIDFILE
         # COMPONENT-socat.pid and verifying that thing is still running
         return ttbl.power.socat_pc.get(self, target, component)
+
+
+class logfile_c(impl_c):
+    """
+    A console that streams a logfile in the server
+
+    :params str logfile_name: Name of the log file to stream; if
+      relative, this file must be present in the target's state
+      directory. If absolute, it can be any file in the file system
+      the daemon has access to.
+
+      .. warning:: Make sure publishing the log file does not open
+                   users to internals from the system's operation
+
+    This console can be read from but not written; the driver makes a
+    weak attempt at deciding if the file has been removed and
+    recreated by looking at the size. See the discussion on
+    generations in :class:ttbl.console.impl_c.
+
+    This console will report it is disabled if the file is not
+    present, enabled otherwise. Attempts to enable it at will be
+    ignored; disabling it removes the logfile.
+
+    >>> target.console.impl_add(
+    >>>     "debugger_log",
+    >>>     ttbl.console.logfile_c("debugger.log")
+    >>> )
+
+    """
+    def __init__(self, logfile_name, **kwargs):
+        assert isinstance(logfile_name, basestring)
+        impl_c.__init__(self, **kwargs)
+        self.logfile_name = logfile_name
+
+    # console interface)
+    def _size(self, target, component, file_name):
+        # read the file; however, let's do a basic attempt at
+        # detecting if it has been removed and created new  since the
+        # last time we read it -- ideally we'd use the creation time,
+        # but Linux keeps not.
+        # If the file's size is smaller than the last file_size we
+        # recorded, then we assume is a new file and thus set a new
+        # generation.
+        # This might work because most people reading it will be
+        # reading in a loop so the likelyhood of changes detected
+        # comes up.
+        try:
+            s = os.stat(file_name)
+            last_size = target.fsdb.get(
+                "interfaces.console." + component + ".last_size", 0)
+            if s.st_size > 0 and s.st_size < last_size:
+                generation_set(target, component)
+                target.fsdb.set("interfaces.console." + component + ".last_size",
+                                s.st_size)
+            return s.st_size
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            return None		# API way for saying "disabled"
+
+    def size(self, target, component):
+        if not os.path.isabs(self.logfile_name):
+            file_name = os.path.join(target.state_dir, self.logfile_name)
+        else:
+            file_name = self.logfile_name
+        return self._size(target, component, file_name)
+    
+    def read(self, target, component, offset):
+        # read the file; however, let's do a basic attempt at
+        # detecting if it has been removed and created new  since the
+        # last time we read it -- ideally we'd use the creation time,
+        # but Linux keeps not.
+        # If the file's size is smaller than the last file_size we
+        # recorded, then we assume is a new file and thus set a new
+        # generation.
+        # This might work because most people reading it will be
+        # reading in a loop so the likelyhood of changes detected
+        # comes up.
+        if not os.path.isabs(self.logfile_name):
+            file_name = os.path.join(target.state_dir, self.logfile_name)
+        else:
+            file_name = self.logfile_name
+        size = self._size(target, component, file_name)
+        if size == None:
+            return dict(
+                stream_file = "/dev/null",
+                stream_generation = 0,
+                stream_offset = 0
+            )
+        return dict(
+            stream_file = file_name,
+            stream_generation = target.fsdb.get(
+                "interfaces.console." + component + ".generation", 0),
+            stream_offset = offset
+        )
+
+    @staticmethod
+    def write(_target, component, _data):
+        raise RuntimeError("%s: logfile console is read only" % component)
+
+    def enable(self, _target, _component):
+        pass
+
+    def disable(self, _target, _component):
+        if not os.path.isabs(self.logfile_name):
+            file_name = os.path.join(target.state_dir, self.logfile_name)
+        else:
+            file_name = self.logfile_name
+        try:
+            os.unlink(file_name)
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            # ok, it was already disabled
+
+    # power and console interface
+    def state(self, target, component):
+        if not os.path.isabs(self.logfile_name):
+            file_name = os.path.join(target.state_dir, self.logfile_name)
+        else:
+            file_name = self.logfile_name
+        return self._size(target, component, file_name) != None
