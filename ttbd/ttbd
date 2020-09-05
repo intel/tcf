@@ -253,12 +253,27 @@ def login():
     # Each authenticator might plug us to LDAP, or to a local
     # database...who knows
     token_roles = set()
+    authenticator = "n/a"	# just for keeping pylint happy
     for authenticator in ttbl.config._authenticators:
         try:
             logd("user %s: authenticating with %s", username, authenticator)
-            _token_roles = authenticator.login(
+            user_data = authenticator.login(
                 username, password,
                 remote_address = flask.request.remote_addr)
+            if isinstance(user_data, dict):
+                # New form
+                if 'roles' in user_data:
+                    _token_roles = user_data['roles']
+                    del user_data['roles']
+                else:
+                    _token_roles = set()
+            elif isinstance(user_data, (list, set)):	# COMPAT
+                _token_roles = user_data
+                user_data = {}
+            else:
+                loge("user %s: auth bug with %s: returned type '%s'; "
+                     "expected dict", username, authenticator, type(user_data))
+                continue
             logi("user %s: authenticated with %s: roles: %s",
                  username, authenticator, " ".join(_token_roles))
             token_roles.update(_token_roles)
@@ -309,6 +324,13 @@ def login():
             identity = flask_principal.Identity(user.get_id()))
     for role in token_roles:
         user.role_add(role)
+    # set now auth specific data on the user
+    for key, value in user_data.items():
+        assert isinstance(value, ( int, float, basestring, bool ) ), \
+            "BUG: authenticator '%s' returned user data of" \
+            " invalid type '%s'; only int, float, string, bool allowed" % (
+                authenticator, type(value))
+        user.fsdb.set("data." + key, value)
     logi("user %s: authenticated with roles: %s",
          username, " ".join(token_roles))
     return flask.jsonify({
