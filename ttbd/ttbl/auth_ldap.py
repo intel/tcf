@@ -196,9 +196,10 @@ class authenticator_ldap_c(ttbl.authenticator_c):
             # add anything else the admin has said
             ldap_fields.update(self.ldap_field_set)
             self.conn.simple_bind_s(email, password.encode('utf8'))
-            # FIXME: with self.conn.simple_bind_s?
+            # search_s is picky in the field list; has to be a list,
+            # can't be a set
             record = self.conn.search_s(
-                "", ldap.SCOPE_SUBTREE, 'mail=%s' % email, ldap_fields)
+                "", ldap.SCOPE_SUBTREE, 'mail=%s' % email, list(ldap_fields))
             self.conn.unbind_s()
         except ldap.INVALID_CREDENTIALS as e:
             raise self.invalid_credentials_e(
