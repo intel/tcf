@@ -147,7 +147,7 @@ class extension(tc.target_extension_c):
                             .get('power', {})\
                             .get(component, None)
             if data:
-                timeout += self._estimated_duration_get(data, operation)
+                timeout += extension._estimated_duration_get(data, operation)
         else:
             # collect all the timeouts from the different components
             # to get an estimate on what to wait
