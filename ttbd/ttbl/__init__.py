@@ -2252,9 +2252,28 @@ class authenticator_c(object):
         represented by the token is allowed to use the infrastructure
         and which with category (as determined by the role mapping)
 
-        :returns: None if user is not allowed to log in, otherwise a
-          list with user's information; see :ref:`access control
-          <target_access_control>`.
+        :returns: None if user is not allowed to log in, otherwise:
+
+          - a dictionary keyed by string containing user information.
+
+            - field *roles* is a set or list of strings describing the
+              roles a logged in user will have in this server. For the
+              user to be allowed to log in, at least a role of *user*
+              has to be listed. Another pre-defined role is *admin*;
+              the rest are site-specific roles.
+
+            - any other field is authenticator-specific data that will
+              be stored in the user's database.
+
+              Can be accessed as field *data.FIELDNAME* by drivers
+              (*user.fsdb.get("data.FIELDNAME")*) or by clients over the
+              HTTP calls (*GET http://SERVER/ttb2-v2/users/USERNAME*)
+
+              Allowed types are: *int*, *float*, *Bool* and *str*.
+
+          - deprecated protocol: a list with all the roles a user has
+            access to; see :ref:`access control
+            <target_access_control>`.
 
         """
         assert isinstance(token, basestring)
