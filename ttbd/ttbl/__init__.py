@@ -39,6 +39,7 @@ import threading
 import time
 import traceback
 import types
+import urllib
 import urlparse
 
 import __main__
@@ -279,48 +280,59 @@ class fsdb_symlink_c(fsdb_c):
 
         self.location = dirname
 
-
     def keys(self, pattern = None):
         l = []
-        for _rootname, _dirnames, filenames in os.walk(self.location):
-            if pattern:
-                filenames = fnmatch.filter(filenames, pattern)
-            for filename in filenames:
-                if os.path.islink(os.path.join(self.location, filename)):
-                    l.append(filename)
+        for _rootname, _dirnames, filenames_raw in os.walk(self.location):
+            filenames = []
+            for filename_raw in filenames_raw:
+                # need to filter with the unquoted name...
+                filename = urllib.unquote(filename_raw)
+                if pattern == None or fnmatch.fnmatch(filename, pattern):
+                    if os.path.islink(os.path.join(self.location, filename_raw)):
+                        l.append(filename)
         return l
 
     def get_as_slist(self, *patterns):
         fl = []
-        for _rootname, _dirnames, filenames in os.walk(self.location):
+        for _rootname, _dirnames, filenames_raw in os.walk(self.location):
+            filenames = {}
+            for filename in filenames_raw:
+                filenames[urllib.unquote(filename)] = filename
             if patterns:	# that means no args given
-                use = []
-                for filename in filenames:
+                use = {}
+                for filename, filename_raw in filenames.items():
                     if commonl.field_needed(filename, patterns):
-                        use.append(filename)
+                        use[filename] = filename_raw
             else:
                 use = filenames
-            for filename in use:
-                if os.path.islink(os.path.join(self.location, filename)):
-                    bisect.insort(fl, ( filename, self.get(filename) ))
+            for filename, filename_raw in use.items():
+                if os.path.islink(os.path.join(self.location, filename_raw)):
+                    bisect.insort(fl, ( filename, self._get_raw(filename_raw) ))
         return fl
 
     def get_as_dict(self, *patterns):
         d = {}
-        for _rootname, _dirnames, filenames in os.walk(self.location):
+        for _rootname, _dirnames, filenames_raw in os.walk(self.location):
+            filenames = {}
+            for filename in filenames_raw:
+                filenames[urllib.unquote(filename)] = filename
             if patterns:	# that means no args given
-                use = []
-                for filename in filenames:
+                use = {}
+                for filename, filename_raw in filenames.items():
                     if commonl.field_needed(filename, patterns):
-                        use.append(filename)
+                        use[filename] = filename_raw
             else:
                 use = filenames
-            for filename in use:
-                if os.path.islink(os.path.join(self.location, filename)):
-                    d[filename] = self.get(filename)
+            for filename, filename_raw in use.items():
+                if os.path.islink(os.path.join(self.location, filename_raw)):
+                    d[filename] = self._get_raw(filename_raw)
         return d
 
     def set(self, key, value, force = True):
+        # escape out slashes and other unsavory characters in a non
+        # destructive way that won't work as a filename
+        key = urllib.quote(
+            key, safe = '-_ ' + string.ascii_letters + string.digits)
         location = os.path.join(self.location, key)
         if value != None:
             # the storage is always a string, so encode what is not as
@@ -373,7 +385,7 @@ class fsdb_symlink_c(fsdb_c):
         os.rename(location_new, location)
         return True
 
-    def get(self, key, default = None):
+    def _get_raw(self, key, default = None):
         location = os.path.join(self.location, key)
         try:
             value = os.readlink(location)
@@ -399,6 +411,13 @@ class fsdb_symlink_c(fsdb_c):
             if e.errno == errno.ENOENT:
                 return default
             raise
+
+    def get(self, key, default = None):
+        # escape out slashes and other unsavory characters in a non
+        # destructive way that won't work as a filename
+        key = urllib.quote(
+            key, safe = '-_ ' + string.ascii_letters + string.digits)
+        return self._get_raw(key, default = default)
 
 
 class process_posix_file_lock_c(object):
