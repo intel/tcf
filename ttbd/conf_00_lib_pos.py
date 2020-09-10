@@ -744,7 +744,6 @@ def pos_target_add(
 
     # Power Rail
     #
-    pcl = [ ( "serial0", serial0 ) ]
     if isinstance(power_rail, str):
         # legacy support for URLs for dlwps7
         # remove user/pasword
