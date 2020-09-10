@@ -467,7 +467,7 @@ class dlwps7(ttbl.power.impl_c):
         r = requests.get(self.url + "/outlet?%d=OFF" % self.outlet)
         commonl.request_response_maybe_raise(r)
 
-    state_regex = re.compile("<!-- state=(?P<state>[0-9a-z][0-9a-z]) lock=[0-9a-z][0-9a-z] -->")
+    state_regex = re.compile(b"<!-- state=(?P<state>[0-9a-z][0-9a-z]) lock=[0-9a-z][0-9a-z] -->")
     def get(self, target, component):
         """Get the power status for the outlet
 
