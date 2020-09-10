@@ -1697,10 +1697,10 @@ class quartus_pgm_c(flash_shell_cmd_c):
     def __init__(self, device_id, image_map, args = None, name = None,
                  jtagconfig = None,
                  **kwargs):
-        assert isinstance(device_id, basestring)
+        assert isinstance(device_id, str)
         commonl.assert_dict_of_ints(image_map, "image_map")
         commonl.assert_none_or_dict_of_strings(jtagconfig, "jtagconfig")
-        assert name == None or isinstance(name, basestring)
+        assert name == None or isinstance(name, str)
 
         self.device_id = device_id
         self.image_map = image_map
