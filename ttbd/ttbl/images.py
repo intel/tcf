@@ -1478,6 +1478,9 @@ class flash_shell_cmd_c(impl2_c):
                 for line in logf:
                     target.log.error('%s: logfile: %s', image_types, line)
             raise RuntimeError(msg)
+        # this is needed so SIGCHLD the process and it doesn't become
+        # a zombie
+        ttbl.daemon_pid_add(self.p.pid)	# FIXME: race condition if it died?
         target.log.debug("%s: flasher PID %s started (%s)",
                          image_types, self.p.pid, cmdline_s)
         return
