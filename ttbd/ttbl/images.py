@@ -1513,15 +1513,20 @@ class flash_shell_cmd_c(impl2_c):
 
 
     def _log_file_read(self, context, max_bytes = 2000):
-        with codecs.open(context['logfile_name'], errors = 'ignore') as logf:
-            try:
-                # SEEK to -MAX_BYTES or if EINVAL (too big), leave it
-                # at beginning of file
-                logf.seek(-max_bytes, 2)
-            except IOError as e:
-                if e.errno != errno.EINVAL:
-                    raise
-            return logf.read()
+        try:
+            with codecs.open(context['logfile_name'], errors = 'ignore') as logf:
+                try:
+                    # SEEK to -MAX_BYTES or if EINVAL (too big), leave it
+                    # at beginning of file
+                    logf.seek(-max_bytes, 2)
+                except IOError as e:
+                    if e.errno != errno.EINVAL:
+                        raise
+                return logf.read()
+        except IOError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            return "<no logls recorded>"
 
     def flash_post_check(self, target, images, context,
                          expected_returncode = 0):
@@ -1533,14 +1538,18 @@ class flash_shell_cmd_c(impl2_c):
             raise RuntimeError(msg)
         return
         # example, look at errors in the logfile
-        with codecs.open(context['logfile_name'], errors = 'ignore') as logf:
-            for line in logf:
-                if 'Fail' in line:
-                    logf.seek(0)
-                    msg = "flashing with %s failed, issues in logfile: %s" % (
-                        context['cmdline_s'], logf.read())
-                    target.log.error(msg)
-                    raise RuntimeError(msg)
+        try:
+            with codecs.open(context['logfile_name'], errors = 'ignore') as logf:
+                for line in logf:
+                    if 'Fail' in line:
+                        logf.seek(0)
+                        msg = "flashing with %s failed, issues in logfile: %s" % (
+                            context['cmdline_s'], logf.read())
+                        target.log.error(msg)
+                        raise RuntimeError(msg)
+        except IOError as e:
+            if e.errno != errno.ENOENT:
+                raise
 
 
 class quartus_pgm_c(flash_shell_cmd_c):
@@ -1895,6 +1904,10 @@ class sf100linux_c(flash_shell_cmd_c):
        ])
 
 
+    A console can be added to watch progress with::
+
+      target.console.impl_add("log-flash-IMAGENAME",
+                              ttbl.console.logfile_c("flash-IMAGENAME.log"))
 
     """
     def __init__(self, dediprog_id, args = None, name = None, timeout = 60,
