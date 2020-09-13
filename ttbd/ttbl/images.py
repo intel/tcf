@@ -1923,22 +1923,44 @@ class sf100linux_c(flash_shell_cmd_c):
         if path:
             self.path = path
         # FIXME: verify path works +x
+        # file_name and file_path are set in flash_start()
         cmdline = [
             self.path,
             "--device", dediprog_id,
-            "--silent",
-            "--log", "%(image.#0)s.log",
-            mode, "%(image.#0)s",
+            mode, "%(file_name)s",
         ]
         if args:
             for arg, value in args.items():
                 cmdline += [ arg, value ]
 
-        flash_shell_cmd_c.__init__(self, cmdline, **kwargs)
+        # when flashing, CD to where the image is, otherwise cpcmd
+        # crashes on very log filename :/ workaround
+        flash_shell_cmd_c.__init__(self, cmdline, cwd = '%(file_path)s',
+                                   **kwargs)
         if name == None:
             name = "Dediprog SF[16]00 " + dediprog_id
         self.upid_set(name, dediprog_id = dediprog_id)
 
+
+    def flash_start(self, target, images, context):
+        if len(images) != 1:
+            # yeah, this shoul dbe done in flash_start() but
+            # whatever...I don't feel like overriding it.
+            raise RuntimeError(
+                "%s: Configuration BUG: %s flasher supports only one image"
+                " but it has been called to flash %d images (%s)" % (
+                    target.id, type(self),
+                    len(images), ", ".join(images.keys())))
+
+        # WORKAROUND for dpcmd crashing when the filename is too long;
+        # we chdir into where the image is and run with a basename
+        context['kws'] = {
+            # note this only works with #1 image
+            'file_path': os.path.dirname(images.values()[0]),
+            'file_name': os.path.basename(images.values()[0]),
+        }
+        flash_shell_cmd_c.flash_start(self, target, images, context)
+        
         
     #: Path to *dpcmd*
     #:
@@ -1971,13 +1993,3 @@ class sf100linux_c(flash_shell_cmd_c):
                     target.id, type(self),
                     len(images), ", ".join(images.keys())))
         flash_shell_cmd_c.flash_post_check(self, target, images, context)
-
-        image_name = images.values()[0]
-        with codecs.open(image_name + ".log", errors = 'ignore') as logf:
-            for line in logf:
-                if 'Fail' in line:
-                    logf.seek(0)
-                    msg = "flashing with %s failed, issues in logfile: %s" \
-                        % (context['cmdline_s'], logf.read())
-                    target.log.error(msg)
-                    raise RuntimeError(msg)
