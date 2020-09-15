@@ -242,23 +242,25 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         # the group name, and save only the name the name is between
         # CN=%GROUP NAME%,DC=...
         groups = []
-        for group in data_record['memberOf']:
+        for group in data_record.get('memberOf', []):
             tmp = group.split(",")
             for i in tmp:
                 if i.startswith('CN='):
                     group_name = i.replace('CN=', '')
                     groups.append(group_name)
                     break
+        groups = set(groups)
         # Given the group list @groups, check which more roles we
         # need to add based on group membership
-        for group in groups:
-            for role_name, role in self.roles.iteritems():
-                ldap_groups = role.get('groups', [])
-                if ldap_groups == None:
-                    # anyone, not  necessarily member of any group
-                    token_roles.add(role_name)
-                elif group in ldap_groups:
-                    token_roles.add(role_name)
+        for role_name, role in self.roles.iteritems():
+            role_groups = role.get('groups', [])
+            if role_groups == None:
+                # any valid user can take this role
+                token_roles.add(role_name)
+            elif set(role_groups) & groups:
+                # the LDAP records describes groups that are also in
+                # the list of acceptable groups for this role
+                token_roles.add(role_name)
 
         data = self.ldap_login_hook(record)
         assert isinstance(data, dict), \
