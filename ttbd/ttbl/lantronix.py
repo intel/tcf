@@ -128,8 +128,50 @@ class console_spider_duo_pc(ttbl.console.ssh_pc):
                   # sometimes it doesn't see the prompt if there actually
                   # was no need for the exit command
                   "" ),
-                ( "\r\n",	# just get us a prompt
-                  re.compile("[^>]+> ") ),
+                ( 
+                    "\r\n",	# just get us a prompt
+                    re.compile("[^>]+> ") 
+                ),
+                # Flip the serial port between config and passthrough
+                # mode; this disconnects everyone and ensures we have
+                # it in the right mode to connect
+                #
+                # FIXME: need to verify what happens with
+                # lower-privilege accounts
+                (
+                    "set serial mode config\r\n",
+                    re.compile("[^>]+> ") 
+                ),
+                (
+                    # Now give it a couple secs, flipping the
+                    # configuration needs some time and there is no
+                    # way to tell when it is done
+                    2,
+                    "the serial port to flip to config mode"
+                ),
+                # set back to passthrough mode; experimentation has
+                # shown that doing it twice with two waits yielded the
+                # best results so it consistently would pass
+                (
+                    "set serial mode passthrough\r\n",
+                    re.compile("[^>]+> ") 
+                ),
+                (
+                    # Now give it another couple secs; racy as this
+                    # is, there is no way to tell when it is ready
+                    3,
+                    "the serial port to flip to passthrough mode"
+                ),
+                (
+                    "set serial mode passthrough\r\n",
+                    re.compile("[^>]+> ") 
+                ),
+                (
+                    # Now give it another couple secs; racy as this
+                    # is, there is no way to tell when it is ready
+                    5,
+                    "the serial port to flip to passthrough mode"
+                ),
                 ( "connect serial\r\n",
                   "To exit serial port connection, type 'ESC exit'." ),
             ],
