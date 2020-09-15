@@ -93,16 +93,21 @@ class impl_c(ttbl.tt_interface_impl_c):
       >>>         "Ciphers" : "aes128-cbc,3des-cbc",
       >>>     })
 
-      This is a list of tupples *( SEND, EXPECT )*; *SEND* is a string
-      sent over to the console (unless the empty string; then nothing
-      is sent).  *EXPECT* can be anything that can be fed to Python's
-      Expect :meth:`expect <pexpect.spawn.expect>` function:
+      This list a list of:
 
-      - a string
+      - tupples *( SECONDS, COMMENT )*: wait SECONDs, printing COMMENT
+        in the logs
 
-      - a compiled regular expression
+      - tupples *( SEND, EXPECT )*; *SEND* is a string
+        sent over to the console (unless the empty string; then nothing
+        is sent).  *EXPECT* can be anything that can be fed to Python's
+        Expect :meth:`expect <pexpect.spawn.expect>` function:
 
-      - a list of such
+        - a string
+
+        - a compiled regular expression
+
+        - a list of such
 
       The timeout for each expectation is hardcoded to five seconds
       (FIXME).
@@ -331,6 +336,12 @@ class impl_c(ttbl.tt_interface_impl_c):
                                                timeout = timeout)
             count = 0
             for command, response in self.command_sequence:
+                if isinstance(command, (int, float)):
+                    target.log.info("%s: waiting %ss for '%s'"
+                                    % (component, command, response))
+                    time.sleep(command)
+                    count += 1
+                    continue
                 if command:
                     target.log.info(
                         "%s: writing command: %s"
