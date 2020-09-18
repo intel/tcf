@@ -1000,8 +1000,12 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
             if self.extra_opts:
                 for k, v in self.extra_opts.items():
                     _extra_opts += "%s = %s\n" % (k, v)
+            # CheckHostIP=no and StrictHostKeyChecking=no are needed
+            # because we'll change IPs and reformat a lot, so we dont'
+            # really care for the signature.
             cf.write("""\
 UserKnownHostsFile = %s/%s-ssh-known_hosts
+CheckHostIP = no
 StrictHostKeyChecking = no
 ServerAliveCountMax = 20
 ServerAliveInterval = 10
