@@ -1003,8 +1003,9 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
             # CheckHostIP=no and StrictHostKeyChecking=no are needed
             # because we'll change IPs and reformat a lot, so we dont'
             # really care for the signature.
+            # that's also why we just send the known hosts files to null
             cf.write("""\
-UserKnownHostsFile = %s/%s-ssh-known_hosts
+UserKnownHostsFile = /dev/null
 CheckHostIP = no
 StrictHostKeyChecking = no
 ServerAliveCountMax = 20
@@ -1013,7 +1014,7 @@ TCPKeepAlive = yes
 ForwardX11 = no
 ForwardAgent = no
 EscapeChar = none
-%s""" % (target.state_dir, component, _extra_opts))
+%s""" % _extra_opts)
         ssh_user = target.fsdb.get(
             "interfaces.console." + component + ".parameter_user", None)
         ssh_port = target.fsdb.get(
