@@ -42,6 +42,7 @@ evertything:
 .. automodule:: examples.test_pos_base
 .. automodule:: examples.test_pos0_base
 .. automodule:: examples.test_pos_deploy
+.. automodule:: examples.test_pos_ssh_enable
 .. automodule:: examples.test_pos_deploy_2
 .. automodule:: examples.test_pos_deploy_N
 .. automodule:: examples.test_pos_boot
@@ -287,6 +288,18 @@ server indicating the machine is under active use. It will keep
 sending commands until you cancel it (or give it a time length for
 which to send keep alives).
 
+If the target is already acquired, you can find the allocation ID with
+*tcf ls -v*::
+
+   $ tcf ls -v TARGETNAME
+   SERVER/TARGETNAME [USERNAME:b2Bkhb]
+
+*b2Bkhb* is the allocation ID in this case; now use *tcf
+ acquire... --hold* to keep it allocated::
+
+   $ tcf -a b2Bkhb acquire TARGETNAME --hold
+
+Read on for how this can be combined with *tcf run*
 
 How do I keep a target acquired/reserved after *tcf run* is done?
 -----------------------------------------------------------------
@@ -312,7 +325,7 @@ to find the allocation ID, upon completion::
 to maintain the target acquired and powered while potentially
 debugging or testing other things, run in a separate console, run::
 
-  $ tcf -a ALLOCID nwa qu04a --hold
+  $ tcf -a ALLOCID acquire nwa qu04a --hold
   OoOWEa: NOT ALLOCATED! Holdin allocation ID given with -a
   allocation ID OoOWEa: [+224.5s] keeping alive during state 'active'
 
@@ -2371,7 +2384,7 @@ going to be connected or certain OSes / testcases are to be used:
        https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-59.tar.gz
 
     2. Extract to */opt/xtensa-esp32-elf*::
-       
+
          # tar xf xtensa-esp32-elf-linux64-1.22.0-59.tar.gz -C /opt
 
     3. Add to */etc/environment*::
