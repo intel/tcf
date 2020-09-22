@@ -507,6 +507,7 @@ Console Management Interface
 ----------------------------
 
 .. automodule:: ttbl.console
+.. automodule:: ttbl.lantronix
 
 Debugging Interface
 -------------------

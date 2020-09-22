@@ -12,7 +12,6 @@ This module implements the client side API for controlling the power's
 target as well as the hooks to access these interfaces from the
 command line.
 """
-
 import collections
 import json
 import re
@@ -134,6 +133,32 @@ class extension(tc.target_extension_c):
         self.target.report_info("listed", dlevel = 2)
         return state, substate, data
 
+    @staticmethod
+    def _estimated_duration_get(data, operation):
+        return data.get(
+            'estimated_duration_%s' % operation,
+            data.get('estimated_duration', 0))
+
+    @staticmethod
+    def _compute_duration(target, component, operation):
+        timeout = 0
+        if component:
+            data = target.rt.get('interfaces', {})\
+                            .get('power', {})\
+                            .get(component, None)
+            if data:
+                timeout += extension._estimated_duration_get(data, operation)
+        else:
+            # collect all the timeouts from the different components
+            # to get an estimate on what to wait
+            for name, data in target.rt.get('interfaces', {})\
+                                            .get('power', {})\
+                                            .items():
+                if isinstance(data, dict):
+                    # components are dictionaries, the rest are not components
+                    timeout += extension._estimated_duration_get(data, operation)
+        return timeout
+
     def off(self, component = None, explicit = False):
         """
         Power off a target or parts of its power rail
@@ -143,12 +168,18 @@ class extension(tc.target_extension_c):
         """
         assert component == None or isinstance(component, str)
         assert isinstance(explicit, bool)
-        self.target.report_info("powering off", dlevel = 1)
-        self.target.ttbd_iface_call(
+        target = self.target
+        target.report_info("powering off", dlevel = 1)
+        timeout = 60 + self._compute_duration(target, component, "off")
+        if timeout > 120:            
+            target.report_info(
+                "WARNING: long power-off--estimated duration %s seconds"
+                % timeout)
+        target.ttbd_iface_call(
             "power", "off", component = component, explicit = explicit,
-            # extra time, since power ops can take long
-            timeout = 60)
-        self.target.report_info("powered off")
+            timeout = timeout)
+        target.report_info("powered off")
+
 
     def on(self, component = None, explicit = False):
         """
@@ -159,14 +190,22 @@ class extension(tc.target_extension_c):
         """
         assert component == None or isinstance(component, str)
         assert isinstance(explicit, bool)
-        self.target.report_info("powering on", dlevel = 1)
-        self.target.ttbd_iface_call(
+        target = self.target
+        target.report_info("powering on", dlevel = 1)
+        timeout = 60 + self._compute_duration(target, component, "on")
+        if timeout > 120:            
+            target.report_info(
+                "WARNING: long power-on--estimated duration %s seconds"
+                % timeout)
+
+        target.ttbd_iface_call(
             "power", "on", component = component, explicit = explicit,
             # extra time, since power ops can take long
-            timeout = 60)
-        self.target.report_info("powered on")
-        if hasattr(self.target, "console"):
-            self.target.console._set_default()
+            timeout = timeout)
+        target.report_info("powered on")
+        if hasattr(target, "console"):
+            target.console._set_default()
+
 
     def cycle(self, wait = None, component = None, explicit = False):
         """
@@ -179,15 +218,23 @@ class extension(tc.target_extension_c):
         assert wait == None or wait >= 0
         assert component == None or isinstance(component, str)
         assert isinstance(explicit, bool)
-        self.target.report_info("power cycling", dlevel = 1)
-        self.target.ttbd_iface_call(
+        target = self.target
+        target.report_info("power cycling", dlevel = 1)
+        timeout = 60 \
+            + self._compute_duration(target, component, "on") \
+            + self._compute_duration(target, component, "off")
+        if timeout > 120:            
+            target.report_info(
+                "WARNING: long power-cycle--estimated duration %s seconds"
+                % timeout)
+        target.ttbd_iface_call(
             "power", "cycle",
             component = component, wait = wait, explicit = explicit,
-            # extra time, since power ops can take long
-            timeout = 60)
-        self.target.report_info("power cycled")
-        if hasattr(self.target, "console"):
-            self.target.console._set_default()
+            timeout = timeout)
+        target.report_info("power cycled")
+        if hasattr(target, "console"):
+            target.console._set_default()
+
 
     def reset(self):
         """
@@ -236,6 +283,7 @@ class extension(tc.target_extension_c):
           the default is set in
           :meth:`tcfl.tc.target_c.ttbd_iface_call`.
         """
+        # FIXME: compute length for timeout
         self.target.report_info("running sequence: %s" % (sequence, ), dlevel = 1)
         self.target.ttbd_iface_call("power", "sequence", method = "PUT",
                                     sequence = sequence, timeout = timeout)
@@ -299,6 +347,9 @@ class extension(tc.target_extension_c):
 
 
 def _cmdline_power_off(args):
+    tc.tc_global = tc.tc_c("cmdline", "", "builtin")
+    tc.report_driver_c.add(		# FIXME: hack console driver
+        tc.report_console.driver(0, None))
     with msgid_c("cmdline"):
         for target_name in args.targets:
             target = tc.target_c.create_from_cmdline_args(
@@ -307,6 +358,9 @@ def _cmdline_power_off(args):
             target.power.off(args.component, explicit = args.explicit)
 
 def _cmdline_power_on(args):
+    tc.tc_global = tc.tc_c("cmdline", "", "builtin")
+    tc.report_driver_c.add(		# FIXME: hack console driver
+        tc.report_console.driver(0, None))
     with msgid_c("cmdline"):
         for target_name in args.targets:
             target = tc.target_c.create_from_cmdline_args(
@@ -315,6 +369,9 @@ def _cmdline_power_on(args):
             target.power.on(args.component, explicit = args.explicit)
 
 def _cmdline_power_cycle(args):
+    tc.tc_global = tc.tc_c("cmdline", "", "builtin")
+    tc.report_driver_c.add(		# FIXME: hack console driver
+        tc.report_console.driver(0, None))
     with msgid_c("cmdline"):
         for target_name in args.targets:
             target = tc.target_c.create_from_cmdline_args(

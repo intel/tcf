@@ -11,9 +11,9 @@ pyghmi
 pyserial
 pysnmp
 python_ldap
-pyusb
+pyusb # ubuntu:python-usb
 requests
 sdnotify
 setuptools
 systemd
-tornado
+tornado	# ubuntu:python-tornado

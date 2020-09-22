@@ -9,6 +9,7 @@ Utilities to see user's information
 -----------------------------------
 
 """
+from __future__ import print_function
 import json
 import logging
 import pprint
@@ -16,6 +17,7 @@ import pprint
 import tabulate
 
 from . import commonl
+from . import tc
 from . import ttb_client
 from . import msgid_c
 
@@ -110,32 +112,57 @@ def _cmdline_servers(args):
     # different verbosity levels...yah, lazy
     r = []
     d = {}
-    for name, rtb in ttb_client.rest_target_brokers.items():
+    rtbs = {}
+
+    if args.targets:
+        rtb_list = {}
+        for target_name in args.targets:
+            try:
+                target = tc.target_c.create_from_cmdline_args(
+                    args, target_name, extensions_only = [])
+                rtb_list[target.rtb.aka] = target.rtb
+            except IndexError as e:
+                logging.error("%s: invalid target" % target_name)
+    else:
+        rtb_list = ttb_client.rest_target_brokers
+
+    for name, rtb in rtb_list.items():
+        username = "n/a"
         try:
-            username = rtb.logged_in_username()
+            if args.verbosity >= 0:
+                # FIXME: this should be parallelized
+                # we don't need this if verbosity < 0 and it takes time
+                username = rtb.logged_in_username()
         # FIXME: we need a base exception for errors from the API
         except ( ttb_client.requests.HTTPError, RuntimeError):
             username = "n/a"
         r.append(( rtb.aka, name, username ))
         d[rtb.aka] = dict(url = name, username = username)
+        rtbs[rtb.aka] = rtb
 
     verbosity = args.verbosity - args.quietosity
 
-    if verbosity <= 0:
+    if verbosity < -1:
+        for aka in d:
+            print(aka)
+    elif verbosity == -1:
+        for rtb in rtbs.values():
+            print(rtb.parsed_url.hostname)
+    elif verbosity == 0:
         for aka, url, username in r:
             print(aka, url, username)
-    elif verbosity == 1:
+    elif verbosity in ( 1, 2 ):
         headers = [
             "Server",
             "URL",
             "UserID",
         ]
         print(tabulate.tabulate(r, headers = headers))
-    elif verbosity == 2:
-        commonl.data_dump_recursive(d)
     elif verbosity == 3:
+        commonl.data_dump_recursive(d)
+    elif verbosity == 4:
         pprint.pprint(d)
-    elif verbosity >= 4:
+    elif verbosity >= 5:
         print(json.dumps(d, skipkeys = True, indent = 4))
 
 
@@ -190,11 +217,17 @@ def _cmdline_setup(arg_subparsers):
     ap.add_argument(
         "-q", dest = "quietosity", action = "count", default = 0,
         help = "Decrease verbosity of information to display "
-        "(none is a table, -q or more just the list of allocations,"
-        " one per line")
+        "(none is a table, -q list of shortname, url and username, "
+        "-qq the hostnames, -qqq the shortnames"
+        "; all one per line")
     ap.add_argument(
         "-v", dest = "verbosity", action = "count", default = 1,
         help = "Increase verbosity of information to display "
         "(none is a table, -v table with more details, "
         "-vv hierarchical, -vvv Python format, -vvvv JSON format)")
+    ap.add_argument(
+        "targets", metavar = "TARGETNAMES", nargs = "*",
+        action = "store", default = None,
+        help = "List of targets for which we want to find server"
+        " information (optional; defaults to all)")
     ap.set_defaults(func = _cmdline_servers)

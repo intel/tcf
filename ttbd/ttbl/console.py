@@ -57,7 +57,8 @@ class impl_c(ttbl.tt_interface_impl_c):
       connection has to be established. For example, for some
       Lantronix KVM serial servers, when accessing the console over
       SSH we need to wait for the prompt and then issue a *connect
-      serial* command:
+      serial* command; see :class:ttbl.lantronix.console_spider_duo_pc;
+      it looks like:
 
       >>> serial0_pc = ttbl.console.ssh_pc(
       >>>     "USER:PASSWORD@LANTRONIXHOSTNAME",
@@ -92,16 +93,21 @@ class impl_c(ttbl.tt_interface_impl_c):
       >>>         "Ciphers" : "aes128-cbc,3des-cbc",
       >>>     })
 
-      This is a list of tupples *( SEND, EXPECT )*; *SEND* is a string
-      sent over to the console (unless the empty string; then nothing
-      is sent).  *EXPECT* can be anything that can be fed to Python's
-      Expect :meth:`expect <pexpect.spawn.expect>` function:
+      This list a list of:
 
-      - a string
+      - tupples *( SECONDS, COMMENT )*: wait SECONDs, printing COMMENT
+        in the logs
 
-      - a compiled regular expression
+      - tupples *( SEND, EXPECT )*; *SEND* is a string
+        sent over to the console (unless the empty string; then nothing
+        is sent).  *EXPECT* can be anything that can be fed to Python's
+        Expect :meth:`expect <pexpect.spawn.expect>` function:
 
-      - a list of such
+        - a string
+
+        - a compiled regular expression
+
+        - a list of such
 
       The timeout for each expectation is hardcoded to five seconds
       (FIXME).
@@ -247,7 +253,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         :returns: number of bytes read from the console since the last
           power up.
         """
-        raise NotImplementedError("%s/%s: console control not implemented"
+        raise NotImplementedError("%s/%s: console size not implemented"
                                   % (target.id, component))
 
     def write(self, target, component, data):
@@ -330,6 +336,12 @@ class impl_c(ttbl.tt_interface_impl_c):
                                                timeout = timeout)
             count = 0
             for command, response in self.command_sequence:
+                if isinstance(command, (int, float)):
+                    target.log.info("%s: waiting %ss for '%s'"
+                                    % (component, command, response))
+                    time.sleep(command)
+                    count += 1
+                    continue
                 if command:
                     target.log.info(
                         "%s: writing command: %s"
@@ -834,7 +846,14 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
             "PTY,link=console-%(component)s.write,rawer"
             "!!CREATE:console-%(component)s.read",
             "%s,creat=0,rawer,b115200,parenb=0,cs8,bs1" % serial_file_name)
-
+        self.upid_set("RS-232C serial port @%s" % serial_file_name,
+                      name = "RS-232C serial port",
+                      baud_rate = 115200,
+                      data_bits = 8,
+                      stop_bits = 1,
+                      serial_port = serial_file_name,
+        )
+        
     # console interface; state() is implemented by generic_c
     def on(self, target, component):
         ttbl.power.socat_pc.on(self, target, component)
@@ -903,6 +922,8 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
     See :class:`generic_c` for descriptions on *chunk_size* and
     *interchunk_wait*, :class:`impl_c` for *command_sequence*.
 
+    Other parameters as to :class:ttbl.console.generic_c
+
     For example:
 
     >>> ssh0_pc = ttbl.console.ssh_pc("USERNAME:PASSWORD@HOSTNAME")
@@ -925,9 +946,10 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
      - pass password via agent? file descriptor?
 
     """
-    def __init__(self, hostname, port = 22,
+    def __init__(self, hostname, port = 22, crlf = '\r',
                  chunk_size = 0, interchunk_wait = 0.1,
-                 extra_opts = None, command_sequence = None):
+                 extra_opts = None, command_sequence = None,
+                 **kwargs):
         assert isinstance(hostname, str)
         assert port > 0
         assert extra_opts == None \
@@ -941,7 +963,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
                            chunk_size = chunk_size,
                            interchunk_wait = interchunk_wait,
                            command_sequence = command_sequence,
-                           crlf = '\r')
+                           crlf = crlf, **kwargs)
         ttbl.power.socat_pc.__init__(
             self,
             "PTY,link=console-%(component)s.write,rawer"
@@ -980,8 +1002,13 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
             if self.extra_opts:
                 for k, v in list(self.extra_opts.items()):
                     _extra_opts += "%s = %s\n" % (k, v)
+            # CheckHostIP=no and StrictHostKeyChecking=no are needed
+            # because we'll change IPs and reformat a lot, so we dont'
+            # really care for the signature.
+            # that's also why we just send the known hosts files to null
             cf.write("""\
-UserKnownHostsFile = %s/%s-ssh-known_hosts
+UserKnownHostsFile = /dev/null
+CheckHostIP = no
 StrictHostKeyChecking = no
 ServerAliveCountMax = 20
 ServerAliveInterval = 10
@@ -989,7 +1016,7 @@ TCPKeepAlive = yes
 ForwardX11 = no
 ForwardAgent = no
 EscapeChar = none
-%s""" % (target.state_dir, component, _extra_opts))
+%s""" % _extra_opts)
         ssh_user = target.fsdb.get(
             "interfaces.console." + component + ".parameter_user", None)
         ssh_port = target.fsdb.get(
@@ -1158,3 +1185,125 @@ class netconsole_pc(ttbl.power.socat_pc, generic_c):
         # the process is alive looking at the PIDFILE
         # COMPONENT-socat.pid and verifying that thing is still running
         return ttbl.power.socat_pc.get(self, target, component)
+
+
+class logfile_c(impl_c):
+    """
+    A console that streams a logfile in the server
+
+    :params str logfile_name: Name of the log file to stream; if
+      relative, this file must be present in the target's state
+      directory. If absolute, it can be any file in the file system
+      the daemon has access to.
+
+      .. warning:: Make sure publishing the log file does not open
+                   users to internals from the system's operation
+
+    This console can be read from but not written; the driver makes a
+    weak attempt at deciding if the file has been removed and
+    recreated by looking at the size. See the discussion on
+    generations in :class:ttbl.console.impl_c.
+
+    This console will report it is disabled if the file is not
+    present, enabled otherwise. Attempts to enable it at will be
+    ignored; disabling it removes the logfile.
+
+    >>> target.console.impl_add(
+    >>>     "debugger_log",
+    >>>     ttbl.console.logfile_c("debugger.log")
+    >>> )
+
+    """
+    def __init__(self, logfile_name, **kwargs):
+        assert isinstance(logfile_name, basestring)
+        impl_c.__init__(self, **kwargs)
+        self.logfile_name = logfile_name
+
+    # console interface)
+    def _size(self, target, component, file_name):
+        # read the file; however, let's do a basic attempt at
+        # detecting if it has been removed and created new  since the
+        # last time we read it -- ideally we'd use the creation time,
+        # but Linux keeps not.
+        # If the file's size is smaller than the last file_size we
+        # recorded, then we assume is a new file and thus set a new
+        # generation.
+        # This might work because most people reading it will be
+        # reading in a loop so the likelyhood of changes detected
+        # comes up.
+        try:
+            s = os.stat(file_name)
+            last_size = target.fsdb.get(
+                "interfaces.console." + component + ".last_size", 0)
+            if s.st_size > 0 and s.st_size < last_size:
+                generation_set(target, component)
+                target.fsdb.set("interfaces.console." + component + ".last_size",
+                                s.st_size)
+            return s.st_size
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            return None		# API way for saying "disabled"
+
+    def size(self, target, component):
+        if not os.path.isabs(self.logfile_name):
+            file_name = os.path.join(target.state_dir, self.logfile_name)
+        else:
+            file_name = self.logfile_name
+        return self._size(target, component, file_name)
+    
+    def read(self, target, component, offset):
+        # read the file; however, let's do a basic attempt at
+        # detecting if it has been removed and created new  since the
+        # last time we read it -- ideally we'd use the creation time,
+        # but Linux keeps not.
+        # If the file's size is smaller than the last file_size we
+        # recorded, then we assume is a new file and thus set a new
+        # generation.
+        # This might work because most people reading it will be
+        # reading in a loop so the likelyhood of changes detected
+        # comes up.
+        if not os.path.isabs(self.logfile_name):
+            file_name = os.path.join(target.state_dir, self.logfile_name)
+        else:
+            file_name = self.logfile_name
+        size = self._size(target, component, file_name)
+        if size == None:
+            return dict(
+                stream_file = "/dev/null",
+                stream_generation = 0,
+                stream_offset = 0
+            )
+        return dict(
+            stream_file = file_name,
+            stream_generation = target.fsdb.get(
+                "interfaces.console." + component + ".generation", 0),
+            stream_offset = offset
+        )
+
+    @staticmethod
+    def write(_target, component, _data):
+        raise RuntimeError("%s: logfile console is read only" % component)
+
+    def enable(self, _target, _component):
+        pass
+
+    def disable(self, target, _component):
+        if not os.path.isabs(self.logfile_name):
+            file_name = os.path.join(target.state_dir, self.logfile_name)
+        else:
+            file_name = self.logfile_name
+        try:
+            os.unlink(file_name)
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            # ok, it was already disabled
+
+    # power and console interface
+    def state(self, target, component):
+        if not os.path.isabs(self.logfile_name):
+            file_name = os.path.join(target.state_dir, self.logfile_name)
+        else:
+            file_name = self.logfile_name
+        return self._size(target, component, file_name) != None
