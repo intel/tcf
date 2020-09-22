@@ -253,7 +253,7 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         groups = set(groups)
         # Given the group list @groups, check which more roles we
         # need to add based on group membership
-        for role_name, role in self.roles.iteritems():
+        for role_name, role in self.roles.items():
             role_groups = role.get('groups', [])
             if role_groups == None:
                 # any valid user can take this role
