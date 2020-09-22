@@ -284,7 +284,7 @@ class fsdb_symlink_c(fsdb_c):
             filenames = []
             for filename_raw in filenames_raw:
                 # need to filter with the unquoted name...
-                filename = urllib.unquote(filename_raw)
+                filename = urllib.parse.unquote(filename_raw)
                 if pattern == None or fnmatch.fnmatch(filename, pattern):
                     if os.path.islink(os.path.join(self.location, filename_raw)):
                         l.append(filename)
@@ -295,7 +295,7 @@ class fsdb_symlink_c(fsdb_c):
         for _rootname, _dirnames, filenames_raw in os.walk(self.location):
             filenames = {}
             for filename in filenames_raw:
-                filenames[urllib.unquote(filename)] = filename
+                filenames[urllib.parse.unquote(filename)] = filename
             if patterns:	# that means no args given
                 use = {}
                 for filename, filename_raw in filenames.items():
@@ -313,7 +313,7 @@ class fsdb_symlink_c(fsdb_c):
         for _rootname, _dirnames, filenames_raw in os.walk(self.location):
             filenames = {}
             for filename in filenames_raw:
-                filenames[urllib.unquote(filename)] = filename
+                filenames[urllib.parse.unquote(filename)] = filename
             if patterns:	# that means no args given
                 use = {}
                 for filename, filename_raw in filenames.items():
@@ -329,7 +329,7 @@ class fsdb_symlink_c(fsdb_c):
     def set(self, key, value, force = True):
         # escape out slashes and other unsavory characters in a non
         # destructive way that won't work as a filename
-        key = urllib.quote(
+        key = urllib.parse.quote(
             key, safe = '-_ ' + string.ascii_letters + string.digits)
         location = os.path.join(self.location, key)
         if not self.key_valid_regex.match(key):
@@ -416,7 +416,7 @@ class fsdb_symlink_c(fsdb_c):
     def get(self, key, default = None):
         # escape out slashes and other unsavory characters in a non
         # destructive way that won't work as a filename
-        key = urllib.quote(
+        key = urllib.parse.quote(
             key, safe = '-_ ' + string.ascii_letters + string.digits)
         return self._get_raw(key, default = default)
 
