@@ -154,6 +154,38 @@ slightly more reliable to use:
 *\x04* is the ASCII end-of-transmission character, *Ctrl-D*. This is
 the equivalent of typing the file contents on the command line.
 
+Accessing the server API without the TCFL library
+=================================================
+
+The :ref:`server API <ttbd_api_http>` can also be accessed in other
+ways outside the TCFL library:
+
+Accessing the HTTP API from Python with *requests*
+--------------------------------------------------
+
+Sample code snippet to access a server using Python and the requests
+module instead of the :ref:`TCF library<examples_script>` library.
+
+This :download:`snippet <../examples/code/python.py>`:
+
+- logs in to a server, acquiring credentials via cookies (which are
+  then used for the rest of the operations)
+
+- allocates a machine
+
+- powers the machine off
+
+- powers the machine on
+
+- releases the machine
+
+
+.. literalinclude:: /examples/code/python.py
+   :language: python
+
+
+
+
 
 TCF client tricks
 =================
