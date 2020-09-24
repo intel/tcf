@@ -50,7 +50,7 @@ evertything:
 .. automodule:: examples.test_qemu_bios_N
 .. automodule:: examples.test_deploy_files
 .. automodule:: examples.test_linux_kernel
-
+.. automodule:: examples.test_efi_ipxe_sanboot
 
 Finding stuff in the desktop and injecting input
 ------------------------------------------------

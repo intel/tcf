@@ -2208,6 +2208,53 @@ class tc_pos0_base(tc.tc_c):
         """
         Flash anything specified in :data:image_flash or IMAGE_FLASH*
         environment variables
+
+        The *IMAGE_FLASH* environment variable is a string containing
+        a space separated list of tokens:
+
+        - *soft*: if present, do soft flashing (will only be flashed
+           if the image to be flashed is different than the last image
+           that was flashed)
+
+        - *IMAGETYPE:FILENAME*: *IMAGETYPE* being any of the image
+           destinations the target can flash; can be found with::
+
+             $ tcf image-ls TARGETNAME
+
+           or from the inventory::
+
+             $ tcf get TARGETNAME -p interfaces.images
+
+        The code looks at environment variables called, in this order:
+
+        - *IMAGE_FLASH_<TYPE>*
+        - *IMAGE_FLASH_<FULLID>*
+        - *IMAGE_FLASH_<ID>*
+        - *IMAGE_FLASH*
+
+        Where *type*, *fullid* and *id* are the fields from the
+        inventory of the same name::
+
+          $ tcf ls -vv rasp-1250 -p id -p type -p fullid
+          SERVERNAME/TARGETNAME
+          SERVERNAME/TARGETNAME.fullid: SERVERNAME/TARGETNAME
+          SERVERNAME/TARGETNAME.id: TARGETNAME
+          SERVERNAME/TARGETNAME.type: TYPENAME
+          ...
+
+        with all the characters not in the set *0-9a-zA-Z_* replaced
+        with underscores.
+
+        For example::
+
+          $ export IMAGE_FLASH_TYPE1="soft bios:path/to/bios.bin"
+          $ tcf run test_SOMESCRIPT.py
+
+        if *test_SOMESCRIPT.py* uses this template, every invocation
+        of it on a machine of type TYPE1 will result on the file
+        *path/to/bios.bin* being flashed on the *bios* location
+        (however, because of *soft*, if it was already flashed before,
+        it will be skipped).
         """
         image_flash = self.image_flash
         if not image_flash:
