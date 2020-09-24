@@ -5,19 +5,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
-import os
-import time
+""".. _example_efi_pxe_sanboot:
 
-import tcfl.biosl
-import commonl
-import tcfl.tc
-import tcfl.tl
-
-"""
-.. _example_efi_pxe_sanboot:
-
-Drive a machine with EDK2 EFI BIOS to iPXE boot an image
-========================================================
+Boot an ISO image off the network with EDK2 EFI BIOS and iPXE
+=============================================================
 
 Given a machine that has an EDK2 based EFI BIOS, power cycle the
 machine and using the serial console, break into the BIOS menu to
@@ -81,6 +72,14 @@ with::
 (depending on your installation method, location might be
 *~/.local/share/tcf/examples*)
 """
+import os
+import time
+
+import commonl
+import tcfl.biosl
+import tcfl.tc
+import tcfl.tl
+
 
 class _test(tcfl.pos.tc_pos_base):
 
