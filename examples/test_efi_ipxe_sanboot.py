@@ -26,7 +26,7 @@ Assumptions:
 
 Note how this testcase is reusing the template
 :class:tcfl.pos.tc_pos_base; this allows to use this script to flash
-firmware images (see :meth:tcfl.pos.tc_pos_base.deploy_10_flash for
+firmware images (see :meth:`tcfl.pos.tc_pos0_base.deploy_10_flash` for
 more information).
 
 .. literalinclude:: /examples/test_efi_ipxe_sanboot.py
@@ -55,17 +55,17 @@ with::
   ...
   INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+546.5s]: BIOS: escaped to main
   INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+552.0s]: BIOS:top/Reset: highlighted entry found
-  INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+552.8s]: serial0: wrote 1B (\r) to console
+  INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+552.8s]: serial0: wrote 1B (\\r) to console
   ...
   INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+552.8s]: BIOS: waiting for main menu after power on
   INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+616.2s]: BIOS: confirming we are at toplevel menu
   INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+619.2s]: BIOS:main menu/Boot Manager Menu: highlighted entry found
   INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+621.7s]: BIOS:Boot Manager Menu: found menu header
   INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+623.5s]: BIOS:Boot Manager Menu/UEFI PXEv4 \\(MAC:4AFB6017383C\\): highlighted entry found
-  INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+637.8s]: serial0: wrote 25B (set net0/ip 10.129.318.9\r) to console
-  INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+639.4s]: serial0: wrote 31B (set net0/netmask 255.255.252.0\r) to console
-  INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+640.1s]: serial0: wrote 7B (ifopen\r) to console
-  INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+642.4s]: serial0: wrote 48B (sanboot http://someserver.com/Fedora-Workstation-Live-x86_64-31-1.9.iso\r) to console
+  INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+637.8s]: serial0: wrote 25B (set net0/ip 10.129.318.9\\r) to console
+  INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+639.4s]: serial0: wrote 31B (set net0/netmask 255.255.252.0\\r) to console
+  INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+640.1s]: serial0: wrote 7B (ifopen\\r) to console
+  INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+642.4s]: serial0: wrote 48B (sanboot http://someserver.com/Fedora-Workstation-Live-x86_64-31-1.9.iso\\r) to console
   PASS1/x74ds3  .../test_efi_ipxe_sanboot.py @huty-ehnc [+644.0s]: evaluation passed 
   PASS0/	toplevel @local [+648.6s]: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:10:44.397730) - passed 
 
