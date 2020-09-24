@@ -4,8 +4,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 """
-Control power to targets
-------------------------
+Control power to targets and general control for relays, buttons and jumpers
+----------------------------------------------------------------------------
 
 This interface provides means to power on/off targets and the invidual
 components that compose the power rail of a target.
@@ -13,15 +13,44 @@ components that compose the power rail of a target.
 The interface is implemented by :class:`ttbl.power.interface` needs to
 be attached to a target with :meth:`ttbl.test_target.interface_add`::
 
->>> ttbl.config.targets[NAME].interface_add(
->>>     "INTERFACENAME",
+>>> ttbl.test_target.get(NAME).interface_add(
+>>>     "power",
 >>>     ttbl.power.interface(
 >>>         component0,
 >>>         component1,
 >>>         ...
 >>>     )
 
-each component is an instance of a subclass of
+Generally, this interface can also be used to control any
+instrumentation that has binary states (on/off, true/false,
+connected/disconnected, pressed/released, etc..) such as:
+
+- relays
+- buttons
+- jumpers (controlled by a relay)
+
+by convention, the *buttons* and *jumpers* interfaces are exposed with
+those names; thus, in a configuration :ref:`configuration file
+<ttbd_configuration>`::
+
+>>> ttbl.test_target.get(NAME).interface_add(
+>>>     "buttons",
+>>>     ttbl.power.interface(
+>>>         power = ttbl.usbrly08b.pc("24234", 3),
+>>>         reset = ttbl.usbrly08b.pc("24234", 4),
+>>>         ...
+>>>     )
+
+would add two buttons, power and reset, controlled by a
+:class:`USBRLY08B <ttbl.usbrly08b.pc>` relay bank (by wiring the NO and
+NC lines through the button so that turning on/closing the relay
+effectively presses the button).
+
+Any other mechanism (and driver) to act on jumpers or buttons can be
+implemented to provide the on/off operation that translates into
+button press/release or jumper close/open.
+
+Each component is an instance of a subclass of
 :class:`ttbl.power.impl_c`, which implements the actual control over
 the power unit, such as:
 
@@ -40,15 +69,147 @@ Also power components are able to:
 
 - wait for some particular conditions to happen: a file
   :class:`dissapearing <ttbl.pc.delay_til_file_gone>` or
-  :class:`appearing <ttbl.pc.delay_til_file_appears>`, a USB device is
+  :class:`appearing <ttbl.pc.delay_til_file_appears>`,
+  :class:`a shell command running and returning a value
+  <ttbl.power.delay_til_shell_cmd_c>` or a USB device is
   :class:`detected <ttbl.pc.delay_til_usb_device>` in the system
 
-"""
+.. _ttbd_power_explicit:
 
+Explicit vs normal power components
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Power components can be declared as:
+
+  - **normal** (default): upon running whole rail power **on** or
+    **off** sequences, they are always acted upon.
+
+  - **explicit**: upon running a whole rail power **on** or **off**
+    sequence, they will be skipped, unless the *explicit* option is
+    given.
+
+  - **explicit/on**: upon running a whole rail power **on** sequence,
+    they will be skipped unless the *explicit* option is given.
+
+  - **explicit/off**: upon running a whole rail power **off**
+    sequence, they will be skipped unless the *explicit* option is
+    given.
+
+Thus, an *explicit* power components will be only acted upon when we
+explicitly power them on/off.
+
+Use models for the *explicit* tagging:
+
+- a target is powered by components A and B. Component A takes a
+  long time to power up and can be left on, since the actual power
+  control to the target depends on also on B being on and B is more
+  responsive.
+
+  Component A would be declared as *explicit off*.
+
+  This can be applied for example to servers powered via a PDU for AC
+  power but whose actual state can be governed via a BMC using the
+  IPMI protocol.
+
+- Invasive instrumentation C connected to a target that is to be used
+  only in certain ocassions but has to be powered off for normal use.
+
+  Component C would be declared as *explicit on*.
+
+To configure a component at the configuration level, the :attr:impl_cexplicit
+attribute can be set to:
+
+- *None* for normal behaviour
+
+- *both* explicit for both powering on and off
+
+- *on* explicit for powering on
+
+- *off* explicit for powering off
+
+this can be used either in the intialization sequence or afterwards:
+
+>>> pc = ttbl.power.socat_pc(ADDR1, ADDR2)
+>>> pc.explicit = 'both'
+
+.. _ttbd_power_states:
+
+Overall power state and explicit power components
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Deciding what is the overall power state has a few nuances to take
+into account, especially when explicit power components are taken into
+account.
+
+The target is:
+
+- **fully on**: when **all** the power components (including those
+  tagged as *explicit* and *explicit/on*) are reporting *on* or *n/a*
+
+- *partial on*: when **all** the power components (excluding those
+  tagged as *explicit* and *explicit/on*) reports *on* and some (but
+  not all) of those tagged as *explict* and *explicit/on* are
+  on.
+
+  This might be an inconsistent state, since some of the explicit
+  components might not allow the target to operate normally.
+
+- **on**: when **all** the power components (except those tagged as
+   **explicit** and **explicit/on**) are reporting *on* or *n/a*
+
+- *partial off*: when **any** (but not all) power components
+  (excluding those tagged as *explicit* and *explicit/on*) reports
+  *off*
+
+- *off*: when **all** power components (excluding those tagged as
+  *explicit* and *explicit/off*) report *off*
+
+- **fully off**: when **all** the power components (including those
+  tagged as *explicit* and *explicit/off*) report *off*.
+
+Note the computation of *is the target* off depends on the context:
+
+- for a remote user:
+
+  - *fully on* might be impossible to reach for operation of the
+    target, as some explicit/on power components might not allow the
+    target to work normally (eg: invasive instrumentation that disallows
+    normal operation).
+
+  - *partial on* like *fully on*, this might be an inconsistent state,
+    since some of the explicit components might not allow the target
+    to operate normally.
+
+    This might be used for non-common circumnstances to administer,
+    diagnose or do non typical work on the targets.
+
+  - *on* means the target should operate as it'd be normally
+
+  - *partial off* likely means the not everything the target needs to
+    work is operative; to bring it to operation most likely it shall
+    be power cycled (take to off, then power on).
+
+  - *off* means the target is powered off as it'd be normally
+
+  - *partial off* likely means the not everything the target needs to
+    work is operative; to bring it to operation most likely it shall
+    be power cycled (take to off, then power on).
+
+- for a daemon powering off unused infrastructure, it should take to
+  *off* anything on *partially off*, *on* and *fully on* and after a
+  longer count, maybe bring to *fully off*.
+
+As a convenience, the system publishes in the inventory the data
+*interfaces.power.state* as *true* if *on*. Otherwise, the state is
+not published and must be assumed as *off* or *fully off*.
+
+"""
 import collections
 import errno
-import time
+import json
+import numbers
 import os
+import time
 import traceback
 import types
 import subprocess
@@ -90,15 +251,35 @@ class impl_c(ttbl.tt_interface_impl_c):
     :param bool paranoid: don't trust the operation is really
       blocking, as it should, so double check the state changed happen
       and retry if not.
+
+    :param str explicit: (optional, default *None*) declare if this power
+      component shall be only turned on or off when explicitly named in
+      a power rail. See :ref:ttbd_power_explicit.
+
+      - *None*: for normal behaviour; component will be
+         powered-on/started with the whole power rail
+
+      - *both*: explicit for both powering on and off: only
+        power-on/start and power-off/stop if explicity called by
+        name
+
+      - *on*: explicit for powering on: only power-on/start if explicity
+        powered on by name, power off normally
+
+      - *off*: explicit for powering off: only power-off/stop if explicity
+        powered off by name, power on normally
+
     """
-    def __init__(self, paranoid = False):
+    def __init__(self, paranoid = False, explicit = None):
         assert isinstance(paranoid, bool)
+        assert explicit in ( None, 'on', 'off', 'both' )
         #: If the power on fails, automatically retry it by powering
         #: first off, then on again
         self.power_on_recovery = False
         self.paranoid = paranoid
         self.timeout = 10	# used for paranoid checks
         self.wait = 0.5
+        self.explicit = explicit
         #: for paranoid power getting, now many samples we need to get
         #: that are the same for the value to be considered stable
         self.paranoid_get_samples = 6
@@ -179,12 +360,16 @@ class interface(ttbl.tt_interface):
         # each rail component matters.
         self.impls_set(impls, kwimpls, impl_c)
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         # Called when the interface is added to a target to initialize
         # the needed target aspect (such as adding tags/metadata)
-        target.tags_update(dict(power_rail = self.impls.keys()))
-        self.instrumentation_publish(target, "power")
-
+        for name, impl in self.impls.iteritems():
+            assert name not in ( 'all', 'full' ), \
+                "power component '%s': cannot be called '%s'; name reserved" \
+                % (name, name)
+            assert impl.explicit in ( None, 'on', 'off', 'both' ), \
+                "power component '%s': impls' explicit value is %s;" \
+                " expected None, 'on', 'off' or 'both'" % (name, impl.implicit)
 
     def _release_hook(self, target, _force):
         # nothing to do on target release
@@ -204,10 +389,10 @@ class interface(ttbl.tt_interface):
         while ts - ts0 < impl.timeout:
             try:
                 impl.on(target, component)
-            except impl.power_on_e as e:
-                target.log.exception("%s: impl failed powering on +%.1f;"
-                                     " powering off and retrying: %s",
-                                     component, ts - ts0, e)
+            except impl.error_e as e:
+                target.log.error("%s: impl failed powering on +%.1f;"
+                                 " powering off and retrying: %s",
+                                 component, ts - ts0, e)
                 try:
                     self._impl_off(impl, target, component)
                 except impl.error_e as e:
@@ -218,11 +403,13 @@ class interface(ttbl.tt_interface):
             else:
                 target.log.info("%s: impl powered on +%.1fs",
                                 component, ts - ts0)
-                new_state = self._impl_get(impl, target, component)
-                if new_state == None or new_state == True: # check
-                    return
-                target.log.info("%s: impl didn't power on +%.1f retrying",
-                                component, ts - ts0)
+            # let's check the status, because sometimes with
+            # transitions on its own
+            new_state = self._impl_get(impl, target, component)
+            if new_state == None or new_state == True: # check
+                return
+            target.log.info("%s: impl didn't power on +%.1f retrying",
+                            component, ts - ts0)
             time.sleep(impl.wait)
             ts = time.time()
         raise RuntimeError("%s: impl power-on timed out after %.1fs"
@@ -238,13 +425,20 @@ class interface(ttbl.tt_interface):
 
         ts0 = ts = time.time()
         while ts - ts0 < impl.timeout:
-            impl.off(target, component)
-            target.log.info("%s: impl powered off +%.1fs", component, ts - ts0)
+            try:
+                impl.off(target, component)
+            except impl.error_e as e:
+                target.log.error("%s: impl failed powering off +%.1f;"
+                                 " retrying: %s", component, ts - ts0, e)
+            else:
+                target.log.info("%s: impl powered off +%.1fs",
+                                component, ts - ts0)
+            # maybe it worked, let's checked
             new_state = self._impl_get(impl, target, component)
             if new_state == None or new_state == False: # check
                 return
             target.log.info("%s: ipmi didn't power off +%.1f retrying",
-                            component, ts - ts0)
+                                component, ts - ts0)
             time.sleep(impl.wait)
             ts = time.time()
         raise RuntimeError("%s: impl power-off timed out after %.1fs"
@@ -284,7 +478,7 @@ class interface(ttbl.tt_interface):
             ts = time.time()
         raise RuntimeError(
             "%s: power-get timed out for an stable result (+%.2fs): %s"
-            % (component, impl.timeout, " ".join(results)))
+            % (component, impl.timeout, " ".join(str(r) for r in results)))
 
 
     def _get(self, target, impls = None):
@@ -293,6 +487,10 @@ class interface(ttbl.tt_interface):
         data = collections.OrderedDict()
         if impls == None:	# none give, do the whole power rail
             impls = self.impls.iteritems()
+        normal = {}
+        explicit = {}
+        explicit_on = {}
+        explicit_off = {}
         for component, impl in impls:
             # need to get state for the real one!
             if component in self.aliases:
@@ -302,27 +500,62 @@ class interface(ttbl.tt_interface):
             state = self._impl_get(impl, target, component_real)
             self.assert_return_type(state, bool, target,
                                     component, "power.get", none_ok = True)
-            data[component] = state
-        # the values that are None, we don't care for them, so to
-        # consider if we are fully on, is like they are on
-        result_all = all(i in ( True, None ) for i in data.values())
-        result_any = any(i == True for i in data.values())
-        if result_all:					# update cache
-            power = True
-            target.fsdb.set('powered', "On")
+            data[component] = {
+                "state": state
+            }
+            if impl.explicit:
+                data[component]['explicit'] = impl.explicit
+            if impl.explicit == None:
+                normal[component] = state
+            elif impl.explicit == 'both':
+                explicit[component] = state
+            elif impl.explicit == 'on':
+                explicit_on[component] = state
+            elif impl.explicit == 'off':
+                explicit_off[component] = state
+            else:
+                raise AssertionError(
+                    "BUG! component %s: unknown explicit tag '%s'" %
+                    (component, impl.explicit))
+
+        # What state are we in?
+        #
+        # See 'Overall power state and explicit power components'
+        # above, but basically we need to report:
+        #
+        #  state: True (on) or False (off)
+        #  substate: 'normal', 'full', 'partial'
+        #
+        if all(i in [ True, None ] for i in normal.values() + explicit_off.values()):
+            state = True
+            if all(i['state'] in (True, None) for i in data.values()):
+                substate = 'full'
+            elif all(i == False
+                     for i in explicit.values() + explicit_on.values()):
+                substate = 'normal'
+            else:
+                substate = 'partial'
+        elif any(i == False
+                 for i in normal.values() + explicit_on.values()):
+            state = False
+            if all(i['state'] in (False, None) for i in data.values()):
+                substate = 'full'
+            elif all(i == True
+                     for i in explicit_off.values()):
+                substate = 'normal'
+            else:
+                substate = 'partial'
         else:
-            power = False
-            target.fsdb.set('powered', None)
-        return power, data, result_any
+            # something is really off
+            state = False
+            substate = 'partial'
+
+        target.fsdb.set('interfaces.power.state', state)
+        target.fsdb.set('interfaces.power.substate', substate)
+        return state, data, substate
 
 
-    def _get_any(self, target):
-        # return if any power component in the rail is on
-        _, _, result_any = self._get(target)
-        return result_any
-
-
-    def _off(self, target, impls, why, whole_rail = True):
+    def _off(self, target, impls, why, whole_rail = True, explicit = False):
         #
         # Power off everything
         #
@@ -331,10 +564,7 @@ class interface(ttbl.tt_interface):
         #
         # If the user asked for the whole rail, then we'll also run
         # the pre/post hooks.
-        _, data, result_any = self._get(target, impls)
-        if result_any == False:		# everything is off already
-            target.log.debug("power-off%s: skipping (already off)" % why)
-            return
+        _state, data, _substate = self._get(target, impls)
 
         target.log.info("powering off%s" % why)
         if whole_rail:
@@ -355,9 +585,14 @@ class interface(ttbl.tt_interface):
                 component_real = self.aliases[component]
             else:
                 component_real = component
-            if data[component] == False:
+            if data[component]['state'] == False:
                 target.log.debug("%s: powering off%s: skipping (already off)"
                                  % (component, why))
+                continue            	# it says it is off, so we skip it
+            if whole_rail \
+               and impl.explicit in ( "off", "both" ) and not explicit:
+                target.log.debug("%s: powering off%s: skipping (explicit/%s)"
+                                 % (component, why, impl.explicit))
                 continue            	# it says it is off, so we skip it
 
             target.log.debug("%s: powering off%s" % (component, why))
@@ -388,7 +623,7 @@ class interface(ttbl.tt_interface):
         target.log.info("powered off%s" % why)
 
 
-    def _on(self, target, impls, why, whole_rail = True):
+    def _on(self, target, impls, why, whole_rail = True, explicit = False):
         #
         # Power on
         #
@@ -402,16 +637,14 @@ class interface(ttbl.tt_interface):
         #
         # Recovery can be quite painful, since we might have to retry
         # (a single component) or the whole rail. Code gets ugly.
-        result_all, data, _ = self._get(target, impls)
-        if result_all == True:
-            target.log.debug("power-on%s: skipping (already on)" % why)
-            return
+        _state, data, _substate = self._get(target, impls)
+
         target.log.info("powering on%s" % why)
         if whole_rail:
             # since we are powering on, let's have whoever does this
             # select the right default console, but we wipe whatver
             # was set before
-            target.property_set('console-default', None)
+            target.property_set('interfaces.console.default', None)
             target.log.debug(
                 "power pre-on%s; fns %s"
                 % (why, " ".join(str(f) for f in target.power_on_pre_fns)))
@@ -442,7 +675,12 @@ class interface(ttbl.tt_interface):
                 component_real = self.aliases[component]
             else:
                 component_real = component
-            if data[component] == True:
+            if whole_rail \
+               and impl.explicit in ( "on", "both" ) and not explicit:
+                target.log.debug("%s: powering on%s: skipping (explicit/%s)"
+                                 % (component, why, impl.explicit))
+                continue            	# it says it is off, so we skip it
+            if data[component]['state'] == True:
                 target.log.debug("%s: powering on%s: skipping (already on)"
                                  % (component, why))
                 continue            	# it says it is off, so we skip it
@@ -534,49 +772,215 @@ class interface(ttbl.tt_interface):
     # called by the daemon when a METHOD request comes to the HTTP path
     # /ttb-vVERSION/targets/TARGET/interface/console/CALL
 
+    def _explicit_get(self, args):
+        # return the value of the 'explicit' argument, if given
+        explicit = self.arg_get(args, 'explicit', None, True, False)
+        # support that it might come as bool already
+        if not isinstance(explicit, bool):
+            explicit = json.loads(explicit)
+            assert isinstance(explicit, bool), \
+                "'explicit' argument must be a boolean"
+        return explicit
+
     def get_list(self, target, _who, _args, _files, _user_path):
         # return a dictionary indicating the individual state of
         # each power component
-        _, data, _ = self._get(target)
+        state, data, substate = self._get(target)
         # return a sorted list, so the order is maintained
-        return dict(power = [ ( i, s ) for i, s in data.items() ])
-
-    def get_get(self, target, _who, _args, _files, _user_path):
-        # return a single bool saying if all the power rail
-        # components are on
-        result, _, _  = self._get(target)
-        return dict(result = result)
+        return dict(state = state, substate = substate, components = data)
 
     def put_on(self, target, who, args, _files, _user_path):
         impls, _all = self.args_impls_get(args)
+        explicit = self._explicit_get(args)
         with target.target_owned_and_locked(who):
             target.timestamp()
-            self._on(target, impls, "", _all)
+            self._on(target, impls, "", _all, explicit)
             return {}
 
     def put_off(self, target, who, args, _files, _user_path):
         impls, _all = self.args_impls_get(args)
+        explicit = self._explicit_get(args)
         with target.target_owned_and_locked(who):
             target.timestamp()
-            self._off(target, impls, "", _all)
+            self._off(target, impls, "", _all, explicit)
             return {}
 
     def put_cycle(self, target, who, args, _files, _user_path):
         impls, _all = self.args_impls_get(args)
         # default wait is two seconds
-        wait = float(args.get('wait',
-                              target.tags.get('power_cycle_wait', 2)))
+        wait = self.arg_get(args, 'wait', (type(None), numbers.Real),
+                            allow_missing = True, default = None)
+        if wait == None:
+            wait = float(target.tags.get('power_cycle_wait', 2))
+        explicit = self._explicit_get(args)
         with target.target_owned_and_locked(who):
             target.timestamp()
-            self._off(target, impls, " (because power-cycle)", _all)
+            self._off(target, impls, " (because power-cycle)", _all, explicit)
             if wait:
                 time.sleep(wait)
-            self._on(target, impls, " (because power-cycle)", _all)
+            self._on(target, impls, " (because power-cycle)", _all, explicit)
             return {}
 
     def put_reset(self, target, who, args, _files, _user_path):
         self.put_cycle(target, who, args, _files, _user_path)
 
+
+    def sequence(self, target, sequence):
+        """
+        Execute a sequence of actions on a target
+
+        The sequence argument has to be a list of pairs:
+
+        >>> ( OPERATION, ARGUMENT )
+
+        *OPERATION* is a string that can be:
+
+        - *on*, *off* or *cycle*; *ARGUMENT* is a string being:
+
+          - *all*: do the operation on all the components except
+            :ref:`explicit <ttbd_power_explicit>` ones
+
+          - *full*: perform the operation on all the components
+            including the :ref:`explicit <ttbd_power_explicit>` ones
+
+          - *COMPONENT NAME*: perform the operation only on the given
+            component
+
+        - *wait*: *ARGUMENT* is a number describing how many seconds
+          to wait
+        """
+        target.timestamp()
+        count = 0
+        for s in sequence:
+            # we verify for correctness on the run, which means if the
+            # sequence is wrong it might be left in a weird
+            # state. ok. that's the caller's problem.
+            if not isinstance(s, (list, tuple)):
+                raise ValueError("%s: sequence #%d: invalid type:"
+                                 " expected list; got %s"
+                                 % (target.id, count, type(s)))
+            if len(s) != 2:
+                raise ValueError("%s: sequence #%d: invalid list length; "
+                                 " expected 2; got %s"
+                                 % (target.id, count, len(s)))
+            action = s[0]
+            if action == 'wait':
+                time_to_wait = s[1]
+                assert isinstance(time_to_wait, numbers.Real), \
+                    "%s: sequence #%d: invalid time length; " \
+                    "expected float, got %s" \
+                    % (target.id, count, type(time_to_wait))
+                time.sleep(s[1])
+                continue
+
+            if action not in [ 'on', 'press', 'close',
+                               'off', 'release', 'open',
+                               'cycle' ]:
+                raise ValueError(
+                    "%s: sequence #%d: invalid action spec; "
+                    " expected on|press|close|off|release|open|cycle; got %s"
+                    % (target.id, count, action))
+
+            component = s[1]
+            if not isinstance(component, basestring):
+                raise ValueError("%s: sequence #%d: invalid component spec; "
+                                 " expected str; got %s"
+                                 % (target.id, count, type(component)))
+            # We have an action and a component to act on; None/[]
+            # means act on all components in an explicit/non-explicit
+            # way, so decode the component list
+            explicit = False
+            if component == 'full':
+                impls, _all = self.args_impls_get(dict())
+                explicit = True
+            elif component == 'all':
+                impls, _all = self.args_impls_get(dict())
+            else:
+                impls, _all = self.args_impls_get(dict(component = component))
+            # and now act
+            if action in ( 'on', 'press', 'close' ):
+                self._on(target, impls, " (because sequenced '%s')" % action,
+                         _all, explicit)
+            elif action in ( 'off', 'release', 'open' ):
+                self._off(target, impls, " (because sequenced '%s')" % action,
+                          _all, explicit)
+            elif action == 'cycle':
+                wait = float(target.tags.get('power_cycle_wait', 2))
+                self._off(target, impls, " (because sequenced cycle)",
+                          _all, explicit)
+                if wait:
+                    time.sleep(wait)
+                self._on(target, impls, " (because sequenced cycle)",
+                         _all, explicit)
+            else:
+                raise RuntimeError(
+                    "%s: unknown action"
+                    " (expected on|press|close|off|release|open|cycle)"
+                    % action)
+
+
+
+    def sequence_verify(self, target, sequence, qualifier = ""):
+        """
+        Verify a sequence is correct
+
+        See :meth:sequence for parameters
+
+        :returns: nothing if ok, raises an exceptin on error
+        """
+        count = 0
+        for s in sequence:
+            # we verify for correctness on the run, which means if the
+            # sequence is wrong it might be left in a weird
+            # state. ok. that's the caller's problem.
+            if not isinstance(s, (list, tuple)):
+                raise ValueError("%s%s: sequence #%d: invalid type:"
+                                 " expected list; got %s"
+                                 % (target.id, qualifier, count, type(s)))
+            if len(s) != 2:
+                raise ValueError("%s%s: sequence #%d: invalid list length; "
+                                 " expected 2; got %s"
+                                 % (target.id, qualifier, count, len(s)))
+            action = s[0]
+            if action == 'wait':
+                time_to_wait = s[1]
+                assert isinstance(time_to_wait, numbers.Real), \
+                    "%s: sequence #%d: invalid time length; " \
+                    "expected float, got %s" \
+                    % (target.id, qualifier, count, type(time_to_wait))
+                continue
+
+            if action not in [ 'on', 'press', 'close',
+                               'off', 'release', 'open',
+                               'cycle' ]:
+                raise ValueError(
+                    "%s%s: sequence #%d: invalid action spec; "
+                    " expected on|press|close|off|release|open|cycle; got %s"
+                    % (target.id, qualifier, count, action))
+
+            component = s[1]
+            if not isinstance(component, basestring):
+                raise ValueError("%s%s: sequence #%d: invalid component spec; "
+                                 " expected str; got %s"
+                                 % (target.id, qualifier, count, type(component)))
+            # We have an action and a component to act on; None/[]
+            # means act on all components in an explicit/non-explicit
+            # way, so decode the component list
+            explicit = False
+            if component == 'full':
+                impls, _all = self.args_impls_get(dict())
+                explicit = True
+            elif component == 'all':
+                impls, _all = self.args_impls_get(dict())
+            else:
+                impls, _all = self.args_impls_get(dict(component = component))
+
+
+    def put_sequence(self, target, who, args, _files, _user_path):
+        sequence = self.arg_get(args, 'sequence', list)
+        with target.target_owned_and_locked(who):
+            self.sequence(target, sequence)
+            return {}
 
 
 class fake_c(impl_c):
@@ -587,25 +991,100 @@ class fake_c(impl_c):
 
     It can rely on the *target* and *component* parameters to
     each method to derive where to act.
-    """
 
+    :param str iface_name: (optional; default *power*) name of the
+      interface where this is being used.
+
+      Implementations have no way to know which interface they are
+      being used for (needing for setting state in the right
+      location), so if used in other interface than *power* (default),
+      use paramer *iface_name*.
+
+    Parameters are the same as for :class:impl_c.
+
+    """
+    def __init__(self, name = None, iface_name = "power", **kwargs):
+        impl_c.__init__(self, **kwargs)
+        if name == None:
+            name = "%x" % id(self)
+        self.name = name
+        self.iface_name = iface_name
+        self.upid_set("Fake power controller #%s" % name,
+                      name = name, iface_name = iface_name)
+
+    # State is stored in interfaces.power.COMPONENT, so it in the
+    # right inventory in the namespace and it doesn't collide with
+    # *state*, which is set by the upper layers.
     def on(self, target, component):
-        target.log.info("power-fake-%s on" % component)
-        target.fsdb.set('power-fake-%s' % component, 'True')
+        target.fsdb.set(
+            'interfaces.%s.%s.fake-state' % (self.iface_name, component), True)
 
     def off(self, target, component):
-        target.log.info("power-fake-%s off" % component)
-        target.fsdb.set('power-fake-%s' % component, None)
+        target.fsdb.set(
+            'interfaces.%s.%s.fake-state' % (self.iface_name, component), None)
 
     def get(self, target, component):
-        state = target.fsdb.get('power-fake-%s' % component) == 'True'
-        target.log.info("power-fake-%s get: %s" % (component, state))
-        return state
+        state = target.fsdb.get(
+            'interfaces.%s.%s.fake-state' % (self.iface_name, component))
+        return state == True
+
+
+class inverter_c(impl_c):
+    """
+    A power controller that wraps another power controller and does
+    the opposite.
+
+    When turned on, the wrapped controlled is turned off
+
+    When turned off, the wrapped controlled is turned on
+
+    When querying power, it returns *off* if the wrapped controller is
+      *on*, *on* if *off*.
+
+    :param ttbl.power.impl_c pc: power controller to wrap
+
+    Other parameters as to :class:ttbl.power.impl_c.
+    """
+    def __init__(self, pc, when_on = True, when_off = True, when_get = True,
+                 **kwargs):
+        assert isinstance(pc, impl_c)
+        assert isinstance(when_on, bool)
+        assert isinstance(when_off, bool)
+        assert isinstance(when_get, bool)
+
+        impl_c.__init__(self, **kwargs)
+        self.pc = pc
+        # These have to be the same set of default properties in
+        # ttbl.power.impl_c
+        self.power_on_recovery = pc.power_on_recovery
+        self.paranoid = pc.paranoid
+        self.timeout = pc.timeout
+        self.wait = pc.wait
+        self.paranoid_get_samples = pc.paranoid_get_samples
+        self.when_on = when_on
+        self.when_off = when_off
+        self.when_get = when_get
+        # FIXME: upid set from pc, negating
+
+    def on(self, target, component):
+        if self.when_on:
+            self.pc.off(target, component)
+
+    def off(self, target, component):
+        if self.when_off:
+            self.pc.on(target, component)
+
+    def get(self, target, component):
+        if not self.when_get:
+            return None
+        state = self.pc.get(target, component)
+        if state == None:
+            return state
+        return not state
 
 
 class daemon_c(impl_c):
-    """
-    Generic power controller to start daemons in the server machine
+    """Generic power controller to start daemons in the server machine
 
     FIXME: document
 
@@ -617,18 +1096,40 @@ class daemon_c(impl_c):
       All the entries in the list are templated with *%(FIELD)s*
       expansion, where each field comes either from the *kws*
       dictionary or the target's metadata.
+
+
+    :param str name: (optional) name of this component; defaults to
+      the basename of the path to run.
+
+      eg: if calling */usr/bin/somedaemon*, name would be *daemon*.
+
+    :param bool mkpidfile: (optional; default *True*) create a pidfile
+      when the process starts, using as name/template the value of
+      *pidfile*.
+
+    :param str pidfile: (optional) pidfile name (template); defaults
+      to "PATH/COMPONENT-NAME.pid". *PATH* is the state directory for
+      the given target (usually
+      */var/lib/ttbd/instance/targets/TARGETNAME*). *COMPONENT* is the
+      component under which this driver has been registered when
+      adding to the interface. *NAME* is the name of this driver
+      instance, see above.
+
+    Other parameters as to :class:ttbl.power.impl_c.
+
     """
     #: KEY=VALUE to add to the environment
     #: Keywords to add for templating the arguments
     def __init__(self, cmdline,
                  precheck_wait = 0, env_add = None, kws = None,
                  path = None, name = None,
-                 pidfile = None, mkpidfile = True, paranoid = False):
+                 pidfile = None, mkpidfile = True, paranoid = False,
+                 **kwargs):
         assert isinstance(cmdline, list), \
             "cmdline has to be a list of strings; got %s" \
             % type(cmdline).__name__
         assert precheck_wait >= 0
-        impl_c.__init__(self, paranoid = paranoid)
+        impl_c.__init__(self, paranoid = paranoid, **kwargs)
         self.cmdline = cmdline
         #: extra command line elements that can be added by anybody
         #: subclassing this; note an *on()* method that adds to this
@@ -691,6 +1192,11 @@ class daemon_c(impl_c):
         or
 
         >>> return os.path.exists(self.pidfile % kws)
+
+        or to verify a pid file exists and the prcoess exists:
+
+        >>> return commonl.process_alive(PATH-TO-PIDFILE, PATH-TO-BINARY)
+
 
         :returns: *True* if the daemon started, *False* otherwise
         """
@@ -820,6 +1326,149 @@ class daemon_c(impl_c):
         return commonl.process_alive(self.pidfile % kws, self.path) != None
 
 
+class delay_til_shell_cmd_c(impl_c):
+    """
+    Delay until a shell commands returns an specific value
+
+    This is meant to be used in a power rail to delay until a certain
+    shell command evaluates as succesful (return 0).
+
+    Usage models:
+
+    - look for USB devices whose serial number has to be dug from a
+      deeper protocol than USB
+
+    Other parameters as to :class:ttbl.power.impl_c.
+
+    """
+    def __init__(self, cmdline,
+                 condition_msg = None,
+                 cwd = "/tmp", env = None,
+                 expected_retval = 0, when_on = True, when_off = False,
+                 poll_period = 0.25, timeout = 25, **kwargs):
+        commonl.assert_list_of_strings(cmdline, "cmdline",
+                                       "command line components")
+        assert condition_msg == None or isinstance(condition_msg, basestring)
+        assert isinstance(cwd, basestring)
+        commonl.assert_none_or_dict_of_strings(env, "env")
+        assert isinstance(expected_retval, int)
+        assert isinstance(when_on, bool)
+        assert isinstance(when_off, bool)
+        assert isinstance(poll_period, numbers.Real)
+        assert isinstance(timeout, numbers.Real)
+
+        impl_c.__init__(self, **kwargs)
+        self.cmdline = cmdline
+        cmdline_s = " ".join(self.cmdline)
+        if condition_msg == None:
+            self.condition_msg = "'%s' returns %d" % (
+                cmdline_s, expected_retval)
+        else:
+            self.condition_msg = condition_msg
+        self.cwd = cwd
+        self.env = env
+        self.expected_retval = expected_retval
+        self.when_on = when_on
+        self.when_off = when_off
+        self.poll_period = poll_period
+        self.timeout = timeout
+        self.upid_set(
+            "Delayer until command '%s' returns %d,"
+            " checking every %.2fs timing out at %.1fs" % (
+                cmdline_s, expected_retval, poll_period, timeout),
+            command = cmdline_s,
+            expected_retval = expected_retval,
+            poll_period = poll_period,
+            timeout = timeout)
+
+    def _cmdline_format(self, target, component):
+        kws = dict(target.kws)
+        cmdline = []
+        count = 0
+        try:
+            for i in self.cmdline:
+                # some older Linux distros complain if this string is unicode
+                cmdline.append(str(i % kws))
+            count += 1
+        except KeyError as e:
+            message = "%s: configuration error?" \
+                " can't template command line #%d," \
+                " missing field or target property: %s" % (
+                    component, count, e)
+            target.log.error(message)
+            raise self.power_on_e(message)
+        return cmdline, kws
+
+    def _test(self, _target, _component, cmdline):
+        r = subprocess.call(cmdline,
+                            env = self.env, cwd = self.cwd,
+                            stdin = None, stderr = subprocess.STDOUT)
+        return r == self.expected_retval
+
+
+    def on(self, target, component):
+        if self.when_on == False:
+            return
+        cmdline, kws = self._cmdline_format(target, component)
+        condition_msg = self.condition_msg % kws
+        ts0 = time.time()
+        ts = ts0
+        while ts - ts0 < self.timeout:
+            if self._test(target, component, cmdline):
+                break
+            target.log.debug(
+                "%s: delaying power-on %.fs until %s" % (
+                    component, self.poll_period, condition_msg,
+                ))
+            time.sleep(self.poll_period)
+            ts = time.time()
+        else:
+            raise RuntimeError(
+                "%s: timeout (%.1fs) on power-on delay "
+                "waiting for %s" % (
+                    component, self.timeout, condition_msg
+                ))
+        target.log.info(
+            "%s: delayed power-on %.1fs (max %.1fs) until %s"
+            % (
+                component, ts - ts0, self.timeout, condition_msg
+            ))
+
+
+    def off(self, target, component):
+        if self.when_off == False:
+            return
+        cmdline, kws = self._cmdline_format(target, component)
+        condition_msg = self.condition_msg % kws
+        ts0 = time.time()
+        ts = ts0
+        while ts - ts0 < self.timeout:
+            if not self._test(target, component, cmdline):
+                break
+            target.log.debug(
+                "%s: delaying power-off %.fs until (not) %s" % (
+                    component, self.poll_period, condition_msg
+                ))
+            time.sleep(self.poll_period)
+            ts = time.time()
+        else:
+            raise RuntimeError(
+                "%s: timeout (%.1fs) on power-off delay waiting"
+                " until (not) %s" % (
+                    component, self.timeout, condition_msg
+                ))
+        target.log.info(
+            "%s: delayed power-off %.1fs (max %.1fs)"
+            " until (not) %s" % (
+                component, ts - ts0, self.timeout, condition_msg
+            ))
+
+
+    def get(self, target, component):
+        cmdline, _kws = self._cmdline_format(target, component)
+        return self._test(target, component, cmdline)
+
+
 class socat_pc(daemon_c):
     """
     Generic power component that starts/stops socat as daemon
@@ -838,10 +1487,12 @@ class socat_pc(daemon_c):
       checking if the daemon is running; sometimes it dies after we
       check, so it is good to give it a wait.
 
+    Other arguments as to :class:ttbl.power.impl_c.
+
     This object (or what is derived from it) can be passed to a power
     interface for implementation, eg:
 
-    >>> ttbl.config.targets['TARGETNAME'].interface_add(
+    >>> ttbl.test_target.get('TARGETNAME').interface_add(
     >>>     "power",
     >>>     ttbl.power.interface(
     >>>         ttbl.power.socat_pc(ADDR1, ADDR2)
@@ -903,15 +1554,20 @@ class socat_pc(daemon_c):
     """
 
     def __init__(self, address1, address2, env_add = None,
-                 precheck_wait = 0.2):
+                 precheck_wait = 0.2, extra_cmdline = None,
+                 **kwargs):
         assert isinstance(address1, basestring)
         assert isinstance(address2, basestring)
-
+        if extra_cmdline == None:
+            extra_cmdline = []
+        # extra_cmdline has to be before the address pair otherwise
+        # it'll fail
         daemon_c.__init__(
             self,
             cmdline = [
                 "/usr/bin/socat",
-                "-lf", "%(path)s/%(component)s-%(name)s.log",
+                "-lf", "%(path)s/%(component)s-%(name)s.log"
+            ] + extra_cmdline + [
                 # more than three -d's is a lot of verbosity, will
                 # fill up the drive soon
                 # FIXME: allow individual control/configure strace debug
@@ -921,9 +1577,135 @@ class socat_pc(daemon_c):
                 address2,		# will be formatted against kws
             ],
             precheck_wait = precheck_wait,
-            env_add = env_add)
+            env_add = env_add,
+            **kwargs)
 
     def verify(self, target, component, cmdline_expanded):
         # this is the log file name, that has been expanded already by
         # the daemon_c class calling start
         return os.path.exists(cmdline_expanded[2])
+
+
+def _check_has_iface_buttons(target):
+    buttons_iface = getattr(target, "buttons", None)
+    if not buttons_iface or not isinstance(buttons_iface, interface):
+        raise RuntimeError("%s: target has no buttons interface" % target.id)
+
+
+class button_sequence_pc(impl_c):
+    """Power control implementation that executest a button sequence on
+    power on, another on power off.
+
+    Requires a target that supports the *buttons* interface.
+
+    :param list sequence_on: (optional; list of events) sequence of
+      events to do on power on (see :func:ttbl.power.intrface.sequence
+      for sequence reference).
+
+    :param list sequence_off: (optional; list of events) sequence of
+      events to do on power off (see :func:ttbl.power.intrface.sequence
+      for sequence reference).
+
+
+    Other parameters as to :class:ttbl.power.impl_c.
+
+    For example, to click a power button one second to power on, one
+    would add to the power rail:
+
+    >>> target.interface_add("power", ttbl.power.interface(
+    >>>     (
+    >>>         "release buttons",
+    >>>         ttbl.power.buttons_released_pc("power", "reset")
+    >>>     ),
+    >>>     ...
+    >>>     (
+    >>>         "power button",
+    >>>         ttbl.power.button_sequence_pc(sequence_on = [
+    >>>             # click BUTTONNAME 1 second to power on
+    >>>             ( 'press', 'BUTTONNAME' ),		# press the button
+    >>>             ( 'wait', 1 ),			# hold pressed 1 sec
+    >>>             ( 'release', 'BUTTONNAME' ),	# release the button
+    >>>         ])
+    >>>     ),
+    >>>     ...
+    >>> )
+
+    When having buttons instrumented, it is always a good idea to
+    include a :class:buttons_released_pc also (as described), to
+    ensure all the buttons are released when powering on (to for
+    example make sure the *reset* button is not pressed while trying
+    to turn on a machine).
+
+    """
+    def __init__(self, sequence_on = None, sequence_off = None, **kwargs):
+        impl_c.__init__(self, **kwargs)
+        self.sequence_on = sequence_on
+        self.sequence_off = sequence_off
+        l = []
+        if sequence_on:
+            lon = [ ]
+            for operation, argument in sequence_on:
+                lon.append("%s:%s" % (operation, argument))
+            l.append("OFF:" + ",".join(lon))
+        if sequence_off:
+            loff = [ ]
+            for operation, argument in sequence_off:
+                loff.append("%s:%s" % (operation, argument))
+            l.append("ON:" + ",".join(loff))
+        self.upid_set(
+            "Button/jumper sequence %s" % " ".join(l),
+            sequence_on = ",".join("%s:%s" % (operation, argument)
+                                   for operation, argument in sequence_on),
+            sequence_off = ",".join("%s:%s" % (operation, argument)
+                                    for operation, argument in sequence_off)
+        )
+
+    def on(self, target, _component):
+        _check_has_iface_buttons(target)
+        if self.sequence_on:
+            target.buttons.sequence(target, self.sequence_on)
+
+    def off(self, target, _component):
+        _check_has_iface_buttons(target)
+        if self.sequence_off:
+            target.buttons.sequence(target, self.sequence_off)
+
+    def get(self, target, _component):
+        # no real press status, so can't tell
+        return None
+
+
+class buttons_released_pc(impl_c):
+    """
+    Power control implementation that ensures a list of buttons
+    are released (not pressed) before powering on a target.
+
+    :param str buttons: names of buttons that must be released upon
+      power on
+
+    >>> ttbl.power.buttons_released_pc("reset", "test", "overdrive")
+
+    Other parameters as to :class:ttbl.power.impl_c.
+
+    """
+    def __init__(self, *buttons, **kwargs):
+        commonl.assert_list_of_strings(buttons, "buttons", "button")
+        impl_c.__init__(self, **kwargs)
+        self.sequence = [
+            ( 'off', button )
+            for button in buttons
+        ]
+        self.upid_set(
+            "Button %s releaser" % "/".join(buttons),
+            buttons = " ".join(buttons)
+        )
+
+    def on(self, target, _component):
+        _check_has_iface_buttons(target)
+        target.buttons.sequence(target, self.sequence)
+
+    def off(self, target, _component):
+        pass
+
+    def get(self, target, _component):
+        return None			# no real press status, so can't tell

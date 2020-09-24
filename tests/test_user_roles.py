@@ -15,7 +15,10 @@ import tcfl.tc
 
 srcdir = os.path.dirname(__file__)
 ttbd = commonl.testing.test_ttbd(config_files = [
-    os.path.join(srcdir, "conf_test_user_roles.py") ])
+    # strip to remove the compiled/optimized version -> get source
+    os.path.join(srcdir, "conf_%s" % os.path.basename(__file__.rstrip('cd')))
+])
+
 
 class _test_roles_login(commonl.testing.shell_client_base):
     """
@@ -101,9 +104,9 @@ class roles_gain_drop(commonl.testing.shell_client_base):
         data = json.loads(json_output)
         # in the config we only set these two roles
         assert len(data['local']['user2']['roles']) == 2
-        assert data['local']['user2']['roles']['user'] == "True"
+        assert data['local']['user2']['roles']['user'] == True
         # context2 has to be now disabled
-        assert data['local']['user2']['roles']['context2'] == "False"
+        assert data['local']['user2']['roles']['context2'] == False
         self.report_pass("user2 can drop role context2")
 
         self.run_local(self.tcf_cmdline() +
@@ -113,7 +116,7 @@ class roles_gain_drop(commonl.testing.shell_client_base):
         data = json.loads(json_output)
         # in the config we only set these two roles
         assert len(data['local']['user2']['roles']) == 2
-        assert data['local']['user2']['roles']['user'] == "True"
+        assert data['local']['user2']['roles']['user'] == True
         # context2 has to be now enabled
-        assert data['local']['user2']['roles']['context2'] == "True"
+        assert data['local']['user2']['roles']['context2'] == True
         self.report_pass("user2 can gain role context2")

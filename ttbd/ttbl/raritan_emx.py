@@ -10,6 +10,8 @@
 
 import urlparse
 
+import commonl
+
 import ttbl
 import ttbl.power
 import raritan
@@ -44,6 +46,13 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
     :param bool https_verify: (optional, default *True*) do or
       do not HTTPS certificate verification.
 
+    :param str password: (optional) password to use for
+      authentication; will be processed with
+      :func:`commonl.password_get`; if not specified, it is extracted
+      from the URL if present there.
+
+    Other parameters as to :class:ttbl.power.impl_c.
+
     The RPC implementation is documented in
     https://help.raritan.com/json-rpc/emx/v3.4.0; while this driver
     uses the Raritan SDK driver, probably this is overkill--we could
@@ -74,8 +83,8 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
 
          $ wget http://cdn.raritan.com/download/EMX/version-3.5.0/EMX_JSON_RPC_SDK_3.5.0_45371.zip
          $ unzip -x EMX_JSON_RPC_SDK_3.5.0_45371.zip
-         $ install -m 0755 -o root -g root -d /usr/local/lib/python2.7/site-packages/raritan
-         $ cp -a emx-json-rpc-sdk-030500-45371/emx-python-api/raritan/* /usr/local/lib/python2.7/site-packages/raritan
+         $ sudo install -m 0755 -o root -g root -d /usr/local/lib/python2.7/site-packages/raritan
+         $ sudo cp -a emx-json-rpc-sdk-030500-45371/emx-python-api/raritan/* /usr/local/lib/python2.7/site-packages/raritan
 
     2. As the Raritan SDK had to be installed manually away from PIP
        or distro package management, ensurePython to looks into
@@ -106,17 +115,27 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
       controlled).
 
     """
-    def __init__(self, url, outlet_number, https_verify = True):
+    def __init__(self, url, outlet_number, https_verify = True,
+                 password = None, **kwargs):
         assert isinstance(url, basestring)
         assert isinstance(outlet_number, int) and outlet_number > 0
+        assert password == None or isinstance(password, basestring)
 
-        ttbl.power.impl_c.__init__(self)
+        ttbl.power.impl_c.__init__(self, **kwargs)
         self.url = urlparse.urlparse(url)
+        if password:
+            self.password = commonl.password_get(
+                self.url.netloc, self.url.username, password)
+        else:
+            self.password = None
         # note the indexes for the SW are 0-based, while in the labels
         # in the HW for humans, they are 1 based.
         self.outlet_number = outlet_number - 1
         self.https_verify = https_verify
         self._outlet_rpc = None
+        url_no_password = "%s://%s" % (self.url.scheme, self.url.hostname)
+        self.upid_set("Raritan PDU %s #%d" % (url_no_password, outlet_number),
+                      url = url_no_password, outlet = outlet_number)
 
 
     @property
@@ -129,9 +148,13 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
         # and the initialization done in __init__ might have staled
         # when the processes forked.
         if not self._outlet_rpc:
+            if self.password:
+                password = self.password
+            else:
+                password = self.url.password
             agent = raritan.rpc.Agent(
                 self.url.scheme, self.url.hostname,
-                self.url.username, self.url.password,
+                self.url.username, password,
                 disable_certificate_verification = not self.https_verify)
             pdu = raritan.rpc.pdumodel.Pdu("/model/pdu/0", agent)
             outlets = pdu.getOutlets()

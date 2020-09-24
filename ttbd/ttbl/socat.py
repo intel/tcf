@@ -41,7 +41,7 @@ class pci(ttbl.power.impl_c):
     redirection from port 8080 to an external proxy server
     *proxy-host.in.network:8080* would be implemented as:
 
-    >>> ttbl.config.targets[NWTARGET].pc_impl.append(
+    >>> ttbl.test_target.get(NWTARGET).pc_impl.append(
     >>>     ttbl.socat.pci('tcp',
     >>>                    '192.168.98.1', 8080,
     >>>                    'proxy-host.in.network', 8080))
@@ -49,17 +49,19 @@ class pci(ttbl.power.impl_c):
     Then to facilitate the work of test scripts, it'd make sense to
     export tags that explain where the proxy is:
 
-    >>> ttbl.config.targets[NWTARGET].tags_update({
+    >>> ttbl.test_target.get(NWTARGET).tags_update({
     >>>     'ftp_proxy': 'http://192.168.98.1:8080',
     >>>     'http_proxy': 'http://192.168.98.1:8080',
     >>>     'https_proxy': 'http://192.168.98.1:8080',
     >>> })
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
 
     def __init__(self, proto,
                  local_addr, local_port,
-                 remote_addr, remote_port):
-        ttbl.power.impl_c.__init__(self)
+                 remote_addr, remote_port, **kwargs):
+        ttbl.power.impl_c.__init__(self, **kwargs)
         assert proto in [ 'udp', 'tcp', 'sctp',
                           'udp4', 'tcp4', 'sctp4',
                           'udp6', 'tcp6', 'sctp6' ]

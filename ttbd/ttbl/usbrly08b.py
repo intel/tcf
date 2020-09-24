@@ -5,7 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 import logging
+import pprint
 import os
+import re
 import struct
 
 import serial
@@ -13,7 +15,6 @@ import serial.tools.list_ports
 
 import ttbl
 import ttbl.things
-import ttbl.buttons
 
 class rly08b(object):
     """
@@ -91,14 +92,40 @@ class rly08b(object):
         ports = serial.tools.list_ports.comports()
         port = None
         for port in ports:
-            if port.vid == 0x04d8 and port.pid == 0xffee \
-               and port.serial_number == self.serial_number:
+            if not hasattr(port, "vid"):
+                # old library compat, list looks like:
+                # [
+                #     ('/dev/ttyACM2', 'ttyACM2', 'USB VID:PID=2341:0042 SNR=95730333937351308131'),
+                #     ('/dev/ttyACM0', 'ttyACM0', 'USB VID:PID=2341:0042 SNR=957303339373517172D1'),
+                #     ('/dev/ttyACM1', 'ttyACM1', 'USB VID:PID=04d8:ffee SNR=00026189')
+                # ]
+                device = port[0]
+                tty = port[1]
+                extra = port[2]
+                r = re.compile(
+                    "USB VID:PID=(?P<vid>[0-9a-fA-F]+):(?P<pid>[0-9a-fA-F]+)"
+                    " SNR=(?P<snr>.*)$")
+                m = r.match(extra)
+                if not m:
+                    continue
+                d = m.groupdict()
+                vid = int(d['vid'], 16)
+                pid = int(d['pid'], 16)
+                serial_number = d['snr']                    
+            else:
+                device = port.device
+                vid = port.vid
+                pid = port.pid
+                serial_number = port.serial_number
+            
+            if vid == 0x04d8 and pid == 0xffee \
+               and serial_number == self.serial_number:
                 break
         else:
             raise self.not_found_e("Cannot find USB-RLY8B with serial %s"
                                    % self.serial_number)
 
-        with serial.Serial(port.device, baudrate = 9600,
+        with serial.Serial(device, baudrate = 9600,
                            bytesize = serial.EIGHTBITS,
                            parity = serial.PARITY_NONE,
                            stopbits = serial.STOPBITS_ONE,
@@ -136,11 +163,13 @@ class pc(rly08b, ttbl.power.impl_c):
     """
     Power control implementation that uses a relay to close/open a
     circuit on on/off
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, serial_number, relay):
+    def __init__(self, serial_number, relay, **kwargs):
         self.relay = relay
         rly08b.__init__(self, serial_number)
-        ttbl.power.impl_c.__init__(self)
+        ttbl.power.impl_c.__init__(self, **kwargs)
 
     def on(self, target, _component):
         cmd = 0x64 + self.relay
@@ -192,23 +221,6 @@ class pc(rly08b, ttbl.power.impl_c):
                            "#%d powered off"
                            % (self.serial_number, self.relay))
             return False
-
-
-class button_c(pc, ttbl.buttons.impl_c):
-    """
-    Implement a button press by closing/opening a relay circuit
-    """
-    def __init__(self, serial_number, relay):
-        ttbl.buttons.impl_c.__init__(self)
-        pc.__init__(self, serial_number, relay)
-
-    def press(self, target, button):
-        self.on(target, button)
-
-    def release(self, target, button):
-        self.off(target, button)
-
-    # get implemented by pc.get()
 
 
 class plugger(rly08b,		 # pylint: disable = abstract-method
@@ -364,10 +376,10 @@ class plugger(rly08b,		 # pylint: disable = abstract-method
 
       ttbl.config.interconnect_add(ttbl.test_target("usb__nuc-02__a101-04"),
                                   ic_type = "usb__host__device")
-      ttbl.config.targets['nuc-02'].add_to_interconnect('usb__nuc-02__a101-04')
-      ttbl.config.targets['a101-04'].add_to_interconnect('usb__nuc-02__a101-04')
-      ttbl.config.targets['nuc-02'].thing_add('a101-04',
-                                              ttbl.usbrly08b.plugger("00033085", 1))
+      ttbl.test_target.get('nuc-02').add_to_interconnect('usb__nuc-02__a101-04')
+      ttbl.test_target.get('a101-04').add_to_interconnect('usb__nuc-02__a101-04')
+      ttbl.test_target.get('nuc-02').thing_add('a101-04',
+                                               ttbl.usbrly08b.plugger("00033085", 1))
 
     Where *00033085* is the serial number for the USB-RLY8b which
     implements the USB plugging/unplugging (in this case we use bank 1

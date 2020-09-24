@@ -78,13 +78,16 @@ the server <pos_list_images>`)::
 
 """
 
+import os
+
 import tcfl.tc
 import tcfl.tl
 import tcfl.pos
 
-@tcfl.tc.interconnect('ipv4_addr', mode = 'all')
-@tcfl.tc.target('pos_capable and ic.id in interconnects '
-                'and capture:"screen:snapshot"')
+@tcfl.tc.interconnect('ipv4_addr', mode = os.environ.get('MODE', 'all'))
+@tcfl.tc.target('pos_capable and ic.id in interconnects')
+                # For example, it could add
+                # ' and interfaces.capture.screen.type == "snapshot"')
 class _test(tcfl.pos.tc_pos0_base):
     """
     Provisiong a target, boot it, run a shell command

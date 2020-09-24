@@ -56,7 +56,8 @@ class extension(tc.target_extension_c):
         return r['result']
 
 
-    def flash(self, images, upload = True):
+    def flash(self, images, upload = True, timeout = None, soft = False,
+              hash_target_name = True):
         """Flash images onto target
 
         >>> target.images.flash({
@@ -79,11 +80,26 @@ class extension(tc.target_extension_c):
 
           The types if images supported are determined by the target's
           configuration and can be reported with :meth:`list` (or
-          command line *tcf images-list TARGETNAME*).
+          command line *tcf images-ls TARGETNAME*).
+
+        :param int timeout: (optional) seconds to wait for the
+          operation to complete; defaults to whatever the interface
+          declares in property
+          *interfaces.images.IMAGETYPE.estimated_duration*.
+
+          This is very tool and file specific, a bigger file with a
+          slow tool is going to take way longer than a bigfer file on
+          a slow one.
 
         :param bool upload: (optional) the image names are local files
           that need to be uploaded first to the server (this function
           will take care of that).
+
+        :param boot soft: (optional, default *False*) if *True*, it
+          will only flash an image if the hash of the file is
+          different to the hash of the last image recorded in that
+          image type (or if there is no record of anything having been
+          flashed).
 
         """
         if isinstance(images, dict):
@@ -101,6 +117,19 @@ class extension(tc.target_extension_c):
         target = self.target
         images_str = " ".join("%s:%s" % (k, v) for k, v in images.items())
 
+        if timeout == None:
+            timeout = 0
+            for image_type, image in images.items():
+                images_data = target.rt['interfaces']['images']
+                image_data = images_data.get(image_type, None)
+                if image_data == None:
+                    raise tc.blocked_e("%s: image type '%s' not available"
+                                       % (target.id, image_type),
+                                       dict(target = target))
+                timeout += image_data.get("estimated_duration", 60)
+        else:
+            assert isinstance(timeout, int)
+        
         # if we have to upload them, then we'll transform the names to
         # point to the names we got when uploading
         if upload:
@@ -113,23 +142,46 @@ class extension(tc.target_extension_c):
             for img_type, img_name in images.iteritems():
                 # the remote name will be NAME-DIGEST, so if multiple
                 # testcases for the same user are uploading files with
-                # the same name but different context, they don't
+                # the same name but different content / target, they don't
                 # collide
-                digest = commonl.hash_file(hashlib.sha256(), img_name)
+                ho = commonl.hash_file(hashlib.sha512(), img_name)
+                hd = ho.hexdigest()
                 img_name_remote = \
-                    commonl.file_name_make_safe(os.path.abspath(img_name)) \
-                    + "-" + digest.hexdigest()[:10]
+                    hd[:10] \
+                    + "-" + commonl.file_name_make_safe(os.path.abspath(img_name))
+                if hash_target_name:
+                    # put the target name first, otherwise we might
+                    # alter the extension that the server relies on to
+                    # autodecompress if need to
+                    img_name_remote = target.id + "-" + img_name_remote
+                last_sha512 = target.rt['interfaces']['images']\
+                    [img_type].get('last_sha512', None)
+                if soft and last_sha512 == hd:
+                    # soft mode -- don't flash again if the last thing
+                    # flashed has the same hash as what we want to flash
+                    target.report_info(
+                        "%s:%s: skipping (soft flash: SHA512 match %s)"
+                        % (img_type, img_name, hd), dlevel = 1)
+                    continue
+                target.report_info("uploading: %s %s" %
+                                   (img_type, img_name), dlevel = 3)
                 target.store.upload(img_name_remote, img_name)
                 _images[img_type] = img_name_remote
-                target.report_info("uploaded: " + images_str, dlevel = 1)
+                target.report_info("uploaded: %s %s" %
+                                   (img_type, img_name), dlevel = 2)
+            target.report_info("uploaded: " + images_str, dlevel = 1)
         else:
             _images = images
 
-        # We don't do retries here, we leave it to the server
-        target.report_info("flashing: " + images_str, dlevel = 2)
-        target.ttbd_iface_call("images", "flash", images = _images)
-        target.report_info("flashed: " + images_str, dlevel = 1)
-
+        if _images:
+            # We don't do retries here, we leave it to the server
+            target.report_info("flashing: " + images_str, dlevel = 2)
+            target.ttbd_iface_call("images", "flash", images = _images,
+                                   timeout = timeout)
+            target.report_info("flashed: " + images_str, dlevel = 1)
+        else:
+            target.report_info("flash: all images soft flashed", dlevel = 1)
+            
 
 def _cmdline_images_list(args):
     with msgid_c("cmdline"):
@@ -148,16 +200,21 @@ def _image_list_to_dict(image_list):
     return images
 
 def _cmdline_images_flash(args):
-    with msgid_c("cmdline"):
+    tc.tc_global = tc.tc_c("cmdline", "", "builtin")
+    tc.report_driver_c.add(		# FIXME: hack console driver
+        tc.report_console.driver(4, None))
+    with msgid_c(""):
         target = tc.target_c.create_from_cmdline_args(args, iface = "images")
         target.images.flash(_image_list_to_dict(args.images),
-                            upload = args.upload)
+                            upload = args.upload, timeout = args.timeout,
+                            soft = args.soft)
 
 
 def _cmdline_setup(arg_subparser):
     ap = arg_subparser.add_parser(
-        "images-list",
+        "images-ls",
         help = "List supported image types")
+    commonl.argparser_add_aka(arg_subparser, "images-ls", "images-list")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target name")
     ap.set_defaults(func = _cmdline_images_list)
@@ -176,4 +233,12 @@ def _cmdline_setup(arg_subparser):
     ap.add_argument("-u", "--upload",
                     action = "store_true", default = False,
                     help = "upload FILENAME first and then flash")
+    ap.add_argument("-s", "--soft",
+                    action = "store_true", default = False,
+                    help = "soft flash (only flash if the file's"
+                    " signature is different to the last one flashed)")
+    ap.add_argument("-t", "--timeout",
+                    action = "store", default = None, type = int,
+                    help = "timeout in seconds [default taken from"
+                    " what the server declares or 1m if none]")
     ap.set_defaults(func = _cmdline_images_flash)

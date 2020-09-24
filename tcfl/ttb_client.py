@@ -30,6 +30,7 @@ daemon; it is divided in two main blocks:
 """
 # FIXME: this is crap, need to move all the functions to core or something
 import cPickle
+import collections
 import contextlib
 import errno
 import fcntl
@@ -41,6 +42,8 @@ import math
 import os
 import pprint
 import re
+import requests
+import requests.exceptions
 import struct
 import sys
 import termios
@@ -123,7 +126,7 @@ class rest_target_broker(object):
     # up.
     projection = None
 
-    API_VERSION = 1
+    API_VERSION = 2
     API_PREFIX = "/ttb-v" + str(API_VERSION) + "/"
 
     def __init__(self, state_path, url, ignore_ssl = False, aka = None,
@@ -171,12 +174,72 @@ class rest_target_broker(object):
                 raise e
             else:
                 logger.debug("%s: no state-file, will not load", file_name)
+        #: Version of the code ran by the server; filled up when we do
+        #: the first target list, from the target local, metadata
+        #: versions.server; done in _rts_get() _> _rt_list_to_dict()
+        #:
+        #: Used to adjust backwards compat for short periods of time
+        self.server_version = None
+
+        #: Major version of the server code
+        self.server_version_major = None
+        #: Minor version of the server code
+        self.server_version_minor = None
+        self.server_version_pl = 0
+        #: Changes since the major/minor version tag
+        self.server_version_changes = None
+        #: Commit ID of the server code
+        self.server_version_commit = None
+        
+        #: Server can take all arguments JSON encoded
+        #:
+        #: Previous servers woul donly take as JSON things are are not
+        #: strings, numbers, bools. Newer can do both, since this
+        #: allows the server to also be used from curl command line
+        #: with much ado.
+        #:
+        #: This allows us to transition the code without major changes
+        #: to the code or hard dependencies.
+        self.server_json_capable = True
+
+    _server_version_regex = re.compile(
+        r"v?(?P<major>[0-9]+)\.(?P<minor>[0-9]+)(\.(?P<pl>[0-9]+))?"
+        r"(-(?P<changes>[0-9]+))?"
+        r"(-g(?P<commit>[a-f0-9]+))?")
+
+    def _server_tweaks(self, version):
+        if self.server_version != None:
+            return	# already done
+        if version == None:
+            return	# can't do, no info
+        self.server_version = version
+
+        # Server version is like:
+        #
+        ## [v]0.13[.pl][-202[-gf361416]]
+        #
+        # if not, this is an implementation we know not how to handle
+        m = self._server_version_regex.match(version)
+        if not m:
+            return
+        gd = m.groupdict()
+        self.server_version_major = int(gd['major'])
+        self.server_version_minor = int(gd['minor'])
+        if gd['pl']:
+            self.server_version_pl = int(gd['pl'])
+        self.server_version_changes = int(gd['changes'])
+        self.server_version_commit = gd['commit']
+
+        if self.server_version_major == 0:
+            if self.server_version_minor == 13:
+                # protocol changes
+                if self.server_version_changes <= 202:
+                    self.server_json_capable = False
 
     def __str__(self):
         return self.parsed_url.geturl()
 
-    @classmethod
-    def _rt_list_to_dict(cls, rt_list):
+    def _rt_list_to_dict(self, rt_list):
         rts = {}
         for rt in rt_list:
             rt_fullid = rt['fullid']
@@ -184,6 +247,8 @@ class rest_target_broker(object):
             # TARGETNAME" works
             rt[rt_fullid] = True
             rt[rt['id']] = True
+            if rt['id'] == 'local':	# magic! server description
+                self._server_tweaks(rt.get('versions', {}).get('server', None))
             rts[rt_fullid] = rt
         return rts
 
@@ -266,23 +331,19 @@ class rest_target_broker(object):
     # for the target to flash, which we know from the tags
     def send_request(self, method, url,
                      data = None, json = None, files = None,
-                     stream = False, raw = False, timeout = 480):
+                     stream = False, raw = False, timeout = 160):
         """
         Send request to server using url and data, save the cookies
         generated from request, search for issues on connection and
         raise and exception or return the response object.
 
-        :param url: url to request
-        :type url: str
-        :param data: args to send in the request. default None
-        :type data: dict
-        :param method: method used to request GET, POST and PUT. default PUT
-        :type method: str
-        :param raise_error: if true, raise an error if something goes
-            wrong in the request. default True
-        :type raise_error: bool
-        :returns: response object
-        :rtype: requests.Response
+        :param str url: url to request
+        :param dict data: args to send in the request. default None
+        :param str method: method used to request GET, POST and
+          PUT. Defaults to PUT.
+        :param bool raise_error: if true, raise an error if something goes
+           wrong in the request. default True
+        :returns requests.Response: response object
 
         """
         assert not (data and json), \
@@ -301,24 +362,24 @@ class rest_target_broker(object):
         if method == 'GET':
             r = session.get(url_request, cookies = cookies, json = json,
                             data = data, verify = self.verify_ssl,
-                            stream = stream, timeout = timeout)
+                            stream = stream, timeout = (timeout, timeout))
         elif method == 'PATCH':
             r = session.patch(url_request, cookies = cookies, json = json,
                               data = data, verify = self.verify_ssl,
-                              stream = stream, timeout = timeout)
+                              stream = stream, timeout = ( timeout, timeout ))
         elif method == 'POST':
             r = session.post(url_request, cookies = cookies, json = json,
                              data = data, files = files,
                              verify = self.verify_ssl,
-                             stream = stream, timeout = timeout)
+                             stream = stream, timeout = ( timeout, timeout ))
         elif method == 'PUT':
             r = session.put(url_request, cookies = cookies, json = json,
                             data = data, verify = self.verify_ssl,
-                            stream = stream, timeout = timeout)
+                            stream = stream, timeout = ( timeout, timeout ))
         elif method == 'DELETE':
             r = session.delete(url_request, cookies = cookies, json = json,
                                data = data, verify = self.verify_ssl,
-                               stream = stream, timeout = timeout)
+                               stream = stream, timeout = ( timeout, timeout ))
         else:
             raise Exception("Unknown method '%s'" % method)
 
@@ -336,9 +397,10 @@ class rest_target_broker(object):
         commonl.request_response_maybe_raise(r)
         if raw:
             return r
-        rdata = r.json()
-        diagnostics = rdata.get('diagnostics', "").encode("utf-8", 'replace')
-        if diagnostics != "":
+        rdata = r.json(object_pairs_hook = collections.OrderedDict)
+        if '_diagnostics' in rdata:
+            diagnostics = rdata.pop('_diagnostics').encode("utf-8", 'replace')
+            # this is not very...memory efficient
             for line in diagnostics.split("\n"):
                 logger.warning("diagnostics: " + line)
         return rdata
@@ -352,6 +414,28 @@ class rest_target_broker(object):
                 logger.error("%s: login failed: %s", self._url, e)
             return False
         return True
+
+    def logged_in_username(self):
+        """
+        Return the user name logged into a server
+
+        Based on the cookies, ask the server to translate the special name
+        *self* to the currently logged in user with the cookies stored.
+
+        :returns: name of the user we are logged in as
+        """
+        r = self.send_request("GET", "users/self")
+        # this call returns a dictionary with the user name in the
+        # key name, because we asked for "self", the server will
+        # return only one, but maybe also fields with diagnostics, that
+        # start with _; filter them
+        for username in r:
+            if not username.startswith("_"):
+                break
+            else:
+                raise RuntimeError(
+                    "server can't translate user 'self'; got '%s'" % ur)
+        return username
 
     def logout(self, username = None):
         if username:
@@ -386,7 +470,7 @@ class rest_target_broker(object):
         :param str target_id: Only get information for said target id
         """
         if projection:
-            data = { 'projection': json.dumps(projection) }
+            data = { 'projections': json.dumps(projection) }
         else:
             data = None
         if target_id:
@@ -394,11 +478,17 @@ class rest_target_broker(object):
             # FIXME: imitate same output format until we unfold all
             # these calls--it was a bad idea
             if not 'targets' in r:
-                r['targets'] = [ r ]
+                target_list = [ r ]
         else:
-            r = self.send_request("GET", "targets/", data = data)
+            # force a short timeout to get rid of failing servers quick
+            r = self.send_request("GET", "targets/",
+                                  data = data, timeout = 20)
+            if 'targets' in r:		# old version, deprecated # COMPAT
+                target_list = r['targets']
+            else:
+                target_list = r.values()	# new, target dict
         _targets = []
-        for rt in r['targets']:
+        for rt in target_list:
             # Skip disabled targets
             if target_id != None and rt.get('disabled', None) != None \
                and all_targets != True:
@@ -408,7 +498,6 @@ class rest_target_broker(object):
             # we need to change where we store it in this cache
             rt['rtb'] = self
             _targets.append(rt)
-        del r
         return _targets
 
     def rest_tb_target_update(self, target_id):
@@ -580,15 +669,21 @@ def rest_target_print(rt, verbosity = 0):
             power = " ON"
         else:
             power = ""
+        allocid = rt.get('_alloc', {}).get('id', None)
         owner = rt.get('owner', None)
-        if owner != None:
-            owner_s = "[" + owner + "]"
+        if allocid or owner:
+            ownerl = []
+            if owner:
+                ownerl.append(owner)
+            if allocid:
+                ownerl.append(allocid)
+            owner_s = "[" + ":".join(ownerl) + "]"
         else:
             owner_s = ""
         print "%s %s%s" % (rt['fullid'], owner_s, power)
     elif verbosity == 2:
         print rt['fullid']
-        commonl.data_dump_recursive(rt, prefix = "  ")
+        commonl.data_dump_recursive(rt, prefix = rt['fullid'])
     elif verbosity == 3:
         pprint.pprint(rt)
     else:
@@ -745,7 +840,13 @@ def cmdline_list(spec_strings, do_all = False):
     targetl = []
     for _fullid, rt in sorted(rest_target_broker.rts_cache.iteritems(),
                               key = lambda x: x[0]):
-        if spec and not _target_select_by_spec(rt, spec):
+        # add the remote target info as a dictionary and ...
+        kws = dict(rt)
+        #  ... as a flattened dictionary
+        for key, val in commonl.dict_to_flat(rt,
+                                             sort = False, empty_dict = True):
+            kws[key] = val
+        if spec and not _target_select_by_spec(kws, spec):
             continue
         targetl.append(rt)
     return targetl
@@ -787,18 +888,6 @@ def rest_target_find_all(all_targets = False):
             continue
         targets.append(rt)
     return targets
-
-def rest_target_acquire(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :returns: dictionary of tags
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
-        rtb.rest_tb_target_acquire(
-            rt, ticket = args.ticket, force = args.force)
 
 def rest_target_release(args):
     """

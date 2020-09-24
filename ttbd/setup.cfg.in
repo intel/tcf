@@ -1,0 +1,57 @@
+[install]
+install_data = /
+
+[bdist_rpm]
+release = 1
+packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
+# parted/dosfstools/grub2*/util-linux: for setup-efi-grub2-elf / ttbl.grub2elf
+# The grub thing? So it works in fedora27 or fedora 25
+requires =
+         alsa-utils
+         android-tools
+         dosfstools
+         dnsmasq
+         ipmitool
+         livecd-tools
+         openocd
+         parted
+         pyOpenSSL
+         pyserial
+         python-flask
+         python-flask-login
+         @@Fedora@@python-flask-principal
+         @@Fedora@@python2-ipaddress
+         @@CentOS|RHEL@@python-ipaddress
+         python2-keyring
+         @@Fedora@@python2-pysnmp
+         @@CentOS|RHEL@@pysnmp
+         python-ldap
+         @@Fedora@@python2-netifaces
+         @@CentOS|RHEL@@python-netifaces
+         @@Fedora@@python-pexpect
+         @@CentOS|RHEL@@pexpect
+         python-ply
+         python-requests
+         @@Fedora@@python-systemd
+         @@CentOS|RHEL@@systemd-python
+         @@Fedora@@edk2-ovmf
+         @@CentOS|RHEL@@OVMF
+         python-tornado
+         python-werkzeug
+         pyusb
+         qemu
+         openssh-clients
+         sshpass
+         socat
+         tcf == %{version}-%{release}
+         v4l-utils
+
+build_requires =
+         gcc
+         git
+         make
+         python2-devel
+pre-install = rpm-pre-install.sh
+post-install = rpm-post-install.sh
+post-uninstall = rpm-post-install.sh
+conflicts = ModemManager

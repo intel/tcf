@@ -95,7 +95,7 @@ class qmp_c(object):
         else:
             self.log.error("%s: cannot connect after %d tries"
                            % (self.sockfile, tries,))
-            if os.path.exists(self.logfile):
+            if self.logfile and os.path.exists(self.logfile):
                 with open(self.logfile) as logfile:
                     for line in logfile:
                         self.log.error("%s: qemu log: %s"
@@ -285,7 +285,7 @@ class pc(ttbl.power.daemon_c,
     >>>     'nwa', dict(
     >>>         mac_addr = "02:61:00:00:00:05",
     >>>         ipv4_addr = "192.168.97.5",
-    >>>         ipv6_addr = "fc00::61:05")
+    >>>         ipv6_addr = "fd:00:61::05")
     >>> qemu_pc = ttbl.qemu.pc([ "/usr/bin/qemu-system-x86_64", ... ])
     >>> target.interface_add("power", ttbl.power.interface(
     >>>     ( "tuntap-nwa", ttbl.qemu.network_tap_pc() ),
@@ -452,6 +452,9 @@ class pc(ttbl.power.daemon_c,
                 "complaining about 'vnc-port' not defined",
                 ttbl.config.tcp_port_range)
         else:
+            # set this for general information; the VNC screenshotter
+            # also uses it
+            target.fsdb.set("vnc-host", "localhost")
             target.fsdb.set("vnc-port", "%s" % (tcp_port_base + 1 - 5900))
             # this one is the raw port number
             target.fsdb.set("vnc-tcp-port", "%s" % (tcp_port_base + 1))
@@ -665,7 +668,7 @@ class plugger_c(ttbl.things.impl_c):
     >>>     tags = { },
     >>>     target_type = "usb_disk")
     >>>
-    >>> ttbl.config.targets['qu04a'].interface_add(
+    >>> ttbl.test_target.get('qu04a').interface_add(
     >>>     "things",
     >>>     ttbl.things.interface(
     >>>         drive_34 = ttbl.qemu.plugger_c(
@@ -676,17 +679,18 @@ class plugger_c(ttbl.things.impl_c):
 
 
     """
-    def __init__(self, name, **kwargs):
+    def __init__(self, name, *args, **kwargs):
+        self.args = args
         self.kwargs = kwargs
         self.name = name
         ttbl.things.impl_c.__init__(self)
 
     def plug(self, target, thing):
         assert isinstance(target, ttbl.test_target)
-
+        qmpfile = os.path.join(target.state_dir, "qemu.qmp")
         # Now with QMP, we add the device
-        with qmp_c(target.pidfile + ".qmp") as qmp:
-            r = qmp.command("device_add", id = self.name, **self.kwargs)
+        with qmp_c(qmpfile) as qmp:
+            r = qmp.command("device_add", *self.args, **self.kwargs)
             # prelaunch is what we get when we are waiting for GDB
             if r == {}:
                 return
@@ -695,10 +699,10 @@ class plugger_c(ttbl.things.impl_c):
 
     def unplug(self, target, thing):
         assert isinstance(target, ttbl.test_target)
-
+        qmpfile = os.path.join(target.state_dir, "qemu.qmp")
         # Now with QMP, we add the device
-        with qmp_c(target.pidfile + ".qmp") as qmp:
-            r = qmp.command("device_del", **self.kwargs)
+        with qmp_c(qmpfile) as qmp:
+            r = qmp.command("device_del", *self.args, **self.kwargs)
             # prelaunch is what we get when we are waiting for GDB
             if r == {}:
                 return
@@ -708,7 +712,7 @@ class plugger_c(ttbl.things.impl_c):
     def get(self, target, thing):
         # FIXME: this should query QEMU for the devices plugged, but
         # need to do more research on how
-        return target.fsdb.get("thing-" + thing.id) ==  'True'
+        return target.fsdb.get("interfaces.things." + thing.id + ".plugged", False)
 
 
 class network_tap_pc(ttbl.power.impl_c):
@@ -717,6 +721,8 @@ class network_tap_pc(ttbl.power.impl_c):
 
     A target declares connectivity to one or more interconnects; when
     this object is instantiated as part of the power rail:
+
+    Parameters as to :class:ttbl.power.impl_c.
 
     >>> target.interface_add(
     >>>     "power",
@@ -734,8 +740,8 @@ class network_tap_pc(ttbl.power.impl_c):
       $ tcf list -vv TARGETNAME | grep -i nwka
         interconnects.nwka.ipv4_addr: 192.168.120.101
         interconnects.nwka.ipv4_prefix_len: 24
-        interconnects.nwka.ipv6_addr: fc00::a8:78:65
-        interconnects.nwka.ipv6_prefix_len: 112
+        interconnects.nwka.ipv6_addr: fd:a8:78::65
+        interconnects.nwka.ipv6_prefix_len: 104
         interconnects.nwka.mac_addr: 94:c6:91:1c:9e:d9
 
     Upon powering on the target, the *on()* method will create a
@@ -760,8 +766,8 @@ class network_tap_pc(ttbl.power.impl_c):
     the interface.
 
     """
-    def __init__(self):
-        ttbl.power.impl_c.__init__(self)
+    def __init__(self, **kwargs):
+        ttbl.power.impl_c.__init__(self, **kwargs)
         if not commonl.prctl_cap_get_effective() & 1 << 12:
             # If we don't have network setting privilege,
             # don't even go there

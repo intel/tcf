@@ -162,8 +162,8 @@ networks for virtual (and physical) targets to intercomunicate with
 each other::
 
   $ tcf list | grep nw
-  local/nwa                 # 192.168.61.0/24 fc00::61:0/112
-  local/nwb                 # 192.168.62.0/24 fc00::62:0/112
+  local/nwa                 # 192.168.61.0/24 fd:00:61::0/104
+  local/nwb                 # 192.168.62.0/24 fd:00:62::0/104
 
 QEMU targets defined in the default configuration are made
 members of each subnetwork. The server host is always the *.1*
@@ -184,7 +184,7 @@ More networks can be added by creating configuration files
            ipv4_prefix_len = 24,
        )
    )
-   ttbl.config.targets['NAME'].tags['interfaces'].append('interconnect_c')
+   ttbl.test_target.get('NAME').tags['interfaces']['interconnect_c'] = {}
 
 Be sure to not assign conflicting IP blocks, or IP blocks that route
 to the public internet or intranet--in the example the convention is
@@ -220,7 +220,7 @@ it basically consists on:
              ipv4_prefix_len = 24,
          )
      )
-     ttbl.config.targets['NAME'].tags['interfaces'].append('interconnect_c')
+     ttbl.test_target.get('NAME').tags['interfaces']['interconnect_c'] = {}
 
   or for an existing network (such as the configuration's default
   *nwa*):
@@ -228,15 +228,15 @@ it basically consists on:
   .. code-block:: python
 
      # eth dongle mac 00:e0:4c:36:40:b8 is assigned to NWA
-     ttbl.config.targets['nwa'].tags_update(dict(mac_addr = '00:e0:4c:36:40:b8'))
+     ttbl.test_target.get('nwa').tags_update(dict(mac_addr = '00:e0:4c:36:40:b8'))
 
 - for each target that is connected to said network, report it as part
   of the network *nwc*:
 
   .. code-block:: python
 
-     ttbl.config.targets['TARGETNAME-NN'].tags_update({ 'ipv4_addr': "192.168.10.130" },
-                                                      ic = 'nwc')
+     ttbl.test_target.get('TARGETNAME-NN').tags_update({ 'ipv4_addr': "192.168.10.130" },
+                                                       ic = 'nwc')
 
 - the network switch itself can be also power switched; if you
   connect it, for example to a Digital Loggers Web Power Switch 7
@@ -244,7 +244,7 @@ it basically consists on:
 
   .. code-block:: python
 
-     ttbl.config.targets['nwc'].pc_impl.append(
+     ttbl.test_target.get('nwc').pc_impl.append(
          ttbl.pc.dlwps7("http://admin:1234@spX/M"))
 
   thus, when powering up the network *nwc*, the last step will be to
@@ -447,6 +447,8 @@ follow are configuration examples.
 Configure physical Linux (or other) targets
 -------------------------------------------
 
+.. warning:: this section is old and needs rewriting
+
 There are multiple ways a Linux target can be connected as a target to
 a TCF server. However, dependending on the intended use, different
 configuration steps can be followed:
@@ -458,8 +460,7 @@ configuration steps can be followed:
   This provides no control over the OS installed in the target
 
 - A Linux target can be setup to boot off a read-only live filesystem
-  (to avoid modifications to the root filesystem) following
-  :ref:`these steps <ttbd_config_phys_linux_live>`.
+  (to avoid modifications to the root filesystem).
 
   Serial access to a console can be provided and through it networking
   can be configured.
@@ -498,7 +499,7 @@ properly configured; if you are coonecting a *THINGNAME* using method
 .. code-block:: python
 
    sometarget_add('TARGETNAME' ...)
-   ttbl.config.targets['TARGETNAME'].thing_add(
+   ttbl.test_target.get('TARGETNAME').thing_add(
        'THINGNAME', someplugger(ARG1, ARG2...))
 
 A plugger, such as :class:`ttbl.usbrly08b.plugger` and its
@@ -532,11 +533,11 @@ unplugging it, in the ``conf_10_target.py`` file, we would add:
        ic_type = 'usb__host__device')
 
    SOMETARGET_add('TARGET0'...)
-   ttbl.config.targets['TARGET0'].add_to_interconnect('usb__TARGET1__TARGET0')
+   ttbl.test_target.get('TARGET0').add_to_interconnect('usb__TARGET1__TARGET0')
 
    SOMETARGET_add('TARGET1'...)
-   ttbl.config.targets['TARGET1'].add_to_interconnect('usb__TARGET1__TARGET0')
-   ttbl.config.targets['TARGET1'].add_thing(
+   ttbl.test_target.get('TARGET1').add_to_interconnect('usb__TARGET1__TARGET0')
+   ttbl.test_target.get('TARGET1').add_thing(
        'TARGET0', ttbl.usbrly08b.plugger("SERIALNUMBER", 0))
 
 
@@ -594,7 +595,7 @@ It helps to name networks with a single letter, e.g.: *nwa*,
   ranges and MAC address generation. E.g. *a* in *nwa* is 97, 0x61
   which can be used to define networks::
 
-    ipv6_addr: fc00::61:0/112
+    ipv6_addr: fd:00:61::0/104
     ipv4_addr: 192.168.97.0/24
 
 - as well, as described :ref:`in the previous section
@@ -748,6 +749,31 @@ Once a target is configured in, run a quick healthcheck::
       place links to configuration of network infrastructure (switches
       and interfaces)
 
+
+      
+Configuring support information
+-------------------------------
+
+The server exports a target called *local* (disabled by default) that
+is used to export information about the server; two important fields
+in there are the owner and information to request login, to direct
+users to the right place.
+
+In any :ref:`server configuration file <ttbd_configuration>` named
+*conf_NN_ANYTHING.py* (with NN sorting higher than 06, where we define
+default targets) add:
+
+>>> server = ttbl.test_target.get('local')
+>>> server.tags_update(dict(
+>>> support = dict(
+>>>        owner = "some person/list <automation.admins@some.place.com>",
+>>>        auth_help = "request access at http://automation.place.com/request-access"
+>>>    ))
+>>> )
+
+when the user tries to login and they fail, they are presented this
+information so they know where to go for help.
+
 .. _pos_setup:
 
 Configuring Provisioning OS support
@@ -831,6 +857,7 @@ been tested yet, shall be similar.
      # firewall-cmd --permanent \
         --add-service=dhcp \
         --add-service=dhcpv6 \
+        --add-service=dns \
         --add-service=http \
         --add-service=https \
         --add-service=mountd \
@@ -857,17 +884,10 @@ been tested yet, shall be similar.
 
 5. Enable required services:
 
-   - Apache: to serve the POS Linux kernel and initrd::
-
-       # tee /etc/httpd/conf.d/ttbd.conf <<EOF
-       Alias "/ttbd-pos" "/home/ttbd/public_html"
-
-       <Directory "/home/ttbd/public_html">
-       AllowOverride FileInfo AuthConfig Limit Indexes
-       Options MultiViews Indexes SymLinksIfOwnerMatch IncludesNoExec
-       Require method GET POST OPTIONS
-       </Directory>
-       EOF
+   - Apache: to serve the POS Linux kernel/initrd and bootloaders that
+     might be serve over HTTP (eg using UEFI HTTP boot to bring in
+     iPXE) the installation will install Apache configuration file
+     */etc/httpd/conf.d/ttbd.conf*.
 
      SELinux requires setting a few more things to enable serving from
      home directories::
@@ -888,19 +908,22 @@ been tested yet, shall be similar.
      from any other browser try to access
      http://YOURSERVERNAME/ttbd-pos/testfile and check it succeeds.
 
-     FIXME: move ttbd.conf file as a config file in package
-     ``ttbd-pos``.
-
    - NFS server: provides the POS root filesystem.
 
-     Ensure UDP support is enabled (not for RHEL >= 7.6)::
+     Ensure UDP support is enabled (not for RHEL >= 7.6 or CentOS 7)::
 
        # sed -i 's|RPCNFSDARGS="|RPCNFSDARGS="--udp |' /etc/sysconfig/nfs
-       # systemctl enable nfs-server
-       # systemctl restart nfs-server
+       # systemctl enable --now nfs-server
+
+   - tftp-server provides TFTP boot services (not in all
+     installations)::
+     
+       # systemctl enable --now tftp		# CentOS7
 
 POS: deploy PXE boot image to HTTP and NFS server locations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. _generate_tcf_live_iso:
 
 Currently the Provisioning OS is implemented with a derivative of
 Fedora Linux.
@@ -909,7 +932,10 @@ Fedora Linux.
              to be run in such. Steps for x86 (32-bits) or other
              platforms need to be documented.
 
-.. _generate_tcf_live_iso:
+.. warning:: it is only possible to run these steps now in a Fedora
+             platform; need to document steps to do it from another
+             one.
+             
 
 a. Generate TCF-live on the fly::
 
@@ -971,7 +997,7 @@ c. Make the kernel and initrd for POS available via Apache for
 
    i. Copy the kernel::
 
-        # ln /home/ttbd/images/tcf-live/x86_64/boot/vmlinuz-* \
+        # cp /home/ttbd/images/tcf-live/x86_64/boot/vmlinuz-* \
             /home/ttbd/public_html/x86_64/vmlinuz-tcf-live
 
    ii. Regenerate the *initrd* with nfs-root support, as the initrd
@@ -1012,18 +1038,39 @@ c. Make the kernel and initrd for POS available via Apache for
          # install -m 0644 -o ttbd -g ttbd /home/ttbd/public_html/x86_64/* \
               /var/lib/tftpboot/ttbd-production/efi-x86_64
 
-       This allows targets to get the boot kernel/initrd over TFTP.
+       This allows targets to get the boot kernel/initrd over
+       TFTP. Let's do the same for iPXE for HTTP boot::
+
+         # install -o ttbd -g ttbd /usr/share/ipxe/ipxe-x86_64.efi \
+              /home/ttbd/public_html/x86_64/
+         # install -o ttbd -g ttbd /usr/share/ipxe/ipxe-x86_64.efi \
+              /var/lib/tftpboot
+
+       CentOS 7::
+
+         # install -o ttbd -g ttbd /usr/share/ipxe/ipxe.efi \
+              /home/ttbd/public_html/x86_64/ipxe-x86_64.efi
+         # install -o ttbd -g ttbd /usr/share/ipxe/ipxe.efi \
+              /var/lib/tftpboot
+
+       Note the name changes; as well, there is no need to copy it to
+       the TFTP directory as new code paths do it for us.
+
 
    Ensure those two files work by pointing a browser to
    http://YOURSERVERNAME/ttbd-pos/ and verifying they can be downloaded.
 
-d. Make the POS root image available over NFS as read-only (note we
-   only export those images only, not all)::
+d. Make the POS root image available over NFS as read-only; verify
+   file ``/etc/exports.d/ttbd-pos.exports`` has been installed. This
+   tells the NFS subsystem to export the POS images for the different
+   architectures.
+
+   Manually, it can be created with::
 
      # tee /etc/exports.d/ttbd-pos.exports <<EOF
      /home/ttbd/images/tcf-live/x86_64 *(ro,no_root_squash)
      EOF
-     # systemctl reload nfs-server	# use 'nfs' for RHEL / CentOS
+     # systemctl reload nfs-server		# use 'nfs' for RHEL
 
      
    Verify the directory is exported::
@@ -1060,9 +1107,8 @@ e. Perform final image setup:
 
 f. Deploy content to the server that test content can / will use::
 
-     $ mkdir -p /home/ttbd/images/tcf-live/misc
-
-     $ cp /usr/share/tcf/content/evemu.bin.tar.gz /home/ttbd/images/tcf-live/misc
+     $ install -m 0775 -d /home/ttbd/images/misc
+     $ cp /usr/share/tcf/content/evemu.bin.*.tar.gz /home/ttbd/images/misc
      
 .. _ttbd_pos_deploying_images:
 
@@ -1102,7 +1148,7 @@ POS; for example:
 
 - Fedora::
 
-    $ https://mirrors.rit.edu/fedora/fedora/linux/releases/29/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-29-1.2.iso
+    $ wget https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/29/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-29-1.2.iso
     $ /usr/share/tcf/tcf-image-setup.sh fedora:workstation:29::x86_64 Fedora-Workstation-Live-x86_64-29-1.2.iso
 
 - RHEL::
@@ -1113,8 +1159,8 @@ POS; for example:
 
 - Ubuntu::
 
-    $ wget http://releases.ubuntu.com/18.04/ubuntu-18.04.3-desktop-amd64.iso
-    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/ubuntu:desktop:18.04:3:x86_64 ubuntu-18.04.3-desktop-amd64.iso 
+    $ wget http://releases.ubuntu.com/18.04/ubuntu-18.04.5-desktop-amd64.iso
+    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/ubuntu:desktop:18.04:5:x86_64 ubuntu-18.04.5-desktop-amd64.iso 
     
 - Yocto::
 
@@ -1355,8 +1401,8 @@ a. A network is usually defined, in a ``conf_10_NAME.py``
                                vlan_pci()
                            ]),
           tags = dict(
-              ipv6_addr = 'fc00::61:1',
-              ipv6_prefix_len = 112,
+              ipv6_addr = 'fd:00:61::1',
+              ipv6_prefix_len = 104,
               ipv4_addr = '192.168.97.1',
               ipv4_prefix_len = 24,
           ),
@@ -1378,7 +1424,7 @@ a. A network is usually defined, in a ``conf_10_NAME.py``
 
    Note also the nomenclature: *nwa*, letter *a* )(ASCII 97 / 0x61)
    which we use in the *network* part of the IP address (*192.168.97.x*
-   and *fc00::61:x*).
+   and *fd:00:61::x*).
 
 b. Since we know we are using a physical network, in the form of one of
    the server's network interfaces connected to a network switch, we
@@ -1390,7 +1436,7 @@ b. Since we know we are using a physical network, in the form of one of
            ....
            tags = dict(
                mac_addr =  'a0:ce:c8:00:18:73',
-               ipv6_addr = 'fc00::61:1',
+               ipv6_addr = 'fd:00:61::1',
                ....
 
    Now, powering on or off the *nwa* target will bring up or
@@ -1436,8 +1482,8 @@ d. Now we need to add DHCP support to the network; we do that by using
                                ttbl.pc.dlwps7('http://admin:1234@sp5/8'),
                                ttbl.dhcp.pci("192.168.97.1", "192.168.97.0", 24,
                                              "192.168.97.10", "192.168.97.20"),
-                               ttbl.dhcp.pci("fc00::61:1", "fc00::61:0", 112,
-                                             "fc00::61:2", "fc00::61:fe", ip_mode = 6),
+                               ttbl.dhcp.pci("fd:00:61::1", "fd:00:61::0", 104,
+                                             "fd:00:61::2", "fd:00:61::fe", ip_mode = 6),
                            ]),
           ...
 
@@ -1462,8 +1508,8 @@ e. POS can do very fast and efficient imaging by using rsync; the
                                ttbl.pc.dlwps7('http://admin:1234@sp5/8'),
                                ttbl.dhcp.pci("192.168.97.1", "192.168.97.0", 24,
                                              "192.168.97.10", "192.168.97.20"),
-                               ttbl.dhcp.pci("fc00::61:1", "fc00::61:0", 112,
-                                             "fc00::61:2", "fc00::61:fe", ip_mode = 6),
+                               ttbl.dhcp.pci("fd:00:61:1", "fd:00:61::0", 104,
+                                             "fd:00:61:2", "fd:00:61::fe", ip_mode = 6),
                                ttbl.rsync.pci("192.168.97.1", 'images',
                                               '/home/ttbd/images'),
                            ]),
@@ -1493,8 +1539,8 @@ f. Optionally, you can implement port redirection.
                                ttbl.pc.dlwps7('http://admin:1234@sp5/8'),
                                ttbl.dhcp.pci("192.168.97.1", "192.168.97.0", 24,
                                              "192.168.97.2", "192.168.97.254"),
-                               ttbl.dhcp.pci("fc00::61:1", "fc00::61:0", 112,
-                                             "fc00::61:2", "fc00::61:fe", ip_mode = 6),
+                               ttbl.dhcp.pci("fd:00:61::1", "fd:00:61::0", 104,
+                                             "fd:00:61::2", "fd:00:61::fe", ip_mode = 6),
                                ttbl.rsync.pci("192.168.97.1", 'images',
                                               '/home/ttbd/images'),
                                ttbl.socat.pci('tcp', "192.168.97.1", 8080,
@@ -1512,8 +1558,8 @@ g. Finally, we need to specify a few more tags that the clients and
 
           ...
           tags = dict(
-              ipv6_addr = 'fc00::61:1',
-              ipv6_prefix_len = 112,
+              ipv6_addr = 'fd:00::61:1',
+              ipv6_prefix_len = 104,
               ipv4_addr = '192.168.97.1',
               ipv4_prefix_len = 24,
 
@@ -1542,7 +1588,7 @@ All together, it shall look like:
 
    # Delete existing definition of the 'nwa' target created by the
    # default initialization
-   del ttbl.config.targets['nwa']
+   del ttbl.test_target.get('nwa')
 
    ttbl.config.interconnect_add(
        ttbl.tt.tt_power(
@@ -1553,8 +1599,8 @@ All together, it shall look like:
                #ttbl.pc.dlwps7('http://admin:1234@sp5/8'),
                ttbl.dhcp.pci("192.168.97.1", "192.168.97.0", 24,
                              "192.168.97.10", "192.168.97.20"),
-               ttbl.dhcp.pci("fc00::61:1", "fc00::61:0", 112,
-                             "fc00::61:2", "fc00::61:fe", ip_mode = 6),
+               ttbl.dhcp.pci("fd:00:61::1", "fd:00:61::0", 104,
+                             "fd:00:61::2", "fd:00:61::fe", ip_mode = 6),
                ttbl.rsync.pci("192.168.97.1", 'images',
                               '/home/ttbd/images'),
                ttbl.socat.pci('tcp', "192.168.97.1", 8080,
@@ -1563,8 +1609,8 @@ All together, it shall look like:
                               'socks_proxy.mydomain.com', 1080),
            ]),
        tags = dict(
-           ipv6_addr = 'fc00::61:1',
-           ipv6_prefix_len = 112,
+           ipv6_addr = 'fd:00:61::1',
+           ipv6_prefix_len = 104,
            ipv4_addr = '192.168.97.1',
            ipv4_prefix_len = 24,
 
@@ -1600,8 +1646,8 @@ Now the configuration is loaded and you can run::
     id: nwa
     ipv4_addr: 192.168.97.1
     ipv4_prefix_len: 24
-    ipv6_addr: fc00::61:1
-    ipv6_prefix_len: 112
+    ipv6_addr: fd:00:61::1
+    ipv6_prefix_len: 104
     pos_http_url_prefix: http://192.168.97.1/ttbd-pos/%(bsps)s/
     pos_nfs_path: /home/ttbd/images/tcf-live/%(bsp)s
     pos_nfs_server: 192.168.97.1

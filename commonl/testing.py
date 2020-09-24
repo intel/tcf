@@ -604,7 +604,6 @@ host = '127.0.0.1'
             "-vvvvv",
             "--files-path", self.files_dir,
             "--state-path", self.state_dir,
-            "--var-lib-path", self.lib_dir,
             "--config-path", "", # This empty one is to clear them all
             "--config-path", self.etc_dir
         ]
@@ -699,23 +698,29 @@ host = '127.0.0.1'
         line = line.strip()
         for bad_string in self.bad_strings:
             if bad_string in line:
+                for exclude in self.errors_ignore + self.warnings_ignore:
+                    if isinstance(exclude, re._pattern_type):
+                        if exclude.search(line):
+                            return False
+                    elif exclude in line:
+                        return False
                 return True
         if self.error_regex.search(line):
             for exclude in self.errors_ignore:
-                if isinstance(exclude, re._pattern_type) \
-                   and exclude.search(line):
-                    return False
+                if isinstance(exclude, re._pattern_type):
+                    if exclude.search(line):
+                        return False
                 elif exclude in line:
                     return False
             return True
         if self.warning_regex.search(line):
             for exclude in self.warnings_ignore:
-                if isinstance(exclude, re._pattern_type) \
-                   and exclude.search(line):
-                    return False
+                if isinstance(exclude, type(self.warning_regex)):
+                    if exclude.search(line):
+                        return False
                 elif exclude in line:
                     return False
-                return True
+            return True
 
     def _log_report(self, fd, fd_name, issues, testcase):
         if testcase:
@@ -806,9 +811,14 @@ host = '127.0.0.1'
                 os.kill(-self.p.pid, signal.SIGKILL)
             except OSError:	# Most cases, already dead
                 pass
-        self.check_log_for_issues()
+        try:
+            self.check_log_for_issues()
+        except IOError as e:
+            if e.errno != errno.ENOENT:
+                # tmpdir has been removed, ignore
+                raise
         if not self.keep_temp:
-            shutil.rmtree(self.tmpdir, True)
+            shutil.rmtree(self.tmpdir, ignore_errors = True)
         else:
             logging.warning("keeping TTBD #%s temporary directory @ %s\n",
                             self.port, self.tmpdir)

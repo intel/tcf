@@ -90,6 +90,81 @@ class authenticator_ldap_c(ttbl.authenticator_c):
     def __repr__(self):
         return self.url
 
+
+    ldap_field_set = set()
+
+    def ldap_login_hook(self, record):
+        """
+        Function called by :meth:login once a user is authenticated
+        sucessfully on LDAP
+
+        This function does nothing and is meant for being overloaded
+        in an inherited class to implement any extra needed
+        functionality, eg:
+
+        >>> class my_auth_c(ttbl.auth_ldap.authenticator_ldap_c)
+        >>>
+        >>>     def ldap_login_hook(self, record):
+        >>>
+        >>>
+        >>>     def ldap_login_hook(self, records):
+        >>>         d = 0
+        >>>         record = records[0]
+        >>>         dn = record[0]
+        >>>         fields = record[1]
+        >>>
+        >>>         data = {}
+        >>>         dnl = ldap.dn.explode_dn(dn)
+        >>>         for i in dnl:
+        >>>             if i.startswith("CN="):
+        >>>                 # CN=Lastname\\, Name -> unscape the value
+        >>>                 data['name'] = i.split("=", 1)[1].replace("\\", "")
+        >>>             if i.startswith("DC=") and 'domain' not in data:
+        >>>                 # we take the first DC= component and store as domain,
+        >>>                 # ignore the rest from a string such as
+        >>>                 # u'DC=subdomain2', u'DC=subdomain3', u'DC=company', u'DC=com'
+        >>>                 data['domain'] = i.split("DC=")[1].replace("\\", "")
+        >>>
+        >>>         data['login'] = fields['sAMAccountName'][0]
+        >>>         return data
+
+        :param list record: All the records matching the email given
+          to :meth:login are passed in *record*, which has the
+          following structure:
+
+          >>> [
+          >>>    ( DN, DICT-OF-FIELDS ),
+          >>>    ( DN1, DICT-OF-FIELDS ),
+          >>>    ( DN2, DICT-OF-FIELDS ),
+          >>>    ...
+          >>> ]
+
+          In most properly configured LDAPs, there will be just ONE
+          entry for the matching user.
+
+          *DN* is a string containing the the distinguished name, and
+          might look as::
+
+            CN=Lastnames\\, Firstnames,OU=ORGUNIT,DC=DOMAIN1,DC=DOMAIN2,...
+
+          eg::
+
+            CN=Doe\\, Jane John,OU=Staff,DC=company,DC=com
+
+          Dict of fields is a dictionary of all the fields listed in
+          :data:ldap_field_set plus *sAMAccountName*, *mail* and
+          *memberOf* (which :meth:login below always queries).
+
+          Each fields is a list of values; in some case it might be only
+          one, in others, multiple.
+
+        :returns: dictionary keyed by strings of fields we want the
+          user database to contain; only int, float, bool and strings
+          are allowed. Key name *roles* is reserved.
+
+        """
+        return {}
+
     def login(self, email, password, **kwargs):
         """
         Validate a email|token/password combination and pull which roles it
@@ -117,11 +192,14 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         record = None
         # First bind to LDAP and search the user's email
         try:
+            ldap_fields = set([ 'sAMAccountName', 'mail', 'memberOf' ])
+            # add anything else the admin has said
+            ldap_fields.update(self.ldap_field_set)
             self.conn.simple_bind_s(email, password.encode('utf8'))
-            # FIXME: with self.conn.simple_bind_s?
+            # search_s is picky in the field list; has to be a list,
+            # can't be a set
             record = self.conn.search_s(
-                "", ldap.SCOPE_SUBTREE, 'mail=%s' % email,
-                [ 'sAMAccountName', 'mail', 'memberOf'])
+                "", ldap.SCOPE_SUBTREE, 'mail=%s' % email, list(ldap_fields))
             self.conn.unbind_s()
         except ldap.INVALID_CREDENTIALS as e:
             raise self.invalid_credentials_e(
@@ -164,24 +242,35 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         # the group name, and save only the name the name is between
         # CN=%GROUP NAME%,DC=...
         groups = []
-        for group in data_record['memberOf']:
+        for group in data_record.get('memberOf', []):
             tmp = group.split(",")
             for i in tmp:
                 if i.startswith('CN='):
                     group_name = i.replace('CN=', '')
                     groups.append(group_name)
                     break
+        groups = set(groups)
         # Given the group list @groups, check which more roles we
         # need to add based on group membership
-        for group in groups:
-            for role_name, role in self.roles.iteritems():
-                ldap_groups = role.get('groups', [])
-                if ldap_groups == None:
-                    # anyone, not  necessarily member of any group
-                    token_roles.add(role_name)
-                elif group in ldap_groups:
-                    token_roles.add(role_name)
-        return token_roles
+        for role_name, role in self.roles.iteritems():
+            role_groups = role.get('groups', [])
+            if role_groups == None:
+                # any valid user can take this role
+                token_roles.add(role_name)
+            elif set(role_groups) & groups:
+                # the LDAP records describes groups that are also in
+                # the list of acceptable groups for this role
+                token_roles.add(role_name)
+
+        data = self.ldap_login_hook(record)
+        assert isinstance(data, dict), \
+            "%s.ldap_login_hook() returned '%s', expected dict" \
+            % (type(self).__name__, type(data))
+        assert 'roles' not in data, \
+            "%s.ldap_login_hook() returned a dictionary with a 'roles'" \
+            " field, which is reserved"
+        data['roles'] = token_roles
+        return data
 
 
 class ldap_map_c(object):

@@ -11,14 +11,19 @@ Internal API for *ttbd*
 Note interfaces are added with :meth:`test_target.interface_add`, not
 by subclassing. See as examples :class:`ttbl.console.interface` or
 :class:`ttbl.power.interface`.
+
 """
 import bisect
 import collections
 import contextlib
 import errno
+import fcntl
 import fnmatch
+import glob
 import ipaddress
+import json
 import logging
+import numbers
 import os
 import pprint
 import random
@@ -34,11 +39,12 @@ import threading
 import time
 import traceback
 import types
+import urllib
 import urlparse
 
 import __main__
 import requests
-import usb.core
+import usb.util
 
 import commonl
 import user_control
@@ -52,11 +58,18 @@ class test_target_e(Exception):
     pass
 
 class test_target_busy_e(test_target_e):
-    def __init__(self, target):
+    def __init__(self, target, who, owner):
         test_target_e.__init__(
             self,
-            "%s: tried to use busy target (owned by '%s')"
-            % (target.id, target.owner_get()))
+            "%s: '%s' tried to use busy target (owned by '%s')"
+            % (target.id, who, owner))
+
+class test_target_wrong_state_e(test_target_e):
+    def __init__(self, target, state, expected_state):
+        test_target_e.__init__(
+            self,
+            "%s: tried to use target in state '%s' but needs '%s')"
+            % (target.id, state, expected_state))
 
 class test_target_not_acquired_e(test_target_e):
     def __init__(self, target):
@@ -166,7 +179,7 @@ class fsdb_c(object):
 
     def get_as_slist(self, *patterns):
         """
-        Return a sorted list of tuples *(KEY, VALUE)*s available in the
+        Return a sorted list of tuples *(KEY, VALUE)*\s available in the
         database.
 
         :param list(str) patterns: (optional) list of patterns of fields
@@ -181,7 +194,7 @@ class fsdb_c(object):
 
     def get_as_dict(self, *patterns):
         """
-        Return a dictionary of *KEY/VALUE*s available in the
+        Return a dictionary of *KEY/VALUE*\s available in the
         database.
 
         :param str pattern: (optional) pattern against the key names
@@ -195,20 +208,27 @@ class fsdb_c(object):
     #: Regular expresion that determines the valid characters in a field
     key_valid_regex = re.compile(r"^[-\.a-zA-Z0-9_]+$")
 
-    def set(self, key, value):
+    def set(self, key, value, force = True):
         """
-        Set a value for a key in the database
+        Set a value for a key in the database unless *key* already exists
 
         :param str key: name of the key to set
 
-        :param str value: value to store; *None* to remove the
+        :param str value: value to store; *None* to remove the field;
+          only *string*, *integer*, *float* and *boolean* types,
+          limited to a max of 1024
+
+        :parm bool force: (optional; default *True*) if *key* exists,
+          force the new value
+
+        :return bool: *True* if the new value was set correctly;
+          *False* if *key* already exists and *force* is *False*.
         """
         if not self.key_valid_regex.match(key):
             raise ValueError("%s: invalid key name (valid: %s)" \
                              % (key, self.key_valid_regex.pattern))
         if value != None:
-            assert isinstance(value, basestring)
-            assert len(value) < 1024
+            assert isinstance(value, basestring) and len(value) < 1024
         raise NotImplementedError
 
     def get(self, key, default = None):
@@ -236,97 +256,225 @@ class fsdb_symlink_c(fsdb_c):
     if the link already exists. Same to read it. Thus, for small
     values, it is very efficient.
     """
-    class exception(Exception):
+    class invalid_e(fsdb_c.exception):
         pass
 
-    def __init__(self, location):
+    def __init__(self, dirname, use_uuid = None, concept = "directory"):
         """
         Initialize the database to be saved in the give location
         directory
 
         :param str location: Directory where the database will be kept
         """
-        self.location = location
-        assert os.path.isdir(location) \
-            and os.access(location, os.R_OK | os.W_OK | os.X_OK)
-        self.uuid_seed = commonl.mkid(str(id(self)))
+        if not os.path.isdir(dirname):
+            raise self.invalid_e("%s: invalid %s"
+                                 % (os.path.basename(dirname), concept))
+        if not os.access(dirname, os.R_OK | os.W_OK | os.X_OK):
+            raise self.invalid_e("%s: cannot access %s"
+                                 % (os.path.basename(dirname), concept))
+
+        if use_uuid == None:
+            self.uuid = commonl.mkid(str(id(self)) + str(os.getpid()))
+        else:
+            self.uuid = use_uuid
+
+        self.location = dirname
 
     def keys(self, pattern = None):
         l = []
-        for _rootname, _dirnames, filenames in os.walk(self.location):
-            if pattern:
-                filenames = fnmatch.filter(filenames, pattern)
-            for filename in filenames:
-                if os.path.islink(os.path.join(self.location, filename)):
-                    l.append(filename)
+        for _rootname, _dirnames, filenames_raw in os.walk(self.location):
+            filenames = []
+            for filename_raw in filenames_raw:
+                # need to filter with the unquoted name...
+                filename = urllib.unquote(filename_raw)
+                if pattern == None or fnmatch.fnmatch(filename, pattern):
+                    if os.path.islink(os.path.join(self.location, filename_raw)):
+                        l.append(filename)
         return l
 
     def get_as_slist(self, *patterns):
         fl = []
-        for _rootname, _dirnames, filenames in os.walk(self.location):
+        for _rootname, _dirnames, filenames_raw in os.walk(self.location):
+            filenames = {}
+            for filename in filenames_raw:
+                filenames[urllib.unquote(filename)] = filename
             if patterns:	# that means no args given
-                use = []
-                for filename in filenames:
+                use = {}
+                for filename, filename_raw in filenames.items():
                     if commonl.field_needed(filename, patterns):
-                        use.append(filename)
+                        use[filename] = filename_raw
             else:
                 use = filenames
-            for filename in use:
-                if os.path.islink(os.path.join(self.location, filename)):
-                    bisect.insort(fl, ( filename, self.get(filename) ))
+            for filename, filename_raw in use.items():
+                if os.path.islink(os.path.join(self.location, filename_raw)):
+                    bisect.insort(fl, ( filename, self._get_raw(filename_raw) ))
         return fl
 
     def get_as_dict(self, *patterns):
         d = {}
-        for _rootname, _dirnames, filenames in os.walk(self.location):
+        for _rootname, _dirnames, filenames_raw in os.walk(self.location):
+            filenames = {}
+            for filename in filenames_raw:
+                filenames[urllib.unquote(filename)] = filename
             if patterns:	# that means no args given
-                use = []
-                for filename in filenames:
+                use = {}
+                for filename, filename_raw in filenames.items():
                     if commonl.field_needed(filename, patterns):
-                        use.append(filename)
+                        use[filename] = filename_raw
             else:
                 use = filenames
-            for filename in use:
-                if os.path.islink(os.path.join(self.location, filename)):
-                    d[filename] = self.get(filename)
+            for filename, filename_raw in use.items():
+                if os.path.islink(os.path.join(self.location, filename_raw)):
+                    d[filename] = self._get_raw(filename_raw)
         return d
 
-    def set(self, key, value):
-        if not self.key_valid_regex.match(key):
-            raise ValueError("%s: invalid key name (valid: %s)" \
-                             % (key, self.key_valid_regex.pattern))
-        if value != None:
-            assert isinstance(value, basestring)
-            assert len(value) < 1023
+    def set(self, key, value, force = True):
+        # escape out slashes and other unsavory characters in a non
+        # destructive way that won't work as a filename
+        key = urllib.quote(
+            key, safe = '-_ ' + string.ascii_letters + string.digits)
         location = os.path.join(self.location, key)
-
-        if value == None:		# value == None -> remove key
+        if value != None:
+            # the storage is always a string, so encode what is not as
+            # string as T:REPR, where T is type (b boolean, n number,
+            # s string) and REPR is the textual repr, json valid
+            if isinstance(value, bool):
+                # do first, otherwise it will test as int
+                value = "b:" + str(value)
+            elif isinstance(value, numbers.Integral):
+                # sadly, this looses precission in floats. A lot
+                value = "i:%d" % value
+            elif isinstance(value, numbers.Real):
+                # sadly, this can loose precission in floats--FIXME:
+                # better solution needed
+                value = "f:%.10f" % value
+            elif isinstance(value, basestring):
+                if value.startswith("i:") \
+                   or value.startswith("f:") \
+                   or value.startswith("b:") \
+                   or value.startswith("s:") \
+                   or value == "":
+                    value = "s:" + value
+            else:
+                raise ValueError("can't store value of type %s" % type(value))
+            assert len(value) < 4096
+        if value == None:
             try:
                 os.unlink(location)
             except OSError as e:
-                if e.errno == errno.ENOENT:
-                    pass
-                else:
+                if e.errno != errno.ENOENT:
                     raise
-        else:
-            # New location, add a unique thing to it so there is no
-            # collision if more than one process is trying to modify
-            # at the same time; they can override each other, that's
-            # ok--the last one wins.
-            location_new = location + "-%s-%s-%s" \
-                % (os.getpid(), self.uuid_seed, time.time())
-            commonl.rm_f(location_new)
-            os.symlink(value, location_new)	# POSIX: atomic
-            os.rename(location_new, location)	# POSIX: atomic
+            return True	# already wiped by someone else
+        if force == False:
+            try:
+                os.symlink(value, location)
+            except OSError as e:
+                if e.errno != errno.EEXIST:
+                    raise
+                # ignore if it already exists
+                return False
+            return True
 
-    def get(self, key, default = None):
+        # New location, add a unique thing to it so there is no
+        # collision if more than one process is trying to modify
+        # at the same time; they can override each other, that's
+        # ok--the last one wins.
+        location_new = location + "-" + str(os.getpid())
+        commonl.rm_f(location_new)
+        os.symlink(value, location_new)
+        os.rename(location_new, location)
+        return True
+
+    def _get_raw(self, key, default = None):
         location = os.path.join(self.location, key)
         try:
-            return os.readlink(location)
+            value = os.readlink(location)
+            # if the value was type encoded (see set()), decode it;
+            # otherwise, it is a string
+            if value.startswith("i:"):
+                return json.loads(value.split(":", 1)[1])
+            if value.startswith("f:"):
+                return json.loads(value.split(":", 1)[1])
+            if value.startswith("b:"):
+                val = value.split(":", 1)[1]
+                if val == "True":
+                    return True
+                elif val == "False":
+                    return False
+                raise ValueError("fsdb %s: key %s bad boolean '%s'"
+                                 % (self.location, key, value))
+            if value.startswith("s:"):
+                # string that might start with s: or empty
+                return value.split(":", 1)[1]
+            return value	# other string
         except OSError as e:
             if e.errno == errno.ENOENT:
                 return default
             raise
+
+    def get(self, key, default = None):
+        # escape out slashes and other unsavory characters in a non
+        # destructive way that won't work as a filename
+        key = urllib.quote(
+            key, safe = '-_ ' + string.ascii_letters + string.digits)
+        return self._get_raw(key, default = default)
+
+
+class process_posix_file_lock_c(object):
+    """
+    Very simple interprocess file-based spinning lock
+
+    .. warning::
+
+       - Won't work between threads of a process
+
+       - If a process dies, the next process can acquire it but there
+         will be no warning about the previous process having died,
+         thus state protected by the lock might be inconsistent
+    """
+
+    class timeout_e(Exception):
+        pass
+
+    def __init__(self, lockfile, timeout = 20, wait = 0.3):
+        self.lockfile = lockfile
+        self.timeout = timeout
+        self.wait = wait
+        self.fd = None
+        # ensure the file is created
+        with open(self.lockfile, "w+") as f:
+            f.write("")
+
+    def acquire(self):
+        ts0 = time.time()
+        self.fd = os.open(self.lockfile, os.O_RDWR | os.O_EXCL)
+        while True:
+            try:
+                fcntl.flock(self.fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except IOError as e:
+                if e.errno != errno.EAGAIN:
+                    raise
+                time.sleep(self.wait)
+                ts = time.time()
+                if ts - ts0 > self.timeout:
+                    raise self.timeout_e
+
+    def release(self):
+        os.close(self.fd)
+        self.fd = None
+
+    def locked(self):
+        return self.fd != None
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, _a, _b, _c):
+        self.release()
+
+
 
 
 class acquirer_c(object):
@@ -341,7 +489,7 @@ class acquirer_c(object):
     This can however, use any other resource manager.
 
     The operations in here can raise any exception, but mostly the
-    ones derived from :class:`ttbl.acquirer_c.exception`: 
+    ones derived from :class:`ttbl.acquirer_c.exception`:
 
     - :class:`ttbl.acquirer_c.timeout_e`
     - :class:`ttbl.acquirer_c.busy_e`
@@ -463,7 +611,6 @@ class symlink_acquirer_c(acquirer_c):
         self.location = os.path.join(target.state_dir, "mutex")
         self.wait_period = wait_period
 
-
     def acquire(self, who, force):
         """
         Acquire the mutex, blocking until acquired
@@ -480,7 +627,6 @@ class symlink_acquirer_c(acquirer_c):
             if e.errno == errno.EEXIST:
                 raise self.busy_e()
             raise
-
 
     def release(self, who, force):
         if force:
@@ -537,12 +683,20 @@ class tt_interface_impl_c(object):
         #: >>>     location = "USB port #4 front"))
         self.upid = kwargs
 
-    def upid_set(self, name, **kwargs):
+    def upid_set(self, name_long, **kwargs):
         """
         Set :data:`upid` information in a single shot
 
-        :param str name: Name of the physical component that
-          implements this interface functionality
+        :param str name_long: Long name of the physical component that
+          implements this interface functionality.
+
+          This gets registered as instrument property *name_long* and
+          if the instrument has defined no short *name* property, it
+          will be registered as such.
+
+          The short *name* has more restrictions, thus it is
+          recommended implementations set it.
+
         :param dict kwargs: fields and values (strings) to report for
           the physical component that implements this interface's
           functionality; it is important to specify here a unique
@@ -557,13 +711,16 @@ class tt_interface_impl_c(object):
         This is normally called from the *__init__()* function of a
         component driver, that must inherit :class:`tt_interface_impl_c`.
         """
-        assert name == None or isinstance(name, basestring)
+        assert isinstance(name_long, basestring), \
+            "name_long: expected a string; got %s" % type(name_long)
         for key, val in kwargs.iteritems():
             assert val == None or isinstance(val, (basestring, int,
                                                    float, bool)), \
                 "UPID field '%s' must be string|number|bool; got %s" \
                 % (key, type(val))
-        self.name = name
+        if not self.name:
+            self.name = name_long
+        kwargs['name_long'] = name_long
         self.upid = kwargs
 
 
@@ -601,7 +758,7 @@ class tt_interface(object):
     create methods in the subclass called *METHOD_NAME* with the
     signature:
 
-    >>>     def METHOD_NAME(self, target, who, args, user_path):
+    >>>     def METHOD_NAME(self, target, who, args, files, user_path):
     >>>         impl, component = self.arg_impl_get(args, "component")
     >>>         arg1 = args.get('arg1', None)
     >>>         arg2 = args.get('arg2', None)
@@ -620,6 +777,9 @@ class tt_interface(object):
     - *args* is a dictionary of arguments passed by the client for the
       HTTP call keyed by name (a string)
 
+    - *files* dictionrary of files passed to the HTTP request (FIXME:
+       doc properly)
+
     - *user_path* is a string describing the space in the filesystem
       where files for this user are stored
 
@@ -636,7 +796,7 @@ class tt_interface(object):
 
        - *stream_file*: (string) the named file will be streamed to the client
        - *stream_offset*: (positive integer) the file *steam_file*
-         *will be streamed starting at the given offset.
+         will be streamed starting at the given offset.
        - *stream-generation*: (positive monotonically increasing
          integer) a number that describes the current iteration of
          this file that might be reset [and thus bringing its apparent
@@ -681,7 +841,7 @@ class tt_interface(object):
         #: on [set by the initial call to :meth:`impls_set`]
         self.cls = None
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         # FIXME: move to public interface
         """
         Called when the interface is added to a target to initialize
@@ -692,6 +852,7 @@ class tt_interface(object):
 
     def _release_hook(self, target, force):
         # FIXME: move to public interface
+        # FIXME: remove force, unuused
         """
         Called when the target is released
         """
@@ -768,7 +929,7 @@ class tt_interface(object):
         >>>     def __init__(*impls, **kwimpls):
         >>>         ttbl.tt_interface(self)
         >>>         self.impls_set(impls, kwimplws, my_base_implc_c)
-        
+
         and it allows to specify the interface implementations in
         multiple ways:
 
@@ -796,7 +957,7 @@ class tt_interface(object):
           >>>     ( something, an_impl(args) ),
           >>>     ( someotherthing, another_impl(args) ),
           >>> ))
-        
+
         all forms can be combined; as well, if the implementation is
         the name of an existing component, then it becomes an alias.
         """
@@ -842,6 +1003,67 @@ class tt_interface(object):
             raise RuntimeError("missing '%s' argument" % name)
         return args[name]
 
+    @staticmethod
+    def arg_get(args, arg_name, arg_type,
+                allow_missing = False, default = None):
+        """Return the value of an argument passed to the call
+
+        Given the arguments passed with an HTTP request check if one
+        called ARG_NAME of type ARG_TYPE is present, return whatever
+        value it has.
+
+        Now, some values can be passed JSON encoded, some not -- this
+        is done for making it easy on the client side, so it can do
+        calls with curl/wget without having to mess it up too much:
+
+        :returns: the value
+        """
+        assert isinstance(args, dict)
+        assert isinstance(arg_name, basestring)
+        assert arg_type == None or isinstance(arg_type, type)\
+            or isinstance(arg_type, tuple) and all(isinstance(i, type)
+                                                   for i in arg_type)
+        assert isinstance(allow_missing, bool)
+        if not arg_name in args:
+            if allow_missing:
+                return default
+            raise RuntimeError("missing '%s' argument" % arg_name)
+        try:
+            # support direct calling inside the daemon; if it is a
+            # basestring, we consider it might be JSON and decode it 
+            arg = args[arg_name]
+            if isinstance(arg, basestring):
+                arg = json.loads(arg)
+        except ValueError as e:
+            # so let's assume is not properly JSON encoded and it is
+            # just a string to pass along
+            arg = args[arg_name]
+            # all this is backwards compat..... fugly, yes; but early clients
+            # failed to properly json encode args; also, when calling
+            # from curl with -d it becomes more ellaborate, so let's
+            # keep it.
+            if arg in ( "none", "None", "null" ):
+                arg = None
+            elif arg in ( "True", "true" ):
+                arg = True
+            elif arg in ( "False", "false" ):
+                arg = False
+            else:
+                # if we are expecting another type, let's try to
+                # convert it
+                if arg_type and arg_type != basestring:
+                    try:
+                        arg = arg_type(arg)
+                    except ValueError:
+                        raise ValueError(
+                            "%s: can't convert expected type %s; value: %s"
+                            % (arg_name, arg_type.__name__, arg))
+        if arg_type != None and not isinstance(arg, arg_type):
+            raise RuntimeError(
+                "%s: argument must be a %s; got '%s'"
+                % (arg_name, arg_type.__name__, type(arg).__name__))
+        return arg
+
     def impl_get_by_name(self, arg, arg_name = "component"):
         """
         Return an interface's component implementation by name
@@ -864,14 +1086,9 @@ class tt_interface(object):
         :returns: the implementation in *self.impls* for the component
           specified in the args
         """
-        if not arg_name in args:
-            if allow_missing:
-                return None, None
-            raise RuntimeError("missing '%s' argument" % arg_name)
-        arg = args[arg_name]
-        if not isinstance(arg, basestring):
-            raise RuntimeError("%s: argument must be a string; got '%s'"
-                               % (arg_name, type(arg).__name__))
+        arg = self.arg_get(args, arg_name, basestring, allow_missing)
+        if arg == None:
+            return None, None
         return self.impl_get_by_name(arg, arg_name)
 
 
@@ -885,21 +1102,48 @@ class tt_interface(object):
         (internal interface)
 
         :params dict args: dictionary of arguments keyed by argument
-          name
-        :returns: a list of *(NAME, IMPL)* based on if we got an
-          instance to run on (only execute that one) or on all the
-          components
+          name:
+
+          - *component*: a  component name to consider, if none, all
+          - *components*: list of component names to consider, if none, all
+          - *components_exclude*: (optional) list of components to exclude
+
+        :returns: a tuple of *(list, bool)*; list of a list of
+          implementations that need to be operated on; bool is *True*
+          if the list refers to all the components because the user
+          specified no *component* or *components* argument in the
+          call. *False* means only specific implementations are being
+          refered.
         """
         impl, component = self.arg_impl_get(args, 'component',
                                             allow_missing = True)
+        components_exclude = args.get('components_exclude', [])
+        components = args.get('components', [])
         if impl == None:
-            # no component was specified, so we operate over all the components
+            # no component was specified, so we operate over all the
+            # components unless components was given
             # KEEP THE ORDER
-            impls = self.impls.items()
-            _all = True
+            if components:
+                impls = []
+                for component in components:
+                    impl, name = self.impl_get_by_name(
+                        component, arg_name = "component")
+                    impls.append(( name, impl ))
+                # even if it might be all, we don't now for sure
+                _all = False
+            else:
+                impls = self.impls.items()
+                _all = True
         else:
             impls = [ ( component, impl ) ]
             _all = False
+        if components_exclude:
+            # if we are excluding components, then we need to reset
+            # the list and also the _all flag
+            new_impls = [ i for i in impls if i[0] not in components_exclude ]
+            if len(new_impls) < len(impls):
+                _all = False
+                impls = new_impls
         return impls, _all
 
 
@@ -952,7 +1196,13 @@ class tt_interface(object):
         prefix = "instrumentation." + index
         target.property_set(prefix + ".name", instrument_name)
         for key, val in upid.iteritems():
-            target.property_set(prefix + "." + key, val % kws)
+            if val:
+                # there might be empty values, as defaults, so we ignore them
+                if isinstance(val, basestring):
+                    # if it is a string, it is a template
+                    target.property_set(prefix + "." + key, val % kws)
+                else:
+                    target.property_set(prefix + "." + key, val)
         if components:
             target.property_set(prefix + ".functions." + iface_name,
                                 ":".join(components))
@@ -969,6 +1219,7 @@ class tt_interface(object):
         assert isinstance(target, ttbl.test_target)
         assert isinstance(iface_name, basestring)
 
+        tags_interface = collections.OrderedDict()
         components_by_index = collections.defaultdict(list)
         name_by_index = {}
         upid_by_index = {}
@@ -981,18 +1232,21 @@ class tt_interface(object):
             impl, _ = self.impl_get_by_name(component, "component")
             instrument_name, index = \
                 self.instrument_mkindex(impl.name, impl.upid, kws)
+            tags_interface[component] = {
+                "instrument": index
+            }
             # FIXME: there must be a more efficient way than using
             # pprint.pformat
             components_by_index[index].append(component)
             name_by_index[index] = instrument_name
             upid_by_index[index] = impl.upid
-
         for index, components in components_by_index.iteritems():
             self.instrumentation_publish_component(
                 target, iface_name, index,
                 name_by_index.get(index, None), upid_by_index[index],
                 components,
                 kws = kws)
+        target.tags['interfaces'][iface_name] = tags_interface
 
 
     def request_process(self, target, who, method, call,
@@ -1015,7 +1269,7 @@ class tt_interface(object):
           to the call, some might be JSON encoded.
         :param dict files: dictionary of key/value with the files
           uploaded via forms
-        (https://flask.palletsprojects.com/en/1.1.x/api/#flask.Request.form)
+          (https://flask.palletsprojects.com/en/1.1.x/api/#flask.Request.form)
         :param str user_path: Path to where user files are located
 
         :returns: dictionary of results, call specific
@@ -1027,7 +1281,7 @@ class tt_interface(object):
           >>>    value = 43
           >>> )
 
-        For an example, see :class:`ttbl.buttons.interface`.
+        For an example, see :class:`ttbl.power.interface`.
         """
         assert isinstance(target, test_target)
         assert isinstance(who, basestring)
@@ -1036,7 +1290,7 @@ class tt_interface(object):
         assert isinstance(call, basestring)
         assert isinstance(args, dict)
         assert user_path != None and isinstance(user_path, basestring)
-        raise NotImplementedError("%s|%s: unsuported" % (method, call))
+        raise NotImplementedError("%s|%s: unsupported" % (method, call))
         # Note that upon return, the calling layer will add a field
         # 'diagnostics', so don't use that
         #
@@ -1048,18 +1302,17 @@ class tt_interface(object):
 
 
 # FIXME: yeah, ugly, but import dependency hell
+import allocation
 import ttbl.config
 
-# FIXME: generate a unique ID; has to be stable across reboots, so it
-#        needs to be generated from whichever path we are connecting
-#        it to
+
 class test_target(object):
 
-    #! Path where the runtime state is stored
-    state_path = "/var/run/ttbd"
+    #: Path where the runtime state is stored
+    state_path = None
 
     #: Path where files are stored
-    files_path = "__undefined__"
+    files_path = None
 
     #: Properties that normal users (non-admins) can set when owning a
     #: target and that will be reset when releasing a target (except
@@ -1108,12 +1361,16 @@ class test_target(object):
         self.log.propagate = False
         # List of interfaces that this target supports; updated by
         # interface_add().
-        self.tags['interfaces'] = []
+        self.tags['interfaces'] = {}
 
         # Create the directory where we'll keep the target's state
         self.state_dir = os.path.join(self.state_path, self.id)
-        if not os.path.isdir(self.state_dir):
-            os.makedirs(self.state_dir, 0o2770)
+        commonl.makedirs_p(self.state_dir, 0o2770,
+                           "target %s's state" % self.id)
+        commonl.makedirs_p(os.path.join(self.state_dir, "queue"), 0o2770,
+                           "target %s's allocation queue" % self.id)
+        self.lock = process_posix_file_lock_c(
+            os.path.join(self.state_dir, "lockfile"))
         #: filesystem database of target state; the multiple daemon
         #: processes use this to store information that reflect's the
         #: target's state.
@@ -1123,23 +1380,6 @@ class test_target(object):
             assert isinstance(fsdb, fsdb_c), \
                 "fsdb %s must inherit ttbl.fsdb_c" % fsdb
             self.fsdb = fsdb
-
-        # Much as I HATE reentrant locks, there is no way around it
-        # without major rearchitecting that is not going to happen.
-        #
-        # The ownership lock has to be re-entrant (eg: once locked it
-        # can be locked again N times by the same thread, but then it
-        # has to be unlocked N times).
-        #
-        # Why? because things like the image setting procedure
-        # (that has to be called with the target locked) might to call
-        # the power off routine, that also requires locking the
-        # target.
-        #
-        # At this point, adding locked and unlocked interfaces would
-        # make it very complicated -- so we go with a reentrant lock.
-        self.ownership_lock = threading.RLock()
-        self.timestamp()
 
         #: Keywords that can be used to substitute values in commands,
         #: messages. Target's tags are translated to keywords
@@ -1173,8 +1413,25 @@ class test_target(object):
         self.power_off_pre_fns = []
         self.power_off_post_fns = []
 
-    @staticmethod
-    def get_for_user(target_name, calling_user):
+    @classmethod
+    def known_targets(cls):
+        """
+        Return list of known targets descriptors
+        """
+        return ttbl.config.targets.values()
+
+    @classmethod
+    def get(cls, target_name):
+        """
+        Return an object descripting an existing target name
+
+        :param str: name of target (which shall be available in
+          configuration)
+        """
+        return ttbl.config.targets.get(target_name, None)
+
+    @classmethod
+    def get_for_user(cls, target_name, calling_user):
         """
         If *calling_user* has permission to see & user *target_name*,
         return the target descriptor
@@ -1189,7 +1446,7 @@ class test_target(object):
         """
         assert isinstance(target_name, basestring)
         assert isinstance(calling_user, ttbl.user_control.User)
-        target = ttbl.config.targets.get(target_name, None)
+        target = cls.get(target_name)
         if not target:
             return None
         if not target.check_user_allowed(calling_user):
@@ -1233,7 +1490,7 @@ class test_target(object):
 
           Field names can use periods to dig into dictionaries.
 
-          Field names can match :mod:`python.fnmatch` regular
+          Field names can match :mod:`fnmatch` regular
           expressions.
         """
 
@@ -1242,16 +1499,17 @@ class test_target(object):
         # because it is way easier to filter on flat triyng to keep
         # what has to be there and what not. And the performance at
         # the end might not be much more or less...
-        r = commonl.flat_slist_to_dict(
-            commonl.dict_to_flat(self.tags, projections))
+        l = commonl.dict_to_flat(self.tags, projections,
+                                 sort = False, empty_dict = True)
+
         # Override with changeable stuff set by users
         #
         # Note things such as 'disabled', and 'powered' come from
         # self.fsdb
         # we are unfolding the flat field list l['a.b.c'] = 3 we get
         # from fsdb to -> r['a']['b']['c'] = 3
-        r.update(commonl.flat_slist_to_dict(
-            self.fsdb.get_as_slist(*projections)))
+        l += self.fsdb.get_as_slist(*projections)
+        r = commonl.flat_slist_to_dict(l)
 
 	# mandatory fields, override them all
         if commonl.field_needed('owner', projections):
@@ -1266,7 +1524,30 @@ class test_target(object):
                 except KeyError:
                     pass
 
-        r['id'] = self.id
+        # these two fields are synthetic, they don't exist on fsdb, we
+        # create them from the allocator information
+        _queue_needed = commonl.field_needed('_alloc.queue', projections)
+        _queue_preemption_needed = \
+            commonl.field_needed('_alloc.queue_preemption', projections)
+        if _queue_needed or _queue_preemption_needed:
+            waiters, preempt_in_queue = \
+                allocation._target_queue_load(self)
+            if _queue_needed:
+                if waiters:
+                    r.setdefault('_alloc', {})
+                    # override with this format
+                    r['_alloc']['queue'] = {}
+                    for prio, ts, flags, allocid, _ in reversed(waiters):
+                        r['_alloc']['queue'][allocid] = dict(
+                            priority = prio,
+                            timestamp = int(ts),
+                            preempt = 'P' in flags,
+                            exclusive = 'E' in flags,
+                        )
+            if _queue_preemption_needed:
+                r.setdefault('_alloc', {})
+                r['_alloc']['queue_preemption'] = preempt_in_queue
+
         return r
 
 
@@ -1312,7 +1593,7 @@ class test_target(object):
             real_name, _instance = name.split("#", 1)
         else:
             real_name = name
-        ic = ttbl.config.targets.get(real_name, None)
+        ic = self.get(real_name)
         if ic == None:
             self.log.warning("target declares connectivity to interconnect "
                              "'%s' that is not local, cannot verify; "
@@ -1334,10 +1615,10 @@ class test_target(object):
                                 + str(ic.tags[proto + "_prefix_len"])),
                         strict = False)
                     if ic_net != net:
-                        raise ValueError(
+                        logging.warning(
                             "%s: IP address %s for interconnect %s is outside "
-                            "of the interconnect's network %s" %(
-                                self.id, val, name, ic_net))
+                            "of the interconnect's network %s (vs %s)" % (
+                                self.id, val, name, ic_net, net))
             if key == "ipv4_prefix_len":
                 val = int(val)
                 assert val > 0 and val < 32, \
@@ -1461,17 +1742,136 @@ class test_target(object):
         commonl.kws_update_from_rt(self.kws, self.tags)
 
     def timestamp_get(self):
-        return os.path.getmtime(os.path.join(self.state_dir, "timestamp"))
+        """
+        Return an integer with the timestamp of the last activity on
+        the target.
+
+        See :meth:timestamp.
+
+        :return str: timestamp in the format YYYYMMDDHHSS
+        """
+        # if no target-specific timestamp is set, just do zero; we
+        # cache it instead of using the allocation's since the target
+        # might have not been allocated yet
+        with self.lock:
+            allocdb = self._allocdb_get()
+            if allocdb:
+                ts = allocdb.timestamp_get()
+                self.fsdb.set('timestamp', ts)
+                return ts
+            # if there is no timestamp, forge the Epoch
+            return self.fsdb.get('timestamp', "19700101000000")
 
     def timestamp(self):
         """
-        Update the timestamp on the target to record last activity tme
+        Indicate this target is being used
+
+        The activity is deemed as the user is using the target for
+        something actively; most accesses to the target when it is
+        acquired are considered activity.
         """
-        # Just open the file and truncate it, so if it does not exist,
-        # it will be created.
-        with open(os.path.join(self.state_dir, "timestamp"), "w") as f:
-            f.write(time.strftime("%c\n"))
-            pass
+        with self.lock:
+            allocdb = self._allocdb_get()
+            if allocdb:
+                self.fsdb.set('timestamp', allocdb.timestamp())
+
+    def allocid_get_bare(self):
+        return self.fsdb.get('_alloc.id')
+
+    def _allocid_wipe(self):
+        self.fsdb.set('_alloc.id', None)
+        self.fsdb.set('_alloc.queue_preemption', None)
+        self.fsdb.set('_alloc.priority', None)
+        self.fsdb.set('_alloc.ts_start', None)
+        self.fsdb.set('owner', None)
+
+    def _allocid_get(self):
+        # return the allocid, if valid, None otherwise
+        # needs to be called with self.lock taken!
+        assert self.lock.locked()
+        _allocid = self.fsdb.get('_alloc.id')
+        if _allocid == None:
+            return None
+        try:
+            allocdb = ttbl.allocation.get_from_cache(_allocid)
+            return _allocid	# alloc-ID is valid, return it
+        except ttbl.allocation.allocation_c.invalid_e:
+            logging.info("%s: wiping ownership by invalid allocation/id %s",
+                         self.id, _allocid)
+            self._state_cleanup(False)
+            self._allocid_wipe()
+            return None
+
+    def _allocdb_get(self):
+        # needs to be called with self.lock taken!
+        assert self.lock.locked()
+        _allocid = self.fsdb.get('_alloc.id')
+        if _allocid == None:
+            return None
+        try:
+            return allocation.get_from_cache(_allocid)
+        except allocation.allocation_c.invalid_e:
+            logging.info("%s: wiping ownership by invalid allocation/get %s",
+                         self.id, _allocid)
+            self._state_cleanup(False)
+            self._allocid_wipe()
+            return None
+
+
+    def _deallocate_simple(self, allocid):
+        # Siple deallocation -- if the owner points to the
+        # allocid, just remove it without validating the
+        # allocation is valid
+        #
+        # This is to be used only when we have taken the target but
+        # then have not used it, so there is no need for state clean
+        # up.
+        #
+        # NOTE: ttbl.allocation.allocdb_c.delete() does the same as
+        # this because we know it to be the case
+        assert self.lock.locked()	    # Must have target.lock taken!
+        current_allocid = self.fsdb.get("_alloc.id")
+        if current_allocid and current_allocid == allocid:
+            self._allocid_wipe()
+            return True
+        return False
+
+    # FIXME: move to _deallocate(allocdb), needs changes to use
+    # allocdb in
+    #  - _target_allocate_locked(): current_allocid -> current_allocdb
+    #    - _run_target(): current_allocid -> current_allocdb
+    #  - _deallocate
+    #  - _deallocate_forced
+    #  - release()
+    #
+    # fold _deallocate_forced() to have a state argument that if set,
+    # sets the reservation's state to that one
+    #
+    # NOTE: ttbl.allocation.allocdb_c.delete() does the same as
+    # this because we know it to be the case
+    def _deallocate(self, allocdb, new_state = None):
+        # deallocate verifying the current allocation is valid
+        if self._deallocate_simple(allocdb.allocid):
+            self._state_cleanup(False)
+            # we leave the reservation as is; if someone is using it
+            # they are keepaliving and they'll notice the state
+            # change and act; otherwise it will timeout and be removed
+            # FIXME: if all targets released, release reservation?
+            if new_state:
+                allocdb.state_set('restart-needed')
+
+    def allocid_get(self):
+        with self.lock:
+            return self._allocid_get()
+
+    def owner_get_v1(self):
+        """
+        Return who the current owner of this target is
+
+        :returns: object describing the owner
+        """
+        # OLD acquisition method
+        return self._acquirer.get()
 
     def owner_get(self):
         """
@@ -1479,7 +1879,12 @@ class test_target(object):
 
         :returns: object describing the owner
         """
-        return self._acquirer.get()
+        # OLD acquisition method
+        acquirer_owner = self._acquirer.get()
+        if acquirer_owner:
+            return acquirer_owner
+        # NEW allocator
+        return self.fsdb.get('owner')
 
     def acquire(self, who, force):
         """
@@ -1494,7 +1899,7 @@ class test_target(object):
             if self._acquirer.acquire(who, force):
                 self._state_cleanup(True)
         except acquirer_c.busy_e:
-            raise test_target_busy_e(self)
+            raise test_target_busy_e(self, who, self.owner_get())
         # different operations in the system might require the user
         # storage area to exist, so ensure it is there when the user
         # acquires a target -- as he might need it.
@@ -1636,7 +2041,7 @@ class test_target(object):
             if self.property_is_user(prop) and not self.property_keep_value(prop):
                 self.fsdb.set(prop, None)
 
-    def release(self, who, force):
+    def release_v1(self, who, force):
         """
         Release the ownership of this target.
 
@@ -1645,6 +2050,7 @@ class test_target(object):
         :param str who: User that is releasing the target (must be the owner)
         :param bool force: force release of a target owned by
           someone else (requires admin privilege)
+
         :raises: :class:`test_target_not_acquired_e` if not taken
         """
         assert isinstance(who, basestring)
@@ -1657,8 +2063,63 @@ class test_target(object):
         except acquirer_c.cant_release_not_acquired_e:
             raise test_target_not_acquired_e(self)
 
+    def release(self, user, force, ticket = None):
+        """
+        Release the ownership of this target.
+
+        If the target is not owned by anyone, it does nothing.
+
+        :param ttbl.user_control.User user: User that is releasing the
+          target (must be the owner, guest, creator of the reservation
+          or admin)
+
+        :param bool force: force release of a target owned by
+          someone else (requires admin privilege)
+
+        :raises: :class:`test_target_not_acquired_e` if not taken
+        """
+        assert isinstance(user, ttbl.user_control.User)
+        userid = user.get_id()
+        try:
+            if self.owner_get_v1():
+                if self.target_is_owned_and_locked(userid):
+                    self._state_cleanup(force)
+                self._acquirer.release(who_create(userid, ticket), force)
+                return
+            allocid = self.allocid_get_bare()
+            if not allocid:
+                raise test_target_not_acquired_e(self)
+            with self.lock:
+                # get the DB, we do this only if alloc.id is defined,
+                # since it is a heavier op
+                allocdb = self._allocdb_get()
+                if allocdb == None:	# allocation was removed...shrug
+                    return
+                # validate WHO has rights
+                if allocdb.check_user_is_user_creator(user):
+                    # user or creator can release it; don't change the
+                    # state because if the user releases it it means
+                    # is because they don't need it, so the allocation
+                    # can still proceed working
+                    logging.error(
+                        "FIXME: delete the allocation if "
+                        "there are no more targets")
+                    self._deallocate(allocdb)
+                elif force and allocdb.check_user_is_admin(user):
+                    # if admin and force,
+                    self._deallocate(allocdb, 'restart-needed')
+                elif allocdb.check_user_is_guest(user):
+                    # if guest, just remove it as guest
+                    allocdb.guest_remove(user.get_id())
+                else:
+                    raise test_target_release_denied_e(self)
+        except acquirer_c.cant_release_not_owner_e:
+            raise test_target_release_denied_e(self)
+        except acquirer_c.cant_release_not_acquired_e:
+            raise test_target_not_acquired_e(self)
+
     @contextlib.contextmanager
-    def target_owned_and_locked(self, who):
+    def target_owned_and_locked(self, who, requested_state = "active"):
         """
         Ensure the target is locked and owned for an operation that
         requires exclusivity
@@ -1675,13 +2136,26 @@ class test_target(object):
             # this is the path for executing internal daemon processes
             yield
             return
-        if self.owner_get() == None:
-            raise test_target_not_acquired_e(self)
-        if who != self.owner_get():
-            raise test_target_busy_e(self)
+        userid, ticket = who_split(who)
+        with self.lock:
+            allocdb = self._allocdb_get()
+        if allocdb:
+            # New style, allocation based
+            state = allocdb.state_get()
+            if allocdb.state_get() != requested_state:
+                raise test_target_wrong_state_e(self, state, requested_state)
+            if not allocdb.check_userid_is_user_creator_guest(userid):
+                raise test_target_busy_e(self, userid, self.owner_get())
+        else:
+            # Old style
+            owner = self.owner_get()
+            if owner == None:
+                raise test_target_not_acquired_e(self)
+            if who != owner:
+                raise test_target_busy_e(self, who, owner)
         yield
 
-    def target_is_owned_and_locked(self, who):
+    def target_is_owned_and_locked(self, who, requested_state = "active"):
         """
         Returns if a target is locked and owned for an operation that
         requires exclusivity
@@ -1690,7 +2164,20 @@ class test_target(object):
         :returns: True if @who owns the target or is admin, False
           otherwise or if the target is not owned
         """
+        # FIXME: need to overload who to be string or
+        # ttbl.user_control.User so we can do admin checks here too?
         assert isinstance(who, basestring)
+        userid, ticket = who_split(who)
+        with self.lock:
+            allocdb = self._allocdb_get()
+        if allocdb:
+            # New style, allocation based
+            if allocdb.state_get() != requested_state:
+                return False
+            if not allocdb.check_userid_is_user_creator_guest(userid):
+                return False
+            return True
+        # Old style
         if self.owner_get() == None:
             return False
         if who != self.owner_get():
@@ -1719,8 +2206,10 @@ class test_target(object):
                 "An interface of type %s has been already "
                 "registered for target %s at %s" %
                 (name, self.id, self.interface_origin[name]))
-        obj._target_setup(self)
-        self.tags['interfaces'].append(name)
+        # call this before so it creates the placeholder where driver
+        # called by _target_setup() can store stuff
+        obj.instrumentation_publish(self, name)
+        obj._target_setup(self, name)
         self.interface_origin[name] = commonl.origin_get(2)
         setattr(self, name, obj)
         self.release_hooks.add(obj._release_hook)
@@ -1763,9 +2252,28 @@ class authenticator_c(object):
         represented by the token is allowed to use the infrastructure
         and which with category (as determined by the role mapping)
 
-        :returns: None if user is not allowed to log in, otherwise a
-          dictionary with user's information; see :ref:`access control
-          <target_access_control>`.
+        :returns: None if user is not allowed to log in, otherwise:
+
+          - a dictionary keyed by string containing user information.
+
+            - field *roles* is a set or list of strings describing the
+              roles a logged in user will have in this server. For the
+              user to be allowed to log in, at least a role of *user*
+              has to be listed. Another pre-defined role is *admin*;
+              the rest are site-specific roles.
+
+            - any other field is authenticator-specific data that will
+              be stored in the user's database.
+
+              Can be accessed as field *data.FIELDNAME* by drivers
+              (*user.fsdb.get("data.FIELDNAME")*) or by clients over the
+              HTTP calls (*GET http://SERVER/ttb2-v2/users/USERNAME*)
+
+              Allowed types are: *int*, *float*, *Bool* and *str*.
+
+          - deprecated protocol: a list with all the roles a user has
+            access to; see :ref:`access control
+            <target_access_control>`.
 
         """
         assert isinstance(token, basestring)
@@ -1792,3 +2300,62 @@ def daemon_pid_check(pid):
 # This is usually called by the SIGCHLD signal handler
 def daemon_pid_rm(pid):
     _daemon_pids.remove(pid)
+
+
+# util
+
+def usb_serial_number(d):
+    #depending on the library version, get the USB string one way or another
+    if hasattr(d, 'serial_number'):
+        serial_number = d.serial_number
+    elif hasattr(d, 'iSerialNumber'):
+        serial_number = usb.util.get_string(d, 1000, d.iSerialNumber)
+    else:
+        raise AssertionError("%s: don't know how to find USB device serial number" % d)
+    return serial_number
+
+def _sysfs_read(filename):
+    try:
+        with open(filename) as fr:
+            return fr.read().strip()
+    except IOError as e:
+        if e.errno != errno.ENOENT:
+            raise
+
+def usb_serial_to_path(arg_serial):
+    """
+    Given a USB serial number, return it's USB path
+
+    Given, eg the serial number *4cb7b886a6b0*, it would return *1-9*,
+    as what *lsusb.py* would report::
+
+      $ lsusb.py
+      ...
+       1-9      06cb:009a ff  2.00   12MBit/s 100mA 1IF  (Synaptics, Inc. 4cb7b886a6b0)
+       1-7      8087:0a2b e0  2.00   12MBit/s 100mA 2IFs (Intel Corp.)
+       1-10     2386:4328 00  2.01   12MBit/s 96mA 1IF  (Raydium Corporation Raydium Touch System)
+       1-3      0bda:5411 09  2.10  480MBit/s 0mA 1IF  (Realtek Semiconductor Corp.) hub
+        1-3.4   0bda:5400 11  2.01   12MBit/s 0mA 1IF  (Realtek BillBoard Device 123456789ABCDEFGH)
+      ....
+
+    :param str arg_serial: USB serial number
+    :return: tuple with USB path, vendor product name for the given serial
+      number, *None, None, None* if not found
+
+    """
+    def _sysfs_read(filename):
+        try:
+            with open(filename) as fr:
+                return fr.read().strip()
+        except IOError as e:
+            if e.errno != errno.ENOENT:
+                raise
+
+    for fn_serial in glob.glob("/sys/bus/usb/devices/*/serial"):
+        serial = _sysfs_read(fn_serial)
+        if serial == arg_serial:
+            devpath = os.path.dirname(fn_serial)
+            return os.path.basename(devpath), \
+                _sysfs_read(os.path.join(devpath, "vendor")), \
+                _sysfs_read(os.path.join(devpath, "product"))
+    return None, None, None

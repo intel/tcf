@@ -23,6 +23,8 @@ import argparse
 import os
 import commonl
 import json
+import traceback
+
 import tcfl
 import tcfl.ttb_client as ttb_client
 import tcfl.config
@@ -69,11 +71,16 @@ def _target_get(args):
     # pure target get w/o going through the cache
 
     if args.projection:
-        data = { 'projection': json.dumps(args.projection) }
+        data = { 'projections': json.dumps(args.projection) }
     else:
         data = None
     rtb, _rt = ttb_client._rest_target_find_by_id(args.target)
-    rt = rtb.send_request("GET", "targets/" + args.target, data = data)
+    r = rtb.send_request("GET", "targets/" + args.target, data = data,
+                         raw = True)
+    # Keep the order -- even if json spec doesn't contemplate it, we
+    # use it so the client can tell (if they want) the order in which
+    # for example, power rail components are defined in interfaces.power
+    rt = json.loads(r.text, object_pairs_hook = collections.OrderedDict)
     print json.dumps(rt, skipkeys = True, indent = 4)
 
 def _target_patch(args):
@@ -121,59 +128,74 @@ def _target_enable(args):
                 args, target_name = target_name)
             target.enable()
 
+
+
+def _healthcheck(target, args):
+
+    if args.interfaces == []:
+        # no interface list give; scan the list of interfaces the
+        # target exposes, starting with "power" (always)
+        args.interfaces.append("power")
+
+        # list extensions/interfaces w/ healthcheck
+        for attr, value in target.__dict__.items():
+            if isinstance(value, tcfl.tc.target_extension_c) \
+               and hasattr(value, "_healthcheck") \
+               and attr != "power":	# we did this first
+                args.interfaces.append(attr)
+
+
+    for interface_name in args.interfaces:
+        interface = getattr(target, interface_name, None)
+        if interface == None:
+            target.report_blck("%s: non-existing interface" % interface_name)
+            continue
+        if not isinstance(interface, tcfl.tc.target_extension_c):
+            target.report_blck(
+                "%s: interface not a real interface (type %s)"
+                % (interface_name, type(interface)))
+            continue
+
+        if interface == "power" and not hasattr(target, "power"):
+            target.report_info("WARNING: No power control interface")
+
+        target.report_info(
+            "HEALTHCHECK for %s interface" % interface_name, level = 0)
+        try:
+            interface._healthcheck()
+        except Exception as e:
+            target.report_blck(
+                "HEALTHCHECK for %s: exception" % interface_name,
+                dict(exception = e, trace = traceback.format_exc()),
+                alevel = 0)
+
+    target.report_pass("HEALTHCHECK completed")
+
+
 def healthcheck(args):
     tcfl.tc.report_driver_c.add(		# FIXME: hack console driver
         tcfl.report_console.driver(0, None))
 
-        
     with tcfl.msgid_c("cmdline"):
         target = tcfl.tc.target_c.create_from_cmdline_args(args)
 
-        if args.interfaces == []:
-            # no interface list give; scan the list of interfaces the
-            # target exposes, starting with "power" (always)
-            args.interfaces.append("power")
-
-            # list extensions/interfaces w/ healthcheck
-            for attr, value in target.__dict__.items():
-                if isinstance(value, tcfl.tc.target_extension_c) \
-                   and hasattr(value, "_healthcheck") \
-                   and attr != "power":	# we did this first
-                    args.interfaces.append(attr)
-        
-        target.report_info("acquiring")
-        target.acquire()
-        target.report_pass("acquired")
-
-        for interface_name in args.interfaces:
-            interface = getattr(target, interface_name, None)
-            if interface == None:
-                target.report_blck("%s: non-existing interface"
-                                    % interface_name)
-                continue
-            if not isinstance(interface, tcfl.tc.target_extension_c):
-                target.report_blck(
-                    "%s: interface not a real interface (type %s)"
-                    % (interface_name, type(interface)))
-                continue
-            
-            if interface == "power" and not hasattr(target, "power"):
-                target.report_info("WARNING: No power control interface")
-            
-            target.report_info(
-                "HEALTHCHECK for %s interface" % interface_name, level = 0)
-            try:
-                interface._healthcheck()
-            except Exception as e:
-                target.report_blck(
-                    "HEALTCHECK for %s: exception" % interface_name,
-                    dict(exception = e), alevel = 0)
-            
-        target.report_info("released")
-        target.release()
-        target.report_pass("released")
-
-        target.report_pass("HEALTHCHECK completed")
+        allocid = None
+        try:
+            if args.allocid == None:
+                target.report_info("allocating")
+                allocid, _state, _group_allocated = \
+                    tcfl.target_ext_alloc._alloc_targets(
+                        target.rtb, { "group": [ target.id ] },
+                        preempt = args.preempt,
+                        queue = False, priority = args.priority,
+                        reason = "healthcheck")
+                target.report_pass("allocated %s" % allocid)
+            else:
+                target.report_info("using existing allocation")
+            _healthcheck(target, args)
+        finally:
+            if allocid:
+                tcfl.target_ext_alloc._delete(target.rtb, allocid)
 
 def _cookies(args):
     if '/' in args.target:
@@ -255,6 +277,11 @@ if __name__ == "__main__":
         help = "Ticket used for target operations")
 
     arg_parser.add_argument(
+        "-a", "--allocid", metavar = "ALLOCATIONID",
+        action = "store", default = None,
+        help = "Use this allocid to access targets")
+
+    arg_parser.add_argument(
         "-C", action = "store", default = None, metavar = "DIR",
         dest = "chdir",
         help = "Change to DIR before starting")
@@ -288,9 +315,10 @@ if __name__ == "__main__":
     ap.set_defaults(func = _cookies)
 
     arg_parser_target_list = arg_subparsers.add_parser(
-        "list", help = "List the targets; by default, in a terminal, it will "
+        "ls", help = "List the targets; by default, in a terminal, it will "
         "print a multi-column display with '!' next to powered-on targets, "
         "and @ next to owned targets; -v adds more detail)")
+    commonl.argparser_add_aka(arg_subparsers, "ls", "list")
     arg_parser_target_list.add_argument(
         "-v", dest = "verbosity", action = "count", default = 0,
         help = "Increase information to display about the targets (-v "
@@ -331,17 +359,6 @@ if __name__ == "__main__":
                     default = None, help = "Data items to store; if"
                     " none, specify a JSON dictionary over stdin")
     ap.set_defaults(func = _target_patch)
-
-    ap = arg_subparsers.add_parser(
-        "acquire", help = "Acquire ownership of a target")
-    ap.add_argument(
-        "target", metavar = "TARGET", action = "store",
-        nargs = "+", default = None,
-        help = "Target's name or URL")
-    ap.add_argument("-f", "--force", action = "store_true", default = False,
-                    help = "Force the acquisition, removing the target "
-                    "from its current owner (requires admin rights)")
-    ap.set_defaults(func = ttb_client.rest_target_acquire)
 
     ap = arg_subparsers.add_parser("enable",
                                    help = "Enable a disabled target")
@@ -393,6 +410,7 @@ if __name__ == "__main__":
     tcfl.tc.argp_setup(arg_subparsers)
     # imported by tcfl.tc
     tcfl.tc.pos.cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_alloc._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_console._cmdline_setup(arg_subparsers)
@@ -414,6 +432,12 @@ if __name__ == "__main__":
         dest = "interfaces", action = "append", default = [],
         help = "Names of interfaces to healtcheck (default all "
         "exposed by the target)")
+    ap.add_argument(
+        "-p", "--priority", action = "store", type = int, default = 500,
+        help = "Priority (0 highest, 999 lowest)")
+    ap.add_argument(
+        "--preempt", action = "store_true", default = False,
+        help = "Enable preemption (disabled by default)")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target's name or URL")
     ap.set_defaults(func = healthcheck)

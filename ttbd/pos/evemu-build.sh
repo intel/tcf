@@ -20,7 +20,12 @@ make -C build/libevdev install DESTDIR=$pwd/root
 )
 (
     cd build/evemu;
-    ../../evemu.git/configure --prefix=/opt/evemu "LDFLAGS=-static $pwd/build/libevdev/libevdev/.libs/libevdev.a" --disable-shared --enable-static LIBEVDEV_LIBS="-L$pwd/build/libevdev/libevdev/.libs" LIBEVDEV_CFLAGS=-I/home/inaky/c/evemu/root/opt/evemu/include/libevdev-1.0
+    ../../evemu.git/configure \
+	--prefix=/opt/evemu \
+	"LDFLAGS=-static $pwd/build/libevdev/libevdev/.libs/libevdev.a" \
+	--disable-shared --enable-static \
+	LIBEVDEV_LIBS="-L$pwd/root/opt/evemu/lib" \
+	LIBEVDEV_CFLAGS=-I$pwd/root/opt/evemu/include/libevdev-1.0
 )
 # don't build test since it fails with static linking, we only want the tools
 make -C build/evemu/src -j
@@ -40,4 +45,4 @@ LGPLv3) statically linked to  http://github.com/freedesktop/libevdev
 (licensed MIT).
 EOF
 
-tar czf evemu.bin.tar.gz -C root opt/evemu/bin/evemu-event opt/evemu/bin/evemu-device
+tar czf evemu.bin.$(uname -m).tar.gz -C root opt/evemu/bin/evemu-event opt/evemu/bin/evemu-device

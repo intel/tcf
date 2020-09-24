@@ -43,15 +43,19 @@ imaging on PC-class targets via DHCP / TFTP.
         ( 'etc/systemd/system/ttbd@.service.d/', [
             'pos.conf'
         ]),
-        ( '@prefix@/etc/httpd/conf.d/', [
+        ( '/etc/httpd/conf.d/', [
             'ttbd.conf',
+        ]),
+        ( '/etc/exports.d/', [
+            'ttbd-pos.exports',
         ]),
         ( '@prefix@/share/tcf/', [
             'kickstart-install.sh',
             'tcf-image-setup.sh',
         ]),
         ( '@prefix@/share/tcf/content', [
-            'evemu.bin.tar.gz'
+            'evemu.bin.armv7l.tar.gz',
+            'evemu.bin.x86_64.tar.gz',
         ]),
     ],
 )

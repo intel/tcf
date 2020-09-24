@@ -17,7 +17,7 @@ that the BIOS now reports as vendor string the change made.
 This test showcases how to scale the previous :ref:`example
 <example_qemu_bios>` to an unlimited number of targets by running the
 processes in parallel (note in this one we skip the flashing, look at
-:ref:`pos_deploy_N <_example_pos_deploy_N>` to add that). 
+:ref:`pos_deploy_N <example_pos_deploy_N>` to add that). 
 
 Sequentially its duration would be *O(N)* where as in parallel it is
 only a function of having enough network and local resources to access
@@ -29,8 +29,9 @@ interface (for flashing), a *bios* flashing target and of course, the
 BIOS built must fit the target machines.
 
 This example is meant to run on targets implemented by QEMU (as
-created with the server configuration :func:`target_pos_add`), but it
-can be adapted to any machine:
+created with the server configuration :func:`pos_target_add
+<conf_00_lib_pos.pos_target_add>`), but it can be adapted to any
+machine:
 
 .. literalinclude:: /examples/test_qemu_bios_N.py
    :language: python
@@ -134,7 +135,7 @@ TARGETS = int(os.environ.get('TARGETS', 4))
 MODE = os.environ.get('MODE', 'one-per-type')
 
 @tcfl.tc.interconnect("ipv4_addr", mode = MODE)
-@tcfl.tc.target('pos_capable and "bios" in images', count = TARGETS)
+@tcfl.tc.target('pos_capable and interfaces.images.bios.instrument', count = TARGETS)
 class _test(tcfl.tc.tc_c):
 
     def configure_00(self):

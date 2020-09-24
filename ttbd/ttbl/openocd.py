@@ -421,7 +421,7 @@ class pc(ttbl.power.daemon_c, ttbl.images.impl_c, ttbl.debug.impl_c):
     Each component configured in the target addition maps to an
     OpenOCD target in *boards[X][targets]*.
 
-    **OLD OLD **
+    **OLD OLD**
 
     This is a flasher object that uses OpenOCD to provide flashing
     and GDB server support.
@@ -922,7 +922,7 @@ def __pending(self):
         return r
 
 
-    def _per_target_setup(self, target, _component):
+    def _per_target_setup(self, _target, _component):
         # FIXME: not sure we'll really need this anymore
         if self.serial:
             self.log.prefix = "%s[%s]" % (self.board_name, self.serial)

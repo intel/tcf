@@ -99,7 +99,8 @@ import tcfl.pos
 
 @tcfl.tc.interconnect('ipv4_addr',
                       mode = os.environ.get('MODE', 'one-per-type'))
-@tcfl.tc.target('pos_capable and capture:"screen:snapshot"')
+@tcfl.tc.target('pos_capable'
+                ' and interfaces.capture.screen.type == "snapshot"')
 class _test(tcfl.pos.tc_pos0_base):
 
     def eval(self, target, ic):
@@ -122,10 +123,21 @@ class _test(tcfl.pos.tc_pos0_base):
         target.input.evemu_target_setup(ic)
 
         r_desktop = self.expect(
-            target.capture.image_on_screenshot('canary-icon-firefox.png'),
+            # this assumes we are auto-login in to a GNOME desktop in English
+            target.capture.image_on_screenshot('canary-icon-power.png',
+                                               in_area = ( 0.80, 0, 1, 0.20 )),
+            target.capture.image_on_screenshot('canary-activities.png'),
             name = "desktop start")
 
-        movie = 'screen_stream:stream' in target.rt['capture']
+        target.input.image_click(r_desktop['canary-activities_png'])
+
+        r_desktop = self.expect(
+            # this assumes we are auto-login in to a GNOME desktop in English
+            target.capture.image_on_screenshot('canary-icon-firegox.png',
+                                               in_area = ( 0.80, 0, 1, 0.20 )),
+            name = "desktop start")
+
+        movie = 'interfaces.capture.screen_stream' in target.kws
         if movie:
             target.capture.start("screen_stream")
 

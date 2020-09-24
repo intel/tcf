@@ -36,11 +36,16 @@ class delay(ttbl.power.impl_c):
 
     This is meant to be used in a stacked list of power
     implementations given to a power control interface.
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, on = 0, off = 0):
-        ttbl.power.impl_c.__init__(self)
+    def __init__(self, on = 0, off = 0, **kwargs):
+        ttbl.power.impl_c.__init__(self, **kwargs)
         self.on_delay = float(on)
         self.off_delay = float(off)
+        self.upid_set(
+            "Delays on power on (%.fs) / off (%.fs)" % (on, off),
+            on = on, off = off)
 
     def on(self, target, component):
         target.log.debug("%s: on delay %f", component, self.on_delay)
@@ -61,15 +66,29 @@ class delay_til_file_gone(ttbl.power.impl_c):
 
     This is meant to be used in a stacked list of power
     implementations given to a power control interface.
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
     def __init__(self, poll_period = 0.25, timeout = 25,
-                 on = None, off = None, get = None):
-        ttbl.power.impl_c.__init__(self)
+                 on = None, off = None, get = None, **kwargs):
+        ttbl.power.impl_c.__init__(self, **kwargs)
         self.on_file = on
         self.off_file = off
         self.get_file = get
         self.poll_period = poll_period
         self.timeout = timeout
+        l = []
+        if on:
+            l.append("'%s' disappears when power-on" % on)
+        if off:
+            l.append("'%s' disappears when power-off" % off)
+        self.upid_set(
+            "Delayer until %s, checking every %.2fs timing out at %.1fs" % (
+                ", ".join(l), poll_period, timeout),
+            on_file = on,
+            off_file = off,
+            poll_period = poll_period,
+            timeout = timeout)
 
     def on(self, target, component):
         if self.on_file == None:
@@ -117,11 +136,13 @@ class delay_til_file_appears(ttbl.power.impl_c):
 
     This is meant to be used in a stacked list of power
     implementations given to a power control interface.
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
     def __init__(self, filename,
                  poll_period = 0.25, timeout = 25,
-                 action = None, action_args = None):
-        ttbl.power.impl_c.__init__(self)
+                 action = None, action_args = None, **kwargs):
+        ttbl.power.impl_c.__init__(self, **kwargs)
         self.filename = filename
         self.poll_period = poll_period
         self.timeout = timeout
@@ -131,6 +152,13 @@ class delay_til_file_appears(ttbl.power.impl_c):
             "action '%s' has to be an exception type or callable" % action
         self.action = action
         self.action_args = action_args
+        self.upid_set(
+            "Delayer until file '%s' appears during power-on,"
+            " checking every %.2fs timing out at %.1fs" % (
+                filename, poll_period, timeout),
+            filename = filename,
+            poll_period = poll_period,
+            timeout = timeout)
 
     def on(self, target, component):
         if self.filename == None:
@@ -190,11 +218,13 @@ class delay_til_usb_device(ttbl.power.impl_c):
       parameter given in ``action_args``
 
     :param action_args: tuple of parameters to pass to ``action``.
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
     def __init__(self, serial, when_powering_on = True, want_connected = True,
                  poll_period = 0.25, timeout = 25,
-                 action = None, action_args = None):
-        ttbl.power.impl_c.__init__(self)
+                 action = None, action_args = None, **kwargs):
+        ttbl.power.impl_c.__init__(self, **kwargs)
         self.serial = serial
         self.when_powering_on = when_powering_on
         self.want_connected = want_connected
@@ -206,6 +236,17 @@ class delay_til_usb_device(ttbl.power.impl_c):
         if action != None:
             assert hasattr(action, "__call__")
         self.log = None			# filled out in _on/_off/_get
+        when = "powering-on" if when_powering_on else "powering-off"
+        what = "connected" if want_connected else "disconnected"
+        self.upid_set(
+            "Delayer until USB device with serial number '%s' is %s when %s,"
+            " checking every %.2fs timing out at %.1fs" % (
+                serial, what, when, poll_period, timeout),
+            serial = serial,
+            when_powering_on = when_powering_on,
+            want_connected = want_connected,
+            poll_period = poll_period,
+            timeout = timeout)
 
     class not_found_e(Exception):
         "Exception raised when a USB device is not found"
@@ -225,7 +266,7 @@ class delay_til_usb_device(ttbl.power.impl_c):
                 # stuff. Somehow, using get_string() works better
                 # instead of accessing d.serial_number (which triggers
                 # it being updated on the side and things fail more).
-                serial_number = usb.util.get_string(d, d.iSerialNumber)
+                serial_number = ttbl.usb_serial_number(d)
             except ValueError as e:
                 # Some devices get us here, unknown why--probably
                 # permissions issue
@@ -298,7 +339,7 @@ class delay_til_usb_device(ttbl.power.impl_c):
                 else:
                     self.log.log(8, "%s: USB %04x:%04x @%d/%03d [%s]: found",
                                  self.component, dev.idVendor, dev.idProduct,
-                                 dev.bus, dev.address, dev.serial_number)
+                                 dev.bus, dev.address, ttbl.usb_serial_number(dev))
 #                    if type(self).backend == None:
 #                        type(self).backend = dev._ctx.backend
                     # We don't need this guy, close it
@@ -380,6 +421,8 @@ class dlwps7(ttbl.power.impl_c):
     :param float reboot_wait: Seconds to wait in when power cycling an
       outlet from off to on (defaults to 0.5s) or after powering up.
 
+    Other parameters as to :class:ttbl.power.impl_c.
+
     Access language documented at http://www.digital-loggers.com/http.html.
 
     If you get an error like:
@@ -391,8 +434,8 @@ class dlwps7(ttbl.power.impl_c):
     authentication and imposing javascript execution that made the
     driver fail.
     """
-    def __init__(self, _url, reboot_wait_s = 0.5):
-        ttbl.power.impl_c.__init__(self)
+    def __init__(self, _url, reboot_wait_s = 0.5, **kwargs):
+        ttbl.power.impl_c.__init__(self, **kwargs)
         assert isinstance(_url, basestring)
         assert isinstance(reboot_wait_s, (int, float))
         url = urlparse.urlparse(_url)
@@ -411,7 +454,10 @@ class dlwps7(ttbl.power.impl_c):
             raise Exception("%s: outlet number '%d' has to be 1 >= outlet >= 8"
                             % (_url, self.outlet))
         self.url = self.url
-        self.upid_set("DLI Web Power Switch", url = self.url_no_password)
+        self.upid_set(
+            "DLI Web Power Switch %s #%d" % (
+                self.url_no_password, self.outlet),
+            url = self.url_no_password, outlet = self.outlet)
 
     def on(self, target, component):
         r = requests.get(self.url + "/outlet?%d=ON" % self.outlet)

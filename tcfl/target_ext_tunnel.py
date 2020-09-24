@@ -13,6 +13,7 @@ Create and remove network tunnels to the target via the server
 import pprint
 
 from . import msgid_c
+import commonl
 import tc
 import ttb_client
 
@@ -114,6 +115,9 @@ class tunnel(tc.target_extension_c):
                                         port = port,
                                         method = "PUT")
         server_port = r['result']
+        if isinstance(server_port, basestring):
+            # COMPAT: work around server with unfixed bug
+            server_port = int(server_port)
         self.target.report_info(
             "%s tunnel added from %s:%d to %s:%d" % (
                 protocol,
@@ -140,7 +144,7 @@ class tunnel(tc.target_extension_c):
         else:
             assert isinstance(protocol, basestring), \
                 "protocol shall be a string; got %s" % type(protocol)
-        assert port > 0
+        assert isinstance(port, int)
         ip_addr = self._ip_addr_get(ip_addr)
 
         self.target.ttbd_iface_call("tunnel", "tunnel",
@@ -154,15 +158,57 @@ class tunnel(tc.target_extension_c):
         """
         List existing IP tunnels
 
-        :returns: list of tuples::
-          (protocol, target-ip-address, target-port, server-port)
+        :returns: dictionary keyed by server port of each existing
+          tunnels:
 
-        Reminder that the server's hostname can be obtained from:
+          .. code-block:: python
 
-        >>> target.rtb.parsed_hostname
+             {
+                 SERVER-PORT1: {
+                     "protocol": 'tcp',   # tcp, udp, sctp, ...
+                     "ip_addr": "A.B.C.D",
+                     "port": NNN
+                 },
+                 ...
+             }
+
+          *SERVER-PORT* is the same port returned by the :meth:`add`
+          call, so that the endpoint for the tunnel would be the
+          server's hostname (available at
+          *target.rtb.parsed_hostname*) and the *SERVER-PORT*.
         """
-        r = self.target.ttbd_iface_call("tunnel", "list", method = "GET")
-        return r['result']
+        d = dict()
+        r = self.target.properties_get("interfaces.tunnel")
+        # we get: interfaces: { tunnel: { LOCALPORT: { DATA },
+        # LOCALPORT: { DATA }...}
+        r = r.get("interfaces", {}).get("tunnel", {})
+        for local_port, data in r.items():
+            try:
+                # we get local_port as a string because it is a field
+                # name in the database (versus a value)
+                d[int(local_port)] = dict(
+                    protocol = data['protocol'],
+                    ip_addr = data['ip_addr'],
+                    port = data['port']
+                )
+            except KeyError as e:
+                pass	# ignore, bad data stored
+        if not d: # COMPAT
+            # if didn't found anything in the inventory, maybe this is
+            # an old style server, try calling the old deprecated
+            # method
+            try:
+                r = self.target.ttbd_iface_call("tunnel", "list", method = "GET")
+                for protocol, ip_addr, port, local_port in r['result']:
+                    d[int(local_port)] = dict(
+                        protocol = protocol,
+                        ip_addr = ip_addr,
+                        port = int(port))
+                return d
+            except tc.error_e as e:
+                if not 'unsupported' in e:
+                    raise
+        return d
 
 
     def _healthcheck(self):
@@ -175,58 +221,72 @@ class tunnel(tc.target_extension_c):
         target = self.target
         tunnels = target.tunnel.list()
         for protocol, ip_address, target_port, server_port in tunnels:
-            print "Removing existing tunnel %s %s -> %s:%s" \
-                % (protocol, server_port, ip_address, target_port)
+            target.report_info(
+                "removing existing tunnel %s %s -> %s:%s"
+                % (protocol, server_port, ip_address, target_port))
             target.tunnel.remove(target_port, ip_address, protocol)
 
-        server_port = target.tunnel.add(22)
-        print "OK: added tunnel to port 22"
+        server_port_22 = target.tunnel.add(22)
+        target.report_pass("added tunnel to port 22")
 
         tunnels = target.tunnel.list()
-        assert len(tunnels) == 1, \
-            "FAIL: list() lists %d tunnels; expected 1; got %s" % (
-                len(tunnels), pprint.pformat(tunnels))
-        print "OK: list() lists only one tunnel"
-        assert tunnels[0][2] == 22, \
-            "target port is not 22 as requested; got %s" % tunnels[0]
+        if len(tunnels) != 1:
+            raise tc.failed_e(
+                "list() lists %d tunnels; expected 1" % len(tunnels),
+                dict(tunnels = tunnels))
+        target.report_pass("list() lists only one tunnel")
+        if server_port_22 not in tunnels \
+           or tunnels[server_port_22].get("port", None) != 22:
+            raise tc.failed_e(
+                "list() didn't report target port as 22 as requested",
+                dict(tunnels = tunnels))
+        target.report_pass("list() reports tunnel to 22 as requested")
 
-        server_port = target.tunnel.add(23)
-        print "OK: added tunnel to port 23"
+        server_port_23 = target.tunnel.add(23)
+        target.report_pass("added tunnel to port 23")
 
         tunnels = target.tunnel.list()
 
-        assert len(tunnels) == 2, \
-            "FAIL: list() lists %d tunnels; expected 2; got %s" % (
-                len(tunnels), pprint.pformat(tunnels))
-        print "OK: list() lists two tunnels"
-        assert 23 in [ _tunnel[2] for _tunnel in tunnels ], \
-            "target port 23 not in tunnel list as requested; got %s" \
-                % pprint.pformat(tunnels)
-        assert 22 in [ tunnel[2] for tunnel in tunnels ], \
-            "target port 22 not in tunnel list as requested; got %s" \
-                % pprint.pformat(tunnels)
-        print "OK: we got a tunnel to 23 and to 22"
+        if len(tunnels) != 2:
+            raise tc.failed_e(
+                "list() lists %d tunnels; expected 2" % len(tunnels),
+                dict(tunnels = tunnels))
+        target.report_pass("list() lists two tunnels")
+        if server_port_22 not in tunnels \
+           or tunnels[server_port_22].get("port", None) != 22:
+            raise tc.failed_e(
+                "list() didn't report target port as 22 as requested",
+                dict(tunnels = tunnels))
+        if server_port_23 not in tunnels \
+           or tunnels[server_port_23].get("port", None) != 23:
+            raise tc.failed_e(
+                "list() didn't report target port as 23 as requested",
+                dict(tunnels = tunnels))
+        target.report_pass("list() reports tunnel to 22 and 23 as requested")
 
         target.tunnel.remove(22)
-        print "OK: removed tunnel to port 22"
+        target.report_pass("removed tunnel to port 22")
         tunnels = target.tunnel.list()
-        assert len(tunnels) == 1, \
-            "reported tunnels are %d; expected 1" % len(tunnels)
+        if len(tunnels) != 1:
+            raise tc.failed_e(
+                "list() lists %d tunnels; expected 1" % len(tunnels),
+                dict(tunnels = tunnels))
 
         # leftover tunnel is the one to port 23
-        assert tunnels[0][2] == 23, \
-            "target port is not 23 as expected; got %s" % tunnels[0]
-        assert 23 in [ tunnel[2] for tunnel in tunnels ], \
-            "target port 23 not in tunnel list as requested; got %s" \
-                % pprint.pformat(tunnels)
-        print "OK: list() lists only tunnel to port 23"
+        if server_port_23 not in tunnels \
+           or tunnels[server_port_23].get("port", None) != 23:
+            raise tc.failed_e(
+                "list() didn't report target port as 23 as requested",
+                dict(tunnels = tunnels))
+        target.report_pass("list() lists only tunnel to port 23")
         target.tunnel.remove(23)
-        print "OK: removed tunnel to port 23"
+        target.report_pass("removed tunnel to port 23")
         tunnels = target.tunnel.list()
-        assert len(tunnels) == 0, \
-            "reported tunnels are %d; expected 0; got %s" % (
-                len(tunnels), pprint.pformat(tunnels))
-        print "OK: no tunnels listed after removing all"
+        if len(tunnels) != 0:
+            raise tc.failed_e(
+                "list() reports %d tunnels; expected none" % len(tunnels),
+                dict(tunnels = tunnels))
+        target.report_pass("no tunnels listed after removing all")
 
         # can't really test the tunnel because we don't know if the
         # target is listening, has a real IP interface, etc...this is
@@ -247,11 +307,11 @@ def _cmdline_tunnel_remove(args):
 def _cmdline_tunnel_list(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "tunnel")
-        for proto, ip_addr, port, local_port in  target.tunnel.list():
+        for local_port, data in  target.tunnel.list().items():
             print "%s %s:%s %s:%s" % (
-                proto,
+                data['protocol'],
                 target.rtb.parsed_url.hostname, local_port,
-                ip_addr, port
+                data['ip_addr'], data['port']
             )
 
 
@@ -271,11 +331,13 @@ def cmdline_setup(argsp):
                     "(default is the first IP address the target declares)")
     ap.set_defaults(func = _cmdline_tunnel_add)
 
-    ap = argsp.add_parser("tunnel-remove",
+    ap = argsp.add_parser("tunnel-rm",
                           help = "remove an existing IP tunnel")
+    commonl.argparser_add_aka(argsp, "tunnel-rm", "tunnel-remove")
+    commonl.argparser_add_aka(argsp, "tunnel-rm", "tunnel-delete")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
-    ap.add_argument("port", metavar = "PORT", action = "store",
+    ap.add_argument("port", metavar = "PORT", action = "store", type = int,
                     help = "Port to tunnel to")
     ap.add_argument("protocol", metavar = "PROTOCOL", action = "store",
                     nargs = "?", default = None,
@@ -287,7 +349,7 @@ def cmdline_setup(argsp):
                     "(default is the first IP address the target declares)")
     ap.set_defaults(func = _cmdline_tunnel_remove)
 
-    ap = argsp.add_parser("tunnel-list", help = "List existing IP tunnels")
+    ap = argsp.add_parser("tunnel-ls", help = "List existing IP tunnels")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
     ap.set_defaults(func = _cmdline_tunnel_list)

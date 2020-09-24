@@ -183,10 +183,6 @@ def get_real_srcdir(origin_filename, _srcdir):
     else:    # relative to the path origin_filename
         srcdir = os.path.normpath(
             os.path.join(os.path.dirname(origin_filename), srcdir))
-    if not os.path.isdir(srcdir):
-        # FIXME: print origin of srcdir at the @target definition, the
-        # origin_filename now points to the driver code
-        raise ValueError("%s: is not a directory; cannot find App" % _srcdir)
     return srcdir
 
 def configure(ab, testcase, target, app_src):
@@ -295,7 +291,7 @@ class app_c(object):
     - will be cleaned in between evaluation runs
 
     - is not multi-threaded protected; take
-      :py:meth:`tcfl.tc.tc_c.buffers_lock` if you need to access it
+      :py:meth:`tcfl.tc.tc_c.lock` if you need to access it
       from different paralell execution methods
       (setup/start/eval/test/teardown methods are *always* executed
       serially).

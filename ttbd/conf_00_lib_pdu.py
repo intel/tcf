@@ -20,7 +20,12 @@ def target_pdu_socket_add(name, pc, tags = None, power = True):
         tags = {}
     target = ttbl.test_target(name, _tags = tags)
     target.interface_add("power", ttbl.power.interface(pc))
-    ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+    ttbl.config.target_add(
+        target, tags = dict(
+            idle_power_off = 0, idle_poweroff = 0,     # COMPAT
+            idle_power_fully_off = 0
+        )
+    )
     if power:
         # FIXME: untested
         target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
@@ -31,7 +36,7 @@ def apc_pdu_add(name, powered_on_start = None, hostname = None):
     switch.
 
     The APC PDU needs to be setup and configured (refer to the
-    instructions in :class:`ttbl.apc.pci`); this function exposes the
+    instructions in :class:`ttbl.apc.pc`); this function exposes the
     different targets for to expose the individual sockets for debug.
 
     Add to a configuration file
@@ -68,19 +73,22 @@ def apc_pdu_add(name, powered_on_start = None, hostname = None):
     if hostname == None:
         hostname = name
 
-    _apc = ttbl.apc.pci(hostname, 1)
+    _apc = ttbl.apc.pc(hostname, 1)
     for i in range(1.._apc.outlets):
         target = ttbl.test_target("%s-%d" % (name, i))
         target.interface_add(
             "power",
-            ttbl.power.interface(ttbl.apc.pci(hostname, i)))
-        ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+            ttbl.power.interface(ttbl.apc.pc(hostname, i)))
+        ttbl.config.target_add(target, tags = dict(
+            idle_power_off = 0, idle_poweroff = 0,	# COMPAT
+            idle_power_fully_off = 0
+        ))
         target.disable("")
         if powered_on_start:
             target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
 
 
-def dlwps7_add(hostname, powered_on_start = None,
+def dlwps7_add(hostname, powered_on_start = None, basename = None,
                user = "admin", password = "1234"):
     """Add test targets to individually control each of a DLWPS7's sockets
 
@@ -122,6 +130,14 @@ def dlwps7_add(hostname, powered_on_start = None,
 
     :param str password: password for HTTP Basic authentication
 
+    :param str basename: (optional) use something else to generate the
+      target names if we want it different than the hostname. Defaults
+      to *hostname*. Has to be a simple name (a-zA-Z0-9_-).
+
+      You will need to set this if hostname is an FQDN (eg:
+      *hostname.subdomain.domain* vs just *hostname*) or an IP address
+      (eg: *192.168.4.3*).
+
     :param bool powered_on_start: what to do with the power on the
       downstream ports:
 
@@ -144,125 +160,141 @@ def dlwps7_add(hostname, powered_on_start = None,
 
     **Connecting the power switch**
 
-    1. Ensure you have configured an class C *192.168.X.0/24*,
-       configured with static IP addresses, to which maybe only this
-       server has access to connect IP-controlled power
-       switches.
+    Choose a name for the power switch (for example: *spM*), where *M*
+    is a number.
 
-       Follow :ref:`these instructions <internal_network>` to create a
-       network.
+    There are multiple valid ways to connect smart PDUs to the
+    network; it is recommended they are in an isolated network
 
-       You might need a new Ethernet adaptor to connect to said
-       network (might be PCI, USB, etc).
+    - Isolated network
 
-    2. connect the power switch to said network
-
-    3. assign a name to the power switch and add it along its IP
-       address in ``/etc/hosts``; convention is to call them *spY*,
-       where X is a number and *sp* stands for *Switch; Power*.
-
-       .. warning:: if your system uses proxies, you need to add *spY*
-          also to the *no_proxy* environment varible in
-          :file:`/etc/bashrc` to avoid the daemon trying to access the
-          power switch through the proxy, which will not work.
-
-    4. with the names ``/etc/hosts``, refer to the switches by name
-       rather than by IP address.
+      1. Ensure you have configured an class C *192.168.X.0/24*,
+         configured with static IP addresses, to which maybe only this
+         server has access to connect IP-controlled power
+         switches.
+  
+         Follow :ref:`these instructions <internal_network>` to create a
+         network.
+  
+         You might need a new Ethernet adaptor to connect to said
+         network (might be PCI, USB, etc).
+  
+      2. connect the power switch to said network
+  
+      3. enter the *PDUNAME* name in ``/etc/hosts`` as described
+         above.
+  
+         .. warning:: if your system uses proxies, you need to add
+            *PDUNAME* also to the *no_proxy* environment variables in
+            :file:`/etc/bashrc` and others to avoid the daemon trying
+            to access the power switch through the proxy, which will
+            not work.
 
     **Configuring the system**
 
-    1. Choose a name for the power switch (*spM*), where *M* is a number
+    1. The power switch starts with IP address *192.168.0.100*; it needs
+       to be changed.
 
-    2. The power switch starts with IP address *192.168.0.100*; it needs
-       to be changed to *192.168.X.M*:
+       Determine which IP address the PDU will have (static, DHCP, etc)
 
-       a. Connect to *nsN*
+       There are multiple ways to do this, but this guide is by no
+       means complete:
 
-       b. Ensure the server access to *192.168.0.100* by adding this
-          routing hack::
+       - routing hack on a local Linux machine: in a machine connected
+         to a wired network, add a secondary IP address in the
+         *192.168.0.0/24* network and access the PDU through that:
 
-            # ifconfig nsN:2 192.168.0.0/24
+         a. select the network interface (eg: *eth0*)
 
-       c. With lynx or a web browser, from the server, access the
-          switch's web control interface::
+         b. add routing through an alias::
 
-          $ lynx http://192.168.0.100
+              # ifconfig eth0:2 192.168.0.3/24
 
-       d. Enter the default user *admin*, password *1234*, select *ok*
-          and indicate *A* to always accept cookies
+         c. ensure the PDU is connected to the same network switch as
+            the Linux machine
 
-          .. warning: keep the default user and password at
-                      *admin*/*1234*, the default configuration relies
-                      on it. It makes no sense to change it anyway as
-                      you will have to write them down in the
-                      configuration. Limitations of HTTP Basic Auth
+       - USB Network dongle connected directly (or with a crossover
+         cable if needed) to the PDU:
 
-       e. Hit enter to refresh link redirecting to
-          *192.168.0.100/index.htm*, scroll down to *Setup*,
-          select. On all this steps, make sure to hit submit for each
-          individual change.
+              # ifconfig IFACENAME 192.168.0.3/24
 
-          1. Lookup setup of IP address, change to *192.168.N.M* (where *x*
-             matches *spM*), gateway *192.168.N.1*; hit the *submit* next to
-             it.
+    2. With a web browser, access the switch's web control interface
+       at *http://192.168.0.100*
 
-          2. Disable the security lockout in section *Delay*
+    3. Enter the default user *admin*, password *1234*, select *ok*
 
-             Set *Wrong password lockout* set to zero minutes
+    4. Scroll down to *Setup* menu to configure the different parts
+       needed; on each of this steps, make sure to hit submit for each
+       individual change.
 
-          3. Turn on setting power after power loss:
+       a. Lookup setup of IP address, change to the chosen IP address
+          (or DHCP if so selected); hit the *submit* next to it.
 
-             *Power Loss Recovery Mode > When recovering after power
-             loss* select *Turn all outlets on*
+       b. Disable the security lockout in section *Delay*
 
-          4. Extra steps needed for newer units
-             (https://dlidirect.com/products/new-pro-switch)
+          Set *Wrong password lockout* set to zero minutes
 
-             The new refreshed unit looks the same, but has wifi
-             connectivity and pleny of new features, some of which
-             need tweaking; login to the setup page again and for each
-             of this, set the value/s and hit *submit* before going to
-             the next one:
+       c. Turn on setting power after power loss:
 
-             - Access setings (quite important, as this allows the
-               driver to access the same way for the previous
-               generation of the product too):
+          *Power Loss Recovery Mode > When recovering after power
+          loss* select *Turn all outlets on*
 
-               ENABLE: *allow legacy plaintext login methods*
+       d. Extra steps needed for newer units
+          (https://dlidirect.com/products/new-pro-switch)
 
-               Note in (3) below it is explained why this is not a
-               security problem in this kind of deployments.
+          The new refreshed unit looks the same, but has wifi
+          connectivity and pleny of new features, some of which
+          need tweaking; login to the setup page again and for each
+          of this, set the value/s and hit *submit* before going to
+          the next one:
 
-       g. remove the routing hack::
+          - Access setings (quite important, as this allows the
+            driver to access the same way for the previous
+            generation of the product too):
 
-            # ifconfig nsN:2 down
+            ENABLE: *allow legacy plaintext login methods*
 
-    3. The unit's default admin username and password are kept per
-       original (admin, 1234):
+            Note below it is explained why this is not a security
+            problem in this kind of deployments. On shared networks,
+            an upgrade to https might be needed.
 
-       - They are deployed in a dedicated network switch that is internal
-         to the server; none has access but the server users (targets run
-         on another switch).
+       e. If the PDU is in an isolated network, keep the default user
+          and password at *admin*/*1234*, the default configuration
+          relies on it. It makes no sense to change it anyway as you
+          will have to write them down in the
+          configuration. Limitations of HTTP Basic Auth.
 
-       - they use HTTP Basic Auth, they might as well not use
-         authentication
+       f. If the routing hack method was used, remove it::
 
-    4. Add an entry in ``/etc/hosts`` for *spM* so we can refer to the
-       DLWPS7 by name instead of IP address::
+            # ifconfig eth0:2 down
 
-         192.168.4.X	spM
+
+    If the name of the PDU does not resolve over DNS, you might add it
+    to the server's */etc/hosts*::
+
+       IPADDRESS  PDUNAME PDUNAME.DOMAINNAME
+
+    (the domainname is optional)
 
     """
+    if basename == None:
+        basename = hostname
+    else:
+        isinstance(basename, basestring)
+
     for i in range(1, 9):
-        name = "%s-%d" % (hostname, i)
+        name = "%s-%d" % (basename, i)
         pc_url = "http://%s:%s@%s/%d" % (user, password, hostname, i)
         target = target_pdu_socket_add(
             name,
-            ttbl.pc.dlwps7(pc_url), 
+            ttbl.pc.dlwps7(pc_url),
             power = powered_on_start,
             # Always keep them on, unless we decide otherwise--we need
             # them to control other components
-            tags = dict(idle_poweroff = 0))
+            tags = dict(
+                idle_power_off = 0, idle_poweroff = 0, # COMPAT
+                idle_power_fully_off = 0
+            ))
         target.disable("")
 
 
@@ -338,7 +370,10 @@ try:
                 power = powered_on_start,
                 # Always keep them on, unless we decide otherwise--we need
                 # them to control other components
-                tags = dict(idle_poweroff = 0))
+                tags = dict(
+                    idle_power_off = 0, idle_poweroff = 0, # COMPAT
+                    idle_power_fully_off = 0
+                ))
             target.disable("")
 
 except ImportError as e:
@@ -346,7 +381,7 @@ except ImportError as e:
 
 
 def usbrly08b_targets_add(serial_number, target_name_prefix = None,
-                          power = False):
+                          powered_on_start = None):
     """Set up individual power control targets for each relay of a
     `Devantech USB-RLY08B
     <https://www.robot-electronics.co.uk/htm/usb_rly08btech.htm>`_
@@ -358,6 +393,15 @@ def usbrly08b_targets_add(serial_number, target_name_prefix = None,
 
     :param str target_name_prefix: (optional) Prefix for the target
       names (which defaults to *usbrly08b-SERIALNUMBER-*)
+
+    :param bool powered_on_start: what to do with the power on the
+      downstream ports:
+
+      - *None*: leave them as they are
+
+      - *False*: power them off
+
+      - *True*: power them on
 
     **Bill of materials**
 
@@ -427,11 +471,14 @@ def usbrly08b_targets_add(serial_number, target_name_prefix = None,
             power = powered_on_start,
             # Always keep them on, unless we decide otherwise--we need
             # them to control other components
-            tags = dict(idle_poweroff = 0))
+            tags = dict(
+                idle_power_off = 0, idle_poweroff = 0, # COMPAT
+                idle_power_fully_off = 0
+            ))
         target.disable("")
 
 
-def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
+def ykush_targets_add(ykush_serial, pc_url = None, powered_on_start = None):
     """Given the :ref:`serial number <ykush_serial_number>` for an YKUSH
     hub connected to the system, set up a number of targets to
     manually control it.
@@ -466,15 +513,15 @@ def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
     :param str ykush_serial: USB Serial Number of the hub
       (:ref:`finding <ykush_serial_number>`).
 
-    :param str pc_url: Power Control URL
+    :param str pc_url: (optional) Power Control URL
 
      - A DLPWS7 URL (:py:class:`ttbl.pc.dlwps7`), if given, will create a
        target *YKNNNNN* to power on or off the whole hub and wait for it
        to connect to the system.
 
-     - If None, no power control targets for the whole hub will be
-       created. It will just be expected the hub is connected permanently
-       to the system.
+     - If *None* (default) no power control targets for the whole hub
+       will be created. It will just be expected the hub is connected
+       permanently to the system.
 
     :param bool powered_on_start: what to do with the power on the
       downstream ports:
@@ -530,7 +577,10 @@ def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
     target.interface_add("power", ttbl.power.interface(*pcl))
     # Always keep them on, unless we decide otherwise--we need
     # them to control other components
-    ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+    ttbl.config.target_add(target, tags = dict(
+        idle_power_off = 0, idle_poweroff = 0, # COMPAT
+        idle_power_fully_off = 0
+    ))
     target.disable("")
     if powered_on_start:
         target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)
@@ -542,7 +592,10 @@ def ykush_targets_add(ykush_serial, pc_url, powered_on_start = None):
             ttbl.power.interface(ttbl.pc_ykush.ykush(ykush_serial, i)))
         # Always keep them on, unless we decide otherwise--we need
         # them to control other components
-        ttbl.config.target_add(target, tags = dict(idle_poweroff = 0))
+        ttbl.config.target_add(target, tags = dict(
+            idle_power_off = 0, idle_poweroff = 0, # COMPAT
+            idle_power_fully_off = 0
+        ))
         target.disable("")
         if powered_on_start:
             target.power.put_on(target, ttbl.who_daemon(), {}, {}, None)

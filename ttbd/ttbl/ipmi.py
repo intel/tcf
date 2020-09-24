@@ -25,91 +25,7 @@ import commonl.requirements
 import ttbl.power
 import ttbl.console
 
-import pyghmi.ipmi.command
-
 class pci(ttbl.power.impl_c):
-    """
-    Power controller to turn on/off a server via IPMI
-
-    :param str bmc_hostname: host name or IP address of the BMC
-      controller for the host whose power is to be controller.
-    :param str user: (optional) username to use to login
-    :param str password: (optional) password to use to login
-
-    This is normally used as part of a power rail setup, where an
-    example configuration in /etc/ttbd-production/conf_*.py that would
-    configure the power switching of a machine that also has a serial
-    port would look like:
-
-    >>> ...
-    >>> target.interface_add("power", ttbl.power.interface(
-    >>>     ( "BMC", ttbl.ipmi.pci("bmc_admin:secret@server1.internal.net") ),
-    >>>     ...
-    >>> )
-
-    .. warning:: putting BMCs on an open network is not a good idea;
-                 it is recommended they are only exposed to an
-                 :ref:`infrastructure network <separated_networks>`
-
-    :params str hostname: *USER[:PASSWORD]@HOSTNAME* of where the IPMI BMC is
-      located; see :func:`commonl.password_get` for things *PASSWORD*
-      can be to obtain the password from service providers.
-    """
-    def __init__(self, hostname):
-        ttbl.power.impl_c.__init__(self, paranoid = True)
-        user, password, hostname = commonl.split_user_pwd_hostname(hostname)
-        self.hostname = hostname
-        self.user = user
-        self.password = password
-        self.bmc = None
-        self.power_on_recovery = True
-
-    def _setup(self):
-        # this can run in multiple processes, so make sure this is
-        # setup for this process each time we connect, because we
-        # don't know how long this is going to be open and the session
-        # expires
-        self.bmc = pyghmi.ipmi.command.Command(self.hostname,
-                                               self.user, self.password)
-        self.bmc.wait_for_rsp(5)	# timeout after seconds of inactivity
-
-    def on(self, target, component):
-        self._setup()
-        self.bmc.set_power('on', wait = True)
-
-    def off(self, target, component):
-        self._setup()
-        self.bmc.set_power('off', wait = True)
-
-    def get(self, target, component):
-        self._setup()
-        data = self.bmc.get_power()
-        state = data.get('powerstate', None)
-        if state == 'on':
-            return True
-        elif state == 'off':
-            return False
-        else:
-            target.log.info("%s: ipmi %s@%s get_power returned no state: %s",
-                            component, self.user, self.hostname,
-                            pprint.pformat(data))
-            return None
-
-    def pre_power_pos_setup(self, target):
-        """
-        If target's *pos_mode* is set to *pxe*, tell the BMC to boot
-        off the network.
-
-        This is meant to be use as a pre-power-on hook (see
-        :class:`ttbl.power.interface` and
-        :data:`ttbl.test_target.power_on_pre_fns`).
-        """
-        if target.fsdb.get("pos_mode") == 'pxe':
-            target.log.error("POS boot: telling system to boot network")
-            self.bmc.set_bootdev("network")
-
-
-class pci_ipmitool(ttbl.power.impl_c):
     """
     Power controller to turn on/off a server via IPMI
 
@@ -125,10 +41,14 @@ class pci_ipmitool(ttbl.power.impl_c):
       passed to *ipmitool*'s *-N* option
     :param int ipmi_retries: times to retry the IPMI operation (will be
       passed to *ipmitool*'s *-R* option.
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, hostname, ipmi_timeout = 10, ipmi_retries = 3):
-        ttbl.power.impl_c.__init__(self, paranoid = True)
-        user, password, hostname = commonl.split_user_pwd_hostname(hostname)
+    def __init__(self, bmc_hostname, ipmi_timeout = 10, ipmi_retries = 3,
+                 **kwargs):
+        ttbl.power.impl_c.__init__(self, paranoid = True, **kwargs)
+        user, password, hostname \
+            = commonl.split_user_pwd_hostname(bmc_hostname)
         self.hostname = hostname
         self.user = user
         self.bmc = None
@@ -146,8 +66,9 @@ class pci_ipmitool(ttbl.power.impl_c):
         self.cmdline += [ "-E", "-I", "lanplus" ]
         if password:
             self.env['IPMI_PASSWORD'] = password
-        self.timeout = 20
-        self.wait = 0.5
+        self.paranoid_get_samples = 3
+        self.timeout = 30
+        self.wait = 2
 
     def _run(self, target, command):
         try:
@@ -155,9 +76,10 @@ class pci_ipmitool(ttbl.power.impl_c):
                 self.cmdline + command, env = self.env, shell = False,
                 stderr = subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
-            target.log.error("ipmitool %s failed: %s",
-                             " ".join(command), e.output)
-            raise
+            msg = "ipmitool %s failed: %s" % (
+                " ".join(command), e.output)
+            target.log.error(msg)
+            raise self.error_e(msg)
         return result.rstrip()	# remove trailing NLs
 
 
@@ -198,6 +120,7 @@ class pci_ipmitool(ttbl.power.impl_c):
             self._run(target, [ "chassis", "bootparam",
                                 "set", "bootflag", "force_disk" ])
 
+pci_ipmitool = pci
 
 class pos_mode_c(ttbl.power.impl_c):
     """
@@ -206,7 +129,7 @@ class pos_mode_c(ttbl.power.impl_c):
     This can be used in the power rail of a machine that can be
     provisioned with :ref:`Provisioning OS <provisioning_os>`, instead
     of using pre power-on hooks (such as
-    :meth:`pci_ipmitool.pre_power_pos_setup`).
+    :meth:`pci.pre_power_pos_setup`).
 
     When the target is being powered on, this will be called, and
     based if the value of the *pos_mode* property is *pxe*, the IPMI
@@ -232,12 +155,15 @@ class pos_mode_c(ttbl.power.impl_c):
       passed to *ipmitool*'s *-N* option
     :param int ipmi_retries: times to retry the IPMI operation (will be
       passed to *ipmitool*'s *-R* option.
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, hostname, ipmi_timeout = 10, ipmi_retries = 3):
+    def __init__(self, hostname, ipmi_timeout = 10, ipmi_retries = 3,
+                 **kwargs):
         assert isinstance(hostname, basestring)
         assert isinstance(ipmi_timeout, numbers.Real)
         assert isinstance(ipmi_retries, int)
-        ttbl.power.impl_c.__init__(self, paranoid = True)
+        ttbl.power.impl_c.__init__(self, paranoid = True, **kwargs)
         self.power_on_recovery = True
         self.paranoid_get_samples = 1
         user, password, hostname = commonl.split_user_pwd_hostname(hostname)
@@ -280,7 +206,6 @@ class pos_mode_c(ttbl.power.impl_c):
         # better, because we seem not to be able to get the system to
         # acknowledge the BIOS boot order
         if target.fsdb.get("pos_mode") == 'pxe':
-            target.log.error("DEBUG POS boot: telling system to boot network")
             # self._run(target, [ "chassis", "bootdev", "pxe" ])
             self._run(target, [ "chassis", "bootparam",
                                 "set", "bootflag", "force_pxe" ])
@@ -334,14 +259,14 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
 
     >>> sol0_pc = ttbl.console.serial_pc(console_file_name)
     >>>
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "power",
     >>>     ttbl.power.interface(
     >>>         ...
     >>>         sol0_pc,
     >>>         ...
     >>>     )
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "console",
     >>>     ttbl.console.interface(
     >>>         sol0 = sol0_pc,
@@ -368,7 +293,8 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
         assert isinstance(ipmi_timeout, numbers.Real)
         assert isinstance(ipmi_retries, int)
         ttbl.console.generic_c.__init__(self, chunk_size = chunk_size,
-                                        interchunk_wait = interchunk_wait)
+                                        interchunk_wait = interchunk_wait,
+                                        crlf = "\n")
         ttbl.power.socat_pc.__init__(
             self,
             "PTY,link=console-%(component)s.write,rawer"
@@ -389,6 +315,7 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
         self.ipmi_retries = ipmi_retries
         if password:
             self.env_add['IPMITOOL_PASSWORD'] = password
+        self.re_enable = True
 
     def on(self, target, component):
         # if there is someone leftover reading, kick them out, there can
@@ -416,15 +343,24 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
         ttbl.console.generic_c.enable(self, target, component)
 
     def off(self, target, component):
-        generic_c.disable(self, target, component)
+        ttbl.console.generic_c.disable(self, target, component)
         ttbl.power.socat_pc.off(self, target, component)
 
-    # console interface; state() implemented by generic_c
+    # console interface
     def enable(self, target, component):
         self.on(target, component)
 
     def disable(self, target, component):
         return self.off(target, component)
+
+    def state(self, target, component):
+        # we want to use this to gather state, since the generic_c
+        # implementation relies on the console-NAME.write file
+        # existing; this can linger if a process dies or not...
+        # but the ttbl.power.socat_pc.get() implementation checks if
+        # the process is alive looking at the PIDFILE
+        # COMPONENT-socat.pid and verifying that thing is still running
+        return ttbl.power.socat_pc.get(self, target, component)
 
 
 class sol_ssh_console_pc(ttbl.console.ssh_pc):
@@ -456,15 +392,16 @@ class sol_ssh_console_pc(ttbl.console.ssh_pc):
                  ipmi_timeout = 10, ipmi_retries = 3):
         assert isinstance(ipmi_timeout, numbers.Real)
         assert isinstance(ipmi_retries, int)
-        ttbl.console.ssh_pc.__init__(self, hostname,
-                                     port = ssh_port, chunk_size = chunk_size,
-                                     interchunk_wait = interchunk_wait)
+        ttbl.console.ssh_pc.__init__(
+            self, hostname, port = ssh_port,
+            chunk_size = chunk_size, interchunk_wait = interchunk_wait)
         _user, password, _hostname = commonl.split_user_pwd_hostname(hostname)
         self.ipmi_timeout = ipmi_timeout
         self.ipmi_retries = ipmi_retries
         if password:
             self.env_add['IPMITOOL_PASSWORD'] = password
         self.paranoid_get_samples = 1
+        self.re_enable = True
 
     def on(self, target, component):
         # if there is someone leftover reading, kick them out, there can

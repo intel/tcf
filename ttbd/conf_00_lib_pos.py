@@ -28,7 +28,7 @@ def nw_indexes(nw_name):
       *a-zA-Z*.
 
     :returns: x, y, vlan_id; x and y are meant to be used for creating
-      IP addresses (IPv4 192.x.y.0/24, IPv6 fc00::x:y:0/112)
+      IP addresses (IPv4 192.x.y.0/24, IPv6 fd:x:y::0/104)
 
       (yes, 192.x.y/0.24 with x != 168 is not private, but this is
       supposed to be running inside a private network anyway, so you
@@ -97,7 +97,7 @@ def nw_indexes(nw_name):
 def nw_pos_add(nw_name, power_rail = None,
                mac_addr = None, vlan = None,
                ipv4_prefix_len = 24,
-               ipv6_prefix_len = 112):
+               ipv6_prefix_len = 104):
     """Adds configuration for a network with :ref:`Provisioning OS
     <provisioning_os>` support.
 
@@ -200,24 +200,13 @@ def nw_pos_add(nw_name, power_rail = None,
             + power_rail
             # the rest of the components we need
             + [
-                ( "dhcp4", ttbl.dhcp.pci("192.%d.%d.1" % (x, y),
-                                         "192.%d.%d.0" % (x, y),
-                                         ipv4_prefix_len,
-                                         "192.%d.%d.10" % (x, y),
-                                         "192.%d.%d.20" % (x, y)) ),
-                ( "dhcp6", ttbl.dhcp.pci("fc00::%02x:%02x:1" % (x, y),
-                                         "fc00::%02x:%02x:0" % (x, y),
-                                         ipv6_prefix_len,
-                                         "fc00::%02x:%02x:0a" % (x, y),
-                                         "fc00::%02x:%02x:1d" % (x, y),
-                                         ip_mode = 6) ),
                 ( "rsync", ttbl.rsync.pci("192.%d.%d.1" % (x, y), 'images',
                                           '/home/ttbd/images') ),
                 ( "dnsmasq", ttbl.dnsmasq.pc() ),
             ]))
 
     tags = dict(
-        ipv6_addr = 'fc00::%02x:%02x:1' % (x, y),
+        ipv6_addr = 'fd:%02x:%02x::1' % (x, y),
         ipv6_prefix_len = ipv6_prefix_len,
         ipv4_addr = '192.%d.%d.1' % (x, y),
         ipv4_prefix_len = ipv4_prefix_len,
@@ -457,7 +446,9 @@ def pos_target_add(
         pos_http_url_prefix = None,
         pos_image = None,
         ipv4_prefix_len = 24,
-        ipv6_prefix_len = 112):
+        ipv6_prefix_len = 104,
+        serial_console_name = "serial0",
+        tags = None):
     """
     Add a PC-class target that can be provisioned using Provisioning
     OS.
@@ -611,7 +602,6 @@ def pos_target_add(
 
       - :func:`ttbl.dhcp.power_on_pre_pos_setup`
       - :meth:`ttbl.ipmi.pci.pre_power_pos_setup`
-      - :meth:`ttbl.ipmi.pci_ipmitool.pre_power_pos_setup`
 
       Default is :func:`ttbl.dhcp.power_on_pre_pos_setup`.
 
@@ -625,17 +615,39 @@ def pos_target_add(
     assert isinstance(mac_addr, basestring), \
         "mac_addr must be a string HH:HH:HH:HH:HH:HH; got: %s %s" \
         % (type(name).__name__, name)
-    assert power_rail \
-        and (
-            # a single power rail or a char spec of it
-            isinstance(power_rail, (ttbl.power.impl_c, basestring))
-            or (
-                # a power rail list
-                isinstance(power_rail, list)
-                and all(isinstance(i, ttbl.power.impl_c)
-                        for i in power_rail))
-        ), \
-        "power_rail must be a power rail spec, see doc; got %s" % power_rail
+    if power_rail:
+        # FIXME: move to ttlb.power.validate_spec
+        if isinstance(power_rail, ttbl.power.impl_c):
+            pass
+        elif isinstance(power_rail, basestring):
+            # compat, a descriptor that gets transformed to a pc_dlwps7
+            pass
+        elif isinstance(power_rail, list):
+            count = -1
+            for pc in power_rail:
+                count += 1
+                if isinstance(pc, ttbl.power.impl_c):
+                    continue
+                if isinstance(pc, (tuple, list)):
+                    # list of NAME, IMPL
+                    if len(pc) != 2:
+                        raise AssertionError(
+                            "power rail #%d: list of %d items given;"
+                            " expect 2 (NAME, IMPL)" % (count, len(pc)))
+                    pc_name = pc[0]
+                    pc_impl = pc[1]
+                    if not isinstance(pc_name, basestring):
+                        raise AssertionError(
+                            "power rail #%d: first element must be a string; got %s"
+                            % (count, type(pc_name)))
+                    if not isinstance(pc_impl, ttbl.power.impl_c):
+                        raise AssertionError(
+                            "power rail #%d: second element must be a ttbl.power.impl_c; got %s"
+                            % (count, type(pc_impl)))
+        else:
+            raise AssertionError(
+                "power rail must be a power rail spec (ttbl.power.impl_c"
+                " or list of them), see doc; got %s" % power_rail)
     assert isinstance(boot_disk, basestring) \
         and not '/' in boot_disk, \
         'boot_disk is the base name of the disk from which ' \
@@ -691,16 +703,19 @@ def pos_target_add(
     x, y, _ = nw_indexes(network)
 
     target = ttbl.test_target(name)		# create the target object
-    tags = {				# bake in base tags
-        'linux': True,
-        'bsp_models': { 'x86_64': None },
-        'bsps': {
-            'x86_64': {
-                'linux': True,
-                'console': 'x86_64',
-            }
-        },
-    }
+    if tags == None:
+        tags = {				# bake in base tags
+            'linux': True,
+            'bsp_models': { 'x86_64': None },
+            'bsps': {
+                'x86_64': {
+                    'linux': True,
+                    'console': 'x86_64',
+                }
+            },
+        }
+    else:
+        assert isinstance(tags, dict)
     if target_type_long:
         tags['type_long'] = target_type_long
     else:
@@ -712,17 +727,21 @@ def pos_target_add(
     #
     # serial_pc defaults to open /dev/tty-TARGETNAME; we need to
     # create the object because we'll need to start it upon power on
-    serial0 = ttbl.console.serial_pc()
-    target.interface_add("console", ttbl.console.interface(
-        serial0 = serial0,
+    pcl = [ ]
+    consoles = dict(
         ssh0 = ttbl.console.ssh_pc("root@" + '192.%d.%d.%d' % (x, y, index)),
-        default = "serial0",
-        #preferred = "ssh0",
-    ))
+        default = "ssh0"
+    )
+    if serial_console_name:
+        serial_console = ttbl.console.serial_pc()
+        consoles[serial_console_name] = serial_console
+        consoles['default'] = serial_console_name
+        pcl.append(( serial_console_name, serial_console ))
+    target.interface_add("console", ttbl.console.interface(**consoles))
+
 
     # Power Rail
     #
-    pcl = [ ( "serial0", serial0 ) ]
     if isinstance(power_rail, basestring):
         # legacy support for URLs for dlwps7
         # remove user/pasword
@@ -765,7 +784,7 @@ def pos_target_add(
             mac_addr = mac_addr,
             ipv4_addr = '192.%d.%d.%d' % (x, y, index),
             ipv4_prefix_len = ipv4_prefix_len,
-            ipv6_addr = 'fc00::%02x:%02x:%02x' % (x, y, index),
+            ipv6_addr = 'fd:%02x:%02x::%02x' % (x, y, index),
             ipv6_prefix_len = ipv6_prefix_len)
         )
     return target
@@ -810,7 +829,7 @@ def target_qemu_pos_add(target_name,
     >>>                              "nwa",
     >>>                              mac_addr = "02:61:00:00:00:05",
     >>>                              ipv4_addr = "192.168.95.5",
-    >>>                              ipv6_addr = "fc00::61x:05")
+    >>>                              ipv6_addr = "fd:00:61::05")
 
     See an example usage in :func:`conf_06_default.nw_default_targets_add`
     to create default targets.
@@ -826,7 +845,7 @@ def target_qemu_pos_add(target_name,
     >>>     'nwb', dict(
     >>>         mac_addr = "02:62:00:00:00:05",
     >>>         ipv4_addr = "192.168.98.5",
-    >>>         ipv6_addr = "fc00::62:05")
+    >>>         ipv6_addr = "fd:00:62::05")
 
 
     :param str target_name: name of the target to create
@@ -986,9 +1005,12 @@ def target_qemu_pos_add(target_name,
     # STATE_DIR/console-NAME.{read,write}
     console_pc = ttbl.console.generic_c(chunk_size = 8,
                                         interchunk_wait = 0.15)
-    console_pc.upid_set(qemu_pc.name, **qemu_pc.upid)
+    console_pc.crlf = "\r"
+    upid = qemu_pc.upid
+    del upid['name_long']
+    console_pc.upid_set(qemu_pc.name, **upid)
     ssh_pc = ttbl.console.ssh_pc("root@" + ipv4_addr)
-    ssh_pc.upid_set(qemu_pc.name, **qemu_pc.upid)
+    ssh_pc.upid_set(qemu_pc.name, **upid)
     consolel = []
     for console in consoles:
         consolel.append(
@@ -1024,7 +1046,7 @@ def target_qemu_pos_add(target_name,
         nw_name,
         dict(
             ipv4_addr = ipv4_addr, ipv4_prefix_len = 24,
-            ipv6_addr = ipv6_addr, ipv6_prefix_len = 112,
+            ipv6_addr = ipv6_addr, ipv6_prefix_len = 104,
             mac_addr = mac_addr,
         )
     )

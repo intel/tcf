@@ -116,7 +116,7 @@ class interface(ttbl.tt_interface):
     An instance of this gets added as an object to the target object
     with:
 
-    >>> ttbl.config.targets['qu05a'].interface_add(
+    >>> ttbl.test_target.get('qu05a').interface_add(
     >>>     "capture",
     >>>     ttbl.capture.interface(
     >>>         vnc0 = ttbl.capture.vnc(PORTNUMBER)
@@ -168,20 +168,20 @@ class interface(ttbl.tt_interface):
         # call
         self.user_path = None
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         """
         Called when the interface is added to a target to initialize
         the needed target aspect (such as adding tags/metadata)
         """
         capturers = []
+        publish_dict = target.tags['interfaces'][iface_name]
         for capturer, impl in self.impls.iteritems():
             ctype = "stream" if impl.stream else "snapshot"
+            publish_dict[capturer]['type'] = ctype
             descr = capturer + ":" + ctype
             if impl.mimetype:
                 descr += ":" + impl.mimetype
-            capturers.append(descr)
-        target.tags_update(dict(capture = " ".join(capturers)))
-        self.instrumentation_publish(target, "capture")
+                publish_dict[capturer]['mimetype'] = impl.mimetype
 
     def start(self, who, target, capturer):
         """
@@ -267,14 +267,6 @@ class interface(ttbl.tt_interface):
                 impl.stop_and_get(target, name)
 
 
-    def _args_check(self, target, args):
-        if not 'capturer' in args:
-            raise RuntimeError("missing 'capturer' arguments")
-        capturer = args['capturer']
-        assert isinstance(capturer, basestring)
-        return capturer
-
-
     def request_process(self, target, who, method, call, args, _files,
                         _user_path):
         # called by the daemon when a METHOD request comes to the HTTP path
@@ -282,11 +274,11 @@ class interface(ttbl.tt_interface):
         self.user_path = _user_path
         ticket = args.get('ticket', "")
         if call == "start" and method == "POST":
-            capturer = self._args_check(target, args)
+            capturer = self.arg_get(args, "capturer", basestring)
             self.start(who, target, capturer)
             r = {}
         elif call == "stop_and_get" and method == "POST":
-            capturer = self._args_check(target, args)
+            capturer = self.arg_get(args, "capturer", basestring)
             r = self.stop_and_get(who, target, capturer)
         elif method == "GET" and call == "list":
             r = self.list(target)
@@ -312,7 +304,7 @@ class generic_snapshot(impl_c):
 
     Then attach the capture interface to the target with:
 
-    >>> ttbl.config.targets['TARGETNAME'].interface_add(
+    >>> ttbl.test_target.get('TARGETNAME').interface_add(
     >>>     "capture",
     >>>     ttbl.capture.interface(
     >>>         vnc0 = capture_screenshot_vnc,
@@ -464,7 +456,7 @@ class generic_stream(impl_c):
 
     Then attach the capture interface to the target with:
 
-    >>> ttbl.config.targets['TARGETNAME'].interface_add(
+    >>> ttbl.test_target.get('TARGETNAME').interface_add(
     >>>     "capture",
     >>>     ttbl.capture.interface(
     >>>         hdmi0_vstream = capture_vstream_ffmpeg_v4l,

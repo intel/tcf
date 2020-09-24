@@ -290,11 +290,13 @@ class driver(tc.report_driver_c):
     def _get_fd(self, code, tmpdir):
         # FIXME: document the decorator
         if not code in self.fs:
+            # open truncating because this is a new entry
             f = io.open(
                 os.path.join(tmpdir, "report-" + code + ".txt"),
                 "w", encoding = 'utf-8', errors = 'replace')
             self.fs[code] = f.name
         else:
+            # open to append because this is an existing entry
             f = io.open(self.fs[code], "a+",
                         encoding = 'utf-8', errors = 'replace')
         # reassign the stream so we use the prefix printing

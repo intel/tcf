@@ -9,7 +9,7 @@ srcdir = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 # ok, this is a hack because some distros don't have it -- need it for
 # now so the ttbl.raritan_emx module builds ok -- until we remove the
 # need for the raritan SDK and just use JSON RPC.
-export PYTHONPATH := $(PYTHONPATH):$(srcdir):/usr/local/lib/python2.7/site-packages
+export PYTHONPATH := $(PYTHONPATH):$(srcdir):$(srcdir)/ttbd:/usr/local/lib/python2.7/site-packages
 # You can set these variables from the command line.
 SPHINXOPTS    = -q -n
 # Why like this? Because the script assumes whichever Python is
@@ -52,7 +52,9 @@ help:
 	@echo "  doctest    to run all doctests embedded in the documentation (if enabled)"
 
 clean:
-	-rm -rf $(BUILDDIR)/*
+	-rm -rf $(BUILDDIR)/* \
+	  setup.cfg ttbd/setup.cfg ttbd/pos/setup.cfg \
+	  zephyr/setup.cfg ttbd/zephyr/setup.cfg
 
 html:
 	$(SPHINXBUILD) -v -v -v -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
@@ -182,28 +184,43 @@ BDIST_OPTS := --dist-dir=$(RPMDIR)/ --bdist-base=$(BASE)/dist/
 #   /etc/tcf/conf_zephyr.pyo
 
 
-rpms-ttbd-zephyr:
+#
+# Well, this is a dirty hack
+#
+# Instead of making a spec file, since we want to keep reusing the setup.py infra...
+#
+# - we can't use RPM rich dependencies in setup.cfg, due to older
+#   distro's (CentOS7) not supporting them, so we use @@DISTRONAME@@ as
+#   a dirty switch
+# 
+DISTRO=Fedora
+
+.FORCE:
+
+# Make sure this file is always re-generated, since we might be
+# passing a different DISTRO ... and anyway we are always remaking the
+# RPMs
+%.cfg: %.cfg.in .FORCE
+	sed -e "s|@@.*$(DISTRO).*@@||" -e "/@@/d" $< > $@
+
+rpms-ttbd-zephyr: ttbd/zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
 	cd ttbd/zephyr && VERSION=$(VERSION) python ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
 
-rpms-ttbd-pos:
+rpms-ttbd-pos: ttbd/pos/setup.cfg
 	mkdir -p $(RPMDIR)
 	cd ttbd/pos && VERSION=$(VERSION) python ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
 
-rpms-ttbd:
+rpms-ttbd: ttbd/setup.cfg
 	mkdir -p $(RPMDIR)
 	cd ttbd && VERSION=$(VERSION) python ./setup.py bdist_rpm $(BDIST_OPTS)
 
-rpms-tcf-zephyr:
+rpms-tcf-zephyr: zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
 	cd zephyr && VERSION=$(VERSION) python ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
 
-rpms-tcf-sketch:
-	mkdir -p $(RPMDIR)
-	cd sketch && VERSION=$(VERSION) python ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
-
-rpms-tcf:
+rpms-tcf: setup.cfg
 	mkdir -p $(RPMDIR)
 	VERSION=$(VERSION) python ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
 
-rpms: rpms-tcf rpms-tcf-zephyr rpms-tcf-sketch rpms-ttbd rpms-ttbd-zephyr rpms-ttbd-pos
+rpms: rpms-tcf rpms-tcf-zephyr rpms-ttbd rpms-ttbd-zephyr rpms-ttbd-pos

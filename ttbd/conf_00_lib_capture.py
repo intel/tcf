@@ -17,7 +17,7 @@ interface can be added with:
 
 .. code-block:: python
 
-   ttbl.config.targets['TARGETNAME'].interface_add(
+   ttbl.test_target.get('TARGETNAME').interface_add(
        "capture",
        ttbl.capture.interface(
            screen = "hdmi0_screenshot",
@@ -88,7 +88,7 @@ import ttbl.capture
 #:
 #:  - add the configuration snippet::
 #:
-#:      ttbl.config.targets[TARGETNAME].interface_add(
+#:      ttbl.test_target.get(TARGETNAME).interface_add(
 #:          "capture",
 #:          ttbl.capture.interface(
 #:              screen = "hdmi0_screenshot",
@@ -133,11 +133,12 @@ capture_screenshot_ffmpeg_v4l = ttbl.capture.generic_snapshot(
 capture_screenshot_vnc = ttbl.capture.generic_snapshot(
     # dont set the port for the name, otherwise the UPID keeps
     # changing
-    "VNC %(id)s@localhost",
-    # need to make sure vnc-port is defined in the target's tags
+    "VNC %(id)s@%(vnc-host)s",
+    # need to make sure vnc-host/port are defined in the target's tags
     # needs the .png, otherwise it balks at guessing extensions
-    # don't do -q, otherwise when it fails, it fails silently
-    "gvnccapture localhost:%(vnc-port)s %(output_file_name)s",
+    # don't do -q, otherwise when it fails, it fails silently; for
+    # QEMU, it is *localhost*.
+    "gvnccapture %(vnc-host)s:%(vnc-port)s %(output_file_name)s",
     mimetype = "image/png",
     extension = ".png"
 )

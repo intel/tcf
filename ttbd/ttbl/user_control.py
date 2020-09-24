@@ -80,7 +80,7 @@ class User(object):
             commonl.makedirs_p(path)
         try:
             self.fsdb = ttbl.fsdb_symlink_c(path)
-        except AssertionError:	# FIXME: replace with invalid_e
+        except ( AssertionError, ttbl.fsdb_c.exception ) as e:
             if fail_if_new:
                 raise self.user_not_existant_e("%s: no such user" % userid)
         self.fsdb.set('userid', userid)
@@ -140,8 +140,7 @@ class User(object):
         before with :meth:`role_add`.
         """
         assert isinstance(role, basestring)
-        # FIXME: convert to normal booleans
-        self.fsdb.set('roles.' + role, "False")
+        self.fsdb.set('roles.' + role, False)
 
     def role_gain(self, role):
         """
@@ -153,7 +152,7 @@ class User(object):
         """
         assert isinstance(role, basestring)
         # FIXME: convert to normal booleans
-        self.fsdb.set('roles.' + role, "True")
+        self.fsdb.set('roles.' + role, True)
 
     def role_get(self, role):
         """
@@ -163,11 +162,10 @@ class User(object):
           dropped, *None* if the user does not have the role.
         """
         val = self.fsdb.get('roles.' + role, None)
-        if val == "True":
-            return True
-        if val == "False":
-            return False
-        return None
+        assert val == None or isinstance(val, bool), \
+            "BUG: user %s[roles.%s] is val type %s; expected bool" \
+            % (self.userid, role, type(val))
+        return val
 
     def role_present(self, role):
         """
@@ -180,7 +178,7 @@ class User(object):
         """
         Return *True* if the user has the *admin* role gained.
         """
-        return self.role_present('admin')
+        return self.fsdb.get('roles.admin', False) == True
 
     @staticmethod
     def load_user(userid):

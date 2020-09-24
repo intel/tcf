@@ -21,6 +21,7 @@ import time
 
 import commonl
 import ttbl
+import ttbl.power
 
 import pexpect
 try:
@@ -56,17 +57,18 @@ class impl_c(ttbl.tt_interface_impl_c):
       connection has to be established. For example, for some
       Lantronix KVM serial servers, when accessing the console over
       SSH we need to wait for the prompt and then issue a *connect
-      serial* command:
+      serial* command; see :class:ttbl.lantronix.console_spider_duo_pc;
+      it looks like:
 
       >>> serial0_pc = ttbl.console.ssh_pc(
       >>>     "USER:PASSWORD@LANTRONIXHOSTNAME",
       >>>     command_sequence = [
-      >>>       ## Welcome to the Lantronix SLSLP^M$
-      >>>       ## Firmware: version 030031, build 38120^M$
-      >>>       ## Last login: Thu Jan  1 00:04:20 1970 from 10.24.11.35^M$
-      >>>       ## Current time: Thu Jan  1 00:02:03 1970^M$
-      >>>       ## For a list of commands, type 'help'^M$
-
+      >>>       ## Welcome to the Lantronix SLSLP
+      >>>       ## Firmware: version 030031, build 38120
+      >>>       ## Last login: Thu Jan  1 00:04:20 1970 from 10.24.11.35
+      >>>       ## Current time: Thu Jan  1 00:02:03 1970
+      >>>       ## For a list of commands, type 'help'
+      >>>
       >>>       # command prompt, 'CR[USERNAME@IP]> '... or not, so just
       >>>       # look for 'SOMETHING> '
       >>>       # ^ will not match because we are getting a Carriage
@@ -74,14 +76,14 @@ class impl_c(ttbl.tt_interface_impl_c):
       >>>       (
       >>>           # send a disconnect just in case it is connected
       >>>           # and wait for the command prompt
-      >>>           "\x1bexit\r\n",
+      >>>           "\\x1bexit\\r\\n",
       >>>           # command prompt, 'CR[USERNAME@IP]> '... or not, so just
       >>>           # look for 'SOMETHING> '
       >>>           # ^ will not match because we are getting a CR
       >>>           re.compile("[^>]+> ")
       >>>       ),
       >>>       (
-      >>>           "connect serial\r\n",
+      >>>           "connect serial\\r\\n",
       >>>           "To exit serial port connection, type 'ESC exit'."
       >>>       ),
       >>>     ],
@@ -91,16 +93,21 @@ class impl_c(ttbl.tt_interface_impl_c):
       >>>         "Ciphers" : "aes128-cbc,3des-cbc",
       >>>     })
 
-      This is a list of tupples *( SEND, EXPECT )*; *SEND* is a string
-      sent over to the console (unless the empty string; then nothing
-      is sent).  *EXPECT* can be anything that can be fed to Python's
-      Expect :meth:`expect <pexpect.spawn.expect>` function:
+      This list a list of:
 
-      - a string
+      - tupples *( SECONDS, COMMENT )*: wait SECONDs, printing COMMENT
+        in the logs
 
-      - a compiled regular expression
+      - tupples *( SEND, EXPECT )*; *SEND* is a string
+        sent over to the console (unless the empty string; then nothing
+        is sent).  *EXPECT* can be anything that can be fed to Python's
+        Expect :meth:`expect <pexpect.spawn.expect>` function:
 
-      - a list of such
+        - a string
+
+        - a compiled regular expression
+
+        - a list of such
 
       The timeout for each expectation is hardcoded to five seconds
       (FIXME).
@@ -111,8 +118,19 @@ class impl_c(ttbl.tt_interface_impl_c):
 
     :param int command_timeout: (optional) number of seconds to wait
       for a response ot a command before declaring a timeout
+
+    :param str crlf: (optional; default *None*) newline convention for
+      this console; this is informational for the clients, to know which
+      string they need to use as end of line; the only practical
+      choices are:
+
+      - ``\\r``: one carriage return
+      - ``\\n``: one new line
+      - ``\\r\\n``: one carriage return followed by a new line
+
     """
-    def __init__(self, command_sequence = None, command_timeout = 5):
+    def __init__(self, command_sequence = None, command_timeout = 5,
+                 crlf = '\r'):
         assert command_sequence == None \
             or isinstance(command_sequence, list), \
             "command_sequence: expected list of tuples; got %s" \
@@ -121,7 +139,21 @@ class impl_c(ttbl.tt_interface_impl_c):
         self.command_sequence = command_sequence
         self.command_timeout = command_timeout
         self.parameters = {}
+        assert crlf == None or isinstance(crlf, basestring), \
+            "console implementation declares CRLF with" \
+            " a type %s; expected string" % type(crlf)
         ttbl.tt_interface_impl_c.__init__(self)
+        #: Check if the implementation's link died and it has to be
+        #: re-enabled
+        #:
+        #: Some implementations of console die because their
+        #: connections get killed outside of the implementation's
+        #: control. Setting this to True allows the console code to
+        #: periodically when reading so that if the implementation
+        #: reports is disabled because the link died but it should be
+        #: enabled, it will be automatically re-enabled.
+        self.re_enable_if_dead = False
+        self.crlf = crlf
 
     class exception(Exception):
         """
@@ -149,7 +181,7 @@ class impl_c(ttbl.tt_interface_impl_c):
                                 " for enabling failed" % component)
                 self.disable(target, component)
                 raise
-        target.property_set("console-" + component + ".state", "enabled")
+        target.property_set("interfaces.console." + component + ".state", True)
 
     def disable(self, target, component):
         """
@@ -158,7 +190,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         :param str console: (optional) console to disable; if missing,
           the default one.
         """
-        target.property_set("console-" + component + ".state", None)
+        target.property_set("interfaces.console." + component + ".state", False)
 
     def state(self, target, component):
         """
@@ -221,7 +253,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         :returns: number of bytes read from the console since the last
           power up.
         """
-        raise NotImplementedError("%s/%s: console control not implemented"
+        raise NotImplementedError("%s/%s: console size not implemented"
                                   % (target.id, component))
 
     def write(self, target, component, data):
@@ -255,21 +287,21 @@ class impl_c(ttbl.tt_interface_impl_c):
                              % (console, expect.after))
 
     def _response(self, target, console, expect, response, timeout,
-                  response_str):
+                  response_str, count):
         ts0 = time.time()
         ts = ts0
         while ts - ts0 < timeout:
             try:
                 r = expect.expect(response, timeout = timeout - (ts - ts0))
                 ts = time.time()
-                target.log.error("%s: found response: [+%.1fs] #%s: %s"
-                                 % (console, ts - ts0, r, response_str))
+                target.log.info("%s: found response: [+%.1fs] #%d r %s: %s"
+                                % (console, ts - ts0, count, r, response_str))
                 return
             except pexpect_TIMEOUT as e:
                 self._log_expect_error(target, console, expect, "timeout")
-                raise self.timeout_e(
-                    "%s: timeout [+%.1fs] waiting for response: %s"
-                    % (console, timeout, response_str))
+                # let's try again, if we full timeout, it will be raised below
+                time.sleep(0.5)
+                continue
             except pexpect_EOF as e:
                 ts = time.time()
                 offset = os.lseek(expect.fileno(), 0, os.SEEK_CUR)
@@ -302,9 +334,16 @@ class impl_c(ttbl.tt_interface_impl_c):
             fcntl.fcntl(rfd, fcntl.F_SETFL, flag | os.O_NONBLOCK)
             expect = pexpect.fdpexpect.fdspawn(rf, logfile = logf,
                                                timeout = timeout)
+            count = 0
             for command, response in self.command_sequence:
+                if isinstance(command, (int, float)):
+                    target.log.info("%s: waiting %ss for '%s'"
+                                    % (component, command, response))
+                    time.sleep(command)
+                    count += 1
+                    continue
                 if command:
-                    target.log.debug(
+                    target.log.info(
                         "%s: writing command: %s"
                         % (component, command.encode('unicode-escape',
                                                      errors = 'replace')))
@@ -317,7 +356,9 @@ class impl_c(ttbl.tt_interface_impl_c):
                     target.log.debug("%s: expecting response: %s"
                                      % (component, response_str))
                     self._response(target, component,
-                                   expect, response, timeout, response_str)
+                                   expect, response, timeout, response_str,
+                                   count)
+                count += 1
         # now that the handshake has been done, kill whatever has been
         # read for it so we don't confuse it as console input
         with codecs.open(read_file_name, "w", encoding = 'utf-8') as rf:
@@ -329,7 +370,7 @@ class interface(ttbl.tt_interface):
     An instance of this gets added as an object to the target object
     with:
 
-    >>> ttbl.config.targets['qu05a'].interface_add(
+    >>> ttbl.test_target.get('qu05a').interface_add(
     >>>     "console",
     >>>     ttbl.console.interface(
     >>>         ttyS0 = ttbl.console.serial_device("/dev/ttyS5")
@@ -348,12 +389,15 @@ class interface(ttbl.tt_interface):
       Names have to be valid python symbol names following the
       following convention:
 
-      - *serial\**  RS-232C compatible physical Serial port
-      - *sol\**     IPMI Serial-Over-Lan
-      - *ssh\**     SSH session (may require setup before enabling)
+      - *serial\**: RS-232C compatible physical Serial port
+      - *sol\**: IPMI Serial-Over-Lan
+      - *ssh\**: SSH session (may require setup before enabling and
+        *enabling* before using)
 
     A *default* console is set by declaring an alias as in the example
-    above; however, a preferred console
+    above; otherwise the first one listed in
+    target.console.impls.keys() is considered the default. A
+    *preferred* console is the one that has *preferred* as an alias.
 
     This interface:
 
@@ -378,14 +422,32 @@ class interface(ttbl.tt_interface):
         # the implementations for the console need to be of type impl_c
         self.impls_set(impls, kwimpls, impl_c)
 
+    def _pre_off_disable_all(self, target):
+        for console, impl in self.impls.iteritems():
+            target.log.info("%s: disabling console before powering off",
+                            console)
+            impl.disable(target, console)
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         # Called when the interface is added to a target to initialize
         # the needed target aspect (such as adding tags/metadata)
-        target.tags_update(dict(consoles = self.impls.keys()))
-        target.properties_user.add("console-default")
-        target.properties_keep_on_release.add("console-default")
-        self.instrumentation_publish(target, "console")
+        target.properties_user.add("interfaces.console.default")
+        target.properties_keep_on_release.add("interfaces.console.default")
+        # When the target is powered off, disable the consoles -- why?
+        # because things like consoles over SSH will stop working, no
+        # matter what, and we want it to fail early and not seem there
+        # is something odd.
+        target.power_off_pre_fns.append(self._pre_off_disable_all)
+        for console, impl in self.impls.iteritems():
+            if impl.crlf:
+                # if it declares a CRLF string, publish it
+                assert isinstance(impl.crlf, basestring), \
+                    "%s: target declares CRLF for console %s with" \
+                    " a type %s; expected string" % (
+                        target.id, console, type(impl.crlf))
+                target.fsdb.set("interfaces.console." + console + ".crlf",
+                                impl.crlf)
+
 
     def _release_hook(self, target, _force):
         # nothing to do on target release
@@ -400,11 +462,49 @@ class interface(ttbl.tt_interface):
         parameters['real_name'] = component
         return dict(result = parameters)
 
+    def get_default_name(self, target):
+        """
+        Returns the name of the default console
+
+        The default console is defined as:
+
+        - the name of an existing console in a tag called
+          *console-default*
+
+        - the name of a console called *default*
+
+        - the first console defined
+
+        :param ttbl.test_target target: target on which to find the
+          default console's name
+
+        :returns str: the name of the default console
+        :raises: *RuntimeError* if there are no consoles
+        """
+        console_default = target.property_get("interfaces.console.default", None)
+        try:
+            _impl, name = self.impl_get_by_name(console_default, "console")
+            return default
+        except IndexError:
+            # invalid default, reset it
+            console_default = target.property_set("interfaces.console.default", None)
+            # fallthrough
+        _impl, name = self.arg_impl_get("default", "console", True)
+        if name:
+            return name
+        consoles = self.impls.keys()
+        if not consoles:
+            raise RuntimeError("%s: there are no consoles, can't find default"
+                               % target.id)
+        return consoles[0]
+
     def put_setup(self, target, who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         parameters = dict()
-        for k, v in args.iteritems():
-            parameters[k] = v
+        for k in args.keys():
+            # get the argument with arg_get, since some of it might be
+            # JSON encoded
+            parameters[k] = self.arg_get(args, k, arg_type = None)
         if 'ticket' in parameters:
             del parameters['ticket']
         del parameters['component']
@@ -437,7 +537,7 @@ class interface(ttbl.tt_interface):
             if state:
                 impl.disable(target, component)
             return dict()
-    
+
     def get_state(self, target, _who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         state = impl.state(target, component)
@@ -445,12 +545,44 @@ class interface(ttbl.tt_interface):
                                 component, "console.state")
         return dict(result = state)
 
+    @staticmethod
+    def _maybe_re_enable(target, component, impl):
+        # Some implementations have the bad habit of dying for no good
+        # reason:
+        #
+        #  - IPMIs SOLs close the connections
+        #  - ssh tunnels get killed without timing out
+        #  - dog eat the homework
+        #
+        # and there is nothing we can do about it but just try to
+        # restart it if it reports disabled (because the link is dead)
+        # but we recorded it shall be enabled (because the property
+        # console-COMPONENT.state is True)
+        if impl.re_enable_if_dead == False:
+            return False
+        shall_be_enabled = target.property_get("interfaces.console." + component + ".state", None)
+        is_enabled = impl.state(target, component)
+        if shall_be_enabled and is_enabled == False:
+            # so it died, let's re-enable and retry
+            target.log.warning("%s: console disabled on its own, re-enabling"
+                               % component)
+            impl.enable(target, component)
+            return True
+        return False
+
     def get_read(self, target, who, args, _files, _user_path):
         impl, component = self.arg_impl_get(args, "component")
         offset = int(args.get('offset', 0))
         if target.target_is_owned_and_locked(who):
             target.timestamp()	# only if the reader owns it
-        r =  impl.read(target, component, offset)
+        last_enable_check = target.property_get("interfaces.console." + component + ".check_ts", 0)
+        ts_now = time.time()
+        if ts_now - last_enable_check > 5:
+            # every five secs check if the implementation's link has
+            # been closed and renable it if so
+            self._maybe_re_enable(target, component, impl)
+            target.property_set("interfaces.console." + component + ".check_ts", ts_now)
+        r = impl.read(target, component, offset)
         stream_file = r.get('stream_file', None)
         if stream_file and not os.path.exists(stream_file):
             # no file yet, no console output
@@ -472,12 +604,23 @@ class interface(ttbl.tt_interface):
         impl, component = self.arg_impl_get(args, "component")
         with target.target_owned_and_locked(who):
             target.timestamp()
-            impl.write(target, component,
-                       self._arg_get(args, 'data'))
-            return {}    
+            while True:
+                try:
+                    impl.write(target, component,
+                               self.arg_get(args, 'data', basestring, False))
+                    break
+                except OSError:
+                    # sometimes many of these errors happen because the
+                    # implementation dies -- for IPMIs SOL, for example,
+                    # the other end closes the connection, so we try to
+                    # restart it
+                    if self._maybe_re_enable(target, component, impl):
+                        continue
+                    raise
+            return {}
 
 def generation_set(target, console):
-    target.fsdb.set("console-" + console + ".generation",
+    target.fsdb.set("interfaces.console." + console + ".generation",
                     # trunc the time and make it a string
                     str(int(time.time())))
 
@@ -518,7 +661,7 @@ class generic_c(impl_c):
       If given, this is a dictionary of characters to strings, eg:
 
       >>> escape_chars = {
-      >>>   '\x1b': '\x1b',
+      >>>   '\\x1b': '\\x1b',
       >>>   '~': '\\',
       >>> }
 
@@ -529,14 +672,16 @@ class generic_c(impl_c):
 
     """
     def __init__(self, chunk_size = 0, interchunk_wait = 0.2,
-                 command_sequence = None, escape_chars = None):
+                 command_sequence = None, escape_chars = None,
+                 crlf = '\r'):
         assert chunk_size >= 0
         assert interchunk_wait > 0
         assert escape_chars == None or isinstance(escape_chars, dict)
 
         self.chunk_size = chunk_size
         self.interchunk_wait = interchunk_wait
-        impl_c.__init__(self, command_sequence = command_sequence)
+        impl_c.__init__(self, command_sequence = command_sequence,
+                        crlf = crlf)
         if escape_chars == None:
             self.escape_chars = {}
         else:
@@ -555,7 +700,7 @@ class generic_c(impl_c):
             stream_file = os.path.join(target.state_dir,
                                        "console-%s.read" % component),
             stream_generation = target.fsdb.get(
-                "console-%s.generation" % component, 0),
+                "interfaces.console." + component + ".generation", 0),
             stream_offset = offset
         )
 
@@ -584,7 +729,7 @@ class generic_c(impl_c):
         return _data
 
 
-    
+
     def _write(self, fd, data):
         if self.escape_chars:
             data = self._escape(data)
@@ -606,7 +751,7 @@ class generic_c(impl_c):
                 left -= _chunk_size
         else:
             os.write(fd, data)
-    
+
     def write(self, target, component, data):
         file_name = os.path.join(target.state_dir,
                                  "console-%s.write" % component)
@@ -670,14 +815,14 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
 
     >>> serial0_pc = ttbl.console.serial_pc(console_file_name)
     >>>
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "power",
     >>>     ttbl.power.interface(
     >>>         ...
     >>>         serial0_pc,
     >>>         ...
     >>>     )
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "console",
     >>>     ttbl.console.interface(
     >>>         serial0 = serial0_pc,
@@ -699,7 +844,14 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
             "PTY,link=console-%(component)s.write,rawer"
             "!!CREATE:console-%(component)s.read",
             "%s,creat=0,rawer,b115200,parenb=0,cs8,bs1" % serial_file_name)
-
+        self.upid_set("RS-232C serial port @%s" % serial_file_name,
+                      name = "RS-232C serial port",
+                      baud_rate = 115200,
+                      data_bits = 8,
+                      stop_bits = 1,
+                      serial_port = serial_file_name,
+        )
+        
     # console interface; state() is implemented by generic_c
     def on(self, target, component):
         ttbl.power.socat_pc.on(self, target, component)
@@ -716,6 +868,14 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
     def disable(self, target, component):
         return self.off(target, component)
 
+    def state(self, target, component):
+        # we want to use this to gather state, since the generic_c
+        # implementation relies on the console-NAME.write file
+        # existing; this can linger if a process dies or not...
+        # but the ttbl.power.socat_pc.get() implementation checks if
+        # the process is alive looking at the PIDFILE
+        # COMPONENT-socat.pid and verifying that thing is still running
+        return ttbl.power.socat_pc.get(self, target, component)
 
 class ssh_pc(ttbl.power.socat_pc, generic_c):
     """Implement a serial port over an SSH connection
@@ -748,7 +908,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
 
       Note they all have to be strings; e.g.:
 
-      >>> serial0_pc = ttbl.console.ssh_pc(
+      >>> ssh0_pc = ttbl.console.ssh_pc(
       >>>     "USER:PASSWORD@HOSTNAME",
       >>>     extra_opts = {
       >>>         "Ciphers": "aes128-cbc,3des-cbc",
@@ -760,18 +920,20 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
     See :class:`generic_c` for descriptions on *chunk_size* and
     *interchunk_wait*, :class:`impl_c` for *command_sequence*.
 
+    Other parameters as to :class:ttbl.console.generic_c
+
     For example:
 
     >>> ssh0_pc = ttbl.console.ssh_pc("USERNAME:PASSWORD@HOSTNAME")
     >>>
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "power",
     >>>     ttbl.power.interface(
     >>>         ...
     >>>         ssh0_pc,
     >>>         ...
     >>>     )
-    >>> ttbl.config.targets[name].interface_add(
+    >>> ttbl.test_target.get(name).interface_add(
     >>>     "console",
     >>>     ttbl.console.interface(
     >>>         ssh0 = ssh0_pc,
@@ -782,9 +944,10 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
      - pass password via agent? file descriptor?
 
     """
-    def __init__(self, hostname, port = 22,
+    def __init__(self, hostname, port = 22, crlf = '\r',
                  chunk_size = 0, interchunk_wait = 0.1,
-                 extra_opts = None, command_sequence = None):
+                 extra_opts = None, command_sequence = None,
+                 **kwargs):
         assert isinstance(hostname, basestring)
         assert port > 0
         assert extra_opts == None \
@@ -797,7 +960,8 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
         generic_c.__init__(self,
                            chunk_size = chunk_size,
                            interchunk_wait = interchunk_wait,
-                           command_sequence = command_sequence)
+                           command_sequence = command_sequence,
+                           crlf = crlf, **kwargs)
         ttbl.power.socat_pc.__init__(
             self,
             "PTY,link=console-%(component)s.write,rawer"
@@ -836,8 +1000,13 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
             if self.extra_opts:
                 for k, v in self.extra_opts.items():
                     _extra_opts += "%s = %s\n" % (k, v)
+            # CheckHostIP=no and StrictHostKeyChecking=no are needed
+            # because we'll change IPs and reformat a lot, so we dont'
+            # really care for the signature.
+            # that's also why we just send the known hosts files to null
             cf.write("""\
-UserKnownHostsFile = %s/%s-ssh-known_hosts
+UserKnownHostsFile = /dev/null
+CheckHostIP = no
 StrictHostKeyChecking = no
 ServerAliveCountMax = 20
 ServerAliveInterval = 10
@@ -845,7 +1014,21 @@ TCPKeepAlive = yes
 ForwardX11 = no
 ForwardAgent = no
 EscapeChar = none
-%s""" % (target.state_dir, component, _extra_opts))
+%s""" % _extra_opts)
+        ssh_user = target.fsdb.get(
+            "interfaces.console." + component + ".parameter_user", None)
+        ssh_port = target.fsdb.get(
+            "interfaces.console." + component + ".parameter_port", None)
+        ssh_password = target.fsdb.get(
+            "interfaces.console." + component + ".parameter_password", None)
+        # FIXME: validate port, username basic format
+        if ssh_user:
+            self.kws['username'] = ssh_user
+        if ssh_port:
+            self.kws['port'] = ssh_port
+        if ssh_password:
+            # if one was specified, use it
+            self.env_add['SSHPASS'] = ssh_password
         ttbl.power.socat_pc.on(self, target, component)
         generation_set(target, component)
         generic_c.enable(self, target, component)
@@ -854,14 +1037,18 @@ EscapeChar = none
         generic_c.disable(self, target, component)
         ttbl.power.socat_pc.off(self, target, component)
 
-    # console interface; state() is implemented by generic_c
+    # console interface
     def setup(self, target, component, parameters):
+        # For SSH, all the paremeters are in FSDB
         if parameters == {}:		# reset
-            self.parameters = dict(self.parameters_default)
-                # SSHPASS always has to be defined
-            self.env_add['SSHPASS'] = self.password if self.password else ""
-            self.kws['username'] = self.parameters['user']
-            return dict(result = self.parameters)
+            # wipe existing parameters
+            for param_key in target.fsdb.keys("interfaces.console."
+                                              + component + ".parameter_*"):
+                target.fsdb.set(param_key, None, True)
+            for key, value in self.parameters_default.iteritems():
+                target.fsdb.set("interfaces.console."
+                                + component + ".parameter_" + key, value, True)
+            return {}
 
         # things we allow
         allowed_keys = [ 'user', 'password' ]
@@ -877,17 +1064,244 @@ EscapeChar = none
 
         # ok, all verify, let's set it
         for key, value in parameters.iteritems():
-            if key == 'user':
-                self.kws['username'] = value
-            elif key == 'password':
-                # SSHPASS always has to be defined
-                self.env_add['SSHPASS'] = value if value else ""
-            else:
-                self.parameters[key] = value
-        return dict(result = self.parameters)
+            target.fsdb.set("interfaces.console."
+                            + component + ".parameter_" + key, value, True)
+        return {}
 
     def enable(self, target, component):
         self.on(target, component)
 
     def disable(self, target, component):
         return self.off(target, component)
+
+    def state(self, target, component):
+        # we want to use this to gather state, since the generic_c
+        # implementation relies on the console-NAME.write file
+        # existing; this can linger if a process dies or not...
+        # but the ttbl.power.socat_pc.get() implementation checks if
+        # the process is alive looking at the PIDFILE
+        # COMPONENT-socat.pid and verifying that thing is still running
+        return ttbl.power.socat_pc.get(self, target, component)
+
+
+class netconsole_pc(ttbl.power.socat_pc, generic_c):
+    """Receive Linux's netconsole data over a console
+
+    The linux kernel can forward kernel messages over IP as soon as
+    the network is initialized, which this driver can pick up and
+    register. The target's kernel needs to be configured to output its
+    netconsole to the server's IP, matching the port given to this
+    driver; for example, the kernel command line::
+
+      netconsole=@/,6666@192.168.98.1
+
+    or as a module (see other methods `here
+    <https://www.kernel.org/doc/Documentation/networking/netconsole.txt>`_)::
+
+      # modprobe netconsole netconsole=@/,6666@192.168.98.1
+
+    will send netconsole output to *UDP:192.168.98.1:666*
+
+    The driver implements two interfaces:
+
+    - power interface: to start a console record as soon as the target
+      is powered on. Anything read from the console is written to file
+      *console-NAME.read* file.
+
+      The power interface is implemented by subclassing
+      :class:`ttbl.power.socat_pc`, which starts *socat* as daemon to
+      serve as a data recorder.
+
+    - console interface: interacts with the console interface by
+      exposing the data recorded in the file *console-NAME.read* file.
+      Writing is not supported, since *netconsole* is read only.
+
+    :params str ip_addr: (optional) IP address or hostname of the
+      target.
+
+    :params int port: (optional) port number to which to receive;
+      defaults to *6666* (netconsole's default).
+
+    For example, create a serial port recoder power control / console
+    driver and insert it into the power rail and the console of a
+    target:
+
+    target.console.impl_add("netconsole0", netconsole_pc())
+    >>> netconsole_pc = ttbl.console.netconsole_c("192.168.98.2")
+    >>>
+    >>> ttbl.test_target.get(name).interface_add(
+    >>>     "power",
+    >>>     ttbl.power.interface(
+    >>>         ...
+    >>>         ( "netconsole", netconsole_pc, )
+    >>>         ...
+    >>>     )
+    >>> ttbl.test_target.get(name).interface_add(
+    >>>     "console",
+    >>>     ttbl.console.interface(
+    >>>         ...
+    >>>         netconsole = netconsole_pc,
+    >>>         ...
+    >>>     )
+    >>> )
+
+    """
+    def __init__(self, ip_addr, port = 6666):
+        assert isinstance(port, numbers.Integer)
+        generic_c.__init__(self)
+        ttbl.power.socat_pc.__init__(
+            self,
+            # fork?
+            "UDP-LISTEN:%d,range=%s" % (port, ip_addr),
+            "CREATE:console-%(component)s.read",
+            extra_cmdline = [ "-u" ])	# unidirectional, UDP:6666 -> file
+
+    def on(self, target, component):
+        ttbl.power.socat_pc.on(self, target, component)
+        generation_set(target, component)
+        generic_c.enable(self, target, component)
+
+    def off(self, target, component):
+        generic_c.disable(self, target, component)
+        ttbl.power.socat_pc.off(self, target, component)
+
+    # console interface)
+    def write(self, target, component, data):
+        raise RuntimeError("%s: (net)console is read only" % component)
+
+    def enable(self, target, component):
+        self.on(target, component)
+
+    def disable(self, target, component):
+        return self.off(target, component)
+
+    def state(self, target, component):
+        # we want to use this to gather state, since the generic_c
+        # implementation relies on the console-NAME.write file
+        # existing; this can linger if a process dies or not...
+        # but the ttbl.power.socat_pc.get() implementation checks if
+        # the process is alive looking at the PIDFILE
+        # COMPONENT-socat.pid and verifying that thing is still running
+        return ttbl.power.socat_pc.get(self, target, component)
+
+
+class logfile_c(impl_c):
+    """
+    A console that streams a logfile in the server
+
+    :params str logfile_name: Name of the log file to stream; if
+      relative, this file must be present in the target's state
+      directory. If absolute, it can be any file in the file system
+      the daemon has access to.
+
+      .. warning:: Make sure publishing the log file does not open
+                   users to internals from the system's operation
+
+    This console can be read from but not written; the driver makes a
+    weak attempt at deciding if the file has been removed and
+    recreated by looking at the size. See the discussion on
+    generations in :class:ttbl.console.impl_c.
+
+    This console will report it is disabled if the file is not
+    present, enabled otherwise. Attempts to enable it at will be
+    ignored; disabling it removes the logfile.
+
+    >>> target.console.impl_add(
+    >>>     "debugger_log",
+    >>>     ttbl.console.logfile_c("debugger.log")
+    >>> )
+
+    """
+    def __init__(self, logfile_name, **kwargs):
+        assert isinstance(logfile_name, basestring)
+        impl_c.__init__(self, **kwargs)
+        self.logfile_name = logfile_name
+
+    # console interface)
+    def _size(self, target, component, file_name):
+        # read the file; however, let's do a basic attempt at
+        # detecting if it has been removed and created new  since the
+        # last time we read it -- ideally we'd use the creation time,
+        # but Linux keeps not.
+        # If the file's size is smaller than the last file_size we
+        # recorded, then we assume is a new file and thus set a new
+        # generation.
+        # This might work because most people reading it will be
+        # reading in a loop so the likelyhood of changes detected
+        # comes up.
+        try:
+            s = os.stat(file_name)
+            last_size = target.fsdb.get(
+                "interfaces.console." + component + ".last_size", 0)
+            if s.st_size > 0 and s.st_size < last_size:
+                generation_set(target, component)
+                target.fsdb.set("interfaces.console." + component + ".last_size",
+                                s.st_size)
+            return s.st_size
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            return None		# API way for saying "disabled"
+
+    def size(self, target, component):
+        if not os.path.isabs(self.logfile_name):
+            file_name = os.path.join(target.state_dir, self.logfile_name)
+        else:
+            file_name = self.logfile_name
+        return self._size(target, component, file_name)
+    
+    def read(self, target, component, offset):
+        # read the file; however, let's do a basic attempt at
+        # detecting if it has been removed and created new  since the
+        # last time we read it -- ideally we'd use the creation time,
+        # but Linux keeps not.
+        # If the file's size is smaller than the last file_size we
+        # recorded, then we assume is a new file and thus set a new
+        # generation.
+        # This might work because most people reading it will be
+        # reading in a loop so the likelyhood of changes detected
+        # comes up.
+        if not os.path.isabs(self.logfile_name):
+            file_name = os.path.join(target.state_dir, self.logfile_name)
+        else:
+            file_name = self.logfile_name
+        size = self._size(target, component, file_name)
+        if size == None:
+            return dict(
+                stream_file = "/dev/null",
+                stream_generation = 0,
+                stream_offset = 0
+            )
+        return dict(
+            stream_file = file_name,
+            stream_generation = target.fsdb.get(
+                "interfaces.console." + component + ".generation", 0),
+            stream_offset = offset
+        )
+
+    @staticmethod
+    def write(_target, component, _data):
+        raise RuntimeError("%s: logfile console is read only" % component)
+
+    def enable(self, _target, _component):
+        pass
+
+    def disable(self, target, _component):
+        if not os.path.isabs(self.logfile_name):
+            file_name = os.path.join(target.state_dir, self.logfile_name)
+        else:
+            file_name = self.logfile_name
+        try:
+            os.unlink(file_name)
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            # ok, it was already disabled
+
+    # power and console interface
+    def state(self, target, component):
+        if not os.path.isabs(self.logfile_name):
+            file_name = os.path.join(target.state_dir, self.logfile_name)
+        else:
+            file_name = self.logfile_name
+        return self._size(target, component, file_name) != None

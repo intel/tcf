@@ -142,8 +142,8 @@ if [ -z "$image_type" ]; then
             image_type=yocto;;
         Fedora-*)
             image_type=fedora;;
-        *rootfs.wic)
-            image_type=rootfswic;;
+        *raspbian*img)
+            image_type=raspbian;;
 
         *)
             error Unknown image type for $image_file
@@ -174,6 +174,10 @@ case "$image_type" in
         root_part=p${ROOT_PARTITION:-1}
         ;;
     rootfswic)
+        boot_part=p${BOOT_PARTITION:-1}
+        root_part=p${ROOT_PARTITION:-2}
+        ;;
+    raspbian)
         boot_part=p${BOOT_PARTITION:-1}
         root_part=p${ROOT_PARTITION:-2}
         ;;
@@ -336,7 +340,7 @@ elif [ $image_type == rootfsimage ]; then
 else
 
     sudo mount ${loop_dev}${root_part} $tmpdir/root
-    info mounted ${loop_dev}${root_part} in $tmpdir/root XX2
+    info mounted ${loop_dev}${root_part} in $tmpdir/root
     # do this after mounting works better, sometimes fails otherwise
     root_fstype=$(lsblk -n -o fstype ${loop_dev}${root_part})
     mounted_dirs="$tmpdir/root ${mounted_dirs:-}"
@@ -462,6 +466,8 @@ done
 
 for file in $destdir/etc/pam.d/* $destdir/usr/share/pam.d/*; do
     [ -f $file ] || continue
+    info "$file: allowing login to accounts with no password (replacing 'nullok_secure')"
+    sudo sed -i 's/nullok_secure/nullok/g' $file
     grep -q "pam_unix.so.*nullok" $file && continue
     # Some distros configure PAM to disallow passwordless root; we
     # change that so automation doesn't have to work through so many
@@ -490,7 +496,7 @@ case $image_type in
 InitialSetupEnable=false
 EOF
             info $image_type: disabled GNOME initial setup
-            selinux_relabel["/etc/gdm3/custom.conf"]=1
+            selinux_relabel["etc/gdm3/custom.conf"]=1
         fi
         ;;
     fedoralive|qcow2)
@@ -500,12 +506,43 @@ EOF
 InitialSetupEnable=false
 EOF
             info $image_type: disabled GNOME initial setup
-            selinux_relabe["/etc/gdm/custom.conf"]=1
+            selinux_relabel["etc/gdm/custom.conf"]=1
         fi
         ;;
     *)
         ;;
 esac
+
+
+case $image_type in
+    raspbian)
+        # allow root passwordless login--raspberry Pi defaults to ssh0
+        # console, not serial
+        sudo mkdir -p $destdir/etc/ssh
+        sudo tee -a $destdir/etc/ssh/sshd_config > /dev/null <<EOF
+PermitRootLogin yes
+PermitEmptyPasswords yes
+EOF
+        for v in rsa ecdsa ed25519; do
+            sudo rm -f $destdir/etc/ssh/ssh_host_${v}_key
+            sudo ssh-keygen -q -f $destdir/etc/ssh/ssh_host_${v}_key -t $v -C '' -N ''
+        done
+        sudo ln -sf /lib/systemd/system/ssh.service $destdir/etc/systemd/system/multi-user.target.wants
+        ;;
+    *)
+        ;;
+esac
+
+# Boot stuff
+if echo $image_type | grep -q 'clear'; then
+    if [ -r $destdir/boot/loader/entries/iso-checksum.conf ]; then
+        # we do not use this file when booting and it is confusing the
+        # bootloader configurer in
+        # tcf.git/tcfl/pos_uefi.py:_linux_boot_guess_from_lecs()
+        sudo mv $destdir/boot/loader/entries/iso-checksum.conf \
+           $destdir/boot/loader/entries/iso-checksum.conf.disabled
+    fi
+fi
 
 
 #
@@ -651,6 +688,22 @@ EOF
     selinux_relabel["etc/fstab"]=1
 fi
 
+# Similar, but mainly for raspbian
+if [ $image_type == raspbian ] \
+       && test -r $destdir/etc/fstab \
+       && grep -q "^PARTUUID=" $destdir/etc/fstab; then
+    # rootfs on UUID; generate a command in the metdata file to
+    # runtime replace the UUID with the one of our rootfs
+    info "fstab: replacing PARTUUIDs for / and /boot [ setup script will fixup ]"
+    cat >> $md <<EOF
+  sed -i \\
+      -e "s|^PARTUUID=[-0-9a-fA-F]\+\s\+/boot\s\+|/dev/mmcblk0p1\t/boot\t|" \\
+      -e "s|^PARTUUID=[-0-9a-fA-F]\+\s\+/\s\+|/dev/mmcblk0p2\t/\t|" \\
+      etc/fstab
+EOF
+    selinux_relabel["etc/fstab"]=1
+fi
+
 if test -r $destdir/etc/fstab && grep -q UUID= $destdir/etc/fstab; then
     # aah...UUID based filesystems need love
     # - swap file systems, we know we'll create a swap partition labeled
@@ -769,6 +822,7 @@ fi
 
 sudo mv $tmpdir/.tcf.metadata.yaml $destdir
 
+# extra setup functions
 for setup in ${setupl}; do
     $setup $destdir
 done

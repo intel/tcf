@@ -6,15 +6,22 @@
 #
 # pylint: disable = missing-docstring
 
-import ttbl.power
-import pysnmp.entity.rfc3413.oneliner.cmdgen
-import pysnmp.proto.rfc1902
+import sys
 
-class pci(ttbl.power.impl_c):
+import ttbl.power
+try:
+    import pysnmp.entity.rfc3413.oneliner.cmdgen
+    import pysnmp.proto.rfc1902
+except ImportError as e:
+    # if building doc, it's ok not to have the dependencies
+    if 'sphinx.cmd' not in sys.modules:
+        raise
+
+class pc(ttbl.power.impl_c):
     """
     Power control driver for APC PDUs using SNMP
 
-    This is a very hackish implementation that attempts to reuqire the
+    This is a very hackish implementation that attempts to require the
     least setup possible. It hardcodes the OIDs and MIBs because APC's
     MIBs are not publicly available and the setup
     becomes...complicated (please contribute a better one if you can help)
@@ -24,7 +31,7 @@ class pci(ttbl.power.impl_c):
     >>> import ttbl.apc
     >>>
     >>> ...
-    >>>     ttbl.apc.pci("HOSTNAME", 4)
+    >>>     ttbl.apc.pc("HOSTNAME", 4)
     >>>
 
     for doing power control on APC PDU *HOSTNAME* on outlet *4*.
@@ -33,6 +40,7 @@ class pci(ttbl.power.impl_c):
     :param str outlet: number of the outlet to control
     :param str oid: (optional) Base SNMP OID for the unit. To find it,
 
+    Other parameters as to :class:ttbl.power.impl_c.
 
     Tested with:
 
@@ -107,8 +115,8 @@ class pci(ttbl.power.impl_c):
     #: the last digit is the outlet number, 1..N.
     pdu_outlet_ctl_prefix = [ 4, 2, 1, 3 ]
 
-    def __init__(self, hostname, outlet, oid = None):
-        ttbl.power.impl_c.__init__(self)
+    def __init__(self, hostname, outlet, oid = None, **kwargs):
+        ttbl.power.impl_c.__init__(self, **kwargs)
         self._community = pysnmp.entity.rfc3413.oneliner.cmdgen.CommunityData('private')
         self._destination = pysnmp.entity.rfc3413.oneliner.cmdgen.UdpTransportTarget((hostname, 161))
         self.outlets = self._outlet_count()
@@ -120,6 +128,7 @@ class pci(ttbl.power.impl_c):
             "outlet number '%s' invalid or out of range (1-%d)" \
             % (outlet, self.outlets)
         self.pdu_outlet_ctl = self.pdu_outlet_ctl_prefix + [ outlet ]
+        self.upid_set("APC PDU", hostname = hostname, outlet = outlet)
 
     def _outlet_count(self):
         ( _errors, _status, _index, varl ) = \

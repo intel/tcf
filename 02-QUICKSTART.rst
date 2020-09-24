@@ -8,19 +8,29 @@
 
 .. include:: doc/02-client-setup-LL-00.rst
 
-1. Install the client software from source::
+1. Install the client software from source; install Python2
+   development support::
 
-     $ git clone http://github.com/intel/tcf tcf.git
-     $ cd tcf.git
-     $ pip2 install --user -r requirements.txt	# dependencies
-     $ python2 setup.py install --user
+     $ sudo dnf install -y python2-devel python2-pip  # Fedora <= 30
+     $ sudo yum install -y python2-devel python2-pip  # CentOS/RHEL 7
+     $ sudo apt-get update                            # Ubuntu <= 18
+     $ sudo apt install -y python-dev python-pip      # Ubuntu <= 18
+
+   (TCF is still using python2, hence the limitation to older ditros
+   that still support it, we are in the process of porting to Python3;
+   see branch *pyv3*).
+     
+   now clone install Python dependencies and install the TCF client
+
+   .. include:: doc/02-client-setup-LL-02.rst
 
    (see :ref:`installation
    troubleshooting<tcf_client_install_troubleshooting>` for things
    that can go wrong)
 
-   .. note:: Ensure your PATH includes *$HOME/.local/bin*, where *install
-             --user* puts things, by adding to *~/.bashrc*::
+   .. note:: For **Ubuntu** (mostly): ensure your PATH includes
+             *$HOME/.local/bin*, where *install --user* puts things,
+             by adding to *~/.bashrc*::
      
                $ echo 'test -z "${PATH##*$HOME/.local/bin*}" || export PATH=$PATH:$HOME/.local/bin' >> ~/.bashrc
 
@@ -32,13 +42,18 @@
 
    a. You can run *tcf* from the :ref:`source directory
       <tcf_run_from_source_tree>`
+
+   b. You can run it under WSL (Windows Services for Linux), which
+      first has to be :ref:`installed <setup_wsl>`
      
    .. include:: doc/02-client-setup-LL-01.rst
 
-2. :ref:`Configure it <tcf_guide_configuration>`, adding to
-   `~/.tcf/conf_servers.py` or `/etc/tcf/conf_servers.py`::
+2. :ref:`Configure it <tcf_guide_configuration>`, access to remote HW
+   servers, adding to `~/.tcf/conf_servers.py` or
+   `/etc/tcf/conf_servers.py`::
 
      $ mkdir -p ~/.tcf
+     $ vi ~/.tcf/conf_servers.py
    
    .. include:: doc/02-client-setup-LL-03.rst
 

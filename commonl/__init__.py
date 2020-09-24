@@ -20,6 +20,7 @@ Command line and logging helpers
 import argparse
 import base64
 import bisect
+import collections
 import contextlib
 import errno
 import fcntl
@@ -35,6 +36,7 @@ import numbers
 import os
 import random
 import re
+import requests
 import signal
 import socket
 import string
@@ -49,8 +51,12 @@ import time
 import traceback
 import types
 
-import keyring
-import requests
+try:
+    import keyring
+    keyring_available = True
+except ImportError as e:
+    logging.warning("can't import keyring, functionality disabled")
+    keyring_available = False
 
 from . import expr_parser
 
@@ -190,6 +196,10 @@ def logfile_open(tag, cls = None, delete = True, bufsize = 0,
         + clstag + who + "-" + tag,
         suffix = suffix, delete = delete, bufsize = bufsize, dir = directory)
 
+def argparser_add_aka(ap, name, aka):
+    # UGLY, but...
+    ap._name_parser_map[aka] = ap._name_parser_map[name]
+
 class _Action_increase_level(argparse.Action):
     def __init__(self, option_strings, dest, default = None, required = False,
                  nargs = None, **kwargs):
@@ -259,7 +269,6 @@ def mkid(something, l = 10):
     return base64.b32encode(h.digest())[:l].lower()
 
 
-
 def trim_trailing(s, trailer):
     """
     Trim *trailer* from the end of *s* (if present) and return it.
@@ -272,6 +281,22 @@ def trim_trailing(s, trailer):
         return s[:-tl]
     else:
         return s
+
+def verify_str_safe(s, safe_chars = None):
+    """
+    Raise an exception if string contains unsafe chars
+
+    :param str s: string to check
+    :param str safe_chars: (optional) list/set of valid chars
+      (defaults to ASCII letters, digits, - and _)
+    """
+    if safe_chars == None:
+        safe_chars = set('-_' + string.ascii_letters + string.digits)
+    s_set = set(s)
+    s_unsafe = s_set - s_set.intersection(safe_chars)
+    assert not s_unsafe, \
+        "%s: contains invalid characters: %s (valid are: %s)" % (
+            s, "".join(s_unsafe), "".join(safe_chars))
 
 
 def name_make_safe(name, safe_chars = None):
@@ -331,14 +356,19 @@ def request_response_maybe_raise(response):
     if not response:
         try:
             json = response.json()
-            if json != None and 'message' in json:
-                message = json['message']
+            if json != None:
+                if '_message' in json:
+                    message = json['_message']
+                elif 'message' in json:	# COMPAT: older daemons
+                    message = json['message']
+                else:
+                    message = "no specific error text available"
             else:
                 message = "no specific error text available"
         except ValueError as e:
             message = "no specific error text available"
         logging.debug("HTTP Error: %s", response.text)
-        e = requests.HTTPError(
+        e = requests.exceptions.HTTPError(
             "%d: %s" % (response.status_code, message))
         e.status_code = response.status_code
         raise e
@@ -413,7 +443,7 @@ def rm_f(filename):
         if e.errno != errno.ENOENT:
             raise
 
-def makedirs_p(dirname, mode = None):
+def makedirs_p(dirname, mode = None, reason = None):
     """
     Create a directory tree, ignoring an error if it already exists
 
@@ -427,9 +457,13 @@ def makedirs_p(dirname, mode = None):
         # threads and processes.
         if mode:
             os.chmod(dirname, mode)
-    except OSError:
+    except OSError as e:
         if not os.path.isdir(dirname):
-            raise
+            raise RuntimeError("%s: path for %s is not a directory: %s"
+                               % (dirname, reason, e))
+        if not os.access(dirname, os.W_OK):
+            raise RuntimeError("%s: path for %s does not allow writes: %s"
+                               % (dirname, reason, e))
 
 def symlink_f(source, dest):
     """
@@ -1128,11 +1162,19 @@ def password_get(domain, user, password):
     assert isinstance(user, basestring)
     assert password == None or isinstance(password, basestring)
     if password == "KEYRING":
+        if keyring_available == False:
+            raise RuntimeError(
+                "keyring: functionality to load passwords not available,"
+                " please install keyring support")
         password = keyring.get_password(domain, user)
         if password == None:
             raise RuntimeError("keyring: no password for user %s @ %s"
                                % (user, domain))
     elif password and password.startswith("KEYRING:"):
+        if keyring_available == False:
+            raise RuntimeError(
+                "keyring: functionality to load passwords not available,"
+                " please install keyring support")
         _, domain = password.split(":", 1)
         password = keyring.get_password(domain, user)
         if password == None:
@@ -1204,11 +1246,14 @@ def field_needed(field, projections):
         for projection in projections:
             if fnmatch.fnmatch(field, projection):
                 return True	# we need this field
+            # match projection a to fields a.[x.[y.[...]]]
+            if field.startswith(projection + "."):
+                return True
         return False		# we do not need this field
     else:
         return True	# no list, have it
 
-def dict_to_flat(d, projections = None):
+def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
     """
     Convert a nested dictionary to a sorted list of tuples *( KEY, VALUE )*
 
@@ -1218,14 +1263,28 @@ def dict_to_flat(d, projections = None):
     :param dict d: dictionary to convert
     :param list(str) projections: (optional) list of :mod:`fnmatch`
       patterns of flay keys to bring in (default: all)
+    :param bool sort: (optional, default *True*) sort according to KEY
+      name or leave the natural order (needed to keep the order of the
+      dictionaries) -- requires the underlying dict to be a
+      collections.OrderedDict() in older python versions.
     :returns list: sorted list of tuples *KEY, VAL*
 
     """
-
+    assert isinstance(d, collections.Mapping)
     fl = []
 
+    def _add(field_flat, val):
+        if sort:
+            bisect.insort(fl, ( field_flat, val ))
+        else:
+            fl.append(( field_flat, val ))
+
+    # test dictionary emptiness with 'len(d) == 0' vs 'd == {}', since they
+    # could be ordereddicts and stuff
+    
     def __update_recursive(val, field, field_flat, projections = None,
-                           depth_limit = 10, prefix = "  "):
+                           depth_limit = 10, prefix = "  ", sort = True,
+                           empty_dict = False):
         # Merge d into dictionary od with a twist
         #
         # projections is a list of fields to include, if empty, means all
@@ -1237,16 +1296,32 @@ def dict_to_flat(d, projections = None):
         # change it like that and maybe the evaluation can be done before
         # the assignment.
 
-        if field_needed(field_flat, projections):
-            bisect.insort(fl, ( field_flat, val ))
-        elif isinstance(val, dict) and depth_limit > 0:	# dict to dig in
-            for key, value in val.iteritems():
-                __update_recursive(value, key, field_flat + "." + str(key),
-                                   projections, depth_limit - 1,
-                                   prefix = prefix + "    ")
+        if isinstance(val, collections.Mapping):
+            if len(val) == 0 and empty_dict == True and field_needed(field_flat, projections):
+                # append an empty dictionary; do not append VAL --
+                # why? because otherwise it might be modified later by
+                # somebody else and modify our SOURCE dictionary, and
+                # we do not want that.
+                _add(field_flat, dict())
+            elif depth_limit > 0:	# dict to dig in
+                for key, value in val.iteritems():
+                    __update_recursive(value, key, field_flat + "." + str(key),
+                                       projections, depth_limit - 1,
+                                       prefix = prefix + "    ",
+                                       sort = sort, empty_dict = empty_dict)
+        elif field_needed(field_flat, projections):
+            _add(field_flat, val)
 
+    if len(d) == 0 and empty_dict == True:
+        # empty dict, insert it if we want them
+        # append an empty dictionary; do not append VAL --
+        # why? because otherwise it might be modified later by
+        # somebody else and modify our SOURCE dictionary, and
+        # we do not want that.
+        _add(field_flat, dict())
     for key, _val in d.iteritems():
-        __update_recursive(d[key], key, key, projections, 10)
+        __update_recursive(d[key], key, key, projections, 10, sort = sort,
+                           empty_dict = empty_dict)
 
     return fl
 
@@ -1257,9 +1332,9 @@ def _key_rep(r, key, key_flat, val):
         # this key has sublevels, iterate over them
         lhs, rhs = key.split('.', 1)
         if lhs not in r:
-            r[lhs] = {}
+            r[lhs] = collections.OrderedDict()
         elif not isinstance(r[lhs], dict):
-            r[lhs] = {}
+            r[lhs] = collections.OrderedDict()
 
         _key_rep(r[lhs], rhs, key_flat, val)
     else:
@@ -1277,7 +1352,9 @@ def flat_slist_to_dict(fl):
     :return dict: nested dictionary as described by the flat space of
       keys and values
     """
-    tr = {}
+    # maintain the order in which we add things, we depend on this for
+    # multiple things later on
+    tr = collections.OrderedDict()
     for key, val in fl:
         _key_rep(tr, key, key, val)
     return tr
@@ -1368,10 +1445,15 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
       [3]: <open file '<stdout>', mode 'w' at 0x7f13ba2861e0>
 
     - in a list/set/tuple, each item is printed prefixing *[INDEX]*
+
     - in a dictionary, each item is prefixed with it's key
+
     - strings and cardinals are printed as such
+
     - others are printed as what their representation as a string produces
+
     - if an attachment is a generator, it is iterated to gather the data.
+
     - if an attachment is of :class:generator_factory_c, the method
       for creating the generator is called and then the generator
       iterated to gather the data.
@@ -1379,11 +1461,15 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
     See also :func:`data_dump_recursive_tls`
 
     :param d: data to print
+
     :param str prefix: prefix to start with (defaults to nothing)
+
     :param str separator: used to separate dictionary keys from the
       prefix (defaults to ".")
-    :param FILE of: output stream where to print (defaults to
+
+    :param :python:file of: output stream where to print (defaults to
       *sys.stdout*)
+
     :param int depth_limit: maximum nesting levels to go deep in the
       data structure (defaults to 10)
     """
@@ -1445,7 +1531,7 @@ def data_dump_recursive_tls(d, tls, separator = u".", of = sys.stdout,
     Parameters are as documented in :func:`data_dump_recursive`,
     except for:
 
-    :param thread._local tls: thread local storage to use (as returned
+    :param threading.local tls: thread local storage to use (as returned
       by *threading.local()*
     """
     assert isinstance(separator, basestring)
@@ -1515,18 +1601,19 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
        import io
        import commonl
        import threading
-   
+
        tls = threading.local()
-   
+
        f = io.open("/dev/stdout", "w")
        with commonl.tls_prefix_c(tls, "PREFIX"), \
             commonl.io_tls_prefix_lines_c(tls, f.detach()) as of:
-   
-           of.write(u"line1\nline2\nline3\n")
+
+           of.write(u"line1\\nline2\\nline3\\n")    
 
     Limitations:
 
-    - hack, only works ok if full lines are being printed; eg:
+      - hack, only works ok if full lines are being printed
+
     """
     def __init__(self, tls, *args, **kwargs):
         assert isinstance(tls, thread._local)
@@ -1688,3 +1775,101 @@ def file_iterator(filename, chunk_size = 4096):
             if not data:
                 break
             yield data
+
+def assert_list_of_strings(l, list_name, item_name):
+    assert isinstance(l, ( tuple, list )), \
+        "'%s' needs to be None or a list of strings (%s); got %s" % (
+            list_name, item_name, type(l))
+    count = -1
+    for i in l:
+        count += 1
+        assert isinstance(i, basestring), \
+            "items in '%s' needs to be strings (%s); got %s on #%d"  % (
+                list_name, item_name, type(i), count)
+
+def assert_list_of_types(l, list_name, item_name, item_types):
+    assert isinstance(l, list), \
+        "'%s' needs to be None or a list of strings (%s); got %s" % (
+            list_name, item_name, type(l))
+    count = -1
+    for i in l:
+        count += 1
+        assert isinstance(i, item_types), \
+            "items in '%s' needs to be %s (%s); got %s on #%d"  % (
+                list_name, "|".join(i.__name__ for i in item_types),
+                item_name, type(i), count)
+
+def assert_none_or_list_of_strings(l, list_name, item_name):
+    if l == None:
+        return
+    assert_list_of_strings(l, list_name, item_name)
+
+def assert_dict_of_strings(d, d_name):
+    for k, v in d.items():
+        assert isinstance(k, basestring), \
+            "'%s' needs to be a dict of strings keyed by string;" \
+            " got a key type '%s'; expected string" % (d_name, type(k))
+        assert isinstance(v, basestring), \
+            "'%s' needs to be a dict of strings keyed by string;" \
+            " for key '%s' got a value type '%s'" % (d_name, k, type(v))
+
+def assert_dict_of_ints(d, d_name):
+    for k, v in d.items():
+        assert isinstance(k, basestring), \
+            "'%s' needs to be a dict of ints keyed by string;" \
+            " got a key type '%s'; expected string" % (d_name, type(k))
+        assert isinstance(v, int), \
+            "'%s' needs to be a dict of ints keyed by string;" \
+            " for key '%s' got a value type '%s'" % (d_name, k, type(v))
+
+def assert_none_or_dict_of_strings(d, d_name):
+    if d == None:
+        return
+    assert_dict_of_strings(d, d_name)
+
+#: List of known compressed extensions and ways to decompress them
+#: without removing the input file
+#:
+#: To add more:
+#:
+#: >>> commonl.decompress_handlers[".gz"] = "gz -fkd"
+decompress_handlers = {
+    # keep compressed files
+    ".gz": "gz -fkd",
+    ".bz2": "bzip2 -fkd",
+    ".xz": "xz -fkd",
+}
+
+def maybe_decompress(filename, force = False):
+    """
+    Decompress a file if it has a compressed file extension and return
+    the decompressed name
+
+    If the decompressed file already exists, assume it is the
+    decompressed version already and do not decompress.
+
+    :param str filename: a filename to maybe decompress
+
+    :params bool force: (optional, default *False*) if *True*,
+      decompress even if the decompressed file already exists
+
+    :returns str: the name of the file; if it was compressed. If it
+      is *file.ext*, where *ext* is a compressed file extension, then
+      it decompresses the file to *file* and returns *file*, without
+      removing the original *file.ext*.
+
+    The compressed extensions are registered in
+    :data:`decompress_handlers`.
+
+    """
+    assert isinstance(filename, basestring)
+    basename, ext = os.path.splitext(filename)
+    if ext not in decompress_handlers:	# compressed logfile support
+        return filename
+    if force or not os.path.exists(basename):
+        # FIXME: we need a lock in case we have multiple
+        # processes doing this
+        command = decompress_handlers[ext]
+        subprocess.check_call(command.split() + [ filename ],
+                              stdin = subprocess.PIPE)
+    return basename

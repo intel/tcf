@@ -1,0 +1,26 @@
+[install]
+install_data = /
+
+
+[bdist_rpm]
+release = 1
+packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
+requires =
+         gvnc-tools
+         make
+         python-ply
+         python-requests
+         @@Fedora@@python2-Levenshtein
+         @@CentOS|RHEL@@python-Levenshtein
+         python2-pykwalify
+         python2-backports-functools_lru_cache
+         python2-jinja2
+         python2-junit_xml
+         python2-keyring
+         python2-numpy
+         @@Fedora@@python2-opencv
+         @@CentOS|RHEL@@opencv-python
+         python2-pyyaml
+         python2-tabulate
+
+doc_files = *.rst doc/* _doc/html/*

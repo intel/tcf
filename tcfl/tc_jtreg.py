@@ -282,8 +282,8 @@ Architecture
 Entry points:
 
  - the TCF testcase discovery engine will call
-   :meth:`driver.is_testcase` for every `*.(java|sh)` file found from
-   the list given in the command line.
+   :meth:`driver.is_testcase <tcfl.tc.tc_c.is_testcase>` for every
+   `*.(java|sh)` file found from the list given in the command line.
 
    For each valid TC found, the driver will create a :class:`driver`
    testcase object and give it to the TCF core to execute later
@@ -377,7 +377,10 @@ def _file_scan_regex(filename, regex):
                                           mmap.PROT_READ, 0)) as data:
             return regex.search(data)
 
-class _driver(tcfl.pos.tc_pos_base):
+@tcfl.tc.interconnect("ipv4_addr",
+                      mode = os.environ.get('MODE', 'one-per-type'))
+@tcfl.tc.target("pos_capable")
+class driver(tcfl.pos.tc_pos0_base):
     """Execute JTreg JDK testcases on remote targets
 
 
@@ -419,8 +422,8 @@ class _driver(tcfl.pos.tc_pos_base):
     """
     def __init__(self, path_toplevel, path_test_root,
                  java_version, native_bindir):
-        tcfl.pos.tc_pos_base.__init__(self, path_toplevel, path_toplevel,
-                                      path_toplevel)
+        tcfl.pos.tc_pos0_base.__init__(self, path_toplevel, path_toplevel,
+                                       path_toplevel)
         self.path_toplevel = path_toplevel
         self.path_test_root = path_test_root
         self.path_jdk = None
@@ -1062,4 +1065,4 @@ class _driver(tcfl.pos.tc_pos_base):
         return r
 
 # hook it up to the core
-tcfl.tc.tc_c.driver_add(_driver)
+tcfl.tc.tc_c.driver_add(driver)

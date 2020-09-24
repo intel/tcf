@@ -62,12 +62,16 @@ import pprint
 import random
 import re
 import traceback
+import socket
+import string
 import subprocess
 import time
+import urlparse
 
 import distutils.version
 import Levenshtein
 
+import biosl
 import commonl
 import commonl.yamll
 import tc
@@ -236,9 +240,126 @@ def image_select_best(image, available_images, target):
     # weren't specified, so pick one
     return random.choice(subversion_images)
 
-# FIXME: what I don't like about this is that we have no info on the
-# interconnect -- this must require it?
+
+def mkfs(target, dev, fstype, mkfs_opts):
+    """
+    Format a filesystem in the target
+    """
+    target.report_info("POS: formatting %s (mkfs.%s %s)"
+                       % (dev, fstype, mkfs_opts), dlevel = 1)
+    target.shell.run("mkfs.%s %s %s" % (fstype, mkfs_opts, dev))
+    target.report_info("POS: formatted rootfs %s as %s" % (dev, fstype))
+
+
+def mount_root_part(target, root_part_dev, repartition):
+    """
+    Mount a root partition on target's */mnt*, maybe repartitioning
+    """
+    assert isinstance(target, tc.target_c)
+    assert isinstance(root_part_dev, basestring)
+    assert callable(repartition)
+    root_part_dev_base = os.path.basename(root_part_dev)
+    # save for other functions called later
+    # FIXME: ugly hack
+    target.root_part_dev = root_part_dev
+
+    # fsinfo looks like described in target.pos.fsinfo_read()
+    dev_info = None
+    for blockdevice in target.pos.fsinfo.get('blockdevices', []):
+        for child in blockdevice.get('children', []):
+            if child['name'] == root_part_dev_base:
+                dev_info = child
+    if dev_info == None:
+        # it cannot be we might have to repartition because at this
+        # point *we* have partitioned.
+        raise tc.error_e(
+            "Can't find information for root device %s in FSinfo array"
+            % root_part_dev_base,
+            dict(fsinfo = target.pos.fsinfo))
+
+    # what format does it currently have?
+    current_fstype = dev_info.get('fstype', 'ext4')
+
+    # What format does it have to have?
+    #
+    # Ok, here we need to note that we can't have multiple root
+    # filesystems with the same UUID or LABEL, so the image can't rely
+    # on UUIDs
+    #
+    img_fss = target.pos.metadata.get('filesystems', {})
+    if '/' in img_fss:
+        # a common origin is ok because the YAML schema forces both
+        # fstype and mkfs_opts to be specified
+        origin = "image's /.tcf.metadata.yaml"
+        fsdata = img_fss.get('/', {})
+    else:
+        origin = "defaults @" + commonl.origin_get(0)
+        fsdata = {}
+    fstype = fsdata.get('fstype', 'ext4')
+    mkfs_opts = fsdata.get('mkfs_opts', '-Fj')
+
+    # do they match?
+    if fstype != current_fstype:
+        target.report_info(
+            "POS: reformatting %s because current format is '%s' and "
+            "'%s' is needed (per %s)"
+            % (root_part_dev, current_fstype, fstype, origin))
+        mkfs(target, root_part_dev, fstype, mkfs_opts)
+    else:
+        target.report_info(
+            "POS: no need to reformat %s because current format is '%s' and "
+            "'%s' is needed (per %s)"
+            % (root_part_dev, current_fstype, fstype, origin), dlevel = 1)
+
+    for try_count in range(3):
+        target.report_info("POS: mounting root partition %s onto /mnt "
+                           "to image [%d/3]" % (root_part_dev, try_count))
+
+        # don't let it fail or it will raise an exception, so we
+        # print FAILED in that case to look for stuff; note the
+        # double apostrophe trick so the regex finder doens't trip
+        # on the command
+        output = target.shell.run(
+            "mount %s /mnt || echo FAI''LED" % root_part_dev,
+            output = True)
+        # What did we get?
+        if 'FAILED' in output:
+            if 'special device ' + root_part_dev \
+               + ' does not exist.' in output:
+                repartition(target)
+                target.pos.fsinfo_read(target._boot_label_name)
+            else:
+                # ok, this probably means probably the partitions are not
+                # formatted; so let's just reformat and retry
+                mkfs(target, root_part_dev, fstype, mkfs_opts)
+        else:
+            target.report_info("POS: mounted %s onto /mnt to image"
+                               % root_part_dev)
+            return root_part_dev	# it worked, we are done
+        # fall through, retry
+
+    raise tc.blocked_e(
+        "POS: Tried to mount too many times and failed",
+        dict(target = target))
+
+
 def target_power_cycle_to_pos_pxe(target):
+    """
+    Boot a target to provisioning mode using by booting BIOS to PXE
+
+    By setting a property *pos_mode* to *pxe*, we tell the server we
+    want to boot this target in POS mode. When the server receives the
+    order to power up this target, it will configure the PXE
+    bootloader configuration to direct the target to boot Provisioning
+    OS.
+
+    Requires the target be configured with a pre-power on hook such as
+    :func:ttbl.pxe.power_on_pre_pos_setup, or
+    :meth:ttbl.ipmi.pci.pre_power_pos_setup or with a power component
+    such as :class:ttbl.ipmi.pos_mode_c which take care of configuring
+    the PXE bootloader configuration for redirecting the boot
+    process.
+    """
     target.report_info("POS: setting target to PXE boot Provisioning OS")
     target.property_set("pos_mode", "pxe")
     target.power.cycle()
@@ -251,6 +372,7 @@ def target_power_cycle_to_normal_pxe(target):
     target.report_info("POS: setting target not to PXE boot Provisioning OS")
     target.property_set("pos_mode", "local")
     target.power.cycle()
+
 
 #: Name of the directory created in the target's root filesystem to
 #: cache test content
@@ -574,39 +696,22 @@ class extension(tc.target_extension_c):
         return capability_fn
 
 
-    # can't add $ at the end because sometimes there are spurious
-    # messages after it...\b -> beginning end of a word maybe at
-    # beg/end of string
-    _regex_waiting_for_login = re.compile(r".*\blogin:\s+", re.MULTILINE)
-
     def _unexpected_console_output_try_fix(self, output, target):
-        # so when trying to boot POS we got unexpected console output;
-        # let's see what can we do about it.
-        if output == None:
-            # nah, can't do much
-            return
+        boot_config_fix_fn = target.pos.cap_fn_get('boot_config_fix',
+                                                   'uefi')
+        if boot_config_fix_fn:
+            target.report_info("POS: got an unexpected login "
+                               "prompt, will try to fix the "
+                               "boot configuration")
+            boot_config_fix_fn(target)
+            return True
+        target.report_error(
+            "POS: seems we got a login prompt that is not POS, "
+            "but I don't know how to fix it; target does not "
+            "declare capability `boot_config_fix`",
+            attachments = dict(output = output))
+        return False
 
-        # looks like a login prompt? Maybe we can login and munge
-        # things around
-        m = self._regex_waiting_for_login.search(output)
-        if m:
-            boot_config_fix_fn = target.pos.cap_fn_get('boot_config_fix',
-                                                       'uefi')
-            if boot_config_fix_fn:
-                target.report_info("POS: got an unexpected login "
-                                   "prompt, will try to fix the "
-                                   "boot configuration")
-                boot_config_fix_fn(target)
-            else:
-                target.report_error(
-                    "POS: seems we got a login prompt that is not POS, "
-                    "but I don't know how to fix it; target does not "
-                    "declare capability `boot_config_fix`",
-                    attachments = dict(output = output))
-        else:
-            target.report_error(
-                "POS: didn't find a login prompt in output to try fixing",
-                attachments = dict(output = output, alevel = 0))
     def boot_to_pos(self, pos_prompt = None,
                     # plenty to boot to an nfsroot, hopefully
                     timeout = 60,
@@ -634,31 +739,101 @@ class extension(tc.target_extension_c):
                 target.report_info("POS: rebooting into Provisioning OS [%d/3]"
                                    % tries)
 
-                # Sequence for TCF-live based on Fedora
+                # The POS is configured to print "TCF test node" in
+                # /etc/issue and /etc/motd, so if we get a serial
+                # console prompt or we have a console over SSH that
+                # logs in, we will see it
                 try:
                     boot_to_pos_fn(target)
-                    # POS prints this when it boots before login
-                    target.expect("TCF test node",
-                                  timeout = bios_boot_time + timeout)
-                    target.shell.up(timeout = timeout)
-                except ( tc.error_e, tc.failed_e ) as e:
-                    attachment = e.attachments_get().get('console output', None)
-                    output = ""
-                    for data in attachment.make_generator():
-                        output += data
-                        if len(output) > 32 * 1024:
-                            # we need enought to capture a local boot
-                            # with log messages and all that add up to
-                            # a lot
+                    pos_boot_found = False
+                    ts0 = time.time()
+                    # Try a few times to enable the console and expect
+                    # the *TCF test node* banner
+                    inner_timeout = (bios_boot_time + timeout) / 20
+                    for _ in range(20):
+                        # if this was an SSH console that was left
+                        # enabled, it will die and auto-disable when
+                        # the machine power cycles, so make sure it is enabled
+                        try:
+                            target.console.enable()
+                        except ( tc.error_e, tc.failed_e ) as e:
+                            ts = time.time()
+                            target.report_info(
+                                "POS: can't enable console after +%.1fs"
+                                % (ts - ts0),
+                                dict(target = target, exception = e),
+                                dlevel = 2)
+                            time.sleep(inner_timeout)
+                            continue
+                        try:
+                            # POS prints this 'TCF test node' when it
+                            # boots before login (/etc/issue) or when
+                            # we login (/etc/motd) so that when we
+                            # enable an SSH console it also pops out
+                            #
+                            # If we do not get the login prompt, it
+                            # might be we are in an SSH only console,
+                            # so if we have the issue, we are good.
+                            r = testcase.expect(
+                                target.console.text(
+                                    "TCF test node",
+                                    name = "POS boot issue",
+                                    # if not found, it is ok, we'll
+                                    # handle it
+                                    timeout = 0
+                                ),
+                                # FIXME: for ssh consoles this does
+                                # not apply, find an equivalent
+                                target.console.text(
+                                    "login: ",
+                                    name = "login prompt",
+                                ),
+                                name = "wait for Provisioning OS to boot",
+                                timeout = inner_timeout,
+                            )
+                            if 'POS boot issue' not in r:
+                                # probably booted to the OS instead of
+                                # to the POS
+                                offset = target.console.offset_calc(
+                                    target, None,
+                                    # we need enought to capture a local boot with
+                                    # log messages and all that add up to a lot
+                                    - 32 * 1024)
+                                output = target.console.read(offset = offset)
+                                if 'login prompt' in r:
+                                    self._unexpected_console_output_try_fix(
+                                        output, target)
+                                # it is broken, need a retry w/ power cycle
+                                # is needed
+                                pos_boot_found = False
+                                break
+                            # found the issue and the login banner; good to go!
+                            pos_boot_found = True
                             break
-                    if output == "" or output == "\x00":
-                        target.report_error("POS: no console output, retrying")
+                        except ( tc.error_e, tc.failed_e ) as e:
+                            # we didn't find the login banner nor the
+                            # issue, so we have a big problem, let's retry
+                            ts = time.time()
+                            target.report_info(
+                                "POS: no signs of prompt after +%.1fs"
+                                % (ts - ts0),
+                                dict(target = target, exception = e),
+                                dlevel = 2)
+                            # no wait here, since expect did for us already
+                            continue
+                    if pos_boot_found != True:
+                        target.report_error(
+                            "POS: did not boot, retrying")
                         continue
-                    # sometimes the BIOS has been set to boot local directly,
-                    # so we might as well retry
-                    target.report_error("POS: unexpected console output, retrying",
-                                        attachments = { "console output": attachment })
-                    self._unexpected_console_output_try_fix(output, target)
+                    # Ok, we have a console that seems to be
+                    # ready...so setup the shell.
+                    target.shell.up(timeout = timeout, login_regex = None)
+                except ( tc.error_e, tc.failed_e ) as e:
+                    tc.result_c.report_from_exception(target.testcase, e)
+                    # if we are here, we got no console output because
+                    # it wasn't caught in the inner loopsq
+                    target.report_error(
+                            "POS: no console output? retrying")
                     continue
                 target.report_info("POS: got Provisioning OS shell")
                 break
@@ -707,8 +882,14 @@ class extension(tc.target_extension_c):
         assert isinstance(boot_dev, basestring)
 
         mount_fs_fn = self.cap_fn_get("mount_fs")
-        return mount_fs_fn(self.target, image, boot_dev)
+        root_part_dev = mount_fs_fn(self.target, image, boot_dev)
+        assert isinstance(root_part_dev, basestring), \
+            "cap 'mount_fs' by %s:%s(): did not return a string with the" \
+            " name of the root partition device, but %s" % (
+                inspect.getsourcefile(mount_fs_fn), mount_fs_fn.__name__,
+                type(root_part_dev))
 
+        return root_part_dev
 
     def rsyncd_start(self, ic):
         """
@@ -1068,15 +1249,22 @@ EOF""")
                     return child
         return None
 
-    def fsinfo_get_child_by_partlabel(self, blkdev, partlabel):
+    def _fsinfo_get_child_by(self, blkdev, key, value):
         target = self.target
         for blockdevice in target.pos.fsinfo.get('blockdevices', []):
             if blockdevice['name'] != blkdev:
                 continue
             for child in blockdevice.get('children', []):
-                if child['partlabel'] == partlabel:
+                if child[key] == value:
                     return child
         return None
+
+
+    def fsinfo_get_child_by_partlabel(self, blkdev, partlabel):
+        return self._fsinfo_get_child_by(blkdev, "partlabel", partlabel)
+
+    def fsinfo_get_child_by_label(self, blkdev, label):
+        return self._fsinfo_get_child_by(blkdev, "label", label)
 
     def _fsinfo_load(self):
         # Query filesystem information -> self.fsinfo
@@ -1087,12 +1275,17 @@ EOF""")
         # there was a way to sync partprobe?
         # WARNING: don't print anything other than lsblk's output!
         # will confuse the json loader
+        self.target.shell.run("sync; partprobe; sleep 3s; ")
+        # split in two commands so that output from partprobe doesn't
+        # mess up the JSON. Happens and it is very annoying; we can't
+        # just redirect because we want to see the messages in case
+        # something is wrong to diagnose
         output = self.target.shell.run(
-            "sync;"
-            " partprobe;"
-            " sleep 3s; "
             " lsblk --json -bni -o NAME,SIZE,TYPE,FSTYPE,UUID,PARTLABEL,LABEL,MOUNTPOINT 2> /dev/null",
             output = True, trim = True)
+        if not output.strip():
+            self.fsinfo = {}
+            return None
         # this output will be
         #
         ## {
@@ -1121,8 +1314,9 @@ EOF""")
                                     trace = traceback.format_exc()))
 
 
-    def fsinfo_read(self, boot_partlabel = None,
-                    raise_on_not_found = True, timeout = None):
+    def fsinfo_read(self, p1_value = None,
+                    raise_on_not_found = True, timeout = None,
+                    p1_key = 'partlabel'):
         """
         Re-read the target's partition tables, load the information
 
@@ -1144,7 +1338,8 @@ EOF""")
           partition tables to be re-read; defaults to 30s (some HW
           needs more than others and there is no way to make a good
           determination) or whatever is specified in target
-          tag/property :ref:`pos_partscan_timeout`.
+          tag/property :ref:`*pos_partscan_timeout*
+          <pos_partscan_timeout>`.
         """
         assert timeout == None or timeout > 0, \
             "timeout must be None or a positive number of seconds; " \
@@ -1159,21 +1354,21 @@ EOF""")
         while ts - ts0 < timeout:
             ts = time.time()
             target.pos._fsinfo_load()
-            boot_part = target.pos.fsinfo_get_child(
+            part1 = target.pos.fsinfo_get_child(
                 # lookup partition one; if found properly, the info has loaded
                 device_basename + target.kws['p_prefix'] + "1")
-            if boot_part == None:
+            if part1 == None:
                 target.report_info(
-                    "POS/multiroot: boot partition still not found by lsblk "
+                    "POS/multiroot: partition #1 still not found by lsblk "
                     "after %.1fs/%.1fs; retrying after 3s"
                     % (ts - ts0, timeout))
                 time.sleep(3)
                 continue
-            if boot_partlabel and boot_part['partlabel'] != boot_partlabel:
+            if p1_value and p1_key in part1 and part1[p1_key] != p1_value:
                 target.report_info(
-                    "POS/multiroot: boot partition with label %s still "
+                    "POS/multiroot: partition #1 with %s:%s still "
                     "not found by lsblk after %.1fs/%.1fs; retrying after 3s"
-                    % (target._boot_label_name, ts - ts0, timeout))
+                    % (p1_key, p1_value, ts - ts0, timeout))
                 time.sleep(3)
                 continue
             break
@@ -1225,12 +1420,24 @@ EOF""")
             # we try to keep the downloaded content across
             # re-flashings, so we don't have to re-download it.
             '/var/lib/swupd',
+            '/var/lib/containers',
+
         ],
         'fedora': [
             "/var/lib/rpm",
+            '/var/lib/containers',
         ],
         'rhel': [
             "/var/lib/rpm",
+            '/var/lib/containers',
+        ],
+        'centos': [
+            "/var/lib/rpm",
+            '/var/lib/containers',
+        ],
+        'ubuntu': [
+            '/var/cache/apt/archives',
+            '/var/lib/containers',
         ],
     }
 
@@ -1396,8 +1603,6 @@ EOF""")
             original_prompt = target.shell.shell_prompt_regex
             original_console_default = target.console.default
             try:
-                # ensure we use the POS prompt
-                target.shell.shell_prompt_regex = _pos_prompt
                 # FIXME: this is a hack because now the expecter has a
                 # maximum timeout set that can't be overriden--the
                 # re-design of the expect sequences will fix this, but
@@ -1416,10 +1621,12 @@ EOF""")
                     # Adopt a harder to false positive prompt regex;
                     # the TCF-HASHID is set by target.shell.up() after
                     # we logged in; so if no prompt was specified, use
-                    # this.
                     target.shell.shell_prompt_regex = \
-                        _pos_prompt = re.compile(r'TCF-%s: [0-9]+ \$ '
-                                                 % testcase.kws['tc_hash'])
+                        re.compile("TCF-%(tc_hash)s:POS%% " % testcase.kws)
+                    target.shell.run(
+                        "export PS1='TCF-%(tc_hash)s:POS%% '  "
+                        "# a simple prompt is harder to confuse"
+                        " with general output" % testcase.kws)
 
                 testcase.targets_active()
                 kws = dict(
@@ -1439,6 +1646,12 @@ EOF""")
                 # uninitialized disk we'll have to initialize it on
                 # mount_fs() below.
                 target.pos.fsinfo_read(raise_on_not_found = False)
+
+                # wait until the rsync server is up; sometimes it
+                # takes the target time to setup networking
+                tl.linux_wait_online(ic, target)
+                tl.linux_wait_host_online(
+                    target, kws['rsync_server'].split("::", 1)[0])
 
                 # List the available images and decide if we have the
                 # one we are asked to install, autocomplete missing
@@ -1488,6 +1701,7 @@ cat > /tmp/deploy.ex
 %s/*
 %s
 \x04""" % (persistent_tcf_d, persistent_tcf_d, '\n'.join(cache_locations)))
+                # \x04 is EOF, like pressing Ctrl-D in the shell
                 # DO NOT use --inplace to sync the image; this might
                 # break certain installations that rely on hardlinks
                 # to share files and then updating one pushes the same
@@ -1505,7 +1719,7 @@ cat > /tmp/deploy.ex
                                        re.MULTILINE)
                 m = kpi_regex.search(output)
                 if not m:
-                    raise tcfl.tc.error_e(
+                    raise tc.error_e(
                         "Can't find regex %s in output" % kpi_regex.pattern,
                         dict(output = output))
                 target.report_data("Deployment stats image %(image)s" % kws,
@@ -1732,6 +1946,176 @@ def deploy_path(ic, target, _kws, cache = True):
     for _source_path in source_path:
         _rsync_path(_source_path, dst_path)
 
+
+#: List of string with Linux kernel command options to be passed by
+#: the bootloader
+#:
+
+pos_cmdline_opts = {
+    # FIXME: this is now also in the server, but different clients
+    # also need it depending on the boot method; we need a way to be
+    # able to have a single source for them.
+    'tcf-live':  [
+        # Command Line options for TCF-Live (as created in
+        # tcf.git/ttbd/live
+        #
+        # If you need to debug dracut/initrd/bootup, uncomment these
+        #"rd.info",
+        #"rd.debug",		# WARNING! Very noisy!!
+        # Some networks devices need a lot of time to come up. Oh well
+        "rd.net.timeout.carrier=30",
+        # no 'single' so it force starts getty on different ports
+        # this needs an initrd
+        # needed by Fedora running as live FS hack, so disable selinux
+        # and auditing
+        "rd.live.image",
+        # We need SELinux disabled--otherwise some utilities (eg:
+        # rsync) can't operate properly on the SELinux attributes they need to
+        # move around without SELinux itself getting on the way.
+        "selinux=0", "enforcing=0",
+        "audit=0",
+        # We would hardcode the IP address because we know it ahead of time
+        # *and* it is faster, but we'd lack DNS then
+        #"ip=%(ipv4_addr)s:::%(ipv4_netmask)s::eth0:none",
+        "ip=dhcp",
+        "ro",				# we are read only
+        "quiet",			# don't print much of the boot process
+        "loglevel=2",                   # kernel, be quiet to avoid
+                                        # your messages polluting the
+                                        # serial terminal
+        "plymouth.enable=0 ",		# No installer to run
+        # so syscfg BIOS config utility can run in POS environment
+        "iomem=relaxed",
+        "root=/dev/nfs",
+        "nfsroot=%(pos_nfs_server)s:%(pos_nfs_path)s,soft,nolock,nfsvers=3",
+    ]
+}
+
+
+def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
+    """Wait for iPXE to boot on a serial console, seize control and
+    direct boot to a giveb TCF POS image
+
+    This function is a building block to implement functionality to
+    force a target to boot to Provisioning OS; once a target is made
+    to boot an iPXE bootloader that has enabled Ctrl-B (to interrupt
+    the boot process) functionality, this function sends Ctrl-Bs to
+    get into the iPXE command line and then direct the system to boot
+    the provisioning OS image described
+
+    :param tcfl.tc.target_c target: target on which to operate
+
+    :param bool dhcp: (optional) have iPXE issue DHCP for IP
+      configuration or manually configure using target's data.
+
+    :param str url: (optional) base URL where to load the *pos_image*
+      from; this will ask to load *URL/vmlinuz-POSIMAGE* and
+      *URL/initrd-POSIMAGE*.
+
+      By default, this is taken from the target's keywords
+      (*pos_http_url_prefix*) or from the boot interconnect.
+
+    :param str pos_image: (optional; default *tcf-live*) name of the
+      POS image to load.
+
+    """
+    # can't wait also for the "ok" -- debugging info might pop in th emiddle
+    target.expect("iPXE initialising devices...")
+    # if the connection is slow, we have to start sending Ctrl-B's
+    # ASAP
+    #target.expect(re.compile("iPXE .* -- Open Source Network Boot Firmware"))
+
+    # send Ctrl-B to go to the PXE shell, to get manual control of iPXE
+    #
+    # do this as soon as we see the boot message from iPXE because
+    # otherwise by the time we see the other message, it might already
+    # be trying to boot pre-programmed instructions--we'll see the
+    # Ctrl-B message anyway, so we expect for it.
+    #
+    # before sending these "Ctrl-B" keystrokes in ANSI, but we've seen
+    # sometimes the timing window being too tight, so we just blast
+    # the escape sequence to the console.
+    target.console.write("\x02\x02")	# use this iface so expecter
+    time.sleep(0.3)
+    target.console.write("\x02\x02")	# use this iface so expecter
+    time.sleep(0.3)
+    target.console.write("\x02\x02")	# use this iface so expecter
+    time.sleep(0.3)
+    target.expect("Ctrl-B")
+    target.console.write("\x02\x02")	# use this iface so expecter
+    time.sleep(0.3)
+    target.console.write("\x02\x02")	# use this iface so expecter
+    time.sleep(0.3)
+    target.expect("iPXE>")
+    prompt_orig = target.shell.shell_prompt_regex
+    try:
+        #
+        # When matching end of line, match against \r, since depends
+        # on the console it will send one or two \r (SoL vs SSH-SoL)
+        # before \n -- we removed that in the kernel driver by using
+        # crnl in the socat config
+        #
+        # FIXME: block on anything here? consider infra issues
+        # on "Connection timed out", http://ipxe.org...
+        target.shell.shell_prompt_regex = "iPXE>"
+        kws = dict(target.kws)
+        boot_ic = target.kws['pos_boot_interconnect']
+        ipv4_addr = target.kws['interconnects'][boot_ic]['ipv4_addr']
+        ipv4_prefix_len = target.kws['interconnects'][boot_ic]['ipv4_prefix_len']
+        kws['ipv4_netmask'] = commonl.ipv4_len_to_netmask_ascii(ipv4_prefix_len)
+
+        if dhcp:
+            target.shell.run("dhcp", re.compile("Configuring.*ok"))
+            target.shell.run("show net0/ip", "ipv4 = %s" % ipv4_addr)
+        else:
+            # static is much faster and we know the IP address already
+            # anyway; but then we don't have DNS as it is way more
+            # complicated to get it
+            target.shell.run("set net0/ip %s" % ipv4_addr)
+            target.shell.run("set net0/netmask %s" % kws['ipv4_netmask'])
+            target.shell.run("ifopen")
+
+        if pos_image == None:
+            pos_image = target.kws.get('pos_image', None)
+        if pos_image == None:
+            raise tc.blocked_e(
+                "POS: cannot determine what provisioning image is to be used"
+                "; (no pos_image provided and target doesn't provide"
+                " *pos_image* to indicate it")
+        pos_kernel_image = target.kws.get('pos_kernel_image', pos_image)
+        if 'pos_kernel_image' not in kws:
+            kws['pos_kernel_image'] = pos_kernel_image
+        kws['pos_cmdline_opts'] = \
+            " ".join(pos_cmdline_opts[pos_image]) % kws
+        if url == None:
+            url = target.kws['pos_http_url_prefix']
+
+        target.shell.run("set base %s" % url)
+        # command line options in a variable so later the command line
+        # doesn't get too long and maybe overfill some buffer (has
+        # happened before)
+        target.shell.run(
+            "set cmdline %(pos_cmdline_opts)s" % kws)
+        target.shell.run(
+            "kernel"
+            " ${base}vmlinuz-%(pos_kernel_image)s"
+            " initrd=initramfs-%(pos_kernel_image)s"
+            " console=tty0 console=%(linux_serial_console_default)s,115200"
+            " ${cmdline}"
+            % kws,
+            # .*because there are a lot of ANSIs that can come
+            re.compile(r"\.\.\..* ok"))
+        target.shell.run(
+            "initrd ${base}initramfs-%(pos_kernel_image)s"
+            % kws,
+            # .*because there are a lot of ANSIs that can come
+            re.compile(r"\.\.\..* ok"))
+        target.send("boot")
+        # now the kernel boots
+    finally:
+        target.shell.shell_prompt_regex = prompt_orig
+
+
 # FIXME: when tc.py's import hell is fixed, this shall move to tl.py?
 
 class tc_pos0_base(tc.tc_c):
@@ -1769,6 +2153,30 @@ class tc_pos0_base(tc.tc_c):
     #: the image that was selected.
     image = "image-not-deployed"
 
+    #: Images to flash into different parts of the system with the
+    #: images interface
+    #:
+    #: This is a dictionary keyed by image type, value being the file
+    #: to upload to the server and then flash.
+    #:
+    #: If empty, it will be initialized from the contents of the first
+    #: of the following environment variables that is non empty
+    #:
+    #: - *IMAGE_FLASH_<FULLID>*
+    #: - *IMAGE_FLASH_<ID>*
+    #: - *IMAGE_FLASH_<TYPE>*
+    #: - *IMAGE_FLASH*
+    #:
+    #: where *<FULLID>*, *<ID>*, *<TYPE>* are the full name
+    #: (*SERVER/NAME*), the name and the type of the target with any
+    #: non-alphanumeric character replaced with an underscore (*_*).
+    #:
+    #: The format of the environment variables is a space separated
+    #: list of image types and file names::
+    #:
+    #:   export IMAGE_FLASH_server_target1="bios:FILE1 bmc:FILE2"
+    image_flash = {}
+
     #: extra parameters to the image deployment function
     #: :func:`target.pos.deploy_image
     #: <tcfl.pos.extension.deploy_image>`
@@ -1792,6 +2200,101 @@ class tc_pos0_base(tc.tc_c):
     #: How many seconds to delay before login in once the login prompt
     #: is detected
     delay_login = 0
+
+    _image_flash_regex = re.compile(r"\S+:\S+( \S+:\S+)*")
+
+    @tc.serially()			# make sure it executes in order
+    def deploy_10_flash(self, target):
+        """
+        Flash anything specified in :data:image_flash or IMAGE_FLASH*
+        environment variables
+
+        The *IMAGE_FLASH* environment variable is a string containing
+        a space separated list of tokens:
+
+        - *soft*: if present, do soft flashing (will only be flashed
+           if the image to be flashed is different than the last image
+           that was flashed)
+
+        - *IMAGETYPE:FILENAME*: *IMAGETYPE* being any of the image
+           destinations the target can flash; can be found with::
+
+             $ tcf image-ls TARGETNAME
+
+           or from the inventory::
+
+             $ tcf get TARGETNAME -p interfaces.images
+
+        The code looks at environment variables called, in this order:
+
+        - *IMAGE_FLASH_<TYPE>*
+        - *IMAGE_FLASH_<FULLID>*
+        - *IMAGE_FLASH_<ID>*
+        - *IMAGE_FLASH*
+
+        Where *type*, *fullid* and *id* are the fields from the
+        inventory of the same name::
+
+          $ tcf ls -vv rasp-1250 -p id -p type -p fullid
+          SERVERNAME/TARGETNAME
+          SERVERNAME/TARGETNAME.fullid: SERVERNAME/TARGETNAME
+          SERVERNAME/TARGETNAME.id: TARGETNAME
+          SERVERNAME/TARGETNAME.type: TYPENAME
+          ...
+
+        with all the characters not in the set *0-9a-zA-Z_* replaced
+        with underscores.
+
+        For example::
+
+          $ export IMAGE_FLASH_TYPE1="soft bios:path/to/bios.bin"
+          $ tcf run test_SOMESCRIPT.py
+
+        if *test_SOMESCRIPT.py* uses this template, every invocation
+        of it on a machine of type TYPE1 will result on the file
+        *path/to/bios.bin* being flashed on the *bios* location
+        (however, because of *soft*, if it was already flashed before,
+        it will be skipped).
+        """
+        image_flash = self.image_flash
+        if not image_flash:
+            # empty, load from environment
+            target_id_safe = commonl.name_make_safe(
+                target.id, string.ascii_letters + string.digits)
+            target_fullid_safe = commonl.name_make_safe(
+                target.fullid, string.ascii_letters + string.digits)
+            target_type_safe = commonl.name_make_safe(
+                target.type, string.ascii_letters + string.digits)
+
+            source = None	# keep pylint happy
+            for source in [
+                    "IMAGE_FLASH_%s" % target_type_safe,
+                    "IMAGE_FLASH_%s" % target_fullid_safe,
+                    "IMAGE_FLASH_%s" % target_id_safe,
+                    "IMAGE_FLASH",
+                ]:
+                flash_image_s = os.environ.get(source, None)
+                if flash_image_s:
+                    break
+            else:
+                self.report_info(
+                    "skipping image flashing (no environment IMAGE_FLASH*)")
+                return
+
+            if not self._image_flash_regex.search(flash_image_s):
+                raise tc.blocked_e(
+                    "image specification in %s does not conform to the form"
+                    " IMAGE:NAME[ IMAGE:NAME[..]]]" % source)
+            image_flash = {}
+            for entry in flash_image_s.split(" "):
+                if not entry:	# empty spaces...welp
+                    continue
+                name, value = entry.split(":", 1)
+                image_flash[name] = value
+
+        if image_flash:
+            target.report_info("uploading flash images to remoting server")
+            target.images.flash(image_flash, upload = True)
 
     def deploy_50(self, ic, target):
         # ensure network, DHCP, TFTP, etc are up and deploy
@@ -1887,13 +2390,14 @@ def cmdline_pos_capability_list(args):
                     target, " ".join(unknown_caps))
 
 def cmdline_setup(argsp):
-    ap = argsp.add_parser("pos-capability-list", help = "List available "
+    ap = argsp.add_parser("pos-capability-ls", help = "List available "
                           "POS capabilities or those each target exports")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     nargs = "*", default = None, help = "Target's name")
     ap.set_defaults(func = cmdline_pos_capability_list)
 
 
+# FIXME: this should be moved somewhere else, it is a mess
 import pos_multiroot	# pylint: disable = wrong-import-order,wrong-import-position,relative-import
 import pos_uefi		# pylint: disable = wrong-import-order,wrong-import-position,relative-import
 capability_register('mount_fs', 'multiroot', pos_multiroot.mount_fs)
@@ -1901,3 +2405,84 @@ capability_register('boot_to_pos', 'pxe', target_power_cycle_to_pos_pxe)
 capability_register('boot_to_normal', 'pxe', target_power_cycle_to_normal_pxe)
 capability_register('boot_config', 'uefi', pos_uefi.boot_config_multiroot)
 capability_register('boot_config_fix', 'uefi', pos_uefi.boot_config_fix)
+
+
+def edkii_pxe_ipxe_target_power_cycle_to_pos(target):
+    """
+    Boot an EDKII based system to Provisioning OS using PXE into an iPXE loader
+
+    This boots the first entry called *PXE* in the EFI
+    bootloader. Once iPXE starts, the script seixes control by issuing
+    Ctrl-B characters, which takes us to the iPXE console so we can
+    drive the process to boot the Provisioning OS served by the POS
+    server.
+
+    If the the entry is not found, the scripting tries to enable EFI
+    networking.
+
+    Assumptions:
+
+    - the BIOS is accessible via the serial port and follows default
+      EDKII format from http://tianocore.org.
+
+    - The BIOS provides a boot target called *UEFI PXEv4
+      (MAC:<MACADDR>)*, where MACADDR is the MAC address of the
+      interface on which to boot (we use the address declared in
+      *interconnects.POS_BOOT_INTERCONNECT.mac_addr*).
+
+    - the target is in an environment where a PXE request will send it
+      to a boot server that provides an iPXE bootloader
+
+    - the iPXE bootloader default is configured to allow Ctrl-B to
+      interrupt into a console. If using a Fog enabled iPXE
+      bootloader, follow :ref:`these instructions <howto_fog_ipxe>`
+      to make sure TCF can use it
+
+    - a TCF/POS server and the target's metadata configured to point
+      to it
+
+    """
+    # resolve locally, since the iPXE environment has a harder time
+    # resolving
+    url = urlparse.urlparse(target.kws['pos_http_url_prefix'])
+    url_resolved = url._replace(
+        netloc = url.hostname.replace(url.hostname,
+                                      socket.gethostbyname(url.hostname)))
+    target.report_info("POS: setting target to boot Provisioning OS")
+    target.power.cycle()
+
+    boot_ic = target.kws['pos_boot_interconnect']
+    mac_addr = target.rt.get('interconnects', {})\
+                        .get(boot_ic, {}).get('mac_addr', None)
+    if mac_addr == None:
+        raise tc.blocked_e(
+            "can't find MAC address for interconnect %s" % boot_ic)
+    biosl.boot_network_pxe(
+        target,
+        # Eg: UEFI PXEv4 (MAC:A4BF015598A1)
+        r"UEFI PXEv4 \(MAC:%s\)" % mac_addr.replace(":", "").upper())
+    # this will make it boot the iPXE bootloader and then we seize it
+    # and direct it to our POS provide
+    target.report_info("POS: seizing iPXE boot", )
+    ipxe_seize_and_boot(target, dhcp = False, url = url_resolved.geturl())
+
+capability_register('boot_to_pos', 'edkii+pxe+ipxe',
+                    edkii_pxe_ipxe_target_power_cycle_to_pos)
+
+
+def edkii_pxe_ipxe_target_power_cycle_to_normal(target):
+    """
+    Boot an EDKII based system to default
+    """
+    target.report_info("POS: setting target not to boot Provisioning OS")
+    # The boot configuration has been set so that unattended boot
+    # means boot to localdisk
+    target.power.cycle()
+    target.expect("to enter setup and select boot options",
+                  timeout = 60 + int(target.kws.get("bios_boot_time", 0)),
+                  # For a verbose system, don't report it all
+                  report = 300)
+
+# Register capabilities
+capability_register('boot_to_normal', 'edkii+pxe+ipxe',
+                    edkii_pxe_ipxe_target_power_cycle_to_normal)

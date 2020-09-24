@@ -41,13 +41,15 @@ class pci(ttbl.power.impl_c):
     >>> )
     >>> ...
 
+
+    Other parameters as to :class:ttbl.power.impl_c.
     """
 
     def __init__(self, address,
                  share_name, share_path,
                  port = 873,
-                 uid = None, gid = None, read_only = True):
-        ttbl.power.impl_c.__init__(self)
+                 uid = None, gid = None, read_only = True, **kwargs):
+        ttbl.power.impl_c.__init__(self, **kwargs)
         self.address = address
         self.port = port
         self.share_name = share_name

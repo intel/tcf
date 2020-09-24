@@ -201,6 +201,9 @@ class shell(tc.target_extension_c):
         error happens, it will print an error message and raise a
         block exception. Optionally login as a user and password.
 
+        Note this resets any shell prompt set by the script to what is
+        assumed to be the original one after a power up.
+
         >>> target.shell.up(user = 'root', password = '123456')
 
         :param str tempt: (optional) string to send before waiting for
@@ -252,7 +255,7 @@ class shell(tc.target_extension_c):
         """
         assert tempt == None or isinstance(tempt, basestring)
         assert user == None or isinstance(user, basestring)
-        assert isinstance(login_regex, ( basestring, re._pattern_type ))
+        assert login_regex == None or isinstance(login_regex, ( basestring, re._pattern_type ))
         assert delay_login >= 0
         assert password == None or isinstance(password, basestring)
         assert isinstance(password_regex, ( basestring, re._pattern_type ))
@@ -264,11 +267,15 @@ class shell(tc.target_extension_c):
         testcase = target.testcase
         if timeout == None:
             timeout = 60 + int(target.kws.get("bios_boot_time", 0))
+        # Set the original shell prompt
+        self.shell_prompt_regex = _shell_prompt_regex
         
         def _login(target):
             # If we have login info, login to get a shell prompt
-            target.expect(login_regex, name = "login prompt",
-                          console = console)
+            if login_regex != None:
+                # we have already recevied this, so do not expect it
+                target.expect(login_regex, name = "login prompt",
+                              console = console)
             if delay_login:
                 target.report_info("Delaying %ss before login in"
                                    % delay_login)
@@ -279,37 +286,71 @@ class shell(tc.target_extension_c):
                               console = console)
                 target.send(password, console = console)
 
+        original_timeout = testcase.tls.expect_timeout
         try:
             if console == None:		# reset the default console
                 target.console.default = None
-            original_timeout = testcase.tls.expect_timeout
+                # this will yield the default console name, not None
+                # as we set it above; bad API
+                console = target.console.default
             testcase.tls.expect_timeout = timeout
-            if tempt:
-                tries = 3
-                while tries > 0:
-                    try:
+            ts0 = time.time()
+            ts = ts0
+            inner_timeout = 3 * timeout / 20
+            while ts - ts0 < 3 * timeout:
+                # if this was an SSH console that was left
+                # enabled, it will die and auto-disable when
+                # the machine power cycles, so make sure it is enabled
+                action = "n/a"
+                try:
+                    if console.startswith("ssh"):
+                        action = "enable console %s" % console
+                        target.console.setup(console,
+                                             user = user, password = password)
+                        target.console.enable(console = console)
+                        ts = time.time()
+                        target.report_info(
+                            "shell-up: %s: success at +%.1fs"
+                            % (action, ts - ts0), dlevel = 2)
+                    if tempt:
+                        action = "tempt console %s" % console
                         target.send(tempt, console = console)
+                        ts = time.time()
+                        target.report_info(
+                            "shell-up: %s: success at +%.1fs"
+                            % (action, ts - ts0), dlevel = 2)
+                    if not console.startswith("ssh"):
                         if user:
+                            action = "login in via console %s" % console
+                            # _login uses this 'console' definition
                             _login(self.target)
-                        target.expect(self.shell_prompt_regex,
-                                      console = console, timeout = 3,
-                                      name = "early shell prompt")
-                        break
-                    except tc.error_e as _e:
-                        if tries == 0:
-                            raise tc.error_e(
-                                "Waited too long (%ds) for shell to come up "
-                                "(did not receive '%s')" %
-                                (self.target.testcase.tls.expect_timeout,
-                                 self.shell_prompt_regex.pattern))
-                        continue
-                    finally:
-                        tries -= 1
+                            ts = time.time()
+                            target.report_info(
+                                "shell-up: %s: success at +%.1fs"
+                                % (action, ts - ts0), dlevel = 2)
+                    action = "wait for shell prompt"
+                    target.expect(self.shell_prompt_regex, console = console,
+                                  name = "early shell prompt",
+                                  timeout = inner_timeout)
+                    break
+                except ( tc.error_e, tc.failed_e ) as e:
+                    ts = time.time()
+                    target.report_info(
+                        "shell-up: action '%s' failed at +%.1fs; retrying: %s"
+                        % (action, ts - ts0, e),
+                        dict(target = target, exception = e),
+                        dlevel = 2)
+                    time.sleep(inner_timeout)
+                    ts = time.time()
+                    if console.startswith("ssh"):
+                        target.console.disable(console = console)
+                    continue
             else:
-                if user:
-                    _login(self.target)
-                target.expect(self.shell_prompt_regex, console = console,
-                              name = "early shell prompt")
+                raise tc.error_e(
+                    "Waited too long (%ds) for shell to come up on"
+                    " console '%s' (did not receive '%s')" % (
+                        3 * timeout, console,
+                        self.shell_prompt_regex.pattern))
         finally:
             testcase.tls.expect_timeout = original_timeout
 
@@ -319,10 +360,8 @@ class shell(tc.target_extension_c):
         elif callable(shell_setup):
             shell_setup(console)
         # False, so we don't call shell setup
-
         # don't set a timeout here, leave it to whatever it was defaulted
-
-    crnl_regex = re.compile("\r+\n")
+        return
 
     def _run(self, cmd = None, expect = None, prompt_regex = None,
              output = False, output_filter_crlf = True, trim = False,
@@ -366,11 +405,14 @@ class shell(tc.target_extension_c):
             self.target.expect(prompt_regex, name = "shell prompt",
                                console = console, origin = origin)
         if output:
-            output = self.target.console.read(offset = offset,
-                                              console = console)
+            if console == None:
+                console = target.console.default
             if output_filter_crlf:
-                # replace \r\n, \r\r\n, \r\r\r\r\n... it happens
-                output = re.sub(self.crnl_regex, self.target.crlf, output)
+                newline = None
+            else:
+                newline = ''
+            output = self.target.console.read(
+                offset = offset, console = console, newline = newline)
             if trim:
                 # When we can run(), it usually prints in the console:
                 ## <command-echo from our typing>
@@ -380,8 +422,8 @@ class shell(tc.target_extension_c):
                 # So to trim we just remove the first and last
                 # lines--won't work well without output_filter_crlf
                 # and it is quite a hack.
-                first_nl = output.find(self.target.crlf)
-                last_nl = output.rfind(self.target.crlf)
+                first_nl = output.find("\n")
+                last_nl = output.rfind("\n")
                 output = output[first_nl+1:last_nl+1]
             return output
         return None
@@ -456,7 +498,7 @@ class shell(tc.target_extension_c):
 
              ``output_filter_crlf`` enabled replaces this output with
 
-             >>> output = output.replace('\\r\\n', target.crlf)
+             >>> output = output.replace('\\r\\n', target.console.crlf[CONSOLENAME])
 
         """
         assert timeout == None or timeout > 0, \
@@ -544,7 +586,7 @@ class shell(tc.target_extension_c):
 
         Assumes the target has python3; permissions are not maintained
 
-        See :meth:`copy_to_file`
+        See :meth:`file_copy_to`
 
         .. note:: it is *slow*. The limits are not well defined; how
                   big a file can be sent/received will depend on local

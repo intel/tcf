@@ -15,6 +15,9 @@ import shutil
 import subprocess
 import time
 
+import ipaddress
+import netifaces
+
 import commonl
 import ttbl
 import ttbl.capture
@@ -82,8 +85,8 @@ class vlan_pci(ttbl.power.impl_c):
     >>>     tags = {
     >>>         'ipv4_addr': '192.168.97.1',
     >>>         'ipv4_prefix_len': 24,
-    >>>         'ipv6_addr': 'fc00::61:1',
-    >>>         'ipv6_prefix_len': 112,
+    >>>         'ipv6_addr': 'fd:99:61::1',
+    >>>         'ipv6_prefix_len': 104,
     >>>         'mac_addr': '02:61:00:00:00:01:',
     >>>     })
 
@@ -118,7 +121,7 @@ class vlan_pci(ttbl.power.impl_c):
       - targetname: pc-04
       - ic_index: 04
       - ipv4_addr: 192.168.1.4
-      - ipv6_addr: fc00::1:4
+      - ipv6_addr: fd:00:01:::4
       - mac_addr: 02:01:00:00:00:04
 
     If a tag named *mac_addr* is given, containing the MAC address
@@ -177,8 +180,8 @@ class vlan_pci(ttbl.power.impl_c):
       >>>     tags = {
       >>>         'ipv4_addr': '192.168.97.1',
       >>>         'ipv4_prefix_len': 24,
-      >>>         'ipv6_addr': 'fc00::61:1',
-      >>>         'ipv6_prefix_len': 112,
+      >>>         'ipv6_addr': 'fd:00:61::1',
+      >>>         'ipv6_prefix_len': 104,
       >>>         'mac_addr': "a0:ce:c8:00:18:73",
       >>>     })
 
@@ -188,7 +191,7 @@ class vlan_pci(ttbl.power.impl_c):
       .. code-block:: python
 
          # eth dongle mac 00:e0:4c:36:40:b8 is assigned to NWA
-         ttbl.config.targets['nwa'].tags_update(dict(mac_addr = '00:e0:4c:36:40:b8'))
+         ttbl.test_target.get('nwa').tags_update(dict(mac_addr = '00:e0:4c:36:40:b8'))
 
       Furthermore, default networks *nwa*, *nwb* and *nwc* are defined
       to have a power control rail (versus an individual power
@@ -197,7 +200,7 @@ class vlan_pci(ttbl.power.impl_c):
 
       .. code-block:: python
 
-         ttbl.config.targets['nwa'].pc_impl.append(
+         ttbl.test_target.get('nwa').pc_impl.append(
              ttbl.pc.dlwps7("http://USER:PASSWORD@sp5/8"))
 
       This creates a power controller to switch on or off plug #8 on
@@ -215,8 +218,8 @@ class vlan_pci(ttbl.power.impl_c):
       >>>     tags = {
       >>>         'ipv4_addr': '192.168.97.1',
       >>>         'ipv4_prefix_len': 24,
-      >>>         'ipv6_addr': 'fc00::61:1',
-      >>>         'ipv6_prefix_len': 112,
+      >>>         'ipv6_addr': 'fd:00:61::1',
+      >>>         'ipv6_prefix_len': 104,
       >>>         'mac_addr': "a0:ce:c8:00:18:73",
       >>>         'vlan': 30,
       >>>     })
@@ -229,12 +232,12 @@ class vlan_pci(ttbl.power.impl_c):
 
       .. code-block:: python
 
-         ttbl.config.targets['TARGETNAME-NN'].tags_update(
+         ttbl.test_target.get('TARGETNAME-NN').tags_update(
              {
                'ipv4_addr': "192.168.10.30",
                'ipv4_prefix_len': 24,
-               'ipv6_addr': "fc00::10:30",
-               'ipv4_prefix_len': 112,
+               'ipv6_addr': "fd:00:10::30",
+               'ipv6_prefix_len': 104,
              },
              ic = 'nwc')
 
@@ -290,20 +293,25 @@ class vlan_pci(ttbl.power.impl_c):
             # which till tag for eth vlan %(vlan)
             ifname = commonl.if_find_by_mac(target.tags['mac_addr'],
                                             physical = True)
-            commonl.if_remove_maybe("b%(id)s" % target.kws)
-            kws = dict(target.kws)
-            kws['ifname'] = ifname
-            subprocess.check_call(
-                "/usr/sbin/ip link add"
-                " link %(ifname)s name b%(id)s"
-                " type vlan id %(vlan)s"
-                #" protocol VLAN_PROTO"
-                #" reorder_hdr on|off"
-                #" gvrp on|off mvrp on|off loose_binding on|off"
-                % kws, shell = True)
-            subprocess.check_call(	# bring lower up
-                "/usr/sbin/ip link set dev %s up promisc on" % ifname,
-                shell = True)
+            if not commonl.if_present("b%(id)s" % target.kws):
+                # Do create the new interface only if not already
+                # created, otherwise daemons that are already running
+                # will stop operating
+                # This function might be being called to restablish a
+                # half baked operating state.
+                kws = dict(target.kws)
+                kws['ifname'] = ifname
+                subprocess.check_call(
+                    "/usr/sbin/ip link add"
+                    " link %(ifname)s name b%(id)s"
+                    " type vlan id %(vlan)s"
+                    #" protocol VLAN_PROTO"
+                    #" reorder_hdr on|off"
+                    #" gvrp on|off mvrp on|off loose_binding on|off"
+                    % kws, shell = True)
+                subprocess.check_call(	# bring lower up
+                    "/usr/sbin/ip link set dev %s up promisc on" % ifname,
+                    shell = True)
         elif mode == 'physical':
             ifname = commonl.if_find_by_mac(target.tags['mac_addr'])
             subprocess.check_call(	# bring lower up
@@ -313,22 +321,30 @@ class vlan_pci(ttbl.power.impl_c):
         elif mode == 'virtual':
             # We do not have a physical device, a bridge, to serve as
             # lower
-            commonl.if_remove_maybe("_b%(id)s" % target.kws)
-            subprocess.check_call(
-                "/usr/sbin/ip link add"
-                "  name _b%(id)s"
-                "  type bridge"
-                % target.kws, shell = True)
-            subprocess.check_call(
-                "/usr/sbin/ip link add"
-                "  link _b%(id)s name b%(id)s"
-                "  type macvlan mode bridge; "
-                % target.kws, shell = True)
-            subprocess.check_call(	# bring lower up
-                "/usr/sbin/ip link set"
-                "  dev _b%(id)s"
-                "  up promisc on"
-                % target.kws, shell = True)
+            if not commonl.if_present("b%(id)s" % target.kws) \
+               or not commonl.if_present("_b%(id)s" % target.kws):
+                # Do create the new interface only if not already
+                # created, otherwise daemons that are already running
+                # will stop operating
+                # This function might be being called to restablish a
+                # half baced operating state.
+                commonl.if_remove_maybe("_b%(id)s" % target.kws)
+                subprocess.check_call(
+                    "/usr/sbin/ip link add"
+                    "  name _b%(id)s"
+                    "  type bridge"
+                    % target.kws, shell = True)
+                commonl.if_remove_maybe("b%(id)s" % target.kws)
+                subprocess.check_call(
+                    "/usr/sbin/ip link add"
+                    "  link _b%(id)s name b%(id)s"
+                    "  type macvlan mode bridge; "
+                    % target.kws, shell = True)
+                subprocess.check_call(	# bring lower up
+                    "/usr/sbin/ip link set"
+                    "  dev _b%(id)s"
+                    "  up promisc on"
+                    % target.kws, shell = True)
         else:
             raise AssertionError("Unknown mode %s" % mode)
 
@@ -434,6 +450,12 @@ class vlan_pci(ttbl.power.impl_c):
 
         target.fsdb.set('power_state', 'off')
 
+    @staticmethod
+    def _find_addr(addrs, addr):
+        for i in addrs:
+            if i['addr'] == addr:
+                return i
+        return None
 
     def get(self, target, _component):
         # we know we have created an interface named bNWNAME, so let's
@@ -454,10 +476,51 @@ class vlan_pci(ttbl.power.impl_c):
         else:
             raise AssertionError("Unknown mode %s" % mode)
 
-        # FIXME: check IP addresses are assigned, if is up, until then
-        # return None, as we can't ensure the config is properly set
-        # so it has to be reset
-        return None
+        # Verify IP addresses are properly assigned
+        iface_name = "b" + target.id
+        addrs = netifaces.ifaddresses(iface_name)
+        if 'ipv4_addr' in target.kws:
+            addrs_ipv4 = addrs.get(netifaces.AF_INET, None)
+            if addrs_ipv4 == None:
+                target.log.info(
+                    "vlan_pci/%s: off because no ipv4 addresses are assigned"
+                    % iface_name)
+                return False	                # IPv4 address not set
+            addr = self._find_addr(addrs_ipv4, target.kws['ipv4_addr'])
+            if addr == None:
+                target.log.info(
+                    "vlan_pci/%s: off because ipv4 address %s not assigned"
+                    % (iface_name, target.kws['ipv4_addr']))
+                return False	                # IPv4 address mismatch
+            prefixlen = ipaddress.IPv4Network(
+                unicode('0.0.0.0/' + addr['netmask'])).prefixlen
+            if prefixlen != target.kws['ipv4_prefix_len']:
+                target.log.info(
+                    "vlan_pci/%s: off because ipv4 prefix is %s; expected %s"
+                    % (iface_name, prefixlen, target.kws['ipv4_prefix_len']))
+                return False	                # IPv4 prefix mismatch
+
+        if 'ipv6_addr' in target.kws:
+            addrs_ipv6 = addrs.get(netifaces.AF_INET6, None)
+            if addrs_ipv6 == None:
+                target.log.info(
+                    "vlan_pci/%s: off because no ipv6 address is assigned"
+                    % iface_name)
+                return False	                # IPv6 address not set
+            addr = self._find_addr(addrs_ipv6, target.kws['ipv6_addr'])
+            if addr == None:
+                target.log.info(
+                    "vlan_pci/%s: off because ipv6 address %s not assigned"
+                    % (iface_name, target.kws['ipv6_addr']))
+                return False	                # IPv6 address mismatch
+            prefixlen = ipaddress.IPv6Network(unicode(addr['netmask'])).prefixlen
+            if prefixlen != target.kws['ipv6_prefix_len']:
+                target.log.info(
+                    "vlan_pci/%s: off because ipv6 prefix is %s; expected %s"
+                    % (iface_name, prefixlen, target.kws['ipv6_prefix_len']))
+                return False	                # IPv6 prefix mismatch
+
+        return True
 
 
 # FIXME: replace tcpdump with a interconnect capture interface

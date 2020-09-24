@@ -87,25 +87,26 @@ class interface(ttbl.tt_interface):
         ttbl.tt_interface.__init__(self)
         self.impls_set(impls, kwimpls, impl_c)
 
-    def _target_setup(self, target):
+    def _target_setup(self, target, iface_name):
         # Called when the interface is added to a target to initialize
         # the needed target aspect (such as adding tags/metadata)
+        publish_dict = target.tags['interfaces'][iface_name]
         for name, _impl in self.impls.iteritems():
             # for each thing we added, we are going to tell them they
             # are a thing to this target, so they can unplug
             # themselves when they are released
-            assert name in ttbl.config.targets, \
+            thing = ttbl.test_target.get(name)
+            assert thing != None, \
                 "%s: thing '%s' for target '%s' has to be an" \
                 " existing target" % (target.id, name, target.id)
-            thing = ttbl.config.targets[name]
             thing.thing_to.add(target)
-        target.tags_update(dict(things = self.impls.keys()))
-        self.instrumentation_publish(target, "things")
+            publish_dict[name] = thing.type
+
 
     def _release_hook(self, target, _force):
         # unplug all the things plugged to this target
         for name, impl in self.impls.iteritems():
-            thing = ttbl.config.targets[name]
+            thing = ttbl.test_target.get(name)
             if impl.get(target, thing):
                 impl.unplug(target, thing)
         # if this target is a thing to other targets, unplug
@@ -120,7 +121,7 @@ class interface(ttbl.tt_interface):
     def get_list(self, target, who, _args, _files, _user_path):
         data = {}
         for thing_name, impl in self.impls.iteritems():
-            thing = ttbl.config.targets[thing_name]
+            thing = ttbl.test_target.get(thing_name)
             if target.target_is_owned_and_locked(who) \
                and thing.target_is_owned_and_locked(who):
                 # FIXME: this is a race condition in the making, this
@@ -138,7 +139,7 @@ class interface(ttbl.tt_interface):
         The user who is plugging must own this target *and* the thing.
         """
         impl, thing_name = self.arg_impl_get(args, "thing")
-        thing = ttbl.config.targets[thing_name]
+        thing = ttbl.test_target.get(thing_name)
         with target.target_owned_and_locked(who), \
              thing.target_owned_and_locked(who):
             return dict(result = impl.get(target, thing))
@@ -152,12 +153,12 @@ class interface(ttbl.tt_interface):
         The user who is plugging must own this target *and* the thing.
         """
         impl, thing_name = self.arg_impl_get(args, "thing")
-        thing = ttbl.config.targets[thing_name]
+        thing = ttbl.test_target.get(thing_name)
         with target.target_owned_and_locked(who), \
              thing.target_owned_and_locked(who):
             if not impl.get(target, thing):
                 impl.plug(target, thing)
-                target.fsdb.set("thing-" + thing.id, 'True')
+                target.fsdb.set("interfaces.things." + thing.id + ".plugged", True)
                 target.timestamp()	# If this works, it is acquired and locked
         return {}
 
@@ -173,11 +174,11 @@ class interface(ttbl.tt_interface):
         things.
         """
         impl, thing_name = self.arg_impl_get(args, "thing")
-        thing = ttbl.config.targets[thing_name]
+        thing = ttbl.test_target.get(thing_name)
         with target.target_owned_and_locked(who), \
              thing.target_owned_and_locked(who):
             if impl.get(target, thing):
                 impl.unplug(target, thing)
-                target.fsdb.set("thing-" + thing.id, None)
+                target.fsdb.set("interfaces.things." + thing.id + ".plugged", False)
                 target.timestamp()	# If this works, it is acquired and locked
         return {}

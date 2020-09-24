@@ -334,6 +334,20 @@ PermitEmptyPasswords yes
 def deploy_linux_ssh_root_nopwd(_ic, target, _kws):
     linux_ssh_root_nopwd(target, "/mnt")
 
+def linux_hostname_set(target, prefix = ""):
+    """
+    Set the target's OS hostname to the target's name
+
+    :param tcfl.tc.target_c target: target where to run
+
+    :param str prefix: (optional) directory where the root partition
+      is mounted.
+    """
+    target.shell.run("echo %s > %s/etc/hostname" % (target.id, prefix))
+
+def deploy_linux_hostname_set(_ic, target, _kws):
+    linux_hostname_set(target, "/mnt")
+
 def linux_sshd_restart(ic, target):
     """
     Restart SSHD in a linux/systemctl system
@@ -406,7 +420,7 @@ def sh_export_proxy(ic, target):
 
        $ export  http_proxy=http://192.168.98.1:8888 \
           https_proxy=http://192.168.98.1:8888 \
-          no_proxy=127.0.0.1,192.168.98.1/24,fc00::62:1/112 \
+          no_proxy=127.0.0.1,192.168.98.1/24,fd:00:62::1/104 \
           HTTP_PROXY=$http_proxy \
           HTTPS_PROXY=$https_proxy \
           NO_PROXY=$no_proxy
@@ -416,20 +430,22 @@ def sh_export_proxy(ic, target):
     """
     proxy_cmd = ""
     if 'http_proxy' in ic.kws:
-        proxy_cmd += " http_proxy=%(http_proxy)s "\
-            "HTTP_PROXY=%(http_proxy)s"
+        target.shell.run("export http_proxy=%(http_proxy)s; "
+                         "export HTTP_PROXY=$http_proxy" % ic.kws)
     if 'https_proxy' in ic.kws:
-        proxy_cmd += " https_proxy=%(https_proxy)s "\
-            "HTTPS_PROXY=%(https_proxy)s"
-    if proxy_cmd != "":
+        target.shell.run("export https_proxy=%(https_proxy)s; "
+                         "export HTTPS_PROXY=$https_proxy" % ic.kws)
+    if 'https_proxy' in ic.kws or 'http_proxy' in ic.kws:
         # if we are setting a proxy, make sure it doesn't do the
         # local networks
-        proxy_cmd += \
-            " no_proxy=127.0.0.1,%(ipv4_addr)s/%(ipv4_prefix_len)s," \
-            "%(ipv6_addr)s/%(ipv6_prefix_len)d,localhost" \
-            " NO_PROXY=127.0.0.1,%(ipv4_addr)s/%(ipv4_prefix_len)s," \
-            "%(ipv6_addr)s/%(ipv6_prefix_len)d,localhost"
+        no_proxyl = [ "127.0.0.1", "localhost" ]
+        if 'ipv4_addr' in ic.kws:
+            no_proxyl += [ "%(ipv4_addr)s/%(ipv4_prefix_len)s" ]
+        if 'ipv6_addr' in ic.kws:
+            no_proxyl += [ "%(ipv6_addr)s/%(ipv6_prefix_len)s" ]
+        proxy_cmd += " no_proxy=" + ",".join(no_proxyl)
         target.shell.run("export " + proxy_cmd % ic.kws)
+        target.shell.run("export NO_PROXY=$no_proxy")
 
 def sh_proxy_environment(ic, target):
     """
@@ -497,6 +513,27 @@ def linux_wait_online(ic, target, loops = 20, wait_s = 0.5):
         "# block until the expected IP is assigned, we are online"
         % (loops, target.addr_get(ic, "ipv4"), wait_s, wait_s),
         timeout = (loops + 1) * wait_s)
+
+
+def linux_wait_host_online(target, hostname, loops = 20):
+    """
+    Wait on the console until the given hostname is pingable
+
+    We make the assumption that once the system is assigned the IP
+    that is expected on the configuration, the system has upstream
+    access and thus is online.
+    """
+    assert isinstance(target, tcfl.tc.target_c)
+    assert isinstance(hostname, basestring)
+    assert loops > 0
+    target.shell.run(
+        "for i in {1..%d}; do"
+        " ping -c 3 %s && break;"
+        "done; "
+        "# block until the hostname pongs"
+        % (loops, hostname),
+        # three pings at one second each
+        timeout = (loops + 1) * 3 * 1)
 
 
 def linux_rsync_cache_lru_cleanup(target, path, max_kbytes):
@@ -576,18 +613,21 @@ def linux_rsync_cache_lru_cleanup(target, path, max_kbytes):
         # And don't print anything...takes too long for large trees
         target.shell.run("""
 import os, errno, stat
-fsbsize = os.statvfs('%(path)s').f_bsize
 l = []
 dirs = []
-for r, dl, fl in os.walk('%(path)s', topdown = False):
-    for fn in fl + dl:
-        fp = os.path.join(r, fn)
-        try:
-            s = os.stat(fp)
-            sd = fsbsize * ((s.st_size + fsbsize - 1) / fsbsize)
-            l.append((s.st_mtime, sd, fp, stat.S_ISDIR(s.st_mode)))
-        except (OSError, FileNotFoundError) as x:
-            pass
+try:
+    fsbsize = os.statvfs('%(path)s').f_bsize
+    for r, dl, fl in os.walk('%(path)s', topdown = False):
+        for fn in fl + dl:
+            fp = os.path.join(r, fn)
+            try:
+                s = os.stat(fp)
+                sd = fsbsize * ((s.st_size + fsbsize - 1) / fsbsize)
+                l.append((s.st_mtime, sd, fp, stat.S_ISDIR(s.st_mode)))
+            except (OSError, FileNotFoundError) as x:
+                pass
+except (OSError, FileNotFoundError) as x:
+    pass
 
 
 acc = 0
@@ -605,8 +645,7 @@ for e in sorted(l, key = lambda e: e[0], reverse = True):
             os.unlink(e[2])
 
 
-exit()
-""" % dict(path = path, max_bytes = max_kbytes * 1024))
+exit()""" % dict(path = path, max_bytes = max_kbytes * 1024))
     finally:
         target.shell.shell_prompt_regex = prompt_original
         testcase.expect_tls_remove(python_error_ex)
@@ -972,31 +1011,35 @@ def linux_package_add(ic, target, *packages, **kws):
 
     packages = list(packages)
     if distro.startswith('clear'):
-        tcfl.tl.swupd_bundle_add(
-            ic, target, packages + kws.get("any", []) + kws.get("clear", []),
-            fix_time = True, set_proxy = True)
+        _packages = packages + kws.get("any", []) + kws.get("clear", [])
+        if _packages:
+            tcfl.tl.swupd_bundle_add(ic, target, _packages,
+                                     fix_time = True, set_proxy = True)
     elif distro == 'centos':
         _packages = packages + kws.get("any", []) + kws.get("centos", [])
-        target.shell.run(
-            "dnf install -qy " +  " ".join(_packages))
+        if _packages:
+            target.shell.run("dnf install -qy " +  " ".join(_packages))
     elif distro == 'fedora':
         _packages = packages + kws.get("any", []) + kws.get("fedora", [])
-        target.shell.run(
-            "dnf install -qy " +  " ".join(_packages))
+        if _packages:
+            target.shell.run(
+                "dnf install --releasever %s -qy " % distro_version
+                +  " ".join(_packages))
     elif distro == 'rhel':
         _packages = packages + kws.get("any", []) + kws.get("rhel", [])
-        target.shell.run(
-            "dnf install -qy " +  " ".join(_packages))
+        if _packages:
+            target.shell.run("dnf install -qy " +  " ".join(_packages))
     elif distro == 'ubuntu':
-        # FIXME: add needed repos [ubuntu|debian]_extra_repos
-        target.shell.run(
-            "sed -i 's/main restricted/main restricted universe multiverse/'"
-            " /etc/apt/sources.list")
-        target.shell.run("apt-get -qy update", timeout = 200)
         _packages = packages + kws.get("any", []) + kws.get("ubuntu", [])
-        target.shell.run(
-            "DEBIAN_FRONTEND=noninteractive"
-            " apt-get install -qy " +  " ".join(_packages))
+        if _packages:
+            # FIXME: add needed repos [ubuntu|debian]_extra_repos
+            target.shell.run(
+                "sed -i 's/main restricted/main restricted universe multiverse/'"
+                " /etc/apt/sources.list")
+            target.shell.run("apt-get -qy update", timeout = 200)
+            target.shell.run(
+                "DEBIAN_FRONTEND=noninteractive"
+                " apt-get install -qy " +  " ".join(_packages))
     else:
         raise tcfl.tc.error_e("unknown OS: %s %s (from /etc/os-release)"
                               % (distro, distro_version))

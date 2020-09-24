@@ -28,10 +28,12 @@ class pos_mode_c(ttbl.power.impl_c):
     """
     Power controller to redirect a machine's boot to network upon ON
 
+    Other parameters as to :class:ttbl.power.impl_c.
+
     This can be used in the power rail of a machine that can be
     provisioned with :ref:`Provisioning OS <provisioning_os>`, instead
     of using pre power-on hooks (such as
-    :meth:`pci_ipmitool.pre_power_pos_setup`).
+    :meth:`pci.pre_power_pos_setup`).
 
     When the target is being powered on, this will be called, and
     based if the value of the *pos_mode* property is *pxe*, the RedFish
@@ -42,10 +44,10 @@ class pos_mode_c(ttbl.power.impl_c):
     Otherwise, it'll let the machine to default boot off the local
     disk. 
     """
-    def __init__(self, bmc_url, verify = True):
+    def __init__(self, bmc_url, verify = True, **kwargs):
         assert isinstance(bmc_url, basestring)
         assert isinstance(verify, bool)
-        ttbl.power.impl_c.__init__(self, paranoid = True)
+        ttbl.power.impl_c.__init__(self, paranoid = True, **kwargs)
         self.power_on_recovery = False
         self.paranoid_get_samples = 0
         url = urlparse.urlparse(bmc_url)

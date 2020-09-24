@@ -48,8 +48,9 @@ import tcfl.pos
 
 @tcfl.tc.tags(ignore_example = True)
 @tcfl.tc.interconnect('ipv4_addr', mode = 'all')
-@tcfl.tc.target("pos_capable and capture:'front_astream:stream' "
-                "and ic.id in interconnects")
+@tcfl.tc.target('pos_capable'
+                ' and interfaces.capture.front_astream.type == "stream"'
+                ' and ic.id in interconnects')
 class _test(tcfl.pos.tc_pos0_base):
     """
     Simple audio test
