@@ -131,6 +131,14 @@ def ansi_key_code(key, term):
     raise unknown_key_code_e("unknown key code %s for term %s"
                              % (key, term))
 
+def entry_select(target, wait = 0.5):
+    # sometimes it needs to wait a wee bit for the menu to settle; so
+    # do it here
+    # in the future this will include more things, BIOS specific, to
+    # select entries
+    time.sleep(wait)
+    target.console_tx("\r")
+
 def menu_scroll_to_entry(
         target, entry_string, has_value = False,
         max_scrolls = 30, direction = "down",
@@ -329,9 +337,14 @@ def menu_scroll_to_entry(
                                    % (name, skips), dlevel = 1)
                 # sometimes these are caused by bad serial lines,
                 # with key characters missed, so we just try to
-                # scroll up and down and see what happens
-                target.console_tx("\x1b[B")		# press arrow down
-                target.console_tx("\x1b[A")		# press arrow up
+                # scroll up and try again; we don't try to go up and
+                # down because it confuses the state machine.
+                skips += 0.5
+                if _direction:
+                    # FIXME: use get_key() -- how do we pass the terminal encoding?
+                    target.console_tx("\x1b[B")			# press arrow up
+                else:
+                    target.console_tx("\x1b[A")			# press arrow down
                 continue
             # the key always matches spaces all the way to the end, so it
             # needs to be stripped
@@ -494,7 +507,7 @@ def menu_dig_to(
         if cnt < entries_len or cnt == entries_len and dig_last == True:
             target.report_info("BIOS: %s: selecting menu entry '%s'"
                                % (_menu_name, entry_next))
-            target.console_tx("\r")
+            entry_select(target)
 
             # Wait for main menu title
             #
@@ -845,10 +858,10 @@ def menu_config_network_enable(target):
 
     target.report_info("BIOS: %s: enabling (was: %s)" % (entry, value))
     # it's disabled, let's enable
-    target.console_tx("\r")			# select it
+    entry_select(target)			# select it
     # geee ... some do Enable, some Enabled (see the missing d)
     multiple_entry_select_one(target, "Enabled?")
-    target.console_tx("\r")			# select it
+    entry_select(target)			# select it
     # Need to hit ESC twice to get the "save" menu
     target.console_tx("\x1b\x1b")
     dialog_changes_not_saved_expect(target, "Y")
@@ -868,7 +881,7 @@ def menu_reset(target):
     # reset to apply new boot option
     r = menu_scroll_to_entry(target, "Reset")
     if r:
-        target.console_tx("\r")
+        entry_select(target)
     else:
         raise tcfl.tc.error_e("BIOS: can't find 'Reset'")
 
@@ -887,7 +900,7 @@ def menu_continue(target):
     # reset to apply new boot option
     r = menu_scroll_to_entry(target, "Continue")
     if r:
-        target.console_tx("\r")
+        entry_select(target)
     else:
         raise tcfl.tc.error_e("BIOS: can't find 'Continue'")
 
@@ -1009,7 +1022,7 @@ def boot_network_http_boot_add_entry(target, entry, url):
     r = menu_scroll_to_entry(target, "Input the description",
                              level = "HTTP Boot Menu",
                              has_value = True)
-    target.console_tx("\r")			# select it
+    entry_select(target)			# select it
     # this pops a menu in the middle of the screen
     # /-----------------------------------------------------------------\
     # |                                                                 |
@@ -1025,14 +1038,14 @@ def boot_network_http_boot_add_entry(target, entry, url):
     _paced_send(target, "\x08" * len(value))
     # Fill our new value
     _paced_send(target, entry)
-    target.console_tx("\r")			# select it
+    entry_select(target)			# select it
     # wait until the menu redraw's otherwise we'll get false positives
     target.expect("^v=Move Highlight")
 
     r = menu_scroll_to_entry(target, "Boot URI",
                              level = "HTTP Boot Menu",
                              has_value = True)
-    target.console_tx("\r")			# select it
+    entry_select(target)			# select it
     # this pops a menu in the middle of the screen
     # /-------------------------------------------------------------\
     # |                                                             |
@@ -1048,7 +1061,7 @@ def boot_network_http_boot_add_entry(target, entry, url):
     _paced_send(target, "\x08" * len(value))
     # Fill our new value
     _paced_send(target, url)
-    target.console_tx("\r")			# select it
+    entry_select(target)			# select it
     # wait until the menu redraw's otherwise we'll get false positives
     target.expect("^v=Move Highlight")
 
@@ -1082,7 +1095,7 @@ def main_boot_select_entry(target, boot_entry):
                              level = "main menu")
     if not r:
         raise tcfl.tc.error_e("BIOS: can't find boot manager menu")
-    target.console_tx("\r")			# select it
+    entry_select(target)			# select it
     submenu_header_expect(target, "Boot Manager Menu",
                           canary_end_menu_redrawn = None)
     r = menu_scroll_to_entry(target, boot_entry,
@@ -1130,7 +1143,7 @@ def boot_network_http(target, entry, url,
         else:
             main_menu_expect(target)
         if main_boot_select_entry(target, entry):
-            target.console_tx("\r")			# select it
+            entry_select(target)			# select it
             break
         target.report_info("BIOS: can't find HTTP network boot entry '%s';"
                            " attempting to enable EFI network support"
@@ -1204,7 +1217,7 @@ def boot_network_pxe(target, entry = "UEFI PXEv4.*",
         else:
             main_menu_expect(target)
         if main_boot_select_entry(target, entry):
-            target.console_tx("\r")			# select it
+            entry_select(target)			# select it
             break
         target.report_info("BIOS: can't find PXE network boot entry '%s';"
                            " attempting to enable EFI network support"
@@ -1230,7 +1243,7 @@ def boot_efi_shell(target):
     main_menu_expect(target)
 
     if main_boot_select_entry(target, "EFI .* Shell"):
-        target.console_tx("\r")			# select it
+        entry_select(target)			# select it
         target.expect("Shell>")
     else:
         raise tcfl.tc.error_e("BIOS: can't find an EFI shell entry")
