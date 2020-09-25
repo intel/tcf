@@ -65,6 +65,7 @@ would need a different context:
 
 """
 
+import argparse
 import collections
 import contextlib
 import errno
@@ -1735,8 +1736,17 @@ def _cmdline_console_wall(args):
 
         # Compute how many rows and columns we'll need to host all the
         # consoles
-        rows = int(math.sqrt(len(consolel)))
-        columns = (len(consolel) + rows - 1) // rows
+        if args.rows and args.columns:
+            raise RuntimeError("can't specify rows and columns")
+        if args.rows != None:
+            rows = args.rows
+            columns = (len(consolel) + rows - 1) // rows
+        elif args.columns != None:
+            columns = args.columns
+            rows = len(consolel) // args.columns
+        else:
+            rows = int(math.sqrt(len(consolel)))
+            columns = (len(consolel) + rows - 1) // rows
 
         # Write the GNU screen config file that will divide the window
         # in sub-windows (screens in GNU screen parlance and run the
@@ -1915,6 +1925,17 @@ def _cmdline_setup(arg_subparser):
     ap.set_defaults(func = _cmdline_console_enable)
 
 
+    def _check_positive(value):
+        try:
+            value = int(value)
+        except TypeError as e:
+            raise argparse.ArgumentTypeError(
+                f"{value}: expected integer; got {type(value)}") from e
+        if not value > 0:
+            raise argparse.ArgumentTypeError(
+                f"{value}: expected non-zero positive integer")
+        return value
+
     ap = arg_subparser.add_parser(
         "console-wall",
         help = "Display multiple serial consoles in a tiled terminal"
@@ -1926,6 +1947,14 @@ def _cmdline_setup(arg_subparser):
                     action = "store", default = None,
                     help = "name to set for this wall (defaults to "
                     "the target specification")
+    ap.add_argument("--rows", "-r", metavar = "ROWS",
+                    action = "store", type = _check_positive, default = None,
+                    help = "fix rows to ROWS (default auto)"
+                    " incompatible with -o|--columns")
+    ap.add_argument("--columns", "-o", metavar = "COLUMNS",
+                    action = "store", type = int, default = None,
+                    help = "fix rows to COLUMNS (default auto)"
+                    ";  incompatible with -r|--rows")
     ap.add_argument("--console", "-c", metavar = "CONSOLE",
                     action = "append", default = None,
                     help = "Read only from the named consoles (default: all)")
