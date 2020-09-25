@@ -5970,6 +5970,9 @@ class tc_c(reporter_c):
         # need a better fix
         timeout *= 1 + tc_c._tcs_total / 3.0
 
+        # ensure we have an entry for this server in the list of
+        # _allocids we have to remove if we Ctrl-C
+        _allocids.setdefault(rtb, set())
         # FIXME: use commonl.progress("")
         allocid, state, targetids = target_ext_alloc._alloc_targets(
             rtb,
@@ -5978,7 +5981,8 @@ class tc_c(reporter_c):
             preempt = self.preempt,
             priority = self.priority,
             queue_timeout = timeout,
-            reason = self.reason % commonl.dict_missing_c(self.kws))
+            reason = self.reason % commonl.dict_missing_c(self.kws),
+            register_at = _allocids[rtb])
         if state != 'active':
             # FIXME: this need sto carry more data, we've lost a lot
             # on the way here
@@ -5998,9 +6002,14 @@ class tc_c(reporter_c):
         finally:
             self._prefix_update()
             if tc_c.release:
+                if allocid in _allocids[rtb]:
+                    # remove from the Ctrl-C list? it might have been
+                    # removed already
+                    _allocids[rtb].remove(allocid)
+                # but just in case do it in the server too
                 target_ext_alloc._delete(rtb, allocid)
                 self.report_info(
-                    "acquired",
+                    "released",
                     dict(
                         targets = targetids,
                         servers = [ str(rtb) for rtb in rtbs ],
@@ -7970,6 +7979,11 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
 import report_console
 import report_jinja2
 
+# list of allocation IDs we have currently reserved; this list is
+# local to each thread so when we interrupt it with a signal, we can
+# ask the server to drop those reservations
+_allocids = {}
+
 def _run(args):
     """
     Runs one ore more test cases
@@ -8186,14 +8200,33 @@ def _run(args):
 
         tc_c._tcs_total = len(tcs_filtered)
         threads_no = int(args.threads)
+        tp = None
 
         def _sigint_handler(signum, frame):
-            logging.error("brute force termination")
+            # FIXME: move to a sigaction and don't exit, in case we are called from a
+            # library
+            # FIXME: move one level up
+            logging.error("brute force termination; cleaning up..couple secs")
+            if tc_c.release:
+                # if we are to release targets, do so on cancellation;
+                # if the user has given --no-release, then we leave
+                # them in whatever state they are, since we might have
+                # an user just wanting to cancel to take manual control
+                for rtb in _allocids:
+                    # FIXME: this has to be done so we can submit a list
+                    #        of allocids to remove
+                    for allocid in _allocids[rtb]:
+                        logging.error("removing allocation %s on %s",
+                                      allocid, rtb)
+                        target_ext_alloc._delete(rtb, allocid)
+                _allocids[rtb].clear()
+            if tp:
+                tp.terminate()
+            time.sleep(1)
+            os.kill(0, 9)
             if args.remove_tmpdir:
                 shutil.rmtree(tc_c.tmpdir, True)
-            os.kill(0, 9)
-            tp.terminate()
-            sys.exit()
+            sys.exit(1)
 
         signal.signal(signal.SIGINT, _sigint_handler)
         signal.signal(signal.SIGQUIT, _sigint_handler)
