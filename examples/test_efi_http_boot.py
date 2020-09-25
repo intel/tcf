@@ -64,18 +64,18 @@ URL is::
   INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+105.5s]: BIOS:Boot Manager Menu: scrolling to 'HTTP yka3'
   ...
   INFO2/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+105.9s]: BIOS:Boot Manager Menu/HTTP yka3: highlighted entry found
-  INFO2/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+106.7s]: serial0: wrote 1B (\r) to console
+  INFO2/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+106.7s]: serial0: wrote 1B (\\r) to console
   INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+107.2s]: 14/Start__HTTP__Boot: found 'Start\\ HTTP\\ Boot' at @280753-280768 on console local/qu-06b:serial0 [report-:zo6ots.console-target.qu-06b.serial0.txt]
   ...
-  INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+107.2s]:    console output: \r
+  INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+107.2s]:    console output: \\r
   INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+107.2s]:    console output: >>Start HTTP Boot over IPv4...
   INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+110.6s]: 15/Downloading______: found 'Downloading\\.\\.\\.' at @280919-280933 on console local/qu-06b:serial0 [report-:zo6ots.console-target.qu-06b.serial0.txt]
-  INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+110.6s]:    console output:  over IPv4.....\r
-  INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+110.6s]:    console output:   Station IP address is 10.291.183.9\r
-  INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+110.6s]:    console output: \r
-  INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+110.6s]:    console output:   URI: http://file.server//boot.img\r
-  INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+110.6s]:    console output:   File Size: 110100480 Bytes\r
-  INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+110.6s]:    console output: \r  Downloading...1%\r  Downloading...2%
+  INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+110.6s]:    console output:  over IPv4.....\\r
+  INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+110.6s]:    console output:   Station IP address is 10.291.183.9\\r
+  INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+110.6s]:    console output: \\r
+  INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+110.6s]:    console output:   URI: http://file.server//boot.img\\r
+  INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+110.6s]:    console output:   File Size: 110100480 Bytes\\r
+  INFO3/zo6otsE#1	test_efi_http_boot.py @huty-ehnc|local/qu-06b [+110.6s]:    console output: \\r  Downloading...1%\\r  Downloading...2%
   PASS1/zo6ots	test_efi_http_boot.py @huty-ehnc [+110.6s]: evaluation passed 
   PASS0/	toplevel @local [+115.2s]: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:01:51.024391) - passed 
   
