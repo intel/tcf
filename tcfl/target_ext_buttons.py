@@ -199,7 +199,7 @@ def _cmdline_button_double_click(args):
         target = tc.target_c.create_from_cmdline_args(
             args, iface = extension.iface_name)
         target.button.double_click(args.button_name,
-                                   args.click_time, args.wait_time)
+                                   args.click_time, args.interclick_time)
 
 def _cmdline_button_list(args):
     with msgid_c("cmdline"):
@@ -235,7 +235,7 @@ def _cmdline_setup(argsp):
                     default = None, help = "Target's name or URL")
     ap.add_argument("button_name", metavar = "BUTTON-NAME", action = "store",
                     type = str, help = "Name of the button")
-    ap.add_argument("-c", "--click-time", metavar = "CLICK-TIME",
+    ap.add_argument("-w", "--click-time", metavar = "CLICK-TIME",
                     action = "store", type = float, default = 0.25,
                     help = "Seconds to click for (%(default).2fs)")
     ap.set_defaults(func = _cmdline_button_click)
@@ -246,10 +246,10 @@ def _cmdline_setup(argsp):
                     default = None, help = "Target's name or URL")
     ap.add_argument("button_name", metavar = "BUTTON-NAME", action = "store",
                     type = str, help = "Name of the button")
-    ap.add_argument("-c", "--click-time", metavar = "CLICK-TIME",
+    ap.add_argument("-w", "--click-time", metavar = "CLICK-TIME",
                     action = "store", type = float, default = 0.25,
                     help = "Seconds to click for (%(default).2fs)")
-    ap.add_argument("-w", "--wait-time", metavar = "WAIT-TIME",
+    ap.add_argument("-i", "--interclick-time", metavar = "WAIT-TIME",
                     action = "store", type = float, default = 0.25,
                     help = "Seconds to wait between clicks (%(default).2fs)")
     ap.set_defaults(func = _cmdline_button_double_click)
