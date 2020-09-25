@@ -50,6 +50,14 @@ evertything:
 .. automodule:: examples.test_qemu_bios_N
 .. automodule:: examples.test_deploy_files
 .. automodule:: examples.test_linux_kernel
+
+Booting off images on the network
+---------------------------------
+
+Instead of connecting a USB drive to a machine, modern BIOSes can
+download an image for you and boot off it.
+
+.. automodule:: examples.test_efi_http_boot
 .. automodule:: examples.test_efi_ipxe_sanboot
 
 Finding stuff in the desktop and injecting input
@@ -295,9 +303,9 @@ If the target is already acquired, you can find the allocation ID with
    SERVER/TARGETNAME [USERNAME:b2Bkhb]
 
 *b2Bkhb* is the allocation ID in this case; now use *tcf
- acquire... --hold* to keep it allocated::
+acquire... --hold* to keep it allocated::
 
-   $ tcf -a b2Bkhb acquire TARGETNAME --hold
+  $ tcf -a b2Bkhb acquire TARGETNAME --hold
 
 Read on for how this can be combined with *tcf run*
 
