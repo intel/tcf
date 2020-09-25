@@ -1487,8 +1487,8 @@ def _cmdline_console_read(args):
                     backoff_wait *= 2
                 else:
                     backoff_wait = 0.1
-                if backoff_wait >= 4:
-                    backoff_wait = 4
+                if backoff_wait >= args.max_backoff_wait:
+                    backoff_wait = args.max_backoff_wait
 
                 time.sleep(backoff_wait)	# no need to bombard the server..
         finally:
@@ -1660,10 +1660,10 @@ def _cmdline_console_wall(args):
                         done = True
                     descr = consolel[item]
                     cf.write(
-                        'screen -c %s console-read %s -c %s --follow\n'
+                        'screen -c %s console-read %s --max-backoff-wait %f -c %s --follow\n'
                         'title %s\n\n' % (
                             sys.argv[0],
-                            descr.target.fullid, descr.console, item
+                            descr.target.fullid, args.max_backoff_wait, descr.console, item
                         ))
                     if done or item == console_names[-1]:
                         break
@@ -1718,6 +1718,11 @@ def _cmdline_setup(arg_subparser):
                     action = "store_true", default = False,
                     help = "Continue reading in a loop until Ctrl-C is "
                     "pressed")
+    ap.add_argument(
+        "--max-backoff-wait",
+        action = "store", type = float, metavar = "SECONDS", default = 2,
+        help = "Maximum number of seconds to backoff wait for"
+        " data (%(default)ss)")
     ap.set_defaults(func = _cmdline_console_read, offset = 0)
 
     ap = arg_subparser.add_parser(
@@ -1819,6 +1824,11 @@ def _cmdline_setup(arg_subparser):
     ap.add_argument("--console", "-c", metavar = "CONSOLE",
                     action = "append", default = None,
                     help = "Read only from the named consoles (default: all)")
+    ap.add_argument(
+        "--max-backoff-wait",
+        action = "store", type = float, metavar = "SECONDS", default = 2,
+        help = "Maximum number of seconds to backoff wait for"
+        " data (%(default)ss)")
     ap.add_argument(
         "target", metavar = "TARGETSPEC", nargs = "*",
         action = "store", default = [],
