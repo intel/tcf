@@ -54,8 +54,18 @@ def _delete(rtb, allocid):
 # FIXME: what happens if the conn
 def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
                    queue_timeout = None, priority = 700, preempt = False,
-                   queue = True, reason = None, wait_in_queue = True):
+                   queue = True, reason = None, wait_in_queue = True,
+                   register_at = None):
+    """
+    :param set register_at: (optional) if given, this is a set where
+      we will add the allocation ID created only if ACTIVE or QUEUED
+      inmediately as we get it before doing any waiting.
+
+      This is used for being able to cleanup on the exit path if the
+      client is cancelled.
+    """
     assert isinstance(groups, dict)
+    assert register_at == None or isinstance(register_at, set)
 
     data = dict(
         priority = priority,
@@ -76,6 +86,8 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
             "allocation failed: %s: %s"
             % (state, r.get('_message', 'message n/a')))
     allocid = r['allocid']
+    if register_at != None:	# if empty, it is ok
+        register_at.add(allocid)
     data = { allocid: state }
     if state == 'active':			# got it
         return allocid, state, r['group_allocated'].split(',')

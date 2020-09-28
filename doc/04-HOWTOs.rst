@@ -42,6 +42,7 @@ evertything:
 .. automodule:: examples.test_pos_base
 .. automodule:: examples.test_pos0_base
 .. automodule:: examples.test_pos_deploy
+.. automodule:: examples.test_pos_ssh_enable
 .. automodule:: examples.test_pos_deploy_2
 .. automodule:: examples.test_pos_deploy_N
 .. automodule:: examples.test_pos_boot
@@ -50,6 +51,14 @@ evertything:
 .. automodule:: examples.test_deploy_files
 .. automodule:: examples.test_linux_kernel
 
+Booting off images on the network
+---------------------------------
+
+Instead of connecting a USB drive to a machine, modern BIOSes can
+download an image for you and boot off it.
+
+.. automodule:: examples.test_efi_http_boot
+.. automodule:: examples.test_efi_ipxe_sanboot
 
 Finding stuff in the desktop and injecting input
 ------------------------------------------------
@@ -154,6 +163,38 @@ slightly more reliable to use:
 *\x04* is the ASCII end-of-transmission character, *Ctrl-D*. This is
 the equivalent of typing the file contents on the command line.
 
+Accessing the server API without the TCFL library
+=================================================
+
+The :ref:`server API <ttbd_api_http>` can also be accessed in other
+ways outside the TCFL library:
+
+Accessing the HTTP API from Python with *requests*
+--------------------------------------------------
+
+Sample code snippet to access a server using Python and the requests
+module instead of the :ref:`TCF library<examples_script>` library.
+
+This :download:`snippet <../examples/code/python.py>`:
+
+- logs in to a server, acquiring credentials via cookies (which are
+  then used for the rest of the operations)
+
+- allocates a machine
+
+- powers the machine off
+
+- powers the machine on
+
+- releases the machine
+
+
+.. literalinclude:: /examples/code/python.py
+   :language: python
+
+
+
+
 
 TCF client tricks
 =================
@@ -255,6 +296,18 @@ server indicating the machine is under active use. It will keep
 sending commands until you cancel it (or give it a time length for
 which to send keep alives).
 
+If the target is already acquired, you can find the allocation ID with
+*tcf ls -v*::
+
+   $ tcf ls -v TARGETNAME
+   SERVER/TARGETNAME [USERNAME:b2Bkhb]
+
+*b2Bkhb* is the allocation ID in this case; now use *tcf
+acquire... --hold* to keep it allocated::
+
+  $ tcf -a b2Bkhb acquire TARGETNAME --hold
+
+Read on for how this can be combined with *tcf run*
 
 How do I keep a target acquired/reserved after *tcf run* is done?
 -----------------------------------------------------------------
@@ -280,7 +333,7 @@ to find the allocation ID, upon completion::
 to maintain the target acquired and powered while potentially
 debugging or testing other things, run in a separate console, run::
 
-  $ tcf -a ALLOCID nwa qu04a --hold
+  $ tcf -a ALLOCID acquire nwa qu04a --hold
   OoOWEa: NOT ALLOCATED! Holdin allocation ID given with -a
   allocation ID OoOWEa: [+224.5s] keeping alive during state 'active'
 
@@ -2339,7 +2392,7 @@ going to be connected or certain OSes / testcases are to be used:
        https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-59.tar.gz
 
     2. Extract to */opt/xtensa-esp32-elf*::
-       
+
          # tar xf xtensa-esp32-elf-linux64-1.22.0-59.tar.gz -C /opt
 
     3. Add to */etc/environment*::

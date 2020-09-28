@@ -29,9 +29,12 @@ def _user_list(rtb, userids):
             try:
                 result.update(rtb.send_request("GET", "users/" + userid))
             except Exception as e:
-                logging.error("%s: error getting info: %s", userid, e)
+                logging.error("%s: error getting user's info: %s", userid, e)
     else:
-        result.update(rtb.send_request("GET", "users/"))
+        try:
+            result.update(rtb.send_request("GET", "users/"))
+        except Exception as e:
+            logging.error("error getting all user info: %s", e)
     return result
 
 def _cmdline_user_list(args):
