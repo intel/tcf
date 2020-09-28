@@ -1249,6 +1249,18 @@ class logfile_c(impl_c):
         else:
             file_name = self.logfile_name
         return self._size(target, component, file_name)
+
+    def setup(self, target, component, parameters):
+        # we use the setup call to wipe the log file
+        if not os.path.isabs(self.logfile_name):
+            file_name = os.path.join(target.state_dir, self.logfile_name)
+        else:
+            file_name = self.logfile_name
+        try:
+            os.unlink(file_name)
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
     
     def read(self, target, component, offset):
         # read the file; however, let's do a basic attempt at
@@ -1283,20 +1295,15 @@ class logfile_c(impl_c):
     def write(_target, component, _data):
         raise RuntimeError("%s: logfile console is read only" % component)
 
+    # we do not touch the logfile when we enable/disable, since these
+    # paths are very common during normal execution and we don't want
+    # that to (for example) remove the log file, since we would loose
+    # access to its contents.
     def enable(self, _target, _component):
         pass
 
     def disable(self, target, _component):
-        if not os.path.isabs(self.logfile_name):
-            file_name = os.path.join(target.state_dir, self.logfile_name)
-        else:
-            file_name = self.logfile_name
-        try:
-            os.unlink(file_name)
-        except OSError as e:
-            if e.errno != errno.ENOENT:
-                raise
-            # ok, it was already disabled
+        pass
 
     # power and console interface
     def state(self, target, component):
