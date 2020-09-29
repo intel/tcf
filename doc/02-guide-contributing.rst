@@ -83,17 +83,16 @@ running locally on your machine:
          android-tools \
          gvnc-tools \
          make \
-         python-ply \
-         python2-pykwalify \
-         python-requests \
-         python2-Levenshtein \
-         python2-backports-functools_lru_cache \
-         python2-jinja2 \
-         python2-junit_xml \
-         python2-keyring \
-         python2-numpy \
-         python2-opencv \
-         python2-pyyaml
+         python3-ply \
+         python3-pykwalify \
+         python3-requests \
+         python3-Levenshtein \
+         python3-jinja2 \
+         python3-junit_xml \
+         python3-keyring \
+         python3-numpy \
+         python3-opencv \
+         python3-pyyaml
 
      server::
 
@@ -112,29 +111,29 @@ running locally on your machine:
          openocd \
          openssh-clients \
          parted \
-         pexpect \
-         pyOpenSSL \
-         pyserial \
-         python-flask \
-         python-flask-login \
-         python-flask-principal \
-         python-ldap \
-         python-ply \
-         python-requests \
-         python-systemd \
-         python-tornado \
-         python-werkzeug \
-         python2-devel \
-         python2-keyring \
-         python2-pyghmi \
-         python2-pysnmp \
-         pyusb \
+         python3-pexpect \
+         python3-pyOpenSSL \
+         python3-pyserial \
+         python3-flask \
+         python3-flask-login \
+         python3-flask-principal \
+         python3-ldap \
+         python3-ply \
+         python3-requests \
+         python3-systemd \
+         python3-tornado \
+         python3-werkzeug \
+         python3-devel \
+         python3-keyring \
+         python3-pyghmi \
+         python3-pysnmp \
+         python3-pyusb \
          qemu \
          socat \
          sshpass \
          tftp-server \
          v4l-utils
-       $ pip2 install --user sdnotify python-prctl
+       $ pip3 install --user sdnotify python-prctl
 
      If you will be isntrumenting targets with video capture, you
      might need *ffmpeg* installed on your servers (see
@@ -146,9 +145,9 @@ running locally on your machine:
 
        # yum install -y ffmpeg
      
-   - pure PIP2 dependencies::
+   - pure PIP3 dependencies::
 
-         $ pip2 install --user \
+         $ pip3 install --user \
             Flask              \
             Flask-Login        \
             Flask-Principal    \
@@ -156,7 +155,7 @@ running locally on your machine:
             Werkzeug           \
             keyring            \ 
             ply                \
-            prctl              \
+            python-prctl       \
             pykwalify          \
             pyserial           \
             python-Levenshtein \
