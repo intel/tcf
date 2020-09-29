@@ -16,8 +16,8 @@ requires =
          openocd
          openssh-clients
          parted
-         pyOpenSSL
-         pyserial
+         python3-pyOpenSSL
+         python3-pyserial
          python3-ldap
          python3-ply
          python3-pyghmi
@@ -55,7 +55,7 @@ build_requires =
          gcc
          git
          make
-         python-devel
+         python3-devel
 pre-install = rpm-pre-install.sh
 post-install = rpm-post-install.sh
 post-uninstall = rpm-post-install.sh

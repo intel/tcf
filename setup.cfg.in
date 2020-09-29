@@ -10,17 +10,16 @@ requires =
          make
          python-ply
          python-requests
-         @@Fedora@@python2-Levenshtein
+         @@Fedora@@python3-Levenshtein
          @@CentOS|RHEL@@python-Levenshtein
-         python2-pykwalify
-         python2-backports-functools_lru_cache
-         python2-jinja2
-         python2-junit_xml
-         python2-keyring
-         python2-numpy
-         @@Fedora@@python2-opencv
+         python3-pykwalify
+         python3-jinja2
+         python3-junit_xml
+         python3-keyring
+         python3-numpy
+         @@Fedora@@python3-opencv
          @@CentOS|RHEL@@opencv-python
-         python2-pyyaml
-         python2-tabulate
+         python3-pyyaml
+         python3-tabulate
 
 doc_files = *.rst doc/* _doc/html/*
