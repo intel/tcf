@@ -696,6 +696,9 @@ class tt_interface_impl_c(object):
         #: >>>     serial_number = "RS33433E",
         #: >>>     location = "USB port #4 front"))
         self.upid = kwargs
+        #: Unique ID for this instrument/device -- this gets filled in
+        #: by the daemon upon initialization
+        self.upid_index = None
 
     def upid_set(self, name_long, **kwargs):
         """
@@ -1249,6 +1252,7 @@ class tt_interface(object):
             tags_interface[component] = {
                 "instrument": index
             }
+            impl.upid_index = index
             # FIXME: there must be a more efficient way than using
             # pprint.pformat
             components_by_index[index].append(component)
