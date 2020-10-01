@@ -1330,6 +1330,8 @@ if __name__ == "__main__":
         raise RuntimeError("can't give --no-ssl and --ssl* options")
 
     ttbl.allocation.init()
+    for target in ttbl.test_target.known_targets():
+        target.fsdb_cleanup()
 
     #
     # Make this process a reaper
