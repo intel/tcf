@@ -331,6 +331,7 @@ class fsdb_symlink_c(fsdb_c):
     def set(self, key, value, force = True):
         # escape out slashes and other unsavory characters in a non
         # destructive way that won't work as a filename
+        key_orig = key
         key = urllib.quote(
             key, safe = '-_ ' + string.ascii_letters + string.digits)
         location = os.path.join(self.location, key)
@@ -359,11 +360,24 @@ class fsdb_symlink_c(fsdb_c):
                 raise ValueError("can't store value of type %s" % type(value))
             assert len(value) < 4096
         if value == None:
+            # note that we are setting None (aka: removing the value)
+            # we also need to remove any "subfield" -- KEY.a, KEY.b
             try:
                 os.unlink(location)
             except OSError as e:
                 if e.errno != errno.ENOENT:
                     raise
+            # FIXME: this can be optimized a lot, now it is redoing a
+            # lot of work
+            for key_itr in self.keys(key_orig + ".*"):
+                key_itr_raw = urllib.quote(
+                    key_itr, safe = '-_ ' + string.ascii_letters + string.digits)
+                location = os.path.join(self.location, key_itr_raw)
+                try:
+                    os.unlink(location)
+                except OSError as e:
+                    if e.errno != errno.ENOENT:
+                        raise
             return True	# already wiped by someone else
         if force == False:
             try:
