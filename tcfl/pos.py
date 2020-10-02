@@ -2525,3 +2525,47 @@ def edkii_pxe_ipxe_target_power_cycle_to_normal(target):
 # Register capabilities
 capability_register('boot_to_normal', 'edkii+pxe+ipxe',
                     edkii_pxe_ipxe_target_power_cycle_to_normal)
+
+
+def target_power_cycle_pos_serial_f12_ipxe(target):
+    """
+    Direct a target that is preconfigured to boot off the network with
+    iPXE to boot in Provisioning mode
+
+    .. note:: This utility function is be used by
+              :meth:`target.pos.boot_to_pos
+              <tcfl.pos.extension.boot_to_pos>` as a mathod to direct
+              a target to do a Provisoning OS boot based on what the target's
+              pos_capable.boot_to_pos capability declares.
+
+
+    Assumptions:
+
+    - Target's BIOS is available over the default console
+
+    - Target's BIOS prints::
+
+        Press [F12] to boot from network
+
+      when it starts
+
+    - Target's network boot is preconfigured to boot to an iPXE
+      destination (eg: by asking for DHCP that sets a boot server and
+      file that loads iPXE)
+
+    - The iPXE destination is configured to allow *Ctrl-B* to be used
+
+    """
+    target.report_info("POS: setting target to PXE boot Provisioning OS")
+    target.property_set("pos_mode", "pxe")
+    target.power.cycle()
+    # Now setup the local boot loader to boot off that
+    target.property_set("pos_mode", "local")
+    # this is how we know the BIOS booted
+    #target.expect("Primary Bios Version")	# helps us to measure times
+    target.expect(re.compile(r"Press +\[F12\] +to boot from network"))
+    target.console.write(biosl.ansi_key_code("F12", "vt100"))
+    ipxe_seize_and_boot(target)
+
+capability_register('boot_to_pos', 'serial_f12_ipxe',
+                    target_power_cycle_pos_serial_f12_ipxe)
