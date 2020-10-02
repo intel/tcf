@@ -42,15 +42,7 @@ would generate a json file like::
 
 """
 
-import codecs
-import datetime
-import os
-import types
 
-import pymongo
-
-import commonl
-import tcfl
 import tc
 
 class driver(tc.report_driver_c):

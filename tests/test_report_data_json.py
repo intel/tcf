@@ -60,7 +60,7 @@ class _subtest1_base(tcfl.tc.subtc_c):
                     ))
                 issues = True
                 continue
-            self.report_data(domain, name, value)
+            self.report_pass("%s/%s matches value %s" % (domain, name, value))
         if issues:
             raise tcfl.tc.failed_e("issues found")
         self.report_pass("all values are valid")
