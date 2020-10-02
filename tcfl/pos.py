@@ -1992,31 +1992,16 @@ pos_cmdline_opts = {
 }
 
 
-def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
-    """Wait for iPXE to boot on a serial console, seize control and
-    direct boot to a giveb TCF POS image
+def ipxe_seize(target):
+    """Wait for iPXE to boot on a serial console, seize control onto
+    the iPXE command line
 
-    This function is a building block to implement functionality to
-    force a target to boot to Provisioning OS; once a target is made
-    to boot an iPXE bootloader that has enabled Ctrl-B (to interrupt
-    the boot process) functionality, this function sends Ctrl-Bs to
-    get into the iPXE command line and then direct the system to boot
-    the provisioning OS image described
+    Once a target is made to boot an iPXE bootloader that has enabled
+    Ctrl-B (to interrupt the boot process) functionality, this
+    function sends Ctrl-Bs to get into the iPXE command line and then
+    direct the system to boot the provisioning OS image described
 
     :param tcfl.tc.target_c target: target on which to operate
-
-    :param bool dhcp: (optional) have iPXE issue DHCP for IP
-      configuration or manually configure using target's data.
-
-    :param str url: (optional) base URL where to load the *pos_image*
-      from; this will ask to load *URL/vmlinuz-POSIMAGE* and
-      *URL/initrd-POSIMAGE*.
-
-      By default, this is taken from the target's keywords
-      (*pos_http_url_prefix*) or from the boot interconnect.
-
-    :param str pos_image: (optional; default *tcf-live*) name of the
-      POS image to load.
 
     """
     # can't wait also for the "ok" -- debugging info might pop in th emiddle
@@ -2047,6 +2032,36 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
     target.console.write("\x02\x02")	# use this iface so expecter
     time.sleep(0.3)
     target.expect("iPXE>")
+
+
+def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
+    """Wait for iPXE to boot on a serial console, seize control and
+    direct boot to a given TCF POS image
+
+    This function is a building block to implement functionality to
+    force a target to boot to Provisioning OS; once a target is made
+    to boot an iPXE bootloader that has enabled Ctrl-B (to interrupt
+    the boot process) functionality, this function sends Ctrl-Bs to
+    get into the iPXE command line and then direct the system to boot
+    the provisioning OS image described
+
+    :param tcfl.tc.target_c target: target on which to operate
+
+    :param bool dhcp: (optional) have iPXE issue DHCP for IP
+      configuration or manually configure using target's data.
+
+    :param str url: (optional) base URL where to load the *pos_image*
+      from; this will ask to load *URL/vmlinuz-POSIMAGE* and
+      *URL/initrd-POSIMAGE*.
+
+      By default, this is taken from the target's keywords
+      (*pos_http_url_prefix*) or from the boot interconnect.
+
+    :param str pos_image: (optional; default *tcf-live*) name of the
+      POS image to load.
+
+    """
+    ipxe_seize(target)
     prompt_orig = target.shell.shell_prompt_regex
     try:
         #
