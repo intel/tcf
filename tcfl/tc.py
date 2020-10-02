@@ -7984,6 +7984,7 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
 # This need to be imported here since they rely on definitions
 import report_console
 import report_jinja2
+import tcfl.report_data_json
 
 # list of allocation IDs we have currently reserved; this list is
 # local to each thread so when we interrupt it with a signal, we can
@@ -8112,6 +8113,7 @@ def _run(args):
     report_driver_c.add(report_console_impl)
     report_file_impl = report_jinja2.driver(log_dir)
     report_driver_c.add(report_file_impl)
+    report_driver_c.add(tcfl.report_data_json.driver())
 
     # Setup defaults in the base testcase class
     tc_c.preempt = args.preempt
