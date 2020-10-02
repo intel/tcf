@@ -2569,3 +2569,78 @@ def target_power_cycle_pos_serial_f12_ipxe(target):
 
 capability_register('boot_to_pos', 'serial_f12_ipxe',
                     target_power_cycle_pos_serial_f12_ipxe)
+
+
+def target_power_cycle_to_pos_uefi_http_boot_ipxe(target):
+    """
+    Boot to provisioning OS using HTTP Boot to an iPXE x86_64 EFI
+    loader
+
+    This boots an entry called *TCF-POS-HTTP-HASH* that points to an
+    iPXE EFI bootloader. HASH is a hash of the URL that the target
+    describes in property *pos_http_url_prefix* (which normally points
+    to the HTTP server which provides TCF/POS services) appending
+    */ipxe-x86_64.efi*, thus::
+
+      http://server/path/ipxe-x86_64.efi
+
+    Once iPXE starts, the script send *Ctrl-B* sequences to switch to
+    the iPXE command line control and then directs iPXE to load the
+    POS environment served by the POS server (all described in the
+    target's *pos_* inventory data or on the target's network).
+
+    If the the entry is not found, the scripting tries to enable EFI
+    networking and traverses the BIOS menus to add the HTTP boot entry
+    itself.
+
+    - Requirements:
+
+      - a recognized BIOS that can be controlled via the default
+        console of the target (EDKII based, for example)
+
+      - a TCF/POS server and the target's metadata configured to point
+        to it.
+
+      - an HTTP server that exports the iPXE binary described above
+
+    """
+    target.report_info("POS: setting target to boot Provisioning OS")
+    target.power.cycle()
+
+    # Resolve the URL in the client
+    #
+    # While the BIOS and iPXE can resolve DNS, sometimes they are not
+    # as robust, so let's have it resolved here, since we have better
+    # caps.
+    url = urlparse.urlparse(target.kws['pos_http_url_prefix'])
+    url_resolved = url._replace(
+        netloc = url.hostname.replace(url.hostname,
+                                      socket.gethostbyname(url.hostname)))
+
+    # There is no danger of using an IP (vs hostname) URL because the
+    # hashid in the name [%(ID)s] will change with the IP too. If the
+    # hostname has resolved to something different, we'll use the boot
+    # entry for it (and it will add a new one if we have resolved to a
+    # whole new IP address). They won't change that much.
+    biosl.boot_network_http(target, "TCF-POS-HTTP-%(ID)s",
+                            url_resolved.geturl() + "/ipxe-x86_64.efi")
+
+    # FIXME: latch on this
+    ## Client Error: 404 Not Found
+    ## URI: http://HOSTNAME/ttbd-pos/x86_64/ipxe-x86_64.efi
+    ##
+    ## Client Error: 404 Not Found
+    ## Error: Could not retrieve NBP file size from HTTP server.
+
+    # This will make it boot the iPXE bootloader and then we seize it
+    # and direct it to our POS provide.  We can tell
+    # ipxe_seize_and_boot() to not use DHCP (we know the IP
+    # assignment; dhcp is slower).
+    target.report_info("POS: seizing iPXE boot")
+    ipxe_seize_and_boot(target, dhcp = False, url = url_resolved.geturl())
+
+uefi_http_boot_ipxe_target_power_cycle_to_pos = \
+    target_power_cycle_to_pos_uefi_http_boot_ipxe
+
+tcfl.pos.capability_register('boot_to_pos', 'edkii+http+ipxe',
+                             target_power_cycle_to_pos_uefi_http_boot_ipxe)
