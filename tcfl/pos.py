@@ -366,12 +366,36 @@ def target_power_cycle_to_pos_pxe(target):
     # Now setup the local boot loader to boot off that
     target.property_set("pos_mode", "local")
 
-# FIXME: what I don't like about this is that we have no info on the
-# interconnect -- this must require it?
-def target_power_cycle_to_normal_pxe(target):
-    target.report_info("POS: setting target not to PXE boot Provisioning OS")
+
+def target_power_cycle_to_normal(target):
+    """
+    Boot a target normally, not to the Provisioning OS
+
+    It is a generic in that it can clear up the setup done by
+    different methods to boot to Provisioning OS.
+
+    This utility function is be used by :meth:`target.pos.boot_normal
+    <tcfl.pos.extension.boot_normal>` as a mathod to direct a target
+    to do a normal boot based on what the target's
+    pos_capable.boot_to_normal capability declares.
+    """
+    target.report_info("POS: setting target to not boot Provisioning OS")
+    # we reset any server side passive POS mode boot systems we have
+    # here, so we can share this implementation
     target.property_set("pos_mode", "local")
     target.power.cycle()
+
+def target_power_cycle_to_normal_pxe(target):
+    """
+    Deprecated in favour of :func:`target_power_cycle_to_normal`
+    """
+    target.report_info(
+        "WARNING! tcfl.pos.target_power_cycle_to_normal_pxe() is deprecated"
+        " in favour of tcfl.pos.target_power_cycle_to_normal()",
+        dict(trace = traceback.format_exc())
+    )
+    target_power_cycle_to_normal(target)
+
 
 
 #: Name of the directory created in the target's root filesystem to
@@ -2417,7 +2441,7 @@ import pos_multiroot	# pylint: disable = wrong-import-order,wrong-import-positio
 import pos_uefi		# pylint: disable = wrong-import-order,wrong-import-position,relative-import
 capability_register('mount_fs', 'multiroot', pos_multiroot.mount_fs)
 capability_register('boot_to_pos', 'pxe', target_power_cycle_to_pos_pxe)
-capability_register('boot_to_normal', 'pxe', target_power_cycle_to_normal_pxe)
+capability_register('boot_to_normal', 'pxe', target_power_cycle_to_normal)
 capability_register('boot_config', 'uefi', pos_uefi.boot_config_multiroot)
 capability_register('boot_config_fix', 'uefi', pos_uefi.boot_config_fix)
 
