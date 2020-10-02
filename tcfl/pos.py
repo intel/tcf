@@ -2509,9 +2509,16 @@ capability_register('boot_to_pos', 'edkii+pxe+ipxe',
                     edkii_pxe_ipxe_target_power_cycle_to_pos)
 
 
-def edkii_pxe_ipxe_target_power_cycle_to_normal(target):
+def target_power_cycle_to_normal_edkii(target):
     """
-    Boot an EDKII based system to default
+    Boot a target normally, not to the Provisioning OS, using the
+    EDKII BIOS boot menus
+
+    .. note:: This utility function is be used by
+              :meth:`target.pos.boot_normal
+              <tcfl.pos.extension.boot_normal>` as a mathod to direct
+              a target to do a normal boot based on what the target's
+              pos_capable.boot_to_normal capability declares.
     """
     target.report_info("POS: setting target not to boot Provisioning OS")
     # The boot configuration has been set so that unattended boot
@@ -2522,9 +2529,14 @@ def edkii_pxe_ipxe_target_power_cycle_to_normal(target):
                   # For a verbose system, don't report it all
                   report = 300)
 
+edkii_pxe_ipxe_target_power_cycle_to_normal = \
+    target_power_cycle_to_normal_edkii
 # Register capabilities
+# Backwards compat
 capability_register('boot_to_normal', 'edkii+pxe+ipxe',
-                    edkii_pxe_ipxe_target_power_cycle_to_normal)
+                    target_power_cycle_to_normal_edkii)
+capability_register('boot_to_normal', 'edkii',
+                    target_power_cycle_to_normal_edkii)
 
 
 def target_power_cycle_pos_serial_f12_ipxe(target):
@@ -2642,5 +2654,5 @@ def target_power_cycle_to_pos_uefi_http_boot_ipxe(target):
 uefi_http_boot_ipxe_target_power_cycle_to_pos = \
     target_power_cycle_to_pos_uefi_http_boot_ipxe
 
-tcfl.pos.capability_register('boot_to_pos', 'edkii+http+ipxe',
-                             target_power_cycle_to_pos_uefi_http_boot_ipxe)
+capability_register('boot_to_pos', 'edkii+http+ipxe',
+                    target_power_cycle_to_pos_uefi_http_boot_ipxe)
