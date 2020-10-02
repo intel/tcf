@@ -649,6 +649,7 @@ class reporter_c(object):
             self.ts_start = testcase.ts_start
         else:
             self.ts_start = time.time()
+        self.testcase = testcase
 
     @staticmethod
     def _argcheck(message, attachments, level, dlevel, alevel):
@@ -3547,7 +3548,17 @@ class tc_c(reporter_c):
     # allocation ID)
 
     def __init__(self, name, tc_file_path, origin):
-        reporter_c.__init__(self)
+        #
+        # need this before calling reporter_c.__init__
+        #
+        #: Time when this testcase was created (and thus all
+        #: references to it's inception are done); note in
+        #: __init_shallow__() we update this for when we assign it to
+        #: a target group to run.
+        self.ts_start = time.time()
+        self.ts_end = None
+
+        reporter_c.__init__(self, testcase = self)
         for hook_pre in self.hook_pre:
             assert callable(hook_pre), \
                 "tcfl.tc.tc_c.hook_pre contains %s, defined as type '%s', " \
@@ -3700,13 +3711,6 @@ class tc_c(reporter_c):
         self._kw_set("tmpdir", self.tmpdir)
         self._kw_set("tc_hash", self.ticket)
 
-        #: time when this testcase was created (and thus all
-        #: references to it's inception are done); note in
-        #: __init_shallow__() we update this for when we assign it to
-        #: a target group to run.
-        self.ts_start = time.time()
-        self.ts_end = None
-
         global log_dir
         if log_dir == None:
             _log_dir = os.getcwd()
@@ -3818,9 +3822,11 @@ class tc_c(reporter_c):
         self._expectations_global = []
         self._expectations_global_names = set()
 
-        # update it's inception time (from reporter_c.__init__), since
+        # update its inception time (from reporter_c.__init__), since
         # calling this means this is being assigned to a target group
         # to run.
+        # for reporter_c
+        self.testcase = self
         self.ts_start = time.time()
 
     def __thread_init__(self, tls_parent):
