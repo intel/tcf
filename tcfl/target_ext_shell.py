@@ -226,6 +226,42 @@ class shell(tc.target_extension_c):
             skip_duplicate = True
         )
 
+    def setup_windows(self, console = None):
+        """
+        Setup the Windows shell for scripting operation
+
+        In the case of a bash shell, this:
+
+        - sets the prompt to something easer to latch on to with less
+          false negatives
+
+        - traps errors in shell execution
+
+        This function is meant to be used by :meth:`up`:
+
+        >>> class _test(tcfl.tc.tc_c):
+        >>>
+        >>>     def eval(self, target):
+        >>>         target.power.cycle()
+        >>>         target.shell.up(shell_setup = target.shell.setup_windows)
+        >>>
+
+        """
+        target = self.target
+        # dereference which console we are using; we don't want to
+        # setup our trackers below to the "default" console and leave
+        # it floating because then it will get confused if we switch
+        # default consoles.
+        console = target.console._console_get(console)
+        self.prompt_regex = re.compile(
+            "TCF-%s:[^>]+>" % self.target.kws['tc_hash'])
+        self.run('set prompt=TCF-%s:%%PROMPT%%' % self.target.kws['tc_hash'],
+                 console = console)
+        # I do not know of any way to trap general shell error
+        # commands in Windows that can be used to print a message that
+        # then raises an exception (see :meth:setup)
+
+
     def up(self, tempt = None,
            user = None, login_regex = re.compile('login:'), delay_login = 0,
            password = None, password_regex = re.compile('[Pp]assword:'),
