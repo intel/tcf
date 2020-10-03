@@ -7730,35 +7730,41 @@ class subtc_c(tc_c):
         self.parent = parent
         self.result = None	# FIXME: already there?
         self.summary = None
-        self.output = None
         # we don't need to acquire our targets, won't use them
         self.do_acquire = False
+        self.attachments = None
 
-    def update(self, result, summary, output):
+    def update(self, result, summary, output = None, **attachments):
         """
         Update the results this subcase will report
 
         :param tcfl.tc.result_c result: result to be reported
         :param str summary: one liner summary of the execution report
+        :param str output: (optional) string describing output from
+          the testcase (general)
+        :param attachments: any combination of `KEY=VALUE` which will
+          be reported using the reporting API attachment system
         """
         assert isinstance(result, tcfl.tc.result_c)
         assert isinstance(summary, basestring)
         assert isinstance(output, basestring)
         self.result = result
         self.summary = summary
-        self.output = output
+        self.attachments = dict(attachments)
+        if output:
+            self.attachments['output'] = output
 
     def eval_50(self):		# pylint: disable = missing-docstring
         if self.result == None:
             self.result = self.parent.result
             self.result.report(
                 self, "subcase didn't run; parent didn't complete execution?",
-                dlevel = 2, attachments = dict(output = self.output))
+                dlevel = 2, attachments = self.attachments)
         else:
             self.result.report(
                 self, "subcase run summary: %s"
                 % (self.summary if self.summary else "<not provided>"),
-                dlevel = 2, attachments = dict(output = self.output))
+                dlevel = 2, attachments = self.attachments)
         self.result.report(self, "NOTE: this is a subtestcase of %(tc_name)s "
                            "(%(runid)s:%(tc_hash)s); refer to it for full "
                            "information" % self.parent.kws, dlevel = 1)
