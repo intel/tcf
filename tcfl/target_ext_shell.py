@@ -265,7 +265,8 @@ class shell(tc.target_extension_c):
     def up(self, tempt = None,
            user = None, login_regex = re.compile('login:'), delay_login = 0,
            password = None, password_regex = re.compile('[Pp]assword:'),
-           shell_setup = True, timeout = None, console = None):
+           shell_setup = True, timeout = None, console = None,
+           wait_for_early_shell_prompt = True):
         """Wait for the shell in a console to be ready
 
         Giving it ample time to boot, wait for a :data:`shell prompt
@@ -376,6 +377,7 @@ class shell(tc.target_extension_c):
                 action = "n/a"
                 try:
                     if console.startswith("ssh"):
+                        target.console.disable()
                         action = "enable console %s" % console
                         target.console.setup(console,
                                              user = user, password = password)
@@ -400,10 +402,12 @@ class shell(tc.target_extension_c):
                             target.report_info(
                                 "shell-up: %s: success at +%.1fs"
                                 % (action, ts - ts0), dlevel = 2)
-                    action = "wait for shell prompt"
-                    target.expect(self.shell_prompt_regex, console = console,
-                                  name = "early shell prompt",
-                                  timeout = inner_timeout)
+                    if wait_for_early_shell_prompt:
+                        action = "wait for shell prompt"
+                        target.expect(self.prompt_regex,
+                                      console = console,
+                                      name = "early shell prompt",
+                                      timeout = inner_timeout)
                     break
                 except ( tc.error_e, tc.failed_e ) as e:
                     ts = time.time()
