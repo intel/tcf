@@ -5266,14 +5266,25 @@ class tc_c(reporter_c):
     def expect_global_remove(self, exp):
         """
         Remove an expectation from the testcase global expectation list
+        
+        :param str exp: expectation's name
+        :param tcfl.tc.expectation_c exp: expectation's instance
 
         Refer to :meth:`expect` for more information
         """
-        assert isinstance(exp, expectation_c), \
-            'argument %s is not an instance of expectation_c but %s' \
+        assert isinstance(exp, (basestring, expectation_c)), \
+            'argument %s is not an instance of expectation_c or name, but %s' \
             % (exp, type(exp).__name__)
-        self._expectations_global_names.remove(exp.name)
-        self._expectations_global.remove(exp)
+        if isinstance(exp, basestring):
+            # FIXME: this shall be made a dictionary, wth
+            for exp_itr in self._expectations_global:
+                if exp_itr.name == exp:
+                    self._expectations_global_names.remove(exp_itr.name)
+                    self._expectations_global.remove(exp_itr)
+                    break
+        else:
+            self._expectations_global_names.remove(exp.name)
+            self._expectations_global.remove(exp)
 
     def expect_tls_append(self, exp):
         """
@@ -5291,13 +5302,23 @@ class tc_c(reporter_c):
     def expect_tls_remove(self, exp):
         """
         Remove an expectation from the testcase global expectation list
+        
+        :param str exp: expectation's name
+        :param tcfl.tc.expectation_c exp: expectation's instance
 
         Refer to :meth:`expect` for more information
         """
-        assert isinstance(exp, expectation_c), \
-            'argument %s is not an instance of expectation_c but %s' \
+        assert isinstance(exp, (basestring, expectation_c)), \
+            'argument %s is not an instance of expectation_c or name, but %s' \
             % (exp, type(exp).__name__)
-        self.tls._expectations.remove(exp)
+        if isinstance(exp, basestring):
+            # FIXME: this shall be made a dictionary, wth
+            for exp_itr in self.tls._expectations:
+                if exp_itr.name == exp:
+                    self.tls._expectations.remove(exp_itr)
+                    break
+        else:
+            self.tls._expectations.remove(exp)
 
     def expect(self, *exps_args, **exps_kws):
         """Wait for a list of things we expect to happen
