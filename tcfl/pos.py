@@ -1624,7 +1624,7 @@ EOF""")
         with msgid_c("POS"):
 
             original_timeout = testcase.tls.expect_timeout
-            original_prompt = target.shell.shell_prompt_regex
+            original_prompt = target.shell.prompt_regex
             original_console_default = target.console.default
             try:
                 # FIXME: this is a hack because now the expecter has a
@@ -1645,7 +1645,7 @@ EOF""")
                     # Adopt a harder to false positive prompt regex;
                     # the TCF-HASHID is set by target.shell.up() after
                     # we logged in; so if no prompt was specified, use
-                    target.shell.shell_prompt_regex = \
+                    target.shell.prompt_regex = \
                         re.compile("TCF-%(tc_hash)s:POS%% " % testcase.kws)
                     target.shell.run(
                         "export PS1='TCF-%(tc_hash)s:POS%% '  "
@@ -1798,7 +1798,7 @@ cat > /tmp/deploy.ex
                     % " ".join(reversed(target.pos.umount_list)))
             finally:
                 target.console.default = original_console_default
-                target.shell.shell_prompt_regex = original_prompt
+                target.shell.prompt_regex = original_prompt
                 testcase.tls.expect_timeout = original_timeout
 
             target.report_info("POS: deployed %(image)s" % kws)
@@ -2086,7 +2086,7 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
 
     """
     ipxe_seize(target)
-    prompt_orig = target.shell.shell_prompt_regex
+    prompt_orig = target.shell.prompt_regex
     try:
         #
         # When matching end of line, match against \r, since depends
@@ -2096,7 +2096,7 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
         #
         # FIXME: block on anything here? consider infra issues
         # on "Connection timed out", http://ipxe.org...
-        target.shell.shell_prompt_regex = "iPXE>"
+        target.shell.prompt_regex = "iPXE>"
         kws = dict(target.kws)
         boot_ic = target.kws['pos_boot_interconnect']
         ipv4_addr = target.kws['interconnects'][boot_ic]['ipv4_addr']
@@ -2152,7 +2152,7 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
         target.send("boot")
         # now the kernel boots
     finally:
-        target.shell.shell_prompt_regex = prompt_orig
+        target.shell.prompt_regex = prompt_orig
 
 
 # FIXME: when tc.py's import hell is fixed, this shall move to tl.py?

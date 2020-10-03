@@ -562,7 +562,7 @@ def linux_rsync_cache_lru_cleanup(target, path, max_kbytes):
     target.report_info(
         "rsync cache: reducing %s to %dMiB" % (path, max_kbytes / 1024.0))
 
-    prompt_original = target.shell.shell_prompt_regex
+    prompt_original = target.shell.prompt_regex
     python_error_ex = target.console.text(
         re.compile("^(.*Error|Exception):.*^>>> ", re.MULTILINE | re.DOTALL),
         name = "python error",
@@ -647,7 +647,7 @@ for e in sorted(l, key = lambda e: e[0], reverse = True):
 
 exit()""" % dict(path = path, max_bytes = max_kbytes * 1024))
     finally:
-        target.shell.shell_prompt_regex = prompt_original
+        target.shell.prompt_regex = prompt_original
         testcase.expect_tls_remove(python_error_ex)
 
 #

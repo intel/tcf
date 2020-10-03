@@ -56,7 +56,7 @@ class ssh(tc.target_extension_c):
        >>> def start(self, ic, target):
        >>>     ic.power.on()
        >>>     target.power.cycle()
-       >>>     target.shell.linux_shell_prompt_regex = re.compile('root@.*# ')
+       >>>     target.shell.prompt_regex = re.compile('root@.*# ')
        >>>     target.shell.up(user = 'root')
 
     2. indicate the tunneling system which IP address is to be
