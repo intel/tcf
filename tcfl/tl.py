@@ -401,9 +401,6 @@ def linux_ipv4_addr_get_from_console(target, ifname):
         raise tcfl.tc.error_e("can't find IP addr")
     return matches.groupdict()['name']
 
-# common linux root prompts
-linux_root_prompts = target_ext_shell._shell_prompt_regex
-
 def sh_export_proxy(ic, target):
     """
     If the interconnect *ic* defines a proxy environment, issue a
