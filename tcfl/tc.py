@@ -8248,7 +8248,7 @@ def _run(args):
                         logging.error("removing allocation %s on %s",
                                       allocid, rtb)
                         target_ext_alloc._delete(rtb, allocid)
-                _allocids[rtb].clear()
+                    _allocids[rtb].clear()
             if tp:
                 tp.terminate()
             time.sleep(1)
