@@ -16,7 +16,6 @@ import ttbl.capture
 import ttbl.console
 
 class console_spider_duo_pc(ttbl.console.ssh_pc):
-
     """
     Serial console driver over a Lantronix Spider Duo KVM.
 
@@ -49,20 +48,30 @@ class console_spider_duo_pc(ttbl.console.ssh_pc):
     **System setup**
 
     1. connect a serial port to the Lantronix Spider KVM
+
     2. login to the KVM with an account that has admin permission
        (https://kvm_hostname.somewhere)
+
     3. Navigate to *Interfaces / Network* in section *Network
        Miscellaneous Settings* (bottom right) and:
+
        - make sure SSH port is set (to 22 default)
+
        - ensure SSH access is enabled
+
        - Click *Save*
+
     4. Navigate to *Interfaces / Serial Port*
+
        - ensure Passthrough Access to Serial Port 1 via Telnet/SSH is selected
+
        - ensure baud rate is set to 115200, data bits to 8, Parity to
          None, Stop bits to 1 (these are standard settings), or
          whatever your target requires.
+
        - ensure Flow control is set to RTS/CTS (most targets) or none;
          if none, please look above re chunking.
+
        - Click *Save*
 
     5. create an account with SSH access in user *Accounts /
@@ -105,6 +114,7 @@ class console_spider_duo_pc(ttbl.console.ssh_pc):
       Solution:
 
         flip the configuration from RTS/CTS to None or viceversa
+
     """
     def __init__(self, kvm_hostname, crlf = '\r', **kwargs):
         ttbl.console.ssh_pc.__init__(
@@ -213,7 +223,7 @@ class screenshot_spider_c(ttbl.capture.generic_snapshot):
     resolution screenshot of the screen.
 
     :param str kvm_hostname: hostname for the KVM; no user/password is
-    needed, and if provided, it will be ignored.
+      needed, and if provided, it will be ignored.
 
     Other parameters as per :class:ttbl.capture.generic_snapshot
 
