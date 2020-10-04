@@ -1800,7 +1800,32 @@ class target_c(reporter_c):
           output. Further info :ref:`here
           <console_expectation_detect_context>`
 
-        :returns: Nothing, if the output is received.
+        :param str name: (optional) name for this match; defaults to a
+          sanitized version of the regular expression to match and
+          will be in the return value's key.
+
+        :returns: dictionary with the match information:
+
+          >>> target.send("hello")
+          >>> target.expect("hello")
+          >>> {
+          >>>     'hello': {
+          >>>         'console': u'serial0',
+          >>>         'console output': <commonl.generator_factory_c object at 0x7fc899511f10>,
+          >>>         'groupdict': {},
+          >>>         'offset': 0,
+          >>>         'offset_match_end': 710,
+          >>>         'offset_match_start': 709,
+          >>>         'origin': 'FILENAME:LINE',
+          >>>         'pattern': 'hello',
+          >>>         'target': <tcfl.tc.target_c object at 0x7fc891959f90>
+          >>>     }
+          >>> }
+
+          Given the regular expression to match in :meth:`expect`,
+          when matched returns information about said match; see
+          :meth:`tcfl.target_ext_console.expect_text_on_console_c.detect`
+          for full details and field description.
 
         :raises: :py:exc:`tcfl.tc.blocked_e` on error,
           :py:exc:`tcfl.tc.error_e` if not received,
