@@ -311,7 +311,7 @@ def login():
         user.role_add(role)
     # set now auth specific data on the user
     for key, value in user_data.items():
-        assert isinstance(value, ( int, float, basestring, bool ) ), \
+        assert isinstance(value, ( int, float, str, bool ) ), \
             "BUG: authenticator '%s' returned user data of" \
             " invalid type '%s'; only int, float, string, bool allowed" % (
                 authenticator, type(value))

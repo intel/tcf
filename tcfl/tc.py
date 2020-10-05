@@ -1978,7 +1978,7 @@ class target_c(reporter_c):
                 # We need None  passed verbatim so it is not really
                 # passed, so we don't encode it as JSON here--this needs
                 # some cleanup, is quite confusing, to be fair.
-                if v == None: # or isinstance(v, basestring):
+                if v == None: # or isinstance(v, str):
                     continue
                 kwargs[k] = json.dumps(v)
             else:
@@ -5302,10 +5302,10 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
         Refer to :meth:`expect` for more information
         """
-        assert isinstance(exp, (basestring, expectation_c)), \
+        assert isinstance(exp, (str, expectation_c)), \
             'argument %s is not an instance of expectation_c or name, but %s' \
             % (exp, type(exp).__name__)
-        if isinstance(exp, basestring):
+        if isinstance(exp, str):
             # FIXME: this shall be made a dictionary, wth
             for exp_itr in self._expectations_global:
                 if exp_itr.name == exp:

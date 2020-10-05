@@ -1048,7 +1048,7 @@ class tt_interface(object):
             raise RuntimeError("missing '%s' argument" % arg_name)
         try:
             # support direct calling inside the daemon; if it is a
-            # basestring, we consider it might be JSON and decode it 
+            # str, we consider it might be JSON and decode it 
             arg = args[arg_name]
             if isinstance(arg, str):
                 arg = json.loads(arg)

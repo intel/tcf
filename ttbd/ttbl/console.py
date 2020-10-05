@@ -1215,7 +1215,7 @@ class logfile_c(impl_c):
 
     """
     def __init__(self, logfile_name, **kwargs):
-        assert isinstance(logfile_name, basestring)
+        assert isinstance(logfile_name, str)
         impl_c.__init__(self, **kwargs)
         self.logfile_name = logfile_name
 

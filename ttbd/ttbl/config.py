@@ -109,8 +109,8 @@ def target_add(target, _id = None, tags = None, target_type = None,
         assert isinstance(tags, dict)
         # FIXME: this shall be a recursive lookup?
         #for tag, value in tags.items():
-        #    if not isinstance(tag, basestring) \
-        #       or not isinstance(value, basestring):
+        #    if not isinstance(tag, str) \
+        #       or not isinstance(value, str):
         #        raise ValueError("tag '%s:%s' is not all strings"
         #                         % (tag, value))
         target.tags.update(tags)
