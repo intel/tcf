@@ -43,7 +43,7 @@ would generate a json file like::
 """
 
 
-import tc
+from . import tc
 
 class driver(tc.report_driver_c):
     """
