@@ -8,8 +8,8 @@ packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
 requires =
          gvnc-tools
          make
-         python-ply
-         python-requests
+         python3-ply
+         python3-requests
          @@Fedora@@python3-Levenshtein
          @@CentOS|RHEL@@python-Levenshtein
          python3-pykwalify
