@@ -366,12 +366,36 @@ def target_power_cycle_to_pos_pxe(target):
     # Now setup the local boot loader to boot off that
     target.property_set("pos_mode", "local")
 
-# FIXME: what I don't like about this is that we have no info on the
-# interconnect -- this must require it?
-def target_power_cycle_to_normal_pxe(target):
-    target.report_info("POS: setting target not to PXE boot Provisioning OS")
+
+def target_power_cycle_to_normal(target):
+    """
+    Boot a target normally, not to the Provisioning OS
+
+    It is a generic in that it can clear up the setup done by
+    different methods to boot to Provisioning OS.
+
+    This utility function is be used by :meth:`target.pos.boot_normal
+    <tcfl.pos.extension.boot_normal>` as a mathod to direct a target
+    to do a normal boot based on what the target's
+    pos_capable.boot_to_normal capability declares.
+    """
+    target.report_info("POS: setting target to not boot Provisioning OS")
+    # we reset any server side passive POS mode boot systems we have
+    # here, so we can share this implementation
     target.property_set("pos_mode", "local")
     target.power.cycle()
+
+def target_power_cycle_to_normal_pxe(target):
+    """
+    Deprecated in favour of :func:`target_power_cycle_to_normal`
+    """
+    target.report_info(
+        "WARNING! tcfl.pos.target_power_cycle_to_normal_pxe() is deprecated"
+        " in favour of tcfl.pos.target_power_cycle_to_normal()",
+        dict(trace = traceback.format_exc())
+    )
+    target_power_cycle_to_normal(target)
+
 
 
 #: Name of the directory created in the target's root filesystem to
@@ -1600,7 +1624,7 @@ EOF""")
         with msgid_c("POS"):
 
             original_timeout = testcase.tls.expect_timeout
-            original_prompt = target.shell.shell_prompt_regex
+            original_prompt = target.shell.prompt_regex
             original_console_default = target.console.default
             try:
                 # FIXME: this is a hack because now the expecter has a
@@ -1621,7 +1645,7 @@ EOF""")
                     # Adopt a harder to false positive prompt regex;
                     # the TCF-HASHID is set by target.shell.up() after
                     # we logged in; so if no prompt was specified, use
-                    target.shell.shell_prompt_regex = \
+                    target.shell.prompt_regex = \
                         re.compile("TCF-%(tc_hash)s:POS%% " % testcase.kws)
                     target.shell.run(
                         "export PS1='TCF-%(tc_hash)s:POS%% '  "
@@ -1774,7 +1798,7 @@ cat > /tmp/deploy.ex
                     % " ".join(reversed(target.pos.umount_list)))
             finally:
                 target.console.default = original_console_default
-                target.shell.shell_prompt_regex = original_prompt
+                target.shell.prompt_regex = original_prompt
                 testcase.tls.expect_timeout = original_timeout
 
             target.report_info("POS: deployed %(image)s" % kws)
@@ -1999,31 +2023,16 @@ pos_cmdline_opts = {
 }
 
 
-def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
-    """Wait for iPXE to boot on a serial console, seize control and
-    direct boot to a giveb TCF POS image
+def ipxe_seize(target):
+    """Wait for iPXE to boot on a serial console, seize control onto
+    the iPXE command line
 
-    This function is a building block to implement functionality to
-    force a target to boot to Provisioning OS; once a target is made
-    to boot an iPXE bootloader that has enabled Ctrl-B (to interrupt
-    the boot process) functionality, this function sends Ctrl-Bs to
-    get into the iPXE command line and then direct the system to boot
-    the provisioning OS image described
+    Once a target is made to boot an iPXE bootloader that has enabled
+    Ctrl-B (to interrupt the boot process) functionality, this
+    function sends Ctrl-Bs to get into the iPXE command line and then
+    direct the system to boot the provisioning OS image described
 
     :param tcfl.tc.target_c target: target on which to operate
-
-    :param bool dhcp: (optional) have iPXE issue DHCP for IP
-      configuration or manually configure using target's data.
-
-    :param str url: (optional) base URL where to load the *pos_image*
-      from; this will ask to load *URL/vmlinuz-POSIMAGE* and
-      *URL/initrd-POSIMAGE*.
-
-      By default, this is taken from the target's keywords
-      (*pos_http_url_prefix*) or from the boot interconnect.
-
-    :param str pos_image: (optional; default *tcf-live*) name of the
-      POS image to load.
 
     """
     # can't wait also for the "ok" -- debugging info might pop in th emiddle
@@ -2054,7 +2063,37 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
     target.console.write("\x02\x02")	# use this iface so expecter
     time.sleep(0.3)
     target.expect("iPXE>")
-    prompt_orig = target.shell.shell_prompt_regex
+
+
+def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
+    """Wait for iPXE to boot on a serial console, seize control and
+    direct boot to a given TCF POS image
+
+    This function is a building block to implement functionality to
+    force a target to boot to Provisioning OS; once a target is made
+    to boot an iPXE bootloader that has enabled Ctrl-B (to interrupt
+    the boot process) functionality, this function sends Ctrl-Bs to
+    get into the iPXE command line and then direct the system to boot
+    the provisioning OS image described
+
+    :param tcfl.tc.target_c target: target on which to operate
+
+    :param bool dhcp: (optional) have iPXE issue DHCP for IP
+      configuration or manually configure using target's data.
+
+    :param str url: (optional) base URL where to load the *pos_image*
+      from; this will ask to load *URL/vmlinuz-POSIMAGE* and
+      *URL/initrd-POSIMAGE*.
+
+      By default, this is taken from the target's keywords
+      (*pos_http_url_prefix*) or from the boot interconnect.
+
+    :param str pos_image: (optional; default *tcf-live*) name of the
+      POS image to load.
+
+    """
+    ipxe_seize(target)
+    prompt_orig = target.shell.prompt_regex
     try:
         #
         # When matching end of line, match against \r, since depends
@@ -2064,7 +2103,7 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
         #
         # FIXME: block on anything here? consider infra issues
         # on "Connection timed out", http://ipxe.org...
-        target.shell.shell_prompt_regex = "iPXE>"
+        target.shell.prompt_regex = "iPXE>"
         kws = dict(target.kws)
         boot_ic = target.kws['pos_boot_interconnect']
         ipv4_addr = target.kws['interconnects'][boot_ic]['ipv4_addr']
@@ -2120,7 +2159,7 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
         target.send("boot")
         # now the kernel boots
     finally:
-        target.shell.shell_prompt_regex = prompt_orig
+        target.shell.prompt_regex = prompt_orig
 
 
 # FIXME: when tc.py's import hell is fixed, this shall move to tl.py?
@@ -2409,7 +2448,7 @@ from . import pos_multiroot	# pylint: disable = wrong-import-order,wrong-import-
 from . import pos_uefi		# pylint: disable = wrong-import-order,wrong-import-position,relative-import
 capability_register('mount_fs', 'multiroot', pos_multiroot.mount_fs)
 capability_register('boot_to_pos', 'pxe', target_power_cycle_to_pos_pxe)
-capability_register('boot_to_normal', 'pxe', target_power_cycle_to_normal_pxe)
+capability_register('boot_to_normal', 'pxe', target_power_cycle_to_normal)
 capability_register('boot_config', 'uefi', pos_uefi.boot_config_multiroot)
 capability_register('boot_config_fix', 'uefi', pos_uefi.boot_config_fix)
 
@@ -2477,9 +2516,16 @@ capability_register('boot_to_pos', 'edkii+pxe+ipxe',
                     edkii_pxe_ipxe_target_power_cycle_to_pos)
 
 
-def edkii_pxe_ipxe_target_power_cycle_to_normal(target):
+def target_power_cycle_to_normal_edkii(target):
     """
-    Boot an EDKII based system to default
+    Boot a target normally, not to the Provisioning OS, using the
+    EDKII BIOS boot menus
+
+    .. note:: This utility function is be used by
+              :meth:`target.pos.boot_normal
+              <tcfl.pos.extension.boot_normal>` as a mathod to direct
+              a target to do a normal boot based on what the target's
+              pos_capable.boot_to_normal capability declares.
     """
     target.report_info("POS: setting target not to boot Provisioning OS")
     # The boot configuration has been set so that unattended boot
@@ -2490,6 +2536,130 @@ def edkii_pxe_ipxe_target_power_cycle_to_normal(target):
                   # For a verbose system, don't report it all
                   report = 300)
 
+edkii_pxe_ipxe_target_power_cycle_to_normal = \
+    target_power_cycle_to_normal_edkii
 # Register capabilities
+# Backwards compat
 capability_register('boot_to_normal', 'edkii+pxe+ipxe',
-                    edkii_pxe_ipxe_target_power_cycle_to_normal)
+                    target_power_cycle_to_normal_edkii)
+capability_register('boot_to_normal', 'edkii',
+                    target_power_cycle_to_normal_edkii)
+
+
+def target_power_cycle_pos_serial_f12_ipxe(target):
+    """
+    Direct a target that is preconfigured to boot off the network with
+    iPXE to boot in Provisioning mode
+
+    .. note:: This utility function is be used by
+              :meth:`target.pos.boot_to_pos
+              <tcfl.pos.extension.boot_to_pos>` as a mathod to direct
+              a target to do a Provisoning OS boot based on what the target's
+              pos_capable.boot_to_pos capability declares.
+
+
+    Assumptions:
+
+    - Target's BIOS is available over the default console
+
+    - Target's BIOS prints::
+
+        Press [F12] to boot from network
+
+      when it starts
+
+    - Target's network boot is preconfigured to boot to an iPXE
+      destination (eg: by asking for DHCP that sets a boot server and
+      file that loads iPXE)
+
+    - The iPXE destination is configured to allow *Ctrl-B* to be used
+
+    """
+    target.report_info("POS: setting target to PXE boot Provisioning OS")
+    target.property_set("pos_mode", "pxe")
+    target.power.cycle()
+    # Now setup the local boot loader to boot off that
+    target.property_set("pos_mode", "local")
+    # this is how we know the BIOS booted
+    #target.expect("Primary Bios Version")	# helps us to measure times
+    target.expect(re.compile(r"Press +\[F12\] +to boot from network"))
+    target.console.write(biosl.ansi_key_code("F12", "vt100"))
+    ipxe_seize_and_boot(target)
+
+capability_register('boot_to_pos', 'serial_f12_ipxe',
+                    target_power_cycle_pos_serial_f12_ipxe)
+
+
+def target_power_cycle_to_pos_uefi_http_boot_ipxe(target):
+    """
+    Boot to provisioning OS using HTTP Boot to an iPXE x86_64 EFI
+    loader
+
+    This boots an entry called *TCF-POS-HTTP-HASH* that points to an
+    iPXE EFI bootloader. HASH is a hash of the URL that the target
+    describes in property *pos_http_url_prefix* (which normally points
+    to the HTTP server which provides TCF/POS services) appending
+    */ipxe-x86_64.efi*, thus::
+
+      http://server/path/ipxe-x86_64.efi
+
+    Once iPXE starts, the script send *Ctrl-B* sequences to switch to
+    the iPXE command line control and then directs iPXE to load the
+    POS environment served by the POS server (all described in the
+    target's *pos_* inventory data or on the target's network).
+
+    If the the entry is not found, the scripting tries to enable EFI
+    networking and traverses the BIOS menus to add the HTTP boot entry
+    itself.
+
+    - Requirements:
+
+      - a recognized BIOS that can be controlled via the default
+        console of the target (EDKII based, for example)
+
+      - a TCF/POS server and the target's metadata configured to point
+        to it.
+
+      - an HTTP server that exports the iPXE binary described above
+
+    """
+    target.report_info("POS: setting target to boot Provisioning OS")
+    target.power.cycle()
+
+    # Resolve the URL in the client
+    #
+    # While the BIOS and iPXE can resolve DNS, sometimes they are not
+    # as robust, so let's have it resolved here, since we have better
+    # caps.
+    url = urlparse.urlparse(target.kws['pos_http_url_prefix'])
+    url_resolved = url._replace(
+        netloc = url.hostname.replace(url.hostname,
+                                      socket.gethostbyname(url.hostname)))
+
+    # There is no danger of using an IP (vs hostname) URL because the
+    # hashid in the name [%(ID)s] will change with the IP too. If the
+    # hostname has resolved to something different, we'll use the boot
+    # entry for it (and it will add a new one if we have resolved to a
+    # whole new IP address). They won't change that much.
+    biosl.boot_network_http(target, "TCF-POS-HTTP-%(ID)s",
+                            url_resolved.geturl() + "/ipxe-x86_64.efi")
+
+    # FIXME: latch on this
+    ## Client Error: 404 Not Found
+    ## URI: http://HOSTNAME/ttbd-pos/x86_64/ipxe-x86_64.efi
+    ##
+    ## Client Error: 404 Not Found
+    ## Error: Could not retrieve NBP file size from HTTP server.
+
+    # This will make it boot the iPXE bootloader and then we seize it
+    # and direct it to our POS provide.  We can tell
+    # ipxe_seize_and_boot() to not use DHCP (we know the IP
+    # assignment; dhcp is slower).
+    target.report_info("POS: seizing iPXE boot")
+    ipxe_seize_and_boot(target, dhcp = False, url = url_resolved.geturl())
+
+uefi_http_boot_ipxe_target_power_cycle_to_pos = \
+    target_power_cycle_to_pos_uefi_http_boot_ipxe
+
+capability_register('boot_to_pos', 'edkii+http+ipxe',
+                    target_power_cycle_to_pos_uefi_http_boot_ipxe)

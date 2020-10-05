@@ -349,6 +349,54 @@ class expect_text_on_console_c(tc.expectation_c):
         :returns: dictionary of data describing the match, including
           an interator over the console output
 
+          >>> {
+          >>>     'console': CONSOLENAME,
+          >>>     'console output': <commonl.generator_factory_c ...>,
+          >>>     'groupdict': {},
+          >>>     'offset': 0,
+          >>>     'offset_match_end': 710,
+          >>>     'offset_match_start': 709,
+          >>>     'origin': 'FILENAME:LINE',
+          >>>     'pattern': 'TEXT_OR_REGEX',
+          >>>     'target': TARGETOBJECT,
+          >>> }
+
+          The different fields:
+
+          - *target*: :class:`target object <tcfl.tc.target_c>` on
+            which console this match happened
+
+          - *console*: name of console where the match happened
+
+          - *pattern* text or regular expression that was being matched
+
+          - *origin* source file and line number where this match was
+             called from.
+
+          - *offset*, *offset_match_start* and *offset_match_end*:
+             offset where the console was read from, where the match
+             starts and where the match ends.
+
+          - *groupdict* is the list of grups returned when matching
+            the regular expression
+            (:meth:`re.MatchObject.groupdict`). Eg, if
+            *TEXT_OR_REGEX* was:
+
+            >>> re.compile("(?P<field_name>[a-z]+)=(?P<field_value>[0-9]+)")
+
+            and the text matched was *length=54*, *groupdict* would be
+            returned as:
+
+            >>> { 'field_name': 'lentgh', 'field_value': '54' }
+
+          - *console output*: generator maker to report the console
+            output at the offset of the match; initialize the generator
+            and then use it as usual (see
+            :class:`commonl.generator_factory_c`):
+
+            >>> for line in r['console output'].make_generator():
+            >>>     do_something_with_this_line(line)
+
         """
 
         target = self.target
@@ -897,7 +945,7 @@ class extension(tc.target_extension_c):
 
         :param newline: (optional, defaults to *None*, universal)
           convention for end-of-line characters.
-        
+
           - *None* any of *\\r*, *\\n*, *\\r\\n* or multile *\\r* followed
             by a *\\n* are considered a newline and replaced with *\\n*
 

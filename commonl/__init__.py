@@ -345,6 +345,16 @@ def file_name_make_safe(file_name, extra_chars = ":/"):
         r += c
     return r
 
+def file_touch(file_name):
+    """
+    Set a file's mtime to current time
+
+    :param str file_name: name of the file whose timestamp is to be modified
+    """
+    ts = time.time()
+    os.utime(file_name, ( ts, ts ))
+
+
 def hash_file(hash_object, filepath, blk_size = 8192):
     """
     Run a the contents of a file though a hash generator.

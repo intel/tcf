@@ -172,7 +172,8 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
     # :meth:`extension.image_on_screenshot`
     def __init__(self, target, template_image_filename, capturer,
                  in_area, merge_similar, min_width, min_height,
-                 poll_period, timeout, raise_on_timeout, raise_on_found):
+                 poll_period, timeout, raise_on_timeout, raise_on_found,
+                 name = None):
         if not image_expectation_works:
             raise RuntimeError("Image matching won't work; need packages"
                                " cv2, imutils, numpy")
@@ -188,6 +189,7 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
             'eg: (0, 0, 0.5, 0.5) means in the top left quarter'
         assert merge_similar >= 0.0 and merge_similar <= 1.0, \
             "merge_similar has to be a float from 0.0 to 1.0"
+        assert name == None or isinstance(name, str)
         tc.expectation_c.__init__(self, target, poll_period, timeout,
                                   raise_on_timeout = raise_on_timeout,
                                   raise_on_found = raise_on_found)
@@ -196,7 +198,10 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
         self.merge_similar = merge_similar
         # if the image is relative, we make it relative to the
         # filename of the caller--so we can do short names
-        self.name = commonl.name_make_safe(template_image_filename)
+        if name:
+            self.name = name
+        else:
+            self.name = commonl.name_make_safe(template_image_filename)
         if os.path.isabs(template_image_filename):
             self.template_image_filename = template_image_filename
         else:
@@ -676,7 +681,8 @@ class extension(tc.target_extension_c):
             in_area = None, merge_similar = 0.7,
             min_width = 30, min_height = 30,
             poll_period = 3, timeout = 130,
-            raise_on_timeout = tc.error_e, raise_on_found = None):
+            raise_on_timeout = tc.error_e, raise_on_found = None,
+            name = None):
         """
         Returns an object that finds an image/template in an
         screenshot from the target.
@@ -789,6 +795,9 @@ class extension(tc.target_extension_c):
         :param int min_height: (optional, default 30) minimum height of
           the template when scaling.
 
+        :param str name: (optional) name of this expectation; defaults
+          to a sanitized form of the filename
+
         The rest of the arguments are described in
         :class:`tcfl.tc.expectation_c`.
         """
@@ -799,7 +808,8 @@ class extension(tc.target_extension_c):
             self.target,
             template_image_filename, capturer,
             in_area, merge_similar, min_width, min_height,
-            poll_period, timeout, raise_on_timeout, raise_on_found)
+            poll_period, timeout, raise_on_timeout, raise_on_found,
+            name = name)
 
 
 def _cmdline_capture_start(args):

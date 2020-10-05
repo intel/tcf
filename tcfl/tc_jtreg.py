@@ -558,7 +558,7 @@ class driver(tcfl.pos.tc_pos0_base):
 
     def eval_10_execute(self, ic, target):
         self.report_info("subtc count %d" % len(self.subtc), dlevel = 1)
-        target.shell.shell_prompt_regex = re.compile("JTREG-PROMPT% ")
+        target.shell.prompt_regex = re.compile("JTREG-PROMPT% ")
         target.shell.run(
             "export PS1='JTREG-PROMPT% '  # a simple prompt is "
             "harder to confuse with general output")

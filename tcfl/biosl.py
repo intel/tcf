@@ -104,6 +104,10 @@ ansi_key_codes = {
     'F10': {
         "\x1b[21~": [ "rxvt", "xterm", 'vt100' ],
     },
+    'F12': {
+        # 24, not 23 :/ https://en.wikipedia.org/wiki/ANSI_escape_code#Terminal_input_sequences
+        "\x1b[24~": [ "rxvt", "xterm", 'vt100' ],
+    },
 }
 
 class unknown_key_code_e(Exception):
@@ -917,7 +921,8 @@ def bios_boot_expect(target):
     assert isinstance(target, tcfl.tc.target_c)
 
     target.report_info("BIOS: waiting for main menu after power on")
-    target.expect(re.compile(b"Press\s+\[F7\]\s+to show boot menu options"),
+    # FIXME: [67] should be BIOS profile
+    target.expect(re.compile(b"Press\s+\[F[67]\]\s+to show boot menu options"),
                   # this prints a lot, so when reporting, report
                   # only the previous 500 or per spend so much
                   # time reporting we miss the rest

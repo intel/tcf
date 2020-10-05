@@ -44,6 +44,7 @@ import binascii
 import collections
 import re
 import time
+import traceback
 import typing
 
 from . import commonl
@@ -77,9 +78,6 @@ shell_prompts = [
     r'[^:]+:.*[#\$>]',
 ]
 
-_shell_prompt_regex = \
-    re.compile('(TCF-[0-9a-zA-Z]{4})?(' + "|".join(shell_prompts) + ')')
-
 class shell(tc.target_extension_c):
     """
     Extension to :py:class:`tcfl.tc.target_c` for targets that support
@@ -94,7 +92,7 @@ class shell(tc.target_extension_c):
     Waits for the shell to be up and ready; sets it up so that if an
     error happens, it will print an error message and raise a block
     exception. Note you can change what is expected as a :data:`shell
-    prompt <shell_prompt_regex>`.
+    prompt <prompt_regex>`.
 
     >>> target.shell.run("some command")
 
@@ -111,6 +109,9 @@ class shell(tc.target_extension_c):
         if 'console' not in target.rt['interfaces']:
             raise self.unneeded
         tc.target_extension_c.__init__(self, target)
+
+    prompt_regex_default = \
+        re.compile('(TCF-[0-9a-zA-Z]{4})?(' + "|".join(shell_prompts) + ')')
 
     #: What do we look for into a shell prompt
     #:
@@ -142,11 +143,46 @@ class shell(tc.target_extension_c):
     #:
     #: >>> target.shell
     #:
-    # default is set by the global variable
-    shell_prompt_regex = _shell_prompt_regex
+    prompt_regex = prompt_regex_default
 
-    #: Deprecated, use :data:`shell_prompt_regex`
-    linux_shell_prompt_regex = shell_prompt_regex
+    #: Deprecated, use :data:`prompt_regex`
+    @property
+    def shell_prompt_regex(self):
+        role = self.target.want_name
+        self.target.report_info(
+            "DEPRECATED: %s.pos.shell_prompt_regex is deprecated in"
+            " favour of %s.pos.prompt_regex" % (role, role),
+            dict(trace = traceback.format_stack()))
+        return self.prompt_regex
+
+    @shell_prompt_regex.setter
+    def shell_prompt_regex(self, val):
+        role = self.target.want_name
+        self.target.report_info(
+            "DEPRECATED: %s.pos.shell_prompt_regex is deprecated in"
+            " favour of %s.pos.prompt_regex" % (role, role),
+            dict(trace = traceback.format_stack()))
+        self.prompt_regex = val
+
+    #: Deprecated, use :data:`prompt_regex`
+    @property
+    def linux_shell_prompt_regex(self):
+        role = self.target.want_name
+        self.target.report_info(
+            "DEPRECATED: %s.pos.linux_shell_prompt_regex is deprecated in"
+            " favour of %s.pos.prompt_regex" % (role, role),
+            dict(trace = traceback.format_stack()))
+        return self.prompt_regex
+
+    @linux_shell_prompt_regex.setter
+    def linux_shell_prompt_regex(self, val):
+        role = self.target.want_name
+        self.target.report_info(
+            "DEPRECATED: %s.pos.linux_shell_prompt_regex is deprecated in"
+            " favour of %s.pos.prompt_regex" % (role, role),
+            dict(trace = traceback.format_stack()))
+        self.prompt_regex = val
+
 
     def setup(self, console = None):
         """
@@ -191,14 +227,51 @@ class shell(tc.target_extension_c):
             skip_duplicate = True
         )
 
+    def setup_windows(self, console = None):
+        """
+        Setup the Windows shell for scripting operation
+
+        In the case of a bash shell, this:
+
+        - sets the prompt to something easer to latch on to with less
+          false negatives
+
+        - traps errors in shell execution
+
+        This function is meant to be used by :meth:`up`:
+
+        >>> class _test(tcfl.tc.tc_c):
+        >>>
+        >>>     def eval(self, target):
+        >>>         target.power.cycle()
+        >>>         target.shell.up(shell_setup = target.shell.setup_windows)
+        >>>
+
+        """
+        target = self.target
+        # dereference which console we are using; we don't want to
+        # setup our trackers below to the "default" console and leave
+        # it floating because then it will get confused if we switch
+        # default consoles.
+        console = target.console._console_get(console)
+        self.prompt_regex = re.compile(
+            "TCF-%s:[^>]+>" % self.target.kws['tc_hash'])
+        self.run('set prompt=TCF-%s:%%PROMPT%%' % self.target.kws['tc_hash'],
+                 console = console)
+        # I do not know of any way to trap general shell error
+        # commands in Windows that can be used to print a message that
+        # then raises an exception (see :meth:setup)
+
+
     def up(self, tempt = None,
            user = None, login_regex = re.compile('login:'), delay_login = 0,
            password = None, password_regex = re.compile('[Pp]assword:'),
-           shell_setup = True, timeout = None, console = None):
+           shell_setup = True, timeout = None, console = None,
+           wait_for_early_shell_prompt = True):
         """Wait for the shell in a console to be ready
 
         Giving it ample time to boot, wait for a :data:`shell prompt
-        <shell_prompt_regex>` and set up the shell so that if an
+        <prompt_regex>` and set up the shell so that if an
         error happens, it will print an error message and raise a
         block exception. Optionally login as a user and password.
 
@@ -269,8 +342,8 @@ class shell(tc.target_extension_c):
         if timeout == None:
             timeout = 60 + int(target.kws.get("bios_boot_time", 0))
         # Set the original shell prompt
-        self.shell_prompt_regex = _shell_prompt_regex
-        
+        self.prompt_regex = self.prompt_regex_default
+
         def _login(target):
             # If we have login info, login to get a shell prompt
             if login_regex != None:
@@ -305,6 +378,7 @@ class shell(tc.target_extension_c):
                 action = "n/a"
                 try:
                     if console.startswith("ssh"):
+                        target.console.disable()
                         action = "enable console %s" % console
                         target.console.setup(console,
                                              user = user, password = password)
@@ -329,10 +403,12 @@ class shell(tc.target_extension_c):
                             target.report_info(
                                 "shell-up: %s: success at +%.1fs"
                                 % (action, ts - ts0), dlevel = 2)
-                    action = "wait for shell prompt"
-                    target.expect(self.shell_prompt_regex, console = console,
-                                  name = "early shell prompt",
-                                  timeout = inner_timeout)
+                    if wait_for_early_shell_prompt:
+                        action = "wait for shell prompt"
+                        target.expect(self.prompt_regex,
+                                      console = console,
+                                      name = "early shell prompt",
+                                      timeout = inner_timeout)
                     break
                 except ( tc.error_e, tc.failed_e ) as e:
                     ts = time.time()
@@ -351,7 +427,7 @@ class shell(tc.target_extension_c):
                     "Waited too long (%ds) for shell to come up on"
                     " console '%s' (did not receive '%s')" % (
                         3 * timeout, console,
-                        self.shell_prompt_regex.pattern))
+                        self.prompt_regex.pattern))
         finally:
             testcase.tls.expect_timeout = original_timeout
 
@@ -400,7 +476,7 @@ class shell(tc.target_extension_c):
                 target.expect(expect, name = "command output",
                               console = console, origin = origin)
         if prompt_regex == None:
-            self.target.expect(self.shell_prompt_regex, name = "shell prompt",
+            self.target.expect(self.prompt_regex, name = "shell prompt",
                                console = console, origin = origin)
         else:
             self.target.expect(prompt_regex, name = "shell prompt",
@@ -453,7 +529,7 @@ class shell(tc.target_extension_c):
 
         or collecting the output:
 
-        >>> target.shell.run("ls --color=never -1 /etc/", output = True)
+        >>> output = target.shell.run("ls --color=never -1 /etc/", output = True)
         >>> for file in output.split('\\r\\n'):
         >>>     target.report_info("file %s" % file)
         >>>     target.shell.run("md5sum %s" % file)
@@ -532,7 +608,7 @@ class shell(tc.target_extension_c):
         Remove a multiple remote files (if the target supports it)
         """
         assert isinstance(remote_filenames, collections.Iterable)
-        
+
         self.run("rm -f " + " ".join(remote_filenames))
 
     def file_copy_to(self, local_filename, remote_filename):

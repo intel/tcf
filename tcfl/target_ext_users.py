@@ -139,8 +139,8 @@ def _cmdline_servers(args):
         # FIXME: we need a base exception for errors from the API
         except ( ttb_client.requests.HTTPError, RuntimeError):
             username = "n/a"
-        r.append(( rtb.aka, name, username ))
-        d[rtb.aka] = dict(url = name, username = username)
+        r.append(( rtb.aka, str(rtb), username ))
+        d[rtb.aka] = dict(url = str(rtb), username = username)
         rtbs[rtb.aka] = rtb
 
     verbosity = args.verbosity - args.quietosity

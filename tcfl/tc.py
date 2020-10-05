@@ -649,6 +649,7 @@ class reporter_c(object):
             self.ts_start = testcase.ts_start
         else:
             self.ts_start = time.time()
+        self.testcase = testcase
 
     @staticmethod
     def _argcheck(message, attachments, level, dlevel, alevel):
@@ -1797,7 +1798,32 @@ class target_c(reporter_c):
           output. Further info :ref:`here
           <console_expectation_detect_context>`
 
-        :returns: Nothing, if the output is received.
+        :param str name: (optional) name for this match; defaults to a
+          sanitized version of the regular expression to match and
+          will be in the return value's key.
+
+        :returns: dictionary with the match information:
+
+          >>> target.send("hello")
+          >>> target.expect("hello")
+          >>> {
+          >>>     'hello': {
+          >>>         'console': u'serial0',
+          >>>         'console output': <commonl.generator_factory_c object at 0x7fc899511f10>,
+          >>>         'groupdict': {},
+          >>>         'offset': 0,
+          >>>         'offset_match_end': 710,
+          >>>         'offset_match_start': 709,
+          >>>         'origin': 'FILENAME:LINE',
+          >>>         'pattern': 'hello',
+          >>>         'target': <tcfl.tc.target_c object at 0x7fc891959f90>
+          >>>     }
+          >>> }
+
+          Given the regular expression to match in :meth:`expect`,
+          when matched returns information about said match; see
+          :meth:`tcfl.target_ext_console.expect_text_on_console_c.detect`
+          for full details and field description.
 
         :raises: :py:exc:`tcfl.tc.blocked_e` on error,
           :py:exc:`tcfl.tc.error_e` if not received,
@@ -3558,7 +3584,17 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     # allocation ID)
 
     def __init__(self, name, tc_file_path, origin):
-        reporter_c.__init__(self)
+        #
+        # need this before calling reporter_c.__init__
+        #
+        #: Time when this testcase was created (and thus all
+        #: references to it's inception are done); note in
+        #: __init_shallow__() we update this for when we assign it to
+        #: a target group to run.
+        self.ts_start = time.time()
+        self.ts_end = None
+
+        reporter_c.__init__(self, testcase = self)
         for hook_pre in self.hook_pre:
             assert callable(hook_pre), \
                 "tcfl.tc.tc_c.hook_pre contains %s, defined as type '%s', " \
@@ -3711,13 +3747,6 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         self._kw_set("tmpdir", self.tmpdir)
         self._kw_set("tc_hash", self.ticket)
 
-        #: time when this testcase was created (and thus all
-        #: references to it's inception are done); note in
-        #: __init_shallow__() we update this for when we assign it to
-        #: a target group to run.
-        self.ts_start = time.time()
-        self.ts_end = None
-
         global log_dir
         if log_dir == None:
             _log_dir = os.getcwd()
@@ -3829,9 +3858,11 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         self._expectations_global = []
         self._expectations_global_names = set()
 
-        # update it's inception time (from reporter_c.__init__), since
+        # update its inception time (from reporter_c.__init__), since
         # calling this means this is being assigned to a target group
         # to run.
+        # for reporter_c
+        self.testcase = self
         self.ts_start = time.time()
 
     def __thread_init__(self, tls_parent):
@@ -5265,14 +5296,25 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     def expect_global_remove(self, exp):
         """
         Remove an expectation from the testcase global expectation list
+        
+        :param str exp: expectation's name
+        :param tcfl.tc.expectation_c exp: expectation's instance
 
         Refer to :meth:`expect` for more information
         """
-        assert isinstance(exp, expectation_c), \
-            'argument %s is not an instance of expectation_c but %s' \
+        assert isinstance(exp, (basestring, expectation_c)), \
+            'argument %s is not an instance of expectation_c or name, but %s' \
             % (exp, type(exp).__name__)
-        self._expectations_global_names.remove(exp.name)
-        self._expectations_global.remove(exp)
+        if isinstance(exp, basestring):
+            # FIXME: this shall be made a dictionary, wth
+            for exp_itr in self._expectations_global:
+                if exp_itr.name == exp:
+                    self._expectations_global_names.remove(exp_itr.name)
+                    self._expectations_global.remove(exp_itr)
+                    break
+        else:
+            self._expectations_global_names.remove(exp.name)
+            self._expectations_global.remove(exp)
 
     def expect_tls_append(self, exp):
         """
@@ -5290,13 +5332,23 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     def expect_tls_remove(self, exp):
         """
         Remove an expectation from the testcase global expectation list
+        
+        :param str exp: expectation's name
+        :param tcfl.tc.expectation_c exp: expectation's instance
 
         Refer to :meth:`expect` for more information
         """
-        assert isinstance(exp, expectation_c), \
-            'argument %s is not an instance of expectation_c but %s' \
+        assert isinstance(exp, (str, expectation_c)), \
+            'argument %s is not an instance of expectation_c or name, but %s' \
             % (exp, type(exp).__name__)
-        self.tls._expectations.remove(exp)
+        if isinstance(exp, str):
+            # FIXME: this shall be made a dictionary, wth
+            for exp_itr in self.tls._expectations:
+                if exp_itr.name == exp:
+                    self.tls._expectations.remove(exp_itr)
+                    break
+        else:
+            self.tls._expectations.remove(exp)
 
     def expect(self, *exps_args, **exps_kws):
         """Wait for a list of things we expect to happen
@@ -7708,35 +7760,41 @@ class subtc_c(tc_c):
         self.parent = parent
         self.result = None	# FIXME: already there?
         self.summary = None
-        self.output = None
         # we don't need to acquire our targets, won't use them
         self.do_acquire = False
+        self.attachments = None
 
-    def update(self, result, summary, output):
+    def update(self, result, summary, output = None, **attachments):
         """
         Update the results this subcase will report
 
         :param tcfl.tc.result_c result: result to be reported
         :param str summary: one liner summary of the execution report
+        :param str output: (optional) string describing output from
+          the testcase (general)
+        :param attachments: any combination of `KEY=VALUE` which will
+          be reported using the reporting API attachment system
         """
         assert isinstance(result, result_c)
         assert isinstance(summary, str)
         assert isinstance(output, str)
         self.result = result
         self.summary = summary
-        self.output = output
+        self.attachments = dict(attachments)
+        if output:
+            self.attachments['output'] = output
 
     def eval_50(self):		# pylint: disable = missing-docstring
         if self.result == None:
             self.result = self.parent.result
             self.result.report(
                 self, "subcase didn't run; parent didn't complete execution?",
-                dlevel = 2, attachments = dict(output = self.output))
+                dlevel = 2, attachments = self.attachments)
         else:
             self.result.report(
                 self, "subcase run summary: %s"
                 % (self.summary if self.summary else "<not provided>"),
-                dlevel = 2, attachments = dict(output = self.output))
+                dlevel = 2, attachments = self.attachments)
         self.result.report(self, "NOTE: this is a subtestcase of %(tc_name)s "
                            "(%(runid)s:%(tc_hash)s); refer to it for full "
                            "information" % self.parent.kws, dlevel = 1)
@@ -7983,6 +8041,7 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
 # This need to be imported here since they rely on definitions
 from . import report_console
 from . import report_jinja2
+import tcfl.report_data_json
 
 # list of allocation IDs we have currently reserved; this list is
 # local to each thread so when we interrupt it with a signal, we can
@@ -8111,6 +8170,7 @@ def _run(args):
     report_driver_c.add(report_console_impl)
     report_file_impl = report_jinja2.driver(log_dir)
     report_driver_c.add(report_file_impl)
+    report_driver_c.add(tcfl.report_data_json.driver())
 
     # Setup defaults in the base testcase class
     tc_c.preempt = args.preempt
@@ -8223,7 +8283,7 @@ def _run(args):
                         logging.error("removing allocation %s on %s",
                                       allocid, rtb)
                         target_ext_alloc._delete(rtb, allocid)
-                _allocids[rtb].clear()
+                    _allocids[rtb].clear()
             if tp:
                 tp.terminate()
             time.sleep(1)

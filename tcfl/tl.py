@@ -401,9 +401,6 @@ def linux_ipv4_addr_get_from_console(target, ifname):
         raise tcfl.tc.error_e("can't find IP addr")
     return matches.groupdict()['name']
 
-# common linux root prompts
-linux_root_prompts = target_ext_shell._shell_prompt_regex
-
 def sh_export_proxy(ic, target):
     """
     If the interconnect *ic* defines a proxy environment, issue a
@@ -562,7 +559,7 @@ def linux_rsync_cache_lru_cleanup(target, path, max_kbytes):
     target.report_info(
         "rsync cache: reducing %s to %dMiB" % (path, max_kbytes / 1024.0))
 
-    prompt_original = target.shell.shell_prompt_regex
+    prompt_original = target.shell.prompt_regex
     python_error_ex = target.console.text(
         re.compile("^(.*Error|Exception):.*^>>> ", re.MULTILINE | re.DOTALL),
         name = "python error",
@@ -647,7 +644,7 @@ for e in sorted(l, key = lambda e: e[0], reverse = True):
 
 exit()""" % dict(path = path, max_bytes = max_kbytes * 1024))
     finally:
-        target.shell.shell_prompt_regex = prompt_original
+        target.shell.prompt_regex = prompt_original
         testcase.expect_tls_remove(python_error_ex)
 
 #

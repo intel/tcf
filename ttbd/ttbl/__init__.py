@@ -329,6 +329,7 @@ class fsdb_symlink_c(fsdb_c):
     def set(self, key, value, force = True):
         # escape out slashes and other unsavory characters in a non
         # destructive way that won't work as a filename
+        key_orig = key
         key = urllib.parse.quote(
             key, safe = '-_ ' + string.ascii_letters + string.digits)
         location = os.path.join(self.location, key)
@@ -360,11 +361,24 @@ class fsdb_symlink_c(fsdb_c):
                 raise ValueError("can't store value of type %s" % type(value))
             assert len(value) < 4096
         if value == None:
+            # note that we are setting None (aka: removing the value)
+            # we also need to remove any "subfield" -- KEY.a, KEY.b
             try:
                 os.unlink(location)
             except OSError as e:
                 if e.errno != errno.ENOENT:
                     raise
+            # FIXME: this can be optimized a lot, now it is redoing a
+            # lot of work
+            for key_itr in self.keys(key_orig + ".*"):
+                key_itr_raw = urllib.quote(
+                    key_itr, safe = '-_ ' + string.ascii_letters + string.digits)
+                location = os.path.join(self.location, key_itr_raw)
+                try:
+                    os.unlink(location)
+                except OSError as e:
+                    if e.errno != errno.ENOENT:
+                        raise
             return True	# already wiped by someone else
         if force == False:
             try:
@@ -683,6 +697,9 @@ class tt_interface_impl_c(object):
         #: >>>     serial_number = "RS33433E",
         #: >>>     location = "USB port #4 front"))
         self.upid = kwargs
+        #: Unique ID for this instrument/device -- this gets filled in
+        #: by the daemon upon initialization
+        self.upid_index = None
 
     def upid_set(self, name_long, **kwargs):
         """
@@ -1236,6 +1253,7 @@ class tt_interface(object):
             tags_interface[component] = {
                 "instrument": index
             }
+            impl.upid_index = index
             # FIXME: there must be a more efficient way than using
             # pprint.pformat
             components_by_index[index].append(component)
@@ -2214,6 +2232,70 @@ class test_target(object):
         setattr(self, name, obj)
         self.release_hooks.add(obj._release_hook)
 
+
+    def fsdb_cleanup(self):
+        # Cleanup the inventory database for the target
+        #
+        # As the target's evolve, configurations change, instruments
+        # are replaced, etc and some information in the database might
+        # become stale.
+        #
+        # This function navigates the driver tree in the target object
+        # looking for the instruments we are using and then removes
+        # from the instrumentation and interface inventory tree
+        # anything that we know is not in use.
+        #
+        # note we ignore, in the instrument tree, anythinf that has a
+        # "manual" field, since this means this was entered by hand,
+        # not by a driver.
+
+        instrument_names_driver = set()
+        interface_names = set()
+        # Get list of instruments used by the different interfaces; we
+        # know these because each driver (impl_c object) as an UPID
+        # field that contains it
+        # So basically scan the hole driver tree looking for them
+        # iterate over all the interfaces, objects attached to @self
+        # of type tt_interface
+        for attr_name in dir(self):
+            if attr_name.startswith("__"):
+                continue
+            attr = getattr(self, attr_name)
+            if not isinstance(attr, ttbl.tt_interface):
+                continue
+
+            # yay, got an interface; look for implementation info on it
+            interface_names.add(attr_name)
+            # some interfaces might be also driver
+            # implementations (eg: an interface with a single
+            # implementation)
+            if isinstance(attr, ttbl.tt_interface_impl_c):
+                instrument_names_driver.add(attr.upid_index)
+            # but most commonly, interfaces contain a list of
+            # implementations
+            for impl in attr.impls.values():
+                instrument_names_driver.add(impl.upid_index)
+
+        # now collect the list of instruments exposed in the FSDB
+        instrument_names_fsdb = set()
+        for key in self.fsdb.keys("instrumentation.*"):
+            instrument_names_fsdb.add(key.split(".")[1])
+
+        # we got now two sets: the list of instruments we know we have
+        # from the driver tree and the ones exposed in the FSDB;
+        # remove any that is not in the
+        for instrument in instrument_names_fsdb - instrument_names_driver:
+            if self.fsdb.get("instrumentation." + instrument + ".manual"):
+                continue
+            self.fsdb.set("instrumentation." + instrument, None)
+
+        # now let's cleanup leftover interface information
+        interface_names_fsdb = set()
+        for key in self.fsdb.keys("interfaces.*"):
+            interface_names_fsdb.add(key.split(".")[1])
+        for interface_name in interface_names_fsdb - interface_names:
+            self.fsdb.set("interfaces." + interface_name, None)
+
 class interconnect_c(test_target):
     """
     Define an interconnect as a target that provides connectivity
@@ -2289,7 +2371,16 @@ class authenticator_c(object):
     class invalid_credentials_e(error_e):
         pass
 
+
+
 _daemon_pids = set()
+# for who knows what reason hidden in the guts of Unix and probably my
+# lack of knowledge, because of the way we are handling the SIGCHLD
+# handler to avoid zombies, when we run with subprocess it somehow
+# misses the return value--so we have the SIGCHLD handler keep it here
+# and if anyone needs it, they can use it; eg
+# ttbl.images.flash_shell_cmd_c.flash_check_done()
+daemon_retval_cache = commonl.dict_lru_c(32)
 
 def daemon_pid_add(pid):
     _daemon_pids.add(pid)
