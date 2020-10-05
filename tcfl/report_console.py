@@ -181,7 +181,8 @@ class driver(tc.report_driver_c):
 
     def _shall_do(self, level):
         console = level <= self.verbosity
-        logfile = level <= self.verbosity_logf and level >= 1000
+        # level >= 1000 is for control messages
+        logfile = level <= self.verbosity_logf or level >= 1000
         return console, logfile
 
     def report(self, reporter, tag, ts, delta,
