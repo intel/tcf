@@ -1895,3 +1895,44 @@ def maybe_decompress(filename, force = False):
         subprocess.check_call(command.split() + [ filename ],
                               stdin = subprocess.PIPE)
     return basename
+
+
+class dict_lru_c:
+    """
+    Way simple LRU dictionary with maximum size
+
+    When getting, the entries get removed, so it kinda works like a FIFO
+
+    :param int max_size: maximum number of entries in the dictionary;
+      when putting a new one, older entries will be removed.
+    """
+
+    def __init__(self, max_size):
+        assert isinstance(max_size, int)
+        self.max_size = max_size
+        self.cache = dict()
+
+
+    def set(self, key, value):
+        self.cache[key] = ( value, time.time() )
+        if len(self.cache) > self.max_size:
+            # lame LRU purge
+            ts_earliest = time.time()
+            key_earliest = None
+            for key, ( value, ts ) in self.cache.items():
+                if ts < ts_earliest:
+                    ts_earliest = ts
+                    key_earliest = key
+            # there has to be one, otherwise, how did we get here past
+            # the len check?
+            del self.cache[key_earliest]
+
+    def get_and_remove(self, key, default = None):
+        """
+        Get a value for a key
+
+        Note this is a destructive get; we can get it only once and
+        then it is deleted.
+        """
+        value, ts = self.cache.pop(key, ( None, None ) )
+        return value

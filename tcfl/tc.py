@@ -7000,6 +7000,8 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             tc._targets = self._targets
             tc._kw_set("type", self.kws['type'])
             tc._methods_prepare()	# setup phase running methods
+            tc.__init_shallow__(tc)
+            tc._prefix_update()
             # remember this returns a list, so we have to concatenate them
             results += tc._run(msgid_c.parent(),
                                _simple_namespace(self.tls.__dict__))
@@ -7518,6 +7520,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             path = inspect.getsourcefile(_cls)
             subcase_name = _cls.__name__
             if subcase_name != "_driver" \
+               and subcase_name != "_test" \
                and subcases_cmdline and subcase_name not in subcases_cmdline:
                 logging.info("%s: subcase ignored since it wasn't "
                              "given in the command line list: %s",
@@ -7539,7 +7542,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             except IOError as e:
                 source_line = "n/a"
             tc = _cls(name, path, path + ":" + source_line)
-            if subcase_name == "_driver":
+            if subcase_name in ( "_test", "_driver" ):
                 # make a copy, as we might modify during execution
                 tc.subcases = list(subcases_cmdline)
             tcs.append(tc)
@@ -7870,8 +7873,11 @@ def testcases_discover(tcs_filtered, args):
             parts = tc_path.split("#")
             tc_path = parts[0]
             subcases_cmdline = parts[1:]
+            logger.info("commandline '%s' requests subcases: %s",
+                        tc_path, " ".join(subcases_cmdline))
         else:
             subcases_cmdline = []
+            logger.info("commandline '%s' requests no subcases", tc_path)
         if not os.path.exists(tc_path):
             logger.error("%s: does not exist; ignoring", tc_path)
             continue
