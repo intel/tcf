@@ -7515,6 +7515,7 @@ class tc_c(reporter_c):
             path = inspect.getsourcefile(_cls)
             subcase_name = _cls.__name__
             if subcase_name != "_driver" \
+               and subcase_name != "_test" \
                and subcases_cmdline and subcase_name not in subcases_cmdline:
                 logging.info("%s: subcase ignored since it wasn't "
                              "given in the command line list: %s",
@@ -7536,7 +7537,7 @@ class tc_c(reporter_c):
             except IOError as e:
                 source_line = "n/a"
             tc = _cls(name, path, path + ":" + source_line)
-            if subcase_name == "_driver":
+            if subcase_name in ( "_test", "_driver" ):
                 # make a copy, as we might modify during execution
                 tc.subcases = list(subcases_cmdline)
             tcs.append(tc)
