@@ -128,16 +128,14 @@ class driver(tc.report_driver_c):
                 pipe = subprocess.Popen(
                     "exec " + command % kws + " > '%s'" % log_file,
                     shell = True, stdin = subprocess.PIPE)
-                logf = pipe.stdin
-                self.logf = commonl.io_tls_prefix_lines_c(
-                    self.tls, io.open(pipe.stdin.fileno(), "w"),
-                    encoding = 'utf-8', errors = 'replace')
+                logf = io.open(pipe.stdin.fileno(), "w",
+                               encoding = 'utf-8', errors = 'replace')
             else:
                 logf = io.open(log_file, "w+", encoding = 'utf-8',
                                errors = 'replace')
-                self.logf = commonl.io_tls_prefix_lines_c(
-                    self.tls, logf.detach(),
-                    encoding = 'utf-8', errors = 'replace')
+            self.logf = commonl.io_tls_prefix_lines_c(
+                self.tls, logf.detach(),
+                encoding = 'utf-8', errors = 'replace')
         else:
             self.logf = None
         consolef = io.open(sys.stdout.fileno(), "w",
