@@ -946,8 +946,8 @@ def main_menu_expect(target):
 
     bios_boot_expect(target)
     # let's just go to the BIOS menu, F7 is not working
-    for _ in range(5):
-        time.sleep(0.3)
+    for _ in range(10):
+        time.sleep(0.5)
         target.console.write(ansi_key_code("F2", "vt100"))
 
     # This means we have reached the BIOS main menu
