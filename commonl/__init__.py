@@ -362,6 +362,160 @@ def hash_file(hash_object, filepath, blk_size = 8192):
             hash_object.update(chunk)
     return hash_object
 
+def symlink_lru_cleanup(dirname, max_entries):
+    """
+    Delete the oldest in a list of symlinks that are used as a cache
+    until only *max_entries* are left
+
+    :param str dirname: path where the files are located
+
+    :param int max_entries: maximum number of entries which should be
+      left
+
+    """
+    assert isinstance(dirname, basestring)
+    assert isinstance(max_entries, int) and max_entries > 0
+
+    mtimes_sorted_list = []
+    mtimes = {}
+
+    for path, _dirs, filenames in os.walk(dirname):
+        for filename in filenames:
+            filepath = os.path.join(path, filename)
+            mtime = os.lstat(filepath).st_mtime
+            mtimes[mtime] = filepath
+            bisect.insort(mtimes_sorted_list, mtime)
+        break	# only one directory level
+
+    clean_number = len(mtimes_sorted_list) - max_entries
+    if clean_number < 0:
+        return
+    for mtime in mtimes_sorted_list[:clean_number]:
+        rm_f(mtimes[mtime])
+
+
+def hash_file_maybe_compressed(hash_object, filepath, cache_entries = 128,
+                               cache_path = None, tmpdir = None):
+    """Run the file's contents through a hash generator, maybe
+    uncompressing it first.
+
+    Uncompression only works if the file is compressed using a filter
+    like program (eg: gz, bzip2, xz) -- see :func:`maybe_decompress`.
+
+    If caching is enabled, the results of uncompressing and hashing
+    the file will be kept in a cache so that next time it can be used
+    instead of decompressing the file again.
+
+    :param hash_object: :mod:`hashlib` returned object to do hashing
+      on data.
+
+      >>> hashlib.sha512()
+
+    :param str filepath: path to file to hash; if not compressed, it
+      will be passed straight to :func:`hash_file`.
+
+    :param int cache_entries: (optional; default *128*) if zero,
+      caching is disabled. Otherwise, caching is enabled and we'll
+      keep those many entries.
+
+      The results are cached based on the hash of the compressed
+      data--if the hexdigest for the compressed data is in the cache,
+      it's value will be the hexdigest of the uncompressed data. If
+      not, decompress, calculate and store int he cache for future
+      use.
+
+    :param str cache_path: (optional; default
+      *~/.cache/compressed-hashes*) if caching is enabled, path where
+      to store the cached hashes.
+
+    :param str tmpdir: (optional; default
+      */tmp/compressed-hashes.XXXXXX*) temporary directory where to
+      uncompress to generate the hash.
+
+    :returns: hexdigest of the compressed file data in string form
+
+
+    **Cache database**
+
+    Cache entries use symlinks as an atomic key/value storage system
+    in a directory. These are lightweight and setting is POSIX
+    atomic.
+
+    There is an slight race condition until we move to Python3 in that
+    we can't update the mtime when used. However, it is harmless
+    because it means a user will decompress and update, but not create
+    bad results.
+
+    """
+    assert isinstance(cache_entries, int) and cache_entries >= 0
+
+    _basename, ext = file_is_compressed(filepath)
+    if ext == None:	# not compressed, so pass through
+        return hash_file(hash_object, filepath).hexdigest()
+
+    # File is compressed
+    #
+    # Let's get the hash of the compressed data, using the same hash
+    # object algorithm, to see if we have it cached.
+    hoc = hash_file(hashlib.new(hash_object.name), filepath)
+    hexdigest_compressed = hoc.hexdigest()
+    if cache_entries:
+        # if there is no cache location, use our preset in the user's home dir
+        if cache_path == None:
+            cache_path = os.path.join(
+                os.path.expanduser("~"), ".cache", "compressed-hashes")
+            makedirs_p(cache_path)
+        symlink_lru_cleanup(cache_path, cache_entries)
+        cached_filename = os.path.join(cache_path, hoc.hexdigest())
+        try:
+            value = os.readlink(cached_filename)
+            # we have read the value, so now we remove the entry and
+            # if it is "valid", we recreate it, so the mtime is
+            # updated and thus an LRU cleanup won't wipe it.
+            # FIXME: python3 just update utime
+            rm_f(cached_filename)
+            # basic verification, it has to look like the hexdigest()
+            if len(value) != len(hoc.hexdigest()):
+                value = None
+            # recreate it, so that the mtime shows we just used it
+            os.symlink(value, cached_filename)
+            return value
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            value = None
+
+    # decompress and generate hash
+    #
+    # We need a tmpdir where to decompress
+    if not tmpdir:
+        tmpdir = tempfile.mkdtemp(prefix = "compressed-hashes.")
+        tmpdir_delete = True
+    else:
+        tmpdir_delete = False
+    # Now, because maybe_decompress() works by decompressing to a file
+    # named without the extension (it is how it is), we link the file
+    # with the extension to the tmpdir and tell maybe_decompress() to
+    # do its thing -- then we has the raw data
+    filename_tmp_compressed = os.path.join(tmpdir, os.path.basename(filepath))
+    os.symlink(os.path.abspath(filepath), filename_tmp_compressed)
+    try:
+        filename_tmp = maybe_decompress(filename_tmp_compressed)
+        ho = hash_file(hash_object, filename_tmp)
+    finally:
+        rm_f(filename_tmp)
+        rm_f(filename_tmp_compressed)
+        if tmpdir_delete:
+            os.rmdir(tmpdir)
+
+    hexdigest = ho.hexdigest()
+
+    if cache_entries:
+        symlink_f(hexdigest, os.path.join(cache_path, hexdigest_compressed))
+
+    return hexdigest
+
+
 def request_response_maybe_raise(response):
     if not response:
         try:
@@ -1291,7 +1445,7 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
 
     # test dictionary emptiness with 'len(d) == 0' vs 'd == {}', since they
     # could be ordereddicts and stuff
-    
+
     def __update_recursive(val, field, field_flat, projections = None,
                            depth_limit = 10, prefix = "  ", sort = True,
                            empty_dict = False):
@@ -1618,7 +1772,7 @@ class io_tls_prefix_lines_c(io.TextIOWrapper):
        with commonl.tls_prefix_c(tls, "PREFIX"), \
             commonl.io_tls_prefix_lines_c(tls, f.detach()) as of:
 
-           of.write(u"line1\\nline2\\nline3\\n")    
+           of.write(u"line1\\nline2\\nline3\\n")
 
     Limitations:
 
@@ -1850,6 +2004,13 @@ decompress_handlers = {
     ".xz": "xz -fkd",
 }
 
+def file_is_compressed(filename):
+    assert isinstance(filename, basestring)
+    basename, ext = os.path.splitext(filename)
+    if ext not in decompress_handlers:	# compressed logfile support
+        return filename, None
+    return basename, ext
+
 def maybe_decompress(filename, force = False):
     """
     Decompress a file if it has a compressed file extension and return
@@ -1873,8 +2034,8 @@ def maybe_decompress(filename, force = False):
 
     """
     assert isinstance(filename, basestring)
-    basename, ext = os.path.splitext(filename)
-    if ext not in decompress_handlers:	# compressed logfile support
+    basename, ext = file_is_compressed(filename)
+    if not ext:	# compressed logfile support
         return filename
     if force or not os.path.exists(basename):
         # FIXME: we need a lock in case we have multiple
