@@ -1953,8 +1953,9 @@ def assert_list_of_strings(l, list_name, item_name):
 
 def assert_list_of_types(l, list_name, item_name, item_types):
     assert isinstance(l, list), \
-        "'%s' needs to be None or a list of strings (%s); got %s" % (
-            list_name, item_name, type(l))
+        "'%s' needs to be a list of items (%s) of types '%s'; got %s" % (
+            list_name, item_name,
+            ",".join(type(i).__name__ for i in item_types), type(l))
     count = -1
     for i in l:
         count += 1
