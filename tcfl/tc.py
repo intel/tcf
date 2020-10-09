@@ -1421,10 +1421,10 @@ class target_c(reporter_c):
         Set a property on the target
 
         :param str property_name: Name of the property to read
-        :param str value: (optional) Value to set; *None* to unset it
+        :param value: (optional) Value to set; *None* to unset it
         """
         if value:
-            assert isinstance(value, basestring)
+            assert isinstance(value, (basestring, numbers.Integral, numbers.Real, bool))
         self.report_info("setting property '%s' to '%s'"
                          % (property_name, value), dlevel = 3)
         data = { property_name: value }
@@ -1928,7 +1928,7 @@ class target_c(reporter_c):
 
     def ttbd_iface_call(self, interface, call, method = "PUT",
                         component = None, stream = False, raw = False,
-                        files = None, timeout = 60,
+                        files = None, timeout = 160,
                         **kwargs):
         """
         Execute a general interface call to TTBD, the TCF remoting server
@@ -2076,13 +2076,20 @@ class target_c(reporter_c):
         commonl.kws_update_from_rt(self.kws, self.rt)
         for key, val in commonl.dict_to_flat(self.rt,
                                              sort = False, empty_dict = True):
-            self._kws[key] = val
+            if key == 'rtb':
+                # ok, this is truly a hack -- but we will get ONE value
+                # from target.rt that is the daemon representation, and we
+                # just want its url, which str() does.
+                val = str(val)
+            self.kws[key] = val
+
         kws_bsp = dict()
         if 'bsps' in self.rt.keys() and bsp and bsp in self.rt['bsps']:
             commonl.kws_update_type_string(kws_bsp, self.rt['bsps'][bsp])
             kws_bsp.update(self._kws_bsp.get(bsp, {}))
             kws_bsp['bsp'] = bsp
         self.kws.update(kws_bsp)
+
 
     def _kw_set(self, kw, value, origin = None):
         """
@@ -2092,13 +2099,21 @@ class target_c(reporter_c):
         :py:data:`_kws`).
 
         :param str kw: keyword name
-        :param str value: value for the keyword
+        :param (basestring, int, float, bool) value: value for the keyword
         :param str origin: origin of this setting; if none, it will be
           taken from the stack
 
         """
         assert isinstance(kw, basestring)
-        assert isinstance(value, (basestring, int))
+        if isinstance(value, ttb_client.rest_target_broker):
+            # ok, this is truly a hack -- but we will get ONE value
+            # from target.rt that is the daemon representation, and we
+            # just want its url, which str() does.
+            value = str(value)
+        assert value in ({}, None) \
+            or isinstance(value, (basestring, int, float, bool)), \
+            "keyword %s: value type %s not allowed (str, int, float, bool): %s" % (
+                kw, type(value), value)
         if origin == None:
             o = inspect.stack()[1]
             origin = "%s:%s" % (o[1], o[2])
@@ -7830,6 +7845,7 @@ def _testcase_match_tags(tc, tags_spec, origin = None):
     kws = dict()
     for name, (value, _vorigin) in tc._tags.iteritems():
         kws[name] = value
+
     if not commonl.conditional_eval("testcase tag match", kws, tags_spec,
                                     origin, kind = "specification"):
         raise skip_e("because of tag specification '%s' @ %s" %
