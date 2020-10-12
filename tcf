@@ -207,7 +207,7 @@ def _cookies(args):
 
 
 if __name__ == "__main__":
-    tcfl.version = commonl.version_get(tcfl, "tcf")
+    tcfl.tc.version = commonl.version_get(tcfl.tc, "tcf")
     arg_parser = argparse.ArgumentParser()
     commonl.cmdline_log_options(arg_parser)
     # FIXME: should be in cmdline_log_options() but it does not work :/
@@ -263,7 +263,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         '-V', '--version',
         action = 'version', default = argparse.SUPPRESS,
-        version = tcfl.version,
+        version = tcfl.tc.version,
         help = "show program's version number and exit")
 
     arg_parser.add_argument(

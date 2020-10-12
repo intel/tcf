@@ -906,7 +906,7 @@ def version_get(module, name):
         git_version = subprocess.check_output(
             "git describe --tags --always --abbrev=7 --dirty".split(),
             cwd = _srcdir, stderr = subprocess.STDOUT)
-        return git_version.strip()
+        return git_version.strip().decode('utf-8')
     except subprocess.CalledProcessError as _e:
         # At this point, logging is still not initialized
         raise RuntimeError("Unable to determine %s (%s) version: %s"
