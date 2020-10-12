@@ -301,8 +301,11 @@ class extension(tc.target_extension_c):
 
         target.power.on()
         power = target.power.get()
+        state, substate, components = target.power.list()
         if power != True:
-            raise tc.failed_e("power should be True, reported %s" % power)
+            raise tc.failed_e("power should be True, reported %s" % power,
+                              dict(state = state, substate = substate,
+                                   components = components, power = power))
         target.report_pass("power is reported correctly as %s" % power)
 
         target.power.cycle()
