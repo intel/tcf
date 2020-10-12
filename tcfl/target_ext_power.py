@@ -292,58 +292,32 @@ class extension(tc.target_extension_c):
 
     def _healthcheck(self):
         target = self.target
-        print("Powering off")
         target.power.off()
-        print("Powered off")
-
-        print("Querying power status")
         power = target.power.get()
         if power != False:
-            msg = "Power should be False, reported %s" % power
-            raise Exception(msg)
-        print("Power is reported correctly as %s" % power)
+            raise tc.failed_e("power should be False, reported %s" % power)
 
-        print("Powering on")
+        target.report_pass("power is reported correctly as %s" % power)
+
         target.power.on()
-        print("Powered on")
-
-        print("Querying power status")
         power = target.power.get()
+        state, substate, components = target.power.list()
         if power != True:
-            msg = "Power should be True, reported %s" % power
-            raise Exception(msg)
-        print("Power is reported correctly as %s" % power)
+            raise tc.failed_e("power should be True, reported %s" % power,
+                              dict(state = state, substate = substate,
+                                   components = components, power = power))
+        target.report_pass("power is reported correctly as %s" % power)
 
-        print("Power cycling")
         target.power.cycle()
-        print("Power cycled")
+        components = target.power.list()
+        target.report_pass("power components listed",
+                           dict(components = components))
 
-        print("Power conmponents: listing")
-        try:
-            components = target.power.list()
-        except RuntimeError as e:
-            print("Power components: not supported")
-        else:
-            print("Power components: listed", components)
-
-        print("Querying power status")
-        power = target.power.get()
-        if power != True:
-            msg = "Power should be True, reported %s" % power
-            raise Exception(msg)
-        print("Power is reported correctly as %s" % power)
-
-        print("Powering off")
         target.power.off()
-        print("Powered off")
-
-        print("Querying power status")
         power = target.power.get()
         if power != False:
-            msg = "Power should be False, reported %s" % power
-            raise Exception(msg)
-        print("Power is reported correctly as %s" % power)
-        print("Power test passed")
+            raise tc.failed_e("power should be False, reported %s" % power)
+        target.report_pass("power is reported correctly as %s" % power)
 
 
 def _cmdline_power_off(args):

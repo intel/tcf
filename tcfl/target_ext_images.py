@@ -143,8 +143,7 @@ class extension(tc.target_extension_c):
                 # testcases for the same user are uploading files with
                 # the same name but different content / target, they don't
                 # collide
-                ho = commonl.hash_file(hashlib.sha512(), img_name)
-                hd = ho.hexdigest()
+                hd = commonl.hash_file_maybe_compressed(hashlib.sha512(), img_name)
                 img_name_remote = \
                     hd[:10] \
                     + "-" + commonl.file_name_make_safe(os.path.abspath(img_name))
