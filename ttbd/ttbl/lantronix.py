@@ -189,8 +189,12 @@ class console_spider_duo_pc(ttbl.console.ssh_pc):
                 # Lantronix dropbear 0.45 server (or its configuration)
                 # needs this setting for it to work. old, but nothing we
                 # can do.
+                # KEX works for FW 3.x and 4.x; if you just append it,
+                # FW 3.x cuts the negotiation short and it does not
+                # work
                 "KexAlgorithms": "diffie-hellman-group1-sha1",
-                "Ciphers" : "aes128-cbc,3des-cbc",
+                # Ciphers needed for FW 3.x 
+                "Ciphers" : "+aes128-cbc,3des-cbc,aes128-ctr,aes256-ctr",
             },
             **kwargs)
         # it is reliable on reporting state
