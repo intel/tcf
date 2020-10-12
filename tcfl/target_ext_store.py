@@ -124,52 +124,60 @@ class extension(tc.target_extension_c):
 
     def _healthcheck(self):
         target = self.target
-        l = target.store.list()
-        print "OK: can do initial list, got", pprint.pformat(l)
-        for name, _md5 in l.items():
-            target.store.delete(name)
-            print "OK: deleted existing %s" % name
+        l0 = target.store.list()
+        target.report_pass("got existing list of files", dict(l0 = l0))
     
         tmpname = commonl.mkid(str(id(target))) + ".1"
         target.store.upload(tmpname, __file__)
-        print "OK: uploaded 1", tmpname
+        target.report_pass("uploaded file %s" % tmpname)
         l = target.store.list()
-        assert len(l) == 1, \
-            "after uploading one file, %d are listed, expected 1; got %s" \
-            % (len(l), pprint.pformat(l))
-        assert l.keys()[0] == tmpname, \
-            "after uploading file, name differs, expected %s; got %s" \
-            % (tmpname, pprint.pformat(l))
-        print "OK: 1 listed"
+        # remove elements we knew existed (there might be other
+        # processes in parallel using this )
+        l = list(set(l) - set(l0))
+        if len(l) != 1:
+            raise tc.failed_e(
+                "after uploading one file, %d are listed; expected 1" % len(l),
+                dict(l = l))
+        if l[0] != tmpname:
+            raise tc.failed_e(
+                "after uploading file, name differs, expected %s" % tmpname,
+                dict(l = l))
+        target.report_pass("listed afer uploading one")
 
         tmpname2 = commonl.mkid(str(id(target))) + ".2"
         target.store.upload(tmpname2, __file__)
-        print "OK: uploaded 2", tmpname2
+        target.report_pass("uploaded second file %s" % tmpname2)
         l = target.store.list()
-        assert len(l) == 2, \
-            "after uploading another file, %d are listed, expected 2; got %s" \
-            % (len(l), pprint.pformat(l))
-        assert tmpname2 in l.keys(), \
-            "after uploading file, can't find %s; got %s" \
-            % (tmpname2, pprint.pformat(l))
-        print "OK: 2 listed"
+        l = list(set(l) - set(l0))
+        if len(l) != 2:
+            raise tc.failed_e(
+                "after uploading another file, %d are listed, expected 2" % len(l),
+                dict(l = l))
+        if tmpname2 not in l:
+            raise tc.failed_e(
+                "after uploading file, can't find %s" % tmpname2,
+                dict(l = l))
+        target.report_pass("listed after uploading second file", dict(l = l))
 
         target.store.delete(tmpname)
         l = target.store.list()
-        assert tmpname not in l.keys(), \
-            "after removing %s, still can find it in listing; got %s" \
-            % (tmpname, pprint.pformat(l))
-        print "OK: removed", tmpname
+        if tmpname in l:
+            raise tc.failed_e(
+                "after removing %s, still can find it in listing" % tmpname,
+                dict(l = l))
+        target.report_pass("removed %s" % tmpname)
 
         target.store.delete(tmpname2)
         l = target.store.list()
-        assert tmpname2 not in l.keys(), \
-            "after removing %s, still can find it in listing; got %s" \
-            % (tmpname2, pprint.pformat(l))
-        assert len(l) == 0, \
-            "after removing all, list is not empty; got %s" \
-            % pprint.pformat(l)
-        print "OK: removed", tmpname2, "list is empty"
+        if tmpname2 in l:
+            raise tc.failed_e(
+                "after removing %s, still can find it in listing" % tmpname2,
+                dict(l = l))
+        l = list(set(l) - set(l0))
+        if l:
+            raise tc.failed_e(
+                "after removing all, list is not empty", dict(l = l))
+        target.report_pass("all files removed report empty list")
         
 def _cmdline_store_upload(args):
     with msgid_c("cmdline"):
