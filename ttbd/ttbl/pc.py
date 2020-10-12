@@ -435,7 +435,12 @@ class dlwps7(ttbl.power.impl_c):
     driver fail.
     """
     def __init__(self, _url, reboot_wait_s = 0.5, **kwargs):
-        ttbl.power.impl_c.__init__(self, **kwargs)
+        ttbl.power.impl_c.__init__(self, paranoid = True, **kwargs)
+        # we run the driver in paranoid mode so the on and off
+        # operations become synchronous and won't return until we
+        # confirm the power is on or off. We do one sample only, since
+        # we know it returns values correctly
+        self.paranoid_get_samples = 1
         assert isinstance(_url, basestring)
         assert isinstance(reboot_wait_s, (int, float))
         url = urlparse.urlparse(_url)
