@@ -2046,15 +2046,9 @@ def maybe_decompress(filename, force = False):
     :data:`decompress_handlers`.
 
     """
-<<<<<<< HEAD
     assert isinstance(filename, str)
-    basename, ext = os.path.splitext(filename)
-    if ext not in decompress_handlers:	# compressed logfile support
-=======
-    assert isinstance(filename, basestring)
     basename, ext = file_is_compressed(filename)
     if not ext:	# compressed logfile support
->>>>>>> b75b6f07d7f931acb2da3320032515a2fe7db0cf
         return filename
     if force or not os.path.exists(basename):
         # FIXME: we need a lock in case we have multiple
