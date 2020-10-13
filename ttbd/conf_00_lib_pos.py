@@ -747,10 +747,10 @@ def pos_target_add(
         # remove user/pasword
         _name = re.sub(r"^([^\s]+:)?([^\s]+@)?", "", power_rail)
         if "@" in power_rail:	# use given user password
-            pcl.append((_name, ttbl.pc.dlwps7("http://%s" % power_rail)))
+            pcl.append(( "AC", ttbl.pc.dlwps7("http://%s" % power_rail) ))
         else:				# use default password
-            pcl.append((_name,
-                        ttbl.pc.dlwps7("http://admin:1234@%s" % power_rail)))
+            pcl.append(
+                ( "AC", ttbl.pc.dlwps7("http://admin:1234@%s" % power_rail) ))
     elif isinstance(power_rail, ttbl.power.impl_c):
         # already asserted above
         pcl.append(power_rail)
@@ -988,7 +988,7 @@ def target_qemu_pos_add(target_name,
     power_rail = []
     if nw_name:			# got networking?
         power_rail.append(( "tuntap-" + nw_name, ttbl.qemu.network_tap_pc() ))
-    power_rail.append(( "main_power", qemu_pc ))
+    power_rail.append(( "AC", qemu_pc ))
     target.interface_add("power", ttbl.power.interface(*power_rail))
 
     # The QEMU object exposes an image setting interface
