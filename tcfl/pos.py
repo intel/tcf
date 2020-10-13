@@ -775,10 +775,17 @@ class extension(tc.target_extension_c):
                     # the *TCF test node* banner
                     inner_timeout = (bios_boot_time + timeout) / 20
                     for _ in range(20):
-                        # if this was an SSH console that was left
-                        # enabled, it will die and auto-disable when
-                        # the machine power cycles, so make sure it is enabled
                         try:
+                            if target.console.default.startswith("ssh"):
+                                # if this was an SSH console that was left
+                                # enabled, it will not die because SSH takes
+                                # its sweet time to die by timeout (and thus
+                                # auto-disable when the machine power cycles),
+                                # so let's disable/enable to make sure
+                                # This is tricky, because
+                                # target.shell.up() will basically do
+                                # the same
+                                target.console.disable()
                             target.console.enable()
                         except ( tc.error_e, tc.failed_e ) as e:
                             ts = time.time()
@@ -806,16 +813,33 @@ class extension(tc.target_extension_c):
                                     # handle it
                                     timeout = 0
                                 ),
-                                # FIXME: for ssh consoles this does
-                                # not apply, find an equivalent
+                                # SSH consoles will just print a prompt
+                                target.console.text(
+                                    target.shell.prompt_regex,
+                                    name = "Linux shell prompt",
+                                    # if not found, it is ok, we'll
+                                    # handle it
+                                    timeout = 0
+                                ),
                                 target.console.text(
                                     "login: ",
                                     name = "login prompt",
+                                    # if not found, it is ok, we'll
+                                    # handle it
+                                    timeout = 0
                                 ),
                                 name = "wait for Provisioning OS to boot",
                                 timeout = inner_timeout,
                             )
-                            if 'POS boot issue' not in r:
+                            if 'Linux shell prompt' in r:
+                                pos_boot_found = True
+                                break
+                            elif 'POS boot issue' in r:
+                                # found the issue and the login banner; good to go!
+                                # need to login!
+                                pos_boot_found = True
+                                break
+                            elif 'login prompt' in r:
                                 # probably booted to the OS instead of
                                 # to the POS
                                 offset = target.console.offset_calc(
@@ -824,16 +848,15 @@ class extension(tc.target_extension_c):
                                     # log messages and all that add up to a lot
                                     - 32 * 1024)
                                 output = target.console.read(offset = offset)
-                                if 'login prompt' in r:
-                                    self._unexpected_console_output_try_fix(
-                                        output, target)
+                                self._unexpected_console_output_try_fix(
+                                    output, target)
                                 # it is broken, need a retry w/ power cycle
                                 # is needed
                                 pos_boot_found = False
                                 break
-                            # found the issue and the login banner; good to go!
-                            pos_boot_found = True
-                            break
+                            else:
+                                pos_boot_found = False
+                                raise tc.error_e("POS: got nothing I understand on the console")
                         except ( tc.error_e, tc.failed_e ) as e:
                             # we didn't find the login banner nor the
                             # issue, so we have a big problem, let's retry
@@ -849,9 +872,12 @@ class extension(tc.target_extension_c):
                         target.report_error(
                             "POS: did not boot, retrying")
                         continue
+                    target.report_pass(
+                        "POS: boot found, setting up")
                     # Ok, we have a console that seems to be
                     # ready...so setup the shell.
-                    target.shell.up(timeout = timeout, login_regex = None)
+                    target.shell.up(timeout = timeout, login_regex = None,
+                                    wait_for_early_shell_prompt = False)
                 except ( tc.error_e, tc.failed_e ) as e:
                     tc.result_c.report_from_exception(target.testcase, e)
                     # if we are here, we got no console output because
