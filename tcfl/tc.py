@@ -6713,6 +6713,7 @@ class tc_c(reporter_c):
         # repetitions, we accumulate it in result_all_evals.
         result_all_evals = result_c(0, 0, 0, 0, 0)
         for self.eval_count in range(0, self.eval_repeat):
+            self.kw_set("eval_count", self.eval_count)
             try:
                 # Repeat the evaluation as many times as we were asked
                 # too, even if it fails.
