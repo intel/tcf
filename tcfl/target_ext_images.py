@@ -9,10 +9,12 @@ Flash the target with JTAGs and other mechanism
 ------------------------------------------------
 
 """
-
+import commonl
 import hashlib
 import json
 import os
+import string
+import re
 import time
 
 import requests
@@ -181,22 +183,154 @@ class extension(tc.target_extension_c):
         else:
             target.report_info("flash: all images soft flashed", dlevel = 1)
             
+    # match: [no-]upload [no-]soft IMGTYPE1:IMGFILE1 IMGTYPE2:IMGFILE2 ...
+    _image_flash_regex = re.compile(
+        r"((no-)?soft|(no-)?upload|\S+:\S+)( ((no-)?soft|(no-)?upload|\S+:\S+))*")
+
+    def flash_spec_parse(self, image_flash = None):
+        """Parse a images to flash specification in a string (that might be
+        taken from the environment
+
+        The string describing what to flash is in the form::
+
+          [[no-]soft] [[no-]upload] IMAGE:NAME[ IMAGE:NAME[..]]]
+
+        - *soft*: flash in soft mode (default *False) (see
+          :meth:`target.images.flash
+          <tcfl.target_ext_images.extension.flash>`) the image(s) will
+          only be flashed if the image to be flashed is different than the
+          last image that was flashed.
+
+        - *upload*: flash in soft mode (default *True*) (see
+          :meth:`target.images.flash
+          <tcfl.target_ext_images.extension.flash>`). The file will be
+          uploaded to the server first or it will be assumed it is already
+          present in the server.
+
+        - *IMAGETYPE:FILENAME* flash file *FILENAME* in flash destination
+          *IMAGETYPE*; *IMAGETYPE* being any of the image
+          destinations the target can flash; can be found with::
+
+            $ tcf image-ls TARGETNAME
+
+          or from the inventory::
+
+            $ tcf get TARGETNAME -p interfaces.images
+
+        The string specification will be taken, in this order from the
+        following list
+
+        - the *image_flash* parameter
+
+        - environment *IMAGE_FLASH_<TYPE>*
+
+        - environment *IMAGE_FLASH_<FULLID>*
+
+        - environment *IMAGE_FLASH_<ID>*
+
+        - environment *IMAGE_FLASH*
+
+        With *TYPE*, *FULLID* and *ID* sanitized to any character outside
+        of the ranges *[a-zA-Z0-9_]* replaced with an underscore (*_*).
+
+        **Example**
+
+        ::
+
+          $ export IMAGE_FLASH_TYPE1="soft bios:path/to/bios.bin"
+          $ tcf run test_SOMESCRIPT.py
+
+        if *test_SOMESCRIPT.py* uses this template, every invocation of it
+        on a machine of type TYPE1 will result on the file
+        *path/to/bios.bin* being flashed on the *bios* location (however,
+        because of *soft*, if it was already flashed before, it will be
+        skipped).
+
+        :return: a tuple of
+
+          >>> ( DICT, UPLOAD, SOFT )
+
+          - *DICT*: Dictionary is a dictionary of IMAGETYPE/file name to flash:
+
+            >>> {
+            >>>     IMGTYPE1: IMGFILE1,
+            >>>     IMGTYPE2: IMGFILE2,
+            >>>     ...
+            >>> }
+
+          - *UPLOAD*: boolean indicating if the user wants the files to be
+            uploaded (*True*, default) or to assume they are already in
+            the server (*False*).
+
+          - *SOFT*: flash in soft mode (*True*) or not (*False*, default
+            if not given).
+
+        """
+        target = self.target
+        if not image_flash:
+
+            # empty, load from environment
+            target_id_safe = commonl.name_make_safe(
+                target.id, string.ascii_letters + string.digits)
+            target_fullid_safe = commonl.name_make_safe(
+                target.fullid, string.ascii_letters + string.digits)
+            target_type_safe = commonl.name_make_safe(
+                target.type, string.ascii_letters + string.digits)
+
+            source = None	# keep pylint happy
+            sourcel = [
+                # go from most specifcy to most generic
+                "IMAGE_FLASH_%s" % target_fullid_safe,
+                "IMAGE_FLASH_%s" % target_id_safe,
+                "IMAGE_FLASH_%s" % target_type_safe,
+                "IMAGE_FLASH",
+            ]
+            for source in sourcel:
+                flash_image_s = os.environ.get(source, None)
+                if flash_image_s != None:
+                    break
+            else:
+                target.report_info(
+                    "skipping image flashing (no function argument nor environment: %s)"
+                    % " ".join(sourcel))
+                return {}, False, False
+        else:
+            source = "function argument"
+
+        # verify the format
+        if not self._image_flash_regex.search(flash_image_s):
+            raise tc.blocked_e(
+                "image specification in %s does not conform to the form"
+                " [[no-]soft] [[no-]upload] IMAGE:NAME[ IMAGE:NAME[..]]]" % source,
+                dict(target = target))
+
+        image_flash = {}
+        soft = False
+        upload = True
+        for entry in flash_image_s.split(" "):
+            if not entry:	# empty spaces...welp
+                continue
+            if entry == "soft":
+                soft = True
+                continue
+            if entry == "no-soft":
+                soft = False
+                continue
+            if entry == "upload":
+                upload = True
+                continue
+            if entry == "no-upload":
+                upload = False
+                continue
+            name, value = entry.split(":", 1)
+            image_flash[name] = value
+
+        return image_flash, upload, soft
 
 def _cmdline_images_list(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "images")
         print "\n".join(target.images.list())
-
-def _image_list_to_dict(image_list):
-    images = {}
-    for image in image_list:
-        if not ":" in image:
-            raise AssertionError(
-                "images has to be specified in the format IMAGETYPE:IMAGEFILE;"
-                " got (%s) %s" % (type(image), image))
-        k, v = image.split(":", 1)
-        images[k] = v
-    return images
 
 def _cmdline_images_flash(args):
     tc.tc_global = tc.tc_c("cmdline", "", "builtin")
@@ -204,8 +338,8 @@ def _cmdline_images_flash(args):
         tc.report_console.driver(4, None))
     with msgid_c(""):
         target = tc.target_c.create_from_cmdline_args(args, iface = "images")
-        target.images.flash(_image_list_to_dict(args.images),
-                            upload = args.upload, timeout = args.timeout,
+        images, _upload, _soft = target.images.flash_spec_parse(args.images)
+        target.images.flash(images, upload = args.upload, timeout = args.timeout,
                             soft = args.soft)
 
 

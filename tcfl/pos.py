@@ -2214,6 +2214,25 @@ class tc_pos0_base(tc.tc_c):
     #: >>>         ...
     image_requested = os.environ.get("IMAGE", None)
 
+    #: Specification of images we want to flash (eg BIOS, firmware,
+    #: etc) by default (can be overriden via environment, see
+    #: :meth:`target.images.flash_spec_parse
+    #: <tcfl.target_ext_images.flash_spec_parse>` for more info and
+    #: format)
+    #:
+    #: If none specified and nothing is obtained from the environment,
+    #: no image flashing will be done
+    #:
+    #: Note this is meant to be specialized in a subclass such as
+    #:
+    #: >>> class my_test(tcfl.tl.tc_pos_base):
+    #: >>>
+    #: >>>     image_flash_requested = "soft bios:/path/to/bios.xz"
+    #: >>>
+    #: >>>     def eval(self, ic, target):
+    #: >>>         ...
+    image_flash_requested = None
+
     #: Once the image was deployed, this will be set with the name of
     #: the image that was selected.
     image = "image-not-deployed"
@@ -2271,6 +2290,12 @@ class tc_pos0_base(tc.tc_c):
     @tc.serially()			# make sure it executes in order
     def deploy_10_flash(self, target):
         """
+        Please refer to :meth:`target.images.flash_spec_parse
+        <tcfl.target_ext_images.flash_spec_parse>` for
+        more details in the spec of the environemnt variables::
+
+         [[no-]soft] [[no-]upload] IMAGE:NAME[ IMAGE:NAME[..]]]
+
         Flash anything specified in :data:image_flash or IMAGE_FLASH*
         environment variables
 
@@ -2321,45 +2346,18 @@ class tc_pos0_base(tc.tc_c):
         (however, because of *soft*, if it was already flashed before,
         it will be skipped).
         """
-        image_flash = self.image_flash
-        if not image_flash:
-            # empty, load from environment
-            target_id_safe = commonl.name_make_safe(
-                target.id, string.ascii_letters + string.digits)
-            target_fullid_safe = commonl.name_make_safe(
-                target.fullid, string.ascii_letters + string.digits)
-            target_type_safe = commonl.name_make_safe(
-                target.type, string.ascii_letters + string.digits)
+        if not hasattr(target, 'images'):
+            return
 
-            source = None	# keep pylint happy
-            for source in [
-                    "IMAGE_FLASH_%s" % target_type_safe,
-                    "IMAGE_FLASH_%s" % target_fullid_safe,
-                    "IMAGE_FLASH_%s" % target_id_safe,
-                    "IMAGE_FLASH",
-                ]:
-                flash_image_s = os.environ.get(source, None)
-                if flash_image_s:
-                    break
+        self.image_flash, upload, soft = target.images.flash_spec_parse(
+            self.image_flash_requested)
+
+        if self.image_flash:
+            if upload:
+                target.report_info("uploading files to server and flashing")
             else:
-                self.report_info(
-                    "skipping image flashing (no environment IMAGE_FLASH*)")
-                return
-
-            if not self._image_flash_regex.search(flash_image_s):
-                raise tc.blocked_e(
-                    "image specification in %s does not conform to the form"
-                    " IMAGE:NAME[ IMAGE:NAME[..]]]" % source)
-            image_flash = {}
-            for entry in flash_image_s.split(" "):
-                if not entry:	# empty spaces...welp
-                    continue
-                name, value = entry.split(":", 1)
-                image_flash[name] = value
-
-        if image_flash:
-            target.report_info("uploading flash images to remoting server")
-            target.images.flash(image_flash, upload = True)
+                target.report_info("flashing")
+            target.images.flash(self.image_flash, upload = True, soft = soft)
 
     def deploy_50(self, ic, target):
         # ensure network, DHCP, TFTP, etc are up and deploy
@@ -2429,8 +2427,8 @@ def cmdline_pos_capability_list(args):
     if not args.target:
         for name, data in capability_fns.iteritems():
             for value, fn in data.iteritems():
-                print "%s: %s @%s.%s()" % (
-                    name, value, inspect.getsourcefile(fn), fn.__name__)
+                print "%s: %s @%s.%s(): %s" % (
+                    name, value, inspect.getsourcefile(fn), fn.__name__, fn.__doc__)
     else:
         for target in args.target:
             _rtb, rt = tc.ttb_client._rest_target_find_by_id(target)
