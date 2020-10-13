@@ -73,51 +73,30 @@ MODE = os.environ.get('MODE', 'one-per-type')
 class _test(tcfl.tc.tc_c):
 
     image_requested = None
+    image_flash_requested = None
+    image_flash = None
     image = "not deployed"
 
     # format for specifying images to flash is IMAGE:NAME[ IMAGE:NAME[..]]]
     _image_flash_regex = re.compile(r"\S+:\S+( \S+:\S+)*")
 
-    @tcfl.tc.serially()			# otherwise it runs out of order
+    # this has to be the same as
+    # ttbl.pos.tc_pos0_base.deploy_10_flash() it is here unrolled as
+    # an example
+    @tcfl.tc.serially()			# make sure it executes in order
     def deploy_10_flash(self, target):
-        """
-        Flash anything specified in IMAGE_FLASH* environment variables
-        """
-        # this also in tcfl/pos.tc_pos0_base.deploy_10-flash
-        target_id_safe = commonl.name_make_safe(
-            target.id, string.ascii_letters + string.digits)
-        target_fullid_safe = commonl.name_make_safe(
-            target.fullid, string.ascii_letters + string.digits)
-        target_type_safe = commonl.name_make_safe(
-            target.type, string.ascii_letters + string.digits)
-
-        source = None	# keep pylint happy
-        for source in [
-                "IMAGE_FLASH_%s" % target_type_safe,
-                "IMAGE_FLASH_%s" % target_fullid_safe,
-                "IMAGE_FLASH_%s" % target_id_safe,
-                "IMAGE_FLASH",
-            ]:
-            flash_image_s = os.environ.get(source, None)
-            if flash_image_s:
-                break
-        else:
-            self.report_info(
-                "skipping image flashing (no environment IMAGE_FLASH*)")
+        if not hasattr(target, 'images'):
             return
 
-        if not self._image_flash_regex.search(flash_image_s):
-            raise tcfl.tc.blocked_e(
-                "image specification in %s does not conform to the form"
-                " IMAGE:NAME[ IMAGE:NAME[..]]]" % source)
-        flash_images = {}
-        for entry in flash_image_s.split(" "):
-            if not entry:	# empty spaces...welp
-                continue
-            name, value = entry.split(":", 1)
-            flash_images[name] = value
-        target.report_info("uploading flash images to remoting server")
-        target.images.flash(flash_images, upload = True)
+        self.image_flash, upload, soft = target.images.flash_spec_parse(
+            self.image_flash_requested)
+
+        if self.image_flash:
+            if upload:
+                target.report_info("uploading files to server and flashing")
+            else:
+                target.report_info("flashing")
+            target.images.flash(self.image_flash, upload = upload, soft = soft)
 
     def deploy_50_os(self, ic, target):
 

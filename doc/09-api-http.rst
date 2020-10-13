@@ -2161,6 +2161,21 @@ button and jumper control, but under the endpoint
 */PREFIX/targets/TARGETID/buttons* -- as buttons / jumpers are
 generally controlled with binary states actuated with a relay.
 
+Power Rail Components naming conventions
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In general, if the target has a single component of one category, it
+is called as it is (eg: *AC*), but if more are going to be present,
+then all are indexes with an integer (eg: *AC1*, *AC2*).
+
+The following conventions are followed:
+
+- *AC*, *AC1* ... *AC4* ...: anything that controls power from a wall
+  outlet (eg: a smart PDU). 
+
+- *DC*, *DC1* ... *DC4* ...: anything that controls power using things
+  like a button, or via *BMC*.
+
 
 GET /targets/TARGETID/power/list
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

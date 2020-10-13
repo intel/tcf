@@ -775,10 +775,17 @@ class extension(tc.target_extension_c):
                     # the *TCF test node* banner
                     inner_timeout = (bios_boot_time + timeout) / 20
                     for _ in range(20):
-                        # if this was an SSH console that was left
-                        # enabled, it will die and auto-disable when
-                        # the machine power cycles, so make sure it is enabled
                         try:
+                            if target.console.default.startswith("ssh"):
+                                # if this was an SSH console that was left
+                                # enabled, it will not die because SSH takes
+                                # its sweet time to die by timeout (and thus
+                                # auto-disable when the machine power cycles),
+                                # so let's disable/enable to make sure
+                                # This is tricky, because
+                                # target.shell.up() will basically do
+                                # the same
+                                target.console.disable()
                             target.console.enable()
                         except ( tc.error_e, tc.failed_e ) as e:
                             ts = time.time()
@@ -806,16 +813,33 @@ class extension(tc.target_extension_c):
                                     # handle it
                                     timeout = 0
                                 ),
-                                # FIXME: for ssh consoles this does
-                                # not apply, find an equivalent
+                                # SSH consoles will just print a prompt
+                                target.console.text(
+                                    target.shell.prompt_regex,
+                                    name = "Linux shell prompt",
+                                    # if not found, it is ok, we'll
+                                    # handle it
+                                    timeout = 0
+                                ),
                                 target.console.text(
                                     "login: ",
                                     name = "login prompt",
+                                    # if not found, it is ok, we'll
+                                    # handle it
+                                    timeout = 0
                                 ),
                                 name = "wait for Provisioning OS to boot",
                                 timeout = inner_timeout,
                             )
-                            if 'POS boot issue' not in r:
+                            if 'Linux shell prompt' in r:
+                                pos_boot_found = True
+                                break
+                            elif 'POS boot issue' in r:
+                                # found the issue and the login banner; good to go!
+                                # need to login!
+                                pos_boot_found = True
+                                break
+                            elif 'login prompt' in r:
                                 # probably booted to the OS instead of
                                 # to the POS
                                 offset = target.console.offset_calc(
@@ -824,16 +848,15 @@ class extension(tc.target_extension_c):
                                     # log messages and all that add up to a lot
                                     - 32 * 1024)
                                 output = target.console.read(offset = offset)
-                                if 'login prompt' in r:
-                                    self._unexpected_console_output_try_fix(
-                                        output, target)
+                                self._unexpected_console_output_try_fix(
+                                    output, target)
                                 # it is broken, need a retry w/ power cycle
                                 # is needed
                                 pos_boot_found = False
                                 break
-                            # found the issue and the login banner; good to go!
-                            pos_boot_found = True
-                            break
+                            else:
+                                pos_boot_found = False
+                                raise tc.error_e("POS: got nothing I understand on the console")
                         except ( tc.error_e, tc.failed_e ) as e:
                             # we didn't find the login banner nor the
                             # issue, so we have a big problem, let's retry
@@ -849,9 +872,12 @@ class extension(tc.target_extension_c):
                         target.report_error(
                             "POS: did not boot, retrying")
                         continue
+                    target.report_pass(
+                        "POS: boot found, setting up")
                     # Ok, we have a console that seems to be
                     # ready...so setup the shell.
-                    target.shell.up(timeout = timeout, login_regex = None)
+                    target.shell.up(timeout = timeout, login_regex = None,
+                                    wait_for_early_shell_prompt = False)
                 except ( tc.error_e, tc.failed_e ) as e:
                     tc.result_c.report_from_exception(target.testcase, e)
                     # if we are here, we got no console output because
@@ -2195,6 +2221,25 @@ class tc_pos0_base(tc.tc_c):
     #: >>>         ...
     image_requested = os.environ.get("IMAGE", None)
 
+    #: Specification of images we want to flash (eg BIOS, firmware,
+    #: etc) by default (can be overriden via environment, see
+    #: :meth:`target.images.flash_spec_parse
+    #: <tcfl.target_ext_images.flash_spec_parse>` for more info and
+    #: format)
+    #:
+    #: If none specified and nothing is obtained from the environment,
+    #: no image flashing will be done
+    #:
+    #: Note this is meant to be specialized in a subclass such as
+    #:
+    #: >>> class my_test(tcfl.tl.tc_pos_base):
+    #: >>>
+    #: >>>     image_flash_requested = "soft bios:/path/to/bios.xz"
+    #: >>>
+    #: >>>     def eval(self, ic, target):
+    #: >>>         ...
+    image_flash_requested = None
+
     #: Once the image was deployed, this will be set with the name of
     #: the image that was selected.
     image = "image-not-deployed"
@@ -2252,6 +2297,12 @@ class tc_pos0_base(tc.tc_c):
     @tc.serially()			# make sure it executes in order
     def deploy_10_flash(self, target):
         """
+        Please refer to :meth:`target.images.flash_spec_parse
+        <tcfl.target_ext_images.flash_spec_parse>` for
+        more details in the spec of the environemnt variables::
+
+         [[no-]soft] [[no-]upload] IMAGE:NAME[ IMAGE:NAME[..]]]
+
         Flash anything specified in :data:image_flash or IMAGE_FLASH*
         environment variables
 
@@ -2302,45 +2353,18 @@ class tc_pos0_base(tc.tc_c):
         (however, because of *soft*, if it was already flashed before,
         it will be skipped).
         """
-        image_flash = self.image_flash
-        if not image_flash:
-            # empty, load from environment
-            target_id_safe = commonl.name_make_safe(
-                target.id, string.ascii_letters + string.digits)
-            target_fullid_safe = commonl.name_make_safe(
-                target.fullid, string.ascii_letters + string.digits)
-            target_type_safe = commonl.name_make_safe(
-                target.type, string.ascii_letters + string.digits)
+        if not hasattr(target, 'images'):
+            return
 
-            source = None	# keep pylint happy
-            for source in [
-                    "IMAGE_FLASH_%s" % target_type_safe,
-                    "IMAGE_FLASH_%s" % target_fullid_safe,
-                    "IMAGE_FLASH_%s" % target_id_safe,
-                    "IMAGE_FLASH",
-                ]:
-                flash_image_s = os.environ.get(source, None)
-                if flash_image_s:
-                    break
+        self.image_flash, upload, soft = target.images.flash_spec_parse(
+            self.image_flash_requested)
+
+        if self.image_flash:
+            if upload:
+                target.report_info("uploading files to server and flashing")
             else:
-                self.report_info(
-                    "skipping image flashing (no environment IMAGE_FLASH*)")
-                return
-
-            if not self._image_flash_regex.search(flash_image_s):
-                raise tc.blocked_e(
-                    "image specification in %s does not conform to the form"
-                    " IMAGE:NAME[ IMAGE:NAME[..]]]" % source)
-            image_flash = {}
-            for entry in flash_image_s.split(" "):
-                if not entry:	# empty spaces...welp
-                    continue
-                name, value = entry.split(":", 1)
-                image_flash[name] = value
-
-        if image_flash:
-            target.report_info("uploading flash images to remoting server")
-            target.images.flash(image_flash, upload = True)
+                target.report_info("flashing")
+            target.images.flash(self.image_flash, upload = True, soft = soft)
 
     def deploy_50(self, ic, target):
         # ensure network, DHCP, TFTP, etc are up and deploy
@@ -2410,8 +2434,9 @@ def cmdline_pos_capability_list(args):
     if not args.target:
         for name, data in capability_fns.items():
             for value, fn in data.items():
-                print("%s: %s @%s.%s()" % (
-                    name, value, inspect.getsourcefile(fn), fn.__name__))
+                print("%s: %s @%s.%s(): %s" % (
+                    name, value, inspect.getsourcefile(fn),
+                    fn.__name__, fn.__doc__))
     else:
         for target in args.target:
             _rtb, rt = tc.ttb_client._rest_target_find_by_id(target)
