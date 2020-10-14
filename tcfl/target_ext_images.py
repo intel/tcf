@@ -186,7 +186,7 @@ class extension(tc.target_extension_c):
     _image_flash_regex = re.compile(
         r"((no-)?soft|(no-)?upload|\S+:\S+)( ((no-)?soft|(no-)?upload|\S+:\S+))*")
 
-    def flash_spec_parse(self, image_flash = None):
+    def flash_spec_parse(self, flash_image_s = None):
         """Parse a images to flash specification in a string (that might be
         taken from the environment
 
@@ -266,7 +266,7 @@ class extension(tc.target_extension_c):
 
         """
         target = self.target
-        if not image_flash:
+        if not flash_image_s:
 
             # empty, load from environment
             target_id_safe = commonl.name_make_safe(
@@ -337,7 +337,7 @@ def _cmdline_images_flash(args):
         tc.report_console.driver(4, None))
     with msgid_c(""):
         target = tc.target_c.create_from_cmdline_args(args, iface = "images")
-        images, _upload, _soft = target.images.flash_spec_parse(args.images)
+        images, _upload, _soft = target.images.flash_spec_parse(" ".join(args.images))
         target.images.flash(images, upload = args.upload, timeout = args.timeout,
                             soft = args.soft)
 
