@@ -380,7 +380,7 @@ def symlink_lru_cleanup(dirname, max_entries):
       left
 
     """
-    assert isinstance(dirname, basestring)
+    assert isinstance(dirname, str)
     assert isinstance(max_entries, int) and max_entries > 0
 
     mtimes_sorted_list = []
@@ -2018,7 +2018,7 @@ decompress_handlers = {
 }
 
 def file_is_compressed(filename):
-    assert isinstance(filename, basestring)
+    assert isinstance(filename, str)
     basename, ext = os.path.splitext(filename)
     if ext not in decompress_handlers:	# compressed logfile support
         return filename, None
