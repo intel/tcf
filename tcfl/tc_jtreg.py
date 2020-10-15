@@ -1031,7 +1031,8 @@ class driver(tcfl.pos.tc_pos0_base):
                 stderr = subprocess.STDOUT,
                 # CDing into the toplevel dir makes it work if we are
                 # calling from inside the git tree or from outside
-                cwd = os.path.dirname(path)
+                cwd = os.path.dirname(path),
+                encoding = "UTF-8"
             ).strip()
             tc.path_jdk_to_test_root = os.path.relpath(
                 path_test_root_abs, os.path.dirname(tc.path_jdk))
