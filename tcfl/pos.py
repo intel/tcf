@@ -1940,7 +1940,7 @@ def deploy_path(ic, target, _kws, cache = True):
         if not skip_local:
             # Get local file type - regular file / directory
             local_type = subprocess.check_output([
-                "/usr/bin/stat", "-c%F", src]).strip()
+                "/usr/bin/stat", "-c%F", src], encoding = "UTF-8").strip()
 
         # Get remote file type - regular file / directory / doesn't exist
         remote_type = target.shell.run(
