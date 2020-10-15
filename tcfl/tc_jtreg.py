@@ -762,7 +762,8 @@ class driver(tcfl.pos.tc_pos0_base):
         output = subprocess.check_output(
             "java -jar %s/lib/jtreg.jar %s -l -w:'%s' '%s'" % (
                 jtreg_dir, native_cmdline, jtwork_dir, dirname),
-            shell = True, env = _env, stderr = subprocess.STDOUT)
+            shell = True, env = _env, stderr = subprocess.STDOUT,
+            encoding = "UTF-8")
         # So that thing prints
         #
         ## $ java -jar %s/lib/jtreg.jar -l PATH/DIRNAME/def/1.java
