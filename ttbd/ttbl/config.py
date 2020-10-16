@@ -24,8 +24,23 @@ _count = 0
 state_path = None
 upload_max_size = 16 * 1024 * 1024
 
+#: Enable (*True*) or disable SSL (*False* or *None*)
 ssl_enabled = None
 ssl_enabled_check_disregard = None
+#: If :ref:`SSL is enabled <ssl_enabled>`, file which contains the
+#: certificate
+ssl_cert = None
+#: If :data:`SSL is enabled <ssl_enabled>`, file which contains the
+#: key
+ssl_key = None
+#: If :data:`SSL is enabled <ssl_enabled>`, and the :data:`ssl_key`
+#: needs a password, specify it here.
+#:
+#: It will be processed with
+#: :func:`commonl.password_get`, thus it can be
+#: *FILE:/etc/ttbd-production/pwd.somefile* to read the password from
+#: file */etc/ttbd-production/pwd.somefile*.
+ssl_key_password = None
 
 #: Parse defaults configuration blocks protected by::
 #:
