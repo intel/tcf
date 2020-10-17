@@ -661,15 +661,18 @@ def multiple_entry_select_one(
     assert isinstance(timeout, numbers.Real) and timeout > 0
     assert isinstance(level, str)
 
+    # so this assumes the whole box is redrawn every time we move the
+    # cursor -- hence why we look for /---- ANSICRUFT+KEYSANSI+CRUFT
+    # HIGHLIGHT KEY ANSICRUFT ----/
     _direction = False
     entry_highlighted_regex = re.compile(
-        b"/-+\\"
-        + ".*"
+        b"/-+"
+        + b".*"
         + highlight_string.encode('utf-8')
-        + "\x1b\[[0-9]+;[0-9]+H"
-        + "(?P<key>[^\x1b]+)"
-        + ".*"
-        + r"\-+/")
+        + b"\x1b\[[0-9]+;[0-9]+H"
+        + b"(?P<key>[^\x1b]+)"
+        + b".*"
+        + rb"-+/")
     target.report_info("BIOS: %s: scrolling for '%s'"
                        % (level, select_entry))
     last_seen_entry = None
@@ -763,7 +766,7 @@ def menu_escape_to_main(target, esc_first = True):
     # paranoid makes the main menu detection go out of synch
     regexl = []
     for entry in main_level_entries:
-        regexl.append(b"\[[0-9]+;[0-9]+H" + entry.encode('utf-8'))
+        regexl.append("\[[0-9]+;[0-9]+H" + entry)
     main_menu_regex = re.compile(".*".join(regexl))
     for level in range(max_levels):
         offset = target.console.size()
@@ -855,7 +858,7 @@ def menu_config_network_enable(target):
     entry = 'EFI Network'
     value = r['EFI Network']['value']
     # sic, different versions have differnt values, Disable vs Disabled vs ...
-    if "Disable" not in value:
+    if b"Disable" not in value:
         target.report_info("BIOS: %s: already enabled (%s)" % (entry, value))
         target.console_tx("\x1b")	# ESC one menu up
         return False
