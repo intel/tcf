@@ -467,6 +467,7 @@ done
 for file in $destdir/etc/pam.d/* $destdir/usr/share/pam.d/*; do
     [ -f $file ] || continue
     info "$file: allowing login to accounts with no password (replacing 'nullok_secure')"
+    selinux_relabel["${file##$destdir}"]=1
     sudo sed -i 's/nullok_secure/nullok/g' $file
     grep -q "pam_unix.so.*nullok" $file && continue
     # Some distros configure PAM to disallow passwordless root; we
@@ -474,7 +475,6 @@ for file in $destdir/etc/pam.d/* $destdir/usr/share/pam.d/*; do
     # hoops
     info "$file: allowing login to accounts with no password (adding 'nullok')"
     sudo sed -i 's/pam_unix.so/pam_unix.so\tnullok /' $file
-    selinux_relabel["${file##$destdir}"]=1
 done
 
 if test -r $destdir/usr/share/defaults/etc/profile.d/50-prompt.sh; then
@@ -841,6 +841,6 @@ if ! [ -z "${tarname:-}" ]; then
     # doesn't try to pick it up until it is fully baked
     sudo XZ_OPT="--threads=0 -9e" \
          tar cJf $tarname.tmp --numeric-owner --force-local --selinux --acls --xattrs $basename
-    mv $tarname.tmp $tarname
+    mv -f $tarname.tmp $tarname
     sudo rm -rf $destdir
 fi
