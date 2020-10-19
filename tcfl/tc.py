@@ -6336,7 +6336,18 @@ class tc_c(reporter_c):
             kws = {}
         # Decide if a remote target and BSP model shall be considered
         # by a testcase's want of a target
-        rt = self.rt_all[rt_full_id]
+        rt = dict(self.rt_all[rt_full_id])
+        # update the flat dictionaries FIXME: this is now a quick hack
+        # which we are doing in the most non-efficient way--ideally we
+        # shall have only one place where we do this at target
+        # discovery time.
+        for key, val in commonl.dict_to_flat(
+                rt, sort = False, empty_dict = True):
+            if key not in rt:
+                # only update if we would not be overriding an
+                # existing key (eg: flat and non flat names match, or
+                # this is a dictionary in the non-flat equivalents)
+                rt[key] = val
         rt_type = rt['type']
         spec = target_want.get('spec', None)
         if spec == None:
