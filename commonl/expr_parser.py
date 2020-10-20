@@ -270,7 +270,22 @@ def ast_expr(ast, env):
         return ast_sym_int(ast[1], env) <= int(ast[2])
     elif ast[0] == "in":
         def _val_get(val):
-            if isinstance(val, _t_symbol_c):
+            # FIXME: horrible hack
+            #
+            # because we have an import hell which mixes relative and
+            # absolute imports, we end up w Python3 confused on the
+            # type of the instance of this object we instantiated as
+            # _t_symbol_c but it saying it is
+            # tcfl.commonl.expr_parser._t_symbol_c.
+            #
+            # Thus the right code:
+            #
+            ## if repr(val.__class__)val.__class__.isinstance(val, _t_symbol_c):
+            #
+            # doesn't work.
+            #
+            # So until we have this fixed, this horrible hack does it.
+            if "_t_symbol_c'" in repr(val.__class__):
                 return ast_sym(val, env)
             else:
                 return val
