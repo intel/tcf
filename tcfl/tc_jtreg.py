@@ -583,7 +583,10 @@ class driver(tcfl.pos.tc_pos0_base):
         # DEFAULT timeout per testcases in JTREG is 120 seconds
         # FIXME: some TCs might declare a multiplier; find how to
         # extract it -> @run SOMETHING/SOMETHING/timeout=NNN/SOMETHING...
-        timeout = 120 * len(self.subtc)
+        if self.subtc:
+            timeout = 120 * len(self.subtc)
+        else:
+            timeout = 120
 
         # Now we have to figure out where thing are in the remote
         # machine vs in the local one. path_toplevel
@@ -858,7 +861,7 @@ class driver(tcfl.pos.tc_pos0_base):
             logging.debug("%s: ignored for not matching name %s",
                           path, cls._filename_regex.pattern)
             return []
-        if not _file_scan_regex(path, cls._test_regex):
+        if not _file_scan_regex(path.encode('utf-8'), cls._test_regex):
             logging.debug("%s: ignored for not containing %s",
                           path, cls._test_regex.pattern)
             return []
@@ -992,9 +995,10 @@ class driver(tcfl.pos.tc_pos0_base):
         # some testcases are listead as PATH#id0, PATH#id1 ... because
         # they contain multiple cases, so let's see if it is the case
         # with this path
-        ids = filter(lambda i: i.startswith(path_tc_rel_to_test_root
-                                            + "#id"),
-                     tcs)
+        ids = []
+        for i in tcs:
+            if i.startswith(path_tc_rel_to_test_root + "#id"):
+                ids.append(i)
         if ids == [] and path_tc_rel_to_test_root not in tcs:
             logging.debug("%s: ignored, path %s not in testsuite",
                           path, path_tc_rel_to_test_root)
