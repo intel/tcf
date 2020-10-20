@@ -931,7 +931,7 @@ def bios_boot_expect(target):
                   # time reporting we miss the rest
                   report = 500,
                   # can take a long time w/ some BIOSes
-                  timeout = 180)
+                  timeout = target.kws.get('bios.boot_time', 180))
 
 
 def main_menu_expect(target):
