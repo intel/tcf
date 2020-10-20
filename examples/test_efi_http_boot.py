@@ -84,6 +84,8 @@ URL is::
 
 """
 import os
+import socket
+import urllib.parse
 
 import tcfl.biosl
 import tcfl.tc
@@ -108,8 +110,19 @@ class _test(tcfl.pos.tc_pos_base):
         if IMG_URL == None:
             raise tcfl.tc.blocked_e("No IMG_URL environment given")
 
+        # Resolve the URL in the client
+        #
+        # While the BIOS and iPXE can resolve DNS, sometimes they are not
+        # as robust, so let's have it resolved here, since we have better
+        # caps.
+        url = urllib.parse.urlparse(IMG_URL)
+        url_resolved = url._replace(
+            netloc = url.hostname.replace(url.hostname,
+                                          socket.gethostbyname(url.hostname)))
+
         target.power.cycle()
-        tcfl.biosl.boot_network_http(target, r"HTTP %(ID)s", IMG_URL)
+        tcfl.biosl.boot_network_http(
+            target, r"HTTP %(ID)s", url_resolved.geturl())
 
         # expect something to happen:
 
