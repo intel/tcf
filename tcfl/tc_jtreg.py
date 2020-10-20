@@ -361,7 +361,7 @@ import subprocess
 import commonl
 import tcfl.tc
 
-jtreg_concurrency = os.environ.get("JTREG_CONCURRENCY", "1")
+jtreg_concurrency = os.environ.get("JTREG_CONCURRENCY", "auto")
 # if JTREG_DIR is not defined, be ok -- just complain if we are trying
 # to use it, later in driver._list()
 jtreg_dir = os.environ.get("JTREG_DIR", None)
