@@ -5,6 +5,7 @@ imutils
 ipaddress
 junit_xml
 keyring
+keyring
 numpy
 # CentOS7's pip3 is quite old, barfs at newer
 opencv-python==3.1.0.4
