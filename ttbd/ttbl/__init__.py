@@ -371,7 +371,7 @@ class fsdb_symlink_c(fsdb_c):
             # FIXME: this can be optimized a lot, now it is redoing a
             # lot of work
             for key_itr in self.keys(key_orig + ".*"):
-                key_itr_raw = urllib.quote(
+                key_itr_raw = urllib.parse.quote(
                     key_itr, safe = '-_ ' + string.ascii_letters + string.digits)
                 location = os.path.join(self.location, key_itr_raw)
                 try:
