@@ -22,17 +22,21 @@ saved to those separate files.
 
 The default configuraton (the *text* template) will generate files
 called ``report-[RUNID:]HASHID.txt`` files for each
-error/failure/blockage. To enable it for passed or skipped test cases:
+error/failure/blockage.
 
->>> tcfl.report_jinja2.driver.templates['junit']['report_pass'] = False
->>> tcfl.report_jinja2.driver.templates['junit']['report_skip'] = False
+To enable it for passed or skipped test cases, add to any :ref:`TCF
+configuration file <tcf_client_configuration>`:
+
+>>> tcfl.report_jinja2.driver.templates['junit']['report_pass'] = True
+>>> tcfl.report_jinja2.driver.templates['junit']['report_skip'] = True
 
 The junit template (disabled by default) will generate
 ``junit-[RUNID:]HASHID.xml`` files with information from all the
 testcases executed based on the configuration settings below.
 
-To enable it for all conditions (or disable any replacing *True*
-with *False*):
+To enable it for all conditions (or disable any replacing *True* with
+*False*), add to any :ref:`TCF configuration file
+<tcf_client_configuration>`:
 
 >>> tcfl.report_jinja2.driver.templates['junit']['report_pass'] = True
 >>> tcfl.report_jinja2.driver.templates['junit']['report_skip'] = True
@@ -49,6 +53,7 @@ Limitations:
   to a two pass system, where the the file is generated as data comes
   out, unresolved fields left as fields and then a second pass during
   COMPLETION resolves the missing fields.
+
 """
 import io
 import logging
