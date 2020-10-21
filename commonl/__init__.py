@@ -50,13 +50,18 @@ import time
 import traceback
 import types
 
-try:
-    import keyring
-    keyring_available = True
-except ImportError as e:
-    logging.warning("can't import keyring, functionality disabled")
+if False:
+    # disabling all this until we have a proper fix for the import
+    # mess they keyring package has
+    try:
+        import keyring
+        keyring_available = True
+    except ImportError as e:
+        logging.warning("can't import keyring, functionality disabled")
+        keyring_available = False
+else:
     keyring_available = False
-
+    
 from . import expr_parser
 
 logging.addLevelName(50, "C")
