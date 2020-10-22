@@ -120,6 +120,11 @@ class console_spider_duo_pc(ttbl.console.ssh_pc):
         ttbl.console.ssh_pc.__init__(
             self,
             kvm_hostname,
+            # before this command sequence tried to use 'set serial
+            # mode config' and 'set serial mode passhtrough" to flip
+            # the serial port between modes to kick out other users,
+            # but we found out that in many cases, this was rendering
+            # the serial port unusable in a random way, so it was removed
             command_sequence = [
                 ## Welcome to the Lantronix SLSLP^M$
                 ## Firmware: version 030031, build 38120^M$
@@ -141,46 +146,6 @@ class console_spider_duo_pc(ttbl.console.ssh_pc):
                 ( 
                     "\r\n",	# just get us a prompt
                     re.compile("[^>]+> ") 
-                ),
-                # Flip the serial port between config and passthrough
-                # mode; this disconnects everyone and ensures we have
-                # it in the right mode to connect
-                #
-                # FIXME: need to verify what happens with
-                # lower-privilege accounts
-                (
-                    "set serial mode config\r\n",
-                    re.compile("[^>]+> ") 
-                ),
-                (
-                    # Now give it a couple secs, flipping the
-                    # configuration needs some time and there is no
-                    # way to tell when it is done
-                    2,
-                    "the serial port to flip to config mode"
-                ),
-                # set back to passthrough mode; experimentation has
-                # shown that doing it twice with two waits yielded the
-                # best results so it consistently would pass
-                (
-                    "set serial mode passthrough\r\n",
-                    re.compile("[^>]+> ") 
-                ),
-                (
-                    # Now give it another couple secs; racy as this
-                    # is, there is no way to tell when it is ready
-                    3,
-                    "the serial port to flip to passthrough mode"
-                ),
-                (
-                    "set serial mode passthrough\r\n",
-                    re.compile("[^>]+> ") 
-                ),
-                (
-                    # Now give it another couple secs; racy as this
-                    # is, there is no way to tell when it is ready
-                    5,
-                    "the serial port to flip to passthrough mode"
                 ),
                 ( "connect serial\r\n",
                   "To exit serial port connection, type 'ESC exit'." ),
