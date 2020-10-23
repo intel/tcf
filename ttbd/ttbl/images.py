@@ -540,6 +540,10 @@ class interface(ttbl.tt_interface):
                 "interfaces.images." + image_type + ".last_sha512",
                 ho.hexdigest()
             )
+            target.fsdb.set(
+                "interfaces.images." + image_type + ".last_name",
+                name
+            )
 
     def _impl_flash(self, impl, target, subimages):
         if impl.power_sequence_pre:
