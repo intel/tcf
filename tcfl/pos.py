@@ -2607,7 +2607,8 @@ def target_power_cycle_pos_serial_f12_ipxe(target):
     target.property_set("pos_mode", "local")
     # this is how we know the BIOS booted
     #target.expect("Primary Bios Version")	# helps us to measure times
-    target.expect(re.compile(r"Press +\[F12\] +to boot from network"))
+    target.expect(re.compile(r"Press +\[F12\] +to boot from network"),
+                  timeout = target.kws.get('bios.boot_time', None))
     target.console.write(biosl.ansi_key_code("F12", "vt100"))
     ipxe_seize_and_boot(target)
 
