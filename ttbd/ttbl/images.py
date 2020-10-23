@@ -428,6 +428,19 @@ class impl2_c(impl_c):
         target.log.info("flashed image")
 
 
+#: List of paths in the systems where clients are allowed to read
+#: files from to flash with this interface
+#:
+#: Each entry is the path is the top level directory the user can
+#: specify and the value is the mapping into the real file system path.
+#:
+#: In any :ref:`server configuration file <ttbd_configuration>`, add:
+#:
+#: >>> ttbl.images.paths_allowed['/images'] = '/home/SOMEUSER/images'
+#:
+paths_allowed = {
+}
+
 class interface(ttbl.tt_interface):
     """Interface to flash a list of images (OS, BIOS, Firmware...) that
     can be uploaded to the target server and flashed onto a target.
@@ -513,8 +526,9 @@ class interface(ttbl.tt_interface):
         # if update MD5s of the images we flashed (if succesful)
         # so we can use this to select where we want to run
         #
-        # Why not the name? because the name can change, but
-        # the content stays the same, hence the hash
+        # The name is not a fully good reference, but still helpful
+        # sometimes; the name can change though, but the content stays
+        # the same, hence the hash is the first reference one.
         #
         # note this gives the same result as:
         #
@@ -649,10 +663,32 @@ class interface(ttbl.tt_interface):
                 # the components and aliases
                 impl, img_type_real = self.impl_get_by_name(img_type,
                                                             "image type")
-                file_name = os.path.join(user_path, img_name)
+                if not os.path.isabs(img_name):
+                    # file comes from the user's storage
+                    file_name = os.path.join(user_path, img_name)
+                else:
+                    # file from the system (mounted FS or similar);
+                    # double check it is allowed
+                    for path, path_translated in paths_allowed.items():
+                        if img_name.startswith(path):
+                            img_name = img_name.replace(path, path_translated, 1)
+                            break
+                    else:
+                        raise PermissionError(
+                            "%s: absolute image path tries to read from"
+                            " a location that is not allowed" % img_name)
+                    file_name = img_name
                 # we need to lock, since other processes might be
                 # trying to decompress the file at the same time
-                with ttbl.process_posix_file_lock_c(file_name + ".lock"):
+                # We want to have the lock in another directory
+                # because the source directory where the file name
+                # might be might not be writable to us
+                lock_file_name = os.path.join(
+                    target.state_dir,
+                    "images.flash.decompress."
+                    + commonl.mkid(file_name)
+                    + ".lock")
+                with ttbl.process_posix_file_lock_c(lock_file_name):
                     # if a decompressor crashed, we have no way to
                     # tell if the decompressed file is correct or
                     # truncated and thus corrupted -- we need manual
@@ -662,6 +698,11 @@ class interface(ttbl.tt_interface):
                     parallel[impl][img_type_real] = real_file_name
                 else:
                     serial[impl][img_type_real] = real_file_name
+                if real_file_name.startswith(user_path):
+                    # modify the mtime, so the file storage cleanup knows
+                    # we are still using this file and doesn't not attempt
+                    # to clean it up too soon
+                    commonl.file_touch(real_file_name)
             target.timestamp()
             # iterate over the real implementations only
             for impl, subimages in serial.iteritems():
