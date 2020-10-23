@@ -321,8 +321,27 @@ class extension(tc.target_extension_c):
             if entry == "no-upload":
                 upload = False
                 continue
-            name, value = entry.split(":", 1)
-            image_flash[name] = value
+            # see if we can assume this is in the form
+            # [SOMEPATH/]FILENAME[.EXT]; if FILENAME matches a known
+            # flashing destination, we take it
+            if ":" in entry:
+                name, value = entry.split(":", 1)
+                image_flash[name] = value
+            else:
+                basename, _ext = os.path.splitext(os.path.basename(entry))
+                # if the inventory publishes a
+                # interfaces.images.basename, this means we have a
+                # flasher where this can go
+                image_typel = list(target.rt.get("interfaces", {}).get("images", {}))
+                for image_type in image_typel:
+                    if basename.startswith(image_type):
+                        image_flash[image_type] = entry
+                        break
+                else:
+                    raise RuntimeError(
+                        "%s: can't auto-guess destination for this "
+                        "file, please prefix IMAGETYPE: "
+                        "(known are: %s)" % (entry, " ".join(image_typel)))
 
         return image_flash, upload, soft
 
@@ -356,12 +375,16 @@ def _cmdline_setup(arg_subparser):
         help = "(maybe upload) and flash images in the target")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target's name or URL")
-    ap.add_argument("images", metavar = "TYPE:FILENAME",
+    ap.add_argument("images", metavar = "[TYPE:]FILENAME",
                     action = "store", default = None, nargs = '+',
                     help = "Each FILENAME is (maybe uploaded to the daemon)"
                     " and then set as an image of the given TYPE;"
                     " FILENAME is assumed to be present in the server's"
-                    " storage area (unless -u is given)")
+                    " storage area (unless -u is given);"
+                    " TYPE can be omitted if the file name starts with"
+                    " the name of an image (eg: ~/place/bios-433 would"
+                    " be flashed into 'bios' if the target exposes the"
+                    " 'bios' flash destination)")
     ap.add_argument("-u", "--upload",
                     action = "store_true", default = False,
                     help = "upload FILENAME first and then flash")
