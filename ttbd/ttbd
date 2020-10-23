@@ -1320,7 +1320,7 @@ if __name__ == "__main__":
         args.ssl_key_password = ttbl.config.ssl_key_password
 
     if args.ssl_key_password:
-        ssl_key_password = commonl.password_get(None, None, ssl_key_password)
+        ssl_key_password = commonl.password_get(None, "", args.ssl_key_password)
     else:
         ssl_key_password = None
 
