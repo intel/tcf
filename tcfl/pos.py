@@ -2364,7 +2364,7 @@ class tc_pos0_base(tc.tc_c):
                 target.report_info("uploading files to server and flashing")
             else:
                 target.report_info("flashing")
-            target.images.flash(self.image_flash, upload = True, soft = soft)
+            target.images.flash(self.image_flash, upload = upload, soft = soft)
 
     def deploy_50(self, ic, target):
         # ensure network, DHCP, TFTP, etc are up and deploy
