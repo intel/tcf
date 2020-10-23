@@ -74,6 +74,7 @@ References:
 
 """
 import collections
+import math
 import numbers
 import re
 import time
@@ -961,7 +962,7 @@ def main_menu_expect(target):
 def _paced_send(target, text):
     # FIXME: remove this, use pacing
     cs = 5
-    for i in range((len(text) + cs - 1) / cs):
+    for i in range(math.ceil((len(text) + cs - 1) / cs)):
         target.console_tx(text[cs * i : cs * i + cs])
 
 def boot_network_http_boot_add_entry(target, entry, url):
