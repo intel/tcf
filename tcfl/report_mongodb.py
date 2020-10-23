@@ -287,7 +287,12 @@ class driver(tcfl.tc.report_driver_c):
                 for key, attachment in attachments.items():
                     if attachment == None:
                         continue
-                    if isinstance(attachment, commonl.generator_factory_c):
+                    # FIXME: that thing after the or is a horrible
+                    # hack; see why in the comment to
+                    # commonl.ast_expr(), which has the same horrible
+                    # hack.
+                    if isinstance(attachment, commonl.generator_factory_c) \
+                       or "commonl.generator_factory_c'" in repr(attachment.__class__):
                         for data in attachment.make_generator():
                             if isinstance(data, bytes):
                                 data = data.decode('utf-8')
