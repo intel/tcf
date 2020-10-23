@@ -490,7 +490,13 @@ def hash_file_maybe_compressed(hash_object, filepath, cache_entries = 128,
             if len(value) != len(hoc.hexdigest()):
                 value = None
             # recreate it, so that the mtime shows we just used it
-            os.symlink(value, cached_filename)
+            try:
+                os.symlink(value, cached_filename)
+            except FileExistsError:
+                # this means someone has created the entry between us
+                # deleting it and now, which is fine -- it shall be
+                # the same
+                pass
             return value
         except OSError as e:
             if e.errno != errno.ENOENT:
