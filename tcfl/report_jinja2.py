@@ -27,8 +27,8 @@ error/failure/blockage.
 To enable it for passed or skipped test cases, add to any :ref:`TCF
 configuration file <tcf_client_configuration>`:
 
->>> tcfl.report_jinja2.driver.templates['junit']['report_pass'] = True
->>> tcfl.report_jinja2.driver.templates['junit']['report_skip'] = True
+>>> tcfl.report_jinja2.driver.templates['text']['report_pass'] = True
+>>> tcfl.report_jinja2.driver.templates['text']['report_skip'] = True
 
 The junit template (disabled by default) will generate
 ``junit-[RUNID:]HASHID.xml`` files with information from all the
