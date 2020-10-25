@@ -1713,7 +1713,7 @@ class target_c(reporter_c):
             timeout = self.testcase.tls.expect_timeout
 
         if result == "pass":
-            raise_on_found = None
+            raise_on_found = pass_e
         elif result == "block":
             raise_on_found = blocked_e
         elif result == "error":
@@ -1725,10 +1725,19 @@ class target_c(reporter_c):
         else:
             raise AssertionError("unknown result %s" % result)
 
+        if hasattr(regex_or_str, "pattern"):
+            msg = "found (in console '%s') %s" % (console, regex_or_str.pattern)
+        else:
+            msg = "found (in console '%s') %s" % (console, regex_or_str)
+        
         self.testcase.expect_global_append(
-            self.console.text(regex_or_str, timeout = timeout,
-                              console = console,
-                              raise_on_found = raise_on_found))
+            self.console.text(
+                regex_or_str,
+                timeout = timeout,
+                console = console,
+                raise_on_found = raise_on_found(msg, dict(target = self))
+            )
+        )
 
     def wait(self, regex_or_str, timeout = None, console = None):
         """
