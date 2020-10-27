@@ -1635,20 +1635,9 @@ class target_c(reporter_c):
             # have initialized this from server info
             crlf = self.console.crlf.get(console, None)
 
-        # FIXME: all this is very inneficient--python3 has better
-        # facilities for it
-        def _chunk_crlf(chunk, crlf):
-            # convert \n to @crlf
-            _chars = ""
-            for char in chunk:
-                if char == crlf_replace:
-                    _chars += crlf
-                else:
-                    _chars += char
-            return _chars
         self.console.send_expect_sync(console, detect_context)
         if crlf:
-            self.console.write(_chunk_crlf(data, crlf) + crlf, console)
+            self.console.write(data.replace(crlf_replace, crlf) + crlf, console)
         else:
             self.console.write(data, console)
 
