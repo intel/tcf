@@ -1061,11 +1061,15 @@ class driver(tcfl.pos.tc_pos0_base):
             # tcs that generate NAME#id subtestcases, one subcase for each
             # remember i is TEST.ROOT/NAME#id, so NAME is rel to TEST.ROOT
             for i in ids:
-                index_name = os.path.join(path_jdk_to_test_root, i)
+                # replace PATH with PATH_CMDLINE##SUBCASE
+                index_name = os.path.join(path_jdk_to_test_root, i)\
+                                    .replace(path_cmdline + "/", path_cmdline + "##")
                 tc.subtc[i] = tcfl.tc.subtc_c(index_name, path, path, tc)
         else:
             tc.subtc[path_tc_rel_to_test_root] = tcfl.tc.subtc_c(
-                os.path.join(path_jdk_to_test_root, path_tc_rel_to_test_root),
+                # replace PATH with PATH_CMDLINE##SUBCASE
+                os.path.join(path_jdk_to_test_root, path_tc_rel_to_test_root)\
+                .replace(path_cmdline + "/", path_cmdline + "##"),
                 path, path, tc)
 
         return r
