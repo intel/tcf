@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 #
 # Copyright (c) 2017-20 Intel Corporation
 #
@@ -87,6 +87,7 @@ import codecs
 import datetime
 import os
 import types
+import urllib.parse
 
 import pymongo
 
@@ -284,7 +285,14 @@ class driver(tcfl.tc.report_driver_c):
         else:
             if attachments:
                 result['attachment'] = {}
-                for key, attachment in attachments.items():
+                for key_raw, attachment in attachments.items():
+                    # MongoDB uses periods (.) as subdictionary
+                    # separator, plus also disallowing other chars as
+                    # record names; escape them to avoid issues.
+                    # Now quote() doesn't make it easy to add '.' as a
+                    # char to escape...ugh
+                    key = urllib.parse.quote(key_raw).replace(".", "%2E")
+
                     if attachment == None:
                         continue
                     # FIXME: that thing after the or is a horrible
