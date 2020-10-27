@@ -17,6 +17,7 @@ import fcntl
 import os
 import socket
 import stat
+import sys
 import time
 
 import commonl
@@ -772,6 +773,11 @@ class generic_c(impl_c):
                         self._write(f.fileno(), data)
                         break
                 except EnvironmentError as e:
+                    # Open in write mode if the file does not allow seeking
+                    if e.errno == errno.ESPIPE:
+                        with contextlib.closing(open(file_name, "w")) as f:
+                            self._write(f.fileno(), data)
+                            break
                     if e.errno == errno.ENOENT \
                        and target.property_get(
                            "console-" + component + ".state"):
