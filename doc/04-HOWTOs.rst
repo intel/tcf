@@ -60,6 +60,12 @@ download an image for you and boot off it.
 .. automodule:: examples.test_efi_http_boot
 .. automodule:: examples.test_efi_ipxe_sanboot
 
+Booting to BIOS menus
+---------------------
+
+.. automodule:: examples.test_boot_to_bios_menu
+
+                
 Finding stuff in the desktop and injecting input
 ------------------------------------------------
 
