@@ -98,7 +98,23 @@ def _target_patch(args):
 def _target_property_set(args):
     with tcfl.msgid_c("cmdline"):
         target = tcfl.tc.target_c.create_from_cmdline_args(args)
-        target.property_set(args.property, args.value)
+        value = args.value
+        if value.startswith("i:"):
+            value = int(value.split(":", 1)[1])
+        elif value.startswith("f:"):
+            value = float(value.split(":", 1)[1])
+        elif value.startswith("b:"):
+            val = value.split(":", 1)[1]
+            if val.lower() == "true":
+                value = True
+            elif val.lower() == "false":
+                return False
+            raise ValueError("value %s: bad boolean '%s' (true or false)"
+                             % (value, val))
+        elif value.startswith("s:"):
+            # string that might start with s: or empty
+            return value.split(":", 1)[1]
+        target.property_set(args.property, value)
 
 def _target_property_get(args):
     with tcfl.msgid_c("cmdline"):
@@ -379,7 +395,8 @@ if __name__ == "__main__":
     ap.add_argument("value", metavar = "VALUE", action = "store",
                     nargs = "?",
                     default = None, help = "Value of property (none "
-                    "to remove it)")
+                    "to remove it; i:INTEGER, f:FLOAT b:false or b:true,"
+                    " otherwise it is considered a string)")
     ap.set_defaults(func = _target_property_set)
 
     ap = arg_subparsers.add_parser("property-get",
