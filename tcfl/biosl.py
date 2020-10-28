@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 #
 # Copyright (c) 2019 Intel Corporation
 #
@@ -8,7 +8,9 @@
 #
 # FIXME: create an object 'bios_c' that can be used to manipulate BIOS
 # settings; attach most to it
-"""Utilities for manipulating BIOS menus
+""".. _bios_menus:
+
+Utilities for manipulating BIOS menus
 -------------------------------------
 
 When a BIOS menu can be accessed from the serial console (eg:
@@ -28,6 +30,66 @@ can be used from test scripts to navigate BIOS menus, such as
 All funcions will raise :exc:tcfl.tc.error_e if they cannot find what
 is expected at any time. In some cases they will try to recover but
 will give up after a certain number of tries.
+
+.. _bios_inventory::
+
+Inventory configuration
+^^^^^^^^^^^^^^^^^^^^^^^
+
+This library relies in the target's inventory declaring certain
+values that are inherit to the BIOS:
+
+- *bios.terminal_emulation* (string; default *vt100*): terminal
+  emulation used by the BIOS; normally *vt100*, *vt200*, *rxvt*
+
+  These are valid values in :data:`tcfl.biosl.ansi_key_codes`.
+
+- *bios.boot_time* (positive integer; SECONDS; default 60): time in
+  seconds it takes the BIOS to boot (ie: to show *bios.boot_prompt*)
+
+- *bios.boot_prompt* (Python regular expression string; no default):
+  regex defining what string the BIOS prints when it is done booting
+  and is ready to take input, for example::
+
+    Press  [F6]   to show boot menu options
+
+  can be tackled with::
+
+    "Press\s+\[F[67]\]\s+to show boot menu options"
+
+- *bios.boot_prompt_report_backlog* (positive integer; bytes; default
+  500): how many bytes of data found before the prompt have to be
+  reported.
+
+- *bios.boot_key_main_menu* (string; no default): key to press to
+  enter the main BIOS menu; eg: "he"
+
+  The names of recognized keys are listed in
+  :data:`tcfl.biosl.ansi_key_codes`.
+
+- *bios.main_level_entries* (dictionary of strings; no defaults): list
+  of entries the main BIOS menu contains:
+
+  This is used to validate when the target is actually in the main
+  BIOS menu. The entries value is a valid Python regular expression
+  text (thus not compiled).
+
+  eg::
+
+      bios.main_level_entries.1: Main
+      bios.main_level_entries.2: Advanced
+      bios.main_level_entries.3: Security
+      bios.main_level_entries.4: Server Management
+      bios.main_level_entries.5: Error Manager
+      bios.main_level_entries.6: Boot Manager
+      bios.main_level_entries.7: Boot Maintenance Manager
+      bios.main_level_entries.8: Save & Exit
+      bios.main_level_entries.9: Tls Auth Configuration
+
+
+- *bios.boot_entry_EFI_SHELL* Python regular expression string;
+  defaults to *EFI .* Shell*): name of the boot entry that boots the
+  EFI shell in the boot menu.
 
 .. _biosl_ansi_shortref:
 
@@ -133,8 +195,9 @@ def ansi_key_code(key, term):
     for seq, terms in key_map.items():
         if term in terms:
             return seq
-    raise unknown_key_code_e("unknown key code %s for term %s"
-                             % (key, term))
+    raise unknown_key_code_e(
+        "tcfl.biosl.ansi_key_codes: unknown key code %s for term %s"
+        % (key, term))
 
 def entry_select(target, wait = 0.5):
     # sometimes it needs to wait a wee bit for the menu to settle; so
@@ -766,6 +829,7 @@ def menu_escape_to_main(target, esc_first = True):
     # will be a lot of ANSI flufff in betwween. not being this
     # paranoid makes the main menu detection go out of synch
     regexl = []
+    main_level_entries = main_level_entries_get(target)
     for entry in main_level_entries:
         regexl.append("\[[0-9]+;[0-9]+H" + entry)
     main_menu_regex = re.compile(".*".join(regexl))
@@ -925,12 +989,22 @@ def bios_boot_expect(target):
     assert isinstance(target, tcfl.tc.target_c)
 
     target.report_info("BIOS: waiting for main menu after power on")
-    # FIXME: [67] should be BIOS profile
-    target.expect(re.compile(b"Press\s+\[F[67]\]\s+to show boot menu options"),
+    boot_prompt = target.kws.get("bios.boot_prompt", None)
+    if boot_prompt == None:
+        raise tcfl.tc.blocked_e(
+            r"%s: target does not declare what the BIOS boot prompt looks"
+            r" like (in the serial console) in property bios.boot_prompt;"
+            r" thus I do not know what to wait for; please do set it"
+            r" (eg: 'Press\s+\[F6\]\s+to show boot menu options')"
+            % target.id,
+            dict(target = target))
+    report_backlog = target.kws.get(
+        "bios.boot_prompt_report_backlog", 500)
+    target.expect(re.compile(boot_prompt.encode('utf-8')),
                   # this prints a lot, so when reporting, report
                   # only the previous 500 or per spend so much
                   # time reporting we miss the rest
-                  report = 500,
+                  report = report_backlog,
                   # can take a long time w/ some BIOSes
                   timeout = target.kws.get('bios.boot_time', 180))
 
@@ -949,14 +1023,21 @@ def main_menu_expect(target):
     assert isinstance(target, tcfl.tc.target_c)
 
     bios_boot_expect(target)
-    # let's just go to the BIOS menu, F7 is not working
+    bios_terminal = target.kws.get("bios.terminal_emulation", "vt100")
+    key_main_menu = target.kws.get("bios.boot_key_main_menu", None)
+    if key_main_menu == None:
+        raise tcfl.tc.blocked_e(
+            "%s: target does not declare what the BIOS key to press to"
+            " go to the main menu in property bios.boot_key_main_menu"
+            " (eg: F2, F6, F12...)" % target.id,
+            dict(target = target))
     for _ in range(10):
         time.sleep(0.5)
-        target.console.write(ansi_key_code("F2", "vt100"))
+        target.console.write(ansi_key_code(key_main_menu, bios_terminal))
 
     # This means we have reached the BIOS main menu
     target.report_info("BIOS: confirming we are at toplevel menu")
-    for entry in main_level_entries:
+    for entry in main_level_entries_get(target):
         target.expect(entry, name = "BIOS-toplevel/" + entry, timeout = 120)
 
 def _paced_send(target, text):
@@ -1075,7 +1156,8 @@ def boot_network_http_boot_add_entry(target, entry, url):
     target.expect("^v=Move Highlight")
 
     # save; this takes us to the previous menu
-    target.console_tx(ansi_key_code("F10", "vt100"))
+    bios_terminal = target.kws.get("bios.terminal_emulation", "vt100")
+    target.console_tx(ansi_key_code("F10", bios_terminal))
     target.expect("Press 'Y' to save and exit")
     target.console_tx("Y")
 
@@ -1251,17 +1333,65 @@ def boot_efi_shell(target):
     assert isinstance(target, tcfl.tc.target_c)
     main_menu_expect(target)
 
-    if main_boot_select_entry(target, "EFI .* Shell"):
+    entry_efi_shell = target.kws.get(
+        "boot.boot_entry_EFI_shell", "EFI .* Shell")
+    if main_boot_select_entry(target, entry_efi_shell.encode('utf-8')):
         entry_select(target)			# select it
         target.expect("Shell>")
     else:
         raise tcfl.tc.error_e("BIOS: can't find an EFI shell entry")
 
 
-main_level_entries = [
-    "EDKII Menu",
-    "Boot Manager Menu",
-    "Boot Maintenance Manager",
-    "Continue",
-    "Reset",
-]
+def main_level_entries_get(target):
+    """
+    Return the list of main entries we want to find in the top level
+    BIOS menu
+
+    These are exposed on the target's BIOS data in the inventory (see
+    above) *bios.main_level_entries*.
+
+    :param tcfl.tc.target_c target: target where to find them
+    """
+    # bios.main_level_entries won't work because we either access the
+    # full flat dictionary or not (and main_level_entreies has subentries)
+    entries = target.kws.get("bios", {}).get("main_level_entries", None)
+    if entries == None:
+        raise tcfl.tc.blocked_e(
+            "%s: target does not declare the list of entries in the"
+            " main BIOS menu in property bios.main_level_entries;"
+            " thus I do not know what to look for; please do set it"
+            % target.id,
+            dict(target = target))
+    if not isinstance(entries, collections.abc.Mapping):
+        raise tcfl.tc.blocked_e(
+            "%s: target's property bios.main_level_entries shall be a"
+            " dictionary keyed by entry order"
+            % target.id,
+            dict(target = target))
+
+    # entries will look like (eg: from EDKII)
+    #
+    #   $ tcf get r50s03 -p bios
+    #   {
+    #       "bios": {
+    #           "boot_key_main_menu": "F2",
+    #           "boot_prompt": "Press\\s+\\[F[67]\\]\\s+to show boot menu options",
+    #           "boot_prompt_report_backlog": 500,
+    #           "boot_time": 800,
+    #           "main_level_entries": {
+    #               "1": "EDKII Menu",
+    #               "2": "Boot Manager Menu",
+    #               "3": "Boot Maintenance Manager",
+    #               "4": "Continue",
+    #               "5": "Reset"
+    #           }
+    #       }
+    #   }
+    #
+    # Or in Python form:
+    #
+    #   $ tcf property-get r50s03 bios.main_level_entries
+    #   OrderedDict([('1', 'EDKII Menu'), ('2', 'Boot Manager Menu'), ('3', 'Boot Maintenance Manager'), ('4', 'Continue'), ('5', 'Reset')])
+    #
+    # note the order matters and it is given by sorting the keys
+    return [ entry[1] for entry in sorted(entries.items(), key = lambda x: x[0]) ]
