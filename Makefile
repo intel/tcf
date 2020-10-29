@@ -12,7 +12,7 @@ srcdir = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 export PYTHONPATH := $(PYTHONPATH):$(srcdir):$(srcdir)/ttbd:/usr/local/lib/python3.7/site-packages
 # You can set these variables from the command line.
 SPHINXOPTS    = -q -n
-SPHINXBUILD   = sphinx-build
+SPHINXBUILD   = sphinx-build-3
 PAPER         =
 BUILDDIR      ?= build
 srcdir := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
