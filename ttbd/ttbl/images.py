@@ -678,7 +678,8 @@ class interface(ttbl.tt_interface):
                             img_name = img_name.replace(path, path_translated, 1)
                             break
                     else:
-                        raise PermissionError(
+                        # FIXME: use PermissionError in Python3
+                        raise RuntimeError(
                             "%s: absolute image path tries to read from"
                             " a location that is not allowed" % img_name)
                     file_name = img_name
