@@ -27,8 +27,6 @@ requires =
          python3-werkzeug
          python3-flask
          python3-flask-login
-         @@Fedora@@python3-ipaddress
-         @@CentOS|RHEL@@python3-ipaddress
          python3-keyring
          @@Fedora@@python3-netifaces
          @@CentOS|RHEL@@python3-netifaces
