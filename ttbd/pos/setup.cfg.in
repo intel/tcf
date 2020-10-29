@@ -23,5 +23,5 @@ requires =
          ipxe-bootimgs
          syslinux-tftpboot
          tftp-server
-         ttbd == %{version}-%{release}
+         ttbd == %%{version}-%%{release}
 #post-install = rpm-post-install.sh
