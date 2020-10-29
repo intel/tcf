@@ -12,6 +12,7 @@ requires =
          dnsmasq
          dosfstools
          ipmitool
+         libcap-devel
          livecd-tools
          openocd
          openssh-clients
@@ -42,8 +43,6 @@ requires =
          @@Fedora@@python3-pysnmp
          @@CentOS|RHEL@@pysnmp
          qemu
-         openssh-clients
-         sshpass
          socat
          sshpass
          tcf == %%{version}-%%{release}
