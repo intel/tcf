@@ -48,7 +48,7 @@ requires =
          sshpass
          socat
          sshpass
-         tcf == %{version}-%{release}
+         tcf == %%{version}-%%{release}
          v4l-utils
 
 build_requires =
