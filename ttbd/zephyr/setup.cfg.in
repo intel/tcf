@@ -4,6 +4,6 @@ install_data = /
 [bdist_rpm]
 release = 1
 packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
-requires = ttbd == %{version}-%{release}
-  tcf-zephyr == %{version}-%{release}
+requires = ttbd == %%{version}-%%{release}
+  tcf-zephyr == %%{version}-%%{release}
 post-install = rpm-post-install.sh
