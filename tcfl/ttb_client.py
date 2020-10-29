@@ -683,7 +683,7 @@ def rest_login(args):
             except Exception as e:
                 logger.exception("%s (%s): cannot login: %s",
                                  rtb._url, rtb.aka, e)
-                raise
+                continue         # if we are login into many, we are good
         else:
             logged = True
     if not logged:
