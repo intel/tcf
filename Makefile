@@ -9,7 +9,7 @@ srcdir = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 # ok, this is a hack because some distros don't have it -- need it for
 # now so the ttbl.raritan_emx module builds ok -- until we remove the
 # need for the raritan SDK and just use JSON RPC.
-export PYTHONPATH := $(PYTHONPATH):$(srcdir):$(srcdir)/ttbd:/usr/local/lib/python2.7/site-packages
+export PYTHONPATH := $(PYTHONPATH):$(srcdir):$(srcdir)/ttbd:/usr/local/lib/python3.7/site-packages
 # You can set these variables from the command line.
 SPHINXOPTS    = -q -n
 SPHINXBUILD   = sphinx-build
@@ -159,7 +159,7 @@ doctest:
 	      "results in $(BUILDDIR)/doctest/output.txt."
 
 tests:
-	python -m unittest discover -vv
+	python3 -m unittest discover -vv
 
 VERSION := $(shell git describe | sed 's/^v\([0-9]\+\)/\1/')
 BASE := $(PWD)
@@ -202,22 +202,22 @@ DISTRO=Fedora
 
 rpms-ttbd-zephyr: ttbd/zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
-	cd ttbd/zephyr && VERSION=$(VERSION) python ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
+	cd ttbd/zephyr && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
 
 rpms-ttbd-pos: ttbd/pos/setup.cfg
 	mkdir -p $(RPMDIR)
-	cd ttbd/pos && VERSION=$(VERSION) python ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
+	cd ttbd/pos && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
 
 rpms-ttbd: ttbd/setup.cfg
 	mkdir -p $(RPMDIR)
-	cd ttbd && VERSION=$(VERSION) python ./setup.py bdist_rpm $(BDIST_OPTS)
+	cd ttbd && VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)
 
 rpms-tcf-zephyr: zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
-	cd zephyr && VERSION=$(VERSION) python ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
+	cd zephyr && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
 
 rpms-tcf: setup.cfg
 	mkdir -p $(RPMDIR)
-	VERSION=$(VERSION) python ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
+	VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
 
 rpms: rpms-tcf rpms-tcf-zephyr rpms-ttbd rpms-ttbd-zephyr rpms-ttbd-pos
