@@ -5,7 +5,7 @@ install_data = /
 release = 1
 packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
 requires =
-         tcf == %{version}-%{release}
+         tcf == %%{version}-%%{release}
          autoconf
          automake
          ccache
