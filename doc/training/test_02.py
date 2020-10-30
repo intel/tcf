@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 import tcfl.tc
 
 class _test(tcfl.tc.tc_c):

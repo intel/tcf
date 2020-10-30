@@ -1,9 +1,9 @@
-#! /usr/bin/python2
+#! /usr/bin/python3
 #
 # Copyright (c) 2017 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
-#! /usr/bin/python
+#! /usr/bin/python3
 
 import ttbl
 import ttbl.config

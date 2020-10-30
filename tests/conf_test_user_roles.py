@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 import ttbl.config
 import ttbl.auth_localdb
 

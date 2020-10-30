@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 import ttbl.config
 
 class fake_if(ttbl.tt_interface):

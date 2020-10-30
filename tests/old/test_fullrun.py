@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/python3
 #
 # Copyright (c) 2017 Intel Corporation
 #
@@ -53,7 +53,7 @@ class test_run(unittest.TestCase, commonl.testing.test_ttbd_mixin):
     @classmethod
     def configfile(cls):
         return """\
-#! /usr/bin/python
+#! /usr/bin/python3
 #
 # Copyright (c) 2017 Intel Corporation
 #
