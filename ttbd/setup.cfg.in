@@ -11,37 +11,30 @@ requires =
          android-tools
          dnsmasq
          dosfstools
+         edk2-ovmf
          ipmitool
          libcap-devel
          livecd-tools
          openocd
          openssh-clients
          parted
-         python3-pyOpenSSL
-         python3-pyserial
+         python3-flask
+         python3-flask-login
+         @@Fedora@@python3-flask-principal
+         python3-keyring
          python3-ldap
+         python3-netifaces
+         python3-pexpect
          python3-ply
          python3-pyghmi
+         python3-pyOpenSSL
+         python3-pyserial
+         python3-pysnmp
+         python3-pyusb
          python3-requests
          python3-systemd
          python3-tornado
          python3-werkzeug
-         python3-flask
-         python3-flask-login
-         python3-keyring
-         @@Fedora@@python3-netifaces
-         @@CentOS|RHEL@@python3-netifaces
-         python3-pexpect
-         python3-pyusb
-         @@CentOS|RHEL@@OVMF
-         @@Fedora@@edk2-ovmf
-         @@Fedora@@python3-pexpect
-         @@CentOS|RHEL@@pexpect
-         @@Fedora@@python3-systemd
-         @@CentOS|RHEL@@systemd-python
-         @@Fedora@@python3-flask-principal
-         @@Fedora@@python3-pysnmp
-         @@CentOS|RHEL@@pysnmp
          qemu
          socat
          sshpass

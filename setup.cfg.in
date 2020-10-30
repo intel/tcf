@@ -8,18 +8,17 @@ packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
 requires =
          gvnc-tools
          make
-         python3-ply
-         python3-requests
-         @@Fedora@@python3-Levenshtein
-         @@CentOS|RHEL@@python-Levenshtein
-         python3-pykwalify
          python3-jinja2
          python3-junit_xml
          python3-keyring
+         python3-Levenshtein
          python3-numpy
+         python3-ply
+         python3-pykwalify
+         python3-pyyaml
+         python3-requests
+         python3-tabulate
          @@Fedora@@python3-opencv
          @@CentOS|RHEL@@opencv-python
-         python3-pyyaml
-         python3-tabulate
 
 doc_files = *.rst doc/* _doc/html/*
