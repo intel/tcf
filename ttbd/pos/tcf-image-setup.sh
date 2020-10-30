@@ -509,10 +509,7 @@ EOF
             selinux_relabel["etc/gdm/custom.conf"]=1
         fi
         ;;
-    *)
-        ;;
 esac
-
 
 case $image_type in
     raspbian)
