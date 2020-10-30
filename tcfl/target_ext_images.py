@@ -184,7 +184,7 @@ class extension(tc.target_extension_c):
             
     # match: [no-]upload [no-]soft IMGTYPE1:IMGFILE1 IMGTYPE2:IMGFILE2 ...
     _image_flash_regex = re.compile(
-        r"((no-)?soft|(no-)?upload|\S+:\S+)( ((no-)?soft|(no-)?upload|\S+:\S+))*")
+        r"((no-)?(soft|upload)\s+)?(\s+(\S+:)?\S+)+")
 
     def flash_spec_parse(self, flash_image_s = None):
         """Parse a images to flash specification in a string (that might be
@@ -300,7 +300,7 @@ class extension(tc.target_extension_c):
         if not self._image_flash_regex.search(flash_image_s):
             raise tc.blocked_e(
                 "image specification in %s does not conform to the form"
-                " [[no-]soft] [[no-]upload] IMAGE:NAME[ IMAGE:NAME[..]]]" % source,
+                " [[no-]soft] [[no-]upload] [IMAGE:]NAME[ [IMAGE:]NAME[..]]]" % source,
                 dict(target = target))
 
         image_flash = {}
