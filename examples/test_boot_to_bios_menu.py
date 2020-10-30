@@ -80,11 +80,10 @@ class _test(tcfl.tc.tc_c):
         if not hasattr(target, 'images'):
             return
 
-        self.image_flash, upload, soft = target.images.flash_spec_parse(
-            self.image_flash_requested)
+        image_flash, upload, soft = target.images.flash_spec_parse()
 
-        if self.image_flash:
-            target.images.flash(self.image_flash, upload = upload, soft = soft)
+        if image_flash:
+            target.images.flash(image_flash, upload = upload, soft = soft)
 
 
     def eval(self, target):
