@@ -72,15 +72,15 @@ tmpdir=${TMPDIR:-`mktemp -d $progname-XXXXXX`}
 
 trap cleanup EXIT
 
-function info() {
+function info {
     echo I: "$@" 1>&2
 }
 
-function warning() {
+function warning {
     echo W: "$@" 1>&2
 }
 
-function error() {
+function error {
     echo E: "$@" 1>&2
     exit 1
 }
