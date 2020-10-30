@@ -286,15 +286,14 @@ class driver(tcfl.tc.report_driver_c):
             if attachments:
                 result['attachment'] = {}
                 for key_raw, attachment in attachments.items():
+                    if attachment == None:
+                        continue
                     # MongoDB uses periods (.) as subdictionary
                     # separator, plus also disallowing other chars as
                     # record names; escape them to avoid issues.
                     # Now quote() doesn't make it easy to add '.' as a
                     # char to escape...ugh
                     key = urllib.parse.quote(key_raw).replace(".", "%2E")
-
-                    if attachment == None:
-                        continue
                     # FIXME: that thing after the or is a horrible
                     # hack; see why in the comment to
                     # commonl.ast_expr(), which has the same horrible
