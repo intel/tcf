@@ -303,7 +303,7 @@ def menu_scroll_to_entry(
       this would also include an entry called *macaddr*
     """
     assert isinstance(target, tcfl.tc.target_c)
-    assert isinstance(entry_string, str)
+    assert isinstance(entry_string, (str, bytes))
     assert isinstance(has_value, bool), \
         "has_value: expected bool; got %s: %s" % (type(has_value), has_value)
     assert isinstance(max_scrolls, int) and max_scrolls > 0
@@ -355,7 +355,10 @@ def menu_scroll_to_entry(
             # definitely in a escape sequence
             + b"(?P<key>[^\x1b]*[^ \x1b][^\x1b]*) *\x1b")
 
-    entry_regex = re.compile(entry_string.encode('utf-8'))
+    if isinstance(entry_string, str):
+        # convert to bytes
+        entry_string = entry_string.encode('utf-8')
+    entry_regex = re.compile(entry_string)
     seen_entries = collections.defaultdict(int)
     last_seen_entry = None
     last_seen_entry_count = 0
@@ -1177,7 +1180,7 @@ def main_boot_select_entry(target, boot_entry):
     """
     # FIXME: do straight from the boot menu
     assert isinstance(target, tcfl.tc.target_c)
-    assert isinstance(boot_entry, str)
+    assert isinstance(boot_entry, (str, bytes))
 
     # Now we are in the Boot Manager Menu; we need to check if
     # there is a UEFI PXEv4 entry -- if not, it means the network
