@@ -44,6 +44,10 @@ ROOT_MOUNTOPTS   use these root mount options (default to ext*'s
 
 BOOT_MOUNTOPTS   use these boot mount options (default to empty)
 
+BOOT_CONF_ENTRY  if defined, this is the full file name of a file under
+                 the rootfs boot/loader/entries; any file in there that
+                 is not this one will be rmeoved
+
 See more at https://inakypg.github.io/tcf/doc/04-HOWTOs.html#pos_image_creation
 EOF
 }
@@ -525,12 +529,32 @@ EOF
             sudo ssh-keygen -q -f $destdir/etc/ssh/ssh_host_${v}_key -t $v -C '' -N ''
         done
         sudo ln -sf /lib/systemd/system/ssh.service $destdir/etc/systemd/system/multi-user.target.wants
-        ;;
-    *)
+        :
         ;;
 esac
 
+
+#
 # Boot stuff
+#
+# Leave only which ever boot config file was defined to avoid
+# confusing the TCF POS client
+
+if ! [ -z "$BOOT_CONF_ENTRY" ]; then
+    # verify the single entry we are asking to keep alive exists
+    if ! [ -r $destdir/boot/loader/entries/"$BOOT_CONF_ENTRY" ]; then
+        entries=$(cd $destdir/boot/loader/entries && echo *.conf || true)
+        error "$BOOT_CONF_ENTRY: unknown BOOT_CONF_ENTRY in boot/loader/entries (I see: ${entries:-none?})"
+    fi
+    # delete the rest
+    for entry in $destdir/boot/loader/entries/*.conf; do
+        if [ "$(basename $entry)" != "$BOOT_CONF_ENTRY" ]; then
+            sudo rm -f $entry
+        fi
+    done
+                                                        
+fi
+
 if echo $image_type | grep -q 'clear'; then
     if [ -r $destdir/boot/loader/entries/iso-checksum.conf ]; then
         # we do not use this file when booting and it is confusing the
