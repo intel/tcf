@@ -99,7 +99,9 @@ def _target_property_set(args):
     with tcfl.msgid_c("cmdline"):
         target = tcfl.tc.target_c.create_from_cmdline_args(args)
         value = args.value
-        if value.startswith("i:"):
+        if not value:
+            pass	# used to unset a value
+        elif value.startswith("i:"):
             value = int(value.split(":", 1)[1])
         elif value.startswith("f:"):
             value = float(value.split(":", 1)[1])
