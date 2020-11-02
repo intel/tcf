@@ -67,7 +67,6 @@ would need a different context:
 
 import collections
 import contextlib
-import curses.ascii
 import errno
 import fcntl
 import getpass
