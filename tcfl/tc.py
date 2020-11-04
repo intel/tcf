@@ -651,6 +651,12 @@ class reporter_c(object):
             self.ts_start = time.time()
         self.testcase = testcase
 
+
+    #: Ignore messages with verbosity about this level
+    #:
+    #: >>> self.level_max = 4
+    level_max = None
+    
     @staticmethod
     def _argcheck(message, attachments, level, dlevel, alevel):
         assert isinstance(message, str)
@@ -663,6 +669,8 @@ class reporter_c(object):
         assert alevel >= 0 or alevel < 0
 
     def _report(self, level, alevel, tag, message, attachments):
+        if self.level_max != None and level >= self.level_max:
+            return
         ts = time.time()
         delta = ts - self.ts_start
         for driver in report_driver_c._drivers:
