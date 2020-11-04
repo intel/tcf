@@ -430,6 +430,9 @@ class driver(tcfl.pos.tc_pos0_base):
         self.path_jdk_to_test_root = None
         self.java_version = java_version
         self.native_bindir = native_bindir
+        # is the /usr/bin/java command versioned (eg: call java11 or
+        # java); distro specific :/
+        self.java_cmd_versioned = True
 
     #: Specification of OS image to install
     #:
@@ -465,7 +468,7 @@ class driver(tcfl.pos.tc_pos0_base):
         tcfl.tl.sh_proxy_environment(ic, target)
 
         # Make sure the SSH server is installed
-        tcfl.tl.linux_package_add(ic, target,
+        distro, distro_version = tcfl.tl.linux_package_add(ic, target,
                                   clear = [
                                       'sudo',
                                       'openssh-server', 'openssh-client',
@@ -493,6 +496,8 @@ class driver(tcfl.pos.tc_pos0_base):
             self.pkb_packages_required['ubuntu'] = [ 'openjdk-%s-jdk' % self.java_version ]
             self.pkb_packages_required['clear'] =  [ "java%s-basic" % self.java_version ]
             self.pkb_packages_required['fedora'] = [ 'java-%s-openjdk' % self.java_version ]
+        if distro in ( "ubuntu", "debian" ):
+            self.java_cmd_versioned = False
         tcfl.tl.linux_package_add(ic, target, **self.pkb_packages_required)
 
 
@@ -594,7 +599,7 @@ class driver(tcfl.pos.tc_pos0_base):
                 % (target_native_bindir, target_native_bindir)
         else:
             native_cmdline = ""
-        if self.java_version == '8':
+        if self.java_version == '8' or not self.java_cmd_versioned:
             java_cmd = 'java'
         else:
             java_cmd = 'java' + self.java_version
