@@ -431,6 +431,16 @@ class driver(tcfl.pos.tc_pos0_base):
         self.java_version = java_version
         self.native_bindir = native_bindir
 
+    #: Specification of OS image to install
+    #:
+    #: default to whatever is configured on the environment (if any)
+    #: for quick setup; otherwise it can be configured in a TCF
+    #: configuration file by adding:
+    #:
+    #: >>> tcfl.tc_jreg.driver.image_requested = "ubuntu"
+    #:
+    image_requested = os.environ.get("IMAGE", None)
+
     @tcfl.tc.serially()
     def deploy_00(self, target):
         # the format is still a wee bit pedestrian, we'll improve the
@@ -450,31 +460,41 @@ class driver(tcfl.pos.tc_pos0_base):
     def eval_00_dependencies_install(self, ic, target):
         ic.power.on()
 
+        tcfl.tl.linux_wait_online(ic, target)
+        tcfl.tl.sh_export_proxy(ic, target)
+        tcfl.tl.sh_proxy_environment(ic, target)
+
+        # Make sure the SSH server is installed
+        tcfl.tl.linux_package_add(ic, target,
+                                  clear = [
+                                      'sudo',
+                                      'openssh-server', 'openssh-client',
+                                  ],
+                                  ubuntu = [
+                                      'openssh-server',
+                                  ])
+
         tcfl.tl.linux_ssh_root_nopwd(target)	# allow remote access
-        target.shell.run("systemctl restart sshd")
-        target.shell.run(		# wait for sshd to fully restart
-            # this assumes BASH
-            "while ! exec 3<>/dev/tcp/localhost/22; do"
-            " sleep 1s; done", timeout = 15)
+        tcfl.tl.linux_sshd_restart(ic, target)
         if hasattr(target.console, 'select_preferred'):
             target.console.select_preferred(user = 'root')
+            tcfl.tl.sh_export_proxy(ic, target)
+
+        self.pkb_packages_required = { "any": [ 'binutils', 'diffutils' ] }
 
         if self.java_version == '8':
-            bundle = 'java-basic'	# yeah, exception...
+            self.pkb_packages_required['ubuntu'] = [ 'openjdk-8-jdk' ]
+            # yeah, exception...8 had weird naming conventions, I
+            # guess then they went from v1.X.0 to just vX
+            self.pkb_packages_required['clear'] = [ 'java-basic' ]
+            self.pkb_packages_required['fedora'] = [ 'java-1.8.0-openjdk' ]            
         else:
-            bundle = "java%s-basic" % self.java_version
-        # this will wait for online and set proxy for us and do the
-        # clear certificate fix
-        # diffutils: needed for some testcases
-        tcfl.tl.swupd_bundle_add(ic, target, [
-            # some test content requires ld for AOT compiler
-            'binutils',
-            # some test content requires `diff` to compare the resut
-            # with golden references
-            'diffutils',
-            # basic java support for the version
-            bundle
-        ])
+            # default-jre provides v5 to v10 (according to apt show)
+            self.pkb_packages_required['ubuntu'] = [ 'openjdk-%s-jdk' % self.java_version ]
+            self.pkb_packages_required['clear'] =  [ "java%s-basic" % self.java_version ]
+            self.pkb_packages_required['fedora'] = [ 'java-%s-openjdk' % self.java_version ]
+        tcfl.tl.linux_package_add(ic, target, **self.pkb_packages_required)
+
 
     def _output_subcase_parse(self, tcname, result,
                               failures, other_errors):
@@ -588,6 +608,7 @@ class driver(tcfl.pos.tc_pos0_base):
         else:
             timeout = 120
 
+        target.shell.run("rm -rf JTwork JTreport")
         # Now we have to figure out where thing are in the remote
         # machine vs in the local one. path_toplevel
         #
