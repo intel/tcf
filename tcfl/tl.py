@@ -1002,9 +1002,15 @@ def linux_package_add(ic, target, *packages, **kws):
             "value %s must be a list of strings;" \
             " some items in the list are not" % key
 
-    os_release = linux_os_release_get(target)
-    distro = os_release['ID']
-    distro_version = os_release['VERSION_ID']
+    if not 'linux.distro' in target.kws or not 'linux.distro_version' in target.kws:
+        os_release = linux_os_release_get(target)
+        distro = os_release['ID']
+        distro_version = os_release['VERSION_ID']
+        target.kw_set("linux.distro", distro)
+        target.kw_set("linux.distro_version", distro_version)
+    else:
+        distro = target.kws['linux.distro']
+        distro_version = target.kws['linux.distro_version']
 
     packages = list(packages)
     if distro.startswith('clear'):
