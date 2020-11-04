@@ -429,7 +429,7 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
            not in target.kws.get('capture', ""):
             self.capture_boot_video_source = False
 
-    #: Specification of image to install
+    #: Specification of OS image to install
     #:
     #: default to whatever is configured on the environment (if any)
     #: for quick setup; otherwise it can be configured in a TCF
@@ -437,7 +437,9 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
     #:
     #: >>> tcfl.tc_clear_bbt.tc_clear_bbt_c.image = "clear::24800"
     #:
-    image = os.environ.get("IMAGE", "clear")
+    image_requested = os.environ.get("IMAGE", "clear")
+
+    image = "<deployment skipped>"
 
     #: swupd mirror to use
     #:
@@ -552,7 +554,7 @@ EOF
         if self.image_tree:
             target.deploy_tree_src = self.image_tree
         self.image = target.pos.deploy_image(
-            ic, self.image, extra_deploy_fns = [
+            ic, self.image_requested, extra_deploy_fns = [
                 # first deploy our local tree, if any--note this will
                 # wipe out anything existing
                 tcfl.pos.deploy_tree,
