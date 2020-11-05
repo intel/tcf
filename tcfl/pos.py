@@ -873,6 +873,9 @@ class extension(tc.target_extension_c):
                                 dlevel = 2)
                             # no wait here, since expect did for us already
                             continue
+
+                    # if here, we either have timedout of the loop
+                    # above or someone found signs of boot so we check
                     if pos_boot_found != True:
                         target.report_error(
                             "POS: did not boot, retrying")
@@ -1592,7 +1595,7 @@ EOF""")
           Provisioning OS and to which ``target`` is connected.
 
         :param str image: name of an image available in an rsync server
-          specified in the interconnect's ``pos_rsync_server`` tag. Each
+          specified in the interconnect's ``pos.rsync_server`` tag. Each
           image is specified as ``IMAGE:SPIN:VERSION:SUBVERSION:ARCH``, e.g:
 
           - fedora:workstation:28::x86_64
@@ -1688,7 +1691,9 @@ EOF""")
 
                 testcase.targets_active()
                 kws = dict(
-                    rsync_server = ic.kws['pos_rsync_server'],
+                    rsync_server = _target_ic_kws_get(
+                        target, ic, 'pos.rsync_server',
+                        _target_ic_kws_get(target, ic, 'pos_rsync_server', None)),
                     image = image,
                     boot_dev = boot_dev,
                 )
@@ -1968,7 +1973,9 @@ def deploy_path(ic, target, _kws, cache = True):
                     "# trying to seed %s from the server's cache"
                     % (cache_name, cache_name))
 
-        rsync_server = ic.kws['pos_rsync_server']
+        rsync_server = _target_ic_kws_get(
+            target, ic, 'pos.rsync_server',
+            _target_ic_kws_get(target, ic, 'pos_rsync_server', None))
         target.report_info("POS: rsyncing %s from %s "
                            "to /mnt/persistent.tcf.git/%s"
                            % (cache_name, rsync_server, cache_name),
