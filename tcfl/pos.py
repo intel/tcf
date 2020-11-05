@@ -2161,20 +2161,63 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
         target.shell.prompt_regex = "iPXE>"
         kws = dict(target.kws)
         boot_ic = target.kws['pos_boot_interconnect']
+        mac_addr = target.kws['interconnects'][boot_ic]['mac_addr']
         ipv4_addr = target.kws['interconnects'][boot_ic]['ipv4_addr']
         ipv4_prefix_len = target.kws['interconnects'][boot_ic]['ipv4_prefix_len']
+        kws['mac_addr'] = mac_addr
+        kws['ipv4_addr'] = ipv4_addr
         kws['ipv4_netmask'] = commonl.ipv4_len_to_netmask_ascii(ipv4_prefix_len)
 
+        # Find what network interface our MAC address is; the
+        # output of ifstat looks like:
+        #
+        ## net0: 00:26:55:dd:4a:9d using 82571eb on 0000:6d:00.0 (open)
+        ##   [Link:up, TX:8 TXE:1 RX:44218 RXE:44205]
+        ##   [TXE: 1 x "Network unreachable (http://ipxe.org/28086090)"]
+        ##   [RXE: 43137 x "Operation not supported (http://ipxe.org/3c086083)"]
+        ##   [RXE: 341 x "The socket is not connected (http://ipxe.org/380f6093)"]
+        ##   [RXE: 18 x "Invalid argument (http://ipxe.org/1c056082)"]
+        ##   [RXE: 709 x "Error 0x2a654089 (http://ipxe.org/2a654089)"]
+        ## net1: 00:26:55:dd:4a:9c using 82571eb on 0000:6d:00.1 (open)
+        ##   [Link:down, TX:0 TXE:0 RX:0 RXE:0]
+        ##   [Link status: Down (http://ipxe.org/38086193)]
+        ## net2: 00:26:55:dd:4a:9f using 82571eb on 0000:6e:00.0 (open)
+        ##   [Link:down, TX:0 TXE:0 RX:0 RXE:0]
+        ##   [Link status: Down (http://ipxe.org/38086193)]
+        ## net3: 00:26:55:dd:4a:9e using 82571eb on 0000:6e:00.1 (open)
+        ##   [Link:down, TX:0 TXE:0 RX:0 RXE:0]
+        ##   [Link status: Down (http://ipxe.org/38086193)]
+        ## net4: 98:4f:ee:00:05:04 using NII on NII-0000:01:00.0 (open)
+        ##   [Link:up, TX:10 TXE:0 RX:8894 RXE:8441]
+        ##   [RXE: 8173 x "Operation not supported (http://ipxe.org/3c086083)"]
+        ##   [RXE: 268 x "The socket is not connected (http://ipxe.org/380f6093)"]
+        #
+        # thus we need to match the one that fits our mac address
+        ifstat = target.shell.run("ifstat", output = True, trim = True)
+        regex = re.compile(
+            "(?P<ifname>net[0-9]+): %s using" % mac_addr.lower(),
+            re.MULTILINE)
+        m = regex.search(ifstat)
+        if not m:
+            raise tcfl.tc.error_e(
+                "iPXE: cannot find interface name for MAC address %s;"
+                " is the MAC address in the configuration correct?"
+                % mac_addr.lower(),
+                dict(target = target, ifstat = ifstat,
+                     mac_addr = mac_addr.lower())
+            )
+        ifname = m.groupdict()['ifname']
+
         if dhcp:
-            target.shell.run("dhcp", re.compile("Configuring.*ok"))
-            target.shell.run("show net0/ip", "ipv4 = %s" % ipv4_addr)
+            target.shell.run("dhcp " + ifname, re.compile("Configuring.*ok"))
+            target.shell.run("show %s/ip" % ifname, "ipv4 = %s" % ipv4_addr)
         else:
             # static is much faster and we know the IP address already
             # anyway; but then we don't have DNS as it is way more
             # complicated to get it
-            target.shell.run("set net0/ip %s" % ipv4_addr)
-            target.shell.run("set net0/netmask %s" % kws['ipv4_netmask'])
-            target.shell.run("ifopen")
+            target.shell.run("set %s/ip %s" % (ifname, ipv4_addr))
+            target.shell.run("set %s/netmask %s" % (ifname, kws['ipv4_netmask']))
+            target.shell.run("ifopen " + ifname)
 
         if pos_image == None:
             pos_image = target.kws.get('pos_image', None)
