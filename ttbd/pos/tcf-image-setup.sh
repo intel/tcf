@@ -841,6 +841,22 @@ if [ -f $destdir/etc/selinux/config ]; then
 EOF
 fi
 
+# Calculate size in GiB and post it
+#
+# convert du's ouput (in GiB)
+#
+##   14G    .
+##   14G    total
+#
+# To
+#
+## 14
+#
+# (sed wipes anything from G to the end and just do the first line)
+size_gib=$(sudo du -sc -BG $destdir | sed 's/G.*$//;q')
+echo "size_gib: $size_gib" >> $tmpdir/.tcf.metadata.yaml
+
+# move yaml to final location
 sudo mv $tmpdir/.tcf.metadata.yaml $destdir
 
 # extra setup functions

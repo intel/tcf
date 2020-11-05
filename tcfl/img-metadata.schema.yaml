@@ -37,3 +37,7 @@ mapping:
   "post_flash_script":
     type: str
     required: false
+
+  "size_gib":
+    type: float
+    required: false
