@@ -2116,7 +2116,7 @@ def ipxe_seize(target):
     time.sleep(0.3)
     target.console.write("\x02\x02")	# use this iface so expecter
     time.sleep(0.3)
-    target.expect("Ctrl-B")
+    target.expect("Ctrl-B", target.kws.get('ipxe.ctrl_b_timeout', 30))
     target.console.write("\x02\x02")	# use this iface so expecter
     time.sleep(0.3)
     target.console.write("\x02\x02")	# use this iface so expecter
