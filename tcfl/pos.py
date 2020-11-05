@@ -396,6 +396,8 @@ def target_power_cycle_to_normal_pxe(target):
     )
     target_power_cycle_to_normal(target)
 
+def _target_ic_kws_get(target, ic, kw, default = None):
+    return target.kws.get(kw, ic.kws.get(kw, default))
 
 
 #: Name of the directory created in the target's root filesystem to
@@ -745,7 +747,10 @@ class extension(tc.target_extension_c):
             # None specified, let's take from the target config
             boot_to_pos_fn = self.cap_fn_get('boot_to_pos', 'pxe')
 
-        bios_boot_time = int(target.kws.get("bios_boot_time", 30))
+        bios_boot_time = int(target.kws.get(
+            "bios.boot_time",
+            target.kws.get("bios_boot_time", 30)	# COMPAT: legacy
+        ))
 
         # FIXME: this is a hack because now the expecter has a
         # maximum timeout set that can't be overriden--the
@@ -1661,7 +1666,10 @@ EOF""")
                 # boot_to_pos is higher, it still can go.
                 # bios_boot_time has to be all encapsulated in
                 # boot_to_pos(), as it can be called from other areas
-                bios_boot_time = int(target.kws.get("bios_boot_time", 30))
+                bios_boot_time = int(target.kws.get(
+                    "bios.boot_time",
+                    target.kws.get("bios_boot_time", 30)    # COMPAT: legacy
+                ))
                 testcase.tls.expect_timeout = bios_boot_time + timeout
 
                 self.boot_to_pos(pos_prompt = _pos_prompt, timeout = timeout,
@@ -2556,8 +2564,12 @@ def target_power_cycle_to_normal_edkii(target):
     # The boot configuration has been set so that unattended boot
     # means boot to localdisk
     target.power.cycle()
+    bios_boot_time = int(target.kws.get(
+        "bios.boot_time",
+        target.kws.get("bios_boot_time", 0)	# COMPAT: legacy
+    ))
     target.expect("to enter setup and select boot options",
-                  timeout = 60 + int(target.kws.get("bios_boot_time", 0)),
+                  timeout = 60 + bios_boot_time,
                   # For a verbose system, don't report it all
                   report = 300)
 
