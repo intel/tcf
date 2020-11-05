@@ -441,6 +441,7 @@ class target_extension_c(object):
         # verify this is a valid extension name
         pass
 
+
 class report_driver_c(object):
     """Reporting driver interface
 
@@ -464,6 +465,12 @@ class report_driver_c(object):
     - :mod:`tcfl.report_mongodb`
 
     """
+
+    #: Name for the driver
+    #
+    #: This is optional and can be set with the
+    #: :meth:`report_driver_c.add() <add>` call.
+    name = None
 
     def report(self, reporter, tag, ts, delta,
                level, message, alevel, attachments):
@@ -566,8 +573,9 @@ class report_driver_c(object):
         raise NotImplementedError
 
     _drivers = []
+
     @classmethod
-    def add(cls, obj, origin = None):
+    def add(cls, obj, name = None, origin = None):
         """
         Add a driver to handle other report mechanisms
 
@@ -586,6 +594,9 @@ class report_driver_c(object):
           :class:`tcfl.tc.report_driver_c` that implements the
           reporting.
 
+        :param str name: (optional) driver name; useful so
+          :data:`reporter_c.level_driver_max` can be used.
+
         :param str origin: (optional) where is this being registered;
           defaults to the caller of this function.
         """
@@ -594,6 +605,7 @@ class report_driver_c(object):
             o = inspect.stack()[1]
             origin = "%s:%s" % (o[1], o[2])
         setattr(obj, "origin", origin)
+        obj.name = name
         cls._drivers.append(obj)
 
     @classmethod
@@ -655,7 +667,18 @@ class reporter_c(object):
     #: Ignore messages with verbosity about this level
     #:
     #: >>> self.level_max = 4
-    level_max = None
+    report_level_max = None
+
+    #: Ignore messages with verbosity about this level (per driver)
+    #:
+    #: >>> class _test(tcf.tc.tc_c):
+    #: >>>     ...
+    #: >>>     report_level_driver_max = {
+    #: >>>         "DRIVERNAME": 4,
+    #: >>>         "DRIVERNAME2": 7
+    #: >>>     }
+    #:
+    report_level_driver_max = {}
     
     @staticmethod
     def _argcheck(message, attachments, level, dlevel, alevel):
@@ -669,11 +692,15 @@ class reporter_c(object):
         assert alevel >= 0 or alevel < 0
 
     def _report(self, level, alevel, tag, message, attachments):
-        if self.level_max != None and level >= self.level_max:
+        if self.report_level_max != None and level >= self.report_level_max:
             return
         ts = time.time()
         delta = ts - self.ts_start
         for driver in report_driver_c._drivers:
+            if driver.name:
+                level_driver_max = self.report_level_driver_max.get(driver.name, None)
+                if level_driver_max != None and level >= level_driver_max:
+                    continue
             driver.report(
                 self, tag, ts, delta, level, commonl.mkutf8(message),
                 alevel, attachments)
