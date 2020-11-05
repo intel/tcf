@@ -1764,6 +1764,20 @@ cat > /tmp/deploy.ex
 %s/*
 %s
 \x04""" % (persistent_tcf_d, persistent_tcf_d, '\n'.join(cache_locations)))
+                # Calculate timeout based on size
+                size_gib = int(self.metadata.get('size_gib', 0))
+                # Well, base it at 500 and add one minute per GiB to
+                # be very genereous, but we'd need tweaks per target
+                timeout_base = _target_ic_kws_get(
+                    target, ic, "pos.deploy_timeout_base", 500)
+                timeout_per_gib = _target_ic_kws_get(
+                    target, ic, "pos.deploy_timeout_per_gib", 30)
+                timeout = timeout_base + timeout_per_gib * size_gib
+                target.report_info(
+                    "POS: image deployment timeout %s"
+                    " (base %s, per GiB %s, %s GiB" % (
+                        timeout, timeout_base, timeout_per_gib, size_gib),
+                    dlevel = 1)
                 # \x04 is EOF, like pressing Ctrl-D in the shell
                 # DO NOT use --inplace to sync the image; this might
                 # break certain installations that rely on hardlinks
