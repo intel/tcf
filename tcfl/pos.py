@@ -2063,7 +2063,11 @@ pos_cmdline_opts = {
         # We would hardcode the IP address because we know it ahead of time
         # *and* it is faster, but we'd lack DNS then
         #"ip=%(ipv4_addr)s:::%(ipv4_netmask)s::eth0:none",
-        "ip=dhcp",
+        # Force DHCP on interface named bootnet, which we name based
+        # on the MAC address of the POS boot--this way if the board
+        # has multiple cards, we are good, since we know which one to use
+        "ifname=bootnet:%(mac_addr)s",
+        "ip=bootnet:dhcp",
         "ro",				# we are read only
         "quiet",			# don't print much of the boot process
         "loglevel=2",                   # kernel, be quiet to avoid
