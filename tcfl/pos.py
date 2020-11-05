@@ -2230,11 +2230,16 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
                 "POS: cannot determine what provisioning image is to be used"
                 "; (no pos_image provided and target doesn't provide"
                 " *pos_image* to indicate it")
-        pos_kernel_image = target.kws.get('pos_kernel_image', pos_image)
+        pos_kernel_image = target.kws.get('pos.kernel_image', pos_image)
         if 'pos_kernel_image' not in kws:
             kws['pos_kernel_image'] = pos_kernel_image
-        kws['pos_cmdline_opts'] = \
-            " ".join(pos_cmdline_opts[pos_image]) % kws
+        # split cmdline in two chunks, sometimes it is too long
+        cmdline = pos_cmdline_opts[pos_image]
+        cmdline_len = len(cmdline)
+        cmdline1 = cmdline[ 0 : int(cmdline_len/2) ]
+        cmdline2 = cmdline[ int(cmdline_len/2) : ]
+        kws['pos_cmdline_opts1'] = " ".join(cmdline1) % kws
+        kws['pos_cmdline_opts2'] = " ".join(cmdline2) % kws
         if url == None:
             url = target.kws['pos_http_url_prefix']
 
@@ -2242,14 +2247,33 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
         # command line options in a variable so later the command line
         # doesn't get too long and maybe overfill some buffer (has
         # happened before)
+        # FIXME: all these command line generation stuff needs to be
+        # shared with dhcp.py / dnsmasq.py
         target.shell.run(
-            "set cmdline %(pos_cmdline_opts)s" % kws)
+            "set cmdline1 %(pos_cmdline_opts1)s" % kws)
+        target.shell.run(
+            "set cmdline2 %(pos_cmdline_opts2)s" % kws)
+        pos_kernel_cmdline_extra = target.kws.get('pos.kernel_cmdline_extra', "")
+        chunk_size = 80
+        # FIXME FIXME: this eaither has to use quotes or break at
+        # spaces, otherwise if it falls in a space it munge them
+        pos_kernel_cmdline_extra_chunked =  [
+            pos_kernel_cmdline_extra[i : i + chunk_size]
+            for i in range(0, len(pos_kernel_cmdline_extra), chunk_size)
+        ]
+        count = 0
+        chunk_str = ""
+        for chunk in pos_kernel_cmdline_extra_chunked:
+            target.shell.run("set e%d " % count + chunk)
+            chunk_str += "${e%d}" % count
+            count += 1
+        kws['pos_cmdline_extra_chunked'] = chunk_str
         target.shell.run(
             "kernel"
             " ${base}vmlinuz-%(pos_kernel_image)s"
             " initrd=initramfs-%(pos_kernel_image)s"
             " console=tty0 console=%(linux_serial_console_default)s,115200"
-            " ${cmdline}"
+            " ${cmdline1} ${cmdline2} %(pos_cmdline_extra_chunked)s"
             % kws,
             # .*because there are a lot of ANSIs that can come
             re.compile(r"\.\.\..* ok"))
