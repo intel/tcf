@@ -1,19 +1,18 @@
-flask
-flask-login
-flask-principal
-ipaddress
-keyring
-netifaces
-pexpect
-ply
+flask # fedora:python3-flask
+flask-login # fedora:python3-flask-login
+flask-principal # fedora:python3-flask-principal
+keyring # fedora:python3-keyring
+netifaces # fedora:python3-netifaces
+pexpect # fedora:python3-pexpect
+ply # fedora:python3-ply
 python-prctl
-pyghmi
-pyserial
-pysnmp
-python_ldap
-pyusb # ubuntu:python-usb
-requests
+pyghmi # fedora:python3-pyghmi
+pyserial # fedora:python3-pyserial
+pysnmp # fedora:python3-pysnmp
+python_ldap # fedora:python3-ldap
+pyusb # ubuntu:python-usb, fedora:python3-pyusb
+requests # fedora: python3-requests
 sdnotify
-setuptools
-systemd
-tornado	# ubuntu:python-tornado
+setuptools # fedora:python3-setuptools
+systemd # fedora:python3-systemd
+tornado	# ubuntu:python-tornado, fedora:python3-tornado
