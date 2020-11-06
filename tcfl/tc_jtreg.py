@@ -490,12 +490,16 @@ class driver(tcfl.pos.tc_pos0_base):
             # yeah, exception...8 had weird naming conventions, I
             # guess then they went from v1.X.0 to just vX
             self.pkb_packages_required['clear'] = [ 'java-basic' ]
-            self.pkb_packages_required['fedora'] = [ 'java-1.8.0-openjdk' ]            
+            self.pkb_packages_required['fedora'] = [ 'java-1.8.0-openjdk' ]
+            self.pkb_packages_required['centos'] = [ 'java-1.8.0-openjdk' ]
+            self.pkb_packages_required['rhel'] = [ 'java-1.8.0-openjdk' ]
         else:
             # default-jre provides v5 to v10 (according to apt show)
             self.pkb_packages_required['ubuntu'] = [ 'openjdk-%s-jdk' % self.java_version ]
             self.pkb_packages_required['clear'] =  [ "java%s-basic" % self.java_version ]
             self.pkb_packages_required['fedora'] = [ 'java-%s-openjdk' % self.java_version ]
+            self.pkb_packages_required['centos'] = [ 'java-%s-openjdk' % self.java_version ]
+            self.pkb_packages_required['rhel'] = [ 'java-%s-openjdk' % self.java_version ]
         if distro in ( "ubuntu", "debian" ):
             self.java_cmd_versioned = False
         tcfl.tl.linux_package_add(ic, target, **self.pkb_packages_required)
