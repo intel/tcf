@@ -1024,21 +1024,25 @@ def linux_package_add(ic, target, *packages,
         _packages = packages + kws.get("any", []) + kws.get("clear", [])
         if _packages:
             tcfl.tl.swupd_bundle_add(ic, target, _packages,
+                                     add_timeout = timeout,
                                      fix_time = True, set_proxy = True)
     elif distro == 'centos':
         _packages = packages + kws.get("any", []) + kws.get("centos", [])
         if _packages:
-            target.shell.run("dnf install -qy " +  " ".join(_packages))
+            target.shell.run("dnf install -qy " +  " ".join(_packages),
+            timeout = timeout)
     elif distro == 'fedora':
         _packages = packages + kws.get("any", []) + kws.get("fedora", [])
         if _packages:
             target.shell.run(
                 "dnf install --releasever %s -qy " % distro_version
-                +  " ".join(_packages))
+                +  " ".join(_packages),
+                timeout = timeout)
     elif distro == 'rhel':
         _packages = packages + kws.get("any", []) + kws.get("rhel", [])
         if _packages:
-            target.shell.run("dnf install -qy " +  " ".join(_packages))
+            target.shell.run("dnf install -qy " +  " ".join(_packages),
+                             timeout = timeout)
     elif distro == 'ubuntu':
         _packages = packages + kws.get("any", []) + kws.get("ubuntu", [])
         if _packages:
@@ -1046,10 +1050,11 @@ def linux_package_add(ic, target, *packages,
             target.shell.run(
                 "sed -i 's/main restricted/main restricted universe multiverse/'"
                 " /etc/apt/sources.list")
-            target.shell.run("apt-get -qy update", timeout = 200)
+            target.shell.run("apt-get -qy update", timeout = timeout)
             target.shell.run(
                 "DEBIAN_FRONTEND=noninteractive"
-                " apt-get install -qy " +  " ".join(_packages))
+                " apt-get install -qy " +  " ".join(_packages),
+                timeout = timeout)
     else:
         raise tcfl.tc.error_e("unknown OS: %s %s (from /etc/os-release)"
                               % (distro, distro_version))
