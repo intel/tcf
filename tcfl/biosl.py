@@ -1192,10 +1192,11 @@ def main_boot_select_entry(target, boot_entry):
     entry_select(target)			# select it
     submenu_header_expect(target, "Boot Manager Menu",
                           canary_end_menu_redrawn = None)
+    max_scrolls = target.kws.get("bios.boot_menu_max_scrolls", 60)
     r = menu_scroll_to_entry(target, boot_entry,
                              level = "Boot Manager Menu",
                              # yeah, some destinations have a lot...
-                             max_scrolls = 60)
+                             max_scrolls = max_scrolls)
     if r:
         return True			# DONE!
     return False
