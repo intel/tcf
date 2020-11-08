@@ -502,7 +502,8 @@ class driver(tcfl.pos.tc_pos0_base):
             self.pkb_packages_required['rhel'] = [ 'java-%s-openjdk' % self.java_version ]
         if distro in ( "ubuntu", "debian" ):
             self.java_cmd_versioned = False
-        tcfl.tl.linux_package_add(ic, target, **self.pkb_packages_required)
+        tcfl.tl.linux_package_add(ic, target, timeout = 4 * 60,
+                                  **self.pkb_packages_required)
 
 
     def _output_subcase_parse(self, tcname, result,
