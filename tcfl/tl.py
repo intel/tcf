@@ -951,7 +951,8 @@ def swupd_bundle_add(ic, target, bundle_list,
                            bundle, float(m.groupdict()['seconds']))
 
 
-def linux_package_add(ic, target, *packages, **kws):
+def linux_package_add(ic, target, *packages,
+                      timeout = 120, fix_time = True, **kws):
     """Ask target to install Linux packages in distro-generic way
 
     This function checks the target to see what it has installed and
@@ -1012,6 +1013,12 @@ def linux_package_add(ic, target, *packages, **kws):
         distro = target.kws['linux.distro']
         distro_version = target.kws['linux.distro_version']
 
+    if fix_time:
+        # if the clock is messed up, SSL signing won't work for some things
+        target.shell.run("date -us '%s'; hwclock -wu"
+                         % str(datetime.datetime.utcnow()))
+
+        
     packages = list(packages)
     if distro.startswith('clear'):
         _packages = packages + kws.get("any", []) + kws.get("clear", [])
