@@ -1059,3 +1059,28 @@ def linux_package_add(ic, target, *packages,
         raise tcfl.tc.error_e("unknown OS: %s %s (from /etc/os-release)"
                               % (distro, distro_version))
     return distro, distro_version
+
+def linux_network_ssh_setup(ic, target):
+    """
+    Ensure the target has network and SSH setup and running
+
+    :param tcfl.tc.target_c ic: interconnect where the target is connected
+
+    :param tcfl.tc.target_c target: target on which to operate
+    """
+    tcfl.tl.linux_wait_online(ic, target)
+    tcfl.tl.sh_export_proxy(ic, target)
+    tcfl.tl.sh_proxy_environment(ic, target)
+
+    # Make sure the SSH server is installed
+    distro, distro_version = tcfl.tl.linux_package_add(
+        ic, target,
+        centos = [ 'openssh-server' ],
+        clear = [ 'sudo', 'openssh-server', 'openssh-client' ],
+        fedora = [ 'openssh-server' ],
+        rhel = [ 'openssh-server' ],
+        ubuntu = [ 'openssh-server' ]
+    )
+
+    tcfl.tl.linux_ssh_root_nopwd(target)	# allow remote access
+    tcfl.tl.linux_sshd_restart(ic, target)
