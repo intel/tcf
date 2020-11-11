@@ -12,7 +12,7 @@ srcdir = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 export PYTHONPATH := $(PYTHONPATH):$(srcdir):$(srcdir)/ttbd:/usr/local/lib/python3.7/site-packages
 # You can set these variables from the command line.
 SPHINXOPTS    = -q -n
-SPHINXBUILD   = sphinx-build
+SPHINXBUILD   = sphinx-build-3
 PAPER         =
 BUILDDIR      ?= build
 srcdir := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -191,6 +191,7 @@ DISTROVERSION=29
 BASE := $(PWD)
 RPMDIR ?= $(BASE)/dist
 BDIST_OPTS := --dist-dir=$(RPMDIR)/ --bdist-base=$(BASE)/dist/
+RPMDEPS := python3 rpm-build
 
 .FORCE:
 
@@ -202,22 +203,38 @@ BDIST_OPTS := --dist-dir=$(RPMDIR)/ --bdist-base=$(BASE)/dist/
 
 rpms-ttbd-zephyr: ttbd/zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash -c "cd $(PWD)/ttbd/zephyr && dnf install -y python3 rpm-build && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)"
+	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash \
+	       -c "cd $(PWD)/ttbd/zephyr && dnf install -y $(RPMDEPS) \
+	       && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)"
 
 rpms-ttbd-pos: ttbd/pos/setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash -c "cd $(PWD)/ttbd/pos && dnf install -y python3 rpm-build && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)"
+	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash \
+	       -c "cd $(PWD)/ttbd/pos && dnf install -y $(RPMDEPS) \
+	       && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)"
 
 rpms-ttbd: ttbd/setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash -c "cd $(PWD)/ttbd && dnf install -y python3 rpm-build && VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)"
+	# Find the build dependencies from the generated setup.cfg file 
+	$(eval BUILDDEPS := $(shell awk '/build_requires/ && \
+	                      !f{f=1;x=$$0;sub(/[^ ].*/,"",x);x=x" ";next} \
+	                      f {if (substr($$0,1,length(x))==x) \
+	                      {sub(/^[ \t]+/, "");printf "%s ",$$0;} else f=0}' \
+	                      $<))
+	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash \
+	       -c "cd $(PWD)/ttbd && dnf install -y $(RPMDEPS) $(BUILDDEPS) \
+	       && VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)"
 
 rpms-tcf-zephyr: zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash -c "cd $(PWD)/zephyr && dnf install -y python3 rpm-build && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)"
+	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash \
+	       -c "cd $(PWD)/zephyr && dnf install -y $(RPMDEPS) \
+	       && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)"
 
 rpms-tcf: setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash -c "cd $(PWD) && dnf install -y python3 rpm-build && VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)"
+	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash \
+	       -c "cd $(PWD) && dnf install -y $(RPMDEPS) \
+	       && VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)"
 
 rpms: rpms-tcf rpms-tcf-zephyr rpms-ttbd rpms-ttbd-zephyr rpms-ttbd-pos
