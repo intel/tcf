@@ -6,11 +6,11 @@ install_data = /
 release = 1
 packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
 requires =
-         gvnc-tools
+         @@Fedora@@gvnc-tools
          make
          python3-jinja2
-         python3-junit_xml
-         python3-keyring
+         @@Fedora@@python3-junit_xml
+         @@Fedora@@python3-keyring
          python3-Levenshtein
          python3-numpy
          python3-ply
@@ -19,6 +19,5 @@ requires =
          python3-requests
          python3-tabulate
          @@Fedora@@python3-opencv
-         @@CentOS|RHEL@@opencv-python
 
 doc_files = *.rst doc/* _doc/html/*

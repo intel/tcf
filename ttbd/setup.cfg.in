@@ -8,25 +8,25 @@ packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
 # The grub thing? So it works in fedora27 or fedora 25
 requires =
          alsa-utils
-         android-tools
+         @@Fedora@@android-tools
          dnsmasq
          dosfstools
          edk2-ovmf
          ipmitool
          libcap-devel
-         livecd-tools
-         openocd
+         @@Fedora@@livecd-tools
+         @@Fedora@@openocd
          openssh-clients
          parted
          python3-flask
          python3-flask-login
          @@Fedora@@python3-flask-principal
-         python3-keyring
+         @@Fedora@@python3-keyring
          python3-ldap
          python3-netifaces
          python3-pexpect
          python3-ply
-         python3-pyghmi
+         @@Fedora@@python3-pyghmi
          python3-pyOpenSSL
          python3-pyserial
          python3-pysnmp
@@ -35,11 +35,11 @@ requires =
          python3-systemd
          python3-tornado
          python3-werkzeug
-         qemu
+         @@Fedora@@qemu
          socat
          sshpass
          tcf == %%{version}-%%{release}
-         v4l-utils
+         @@Fedora@@v4l-utils
 
 build_requires =
          gcc
