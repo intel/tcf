@@ -12,7 +12,7 @@ srcdir = $(dir $(realpath $(firstword $(MAKEFILE_LIST))))
 export PYTHONPATH := $(PYTHONPATH):$(srcdir):$(srcdir)/ttbd:/usr/local/lib/python3.7/site-packages
 # You can set these variables from the command line.
 SPHINXOPTS    = -q -n
-SPHINXBUILD   = sphinx-build-3
+SPHINXBUILD   = sphinx-build
 PAPER         =
 BUILDDIR      ?= build
 srcdir := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -162,10 +162,6 @@ tests:
 	python3 -m unittest discover -vv
 
 VERSION := $(shell git describe | sed 's/^v\([0-9]\+\)/\1/')
-BASE := $(PWD)
-RPMDIR ?= $(BASE)/dist
-
-BDIST_OPTS := --dist-dir=$(RPMDIR)/ --bdist-base=$(BASE)/dist/
 
 #
 # Make sure you have
@@ -190,7 +186,11 @@ BDIST_OPTS := --dist-dir=$(RPMDIR)/ --bdist-base=$(BASE)/dist/
 #   distro's (CentOS7) not supporting them, so we use @@DISTRONAME@@ as
 #   a dirty switch
 # 
-DISTRO=Fedora
+DISTRO=fedora
+DISTROVERSION=29
+BASE := $(PWD)
+RPMDIR ?= $(BASE)/dist
+BDIST_OPTS := --dist-dir=$(RPMDIR)/ --bdist-base=$(BASE)/dist/
 
 .FORCE:
 
@@ -198,26 +198,26 @@ DISTRO=Fedora
 # passing a different DISTRO ... and anyway we are always remaking the
 # RPMs
 %.cfg: %.cfg.in .FORCE
-	sed -e "s|@@.*$(DISTRO).*@@||" -e "/@@/d" $< > $@
+	sed -e "s|@@.*$(DISTRO).*@@||i" -e "/@@/d" $< > $@
 
 rpms-ttbd-zephyr: ttbd/zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
-	cd ttbd/zephyr && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
+	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash -c "cd $(PWD)/ttbd/zephyr && dnf install -y python3 rpm-build && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)"
 
 rpms-ttbd-pos: ttbd/pos/setup.cfg
 	mkdir -p $(RPMDIR)
-	cd ttbd/pos && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
+	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash -c "cd $(PWD)/ttbd/pos && dnf install -y python3 rpm-build && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)"
 
 rpms-ttbd: ttbd/setup.cfg
 	mkdir -p $(RPMDIR)
-	cd ttbd && VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)
+	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash -c "cd $(PWD)/ttbd && dnf install -y python3 rpm-build && VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)"
 
 rpms-tcf-zephyr: zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
-	cd zephyr && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
+	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash -c "cd $(PWD)/zephyr && dnf install -y python3 rpm-build && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)"
 
 rpms-tcf: setup.cfg
 	mkdir -p $(RPMDIR)
-	VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)
+	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash -c "cd $(PWD) && dnf install -y python3 rpm-build && VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)"
 
 rpms: rpms-tcf rpms-tcf-zephyr rpms-ttbd rpms-ttbd-zephyr rpms-ttbd-pos
