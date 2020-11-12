@@ -1821,15 +1821,15 @@ class io_tls_prefix_lines_c(io.BufferedWriter):
         # - prefix first
         # - leftover data since last \n
         # - current data from offset to the position where \n was
-        #   (unicode-escape encoded)
-        # - newline (since the one in s was unicode-escaped)
+        #   (we print them escaping non-visible chars)
+        # - newline (since the one in s was escaped)
         substr = s[offset:pos]
         io.BufferedWriter.write(self, prefix)
         if self.data:
             io.BufferedWriter.write(
-                self, self.data.encode('unicode-escape'))
+                self, str_invisible_escape(self.data).encode('utf-8'))
             self.data = ""
-        io.BufferedWriter.write(self, substr.encode('unicode-escape'))
+        io.BufferedWriter.write(self, str_invisible_escape(substr).encode('utf-8'))
         io.BufferedWriter.write(self, "\n".encode('utf-8'))
         # flush after writing one line to avoid corruption from other
         # threads/processes printing to the same FD
@@ -1862,7 +1862,7 @@ class io_tls_prefix_lines_c(io.BufferedWriter):
         prefix = getattr(self.tls, "prefix_c", None)
         if prefix == None:
             io.BufferedWriter.write(
-                self, self.data.encode('unicode-escape'))
+                self, str_invisible_escape(self.data).encode('utf-8'))
         else:
             # flush whatever is accumulated
             self._write(u"", prefix)
@@ -1912,6 +1912,64 @@ def mkutf8(s):
     else:
         # represent it in unicode, however the object says
         return str(s)
+
+#: Index of ASCII/Unicode points to be translated because they are
+#: invisible by :func:`str_invisible_escape`.
+str_invisible_table = [
+    "\0",       #  0
+    "<SOH>",    #  1
+    "<STX>",    #  2
+    "<ETX>",    #  3
+    "<EOT>",    #  4
+    "<ENQ>",    #  5
+    "<ACK>",    #  6
+    "\\a",       #  7
+    "\\b",       #  8
+    "\\t",       #  9
+    "\\n",       #  10
+    "\\v",       #  11
+    "\\f",       #  12
+    "\\r",       #  13
+    "<SO>",     #  14
+    "<SI>",     #  15
+    "<DLE>",    #  16
+    "<DC1>",    #  17
+    "<DC2>",    #  18
+    "<DC3>",    #  19
+    "<DC4>",    #  20
+    "<NAK>",    #  21
+    "<SYN>",    #  22
+    "<ETB>",    #  23
+    "<CAN>",    #  24
+    "<EM>",     #  25
+    "<SUB>",    #  26
+    "<ESC>",    #  27
+    "<FS>",     #  28
+    "<GS>",     #  29
+    "<RS>",     #  30
+    "<US>",     #  31
+]
+
+def str_invisible_escape(s):
+    """
+    Translate invisible characters into visible representations
+
+    For example, if a string contains new line characters, they are
+    replaced with *\\n*, or \0x30 with *<RS>*; translation table is
+    defined by :data:`str_invisible_table`.
+
+    :param str s: string to work on
+
+    :returns str: translated string
+    """
+    _s = ""
+    for c in s:
+        b = ord(c)
+        if b >= 0 and b < 0x20:	# printable chars
+            c = str_invisible_table[b]
+        _s += c
+    return _s
+
 
 class generator_factory_c(object):
     """
