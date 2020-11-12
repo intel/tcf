@@ -951,7 +951,8 @@ def swupd_bundle_add(ic, target, bundle_list,
                            bundle, float(m.groupdict()['seconds']))
 
 
-def linux_package_add(ic, target, *packages, **kws):
+def linux_package_add(ic, target, *packages,
+                      timeout = 120, fix_time = True, **kws):
     """Ask target to install Linux packages in distro-generic way
 
     This function checks the target to see what it has installed and
@@ -1012,26 +1013,36 @@ def linux_package_add(ic, target, *packages, **kws):
         distro = target.kws['linux.distro']
         distro_version = target.kws['linux.distro_version']
 
+    if fix_time:
+        # if the clock is messed up, SSL signing won't work for some things
+        target.shell.run("date -us '%s'; hwclock -wu"
+                         % str(datetime.datetime.utcnow()))
+
+        
     packages = list(packages)
     if distro.startswith('clear'):
         _packages = packages + kws.get("any", []) + kws.get("clear", [])
         if _packages:
             tcfl.tl.swupd_bundle_add(ic, target, _packages,
+                                     add_timeout = timeout,
                                      fix_time = True, set_proxy = True)
     elif distro == 'centos':
         _packages = packages + kws.get("any", []) + kws.get("centos", [])
         if _packages:
-            target.shell.run("dnf install -qy " +  " ".join(_packages))
+            target.shell.run("dnf install -qy " +  " ".join(_packages),
+            timeout = timeout)
     elif distro == 'fedora':
         _packages = packages + kws.get("any", []) + kws.get("fedora", [])
         if _packages:
             target.shell.run(
                 "dnf install --releasever %s -qy " % distro_version
-                +  " ".join(_packages))
+                +  " ".join(_packages),
+                timeout = timeout)
     elif distro == 'rhel':
         _packages = packages + kws.get("any", []) + kws.get("rhel", [])
         if _packages:
-            target.shell.run("dnf install -qy " +  " ".join(_packages))
+            target.shell.run("dnf install -qy " +  " ".join(_packages),
+                             timeout = timeout)
     elif distro == 'ubuntu':
         _packages = packages + kws.get("any", []) + kws.get("ubuntu", [])
         if _packages:
@@ -1039,11 +1050,37 @@ def linux_package_add(ic, target, *packages, **kws):
             target.shell.run(
                 "sed -i 's/main restricted/main restricted universe multiverse/'"
                 " /etc/apt/sources.list")
-            target.shell.run("apt-get -qy update", timeout = 200)
+            target.shell.run("apt-get -qy update", timeout = timeout)
             target.shell.run(
                 "DEBIAN_FRONTEND=noninteractive"
-                " apt-get install -qy " +  " ".join(_packages))
+                " apt-get install -qy " +  " ".join(_packages),
+                timeout = timeout)
     else:
         raise tcfl.tc.error_e("unknown OS: %s %s (from /etc/os-release)"
                               % (distro, distro_version))
     return distro, distro_version
+
+def linux_network_ssh_setup(ic, target):
+    """
+    Ensure the target has network and SSH setup and running
+
+    :param tcfl.tc.target_c ic: interconnect where the target is connected
+
+    :param tcfl.tc.target_c target: target on which to operate
+    """
+    tcfl.tl.linux_wait_online(ic, target)
+    tcfl.tl.sh_export_proxy(ic, target)
+    tcfl.tl.sh_proxy_environment(ic, target)
+
+    # Make sure the SSH server is installed
+    distro, distro_version = tcfl.tl.linux_package_add(
+        ic, target,
+        centos = [ 'openssh-server' ],
+        clear = [ 'sudo', 'openssh-server', 'openssh-client' ],
+        fedora = [ 'openssh-server' ],
+        rhel = [ 'openssh-server' ],
+        ubuntu = [ 'openssh-server' ]
+    )
+
+    tcfl.tl.linux_ssh_root_nopwd(target)	# allow remote access
+    tcfl.tl.linux_sshd_restart(ic, target)

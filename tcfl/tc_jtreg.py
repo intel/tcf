@@ -463,22 +463,8 @@ class driver(tcfl.pos.tc_pos0_base):
     def eval_00_dependencies_install(self, ic, target):
         ic.power.on()
 
-        tcfl.tl.linux_wait_online(ic, target)
-        tcfl.tl.sh_export_proxy(ic, target)
-        tcfl.tl.sh_proxy_environment(ic, target)
+        tcfl.tl.linux_network_ssh_setup(ic, target)
 
-        # Make sure the SSH server is installed
-        distro, distro_version = tcfl.tl.linux_package_add(ic, target,
-                                  clear = [
-                                      'sudo',
-                                      'openssh-server', 'openssh-client',
-                                  ],
-                                  ubuntu = [
-                                      'openssh-server',
-                                  ])
-
-        tcfl.tl.linux_ssh_root_nopwd(target)	# allow remote access
-        tcfl.tl.linux_sshd_restart(ic, target)
         if hasattr(target.console, 'select_preferred'):
             target.console.select_preferred(user = 'root')
             tcfl.tl.sh_export_proxy(ic, target)
@@ -502,7 +488,8 @@ class driver(tcfl.pos.tc_pos0_base):
             self.pkb_packages_required['rhel'] = [ 'java-%s-openjdk' % self.java_version ]
         if distro in ( "ubuntu", "debian" ):
             self.java_cmd_versioned = False
-        tcfl.tl.linux_package_add(ic, target, **self.pkb_packages_required)
+        tcfl.tl.linux_package_add(ic, target, timeout = 4 * 60,
+                                  **self.pkb_packages_required)
 
 
     def _output_subcase_parse(self, tcname, result,

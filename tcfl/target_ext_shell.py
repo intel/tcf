@@ -340,7 +340,11 @@ class shell(tc.target_extension_c):
         target = self.target
         testcase = target.testcase
         if timeout == None:
-            timeout = 60 + int(target.kws.get("bios_boot_time", 0))
+            bios_boot_time = int(target.kws.get(
+                "bios.boot_time",
+                target.kws.get("bios_boot_time", 0)	# COMPAT: legacy
+            ))
+            timeout = 60 + bios_boot_time
         # Set the original shell prompt
         self.prompt_regex = self.prompt_regex_default
 

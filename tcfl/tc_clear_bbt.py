@@ -437,7 +437,9 @@ class tc_clear_bbt_c(tcfl.tc.tc_c):
     #:
     #: >>> tcfl.tc_clear_bbt.tc_clear_bbt_c.image = "clear::24800"
     #:
-    image_requested = os.environ.get("IMAGE", "clear")
+    image_requested = os.environ.get(
+        "IMAGE_BBT",
+        os.environ.get("IMAGE", "clear"))
 
     image = "<deployment skipped>"
 

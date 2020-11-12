@@ -15,18 +15,30 @@ import tcfl.pos
 
 image_env = os.environ.get("IMAGE", None)
 
-@tcfl.tc.interconnect("pos_rsync_server", mode = "all")
+def _target_ic_kws_get(target, ic, kw, default = None):
+    return target.kws.get(kw, ic.kws.get(kw, default))
+
+@tcfl.tc.interconnect(mode = "all")
+@tcfl.tc.target("pos_capable")
 class _(tcfl.tc.tc_c):
     """
     List images available in a POS rsync server
     """
-    def eval(self, ic):
+    def eval(self, ic, target):
         ic.power.on()
-        port = ic.tunnel.add(873, ic.kws['ipv4_addr'])	# rsync's
-        rsync_host = ic.rtb.parsed_url.hostname
-        rsync_port = port
+        rsync_server = _target_ic_kws_get(
+            target, ic, 'pos.rsync_server',
+            _target_ic_kws_get(target, ic, 'pos_rsync_server', None))
+        self.report_info("POS rsync server: %s" % rsync_server)
+
+        rsync_host = rsync_server.split("::", 1)[0]
+        if rsync_host == ic.rtb.parsed_url.hostname:
+            rsync_port = ic.tunnel.add(873, ic.kws['ipv4_addr'])
+        else:
+            rsync_port = 873
+
         output = subprocess.check_output(
-            [ 'rsync', '--port', str(rsync_port), rsync_host + '::images/' ],
+            [ 'rsync', '--port', str(rsync_port), rsync_server + '/' ],
             close_fds = True, stderr = subprocess.PIPE)
         # output looks like:
         #

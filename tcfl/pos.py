@@ -2095,7 +2095,12 @@ def ipxe_seize(target):
 
     """
     # can't wait also for the "ok" -- debugging info might pop in th emiddle
+    ts0 = time.time()
     target.expect("iPXE initialising devices...")
+    ts_init = time.time()
+    target.report_data("Boot statistics %(type)s",
+                       "iPXE initialization time (s)", ts_init - ts0)
+    
     # if the connection is slow, we have to start sending Ctrl-B's
     # ASAP
     #target.expect(re.compile("iPXE .* -- Open Source Network Boot Firmware"))
@@ -2122,6 +2127,9 @@ def ipxe_seize(target):
     target.console.write("\x02\x02")	# use this iface so expecter
     time.sleep(0.3)
     target.expect("iPXE>")
+    ts_prompt = time.time()
+    target.report_data("Boot statistics %(type)s",
+                       "iPXE prompt time (s)", ts_prompt - ts_init)
 
 
 def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
@@ -2655,6 +2663,7 @@ def target_power_cycle_to_normal_edkii(target):
     target.report_info("POS: setting target not to boot Provisioning OS")
     # The boot configuration has been set so that unattended boot
     # means boot to localdisk
+    ts0 = time.time()
     target.power.cycle()
     bios_boot_time = int(target.kws.get(
         "bios.boot_time",
@@ -2664,6 +2673,8 @@ def target_power_cycle_to_normal_edkii(target):
                   timeout = 60 + bios_boot_time,
                   # For a verbose system, don't report it all
                   report = 300)
+    target.report_data("Boot statistics %(type)s", "BIOS boot time (s)",
+                       time.time() - ts0)
 
 edkii_pxe_ipxe_target_power_cycle_to_normal = \
     target_power_cycle_to_normal_edkii
@@ -2707,12 +2718,16 @@ def target_power_cycle_pos_serial_f12_ipxe(target):
     target.report_info("POS: setting target to PXE boot Provisioning OS")
     target.property_set("pos_mode", "pxe")
     target.power.cycle()
+    ts0 = time.time()
     # Now setup the local boot loader to boot off that
     target.property_set("pos_mode", "local")
     # this is how we know the BIOS booted
     #target.expect("Primary Bios Version")	# helps us to measure times
     target.expect(re.compile(r"Press +\[F12\] +to boot from network"),
                   timeout = target.kws.get('bios.boot_time', None))
+    target.report_data("Boot statistics %(type)s", "BIOS boot time (s)",
+                       time.time() - ts0)
+
     target.console.write(biosl.ansi_key_code("F12", "vt100"))
     ipxe_seize_and_boot(target)
 

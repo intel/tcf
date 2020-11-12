@@ -360,6 +360,30 @@ Provisioning OS specific metadata
   boot methods (eg: TFTP) the driver shall copy the files around as
   needed.
 
+  FIXME: this is also in :data:`tcfl.pos.pos_cmdline_opts` for client
+  driven boot; definition and override methods need to be unified.
+
+.. _pos.kernel_cmdline_extra:
+
+- *pos.kernel_cmdline_extra*: extra paremeters to pass to the POS kernel
+  command line so this target can boot.
+
+  These commands are given in the kernel command's line, so depending
+  on the kernel, they would be given to Linux, dractur or whichever
+  kernel it is being booted as POS kernel.
+
+  Defaults to nothing.
+
+.. _pos.kernel_image:
+
+- *pos.kernel_image*: string describing the *kernel* image used to
+  boot the target in POS mode; defaults to same as *pos_image*, whidh
+  defaules to *tcf-live*).
+
+  This is appended to the kernel and initrd name (eg:
+  *vmlinux-SOMETHING*, *initramfs-SOMETHING*). It is useful for
+  special targets that need special kernels to boot.
+
 .. _pos_partscan_timeout:
 
 - *pos_partscan_timeout*: maximum number of seconds we wait for a
@@ -375,8 +399,8 @@ Provisioning OS specific metadata
   code understands the boot drive for the target has to be
   repartitioned and reformated before provisioning::
 
-    $ tcf property-set TARGET pos_reinitialize True
-    $ tcf run -t TARGETs <something that deploys>
+    tcf property-set TARGET pos_reinitialize True
+    tcf run -t TARGETs <something that deploys>
 
 .. _roles_required:
 
@@ -413,6 +437,19 @@ Provisioning OS specific metadata
   even after the PXE boot entry has been enabled manually.
 
   Note this will be compiled into a Python regex.
+
+iPXE specific metadata
+----------------------
+
+.. _ipxe_ctrl_b_timeout:
+
+- *ipxe.ctrl_b_timeout* (positive integer): maximum numbe rof seconds
+  to wait for iPXE to print the Ctrl-B banner
+
+  In order to be able to see or use this targer, a user must have
+  *not* been granted one of the roles in the list. See :ref:`access
+  control <target_access_control>`.
+
 
 *ttbd* HTTP API
 ===============

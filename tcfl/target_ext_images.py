@@ -184,7 +184,7 @@ class extension(tc.target_extension_c):
             
     # match: [no-]upload [no-]soft IMGTYPE1:IMGFILE1 IMGTYPE2:IMGFILE2 ...
     _image_flash_regex = re.compile(
-        r"((no-)?(soft|upload)\s+)?(\s+(\S+:)?\S+)+")
+        r"((no-)?(soft|upload)\s+)*((\S+:)?\S+\s*)+")
 
     def flash_spec_parse(self, flash_image_s = None):
         """Parse a images to flash specification in a string (that might be
