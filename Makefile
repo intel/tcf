@@ -164,20 +164,6 @@ tests:
 VERSION := $(shell git describe | sed 's/^v\([0-9]\+\)/\1/')
 
 #
-# Make sure you have
-#
-# %_unpackaged_files_terminate_build 0
-#
-# Or due to some weird bug, it will fail with:
-
-# Need --quiet so it does not complain about the leftover ocmpiled pyhton files in /etc/tcf :/
-#
-# error: Installed (but unpackaged) file(s) found:
-#   /etc/tcf/conf_zephyr.pyc
-#   /etc/tcf/conf_zephyr.pyo
-
-
-#
 # Well, this is a dirty hack
 #
 # Instead of making a spec file, since we want to keep reusing the setup.py infra...
@@ -190,8 +176,9 @@ DISTRO=fedora
 DISTROVERSION=29
 BASE := $(PWD)
 RPMDIR ?= $(BASE)/dist
-BDIST_OPTS := --dist-dir=$(RPMDIR)/ --bdist-base=$(BASE)/dist/
+BDIST_OPTS := --dist-dir=/home/rpms/ --bdist-base=/home/tcf/dist/
 RPMDEPS := python3 rpm-build
+UID := $(shell id -u)
 
 .FORCE:
 
@@ -203,15 +190,29 @@ RPMDEPS := python3 rpm-build
 
 rpms-ttbd-zephyr: ttbd/zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash \
-	       -c "cd $(PWD)/ttbd/zephyr && dnf install -y $(RPMDEPS) \
-	       && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)"
+	docker run -i --rm \
+	           -v $(PWD):/home/tcf \
+	           -v $(RPMDIR):/home/rpms \
+	           $(DISTRO):$(DISTROVERSION) \
+	           /bin/bash -c \
+	               "dnf install -y $(RPMDEPS) && \
+	                useradd -u $(UID) $(USER) && \
+	                su - $(USER) -c \
+	                    'cd /home/tcf/ttbd/zephyr && \
+	                     VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
 
 rpms-ttbd-pos: ttbd/pos/setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash \
-	       -c "cd $(PWD)/ttbd/pos && dnf install -y $(RPMDEPS) \
-	       && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)"
+	docker run -i --rm \
+	           -v $(PWD):/home/tcf \
+	           -v $(RPMDIR):/home/rpms \
+	           $(DISTRO):$(DISTROVERSION) \
+	           /bin/bash -c \
+	               "dnf install -y $(RPMDEPS) && \
+	                useradd -u $(UID) $(USER) && \
+	                su - $(USER) -c \
+	                    'cd /home/tcf/ttbd/pos && \
+	                     VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
 
 rpms-ttbd: ttbd/setup.cfg
 	mkdir -p $(RPMDIR)
@@ -221,20 +222,41 @@ rpms-ttbd: ttbd/setup.cfg
 	                      f {if (substr($$0,1,length(x))==x) \
 	                      {sub(/^[ \t]+/, "");printf "%s ",$$0;} else f=0}' \
 	                      $<))
-	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash \
-	       -c "cd $(PWD)/ttbd && dnf install -y $(RPMDEPS) $(BUILDDEPS) \
-	       && VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)"
+	docker run -i --rm \
+	           -v $(PWD):/home/tcf \
+	           -v $(RPMDIR):/home/rpms \
+	           $(DISTRO):$(DISTROVERSION) \
+	           /bin/bash -c \
+	               "dnf install -y $(RPMDEPS) $(BUILDDEPS) && \
+	                useradd -u $(UID) $(USER) && \
+	                su - $(USER) -c \
+	                    'cd /home/tcf/ttbd && \
+	                     VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
 
 rpms-tcf-zephyr: zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash \
-	       -c "cd $(PWD)/zephyr && dnf install -y $(RPMDEPS) \
-	       && VERSION=$(VERSION) python3 ./setup.py bdist_rpm --quiet $(BDIST_OPTS)"
+	docker run -i --rm \
+	           -v $(PWD):/home/tcf \
+	           -v $(RPMDIR):/home/rpms \
+	           $(DISTRO):$(DISTROVERSION) \
+	           /bin/bash -c \
+	               "dnf install -y $(RPMDEPS) && \
+	                useradd -u $(UID) $(USER) && \
+	                su - $(USER) -c \
+	                    'cd /home/tcf/zephyr && \
+	                     VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
 
 rpms-tcf: setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run -i --rm -v $(PWD):$(PWD) $(DISTRO):$(DISTROVERSION) /bin/bash \
-	       -c "cd $(PWD) && dnf install -y $(RPMDEPS) \
-	       && VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)"
+	docker run -i --rm \
+	           -v $(PWD):/home/tcf \
+	           -v $(RPMDIR):/home/rpms \
+	           $(DISTRO):$(DISTROVERSION) \
+	           /bin/bash -c \
+	               "dnf install -y $(RPMDEPS) && \
+	                useradd -u $(UID) $(USER) && \
+	                su - $(USER) -c \
+	                    'cd /home/tcf && \
+	                     VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
 
 rpms: rpms-tcf rpms-tcf-zephyr rpms-ttbd rpms-ttbd-zephyr rpms-ttbd-pos
