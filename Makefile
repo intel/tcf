@@ -216,7 +216,7 @@ rpms-ttbd-pos: ttbd/pos/setup.cfg
 
 rpms-ttbd: ttbd/setup.cfg
 	mkdir -p $(RPMDIR)
-	# Find the build dependencies from the generated setup.cfg file 
+	# Find the build dependencies from the generated setup.cfg file
 	$(eval BUILDDEPS := $(shell awk '/build_requires/ && \
 	                      !f{f=1;x=$$0;sub(/[^ ].*/,"",x);x=x" ";next} \
 	                      f {if (substr($$0,1,length(x))==x) \
