@@ -1889,8 +1889,19 @@ class io_tls_prefix_lines_c(io.BufferedWriter):
             io.BufferedWriter.writelines(self, itr)
             return
         offset = 0
+        data = None	# itr might be empty...and later we want to check
         for data in itr:
             offset = self._write(data, prefix, offset)
+        if data:
+            # if there was an iterator (sometimes we are called with
+            # an empty one), if the last char was not a \n, the last
+            # line won't be flushed, so let's flush it manually.
+            # This is quite hackish but heck...otherwise there will be
+            # leftovers in self.data and will accumulate to the next
+            # line printed, that might have nothing to do with it.
+            last_char = data[-1]
+            if last_char != '\n':
+                self._write("\n", prefix, 0)
 
 def mkutf8(s):
     #
