@@ -193,6 +193,10 @@ rpms-ttbd-zephyr: ttbd/zephyr/setup.cfg
 	docker run -i --rm \
 	           -v $(PWD):/home/tcf \
 	           -v $(RPMDIR):/home/rpms \
+	           --env HTTP_PROXY=$(HTTP_PROXY) \
+	           --env HTTPS_PROXY=$(HTTPS_PROXY) \
+	           --env http_proxy=$(http_proxy) \
+	           --env https_proxy=$(https_proxy) \
 	           $(DISTRO):$(DISTROVERSION) \
 	           /bin/bash -c \
 	               "dnf install -y $(RPMDEPS) && \
@@ -206,6 +210,10 @@ rpms-ttbd-pos: ttbd/pos/setup.cfg
 	docker run -i --rm \
 	           -v $(PWD):/home/tcf \
 	           -v $(RPMDIR):/home/rpms \
+	           --env HTTP_PROXY=$(HTTP_PROXY) \
+	           --env HTTPS_PROXY=$(HTTPS_PROXY) \
+	           --env http_proxy=$(http_proxy) \
+	           --env https_proxy=$(https_proxy) \
 	           $(DISTRO):$(DISTROVERSION) \
 	           /bin/bash -c \
 	               "dnf install -y $(RPMDEPS) && \
@@ -225,6 +233,10 @@ rpms-ttbd: ttbd/setup.cfg
 	docker run -i --rm \
 	           -v $(PWD):/home/tcf \
 	           -v $(RPMDIR):/home/rpms \
+	           --env HTTP_PROXY=$(HTTP_PROXY) \
+	           --env HTTPS_PROXY=$(HTTPS_PROXY) \
+	           --env http_proxy=$(http_proxy) \
+	           --env https_proxy=$(https_proxy) \
 	           $(DISTRO):$(DISTROVERSION) \
 	           /bin/bash -c \
 	               "dnf install -y $(RPMDEPS) $(BUILDDEPS) && \
@@ -238,6 +250,10 @@ rpms-tcf-zephyr: zephyr/setup.cfg
 	docker run -i --rm \
 	           -v $(PWD):/home/tcf \
 	           -v $(RPMDIR):/home/rpms \
+	           --env HTTP_PROXY=$(HTTP_PROXY) \
+	           --env HTTPS_PROXY=$(HTTPS_PROXY) \
+	           --env http_proxy=$(http_proxy) \
+	           --env https_proxy=$(https_proxy) \
 	           $(DISTRO):$(DISTROVERSION) \
 	           /bin/bash -c \
 	               "dnf install -y $(RPMDEPS) && \
@@ -251,6 +267,10 @@ rpms-tcf: setup.cfg
 	docker run -i --rm \
 	           -v $(PWD):/home/tcf \
 	           -v $(RPMDIR):/home/rpms \
+	           --env HTTP_PROXY=$(HTTP_PROXY) \
+	           --env HTTPS_PROXY=$(HTTPS_PROXY) \
+	           --env http_proxy=$(http_proxy) \
+	           --env https_proxy=$(https_proxy) \
 	           $(DISTRO):$(DISTROVERSION) \
 	           /bin/bash -c \
 	               "dnf install -y $(RPMDEPS) && \
