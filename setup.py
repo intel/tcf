@@ -27,6 +27,12 @@ import setupl
 # Hook in the source distribution to generate tcfl.version with
 # whichever version we generate or have guessed.
 class _sdist(distutils.command.sdist.sdist):
+    def run(self):
+        # Build the documentation to include in the distribution
+        subprocess.check_call("rm -rf _doc && make BUILDDIR=_doc html",
+                              shell = True)
+        distutils.command.sdist.sdist.run(self)
+
     def make_release_tree(self, base_dir, files):
         self.mkpath(base_dir)
         distutils.dir_util.create_tree(base_dir, files, dry_run=self.dry_run)
