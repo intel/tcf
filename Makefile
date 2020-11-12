@@ -172,13 +172,18 @@ VERSION := $(shell git describe | sed 's/^v\([0-9]\+\)/\1/')
 #   distro's (CentOS7) not supporting them, so we use @@DISTRONAME@@ as
 #   a dirty switch
 # 
-DISTRO=fedora
-DISTROVERSION=29
-BASE := $(PWD)
-RPMDIR ?= $(BASE)/dist
-BDIST_OPTS := --dist-dir=/home/rpms/ --bdist-base=/home/tcf/dist/
-RPMDEPS := python3 rpm-build
-UID := $(shell id -u)
+DISTRO        = fedora
+DISTROVERSION = 29
+
+BASE        := $(PWD)
+RPMDIR      ?= $(BASE)/dist
+BDIST_OPTS  := --dist-dir=/home/rpms/ --bdist-base=/home/tcf/dist/
+RPMDEPS     := python3 rpm-build
+UID         := $(shell id -u)
+DOCKERMOUNT := -v $(PWD):/home/tcf -v $(RPMDIR):/home/rpms
+DOCKERPROXY := --env HTTP_PROXY=$(HTTP_PROXY) --env http_proxy=$(http_proxy) \
+               --env HTTPS_PROXY=$(HTTPS_PROXY) --env https_proxy=$(https_proxy)
+DOCKEROPTS  := -i --rm $(DOCKERMOUNT) $(DOCKERPROXY) $(DISTRO):$(DISTROVERSION)
 
 .FORCE:
 
@@ -190,37 +195,21 @@ UID := $(shell id -u)
 
 rpms-ttbd-zephyr: ttbd/zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run -i --rm \
-	           -v $(PWD):/home/tcf \
-	           -v $(RPMDIR):/home/rpms \
-	           --env HTTP_PROXY=$(HTTP_PROXY) \
-	           --env HTTPS_PROXY=$(HTTPS_PROXY) \
-	           --env http_proxy=$(http_proxy) \
-	           --env https_proxy=$(https_proxy) \
-	           $(DISTRO):$(DISTROVERSION) \
-	           /bin/bash -c \
-	               "dnf install -y $(RPMDEPS) && \
-	                useradd -u $(UID) $(USER) && \
-	                su - $(USER) -c \
-	                    'cd /home/tcf/ttbd/zephyr && \
-	                     VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
+	docker run $(DOCKEROPTS) /bin/bash -c \
+	           "dnf install -y $(RPMDEPS) && \
+	            useradd -u $(UID) $(USER) && \
+	            su - $(USER) -c \
+	                'cd /home/tcf/ttbd/zehpyr && \
+	                 VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
 
 rpms-ttbd-pos: ttbd/pos/setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run -i --rm \
-	           -v $(PWD):/home/tcf \
-	           -v $(RPMDIR):/home/rpms \
-	           --env HTTP_PROXY=$(HTTP_PROXY) \
-	           --env HTTPS_PROXY=$(HTTPS_PROXY) \
-	           --env http_proxy=$(http_proxy) \
-	           --env https_proxy=$(https_proxy) \
-	           $(DISTRO):$(DISTROVERSION) \
-	           /bin/bash -c \
-	               "dnf install -y $(RPMDEPS) && \
-	                useradd -u $(UID) $(USER) && \
-	                su - $(USER) -c \
-	                    'cd /home/tcf/ttbd/pos && \
-	                     VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
+	docker run $(DOCKEROPTS) /bin/bash -c \
+	           "dnf install -y $(RPMDEPS) && \
+	            useradd -u $(UID) $(USER) && \
+	            su - $(USER) -c \
+	                'cd /home/tcf/ttbd/pos && \
+	                 VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
 
 rpms-ttbd: ttbd/setup.cfg
 	mkdir -p $(RPMDIR)
@@ -230,53 +219,29 @@ rpms-ttbd: ttbd/setup.cfg
 	                      f {if (substr($$0,1,length(x))==x) \
 	                      {sub(/^[ \t]+/, "");printf "%s ",$$0;} else f=0}' \
 	                      $<))
-	docker run -i --rm \
-	           -v $(PWD):/home/tcf \
-	           -v $(RPMDIR):/home/rpms \
-	           --env HTTP_PROXY=$(HTTP_PROXY) \
-	           --env HTTPS_PROXY=$(HTTPS_PROXY) \
-	           --env http_proxy=$(http_proxy) \
-	           --env https_proxy=$(https_proxy) \
-	           $(DISTRO):$(DISTROVERSION) \
-	           /bin/bash -c \
-	               "dnf install -y $(RPMDEPS) $(BUILDDEPS) && \
-	                useradd -u $(UID) $(USER) && \
-	                su - $(USER) -c \
-	                    'cd /home/tcf/ttbd && \
-	                     VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
+	docker run $(DOCKEROPTS) /bin/bash -c \
+	           "dnf install -y $(RPMDEPS) $(BUILDDEPS) && \
+	            useradd -u $(UID) $(USER) && \
+	            su - $(USER) -c \
+	                'cd /home/tcf/ttbd && \
+	                 VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
 
 rpms-tcf-zephyr: zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run -i --rm \
-	           -v $(PWD):/home/tcf \
-	           -v $(RPMDIR):/home/rpms \
-	           --env HTTP_PROXY=$(HTTP_PROXY) \
-	           --env HTTPS_PROXY=$(HTTPS_PROXY) \
-	           --env http_proxy=$(http_proxy) \
-	           --env https_proxy=$(https_proxy) \
-	           $(DISTRO):$(DISTROVERSION) \
-	           /bin/bash -c \
-	               "dnf install -y $(RPMDEPS) && \
-	                useradd -u $(UID) $(USER) && \
-	                su - $(USER) -c \
-	                    'cd /home/tcf/zephyr && \
-	                     VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
+	docker run $(DOCKEROPTS) /bin/bash -c \
+	           "dnf install -y $(RPMDEPS) && \
+	            useradd -u $(UID) $(USER) && \
+	            su - $(USER) -c \
+	                'cd /home/tcf/zephyr && \
+	                 VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
 
 rpms-tcf: setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run -i --rm \
-	           -v $(PWD):/home/tcf \
-	           -v $(RPMDIR):/home/rpms \
-	           --env HTTP_PROXY=$(HTTP_PROXY) \
-	           --env HTTPS_PROXY=$(HTTPS_PROXY) \
-	           --env http_proxy=$(http_proxy) \
-	           --env https_proxy=$(https_proxy) \
-	           $(DISTRO):$(DISTROVERSION) \
-	           /bin/bash -c \
-	               "dnf install -y $(RPMDEPS) && \
-	                useradd -u $(UID) $(USER) && \
-	                su - $(USER) -c \
-	                    'cd /home/tcf && \
-	                     VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
+	docker run $(DOCKEROPTS) /bin/bash -c \
+	           "dnf install -y $(RPMDEPS) && \
+	            useradd -u $(UID) $(USER) && \
+	            su - $(USER) -c \
+	                'cd /home/tcf && \
+	                 VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
 
 rpms: rpms-tcf rpms-tcf-zephyr rpms-ttbd rpms-ttbd-zephyr rpms-ttbd-pos
