@@ -175,6 +175,7 @@ VERSION := $(shell git describe | sed 's/^v\([0-9]\+\)/\1/')
 DISTRO        = fedora
 DISTROVERSION = 29
 
+DISTRONAME  := $(shell echo $(DISTRO) | tr A-Z a-z)
 BASE        := $(PWD)
 RPMDIR      ?= $(BASE)/dist
 BDIST_OPTS  := --dist-dir=/home/rpms/ --bdist-base=/home/tcf/dist/
@@ -183,7 +184,13 @@ UID         := $(shell id -u)
 DOCKERMOUNT := -v $(PWD):/home/tcf -v $(RPMDIR):/home/rpms
 DOCKERPROXY := --env HTTP_PROXY=$(HTTP_PROXY) --env http_proxy=$(http_proxy) \
                --env HTTPS_PROXY=$(HTTPS_PROXY) --env https_proxy=$(https_proxy)
-DOCKEROPTS  := -i --rm $(DOCKERMOUNT) $(DOCKERPROXY) $(DISTRO):$(DISTROVERSION)
+DOCKEROPTS  := -i --rm $(DOCKERMOUNT) $(DOCKERPROXY) $(DISTRONAME):$(DISTROVERSION)
+SPHINXDEPS  := python3-sphinx python3-sphinx_rtd_theme make git
+
+ifeq ($(DISTRONAME), centos)
+REPOSETUP := dnf install -y dnf-plugins-core && \
+             dnf config-manager --set-enabled PowerTools &&
+endif
 
 .FORCE:
 
@@ -238,7 +245,7 @@ rpms-tcf-zephyr: zephyr/setup.cfg
 rpms-tcf: setup.cfg
 	mkdir -p $(RPMDIR)
 	docker run $(DOCKEROPTS) /bin/bash -c \
-	           "dnf install -y $(RPMDEPS) && \
+	           "$(REPOSETUP) dnf install -y $(RPMDEPS) $(SPHINXDEPS) && \
 	            useradd -u $(UID) $(USER) && \
 	            su - $(USER) -c \
 	                'cd /home/tcf && \
