@@ -52,8 +52,8 @@ autodoc_mock_imports = [
 intersphinx_mapping = {
     'jinja2': ('http://jinja.pocoo.org/docs/dev', None),
     'pexpect': ('http://pexpect.readthedocs.io/en/stable', None ),
-    'pymongo': ('http://api.mongodb.com/python/current/', None ),
-    'python': ( 'https://docs.python.org/2.7', None ),
+    'pymongo': ('https://pymongo.readthedocs.io/en/stable/', None ),
+    'python': ( 'https://docs.python.org/3.7/', None ),
     'requests': ( 'https://requests.readthedocs.io/en/master/', None ),
     'serial': ('http://pythonhosted.org/pyserial/', None ),
 }
