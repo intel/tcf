@@ -37,7 +37,9 @@ class driver_summary(tcfl.tc.report_driver_c):
        data is to be stored.
 
     :param str password: (optional) password to use to connect,
-       overriding whatever is set in *hostname*
+       overriding whatever is set in *hostname*. Note it will be
+       passed through :func:`commonl.password_get`, thus it can use
+       the *FILE* and *KEYRING* metdhos to describe.
 
     :param int port: (optional; default 3307) port where the database
       server is listening on.
@@ -174,7 +176,8 @@ class driver_summary(tcfl.tc.report_driver_c):
         self.user, self.password, self.host = \
             commonl.split_user_pwd_hostname(hostname)
         if password:
-            self.password = password
+            self.password = commonl.password_get(self.hostname,
+                                                 self.user, password)
         self.port = port
         self.database = database
         self.ssl = ssl
