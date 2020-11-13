@@ -2061,6 +2061,15 @@ def assert_none_or_list_of_strings(l, list_name, item_name):
         return
     assert_list_of_strings(l, list_name, item_name)
 
+def assert_dict_key_strings(d, d_name):
+    """
+    Assert a dictionary is keyed by strings
+    """
+    for k in d:
+        assert isinstance(k, str), \
+            "'%s' needs to be a dict keyed by string;" \
+            " got a key type '%s'; expected string" % (d_name, type(k))
+
 def assert_dict_of_strings(d, d_name):
     for k, v in d.items():
         assert isinstance(k, str), \
