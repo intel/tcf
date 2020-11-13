@@ -176,7 +176,7 @@ class driver_summary(tcfl.tc.report_driver_c):
         self.user, self.password, self.host = \
             commonl.split_user_pwd_hostname(hostname)
         if password:
-            self.password = commonl.password_get(self.hostname,
+            self.password = commonl.password_get(self.host,
                                                  self.user, password)
         self.port = port
         self.database = database
