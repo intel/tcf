@@ -36,6 +36,9 @@ class driver_summary(tcfl.tc.report_driver_c):
     :param str database: name in the datase in the given host where
        data is to be stored.
 
+    :param str password: (optional) password to use to connect,
+       overriding whatever is set in *hostname*
+
     :param int port: (optional; default 3307) port where the database
       server is listening on.
 
@@ -153,10 +156,12 @@ class driver_summary(tcfl.tc.report_driver_c):
       index_column, index_value.
 
     """
-    def __init__(self, hostname, database, port = 3307, ssl = True,
+    def __init__(self, hostname, database, password = None,
+                 port = 3307, ssl = True,
                  table_name_prefix = "", mariadb_extra_opts = None):
         assert isinstance(hostname, str)
         assert isinstance(database, str)
+        assert password == None or isinstance(password, str)
         assert isinstance(port, int)
         assert isinstance(ssl, bool)
         assert isinstance(table_name_prefix, str)
@@ -168,6 +173,8 @@ class driver_summary(tcfl.tc.report_driver_c):
 
         self.user, self.password, self.host = \
             commonl.split_user_pwd_hostname(hostname)
+        if password:
+            self.password = password
         self.port = port
         self.database = database
         self.ssl = ssl
