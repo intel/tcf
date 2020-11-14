@@ -242,7 +242,7 @@ class driver_summary(tcfl.tc.report_driver_c):
         return sql_type
 
     @functools.lru_cache(maxsize = 200)
-    def _connection_get(self, _tls, _made_in_pid):
+    def _connection_get_cache(self, _tls, _made_in_pid):
         # we don't use _tls and _made_in_pid; they are just there for
         # functools.lru_cache to do its caching magic and have them
         # pinned to a thread or a PID (based on if this is being
@@ -253,6 +253,15 @@ class driver_summary(tcfl.tc.report_driver_c):
             database = self.database,
             ssl = self.ssl,
             **self.mariadb_extra_opts)
+        return connection
+
+    def _connection_get(self):
+        # Return a connection to the databse
+        #
+        # We cache them by process and thread, so we always reuse them
+        # (since they are costly) and only have one of each.
+        tls = threading.get_ident()
+        connection = self._connection_get_cache(tls, os.getpid())
         return connection
 
 
@@ -387,7 +396,7 @@ class driver_summary(tcfl.tc.report_driver_c):
 
         _table_name = self.table_name_prefix + self._sql_id_esc(table_name)
 
-        connection = self._connection_get(threading.local(), os.getpid())
+        connection = self._connection_get()
         with connection.cursor() as cursor:
 
             while True:
@@ -489,7 +498,7 @@ class driver_summary(tcfl.tc.report_driver_c):
         # to one.
         _table_name = self.table_name_prefix + self._sql_id_esc(table_name)
 
-        connection = self._connection_get(threading.local(), os.getpid())
+        connection = self._connection_get()
         with connection.cursor() as cursor:
 
             while True:
