@@ -134,7 +134,7 @@ class driver_summary(tcfl.tc.report_driver_c):
     - Python 3 dictionaries are ordered by insertion order (true as of
       v3.6+)
 
-    - RunIDs are shorter than 255 (FIXME: add check)
+    - RunIDs fit in the length of a column identifier
 
     - SQL injection! All `{FIELD}` references (between backticks) are
       protected with a call to _sql_id_escape()
@@ -216,6 +216,8 @@ class driver_summary(tcfl.tc.report_driver_c):
         "Failed": 0,
         "Passed": 0,
         "RunID": "no RunID",
+        # because we use this as primary key for the History tables
+        "Testcase name": "no testcase",
         "Skipped": 0,
         "Total Count": 0,
     }
@@ -225,7 +227,10 @@ class driver_summary(tcfl.tc.report_driver_c):
         "Errored": "int",
         "Failed": "int",
         "Passed": "int",
+        # because we use this as primary key for most tables
         "RunID": "varchar(255)",
+        # because we use this as primary key for the History tables
+        "Testcase name": "varchar(255)",
         "Skipped": "int",
         "Total Count": "int",
     }
@@ -646,7 +651,11 @@ class driver_summary(tcfl.tc.report_driver_c):
                                       **data_flat)
 
             # Add to the table of executed testcases/results
+            # We need to index by test case and column by RunID. Why?
+            # because if we index by RunId and column by testcase
+            # name...SQL complains our test case names get too long
+            # (they do). welp.
             if result:
                 # FIXME: add more info so we can do a link to result
-                self.table_row_update("History", "RunID", runid,
-                                      **{ tc_name: result })
+                self.table_row_update("History", "Testcase name", tc_name,
+                                      **{ runid: result })
