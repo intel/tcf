@@ -7,3 +7,5 @@ numpy
 opencv-python==3.4.8.29
 pylint
 pymongo
+sphinx
+sphinx_rtd_theme

@@ -10,6 +10,4 @@ pyserial
 python-Levenshtein
 requests
 setuptools
-sphinx
-sphinx_rtd_theme
 tabulate
