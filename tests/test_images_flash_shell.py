@@ -20,7 +20,7 @@ ttbd = commonl.testing.test_ttbd(
         "Traceback"
     ])
 
-@tcfl.tc.target("t0")
+@tcfl.tc.target(ttbd.url_spec + " and t0")
 class _test(tcfl.tc.tc_c):
     """
     Verify that different drivers that shall pass/fail do what is
