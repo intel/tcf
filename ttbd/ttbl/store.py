@@ -34,6 +34,21 @@ import re
 import commonl
 import ttbl
 
+#: List of paths in the systems where clients are allowed to read
+#: files from
+#:
+#: Each entry is the path is the top level directory the user can
+#: specify and the value is the mapping into the real file system path.
+#:
+#: In any :ref:`server configuration file <ttbd_configuration>`, add:
+#:
+#: >>> ttbl.store.paths_allowed['/images'] = '/home/SOMEUSER/images'
+#:
+#: Note it is not allowed to upload files to these locations, just to
+#: list and download.
+paths_allowed = {
+}
+
 class interface(ttbl.tt_interface):
 
     def __init__(self):
@@ -52,37 +67,110 @@ class interface(ttbl.tt_interface):
         if matches:
             raise ValueError("%s: file path cannot contains components: "
                              "%s" % (file_path, " ".join(matches)))
-        file_path_normalized = os.path.normpath(file_path)
-        file_path_final = os.path.join(user_path, file_path_normalized)
+
+        if not os.path.isabs(file_path):
+            # file comes from the user's storage
+            file_path_normalized = os.path.normpath(file_path)
+            file_path_final = os.path.join(user_path, file_path_normalized)
+        else:
+            # file from the system (mounted FS or similar);
+            # double check it is allowed
+            for path, path_translated in paths_allowed.items():
+                if file_path.startswith(path):
+                    file_path = file_path.replace(path, path_translated, 1)
+                    file_path_final = os.path.normpath(file_path)
+                    break
+            else:
+                # FIXME: use PermissionError in Python3
+                raise RuntimeError(
+                    "%s: tries to read from a location that is not allowed"
+                    % file_path)
+
         return file_path_final
+
+    @staticmethod
+    def _validate_path(path):
+        if path in paths_allowed:
+            return paths_allowed[path]
+        raise RuntimeError("%s: path not allowed" % path)
+
+    valid_digests = {
+        "md5": "MD5",
+        "sha256": "SHA256",
+        "sha512": "SHA512",
+        "zero": "no signature"
+    }
 
     def get_list(self, _target, _who, args, _files, user_path):
         filenames = self.arg_get(args, 'filenames', list,
                                  allow_missing = True, default = [ ])
+        path = self.arg_get(args, 'path', basestring,
+                            allow_missing = True, default = None)
+        if path == None:
+            path = user_path
+        elif path == "/":
+            pass	# special handling
+        else:
+            path = self._validate_path(path)
+        digest = self.arg_get(args, 'digest', basestring,
+                              allow_missing = True, default = "sha256")
+        if digest not in self.valid_digests:
+            raise RuntimeError("%s: digest not allowed (only %s)"
+                               % digest, ", ".join(self.valid_digests))
+
         file_data = {}
+        if path == "/":
+            # we want the top level list of folders, handle it specially
+            for path in paths_allowed:
+                file_data[path] = "directory"
+            file_data['result'] = dict(file_data)	# COMPAT
+            return file_data
+
         def _list_filename(filename):
-            file_path = os.path.join(user_path, filename)
+            file_path = os.path.join(path, filename)
             try:
-                h = hashlib.sha256()
-                commonl.hash_file(h, file_path)
-                file_data[file_path[len(user_path) + 1:]] = h.hexdigest()
+                if digest == "zero":
+                    file_data[filename] = "0"
+                else:
+                    h = hashlib.new(digest)
+                    commonl.hash_file(h, file_path)
+                    file_data[filename] = h.hexdigest()
             except IOError as e:
                 if e.errno != errno.ENOENT:
                     raise
                 # the file does not exist, ignore it
+
         if filenames:
             for filename in filenames:
                 if isinstance(filename, basestring):
-                    _list_filename(filename)
+                    if os.path.isdir:
+                        file_data[filename] = 'directory'
+                    else:
+                        _list_filename(filename)
         else:
-            for _path, _dirnames, filenames in os.walk(user_path):
+            for _path, dirnames, filenames in os.walk(path, topdown = True):
                 for filename in filenames:
                     _list_filename(filename)
+                for dirname in dirnames:
+                    file_data[dirname] = 'directory'
+                # WE ONLY generate the list of the path, not for
+                # subpaths -- by design we only do the first level
+                # because otherwise we could be generating a lot of
+                # load in the system if a user makes a mistake and
+                # keeps asking for a recursive list.
+                # FIXME: throttle this call
+                break
         file_data['result'] = dict(file_data)	# COMPAT
         return file_data
 
     def post_file(self, target, _who, args, files, user_path):
+        # we can only upload to the user's storage path, never to
+        # paths_allowed -> hence why we alway prefix it.
         file_path = self.arg_get(args, 'file_path', basestring)
+        if os.path.isabs(file_path):
+            raise RuntimeError(
+                "%s: trying to upload a file to an area that is not allowed"
+                % file_path)
         file_object = files['file']
         file_path_final = self._validate_file_path(file_path, user_path)
         commonl.makedirs_p(user_path)
@@ -91,6 +179,9 @@ class interface(ttbl.tt_interface):
         return dict()
 
     def get_file(self, _target, _who, args, _files, user_path):
+        # we can get files from the user's path or from paths_allowed;
+        # an absolute path is assumed to come from paths_allowed,
+        # otherwise from the user's storage area.
         file_path = self.arg_get(args, 'file_path', basestring)
         file_path_final = self._validate_file_path(file_path, user_path)
         # interface core has file streaming support builtin
@@ -100,6 +191,11 @@ class interface(ttbl.tt_interface):
 
     def delete_file(self, _target, _who, args, _files, user_path):
         file_path = self.arg_get(args, 'file_path', basestring)
+        if os.path.isabs(file_path):
+            raise RuntimeError(
+                "%s: trying to delete a file from an area that is not allowed"
+                % file_path)
+
         file_path_final = self._validate_file_path(file_path, user_path)
         commonl.rm_f(file_path_final)
         return dict()

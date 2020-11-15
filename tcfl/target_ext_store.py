@@ -53,7 +53,6 @@ class extension(tc.target_extension_c):
     interface is supported.
 
     """
-
     def upload(self, remote, local, force = False):
         """
         Upload a local file to the store
@@ -78,6 +77,7 @@ class extension(tc.target_extension_c):
                                         file_path = remote,
                                         files = { 'file': inf })
 
+
     def dnload(self, remote, local):
         """
         Download a remote file from the store to the local system
@@ -98,6 +98,7 @@ class extension(tc.target_extension_c):
                 total += len(chunk)	# not chunk_size, it might be less
             return total
 
+
     def delete(self, remote):
         """
         Delete a remote file
@@ -108,15 +109,33 @@ class extension(tc.target_extension_c):
                                     file_path = remote)
 
 
-    def list(self, filenames = None):
+    def list(self, filenames = None, path = None, digest = None):
         """
-        List available files and their MD5 sums
+        List available files and their digital signatures
 
-        :return: dictionary keyed by filename of file's MD5 sums.
+        :param list(str) filenames: (optional; default all) filenames
+          to list. This is used when we only want to get the digital
+          signature of an specific file that might or might not be
+          there.
+
+        :param str path: (optional; default's to user storage) path to
+          list; only allowed paths (per server configuration) can be
+          listed.
+
+          To get the list of allowed paths other than the default
+          user's storage path, specify path */*.
+
+        :param str digest: (optional; default sha256) digest to
+          use. Valid values so far are *md5*, *sha256* and *sha512*.
+
+        :return: dictionary keyed by filename of file digital signatures. An
+          special entry *subdirectories* contains a list of
+          subdirectories in the path.
         """
         commonl.assert_none_or_list_of_strings(filenames, "filenames", "filename")
-        r = self.target.ttbd_iface_call("store", "list",
-                                        filenames = filenames, method = "GET")
+        r = self.target.ttbd_iface_call(
+            "store", "list", path = path, digest = digest,
+            filenames = filenames, method = "GET")
         if 'result' in r:
             return r['result']	# COMPAT
         return r
@@ -126,7 +145,7 @@ class extension(tc.target_extension_c):
         target = self.target
         l0 = target.store.list()
         target.report_pass("got existing list of files", dict(l0 = l0))
-    
+
         tmpname = commonl.mkid(str(id(target))) + ".1"
         target.store.upload(tmpname, __file__)
         target.report_pass("uploaded file %s" % tmpname)
@@ -178,7 +197,7 @@ class extension(tc.target_extension_c):
             raise tc.failed_e(
                 "after removing all, list is not empty", dict(l = l))
         target.report_pass("all files removed report empty list")
-        
+
 def _cmdline_store_upload(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "store")
