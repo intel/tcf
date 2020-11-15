@@ -16,6 +16,24 @@
 #  - check lock order taking, always target or allocid,target
 #  * LRU caches needs being able to invalidate to avoid data
 #    contamination, consider https://pastebin.com/LDwMwtp8
+#
+# This is a simple priority queue allocator; the resource(s) to be
+# allocated are groups of one or more targets.
+#
+# A user places a request for any of multiple targets by calling
+# request().
+#
+# _run() implements the actual scheduler runs by calling _run_target()
+#
+# _run() is triggered by:
+#  
+#  - a new request()
+#
+#  - an allocation deleted [allocdb.delete()]
+#
+#  - periodically by the maintenance() process, which is called from
+#    the system's cleanup thread
+#
 """
 Dynamic preemptable queue multi-resource allocator
 
@@ -445,7 +463,7 @@ def _waiter_validate(target, waiter_string, value):
         # could use a regex to validate this, but the fields are
         # so simple...
         fieldl = rest.split("-")
-        if len(fieldl) != 3:
+        if len(fieldl) != 4:
             logging.info("ALLOC: %s: removed bad waiter entry", waiter_string)
             break
         prio = fieldl[0]
@@ -455,6 +473,11 @@ def _waiter_validate(target, waiter_string, value):
         if len(prio) != 6 or set(prio) - _queue_number_valid:
             logging.info("ALLOC: %s: invalid priority %s",
                          waiter_string, prio)
+            break
+        allocid = fieldl[3]
+        if allocid != value:
+            logging.info("ALLOC: invalid allocid %s, differs from value %s",
+                         allocid, value)
             break
         # set in request()
         if len(ts) != 14 or set(ts) - _queue_number_valid:
@@ -478,15 +501,16 @@ def _waiter_validate(target, waiter_string, value):
     return None, None, None, None
 
 def _target_queue_load(target):
+    # Load the target's queue
     waiters = []
     preempt = False
     for waiter_string, value in target.fsdb.get_as_slist("_alloc.queue.*"):
         # get_as_slist returns an alphabetical sort by key
-        # alphabetical sort gives us  the highest prio first and
-        # within the same prio, sorted by the allocation creation
-        # time.
-        # could use a regex to validate this, but the fields are
-        # so simple...
+        # alphabetical sort by the
+        # prio/ts/flags/allocid/waiter_sstring gives us the highest
+        # prio first and within the same prio, sorted by the
+        # allocation creation time.  could use a regex to validate
+        # this, but the fields are so simple...
         prio, ts, flags, allocid = \
             _waiter_validate(target, waiter_string, value)
         if prio == None:	# bad entry, killed
@@ -843,8 +867,13 @@ def request(groups, calling_user, obo_user, guests,
         # rejected targets and cleanup
         # target.check_user_is_allowed(calling_user)
         # target.check_user_is_allowed(obo_user)
-        target.fsdb.set("_alloc.queue.%06d-%s-%s" % (priority, ts, flags),
-                        allocid)
+        # IF there is a collision, things will get dropped randomly,
+        # so besides the second level granularity timestamp (which is
+        # not enough), add the allocation ID -- since there will be
+        # ONE entry per allocation ID only.
+        target.fsdb.set(
+            "_alloc.queue.%06d-%s-%s-%s" % (priority, ts, flags, allocid),
+            allocid)
 
     _run(targets_all.values(), preempt)
 

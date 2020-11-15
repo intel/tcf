@@ -18,7 +18,7 @@ ttbd = commonl.testing.test_ttbd(config_files = [
 ])
 
 
-@tcfl.tc.target("t0")
+@tcfl.tc.target(ttbd.url_spec + " and t0")
 class _test(tcfl.tc.tc_c):
     """
     Test that explicity vs normal power components follow the rules

@@ -132,7 +132,7 @@ header to identify as a logged in user.
 
 Note in both of these fields, any special character must be properly
 HTTP encoded
-  
+
 **Returns**
 
 - on success, a 200 HTTP code and a JSON dictionary, or optionally
@@ -1939,7 +1939,12 @@ Instrumentation interface: local storage
 Implement access to a local storage facility specific to each user
 where they can store intermediate files for instrumentation tools and
 targets to use; the system is free to clean them up/delete according
-to their own policy (eg: LRU/size)
+to their own policy (eg: LRU/size).
+
+The server can also offer other areas of storage the user can list or
+download files from, but they will not be able to upload or
+delete. These are intended to be used for providing files most users
+would need for any specific reason.
 
 This storage tree is then made available to the clients via:
 
@@ -1953,6 +1958,9 @@ POST /store/file file_path=FILENAME CONTENT -> DICTIONARY
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Upload a file to user’s storage
+
+Note there is no way to create subdirectories in the the user's
+storge; it is meant to be a flat file system.
 
 **Access control:** only the logged in user can call this to access
 their own storage area.
@@ -1971,7 +1979,6 @@ their own storage area.
 
 - On error, non-200 HTTP code and a JSON dictionary with diagnostics
 
-
 **Example**
 
 ::
@@ -1987,10 +1994,16 @@ REMOTEFILENAME LOCALFILENAME* command.
 GET /store/list [ARGUMENTS] -> DICTIONARY
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-List files in user’s storage
+List files in user’s storage or global storage and their digital
+signature.
+
+Note this only lists a single subdirectory without recursing into
+other subdirectories--this is intended by design to avoid recursive
+operation that might be costly to the server. The user can use the
+*path* argument to specify a subdirectory of an storage area.
 
 **Access control:** only the logged in user can call this to access
-their own storage area.
+their own storage area and of common areas.
 
 **Arguments**
 
@@ -1999,11 +2012,30 @@ their own storage area.
   existence of certain files and their signatures and is not
   interested in the rest.
 
+- *path*: (optional) path to the storage area; if not specified,
+  it will list in the user's storage area. Otherwise, it refers to the
+  given storage area. The server's administrator will, upon
+  configuration, specify which paths are allowed.
+
+  The path */* refers to the top level storage area and can be used to
+  list the top level storage areas the administrator has configured.
+
+- *digest*: (optional, default *sha256*) digest to use to calculate
+  digital signatures. Valid are:
+
+  - *md5* (default)
+  - *sha256*
+  - *sha512*
+  - *zero* (returns *0* for all entries)
+  
 **Returns**
 
 - On success, 200 HTTP code and a JSON dictionary keyed by filename
-  containing the MD5 digest of each file.
+  containing the digest of each file.
 
+  If there are subdirectories in the area, they will be listed with a
+  digest of "subdirectory".
+  
   .. admonition:: deprecation notice
 
      Older servers might return the data wrapped inside a field called
@@ -2041,7 +2073,7 @@ With the TCF client, use the *tcf store-ls TARGETNAME* command.
 GET /store/file ARGUMENTS -> CONTENT
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Download a file from user’s storage
+Download a file from user’s storage or from allowed global storage.
 
 **Access control:** only the logged in user can call this to access
 their own storage area.

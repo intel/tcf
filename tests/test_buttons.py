@@ -17,7 +17,7 @@ ttbd = commonl.testing.test_ttbd(config_files = [
     os.path.join(srcdir, "conf_%s" % os.path.basename(__file__.rstrip('cd')))
 ])
 
-@tcfl.tc.target("t0")
+@tcfl.tc.target(ttbd.url_spec + " and t0")
 class _test(tcfl.tc.tc_c):
 
     """Some basic button exercising
