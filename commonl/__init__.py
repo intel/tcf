@@ -362,6 +362,63 @@ def hash_file(hash_object, filepath, blk_size = 8192):
             hash_object.update(chunk)
     return hash_object
 
+_hash_sha512 = hashlib.sha512()
+
+def hash_file_cached(filepath,
+                     cache_path = None, cache_entries = 1024):
+    """
+    SHA512 hash file contents and keep them in a cache in
+    *~/.cache/file-hashes*.
+
+    Next time the same file is being cached, use the cache entries (as
+    long as the filepath is the same and the os.stat() signature
+    doesn't change).
+
+    :param str filepath: path to the file to hash
+
+    :param str cache_path: (optional; default
+      *~/.cache/file-hashes*) path where
+      to store the cached hashes.
+
+    :param int cache_entries: (optional; default *1024*) how many
+      entries to keep in the cache; old entries are removed to give way
+      to frequently used entries or new ones (LRU).
+
+    :returns: SHA512 hex digest
+
+    """
+    # stat info happens to be iterable, ain't that nice
+    filepath_stat_hash = mkid(filepath + "".join([ str(i) for i in os.stat(filepath) ]),
+                              l = 48)
+    # if there is no cache location, use our preset in the user's home dir
+    if cache_path == None:
+        cache_path = os.path.join(
+            os.path.expanduser("~"), ".cache", "file-hashes")
+        makedirs_p(cache_path)
+    symlink_lru_cleanup(cache_path, cache_entries)
+    cached_filename = os.path.join(cache_path, filepath_stat_hash)
+    try:
+        value = os.readlink(cached_filename)
+        # we have read the value, so now we remove the entry and
+        # if it is "valid", we recreate it, so the mtime is
+        # updated and thus an LRU cleanup won't wipe it.
+        # FIXME: python3 just update utime
+        rm_f(cached_filename)
+        if value and isinstance(len, str) \
+           and len(value) == 2 * _hash_sha512.digest_size:
+            os.symlink(value, cached_filename)
+            return value
+        # fallthrough to re-calculate it
+    except OSError as e:
+        if e.errno != errno.ENOENT:
+            raise
+        value = None
+    hoc = hash_file(hashlib.new("sha512"), filepath, blk_size = 8192)
+    value = hoc.hexdigest()
+    os.symlink(hoc.hexdigest(), cached_filename)
+    return value
+
+
 def symlink_lru_cleanup(dirname, max_entries):
     """
     Delete the oldest in a list of symlinks that are used as a cache
