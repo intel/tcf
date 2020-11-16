@@ -215,8 +215,13 @@ def _cmdline_store_delete(args):
 
 def _cmdline_store_list(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "store")
-        for file_name, file_hash in target.store.list().items():
+        target = tc.target_c.create_from_cmdline_args(
+            args, extensions_only = "store", iface = "store")
+        if not args.filename:
+            args.filename = None
+        for file_name, file_hash in target.store.list(
+                filenames = args.filename, path = args.path,
+                digest = args.digest).items():
             print(file_hash, file_name)
 
 
@@ -258,4 +263,11 @@ def _cmdline_setup(arg_subparsers):
                                    help = "List files stored in the server")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target name")
+    ap.add_argument("--path", metavar = "PATH", action = "store",
+                    default = None, help = "Path to list")
+    ap.add_argument("--digest", action = "store",
+                    default = None, help = "Digest to use"
+                    " (zero, md5, sha256 [default], sha512)")
+    ap.add_argument("filename", nargs = "*", action = "store",
+                    default = [], help = "Files to list (defaults to all)")
     ap.set_defaults(func = _cmdline_store_list)
