@@ -133,7 +133,7 @@ class interface(ttbl.tt_interface):
                 if digest == "zero":
                     file_data[filename] = "0"
                 else:
-                    file_data[filename] = commonl.hash_file_cached(file_path)
+                    file_data[filename] = commonl.hash_file_cached(file_path, digest)
             except IOError as e:
                 if e.errno != errno.ENOENT:
                     raise

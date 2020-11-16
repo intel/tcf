@@ -364,10 +364,10 @@ def hash_file(hash_object, filepath, blk_size = 8192):
 
 _hash_sha512 = hashlib.sha512()
 
-def hash_file_cached(filepath,
+def hash_file_cached(filepath, digest,
                      cache_path = None, cache_entries = 1024):
     """
-    SHA512 hash file contents and keep them in a cache in
+    hash file contents and keep them in a cache in
     *~/.cache/file-hashes*.
 
     Next time the same file is being cached, use the cache entries (as
@@ -375,6 +375,8 @@ def hash_file_cached(filepath,
     doesn't change).
 
     :param str filepath: path to the file to hash
+
+    :param str digest: digest to use; anything :mod:`python.hashlib` supports
 
     :param str cache_path: (optional; default
       *~/.cache/file-hashes*) path where
@@ -384,12 +386,13 @@ def hash_file_cached(filepath,
       entries to keep in the cache; old entries are removed to give way
       to frequently used entries or new ones (LRU).
 
-    :returns: SHA512 hex digest
+    :returns str: hex digest
 
     """
     # stat info happens to be iterable, ain't that nice
-    filepath_stat_hash = mkid(filepath + "".join([ str(i) for i in os.stat(filepath) ]),
-                              l = 48)
+    filepath_stat_hash = mkid(
+        digest + filepath + "".join([ str(i) for i in os.stat(filepath) ]),
+        l = 48)
     # if there is no cache location, use our preset in the user's home dir
     if cache_path == None:
         cache_path = os.path.join(
@@ -412,7 +415,7 @@ def hash_file_cached(filepath,
     except OSError as e:
         if e.errno != errno.ENOENT:
             raise
-    hoc = hash_file(hashlib.new("sha512"), filepath, blk_size = 8192)
+    hoc = hash_file(hashlib.new(digest), filepath, blk_size = 8192)
     value = hoc.hexdigest()
     os.symlink(hoc.hexdigest(), cached_filename)
     return value
