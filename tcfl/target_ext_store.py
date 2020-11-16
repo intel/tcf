@@ -11,10 +11,12 @@ Copy files from and to the server's user storage area
 """
 
 import contextlib
+import json
 import hashlib
 import io
 
 import pprint
+import tabulate
 
 from . import commonl
 from . import tc
@@ -200,17 +202,20 @@ class extension(tc.target_extension_c):
 
 def _cmdline_store_upload(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "store")
+        target = tc.target_c.create_from_cmdline_args(args, iface = "store",
+                                                      extensions_only = "store")
         target.store.upload(args.remote_filename, args.local_filename)
 
 def _cmdline_store_dnload(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "store")
+        target = tc.target_c.create_from_cmdline_args(args, iface = "store",
+                                                      extensions_only = "store")
         target.store.dnload(args.remote_filename, args.local_filename)
 
 def _cmdline_store_delete(args):
     with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "store")
+        target = tc.target_c.create_from_cmdline_args(args, iface = "store",
+                                                      extensions_only = "store")
         target.store.delete(args.remote_filename)
 
 def _cmdline_store_list(args):
@@ -219,10 +224,24 @@ def _cmdline_store_list(args):
             args, extensions_only = "store", iface = "store")
         if not args.filename:
             args.filename = None
-        for file_name, file_hash in target.store.list(
-                filenames = args.filename, path = args.path,
-                digest = args.digest).items():
-            print(file_hash, file_name)
+        data = target.store.list(path = args.path, filenames = args.filename,
+                                 digest = args.digest)
+
+        if args.verbosity == 0:
+            for file_name, file_hash in data.items():
+                print(file_hash, file_name)
+        elif args.verbosity == 1:
+            headers = [
+                "File name",
+                "Hash " + (args.digest if args.digest else "(default)"),
+            ]
+            print(tabulate.tabulate(data.items(), headers = headers))
+        elif args.verbosity == 2:
+            commonl.data_dump_recursive(data)
+        elif args.verbosity == 3:
+            pprint.pprint(data)
+        elif args.verbosity >= 4:
+            print(json.dumps(data, skipkeys = True, indent = 4))
 
 
 def _cmdline_setup(arg_subparsers):
@@ -261,6 +280,17 @@ def _cmdline_setup(arg_subparsers):
 
     ap = arg_subparsers.add_parser("store-ls",
                                    help = "List files stored in the server")
+    ap.add_argument(
+        "-v", dest = "verbosity", action = "count", default = 0,
+        help = "Increase verbosity of information to display "
+        "(-v is a table , "
+        "-vv hierarchical, -vvv Python format, -vvvv JSON format)")
+    ap.add_argument(
+        "-q", dest = "quietosity", action = "count", default = 0,
+        help = "Decrease verbosity of information to display "
+        "(none is a table, -q list of shortname, url and username, "
+        "-qq the hostnames, -qqq the shortnames"
+        "; all one per line")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target name")
     ap.add_argument("--path", metavar = "PATH", action = "store",
