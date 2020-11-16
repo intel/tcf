@@ -90,8 +90,9 @@ class interface(ttbl.tt_interface):
 
     @staticmethod
     def _validate_path(path):
-        if path in paths_allowed:
-            return paths_allowed[path]
+        for valid_path, translated_path in paths_allowed.items():
+            if path.startswith(valid_path):
+                return path.replace(valid_path, translated_path, 1)
         raise RuntimeError("%s: path not allowed" % path)
 
     valid_digests = {
@@ -132,24 +133,21 @@ class interface(ttbl.tt_interface):
                 if digest == "zero":
                     file_data[filename] = "0"
                 else:
-                    h = hashlib.new(digest)
-                    commonl.hash_file(h, file_path)
-                    file_data[filename] = h.hexdigest()
+                    file_data[filename] = commonl.hash_file_cached(file_path)
             except IOError as e:
                 if e.errno != errno.ENOENT:
                     raise
                 # the file does not exist, ignore it
-
         if filenames:
             for filename in filenames:
                 if isinstance(filename, basestring):
-                    if os.path.isdir:
+                    if os.path.isdir(os.path.join(path, filename)):
                         file_data[filename] = 'directory'
                     else:
                         _list_filename(filename)
         else:
-            for _path, dirnames, filenames in os.walk(path, topdown = True):
-                for filename in filenames:
+            for _path, dirnames, files in os.walk(path, topdown = True):
+                for filename in files:
                     _list_filename(filename)
                 for dirname in dirnames:
                     file_data[dirname] = 'directory'
