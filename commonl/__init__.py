@@ -404,7 +404,7 @@ def hash_file_cached(filepath,
         # updated and thus an LRU cleanup won't wipe it.
         # FIXME: python3 just update utime
         rm_f(cached_filename)
-        if value and isinstance(len, str) \
+        if value and isinstance(value, str) \
            and len(value) == 2 * _hash_sha512.digest_size:
             os.symlink(value, cached_filename)
             return value
@@ -412,7 +412,6 @@ def hash_file_cached(filepath,
     except OSError as e:
         if e.errno != errno.ENOENT:
             raise
-        value = None
     hoc = hash_file(hashlib.new("sha512"), filepath, blk_size = 8192)
     value = hoc.hexdigest()
     os.symlink(hoc.hexdigest(), cached_filename)
