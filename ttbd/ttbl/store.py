@@ -127,28 +127,33 @@ class interface(ttbl.tt_interface):
             file_data['result'] = dict(file_data)	# COMPAT
             return file_data
 
-        def _list_filename(filename):
+        def _list_filename(index_filename, filename):
             file_path = os.path.join(path, filename)
             try:
                 if digest == "zero":
-                    file_data[filename] = "0"
+                    file_data[index_filename] = "0"
                 else:
-                    file_data[filename] = commonl.hash_file_cached(file_path, digest)
+                    # note file path is normalized, so we shouldn't
+                    # get multiple cahce entries for different paths
+                    file_data[index_filename] = commonl.hash_file_cached(file_path, digest)
             except IOError as e:
                 if e.errno != errno.ENOENT:
                     raise
                 # the file does not exist, ignore it
+
         if filenames:
             for filename in filenames:
-                if isinstance(filename, basestring):
-                    if os.path.isdir(os.path.join(path, filename)):
-                        file_data[filename] = 'directory'
-                    else:
-                        _list_filename(filename)
+                if not isinstance(filename, basestring):
+                    continue
+                file_path = self._validate_file_path(filename, path)
+                if os.path.isdir(file_path):
+                    file_data[filename] = 'directory'
+                else:
+                    _list_filename(filename, file_path)
         else:
             for _path, dirnames, files in os.walk(path, topdown = True):
                 for filename in files:
-                    _list_filename(filename)
+                    _list_filename(filename, filename)
                 for dirname in dirnames:
                     file_data[dirname] = 'directory'
                 # WE ONLY generate the list of the path, not for
