@@ -709,44 +709,46 @@ class driver_summary(tcfl.tc.report_driver_c):
                 data['Skipped'] = 1
                 result = "S"
 
+            # we specify runid here to filter which row we want to
+            # update/create, since if it is already existing we want
+            # to update the count
+            # No need to encode here, all the field names are valid SQL
             try:
-                # we specify runid here to filter which row we want to
-                # update/create, since if it is already existing we want
-                # to update the count
-                # No need to encode here, all the field names are valid SQL
                 self.table_row_inc("Summary", "RunID", runid, **data)
+            except mariadb.Error as e:
+                logging.error(f"Summary: {tc_name}:{hashid}: MariaDB error: {e}")
 
-                # Any field name over 64 chars will make SQL (at least
-                # MariaDB) complain sooo..encoding time; we have a table
-                # mapping field name by hash to a name
+            # Any field name over 64 chars will make SQL (at least
+            # MariaDB) complain sooo..encoding time; we have a table
+            # mapping field name by hash to a name
 
-                # Flush the collected KPI data
-                # note the test case name is not used here at all, just
-                # the domain
-                for domain, data in doc['data'].items():
-                    # convert subdictionaries and lists into columns
-                    data_flat = {}
-                    for key, value in commonl.dict_to_flat(data):
-                        key = self._id_maybe_encode(key)
-                        data_flat[key] = value
+            # Flush the collected KPI data
+            # note the test case name is not used here at all, just
+            # the domain
+            for domain, data in doc['data'].items():
+                # convert subdictionaries and lists into columns
+                data_flat = {}
+                for key, value in commonl.dict_to_flat(data):
+                    key = self._id_maybe_encode(key)
+                    data_flat[key] = value
+                try:
                     self.table_row_update(domain, "RunID", runid,
                                           prefix_bare = "DATA ", **data_flat)
+                except mariadb.Error as e:
+                    logging.error(f"domain: {tc_name}:{hashid}: MariaDB error: {e}")
 
-                # Add to the table of executed testcases/results
-                # We need to index by test case and column by RunID. Why?
-                # because if we index by RunId and column by testcase
-                # name...SQL complains our test case names get too long
-                # (they do) for column IDs; if we encode those so they
-                # are short, it complains that we have too many.... welp.
-                if result:
-                    # FIXME: add more info so we can do a link to
-                    # result
+            # Add to the table of executed testcases/results
+            # We need to index by test case and column by RunID. Why?
+            # because if we index by RunId and column by testcase
+            # name...SQL complains our test case names get too long
+            # (they do) for column IDs; if we encode those so they
+            # are short, it complains that we have too many.... welp.
+            if result:
+                # FIXME: add more info so we can do a link to
+                # result
+                try:
                     self.table_row_update(
                         "History", "Testcase name", tc_name,
                         **{ self._id_maybe_encode(runid, max_len = 63): result })
-
-            except mariadb.Error as e:
-                # catch everything that is a MariaDB problem to avoid
-                # it wrecking results--this is a temporary measure
-                # until all driver issues are solved
-                logging.error(f"{tc_name}:{hashid}: MariaDB error: {e}")
+                except mariadb.Error as e:
+                    logging.error(f"History: {tc_name}:{hashid}: MariaDB error: {e}")
