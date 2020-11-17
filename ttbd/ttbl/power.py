@@ -811,7 +811,9 @@ class interface(ttbl.tt_interface):
         wait = self.arg_get(args, 'wait', (type(None), numbers.Real),
                             allow_missing = True, default = None)
         if wait == None:
-            wait = float(target.tags.get('power_cycle_wait', 2))
+            wait = float(target.tags.get('power_cycle_wait', None))
+        if wait == None:
+            wait = float(target.tags.get('interfaces.power.cycle_wait', 10))
         explicit = self._explicit_get(args)
         with target.target_owned_and_locked(who):
             target.timestamp()
