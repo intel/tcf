@@ -79,7 +79,8 @@ class driver_summary(tcfl.tc.report_driver_c):
     The reporting will take data from the testcase execution and put it in
     different tables in the SQL database.
 
-    - tables will be prefixed with the configured *table_name_prefix*.
+    - tables will be prefixed with the configured *table_name_prefix*
+      and *prefix_bare* (if given).
 
     - tables will have a primary key corresponding to the *Run
       ID* given to *tcf run* with *-i* or *--runid*. If no *RunID* has
@@ -90,6 +91,15 @@ class driver_summary(tcfl.tc.report_driver_c):
       with the same RunID.
 
     - columns will be added dynamically when not present.
+
+    Note any table name or column which is longer than 64 chars will
+    be encoded as *fieldid:10CHARHASH* -- this is because SQL can't do
+    anything longer than that.
+
+    In case of the table name, there is the limitation on putting
+    together *TABLE_NAME_PREFIX PREFIX_BARE [NAME]*--if
+    *TABLE_NAME_PREFIX PREFIX_BARE* is longer than 45 chars, we'll
+    still break the limit (FIXME: assert this)
 
     Currently, the following tables will be created:
 
@@ -137,7 +147,11 @@ class driver_summary(tcfl.tc.report_driver_c):
     - RunIDs fit in the length of a column identifier
 
     - SQL injection! All `{FIELD}` references (between backticks) are
-      protected with a call to _sql_id_escape()
+      not protected, so all the calls that feed stuff like table names
+      and column names HAVE to have been passed by
+      _id_maybe_encode_cache(), which will encode backticks away (to
+      avoid SQL injections) and also replace too long names with a
+      hashed field ID.
 
       Note the table names we do it in the call sites, so it doesn't
       have to be done on each SQL statement expansion.
@@ -181,18 +195,18 @@ class driver_summary(tcfl.tc.report_driver_c):
         self.port = port
         self.database = database
         self.ssl = ssl
-        # we don't use _sql_id_escape() bc we don't want it to be stripped
-        self.table_name_prefix = table_name_prefix.replace("`", "``")
+        self.table_name_prefix_raw = table_name_prefix
+        self.table_name_prefix = self._sql_id_esc(table_name_prefix)
         self.docs = {}
         tcfl.tc.report_driver_c.__init__(self)
+
 
     @staticmethod
     def _sql_id_esc(key):
         # we'll enclose every table/column identifier in backticks, so
         # we have to encode them in the value to avoid injection
         # attacks
-        # We strip since we can't begin/end with spaces
-        return key.strip().replace("`", "``")
+        return key.replace("`", "``")
 
 
     #: Map of Python types to SQL types
@@ -216,6 +230,8 @@ class driver_summary(tcfl.tc.report_driver_c):
         "Failed": 0,
         "Passed": 0,
         "RunID": "no RunID",
+        # key length if fixed to 10 in _id_maybe_encode_cache()
+        "FieldID": "NULL",
         # because we use this as primary key for the History tables
         "Testcase name": "no testcase",
         "Skipped": 0,
@@ -229,17 +245,21 @@ class driver_summary(tcfl.tc.report_driver_c):
         "Passed": "int",
         # because we use this as primary key for most tables
         "RunID": "varchar(255)",
+        # key length if fixed to 10 in _id_maybe_encode_cache()
+        "FieldID": "varchar(11)",
         # because we use this as primary key for the History tables
         "Testcase name": "varchar(255)",
         "Skipped": "int",
         "Total Count": "int",
     }
 
+
     def sql_type(self, field, value):
         sql_type = self.sql_type_by_field.get(field, None)
         if not sql_type:
             sql_type = self.sql_type_by_python_type.get(type(value), None)
         return sql_type
+
 
     @functools.lru_cache(maxsize = 200)
     def _connection_get_cache(self, _tls, _made_in_pid):
@@ -254,6 +274,7 @@ class driver_summary(tcfl.tc.report_driver_c):
             ssl = self.ssl,
             **self.mariadb_extra_opts)
         return connection
+
 
     def _connection_get(self):
         # Return a connection to the databse
@@ -288,10 +309,9 @@ class driver_summary(tcfl.tc.report_driver_c):
         #     [primary key ( FIELDx );
         #
         if defaults:
-            cmd = f"create table `{table_name}` ( " \
+            cmd = f"create table if not exists `{table_name}` ( " \
                 + ", ".join(
-                    f"`{self._sql_id_esc(field)}` {self.sql_type(field, value)}"
-                    f" default ?"
+                    f"`{field}` {self.sql_type(field, value)} default ?"
                     for field, value in fields.items()
                 ) \
                 + ( f", primary key (`{index_column}`)" if index_column else "" ) \
@@ -300,13 +320,13 @@ class driver_summary(tcfl.tc.report_driver_c):
                            for column in fields)
             cursor.execute(cmd, values)
         else:
-            cmd = f"create table `{table_name}` ( " \
+            cmd = f"create table if not exists `{table_name}` ( " \
                 + ", ".join(
-                    f"`{self._sql_id_esc(field)}` {self.sql_type(field, value)}"
+                    f"`{field}` {self.sql_type(field, value)}"
                     for field, value in fields.items()
                 ) \
                 + (
-                    f", primary key (`{self._sql_id_esc(index_column)}`)"
+                    f", primary key (`{index_column}`)"
                     if index_column else ""
                 ) \
                 + " );"
@@ -336,7 +356,7 @@ class driver_summary(tcfl.tc.report_driver_c):
             cmd = \
                 f"alter table `{table_name}` add ( " \
                 + f", ".join(
-                    f" `{self._sql_id_esc(column)}` {self.sql_type(column, fields[column])}"
+                    f" `{column}` {self.sql_type(column, fields[column])}"
                     f" default {self.defaults_map.get(column, None)} "
                     for column in columns_missing
                 ) + f" );"
@@ -344,7 +364,7 @@ class driver_summary(tcfl.tc.report_driver_c):
             cmd = \
                 f"alter table `{table_name}` add ( " \
                 + f", ".join(
-                    f" `{self._sql_id_esc(column)}` {self.sql_type(column, fields[column])}"
+                    f" `{column}` {self.sql_type(column, fields[column])}"
                     for column in columns_missing
                 ) + " );"
         cursor.execute(cmd)
@@ -364,28 +384,44 @@ class driver_summary(tcfl.tc.report_driver_c):
             " values ( " + " , ".join("?" for _ in fields.values()) + " );"
         cursor.execute(cmd, tuple(fields.values()))
 
-    def _table_row_increase(self, cursor, table_name,
-                            index_column, index_value, columns):
-        # increase by one values of the specified columns in the row
-        # whose primary key (index_column) has the given index_value
-        #
-        ## update TABLENAME
-        ## set FIELD1 = FIELD1 + 1, FIELD2 = FIELD2 + 1...
-        ## where INDEX_COLUMN = INDEX_VALUE
-        #
-        # note we use %s placeholders for the values, to let the
-        # python itnerface type them properly and pass execute() a
-        # tuple with the values
-        cmd = \
-            f"update `{table_name}` set " \
-            + ", ".join(f"`{self._sql_id_esc(column)}` = `{self._sql_id_esc(column)}` + 1"
-                        for column in columns) \
-            + f" where ( `{self._sql_id_esc(index_column)}` = '{index_value}' );"
-        cursor.execute(cmd)
+
+    @functools.lru_cache(maxsize = 2048)
+    def _id_maybe_encode_cache(self, _tls, _made_in_pid, identifier, max_len):
+        """
+        If an identifier is longer than the maximum, convert it and
+        register it.
+
+        Register it in the *Field IDs* table so we can later refer to
+        it as needed.
+
+        :param str identifier: identifier to check and maybe convert
+
+        :return str: identifier if (shorter than :data:`id_max_len`)
+          or the encoded name if it was longer.
+        """
+        if len(identifier) >= max_len:
+            fieldid = commonl.mkid(identifier, 10)
+            self.table_row_update("Field IDs", "FieldID", fieldid,
+                                  **{ "Field Name": identifier })
+            return "fieldid:" + fieldid
+        return self._sql_id_esc(identifier)
+
+
+    def _id_maybe_encode(self, identifier, max_len = 32):
+        return self._id_maybe_encode_cache(
+            threading.get_ident(), os.getpid(),
+            identifier, max_len)
+
+
+    def _table_name_prepare(self, table_name, prefix_bare):
+        prefix_esc = self.table_name_prefix + self._sql_id_esc(prefix_bare)
+        prefix_len = len(self.table_name_prefix_raw) + len(prefix_bare)
+        _table_name = prefix_esc + self._id_maybe_encode(table_name, 64 - prefix_len)
+        return _table_name.strip()	# table names can't start/end w space
 
 
     def table_row_update(self, table_name, index_column, index_value,
-                         **fields):
+                         prefix_bare = "", **fields):
         # insert/update fields in a table
         #
         # Use the index value of the index column to find the row to
@@ -393,8 +429,7 @@ class driver_summary(tcfl.tc.report_driver_c):
         #
         # If the table does not exist, create it; if any column is
         # missing, add them.
-
-        _table_name = self.table_name_prefix + self._sql_id_esc(table_name)
+        _table_name = self._table_name_prepare(table_name, prefix_bare)
 
         connection = self._connection_get()
         with connection.cursor() as cursor:
@@ -426,7 +461,6 @@ class driver_summary(tcfl.tc.report_driver_c):
                 #   still do not exist, fix'em and
                 #   try again
                 try:
-
                     cmd = \
                         f"insert into `{_table_name}` (`{index_column}`, " \
                         + ", ".join(
@@ -490,13 +524,14 @@ class driver_summary(tcfl.tc.report_driver_c):
                     continue
 
 
-    def table_row_inc(self, table_name, index_column, index_value, **fields):
+    def table_row_inc(self, table_name, index_column, index_value,
+                      prefix_bare = "", **fields):
         # Increment by one the listed fileds in the row matching
         # index_value
         #
         # If the row does not exist, add it with the given fields set
         # to one.
-        _table_name = self.table_name_prefix + self._sql_id_esc(table_name)
+        _table_name = self._table_name_prepare(table_name, prefix_bare)
 
         connection = self._connection_get()
         with connection.cursor() as cursor:
@@ -507,9 +542,31 @@ class driver_summary(tcfl.tc.report_driver_c):
                 # try again
                 try:
                     f = list(fields.keys())
-                    f.remove(index_column)
-                    self._table_row_increase(cursor, _table_name,
-                                             index_column, index_value, f)
+                    f.remove(index_column) # no need to increase this field
+                    # increase by one values of the specified columns in the row
+                    # whose primary key (index_column) has the given index_value
+                    #
+                    ## insert into TABLENAME (INDEX_COLUMN, FIELD1, FIELD2...)
+                    ## values (INDEX_VALUE, 1, 1, ...)
+                    ## on duplicate key update
+                    ##   FIELD1 = value(FIELD1) + 1,
+                    ##   FIELD2 = value(FIELD2) + 1,
+                    ##   ...;
+                    #
+                    # note we use %s placeholders for the values, to let the
+                    # python itnerface type them properly and pass execute() a
+                    # tuple with the values
+                    cmd = \
+                        f"insert into `{_table_name}` (`{index_column}`, " \
+                        + ", ".join(f"`{column}`" for column in f) \
+                        + " ) values ( ?" + ", 1" * len(f) \
+                        + " ) on duplicate key update " \
+                        + ", ".join(
+                            f"`{column}` = `{column}` + 1"
+                            for column in f
+                        ) + ";"
+                    cursor.execute(cmd, (index_value, ))
+
                     # In theory python MariaDB does autocommit, but I
                     # guess not?
                     connection.commit()
@@ -539,8 +596,14 @@ class driver_summary(tcfl.tc.report_driver_c):
                     # now insert the row, we can't increase because we
                     # know there was nothing -- FIXME: what about if
                     # someone tried before us?
-                    self._table_row_insert(cursor, _table_name, **fields)
-                    connection.commit()
+                    try:
+                        self._table_row_insert(cursor, _table_name, **fields)
+                        connection.commit()
+                    except mariadb.OperationalError as e:
+                        # see next, it is the same
+                        if not str(e).startswith("Unknown column"):
+                            raise
+                        continue	# just retry and let if fail
                     # note we break vs continue, because we already inserted
                     break
 
@@ -614,7 +677,7 @@ class driver_summary(tcfl.tc.report_driver_c):
             value = attachments['value']
             doc['data'].setdefault(domain, {})
             if isinstance(value, str):
-                # fix bad UTF8, so filter a wee bit
+                # fix bad UTF8
                 value = commonl.mkutf8(value)
             doc['data'][domain][name] = value
             return
@@ -622,9 +685,11 @@ class driver_summary(tcfl.tc.report_driver_c):
         if message.startswith("COMPLETION"):
             # The *tag* for COMPLETION says what was the final result
             data = {
-                # we need to store this in the table
+                # we need to store this in the table; we only want to
+                # set the fields we want to increase -- so works
+                # table_row_inc()
                 "RunID": runid,
-                "Total Count": 1
+                "Total Count": 1,
             }
             result = None
             if tag == "PASS":
@@ -645,7 +710,12 @@ class driver_summary(tcfl.tc.report_driver_c):
             # we specify runid here to filter which row we want to
             # update/create, since if it is already existing we want
             # to update the count
+            # No need to encode here, all the field names are valid SQL
             self.table_row_inc("Summary", "RunID", runid, **data)
+
+            # Any field name over 64 chars will make SQL (at least
+            # MariaDB) complain sooo..encoding time; we have a table
+            # mapping field name by hash to a name
 
             # Flush the collected KPI data
             # note the test case name is not used here at all, just
@@ -654,10 +724,10 @@ class driver_summary(tcfl.tc.report_driver_c):
                 # convert subdictionaries and lists into columns
                 data_flat = {}
                 for key, value in commonl.dict_to_flat(data):
+                    key = self._id_maybe_encode(key)
                     data_flat[key] = value
-                self.table_row_update("DATA " + domain,
-                                      "RunID", runid,
-                                      **data_flat)
+                self.table_row_update(domain, "RunID", runid,
+                                      prefix_bare = "DATA ", **data_flat)
 
             # Add to the table of executed testcases/results
             # We need to index by test case and column by RunID. Why?
@@ -666,5 +736,6 @@ class driver_summary(tcfl.tc.report_driver_c):
             # (they do). welp.
             if result:
                 # FIXME: add more info so we can do a link to result
-                self.table_row_update("History", "Testcase name", tc_name,
-                                      **{ runid: result })
+                self.table_row_update(
+                    "History", "RunID", runid,
+                    **{ self._id_maybe_encode(tc_name, max_len = 63): result })
