@@ -749,4 +749,4 @@ class driver_summary(tcfl.tc.report_driver_c):
                 # catch everything that is a MariaDB problem to avoid
                 # it wrecking results--this is a temporary measure
                 # until all driver issues are solved
-                logging.error(f"{tc_name}:{tc_hash}: MariaDB error: {e}")
+                logging.error(f"{tc_name}:{hashid}: MariaDB error: {e}")
