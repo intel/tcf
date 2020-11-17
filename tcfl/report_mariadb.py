@@ -13,6 +13,7 @@ import functools
 import os
 import threading
 
+import logging
 import mariadb
 
 import commonl
