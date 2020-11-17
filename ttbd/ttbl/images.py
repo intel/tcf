@@ -217,7 +217,7 @@ import serial
 
 import commonl
 import ttbl
-
+import ttbl.store
 
 class impl_c(ttbl.tt_interface_impl_c):
     """Driver interface for flashing with :class:`interface`
@@ -427,19 +427,6 @@ class impl2_c(impl_c):
         self.flash_post_check(target, images, context)
         target.log.info("flashed image")
 
-
-#: List of paths in the systems where clients are allowed to read
-#: files from to flash with this interface
-#:
-#: Each entry is the path is the top level directory the user can
-#: specify and the value is the mapping into the real file system path.
-#:
-#: In any :ref:`server configuration file <ttbd_configuration>`, add:
-#:
-#: >>> ttbl.images.paths_allowed['/images'] = '/home/SOMEUSER/images'
-#:
-paths_allowed = {
-}
 
 class interface(ttbl.tt_interface):
     """Interface to flash a list of images (OS, BIOS, Firmware...) that
@@ -673,7 +660,7 @@ class interface(ttbl.tt_interface):
                 else:
                     # file from the system (mounted FS or similar);
                     # double check it is allowed
-                    for path, path_translated in paths_allowed.items():
+                    for path, path_translated in ttbl.store.paths_allowed.items():
                         if img_name.startswith(path):
                             img_name = img_name.replace(path, path_translated, 1)
                             break
