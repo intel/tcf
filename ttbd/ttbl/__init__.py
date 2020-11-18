@@ -2469,3 +2469,93 @@ def usb_serial_to_path(arg_serial):
                 _sysfs_read(os.path.join(devpath, "vendor")), \
                 _sysfs_read(os.path.join(devpath, "product"))
     return None, None, None
+
+
+def usb_device_by_serial(arg_serial, sibling_port = None, *fields):
+    """Given a device with a given USB serial number, the sysfs path to
+    it and maybe the contents of a list of its sysfs fields
+
+    Optionally, do it for one of its siblings (devices connected in
+    another port of the same hub); this is mainly use to be able to
+    pinpoint devices that have no USB serial number (shame) to
+    uniquely identify if we know they are going to be connected next
+    to one that does.
+
+
+    :param str arg_serial: USB serial number
+
+      >>> usb_device_by_serial("4cb7b886a6b0")
+      >>> '/sys/bus/usb/devices/1-3.2'
+
+    :param int sibling_port: (optional) work instead on the device
+      that is in the same hub as the given device, but in this port
+      number.
+
+      eg: given the serial number *4cb7b886a6b0* and the port 4 in this
+      configuration::
+
+        $ lsusb.py
+        ...
+         1-7      8087:0a2b e0  2.00   12MBit/s 100mA 2IFs (Intel Corp.)
+         1-10     2386:4328 00  2.01   12MBit/s 96mA 1IF  (Raydium Corporation Raydium Touch System)
+         1-3      0bda:5411 09  2.10  480MBit/s 0mA 1IF  (Realtek Semiconductor Corp.) hub
+          1-3.4   0bda:5400 11  2.01   12MBit/s 0mA 1IF  (Realtek BillBoard Device 123456789ABCDEFGH)
+          1-3.2   06cb:009a ff  2.00   12MBit/s 100mA 1IF  (Synaptics, Inc. 4cb7b886a6b0)
+        ....
+
+      >>> usb_device_by_sibling("4cb7b886a6b0", sibling_port = 4)
+      >>> '/sys/bus/usb/devices/1-3.4
+'
+      Here it would return */sys/bus/usb/devices/1-3.4*, since that
+      device is connected in port 4 in the same hub as the USB device
+      with serial number *4cb7b886a6b0*.
+
+    :param str fields: (optional) list of field from the sysfs
+      directory whose values we want to return
+
+      >>> usb_device_by_sibling("4cb7b886a6b0", 4, "busnum", "devnum")
+
+    :return: tuple with USB path and values of fields; if *None*, the
+      device in said port does not exist. If the values for the fields
+      are *None*, those fields do not exist.
+
+    """
+    def _sysfs_read(filename):
+        try:
+            with open(filename) as fr:
+                return fr.read().strip()
+        except IOError as e:
+            if e.errno != errno.ENOENT:
+                raise
+
+    # Look for the serial number, kinda like:
+    #
+    ## $ grep -r YK18738 /sys/bus/usb/devices/*/serial
+    ## /sys/bus/usb/devices/1-3.4.3.4/serial:YK18738
+    for fn_serial in glob.glob("/sys/bus/usb/devices/*/serial"):
+        serial = _sysfs_read(fn_serial)
+        if serial == arg_serial:
+            devpath = os.path.dirname(fn_serial)
+            if sibling_port != None:
+                # We are looking for a sibling, so let's find it and
+                # modify devpath to point to it.
+                # Replace the last .4 in the directory name by our
+                # port number in the arguments and look at that
+                # top level devices are BUSNUM-PORTNUMBER, vs after they
+                # are BUSNUM-PORTNUMBER.[PORTNUMBER[.PORTNUMBER...]]
+                if '.' in devpath:
+                    separator = "."
+                else:
+                    separator = "-"
+                head, _sep, _tail = devpath.rpartition(separator)
+                devpath = head + separator + str(sibling_port)
+            if not os.path.isdir(devpath):
+                break
+            if not fields:
+                return devpath
+            return [ devpath ] + [
+                _sysfs_read(os.path.join(devpath, field))
+                for field in fields
+            ]
+
+    return None if not fields else [ None ] + [ None for field in fields ]
