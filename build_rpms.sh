@@ -23,20 +23,20 @@ done
 VERSION=$(git describe | sed 's/^v\([0-9]\+\)/\1/')
 
 # Use docker if a container is specified, otherwise just run locally
-if [ ${CONTAINER} == "None" ]; then
+if [ "${CONTAINER}" == "None" ]; then
     BDIST_OPTS="--dist-dir=${RPMDIR}/ --bdist-base=${PWD}/dist/"
     cd ${PWD}/${TARGET_DIR} && VERSION=${VERSION} python3 ./setup.py bdist_rpm ${BDIST_OPTS}
 else
     BUILD_DEPS="dnf install -y python3 rpm-build"
 
     # Add necessary dependencies depending on the distro and build target
-    if [ ${TARGET_DIR} == "" ]; then
-        if [ ${DISTRO} == "centos" ]; then 
+    if [ "${TARGET_DIR}" == "" ]; then
+        if [ "${DISTRO}" == "centos" ]; then 
             BUILD_DEPS="dnf install -y dnf-plugins-core && dnf config-manager --set-enabled PowerTools && ${BUILD_DEPS}"
         fi
         BUILD_DEPS="${BUILD_DEPS} python3-sphinx python3-sphinx_rtd_theme make git"
     fi
-    if [ ${TARGET_DIR} == "ttbd" ]; then
+    if [ "${TARGET_DIR}" == "ttbd" ]; then
         # Find the build dependencies from the generated setup.cfg file
         BUILD_DEPS+=$(awk '/build_requires/ && \
                     !f{f=1;x=$0;sub(/[^ ].*/,"",x);x=x" ";next} \
