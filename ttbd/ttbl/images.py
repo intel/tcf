@@ -1944,6 +1944,7 @@ class sf100linux_c(flash_shell_cmd_c):
 
     """
     def __init__(self, dediprog_id, args = None, name = None, timeout = 60,
+                 sibling_port = None,
                  path = None,
                  mode = "--batch", **kwargs):
         assert isinstance(dediprog_id, basestring)
@@ -1957,11 +1958,20 @@ class sf100linux_c(flash_shell_cmd_c):
             self.path = path
         # FIXME: verify path works +x
         # file_name and file_path are set in flash_start()
-        cmdline = [
-            self.path,
-            "--device", dediprog_id,
-            mode, "%(file_name)s",
-        ]
+        self.dediprog_id = dediprog_id
+        if sibling_port:
+            cmdline = [
+                self.path,
+                mode, "%(file_name)s",
+            ]
+            self.sibling_port = sibling_port
+        else:
+            cmdline = [
+                self.path,
+                "--device", dediprog_id,
+                mode, "%(file_name)s",
+            ]
+            self.sibling_port = None
         if args:
             for arg, value in args.items():
                 cmdline += [ arg, value ]
@@ -1992,6 +2002,14 @@ class sf100linux_c(flash_shell_cmd_c):
             'file_path': os.path.dirname(images.values()[0]),
             'file_name': os.path.basename(images.values()[0]),
         }
+        if self.sibling_port:
+            _, busnum, devnum = ttbl.usb_device_by_serial(
+                self.dediprog_id, self.sibling_port,
+                "busnum", "devnum")
+            # dpcmd can use these two variables to filter who do we
+            # use
+            self.env_add["DPCMD_USB_BUSNUM"] = busnum
+            self.env_add["DPCMD_USB_DEVNUM"] = devnum
         flash_shell_cmd_c.flash_start(self, target, images, context)
         
         
