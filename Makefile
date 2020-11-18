@@ -163,6 +163,14 @@ tests:
 
 VERSION := $(shell git describe | sed 's/^v\([0-9]\+\)/\1/')
 
+DISTRO        = fedora
+DISTROVERSION = 29
+
+DISTRONAME  := $(shell echo $(DISTRO) | tr A-Z a-z)
+BASE        := $(PWD)
+RPMDIR      ?= $(BASE)/dist
+CONTAINERID ?= None
+
 #
 # Well, this is a dirty hack
 #
@@ -172,26 +180,6 @@ VERSION := $(shell git describe | sed 's/^v\([0-9]\+\)/\1/')
 #   distro's (CentOS7) not supporting them, so we use @@DISTRONAME@@ as
 #   a dirty switch
 # 
-DISTRO        = fedora
-DISTROVERSION = 29
-
-DISTRONAME  := $(shell echo $(DISTRO) | tr A-Z a-z)
-BASE        := $(PWD)
-RPMDIR      ?= $(BASE)/dist
-BDIST_OPTS  := --dist-dir=/home/rpms/ --bdist-base=/home/tcf/dist/
-RPMDEPS     := python3 rpm-build
-UID         := $(shell id -u)
-DOCKERMOUNT := -v $(PWD):/home/tcf -v $(RPMDIR):/home/rpms
-DOCKERPROXY := --env HTTP_PROXY=$(HTTP_PROXY) --env http_proxy=$(http_proxy) \
-               --env HTTPS_PROXY=$(HTTPS_PROXY) --env https_proxy=$(https_proxy)
-DOCKEROPTS  := -i --rm $(DOCKERMOUNT) $(DOCKERPROXY) $(DISTRONAME):$(DISTROVERSION)
-SPHINXDEPS  := python3-sphinx python3-sphinx_rtd_theme make git
-
-ifeq ($(DISTRONAME), centos)
-REPOSETUP := dnf install -y dnf-plugins-core && \
-             dnf config-manager --set-enabled PowerTools &&
-endif
-
 .FORCE:
 
 # Make sure this file is always re-generated, since we might be
@@ -202,53 +190,22 @@ endif
 
 rpms-ttbd-zephyr: ttbd/zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run $(DOCKEROPTS) /bin/bash -c \
-	           "dnf install -y $(RPMDEPS) && \
-	            useradd -u $(UID) $(USER) && \
-	            su - $(USER) -c \
-	                'cd /home/tcf/ttbd/zehpyr && \
-	                 VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
+	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t ttbd/zephyr -p $(RPMDIR) -i $(CONTAINERID)
 
 rpms-ttbd-pos: ttbd/pos/setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run $(DOCKEROPTS) /bin/bash -c \
-	           "dnf install -y $(RPMDEPS) && \
-	            useradd -u $(UID) $(USER) && \
-	            su - $(USER) -c \
-	                'cd /home/tcf/ttbd/pos && \
-	                 VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
+	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t ttbd/pos -p $(RPMDIR) -i $(CONTAINERID)
 
 rpms-ttbd: ttbd/setup.cfg
 	mkdir -p $(RPMDIR)
-	# Find the build dependencies from the generated setup.cfg file
-	$(eval BUILDDEPS := $(shell awk '/build_requires/ && \
-	                      !f{f=1;x=$$0;sub(/[^ ].*/,"",x);x=x" ";next} \
-	                      f {if (substr($$0,1,length(x))==x) \
-	                      {sub(/^[ \t]+/, "");printf "%s ",$$0;} else f=0}' \
-	                      $<))
-	docker run $(DOCKEROPTS) /bin/bash -c \
-	           "dnf install -y $(RPMDEPS) $(BUILDDEPS) && \
-	            useradd -u $(UID) $(USER) && \
-	            su - $(USER) -c \
-	                'cd /home/tcf/ttbd && \
-	                 VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
+	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t ttbd -p $(RPMDIR) -i $(CONTAINERID)
 
 rpms-tcf-zephyr: zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run $(DOCKEROPTS) /bin/bash -c \
-	           "dnf install -y $(RPMDEPS) && \
-	            useradd -u $(UID) $(USER) && \
-	            su - $(USER) -c \
-	                'cd /home/tcf/zephyr && \
-	                 VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
+	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t zephyr -p $(RPMDIR) -i $(CONTAINERID)
 
 rpms-tcf: setup.cfg
 	mkdir -p $(RPMDIR)
-	docker run $(DOCKEROPTS) /bin/bash -c \
-	           "$(REPOSETUP) dnf install -y $(RPMDEPS) $(SPHINXDEPS) && \
-	            useradd -u $(UID) $(USER) && \
-	            su - $(USER) -c \
-	                'cd /home/tcf && \
-	                 VERSION=$(VERSION) python3 ./setup.py bdist_rpm $(BDIST_OPTS)'"
+	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -p $(RPMDIR) -i $(CONTAINERID)
 
 rpms: rpms-tcf rpms-tcf-zephyr rpms-ttbd rpms-ttbd-zephyr rpms-ttbd-pos
