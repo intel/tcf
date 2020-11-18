@@ -136,7 +136,7 @@ class interface(ttbl.tt_interface):
                     # note file path is normalized, so we shouldn't
                     # get multiple cahce entries for different paths
                     file_data[index_filename] = commonl.hash_file_cached(file_path, digest)
-            except IOError as e:
+            except ( OSError, IOError ) as e:
                 if e.errno != errno.ENOENT:
                     raise
                 # the file does not exist, ignore it
