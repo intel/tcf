@@ -2015,9 +2015,14 @@ class sf100linux_c(flash_shell_cmd_c):
             'file_name': os.path.basename(list(images.values())[0]),
         }
         if self.sibling_port:
-            _, busnum, devnum = ttbl.usb_device_by_serial(
+            devpath, busnum, devnum = ttbl.usb_device_by_serial(
                 self.dediprog_id, self.sibling_port,
                 "busnum", "devnum")
+            if devpath == None or busnum == None or devnum == None:
+                raise RuntimeError(
+                    "%s: cannot find Dediprog flasher connected to"
+                    " as sibling in port #%d of USB device %s" % (
+                        target.id, self.dediprog_id, self.sibling_port))
             # dpcmd can use these two variables to filter who do we
             # use
             self.env_add["DPCMD_USB_BUSNUM"] = busnum
