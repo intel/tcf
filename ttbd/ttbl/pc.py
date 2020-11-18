@@ -206,6 +206,10 @@ class delay_til_usb_device(ttbl.power.impl_c):
 
     :param str serial: Serial number of the USB device to monitor
 
+    :param int sibling_port: (optional) work instead on the device
+      that is in the same hub as the given device, but in this port
+      number. See :func:`ttbl.usb_device_by_serial`.
+
     :param bool when_powering_on: Check when powering on if True
       (default) or when powering off (if false)
 
@@ -222,8 +226,12 @@ class delay_til_usb_device(ttbl.power.impl_c):
     Other parameters as to :class:ttbl.power.impl_c.
     """
     def __init__(self, serial, when_powering_on = True, want_connected = True,
+                 sibling_port = None,
                  poll_period = 0.25, timeout = 25,
                  action = None, action_args = None, **kwargs):
+        if sibling_port != None:
+            assert isinstance(sibling_port, int) and sibling_port > 0, \
+                "invalid sibling_port; expected positive integer > 0"
         ttbl.power.impl_c.__init__(self, **kwargs)
         self.serial = serial
         self.when_powering_on = when_powering_on
@@ -233,6 +241,7 @@ class delay_til_usb_device(ttbl.power.impl_c):
         self.action = action
         self.action_args = action_args
         self.component = None		# filled in by _on/_off/_get
+        self.sibling_port = sibling_port
         if action != None:
             assert hasattr(action, "__call__")
         self.log = None			# filled out in _on/_off/_get
@@ -242,69 +251,17 @@ class delay_til_usb_device(ttbl.power.impl_c):
             "Delayer until USB device with serial number '%s' is %s when %s,"
             " checking every %.2fs timing out at %.1fs" % (
                 serial, what, when, poll_period, timeout),
-            serial = serial,
+            serial = serial, sibling_port = sibling_port,
             when_powering_on = when_powering_on,
             want_connected = want_connected,
             poll_period = poll_period,
             timeout = timeout)
 
+
     class not_found_e(Exception):
         "Exception raised when a USB device is not found"
         pass
 
-    # This code is SINGLE THREADED, so we are going to share one
-    # backend to cut in the number of open file handles
-    backend = None
-
-    def _usb_match_on_serial(self, d):
-        try:
-            try:
-                # Use get_string(); it is being better at working
-                # around an issue with context. When we get here, the
-                # 'd' object for some reasons doesn't have all the stuff
-                # it needs to have to properly obtain langIDs and
-                # stuff. Somehow, using get_string() works better
-                # instead of accessing d.serial_number (which triggers
-                # it being updated on the side and things fail more).
-                serial_number = ttbl.usb_serial_number(d)
-            except ValueError as e:
-                # Some devices get us here, unknown why--probably
-                # permissions issue
-                if e.message == "The device has no langid":
-                    self.log.debug("%s: USB %04x:%04x @%d/%03d: "
-                                   "langid error: %s",
-                                   self.component,
-                                   d.idVendor, d.idProduct,
-                                   d.bus, d.address, d.langids)
-                    serial_number = None
-                else:
-                    raise
-            self.log.log(7, "%s: USB %04x:%04x @%d/%03d [%s]: considering",
-                         self.component,
-                         d.idVendor, d.idProduct,
-                         d.bus, d.address, serial_number)
-            return serial_number == self.serial
-        except usb.core.USBError as e:
-            # Ignore errors, normally means we have no permission to
-            # read the device
-            self.log.log(
-                7, "%s: USB %04x:%04x @%d/%03d: can't access: %s",
-                self.component, d.idVendor, d.idProduct, d.bus, d.address, e)
-            return False
-        except Exception as e:
-            self.log.error(
-                "BUG: %s: %04x:%04x @%d/%03d: exception %s\n%s",
-                self.component, d.idVendor, d.idProduct, d.bus, d.address, e,
-                traceback.format_exc())
-
-    def _find_device(self):
-        # We do not cache the backend [commented out code], as
-        # it (somehow) makes it miss the device we are looking
-        # for; talk about butterfly effect at a local level --
-        # might be a USB library version issue?
-        return usb.core.find(find_all = False,
-                             #backend = type(self).backend,
-                             custom_match = self._usb_match_on_serial)
 
     def _is_device_present(self, target, action, timeout = None):
         if timeout == None:
@@ -319,40 +276,33 @@ class delay_til_usb_device(ttbl.power.impl_c):
             text_past = "disappear"
         dev = None
         while True:
-            try:
-                t = time.time()
-                if t - t0 > timeout:
-                    raise self.not_found_e(
-                        "%s: timeout (%.2fs) on %s waiting for "
-                        "USB device with serial %s to %s"
-                        % (self.component, t - t0, action, self.serial, text))
-                # We do not cache the backend [commented out code], as
-                # it (somehow) makes it miss the device we are looking
-                # for; talk about butterfly effect at a local level --
-                # might be a USB library version issue?
-                dev = self._find_device()
-                if dev == None:
-                    self.log.log(8, "%s: USB [%s]: NOT FOUND",
-                                 self.component, self.serial)
-                    if not self.want_connected:
-                        break
-                else:
-                    self.log.log(8, "%s: USB %04x:%04x @%d/%03d [%s]: found",
-                                 self.component, dev.idVendor, dev.idProduct,
-                                 dev.bus, dev.address, ttbl.usb_serial_number(dev))
-#                    if type(self).backend == None:
-#                        type(self).backend = dev._ctx.backend
-                    # We don't need this guy, close it
-                    dev._ctx.managed_close()
-                    if self.want_connected:
-                        break
-            except usb.core.USBError as e:
-                self.log.info("%s/%s: delaying %.2fs for USB device "
-                              "for serial %s to %s: exception %s"
-                              % (self.component, action, self.poll_period,
-                                 self.serial, text, e))
-                if e.errno != errno.EACCES:
-                    raise
+            t = time.time()
+            if t - t0 > timeout:
+                raise self.not_found_e(
+                    "%s: timeout (%.2fs) on %s waiting for "
+                    "USB device with serial %s/%s to %s"
+                    % (self.component, t - t0, action,
+                       self.serial, self.sibling_port, text))
+            # We do not cache the backend [commented out code], as
+            # it (somehow) makes it miss the device we are looking
+            # for; talk about butterfly effect at a local level --
+            # might be a USB library version issue?
+            dev, product, vendor, busnum, devnum = ttbl.usb_device_by_serial(
+                self.serial, self.sibling_port,
+                "idProduct", "idVendor", "busnum", "devnum")
+
+            if dev == None:
+                self.log.debug("%s: USB [%s/%s]: NOT FOUND",
+                               self.component, self.serial, self.sibling_port)
+                if not self.want_connected:
+                    break
+            else:
+                self.log.debug("%s: USB %s:%s @%s.%s [%s/%s]: found",
+                               self.component, product, vendor,
+                               busnum, devnum, self.serial, self.sibling_port)
+                if self.want_connected:
+                    break
+
             if self.action:
                 self.log.debug("%s/%s: executing action %s"
                                % (self.component, action, self.action))
@@ -372,17 +322,20 @@ class delay_til_usb_device(ttbl.power.impl_c):
             % (self.component, action, t - t0, self.serial, text_past))
         return dev
 
+
     def on(self, target, component):
-        self.log = target.log		# for _usb_match_on_serial
-        self.component = component	# for _usb_match_on_serial
+        self.log = target.log		# for _is_device_present
+        self.component = component	# for _is_device_present
         if self.when_powering_on:
             self._is_device_present(target, "power-on")
 
+
     def off(self, target, component):
-        self.log = target.log		# for _usb_match_on_serial
-        self.component = component	# for _usb_match_on_serial
+        self.log = target.log		# for _is_device_present
+        self.component = component	# for _is_device_present
         if not self.when_powering_on:
             self._is_device_present(target, "power-off")
+
 
     def get(self, target, component):
         # Return if the USB device is connected
@@ -391,10 +344,10 @@ class delay_til_usb_device(ttbl.power.impl_c):
         # connected by seeing a USB device plugged to the system. For
         # example, a USB connected Android target which we power
         # on/off by tweaking the buttons so there is no PDU to act upon.
-        self.log = target.log		# for _usb_match_on_serial
-        self.component = component	# for _usb_match_on_serial
+        self.log = target.log		# for _is_device_present
+        self.component = component	# for _is_device_present
         try:
-            dev = self._find_device()
+            dev = ttbl.usb_device_by_serial(self.serial, self.sibling_port)
             # if we find a device, it is connected, we are On
             return dev != None
         except usb.core.USBError as e:
