@@ -169,7 +169,7 @@ DISTROVERSION = 29
 DISTRONAME  := $(shell echo $(DISTRO) | tr A-Z a-z)
 BASE        := $(PWD)
 RPMDIR      ?= $(BASE)/dist
-CONTAINERID ?= None
+CONTAINER   ?= True
 
 #
 # Well, this is a dirty hack
