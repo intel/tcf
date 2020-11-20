@@ -192,6 +192,13 @@ class driver(tcfl.tc.report_driver_c):
         #:   recommended modifying existing fields.
         self.complete_hooks = []
 
+    #: Maximum size of a console attachment
+    #:
+    #: If set to a positive number, any attachment with *console* in
+    #: the name and of type *bytes* or *str* will be capped at that
+    #: maximum size and another attachment with a message about it
+    #: will be added.
+    console_max_size = 0
 
     def report(self, reporter, tag, ts, delta,
                level, message,
@@ -323,6 +330,21 @@ class driver(tcfl.tc.report_driver_c):
                         result["attachment"][key] = attachment.fullid
                     else:
                         result["attachment"][key] = attachment
+
+                    # do we need to cap console attachments?
+                    if 'console' in key and self.console_max_size > 0:
+                        # cap maximum size of any console looking
+                        # attachment; we cap to the beginning only,
+                        # because we want to see what happened and
+                        # lead us to a lot of console
+                        if not isinstance(attachment, ( str, bytes )):
+                            continue
+                        result["attachment"][key + "-WARNING"] = \
+                            "attachment capped from %d to %d" \
+                            % (len(attachment), self.console_max_size)
+                        result["attachment"][key] = \
+                            attachment[:self.console_max_size]
+
 
         doc['results'].append(result)
         del result
