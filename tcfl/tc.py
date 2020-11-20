@@ -609,6 +609,13 @@ class report_driver_c(object):
         cls._drivers.append(obj)
 
     @classmethod
+    def get_by_name(cls, name):
+        for driver in cls._drivers:
+            if driver.name == name:
+                return driver
+        raise ValueError("%s: report driver does not exist" % name)
+
+    @classmethod
     def remove(cls, obj):
         """
         Remove a report driver previously added with :meth:`add`
