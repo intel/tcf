@@ -171,7 +171,24 @@ class extension(tc.target_extension_c):
                                    (img_type, img_name), dlevel = 2)
             target.report_info("uploaded: " + images_str, dlevel = 1)
         else:
-            _images = images
+            # no need to upload--means we are using files stored in
+            # the server's FS already. But we need to check for soft
+            # mode, so use the store interface to query for the remote
+            # file's digest and compare against the last thing flashed.
+            data = target.store.list(digest = "sha512",
+                                     filenames = list(images.values()))
+            _images = {}
+            for img_type, img_name in images.items():
+                last_sha512 = target.rt['interfaces']['images']\
+                    [img_type].get('last_sha512', None)
+                if soft and last_sha512 == data[img_name]:
+                    # soft mode -- don't flash again if the last thing
+                    # flashed has the same hash as what we want to flash
+                    target.report_info(
+                        "%s:%s: skipping (soft flash: SHA512 match %s)"
+                        % (img_type, img_name, last_sha512), dlevel = 1)
+                    continue
+                _images[img_type] = img_name
 
         if _images:
             # We don't do retries here, we leave it to the server

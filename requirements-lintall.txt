@@ -1,0 +1,8 @@
+GitPython
+gitlint
+ansible-lint
+pygithub
+restructuredtext_lint
+pylint
+yamllint
+python-gitlab

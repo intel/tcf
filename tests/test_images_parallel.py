@@ -21,7 +21,7 @@ ttbd = commonl.testing.test_ttbd(
         "Traceback"
     ])
 
-@tcfl.tc.target("t0")
+@tcfl.tc.target(ttbd.url_spec + ' and t0')
 class flashes(tcfl.tc.tc_c):
     """
     Test the estimated_duration field from the imaging flasing
@@ -43,7 +43,7 @@ class flashes(tcfl.tc.tc_c):
         ttbd.check_log_for_issues(self)
 
 
-@tcfl.tc.target("t0")
+@tcfl.tc.target(ttbd.url_spec + " and t0")
 class flasher_timesout(tcfl.tc.tc_c):
     """
     Test the estimated_duration field from the imaging flasing
@@ -69,7 +69,7 @@ class flasher_timesout(tcfl.tc.tc_c):
 
 
 
-@tcfl.tc.target("t0")
+@tcfl.tc.target(ttbd.url_spec + " and t0")
 class flashes_two_in_parallel(tcfl.tc.tc_c):
     """
     Test the estimated_duration field from the imaging flasing
@@ -96,7 +96,7 @@ class flashes_two_in_parallel(tcfl.tc.tc_c):
         ttbd.check_log_for_issues(self)
 
 
-@tcfl.tc.target("t0")
+@tcfl.tc.target(ttbd.url_spec + " and t0")
 class flashes_two_in_parallel_one_serial(tcfl.tc.tc_c):
     """
     Test the estimated_duration field from the imaging flasing
@@ -123,7 +123,7 @@ class flashes_two_in_parallel_one_serial(tcfl.tc.tc_c):
     def teardown_90_scb(self):
         ttbd.check_log_for_issues(self)
 
-@tcfl.tc.target("t0")
+@tcfl.tc.target(ttbd.url_spec + " and t0")
 class serial_timesout(tcfl.tc.tc_c):
     """
     Run two parallel and one serial

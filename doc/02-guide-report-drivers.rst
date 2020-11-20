@@ -26,6 +26,7 @@ Read on about reporting drivers provided by default
 
 .. automodule:: tcfl.report_console
 .. automodule:: tcfl.report_jinja2
+.. automodule:: tcfl.report_mariadb
 .. automodule:: tcfl.report_mongodb
 .. automodule:: tcfl.report_taps
 

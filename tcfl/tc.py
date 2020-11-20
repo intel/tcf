@@ -2130,7 +2130,7 @@ class target_c(reporter_c):
         :py:data:`_kws`).
 
         :param str kw: keyword name
-        :param (basestring, int, float, bool) value: value for the keyword
+        :param (str, int, float, bool) value: value for the keyword
         :param str origin: origin of this setting; if none, it will be
           taken from the stack
 
