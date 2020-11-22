@@ -274,6 +274,7 @@ class driver_summary(tcfl.tc.report_driver_c):
             database = self.database,
             ssl = self.ssl,
             **self.mariadb_extra_opts)
+        connection.auto_reconnect = True
         return connection
 
 
