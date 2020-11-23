@@ -717,7 +717,7 @@ class driver_summary(tcfl.tc.report_driver_c):
             try:
                 self.table_row_inc("Summary", "RunID", runid, **data)
             except mariadb.Error as e:
-                logging.error(f"Summary: {tc_name}:{hashid}: MariaDB error: {e}")
+                logging.error(f"Summary: {tc_name}:{hashid}: MariaDB error: {str(e)}")
 
             # Any field name over 64 chars will make SQL (at least
             # MariaDB) complain sooo..encoding time; we have a table
