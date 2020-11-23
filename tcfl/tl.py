@@ -326,11 +326,11 @@ def linux_ssh_root_nopwd(target, prefix = ""):
     """
     target.shell.run('mkdir -p %s/etc/ssh' % prefix)
     target.shell.run(
-        'grep -qe "^PermitRootLogin yes"'
-        ' || echo "PermitRootLogin yes" >> %s/etc/ssh/sshd_config' % prefix)
+        f'grep -qe "^PermitRootLogin yes" {prefix}/etc/ssh/sshd_config'
+        f' || echo "PermitRootLogin yes" >> {prefix}/etc/ssh/sshd_config')
     target.shell.run(
-        'grep -qe "^PermitEmptyPasswords yes"'
-        ' || echo "PermitEmptyPasswords yes" >> %s/etc/ssh/sshd_config' % prefix)
+        f'grep -qe "^PermitEmptyPasswords yes" {prefix}/etc/ssh/sshd_config'
+        f' || echo "PermitEmptyPasswords yes" >> {prefix}/etc/ssh/sshd_config')
     
 
 def deploy_linux_ssh_root_nopwd(_ic, target, _kws):
