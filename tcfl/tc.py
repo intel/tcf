@@ -216,7 +216,8 @@ class exception(Exception):
       few special fields:
 
       - `target`: this is a :py:class:`tcfl.tc.target_c` which shall be used
-        for reporting
+        for reporting--when indicating this field, the reporting will
+        associate this exception to the given target.
 
       - `dlevel`: this is an integer that indicates the relative
         level of verbosity (FIXME: link to detailed explanation)
@@ -224,6 +225,10 @@ class exception(Exception):
       - `alevel`: this is an integer that indicates the relative
         level of verbosity for attachments (FIXME: link to detailed
         explanation)
+
+      - `recoverable`: (bool) for conditions that might want to be
+        retried, the upper layers of code might want to determine what
+        to do about them.
 
       - any other fields will be passed verbatim and reported
 
