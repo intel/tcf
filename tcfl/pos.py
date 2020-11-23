@@ -752,6 +752,9 @@ class extension(tc.target_extension_c):
             target.kws.get("bios_boot_time", 30)	# COMPAT: legacy
         ))
 
+        retry_data = target.testcase.buffers.setdefault(
+            f"{target.fullid}-retries", collections.defaultdict(int))
+
         # FIXME: this is a hack because now the expecter has a
         # maximum timeout set that can't be overriden--the
         # re-design of the expect sequences will fix this, but
@@ -879,6 +882,16 @@ class extension(tc.target_extension_c):
                     if pos_boot_found != True:
                         target.report_error(
                             "POS: did not boot, retrying")
+                        retry_data['POS boot'] += 1
+                        target.report_data(
+                            "Recovered conditions [%(type)s]",
+                            "boot: retries due to failed Provisioning OS boot",
+                            # we report this value because we want the
+                            # total number in case there were multiple
+                            # nested boot loops; otherwise we'd be
+                            # storing this inner level of retries only
+                            retry_data['POS boot']
+                        )
                         continue
                     target.report_pass(
                         "POS: boot found, setting up")
@@ -888,10 +901,24 @@ class extension(tc.target_extension_c):
                                     wait_for_early_shell_prompt = False)
                 except ( tc.error_e, tc.failed_e ) as e:
                     tc.result_c.report_from_exception(target.testcase, e)
+                    recoverable = e.attachments_get().get('recoverable', True)
+                    if not recoverable:
+                        target.report_error("POS: non-recoverable boot error")
+                        raise
                     # if we are here, we got no console output because
                     # it wasn't caught in the inner loopsq
                     target.report_error(
                             "POS: no console output? retrying")
+                    retry_data['POS boot'] += 1
+                    target.report_data(
+                        "Recovered conditions [%(type)s]",
+                        "boot: retries due to failed Provisioning OS boot",
+                        # we report this value because we want the total number in
+                        # case there were multiple nested boot loops;
+                        # otherwise we'd be storing this inner level of
+                        # retries only
+                        retry_data['POS boot']
+                    )
                     continue
                 target.report_info("POS: got Provisioning OS shell")
                 break
@@ -2488,8 +2515,38 @@ class tc_pos0_base(tc.tc_c):
     def start_50(self, ic, target):
         ic.power.on()
         # fire up the target, wait for a login prompt
-        target.pos.boot_normal()
-        target.shell.up(user = self.login_user, delay_login = self.delay_login)
+
+        # The code looks more complicated because of the retry loops and
+        # reporting of retry data.
+
+        # convention: store retry counters in testcase.buffers
+        retry_data = target.testcase.buffers.setdefault(
+            f"{target.fullid}-retries", collections.defaultdict(int))
+
+        for retry in range(1, 4):
+            try:
+                target.pos.boot_normal()
+                target.shell.up(user = self.login_user, delay_login = self.delay_login)
+                break
+            except ( tc.error_e, tc.failed_e ) as e:
+                tc.result_c.report_from_exception(target.testcase, e)
+                recoverable = e.attachments_get().get('recoverable', True)
+                if not recoverable:
+                    target.report_error("normal boot: non-recoverable boot error")
+                    raise
+                retry_data['normal boot: shell not up'] += 1
+                target.report_data(
+                    "Recovered conditions [%(type)s]",
+                    "boot: retries due to shell not up",
+                    # we report this value because we want the total number in
+                    # case there were multiple nested boot loops;
+                    # otherwise we'd be storing this inner level of
+                    # retries only
+                    retry_data['normal boot: shell not up']
+                )
+                target.report_info(
+                    f"boot: retrying boot {retry}/4 after error")
+                continue
 
     def teardown_50(self):
         tl.console_dump_on_failure(self)
@@ -2599,6 +2656,9 @@ def edkii_pxe_ipxe_target_power_cycle_to_pos(target):
     If the the entry is not found, the scripting tries to enable EFI
     networking.
 
+    Note the process is re-tried up to five times, reporting how many
+    retries were done.
+
     Assumptions:
 
     - the BIOS is accessible via the serial port and follows default
@@ -2621,29 +2681,84 @@ def edkii_pxe_ipxe_target_power_cycle_to_pos(target):
       to it
 
     """
+
+    # The code looks more complicated because of the retry loops and
+    # reporting of retry data.
+
+    # convention: store retry counters in testcase.buffers
+    retry_data = target.testcase.buffers.setdefault(
+        f"{target.fullid}-retries", collections.defaultdict(int))
+
     # resolve locally, since the iPXE environment has a harder time
     # resolving
     url = urllib.parse.urlparse(target.kws['pos_http_url_prefix'])
     url_resolved = url._replace(
         netloc = url.hostname.replace(url.hostname,
                                       socket.gethostbyname(url.hostname)))
-    target.report_info("POS: setting target to boot Provisioning OS")
-    target.power.cycle()
-
     boot_ic = target.kws['pos_boot_interconnect']
     mac_addr = target.rt.get('interconnects', {})\
                         .get(boot_ic, {}).get('mac_addr', None)
     if mac_addr == None:
         raise tc.blocked_e(
             "can't find MAC address for interconnect %s" % boot_ic)
-    biosl.boot_network_pxe(
-        target,
-        # Eg: UEFI PXEv4 (MAC:A4BF015598A1)
-        r"UEFI PXEv4 \(MAC:%s\)" % mac_addr.replace(":", "").upper())
-    # this will make it boot the iPXE bootloader and then we seize it
-    # and direct it to our POS provide
-    target.report_info("POS: seizing iPXE boot", )
-    ipxe_seize_and_boot(target, dhcp = False, url = url_resolved.geturl())
+
+    target.report_info("POS: setting target to boot Provisioning OS")
+    retries_max = 6
+    for retry in range(1, retries_max):
+        try:
+            target.power.cycle()
+            biosl.boot_network_pxe(
+                target,
+                # Eg: UEFI PXEv4 (MAC:A4BF015598A1)
+                r"UEFI PXEv4 \(MAC:%s\)" % mac_addr.replace(":", "").upper())
+            # fall through!
+        except tc.exception as e:
+            # catches anything infrastructure/failure related and puts it
+            # in the same ball of retries
+            if retry == retries_max - 1:
+                raise tc.failed_e(
+                    f"boot failure: retried {retries_max - 1} times"
+                    f" failed EFI PXE boot", dict(recoverable = False))
+            target.report_fail(
+                f"boot failure: retrying {retry}/{retries_max} "
+                f" due to failed EFI PXE boot",
+                dict(exception = e))
+            retry_data['failed EFI PXE boot'] += 1
+            target.report_data(
+                "Recovered conditions [%(type)s]",
+                "boot: retries due to failed EFI PXE boot",
+                # we report this value because we want the total number in
+                # case there were multiple nested boot loops;
+                # otherwise we'd be storing this inner level of
+                # retries only
+                retry_data['failed EFI PXE boot']
+            )
+            continue
+
+        try:
+            # this will make it boot the iPXE bootloader and then we seize it
+            # and direct it to our POS provide
+            target.report_info("POS: seizing iPXE boot", )
+            ipxe_seize_and_boot(target, dhcp = False,
+                                url = url_resolved.geturl())
+            break	# exit the retry loop
+        except tc.exception as e:
+            # catches anything infrastructure/failure related and puts it
+            # in the same ball of retries
+            if retry == retries_max - 1:
+                raise tc.failed_e(
+                    f"boot failure: retried {retries_max - 1} times"
+                    f" failed network boot / iPXE", dict(recoverable = False))
+            target.report_fail(
+                f"boot failure: retry {retry}/{retries_max}:"
+                f" due to failed network boot / iPXE'", dict(exception = e))
+            retry_data["boot: retries due to network boot / iPXE failure"] += 1
+            target.report_data(
+                "Recovered conditions [%(type)s]",
+                "boot: retries due to network boot / iPXE failure",
+                retry_data["boot: retries due to network boot / iPXE failure"]
+            )
+            continue
 
 capability_register('boot_to_pos', 'edkii+pxe+ipxe',
                     edkii_pxe_ipxe_target_power_cycle_to_pos)
@@ -2654,27 +2769,68 @@ def target_power_cycle_to_normal_edkii(target):
     Boot a target normally, not to the Provisioning OS, using the
     EDKII BIOS boot menus
 
+    Note the process is re-tried up to five times, reporting how many
+    retries were done.
+
     .. note:: This utility function is be used by
               :meth:`target.pos.boot_normal
               <tcfl.pos.extension.boot_normal>` as a mathod to direct
               a target to do a normal boot based on what the target's
               pos_capable.boot_to_normal capability declares.
     """
+
+    # The code looks more complicated because of the retry loops and
+    # reporting of retry data.
+
+    # convention: store retry counters in testcase.buffers
+    retry_data = target.testcase.buffers.setdefault(
+        f"{target.fullid}-retries", collections.defaultdict(int))
+
+
     target.report_info("POS: setting target not to boot Provisioning OS")
-    # The boot configuration has been set so that unattended boot
-    # means boot to localdisk
-    ts0 = time.time()
-    target.power.cycle()
     bios_boot_time = int(target.kws.get(
         "bios.boot_time",
         target.kws.get("bios_boot_time", 0)	# COMPAT: legacy
     ))
-    target.expect("to enter setup and select boot options",
-                  timeout = 60 + bios_boot_time,
-                  # For a verbose system, don't report it all
-                  report = 300)
-    target.report_data("Boot statistics %(type)s", "BIOS boot time (s)",
-                       time.time() - ts0)
+    # The boot configuration has been set so that unattended boot
+    # means boot to localdisk
+    retries_max = 6
+    boot_message = "to enter setup and select boot options"
+    for retry in range(1, retries_max):
+        try:
+
+            ts0 = time.time()
+            target.power.cycle()
+            target.expect(boot_message,
+                          timeout = 60 + bios_boot_time,
+                          # For a verbose system, don't report it all
+                          report = 300)
+            target.report_data("Boot statistics %(type)s", "BIOS boot time (s)",
+                               time.time() - ts0)
+
+        except tc.exception as e:
+            # catches anything infrastructure/failure related and puts it
+            # in the same ball of retries
+            if retry == retries_max - 1:
+                raise tc.failed_e(
+                    f"boot failure: retried {retries_max - 1} times"
+                    f" never found BIOS boot message: '{boot_message}'",
+                    dict(recoverable = False))
+            target.report_fail(
+                f"boot failure: retrying {retry}/{retries_max} "
+                f" due to missing BIOS boot message: '{boot_message}'",
+                dict(exception = e))
+            retry_data[boot_message] += 1
+            target.report_data(
+                "Recovered conditions [%(type)s]",
+                f"boot: retries due to missing '{boot_message}'",
+                # we report this value because we want the total number in
+                # case there were multiple nested boot loops;
+                # otherwise we'd be storing this inner level of
+                # retries only
+                retry_data[boot_message]
+            )
+            continue
 
 edkii_pxe_ipxe_target_power_cycle_to_normal = \
     target_power_cycle_to_normal_edkii
@@ -2697,6 +2853,16 @@ def target_power_cycle_pos_serial_f12_ipxe(target):
               a target to do a Provisoning OS boot based on what the target's
               pos_capable.boot_to_pos capability declares.
 
+    This tries up to five times to boot to iPXE and if it doesn't it
+    gives up. Reports as data the total number of accumulated retries
+    since the testcase was started.
+
+    Process is:
+
+    - power cycle
+    - wait for BIOS boot prompt
+    - press F12 to boot to network
+    - wait for iPXE to boot and use it to drive the boot process
 
     Assumptions:
 
@@ -2715,21 +2881,79 @@ def target_power_cycle_pos_serial_f12_ipxe(target):
     - The iPXE destination is configured to allow *Ctrl-B* to be used
 
     """
-    target.report_info("POS: setting target to PXE boot Provisioning OS")
-    target.property_set("pos_mode", "pxe")
-    target.power.cycle()
-    ts0 = time.time()
-    # Now setup the local boot loader to boot off that
-    target.property_set("pos_mode", "local")
-    # this is how we know the BIOS booted
-    #target.expect("Primary Bios Version")	# helps us to measure times
-    target.expect(re.compile(r"Press +\[F12\] +to boot from network"),
-                  timeout = target.kws.get('bios.boot_time', None))
-    target.report_data("Boot statistics %(type)s", "BIOS boot time (s)",
-                       time.time() - ts0)
 
-    target.console.write(biosl.ansi_key_code("F12", "vt100"))
-    ipxe_seize_and_boot(target)
+    # The code looks more complicated because of the retry loops and
+    # reporting of retry data.
+
+    # convention: store retry counters in testcase.buffers
+    retry_data = target.testcase.buffers.setdefault(
+        f"{target.fullid}-retries", collections.defaultdict(int))
+
+    target.report_info("POS: setting target to PXE boot Provisioning OS")
+    retries_max = 6
+    for retry in range(1, retries_max):
+        boot_message = "Press [F12] to boot from network"
+        boot_message_regex = r"Press +\[F12\] +to boot from network"
+        try:
+            target.property_set("pos_mode", "pxe")
+            target.power.cycle()
+            ts0 = time.time()
+            # Now setup the local boot loader to boot off that
+            target.property_set("pos_mode", "local")
+            # this is how we know the BIOS booted
+            #target.expect("Primary Bios Version")	# helps us to measure times
+            target.expect(re.compile(boot_message_regex),
+                          timeout = target.kws.get('bios.boot_time', None))
+            target.report_data("Boot statistics %(type)s", "BIOS boot time (s)",
+                               time.time() - ts0)
+            # fall through!
+        except tc.exception as e:
+            # catches anything infrastructure/failure related and puts it
+            # in the same ball of retries
+            if retry == retries_max - 1:
+                raise tc.failed_e(
+                    f"boot failure: retried {retries_max - 1} times"
+                    f" never found BIOS boot message: '{boot_message}'",
+                    dict(recoverable = False))
+            target.report_fail(
+                f"boot failure: retrying {retry}/{retries_max} "
+                f" due to missing BIOS boot message: '{boot_message}'",
+                dict(exception = e))
+            retry_data[boot_message] += 1
+            target.report_data(
+                "Recovered conditions [%(type)s]",
+                f"boot: retries due to missing '{boot_message}'",
+                # we report this value because we want the total number in
+                # case there were multiple nested boot loops;
+                # otherwise we'd be storing this inner level of
+                # retries only
+                retry_data[boot_message]
+            )
+            continue
+
+        try:
+            target.console.write(biosl.ansi_key_code("F12", "vt100"))
+            ipxe_seize_and_boot(target)
+            break	# exit the retry tloop
+        except tc.exception as e:
+            # catches anything infrastructure/failure related and puts it
+            # in the same ball of retries
+            if retry == retries_max - 1:
+                raise tc.failed_e(
+                    f"boot failure: retried {retries_max - 1} times"
+                    f" failed network boot / iPXE",
+                    dict(recoverable = False))
+            target.report_fail(
+                f"boot failure: retry {retry}/{retries_max}:"
+                f" due to failed network boot / iPXE'", dict(exception = e))
+            retry_data["boot: retries due to network boot / iPXE failure"] += 1
+            target.report_data(
+                "Recovered conditions [%(type)s]",
+                "boot: retries due to network boot / iPXE failure",
+                retry_data["boot: retries due to network boot / iPXE failure"]
+            )
+            continue
+
 
 capability_register('boot_to_pos', 'serial_f12_ipxe',
                     target_power_cycle_pos_serial_f12_ipxe)
@@ -2757,6 +2981,9 @@ def target_power_cycle_to_pos_uefi_http_boot_ipxe(target):
     networking and traverses the BIOS menus to add the HTTP boot entry
     itself.
 
+    Note the process is re-tried up to five times, reporting how many
+    retries were done.
+
     - Requirements:
 
       - a recognized BIOS that can be controlled via the default
@@ -2768,8 +2995,13 @@ def target_power_cycle_to_pos_uefi_http_boot_ipxe(target):
       - an HTTP server that exports the iPXE binary described above
 
     """
-    target.report_info("POS: setting target to boot Provisioning OS")
-    target.power.cycle()
+
+    # The code looks more complicated because of the retry loops and
+    # reporting of retry data.
+
+    # convention: store retry counters in testcase.buffers
+    retry_data = target.testcase.buffers.setdefault(
+        f"{target.fullid}-retries", collections.defaultdict(int))
 
     # Resolve the URL in the client
     #
@@ -2781,27 +3013,75 @@ def target_power_cycle_to_pos_uefi_http_boot_ipxe(target):
         netloc = url.hostname.replace(url.hostname,
                                       socket.gethostbyname(url.hostname)))
 
-    # There is no danger of using an IP (vs hostname) URL because the
-    # hashid in the name [%(ID)s] will change with the IP too. If the
-    # hostname has resolved to something different, we'll use the boot
-    # entry for it (and it will add a new one if we have resolved to a
-    # whole new IP address). They won't change that much.
-    biosl.boot_network_http(target, "TCF-POS-HTTP-%(ID)s",
-                            url_resolved.geturl() + "/ipxe-x86_64.efi")
+    target.report_info("POS: setting target to boot Provisioning OS")
+    retries_max = 6
+    for retry in range(1, retries_max):
+        try:
+            target.power.cycle()
 
-    # FIXME: latch on this
-    ## Client Error: 404 Not Found
-    ## URI: http://HOSTNAME/ttbd-pos/x86_64/ipxe-x86_64.efi
-    ##
-    ## Client Error: 404 Not Found
-    ## Error: Could not retrieve NBP file size from HTTP server.
+            # There is no danger of using an IP (vs hostname) URL because the
+            # hashid in the name [%(ID)s] will change with the IP too. If the
+            # hostname has resolved to something different, we'll use the boot
+            # entry for it (and it will add a new one if we have resolved to a
+            # whole new IP address). They won't change that much.
+            biosl.boot_network_http(target, "TCF-POS-HTTP-%(ID)s",
+                                    url_resolved.geturl() + "/ipxe-x86_64.efi")
+            # fall through!
+        except tc.exception as e:
+            # catches anything infrastructure/failure related and puts it
+            # in the same ball of retries
+            if retry == retries_max - 1:
+                raise tc.failed_e(
+                    f"boot failure: retried {retries_max - 1} times"
+                    f" failed EFI HTTP boot", dict(recoverable = False))
+            target.report_fail(
+                f"boot failure: retrying {retry}/{retries_max} "
+                f" due to failed EFI HTTP boot",
+                dict(exception = e))
+            retry_data['failed EFI HTTP boot'] += 1
+            target.report_data(
+                "Recovered conditions [%(type)s]",
+                "boot: retries due to failed EFI HTTP boot",
+                # we report this value because we want the total number in
+                # case there were multiple nested boot loops;
+                # otherwise we'd be storing this inner level of
+                # retries only
+                retry_data['failed EFI HTTP boot']
+            )
+            continue
 
-    # This will make it boot the iPXE bootloader and then we seize it
-    # and direct it to our POS provide.  We can tell
-    # ipxe_seize_and_boot() to not use DHCP (we know the IP
-    # assignment; dhcp is slower).
-    target.report_info("POS: seizing iPXE boot")
-    ipxe_seize_and_boot(target, dhcp = False, url = url_resolved.geturl())
+        # FIXME: latch on this
+        ## Client Error: 404 Not Found
+        ## URI: http://HOSTNAME/ttbd-pos/x86_64/ipxe-x86_64.efi
+        ##
+        ## Client Error: 404 Not Found
+        ## Error: Could not retrieve NBP file size from HTTP server.
+        try:
+            # This will make it boot the iPXE bootloader and then we seize it
+            # and direct it to our POS provide.  We can tell
+            # ipxe_seize_and_boot() to not use DHCP (we know the IP
+            # assignment; dhcp is slower).
+            target.report_info("POS: seizing iPXE boot")
+            ipxe_seize_and_boot(target, dhcp = False, url = url_resolved.geturl())
+            break	# exit the retry loop
+        except tc.exception as e:
+            # catches anything infrastructure/failure related and puts it
+            # in the same ball of retries
+            if retry == retries_max - 1:
+                raise tc.failed_e(
+                    f"boot failure: retried {retries_max - 1} times"
+                    f" failed network boot / iPXE", dict(recoverable = False))
+            target.report_fail(
+                f"boot failure: retry {retry}/{retries_max}:"
+                f" due to failed network boot / iPXE'", dict(exception = e))
+            retry_data["boot: retries due to network boot / iPXE failure"] += 1
+            target.report_data(
+                "Recovered conditions [%(type)s]",
+                "boot: retries due to network boot / iPXE failure",
+                retry_data["boot: retries due to network boot / iPXE failure"]
+            )
+            continue
+
 
 uefi_http_boot_ipxe_target_power_cycle_to_pos = \
     target_power_cycle_to_pos_uefi_http_boot_ipxe
