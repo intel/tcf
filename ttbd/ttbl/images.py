@@ -254,13 +254,20 @@ class impl_c(ttbl.tt_interface_impl_c):
       know how long to wait for before declaring it took too long due
       to other issues out of server's control (eg: client to server
       problems).
+
+    :param str log_name: (optional, defaults to image name)
+      string to use to generate the log file name (*flash-NAME.log*);
+      this is useful for drivers that are used for multiple images,
+      where it is not clear which one will it be called to flash to.
     """
     def __init__(self,
                  power_sequence_pre = None,
                  power_sequence_post = None,
                  consoles_disable = None,
+                 log_name = None,
                  estimated_duration = 60):
         assert isinstance(estimated_duration, int)
+        assert log_name == None or isinstance(log_name, basestring)
 
         commonl.assert_none_or_list_of_strings(
             consoles_disable, "consoles_disable", "console name")
@@ -273,6 +280,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         self.parallel = False	# this class can't do parallel
         self.consoles_disable = consoles_disable
         self.estimated_duration = estimated_duration
+        self.log_name = log_name
         ttbl.tt_interface_impl_c.__init__(self)
 
     def flash(self, target, images):
@@ -1453,8 +1461,13 @@ class flash_shell_cmd_c(impl2_c):
         kws = dict(target.kws)
         context['images'] = images
 
-        image_types = "-".join(list(images.keys()))
+        # make sure they are sorted so they are always listed the same
+        image_types = "-".join(sorted(images.keys()))
         kws['image_types'] = image_types
+        if self.log_name:
+            kws['log_name'] = self.log_name
+        else:
+            kws['log_name'] = image_types
         # this allows a class inheriting this to set kws before calling us
         context.setdefault('kws', {}).update(kws)
         kws = context['kws']
