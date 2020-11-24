@@ -90,9 +90,9 @@ class pci(ttbl.power.impl_c):
 
     def get(self, target, component):
         result = self._run(target, [ "chassis", "power", "status" ])
-        if 'Chassis Power is on' in result:
+        if b'Chassis Power is on' in result:
             return True
-        elif 'Chassis Power is off' in result:
+        elif b'Chassis Power is off' in result:
             return False
         target.log.error("%s: ipmtool state returned unknown message: %s"
                          % (component, result))
