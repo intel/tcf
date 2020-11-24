@@ -1472,7 +1472,13 @@ class flash_shell_cmd_c(impl2_c):
         cwd = self.cwd % kws
         context['cwd'] = kws['cwd'] = cwd
 
-        logfile_name = "%(path)s/flash-%(image_types)s.log" % kws
+        logfile_name = "%(path)s/flash-%(log_name)s.log" % kws
+        # hack so what the log file reading console (if defined) can
+        # be restarted properly
+        if hasattr(target, "console"):
+            console_name = "log-flash-" + kws['log_name']
+            if console_name in target.console.impls:
+                ttbl.console.generation_set(target, console_name)
         context['logfile_name'] = kws['logfile_name'] = logfile_name
 
         cmdline = []
