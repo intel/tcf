@@ -2807,7 +2807,7 @@ def target_power_cycle_to_normal_edkii(target):
                           report = 300)
             target.report_data("Boot statistics %(type)s", "BIOS boot time (s)",
                                time.time() - ts0)
-
+            break
         except tc.exception as e:
             # catches anything infrastructure/failure related and puts it
             # in the same ball of retries
