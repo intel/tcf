@@ -1542,7 +1542,7 @@ def _cmdline_console_read(args):
                                              max_size, fd, newline = '')
                 if generation_prev != None and generation_prev != generation:
                     sys.stderr.write(
-                        "\n\r\r\nWARNING: target power cycled\r\r\n\n")
+                        "\n\r\r\nWARNING: console reinitialized or target power cycled\r\r\n\n")
                 generation_prev = generation
                 if not args.follow:
                     break
