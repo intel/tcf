@@ -6897,6 +6897,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             # assignment
             try:
                 with self._targets_assign():
+                    self.report_info(f"allocation ID: {self.allocid}")
                     if not deploy_skip:
                         with msgid_c("D", phase = "deploy"):
                             retval = self._methods_call("deploy")
