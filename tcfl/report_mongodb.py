@@ -85,6 +85,7 @@ Pending
 
 import codecs
 import datetime
+import logging
 import os
 import types
 import urllib.parse
@@ -427,8 +428,7 @@ class driver(tcfl.tc.report_driver_c):
                 break
             except pymongo.errors.PyMongoError as e:
                 if retry_count <= 3:
-                    raise tcfl.tc.blocked_e(
-                        "MongoDB error, can't record result: %s" % e)
+                    logging.error(f"{tc_name}:{hashid}: MongoDB error: {str(e)}")
                 else:
                     self.results = None
                     reporter.warning("MongoDB error, reconnecting (%d/3): %s"
