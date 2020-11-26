@@ -776,7 +776,10 @@ class extension(tc.target_extension_c):
                 # console prompt or we have a console over SSH that
                 # logs in, we will see it
                 try:
-                    boot_to_pos_fn(target)
+                    # reset the default console to whatever the
+                    # default configuration makes it be
+                    target.console.default = None
+                    boot_to_pos_fn(target)	# now power cycle to POS
                     pos_boot_found = False
                     ts0 = time.time()
                     # Try a few times to enable the console and expect
