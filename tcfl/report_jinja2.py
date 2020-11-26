@@ -336,6 +336,10 @@ class driver(tc.report_driver_c):
                     logging.error("BUG: missing tgname in line: %s", line)
                 if len(token) > 4:
                     message = token[4]
+                    # if a leading \x01\x01, this means these lines
+                    # are attachments and we want to format them indented
+                    if message.startswith("\x01\x01"):
+                        message = "  " + message[2:]
                 else:
                     logging.error("BUG: missing message in line: %s", line)
                     message = "BUG:message-MISSING"
@@ -570,11 +574,17 @@ class driver(tc.report_driver_c):
             # commonl.io_tls_prefix_lines_c(), which prefixes _prefix
             # on each line.
             of.write(message)
-            if attachments != None:
+        if attachments != None:
+            # FIXME: \x01\x01 hack to denote an attachment, will
+            # replace in _log_iterator() because the intermediate
+            # format we have splits spaces--real fix will be to
+            # convert that format to something more flexible
+            _prefix = u"%s %d %s %s\t \x01\x01" % (tag, level, ident, tgname)
+            with commonl.tls_prefix_c(self.tls, _prefix):
                 assert isinstance(attachments, dict)
                 commonl.data_dump_recursive_tls(attachments, self.tls,
                                                 of = of)
-            of.flush()
+        of.flush()
         # This is an indication that the testcase is done and we
         # can generate final reports
         if message.startswith("COMPLETION "):
