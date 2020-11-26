@@ -2238,7 +2238,7 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
             re.MULTILINE)
         m = regex.search(ifstat)
         if not m:
-            raise tcfl.tc.error_e(
+            raise tc.error_e(
                 "iPXE: cannot find interface name for MAC address %s;"
                 " is the MAC address in the configuration correct?"
                 % mac_addr.lower(),
