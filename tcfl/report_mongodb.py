@@ -426,13 +426,20 @@ class driver(tcfl.tc.report_driver_c):
                 self.results.find_one_and_replace({ '_id': doc['_id'] },
                                                   doc, upsert = True)
                 break
-            except pymongo.errors.PyMongoError as e:
-                if retry_count <= 3:
-                    logging.error(f"{tc_name}:{hashid}: MongoDB error: {str(e)}")
+            except Exception as e:
+                # broad exception, could be almost anything, but we
+                # don't really know what PyMongo can't throw at us
+                # (pymongo.errors, bson errors...the lot)
+                if retry_count > 3:
+                    reporter.log.error(
+                        f"{tc_name}:{hashid}: MongoDB error: {str(e)}")
+                    break
                 else:
+                    retry_count += 1
                     self.results = None
-                    reporter.warning("MongoDB error, reconnecting (%d/3): %s"
-                                     % (e, retry_count))
+                    reporter.log.warning(
+                        f"{tc_name}:{hashid}: MongoDB error, retrying"
+                        " ({retry_count}/3): {str(e)}")
 
 # backwards compat	# COMPAT
 report_mongodb_c = driver
