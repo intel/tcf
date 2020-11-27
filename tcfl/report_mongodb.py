@@ -227,11 +227,13 @@ class driver(tcfl.tc.report_driver_c):
         # Extract the target name where this message came from (if the
         # reporter is a target)
         if isinstance(reporter, tcfl.tc.target_c):
+            fullid = reporter.fullid
             target_name = " @" + reporter.fullid + reporter.bsp_suffix()
             target_server = reporter.rtb.aka
             target_type = reporter.type
             tc_name = reporter.testcase.name
         elif isinstance(reporter, tcfl.tc.tc_c):
+            fullid = None
             target_name = None
             target_server = None
             target_type = None
@@ -281,6 +283,10 @@ class driver(tcfl.tc.report_driver_c):
             assert isinstance (domain, str), \
                 "data name '%s' is a %s, need a string" \
                 % (name, type(name).__name__)
+            # because MongoDB storage will loose from which target
+            # this report comes, append the target id it to the name.
+            if fullid and not fullid in name:
+                name += f" ({fullid})"
             name = name.replace(".", "_")
             if name.startswith("$"):
                 name = name.replace("$", "_", 1)
