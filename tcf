@@ -218,7 +218,14 @@ def _cookies(args):
         else:
             raise ValueError("%s: unknown target" % args.target)
 
-    commonl._dict_print_dotted(rtb.cookies, separator = "")
+    if args.cookiejar:
+        # Follow https://curl.se/docs/http-cookies.html
+        # Note we don't keep the TTL field, so we set it at zero
+        for cookie, value in rtb.cookies.items():
+            print(f"{rtb.parsed_url.hostname}\tFALSE\t/\tTRUE\t0"
+                  f"\t{cookie}\t{value}")
+    else:
+        commonl._dict_print_dotted(rtb.cookies, separator = "")
 
 
 if __name__ == "__main__":
@@ -322,6 +329,9 @@ if __name__ == "__main__":
                                    " into curl, etc) maybe only for one server")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = [], help = "Target name")
+    ap.add_argument("-c","--cookiejar", action = "store_true", default = False,
+                    help = "Print in cookiejar format"
+                    " (https://curl.se/docs/http-cookies.html)")
     ap.set_defaults(func = _cookies)
 
     arg_parser_target_list = arg_subparsers.add_parser(
