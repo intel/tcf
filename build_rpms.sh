@@ -54,5 +54,9 @@ else
             --env HTTPS_PROXY=${HTTPS_PROXY} --env https_proxy=${https_proxy} \
             ${DISTRO}:${DISTROVERSION} \
             /bin/bash -c \
-            "${BUILD_DEPS} && useradd -u ${UID} ${USER} && su - ${USER} -c 'cd /home/tcf/${TARGET_DIR} && ${RUN_SETUP}'"
+            "${BUILD_DEPS} && \
+            useradd -u ${UID} ${USER} && \
+            su - ${USER} -c \
+            'export http_proxy=${http_proxy} && export https_proxy=${https_proxy} &&\
+            cd /home/tcf/${TARGET_DIR} && ${RUN_SETUP}'"
 fi
