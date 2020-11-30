@@ -190,22 +190,22 @@ CONTAINER   ?= True
 
 rpms-ttbd-zephyr: ttbd/zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
-	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t ttbd/zephyr -p $(RPMDIR) -i $(CONTAINERID)
+	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t ttbd/zephyr -p $(RPMDIR) -i $(CONTAINER)
 
 rpms-ttbd-pos: ttbd/pos/setup.cfg
 	mkdir -p $(RPMDIR)
-	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t ttbd/pos -p $(RPMDIR) -i $(CONTAINERID)
+	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t ttbd/pos -p $(RPMDIR) -i $(CONTAINER)
 
 rpms-ttbd: ttbd/setup.cfg
 	mkdir -p $(RPMDIR)
-	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t ttbd -p $(RPMDIR) -i $(CONTAINERID)
+	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t ttbd -p $(RPMDIR) -i $(CONTAINER)
 
 rpms-tcf-zephyr: zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
-	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t zephyr -p $(RPMDIR) -i $(CONTAINERID)
+	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -t zephyr -p $(RPMDIR) -i $(CONTAINER)
 
 rpms-tcf: setup.cfg
 	mkdir -p $(RPMDIR)
-	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -p $(RPMDIR) -i $(CONTAINERID)
+	./build_rpms.sh -d $(DISTRONAME) -v $(DISTROVERSION) -p $(RPMDIR) -i $(CONTAINER)
 
 rpms: rpms-tcf rpms-tcf-zephyr rpms-ttbd rpms-ttbd-zephyr rpms-ttbd-pos
