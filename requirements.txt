@@ -1,13 +1,13 @@
 # Ubuntu 20.4 -- issue installing 3.x
-Jinja2==2.11.2
-PyYAML
+Jinja2==2.11.2 # fedora:python3-jinja2
+PyYAML # fedora:python3-pyyaml
 asciimatics
 imutils
 ipaddress
 ply
-pykwalify
+pykwalify # fedora:python3-pykwalify
 pyserial
-python-Levenshtein
+python-Levenshtein # fedora:python3-Levenshtein
 requests
 setuptools
-tabulate
+tabulate # fedora:python3-tabulate
