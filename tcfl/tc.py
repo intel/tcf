@@ -6171,9 +6171,17 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         >>>         self.targets_active(target)
         >>>         ...
         """
+        # in practical matters, now all targets are in the same
+        # server, but in the future that won't be the case
+        # Also in the future, the allocation thread will take care of
+        # doing this on its own and this function will be a nil
+        servers = collections.defaultdict(dict)
         for target in list(self.targets.values()):
             if not target in skip_targets and target.keep_active:
-                target.active()
+                servers[target.rtb][self.allocid] = "active"
+        # FIXME: paralellize
+        for rtb, allocids in servers.items():
+            rtb.send_request("PUT", "keepalive", json = allocids)
 
     def _targets_active(self):
         # backwards compat
