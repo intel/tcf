@@ -1,10 +1,10 @@
-junit_xml
-keyring
+junit_xml # fedora:python3-junit_xml
+keyring # fedora:python3-keyring
 mariadb # fedora:python3-mariadb
-numpy
+numpy   # fedora:python3-numpy
 # CentOS7's pip3 is quite old, barfs at newer; but then 3.1.0.4 can't
 # be found on Ubuntu20...
-opencv-python==3.4.8.29
+opencv-python==3.4.8.29 # fedora:python3-opencv
 pylint
 pymongo # fedora:python3-pymongo
 sphinx

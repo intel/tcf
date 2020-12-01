@@ -1,12 +1,23 @@
+#
+# Auto extract requirements:
+#
+# $ source /etc/os-release
+# $ for word in $(<requirements-lintall.txt ); do
+# >     if echo $word | grep -q $ID:; then
+# >         pkgs=${word//$ID:}; pkgs=${pkgs//,/ };
+# >         sudo dnf install -y $pkgs;
+# >     fi;
+# > done
+
 # Ubuntu 20.4 -- issue installing 3.x
-Jinja2==2.11.2 # fedora:python3-jinja2
-PyYAML # fedora:python3-pyyaml
+Jinja2==2.11.2      # fedora:python3-jinja2
+PyYAML              # fedora:python3-pyyaml
 asciimatics
 imutils
-ply # fedora:python3-ply
-pykwalify # fedora:python3-pykwalify
-pyserial # fedora:python3-pyserial
-python-Levenshtein # fedora:python3-Levenshtein
-requests # fedora:python3-requests
-setuptools # fedora:python3-setuptools
-tabulate # fedora:python3-tabulate
+ply                 # fedora:python3-ply
+pykwalify           # fedora:python3-pykwalify
+pyserial            # fedora:python3-pyserial
+python-Levenshtein  # fedora:python3-Levenshtein
+requests            # fedora:python3-requests
+setuptools          # fedora:python3-setuptools
+tabulate            # fedora:python3-tabulate

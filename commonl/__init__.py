@@ -1977,7 +1977,7 @@ def mkutf8(s):
 str_invisible_table = [
     "\0",       #  0
     "<SOH>",    #  1
-    "<STX>",    #  2
+    "<\\x02|Ctrl-B>",    #  2
     "<ETX>",    #  3
     "<EOT>",    #  4
     "<ENQ>",    #  5

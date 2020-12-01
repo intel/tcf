@@ -34,8 +34,11 @@ for path in os.environ.get("SPHINX_PATHS_EXTRA", "").split():
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.todo', 'sphinx.ext.autodoc', 'sphinx.ext.coverage',
-    'sphinx.ext.intersphinx'
+    'sphinx.ext.autodoc',
+    'sphinx.ext.coverage',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.todo',
+    'sphinxcontrib.confluencebuilder',
 ]
 autodoc_default_options = { 'members': None, 'undoc-members': None }
 autoclass_content = 'both'
@@ -148,6 +151,16 @@ pygments_style = 'sphinx'
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
 
+confluence_publish = True
+confluence_space_name = 'TCF'
+confluence_parent_page = 'Documentation'
+# (for confluence cloud)
+confluence_server_url = 'https://wiki.ith.intel.com'
+confluence_disable_ssl_validation = True
+confluence_server_user = 'inaky'
+#confluence_server_user = 'inaky.perez-gonzalez'
+#confluence_server_user = 'inaky.perez-gonzalez@intel.com'
+confluence_server_pass = '109bank$kk'
 
 # -- Options for HTML output ------------------------------------------------
 # import alabaster
