@@ -274,6 +274,7 @@ class driver_summary(tcfl.tc.report_driver_c):
             database = self.database,
             ssl = self.ssl,
             **self.mariadb_extra_opts)
+        connection.auto_reconnect = True
         return connection
 
 
@@ -654,8 +655,10 @@ class driver_summary(tcfl.tc.report_driver_c):
         # reporter is a target)
         if isinstance(reporter, tcfl.tc.target_c):
             tc_name = reporter.testcase.name
+            target = reporter
         elif isinstance(reporter, tcfl.tc.tc_c):
             tc_name = reporter.name
+            target = None
         else:
             raise AssertionError(
                 "reporter is not tcfl.tc.{tc,target}_c but %s" % type(reporter))
@@ -680,6 +683,10 @@ class driver_summary(tcfl.tc.report_driver_c):
             if isinstance(value, str):
                 # fix bad UTF8
                 value = commonl.mkutf8(value)
+            # append target name to the column -- otherwise summaries
+            # loose that information
+            if target and target.fullid not in name:
+                name = name + f" ({target.fullid})"
             doc['data'][domain][name] = value
             return
 
@@ -716,7 +723,7 @@ class driver_summary(tcfl.tc.report_driver_c):
             try:
                 self.table_row_inc("Summary", "RunID", runid, **data)
             except mariadb.Error as e:
-                logging.error(f"Summary: {tc_name}:{hashid}: MariaDB error: {e}")
+                logging.error(f"Summary: {tc_name}:{hashid}: MariaDB error: {str(e)}")
 
             # Any field name over 64 chars will make SQL (at least
             # MariaDB) complain sooo..encoding time; we have a table

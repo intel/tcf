@@ -431,7 +431,7 @@ class shell(tc.target_extension_c):
                     "Waited too long (%ds) for shell to come up on"
                     " console '%s' (did not receive '%s')" % (
                         3 * timeout, console,
-                        self.prompt_regex.pattern))
+                        self.prompt_regex.pattern), dict(target = target))
         finally:
             testcase.tls.expect_timeout = original_timeout
 

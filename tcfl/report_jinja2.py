@@ -336,6 +336,10 @@ class driver(tc.report_driver_c):
                     logging.error("BUG: missing tgname in line: %s", line)
                 if len(token) > 4:
                     message = token[4]
+                    # if a leading \x01\x01, this means these lines
+                    # are attachments and we want to format them indented
+                    if message.startswith("\x01\x01"):
+                        message = "  " + message[2:]
                 else:
                     logging.error("BUG: missing message in line: %s", line)
                     message = "BUG:message-MISSING"
@@ -344,8 +348,6 @@ class driver(tc.report_driver_c):
                 except ValueError:
                     logging.error("BUG: bad level in line: %s", line)
                     level = 0
-                if tag == "INFO" and level > 2:
-                    continue
                 if ident == "<snip>":
                     # This is just so it aligns well; <snip> comes from
                     # _report() above.
@@ -354,7 +356,13 @@ class driver(tc.report_driver_c):
                 # filter to automatically escape anything that might
                 # not be *ML kosher...but 0x00. So as we only need
                 # this for reporting, we'll make an ugly exception.
-                yield ident, tgname, message.replace("\x00", "<NULL>")
+                # the *log* field in the template generator expands
+                # for each line on a tuple ident, targetname, message,
+                # which are these -- then for example it is consumed
+                # by tcf.git/report-base.j2.txt [execution log
+                # section] which is loaded by _mkreport()
+                # below.
+                yield ident, tgname, commonl.str_invisible_escape(message)
 
     def _mkreport(self, msg_tag, code, _tc, message):
         #
@@ -519,19 +527,29 @@ class driver(tc.report_driver_c):
         if tag == "INFO" and level > 4:	# ignore way chatty stuff
             return
 
+        # Who's the testcase? also extract the target name where this
+        # message came from (if the reporter is a target, otherwise we
+        # consider it a local message)
+        if isinstance(reporter, tc.tc_c):
+            testcase = reporter
+            tgname = "@local"
+        elif isinstance(reporter, tc.target_c):
+            tgname = "@" + reporter.fullid + reporter.bsp_suffix()
+            testcase = reporter.testcase
+        else:
+            raise AssertionError(
+                f"%{type(reporter)}: unknown reporter type;"
+                " expected tcfl.tc.tc_c or tcfl.tc.target_c")
+
         # Note we open the file for every thing we report -- we can be
         # running *A LOT* of stuff in parallel and run out of file
         # descriptors. get stream LRU caches them -- pass arguments
         # like that (instead of passing the testcase) so the LRU cache
         # decorator in _get_fd() can use it to hash.
-        of = self._get_fd(reporter.ticket, reporter.tmpdir)
-
-        # Extract the target name where this message came from (if the
-        # reporter is a target, otherwise we consider it a local message)
-        if isinstance(reporter, tc.target_c):
-            tgname = "@" + reporter.fullid + reporter.bsp_suffix()
-        else:
-            tgname = "@local"
+        # NOTE WE ALWAYS save relative to the testcase's tmpdir, not
+        # the reporter.tmpdir, which might be different (if the
+        # reporter is a target)
+        of = self._get_fd(reporter.ticket, testcase.tmpdir)
 
         # Remove the ticket from the ident string, as it will be
         # the same for all and makes no sense to have it.
@@ -551,12 +569,22 @@ class driver(tc.report_driver_c):
         with commonl.tls_prefix_c(self.tls, _prefix):
             if not message.endswith('\n'):
                 message += "\n"
+            # @of writes _prefix for us, because we set it with
+            # commonl.tls_prefix_c and @of is a
+            # commonl.io_tls_prefix_lines_c(), which prefixes _prefix
+            # on each line.
             of.write(message)
-            if attachments != None:
+        if attachments != None:
+            # FIXME: \x01\x01 hack to denote an attachment, will
+            # replace in _log_iterator() because the intermediate
+            # format we have splits spaces--real fix will be to
+            # convert that format to something more flexible
+            _prefix = u"%s %d %s %s\t \x01\x01" % (tag, level, ident, tgname)
+            with commonl.tls_prefix_c(self.tls, _prefix):
                 assert isinstance(attachments, dict)
                 commonl.data_dump_recursive_tls(attachments, self.tls,
                                                 of = of)
-            of.flush()
+        of.flush()
         # This is an indication that the testcase is done and we
         # can generate final reports
         if message.startswith("COMPLETION "):

@@ -85,6 +85,7 @@ Pending
 
 import codecs
 import datetime
+import logging
 import os
 import types
 import urllib.parse
@@ -192,6 +193,13 @@ class driver(tcfl.tc.report_driver_c):
         #:   recommended modifying existing fields.
         self.complete_hooks = []
 
+    #: Maximum size of a console attachment
+    #:
+    #: If set to a positive number, any attachment with *console* in
+    #: the name and of type *bytes* or *str* will be capped at that
+    #: maximum size and another attachment with a message about it
+    #: will be added.
+    console_max_size = 0
 
     def report(self, reporter, tag, ts, delta,
                level, message,
@@ -219,11 +227,13 @@ class driver(tcfl.tc.report_driver_c):
         # Extract the target name where this message came from (if the
         # reporter is a target)
         if isinstance(reporter, tcfl.tc.target_c):
+            fullid = reporter.fullid
             target_name = " @" + reporter.fullid + reporter.bsp_suffix()
             target_server = reporter.rtb.aka
             target_type = reporter.type
             tc_name = reporter.testcase.name
         elif isinstance(reporter, tcfl.tc.tc_c):
+            fullid = None
             target_name = None
             target_server = None
             target_type = None
@@ -273,6 +283,10 @@ class driver(tcfl.tc.report_driver_c):
             assert isinstance (domain, str), \
                 "data name '%s' is a %s, need a string" \
                 % (name, type(name).__name__)
+            # because MongoDB storage will loose from which target
+            # this report comes, append the target id it to the name.
+            if fullid and not fullid in name:
+                name += f" ({fullid})"
             name = name.replace(".", "_")
             if name.startswith("$"):
                 name = name.replace("$", "_", 1)
@@ -323,6 +337,21 @@ class driver(tcfl.tc.report_driver_c):
                         result["attachment"][key] = attachment.fullid
                     else:
                         result["attachment"][key] = attachment
+
+                    # do we need to cap console attachments?
+                    if 'console' in key and self.console_max_size > 0:
+                        # cap maximum size of any console looking
+                        # attachment; we cap to the beginning only,
+                        # because we want to see what happened and
+                        # lead us to a lot of console
+                        if not isinstance(attachment, ( str, bytes )):
+                            continue
+                        result["attachment"][key + "-WARNING"] = \
+                            "attachment capped from %d to %d" \
+                            % (len(attachment), self.console_max_size)
+                        result["attachment"][key] = \
+                            attachment[:self.console_max_size]
+
 
         doc['results'].append(result)
         del result
@@ -403,14 +432,20 @@ class driver(tcfl.tc.report_driver_c):
                 self.results.find_one_and_replace({ '_id': doc['_id'] },
                                                   doc, upsert = True)
                 break
-            except pymongo.errors.PyMongoError as e:
-                if retry_count <= 3:
-                    raise tcfl.tc.blocked_e(
-                        "MongoDB error, can't record result: %s" % e)
+            except Exception as e:
+                # broad exception, could be almost anything, but we
+                # don't really know what PyMongo can't throw at us
+                # (pymongo.errors, bson errors...the lot)
+                if retry_count > 3:
+                    reporter.log.error(
+                        f"{tc_name}:{hashid}: MongoDB error: {str(e)}")
+                    break
                 else:
+                    retry_count += 1
                     self.results = None
-                    reporter.warning("MongoDB error, reconnecting (%d/3): %s"
-                                     % (e, retry_count))
+                    reporter.log.warning(
+                        f"{tc_name}:{hashid}: MongoDB error, retrying"
+                        " ({retry_count}/3): {str(e)}")
 
 # backwards compat	# COMPAT
 report_mongodb_c = driver

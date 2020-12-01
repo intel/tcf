@@ -324,15 +324,18 @@ def linux_ssh_root_nopwd(target, prefix = ""):
        >>> target.console.setup_preferred()
 
     """
-    target.shell.run("""\
-mkdir -p %s/etc/ssh
-cat >> %s/etc/ssh/sshd_config
-PermitRootLogin yes
-PermitEmptyPasswords yes
-\x04""" % (prefix, prefix))
+    target.shell.run('mkdir -p %s/etc/ssh' % prefix)
+    target.shell.run(
+        f'grep -qe "^PermitRootLogin yes" {prefix}/etc/ssh/sshd_config'
+        f' || echo "PermitRootLogin yes" >> {prefix}/etc/ssh/sshd_config')
+    target.shell.run(
+        f'grep -qe "^PermitEmptyPasswords yes" {prefix}/etc/ssh/sshd_config'
+        f' || echo "PermitEmptyPasswords yes" >> {prefix}/etc/ssh/sshd_config')
+    
 
 def deploy_linux_ssh_root_nopwd(_ic, target, _kws):
     linux_ssh_root_nopwd(target, "/mnt")
+
 
 def linux_hostname_set(target, prefix = ""):
     """

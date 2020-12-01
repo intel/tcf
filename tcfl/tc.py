@@ -216,7 +216,8 @@ class exception(Exception):
       few special fields:
 
       - `target`: this is a :py:class:`tcfl.tc.target_c` which shall be used
-        for reporting
+        for reporting--when indicating this field, the reporting will
+        associate this exception to the given target.
 
       - `dlevel`: this is an integer that indicates the relative
         level of verbosity (FIXME: link to detailed explanation)
@@ -224,6 +225,10 @@ class exception(Exception):
       - `alevel`: this is an integer that indicates the relative
         level of verbosity for attachments (FIXME: link to detailed
         explanation)
+
+      - `recoverable`: (bool) for conditions that might want to be
+        retried, the upper layers of code might want to determine what
+        to do about them.
 
       - any other fields will be passed verbatim and reported
 
@@ -607,6 +612,13 @@ class report_driver_c(object):
         setattr(obj, "origin", origin)
         obj.name = name
         cls._drivers.append(obj)
+
+    @classmethod
+    def get_by_name(cls, name):
+        for driver in cls._drivers:
+            if driver.name == name:
+                return driver
+        raise ValueError("%s: report driver does not exist" % name)
 
     @classmethod
     def remove(cls, obj):
@@ -6885,6 +6897,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             # assignment
             try:
                 with self._targets_assign():
+                    self.report_info(f"allocation ID: {self.allocid}")
                     if not deploy_skip:
                         with msgid_c("D", phase = "deploy"):
                             retval = self._methods_call("deploy")
