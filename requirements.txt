@@ -12,7 +12,6 @@
 # Ubuntu 20.4 -- issue installing 3.x
 Jinja2==2.11.2      # fedora:python3-jinja2
 PyYAML              # fedora:python3-pyyaml
-asciimatics
 imutils
 ply                 # fedora:python3-ply
 pykwalify           # fedora:python3-pykwalify

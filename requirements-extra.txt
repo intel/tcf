@@ -1,3 +1,4 @@
+asciimatics
 junit_xml               # fedora:python3-junit_xml
 keyring                 # fedora:python3-keyring
 mariadb                 # fedora:python3-mariadb
