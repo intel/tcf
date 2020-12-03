@@ -1798,10 +1798,10 @@ cat > /tmp/deploy.ex
                 size_gib = int(self.metadata.get('size_gib', 0))
                 # Well, base it at 500 and add one minute per GiB to
                 # be very genereous, but we'd need tweaks per target
-                timeout_base = _target_ic_kws_get(
-                    target, ic, "pos.deploy_timeout_base", 500)
-                timeout_per_gib = _target_ic_kws_get(
-                    target, ic, "pos.deploy_timeout_per_gib", 30)
+                timeout_base = int(_target_ic_kws_get(
+                    target, ic, "pos.deploy_timeout_base", 500))
+                timeout_per_gib = int(_target_ic_kws_get(
+                    target, ic, "pos.deploy_timeout_per_gib", 30))
                 timeout = timeout_base + timeout_per_gib * size_gib
                 target.report_info(
                     "POS: image deployment timeout %s"
