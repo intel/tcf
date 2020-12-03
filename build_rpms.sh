@@ -34,8 +34,7 @@ else
         if [ "${DISTRO}" == "centos" ]; then 
             BUILD_DEPS="dnf install -y dnf-plugins-core && dnf config-manager --set-enabled PowerTools && ${BUILD_DEPS}"
         fi
-        BUILD_DEPS="${BUILD_DEPS} python3-sphinx python3-sphinx_rtd_theme make git && \
-                    pip3 install sphinxcontrib-confluencebuilder"
+        BUILD_DEPS="${BUILD_DEPS} python3-sphinx python3-sphinx_rtd_theme make git"
     fi
     if [ "${TARGET_DIR}" == "ttbd" ]; then
         # Find the build dependencies from the generated setup.cfg file
