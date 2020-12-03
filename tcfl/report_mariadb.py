@@ -699,6 +699,7 @@ class driver_summary(tcfl.tc.report_driver_c):
                 "RunID": runid,
                 "Total Count": 1,
             }
+
             result = None
             if tag == "PASS":
                 data['Passed'] = 1
@@ -724,6 +725,14 @@ class driver_summary(tcfl.tc.report_driver_c):
                 self.table_row_inc("Summary", "RunID", runid, **data)
             except mariadb.Error as e:
                 logging.error(f"Summary: {tc_name}:{hashid}: MariaDB error: {str(e)}")
+
+            # Update --id-extra KEY=VALUE
+            if reporter.runid_extra:
+                # Note we might be overriding existing values--in
+                # theory we shouldn't because reporters.runid_extra
+                # should be always all the same.
+                self.table_row_update("Summary", "RunID", runid,
+                                      **reporter.runid_extra)
 
             # Any field name over 64 chars will make SQL (at least
             # MariaDB) complain sooo..encoding time; we have a table

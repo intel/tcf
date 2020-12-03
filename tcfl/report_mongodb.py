@@ -422,6 +422,8 @@ class driver(tcfl.tc.report_driver_c):
         for complete_hook in self.complete_hooks:
             complete_hook(_tc, runid, hashid, tc_name, doc)
 
+        # FIXME: update summaries
+            
         retry_count = 1
         while retry_count <= 3:
             if not self.results or self.made_in_pid != os.getpid():

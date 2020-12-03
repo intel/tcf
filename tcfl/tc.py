@@ -4230,6 +4230,18 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
     runid = None
     runid_visible = ""
+    #: Extra values set from the commandline for identified this run
+    #: (eg: URLs to repositories, repository versions, etc)
+    #:
+    #: They are usually taken from the command line (--id-extra
+    #: KEY=VALUE) or can be set in configuration files:
+    #:
+    #: tcfl.tc.tc_c.runid_extra[KEY] = VALUE
+    #:
+    #: Note this shall be limited to simple values; KEYs can have to
+    #: be strings (using periods to separate subfields FIXME:
+    #: reference), values shall be scalar (str, int, float, bool)
+    runid_extra = {}	# FIXME: impl verification run
 
     #: temporary directory where testcases can drop things; this will
     #: be specific to each testcase instance (testcase and target
@@ -8178,6 +8190,15 @@ def _run(args):
     else:
         tc_c.runid_visible = ""
 
+    for id_extra in args.id_extra:
+        if '=' in id_extra:
+            key, value = id_extra.split('=', 1)
+            value = commonl.cmdline_str_to_value(value)
+        else:
+            key = id_extra
+            value = True
+        tc_c.runid_extra[key] = value
+
     tc_c.max_permutations = args.max_permutations
 
     # Establish what is our log directory
@@ -8514,6 +8535,13 @@ def argp_setup(arg_subparsers):
         default = None,
         help = "Store a run ID, accesible to the reporting engine (this "
         "also will create a log file ID.log)")
+    ap.add_argument(
+        "--id-extra", action = "append", nargs = "?", metavar = "KEY=VALUE",
+        type = str,
+        default = [],
+        help = "Store extra ID specific variables; these are usually that"
+        " that are associated to a full blown execution, like a URL,"
+        " information about a build, etc")
     ap.add_argument("-t", "--target", metavar = "TARGETSPECs",
                     action = "append", default = [],
                     help = "Test target in which to run the test case; "
