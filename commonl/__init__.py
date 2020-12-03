@@ -2246,3 +2246,42 @@ class dict_lru_c:
         """
         value, ts = self.cache.pop(key, ( None, None ) )
         return value
+
+def cmdline_str_to_value(value):
+    """
+    Given a string describing a value from the command line, convert
+    it to an scalar
+
+    :params str value: value as read from the command line in the
+      format *[FORMAT:]VALUE*, format being **i** for integer, **f**
+      for float, **s** for string, **b** for bool; examples::
+
+        i:33
+        i:-33
+        i:+33
+        f:3.2
+        f:-3.2
+        f:+3.2
+        b:true
+        b:false
+        s:somestring
+        somestring
+
+    :returns: value as int, float, bool or string
+    """
+    if value.startswith("i:"):
+        return int(value.split(":", 1)[1])
+    if value.startswith("f:"):
+        return float(value.split(":", 1)[1])
+    if value.startswith("b:"):
+        val = value.split(":", 1)[1]
+        if val.lower() == "true":
+            return True
+        if val.lower() == "false":
+            return False
+        raise ValueError("value %s: bad boolean '%s' (true or false)"
+                         % (value, val))
+    if value.startswith("s:"):
+        # string that might start with s: or empty
+        return value.split(":", 1)[1]
+    return value
