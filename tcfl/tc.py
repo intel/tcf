@@ -3744,6 +3744,8 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             thisfile = os.path.join(srcdir, os.path.basename(tc_file_path))
         self._kw_set("runid", "" if tc_c.runid == None else tc_c.runid,
                      origin = "cmdline")
+        for key, value in self.runid_extra.items():
+            self._kw_set(f"runid_extra.{key}", value, origin = "cmdline")
         self._kw_set("srcdir", srcdir)
         self._kw_set("srcdir_abs",
                      os.path.dirname(os.path.abspath(tc_file_path)))
