@@ -602,6 +602,14 @@ class report_driver_c(object):
         :param str name: (optional) driver name; useful so
           :data:`reporter_c.level_driver_max` can be used.
 
+          The name *console* refers to a driver used to print stuff to
+          the console/command line from which *tcf run* (for example)
+          is exectuted.
+
+          If from a configuration file a report driver is added as
+          *console*, then core will not add the default one
+          (:class:`tcfl.report_console.driver`).
+
         :param str origin: (optional) where is this being registered;
           defaults to the caller of this function.
         """
@@ -8143,7 +8151,8 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
 # This need to be imported here since they rely on definitions
 from . import report_console
 from . import report_jinja2
-import tcfl.report_data_json
+from . import report_taps
+from . import report_data_json
 
 # list of allocation IDs we have currently reserved; this list is
 # local to each thread so when we interrupt it with a signal, we can
@@ -8275,13 +8284,23 @@ def _run(args):
             log_file = os.path.join(log_dir, log_file)
         else:
             log_file = os.path.abspath(log_file)
-    report_console_impl = report_console.driver(
-        args.verbosity - args.quietosity,
-        log_file, verbosity_logf = args.log_file_verbosity)
-    report_driver_c.add(report_console_impl)
+    try:
+        # do we need to add a *console* driver? if a config file has added
+        # one, then do not try to add one. Note _globals_init() might
+        # read it if it is not None too
+        report_console_impl = report_driver_c.get_by_name("console")
+    except ValueError:
+        if args.taps:
+            report_console_impl = report_taps.driver()
+        else:
+            report_console_impl = report_console.driver(
+                args.verbosity - args.quietosity,
+                log_file, verbosity_logf = args.log_file_verbosity)
+        report_driver_c.add(report_console_impl, name = "console")
+
     report_file_impl = report_jinja2.driver(log_dir)
     report_driver_c.add(report_file_impl)
-    report_driver_c.add(tcfl.report_data_json.driver())
+    report_driver_c.add(report_data_json.driver())
 
     # Setup defaults in the base testcase class
     tc_c.preempt = args.preempt
@@ -8660,6 +8679,9 @@ def argp_setup(arg_subparsers):
         "--preempt", action = "store_true", default = False,
         help = "Enable allocation preemption (disabled by default);"
         " server policy might restrict if allowed or not.")
+    ap.add_argument(
+        "--taps", action = "store_true", default = False,
+        help = "Report in TAPS format")
     ap.add_argument("testcase", metavar = "TEST-CASE",
                     nargs = "*",
                     help = "Files describing testcases")
