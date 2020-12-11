@@ -14,10 +14,11 @@ Simple TAPS report driver
   ok 2 (skipped) SKIP/dk3d test_other_name @TARGETNAMEs
   not ok 3 (failed) FAIL/3dr43 test_another_name @TARGETNAMEs
 
-Fields are similar to the ones reported witht the :mod:`console driver
+Fields are similar to the ones reported with the :mod:`console driver
 <tcfl.report_console>`. See for reference.
 
-Limitations / PENDING:
+Limitations / PENDING
+^^^^^^^^^^^^^^^^^^^^^
 
  - can't show progress of testcase execution, as TAPS format is first
    result summary, then output.
@@ -25,6 +26,15 @@ Limitations / PENDING:
  - currently only prints the result message, not the test output
 
  - it doesn't print the expected testcase count
+
+Usage
+^^^^^
+
+In any :ref:`TCF configuration file <tcf_client_configuration>`, add::
+
+>>> import tcfl.report_taps
+>>> tcfl.tc.report_driver_c.add(tcfl.report_taps.driver(), name = "console")
+
 """
 from . import tc
 
