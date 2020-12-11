@@ -301,7 +301,8 @@ def dlwps7_add(hostname, powered_on_start = None, basename = None,
 try:
     import ttbl.raritan_emx
     def raritan_emx_add(url, outlets = 8, targetname = None,
-                        https_verify = True, powered_on_start = None):
+                        https_verify = True, powered_on_start = None,
+                        pdu_password = None):
         """
         Add targets to control the individual outlets of a Raritan EMX PDU
 
@@ -363,10 +364,11 @@ try:
         if targetname == None:
             targetname = _url.hostname.split('.')[0]
         for outlet in range(1, outlets + 1):
-            name = "%s-%d" % (targetname, outlet),
+            name = "%s-%d" % (targetname, outlet)
             target = target_pdu_socket_add(
                 name,
-                ttbl.raritan_emx.pci(url, outlet, https_verify),
+                ttbl.raritan_emx.pci(url, outlet, https_verify,
+                                     password = pdu_password),
                 power = powered_on_start,
                 # Always keep them on, unless we decide otherwise--we need
                 # them to control other components
