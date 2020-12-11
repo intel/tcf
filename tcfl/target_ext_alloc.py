@@ -588,12 +588,37 @@ def _cmdline_alloc_delete(args):
             except Exception as e:
                 logging.exception("Exception: %s", e)
 
-        tp = tcfl.ttb_client._multiprocessing_pool_c(
-            processes = len(args.allocid))
+        def _allocid_delete_by_user(rtb, username):
+
+            try:
+                # translates username == 'self' on its own
+                if username == "self":
+                    username = rtb.logged_in_username()
+                allocs = _allocs_get(rtb, username)
+                for allocid in allocs:
+                    print(f"removed {allocid} @{rtb}")
+                    _delete(rtb, allocid)
+                return
+            except Exception as e:
+                logging.exception("Exception: %s", e)
+
         threads = {}
-        for allocid in args.allocid:
-            threads[allocid] = tp.apply_async(_allocid_delete,
-                                                   (allocid,))
+        if args.allocid:
+            tp = tcfl.ttb_client._multiprocessing_pool_c(
+                processes = len(args.allocid))
+            for allocid in args.allocid:
+                threads[allocid] = tp.apply_async(_allocid_delete,
+                                                  (allocid,))
+        elif args.username:
+            tp = tcfl.ttb_client._multiprocessing_pool_c(
+                processes = len(tcfl.ttb_client.rest_target_brokers))
+            for rtb in tcfl.ttb_client.rest_target_brokers.values():
+                threads[rtb] = tp.apply_async(_allocid_delete_by_user,
+                                                  (rtb, args.username,))
+        else:
+            raise RuntimeError(
+                "Need to specify ALLOCIDs or --user USERNAME or --self;"
+                " see --help")
         tp.close()
         tp.join()
 
@@ -783,8 +808,15 @@ def _cmdline_setup(arg_subparsers):
     commonl.argparser_add_aka(arg_subparsers, "alloc-rm", "alloc-del")
     commonl.argparser_add_aka(arg_subparsers, "alloc-rm", "alloc-delete")
     ap.add_argument(
-        "allocid", metavar = "[SERVER/]ALLOCATIONID", nargs = "+",
-        action = "store", default = None,
+        "-u", "--username", action = "store", default = None,
+        help = "Remove allocations by user")
+    ap.add_argument(
+        "-s", "--self", action = "store_const", dest = "username",
+        const = "self",
+        help = "Remove allocations by the logged in user")
+    ap.add_argument(
+        "allocid", metavar = "[SERVER/]ALLOCATIONID", nargs = "*",
+        action = "store", default = [],
         help = "Allocation IDs to remove")
     ap.set_defaults(func = _cmdline_alloc_delete)
 
