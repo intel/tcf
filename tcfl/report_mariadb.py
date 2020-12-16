@@ -231,6 +231,7 @@ class driver_summary(tcfl.tc.report_driver_c):
         "Failed": 0,
         "Passed": 0,
         "RunID": "no RunID",
+        "RunID-TestcaseName": "NULL",
         # key length if fixed to 10 in _id_maybe_encode_cache()
         "FieldID": "NULL",
         # because we use this as primary key for the History tables
@@ -246,6 +247,9 @@ class driver_summary(tcfl.tc.report_driver_c):
         "Passed": "int",
         # because we use this as primary key for most tables
         "RunID": "varchar(255)",
+        # there is the posibility that we won't fit RunID+TestcaseName
+        # in this limit...
+        "RunID-TestcaseName": "varchar(1024)",
         # key length if fixed to 10 in _id_maybe_encode_cache()
         "FieldID": "varchar(11)",
         # because we use this as primary key for the History tables
@@ -305,7 +309,7 @@ class driver_summary(tcfl.tc.report_driver_c):
         # The SQL command is basically
         #
         #   create table TABLENAME (
-        #     FIELD1 TYPE1 [default DEFAULT1], 
+        #     FIELD1 TYPE1 [default DEFAULT1],
         #     FIELD2 TYPE2 [default DEFAULT2],
         #     ...,
         #     [primary key ( FIELDx );
@@ -635,7 +639,7 @@ class driver_summary(tcfl.tc.report_driver_c):
         # summaries--thus we skip anything we are not interested on,
         # then we collect data and on COMPLETION (end of test case),
         # upload data to the database.
-        
+
         # We only do summaries, so skip anything that is not reporting
         # data or testcase completions
         if tag != "DATA" and not message.startswith("COMPLETION"):
@@ -725,6 +729,18 @@ class driver_summary(tcfl.tc.report_driver_c):
                 self.table_row_inc("Summary", "RunID", runid, **data)
             except mariadb.Error as e:
                 logging.error(f"Summary: {tc_name}:{hashid}: MariaDB error: {str(e)}")
+
+            # Record a mapping of runid-testcasename -> hashid; this
+            # is needed so we can refer to various things that use the
+            # hashid, like for example reports
+            # (report-RUNID:HASHID.ANYTHING)
+            #
+            try:
+                self.table_row_update(
+                    "HashIDs", "RunID-TestcaseName", runid + "##" + tc_name,
+                    **{ 'HashID': hashid })
+            except mariadb.Error as e:
+                logging.error(f"HashIDs: {tc_name}:{hashid}: MariaDB error: {e}")
 
             # Update --id-extra KEY=VALUE
             if reporter.runid_extra:
