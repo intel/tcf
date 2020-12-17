@@ -1,8 +1,8 @@
-GitPython                # fedora:python3-GitPython
-ansible-lint             # fedora:python3-ansible-lint
-gitlint                  # fedora:gitlint
-pygithub                 # fedora:python3-pygithub
-pylint                   # fedora:python3-pylint,pylint
-python-gitlab            # fedora:python3-gitlab
-restructuredtext_lint    # fedora:python3-restructuredtext-lint
-yamllint                 # fedora:yamllint
+GitPython                # centos,fedora:python3-GitPython
+ansible-lint             # fedora:python3-ansible-lint|ubuntu:ansible-lint
+gitlint                  # fedora,ubuntu:gitlint
+pygithub                 # fedora,ubuntu:python3-pygithub
+pylint                   # centos,fedora:python3-pylint,pylint|ubuntu:pylint
+python-gitlab            # python3-gitlab
+restructuredtext_lint    # fedora,ubuntu:python3-restructuredtext-lint
+yamllint                 # yamllint

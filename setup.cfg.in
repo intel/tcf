@@ -5,19 +5,6 @@ install_data = /
 [bdist_rpm]
 release = 1
 packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
-requires =
-         @@Fedora@@gvnc-tools
-         make
-         python3-jinja2
-         @@Fedora@@python3-junit_xml
-         @@Fedora@@python3-keyring
-         python3-Levenshtein
-         python3-numpy
-         python3-ply
-         python3-pykwalify
-         python3-pyyaml
-         python3-requests
-         python3-tabulate
-         @@Fedora@@python3-opencv
+requires = {{requirements}}
 
 doc_files = *.rst doc/* _doc/html/*
