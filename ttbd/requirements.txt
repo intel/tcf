@@ -36,4 +36,4 @@ requests        # python3-requests
 sdnotify
 setuptools      # python3-setuptools
 systemd         # python3-systemd
-tornado	        # python3-tornado
+tornado         # python3-tornado
