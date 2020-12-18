@@ -252,6 +252,14 @@ class impl_c(ttbl.tt_interface_impl_c):
       blocking, as it should, so double check the state changed happen
       and retry if not.
 
+    :param bool ignore_get: when reading the state, ignore it
+      and return *None* (not available)--this is normally used for
+      power components which we want to manipulate but not care for
+      the state.
+
+    :param bool ignore_get_errors: if reading the state causes an
+      error, ignore and return *None* (not available)
+
     :param str explicit: (optional, default *None*) declare if this power
       component shall be only turned on or off when explicitly named in
       a power rail. See :ref:ttbd_power_explicit.
@@ -270,8 +278,11 @@ class impl_c(ttbl.tt_interface_impl_c):
         powered off by name, power on normally
 
     """
-    def __init__(self, paranoid = False, explicit = None):
+    def __init__(self, paranoid = False, explicit = None,
+                 ignore_get = False, ignore_get_errors = False):
         assert isinstance(paranoid, bool)
+        assert isinstance(ignore_get, bool)
+        assert isinstance(ignore_get_errors, bool)
         assert explicit in ( None, 'on', 'off', 'both' )
         #: If the power on fails, automatically retry it by powering
         #: first off, then on again
@@ -280,6 +291,8 @@ class impl_c(ttbl.tt_interface_impl_c):
         self.timeout = 10	# used for paranoid checks
         self.wait = 0.5
         self.explicit = explicit
+        self.ignore_get = ignore_get
+        self.ignore_get_errors = ignore_get_errors
         #: for paranoid power getting, now many samples we need to get
         #: that are the same for the value to be considered stable
         self.paranoid_get_samples = 6
@@ -446,6 +459,8 @@ class interface(ttbl.tt_interface):
 
     @staticmethod
     def _impl_get(impl, target, component):
+        if impl.ignore_get:
+            return None
         # calls the implementation function to do the GET operation,
         # being sure to collection multiple samples and only return
         # once we have N results that are stable if the paranoid flag
@@ -497,7 +512,18 @@ class interface(ttbl.tt_interface):
                 component_real = self.aliases[component]
             else:
                 component_real = component
-            state = self._impl_get(impl, target, component_real)
+            try:
+                state = self._impl_get(impl, target, component_real)
+            except impl.error_e as e:
+                if not impl.ignore_get_errors:
+                    raise
+                # if this is an explicit component, ignore any errors
+                # and just assume we are not using this for real power
+                # control
+                target.log.error(
+                    "%s: ignoring power state error from explicit power component: %s"
+                    % (component, e))
+                state = None
             self.assert_return_type(state, bool, target,
                                     component, "power.get", none_ok = True)
             data[component] = {
