@@ -1,18 +1,39 @@
-flask # fedora:python3-flask
-flask-login # fedora:python3-flask-login
-flask-principal # fedora:python3-flask-principal
-keyring # fedora:python3-keyring
-netifaces # fedora:python3-netifaces
-pexpect # fedora:python3-pexpect
-ply # fedora:python3-ply
+## Non-Python Requirements
+# alsa-utils
+# fedora:android-tools|ubuntu:android-tools-adb,android-tools-fastboot
+# dnsmasq
+# dosfstools
+# centos,fedora:edk2-ovmf
+# ipmitool
+# libcap-devel|ubuntu:libcap-dev
+# fedora:livecd-tools
+# fedora,ubuntu:openocd
+# centos,fedora:openssh-clients
+# parted
+# qemu|centos:qemu-kvm
+# socat
+# sshpass
+# fedora,ubuntu:v4l-utils
+
+## Extra Python Requirements
+# python3-werkzeug
+# python3-pyOpenSSL|ubuntu:python3-openssl
+
+flask           # python3-flask
+flask-login     # python3-flask-login
+flask-principal # fedora,ubuntu:python3-flask-principal
+keyring         # fedora,ubuntu:python3-keyring
+netifaces       # python3-netifaces
+pexpect         # python3-pexpect
+ply             # python3-ply
 python-prctl
-pyghmi # fedora:python3-pyghmi
-pyserial # fedora:python3-pyserial
-pysnmp # fedora:python3-pysnmp
-python_ldap # fedora:python3-ldap
-pyusb # ubuntu:python-usb, fedora:python3-pyusb
-requests # fedora: python3-requests
+pyghmi          # python3-pyghmi
+pyserial        # centos,fedora:python3-pyserial|ubuntu:python3-serial
+pysnmp          # centos,fedora:python3-pysnmp|ubuntu:python3-pysnmp4
+python_ldap     # centos,fedora:python3-ldap
+pyusb           # centos,fedora:python3-pyusb|ubuntu:python3-usb
+requests        # python3-requests
 sdnotify
-setuptools # fedora:python3-setuptools
-systemd # fedora:python3-systemd
-tornado	# ubuntu:python-tornado, fedora:python3-tornado
+setuptools      # python3-setuptools
+systemd         # python3-systemd
+tornado	        # python3-tornado

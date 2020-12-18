@@ -6,46 +6,14 @@ release = 1
 packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
 # parted/dosfstools/grub2*/util-linux: for setup-efi-grub2-elf / ttbl.grub2elf
 # The grub thing? So it works in fedora27 or fedora 25
-requires =
-         alsa-utils
-         @@Fedora@@android-tools
-         dnsmasq
-         dosfstools
-         edk2-ovmf
-         ipmitool
-         libcap-devel
-         @@Fedora@@livecd-tools
-         @@Fedora@@openocd
-         openssh-clients
-         parted
-         python3-flask
-         python3-flask-login
-         @@Fedora@@python3-flask-principal
-         @@Fedora@@python3-keyring
-         python3-ldap
-         python3-netifaces
-         python3-pexpect
-         python3-ply
-         @@Fedora@@python3-pyghmi
-         python3-pyOpenSSL
-         python3-pyserial
-         python3-pysnmp
-         python3-pyusb
-         python3-requests
-         python3-systemd
-         python3-tornado
-         python3-werkzeug
-         @@Fedora@@qemu
-         socat
-         sshpass
-         tcf == %%{version}-%%{release}
-         @@Fedora@@v4l-utils
+requires = {{requirements}}
+    tcf == %%{version}-%%{release}
 
 build_requires =
-         gcc
-         git
-         make
-         python3-devel
+    gcc
+    git
+    make
+    python3-devel
 pre-install = rpm-pre-install.sh
 post-install = rpm-post-install.sh
 post-uninstall = rpm-post-install.sh
