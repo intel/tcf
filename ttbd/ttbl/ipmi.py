@@ -45,10 +45,14 @@ class pci(ttbl.power.impl_c):
     Other parameters as to :class:ttbl.power.impl_c.
     """
     def __init__(self, bmc_hostname, ipmi_timeout = 10, ipmi_retries = 3,
+                 extra_ipmitool_cmdline = None,
                  **kwargs):
         ttbl.power.impl_c.__init__(self, paranoid = True, **kwargs)
         user, password, hostname \
             = commonl.split_user_pwd_hostname(bmc_hostname)
+        commonl.assert_none_or_list_of_strings(
+            extra_ipmitool_cmdline, "extra_ipmitool_cmdline",
+            "command line option")
         self.hostname = hostname
         self.user = user
         self.bmc = None
@@ -64,6 +68,8 @@ class pci(ttbl.power.impl_c):
         if user:
             self.cmdline += [ "-U", user ]
         self.cmdline += [ "-E", "-I", "lanplus" ]
+        if extra_ipmitool_cmdline:
+            self.cmdline += extra_ipmitool_cmdline
         if password:
             self.env['IPMI_PASSWORD'] = password
         self.paranoid_get_samples = 3
