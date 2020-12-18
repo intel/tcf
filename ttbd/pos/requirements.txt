@@ -1,0 +1,15 @@
+## Non-Python Requirements
+# dhcp-server
+# dnsmasq 
+# httpd
+# mod_ssl
+# nfs-utils
+# rsync
+# syslinux
+# fedora:syslinux-efi64
+# syslinux-extlinux
+# syslinux-nonlinux
+# syslinux-extlinux-nonlinux
+# ipxe-bootimgs
+# syslinux-tftpboot
+# tftp-server
