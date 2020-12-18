@@ -50,7 +50,7 @@ try:
                     if result_general:
                         packages += result_general.group("package").split(",")
 except FileNotFoundError:
-    print("No reqirements file found: '%s'" % filename)
+    print("No requirements file found: '%s'" % filename)
 
 # Remove duplicates and order alphabetically
 packages = sorted(set(packages))
