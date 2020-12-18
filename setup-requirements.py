@@ -26,7 +26,7 @@ distro = args["distro"]
 # Pattern for distro specific requirements
 pattern = distro + r"[a-zA-Z0-9\_\-,]*\:?(?P<package>[a-zA-Z0-9\_\-,]+)"
 # Pattern for general requirements
-pattern_general = r"[a-zA-Z0-9\_\- ]+# (?P<package>[a-zA-Z0-9\_\-,]+)(?:\||$)"
+pattern_general = r"^[a-zA-Z0-9\_\- ]*# (?P<package>[a-zA-Z0-9\_\-,]+)(?:\||$)"
 filenames = []
 packages = []
 
