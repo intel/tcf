@@ -171,22 +171,13 @@ BASE        := $(PWD)
 RPMDIR      ?= $(BASE)/dist
 CONTAINER   ?= True
 
-#
-# Well, this is a dirty hack
-#
-# Instead of making a spec file, since we want to keep reusing the setup.py infra...
-#
-# - we can't use RPM rich dependencies in setup.cfg, due to older
-#   distro's (CentOS7) not supporting them, so we use @@DISTRONAME@@ as
-#   a dirty switch
-# 
 .FORCE:
 
 # Make sure this file is always re-generated, since we might be
 # passing a different DISTRO ... and anyway we are always remaking the
 # RPMs
 %.cfg: %.cfg.in .FORCE
-	sed -e "s|@@.*$(DISTRO).*@@||i" -e "/@@/d" $< > $@
+	python3 setup-requirements.py --distro $(DISTRO) --file $@
 
 rpms-ttbd-zephyr: ttbd/zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
