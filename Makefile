@@ -177,7 +177,7 @@ CONTAINER   ?= True
 # passing a different DISTRO ... and anyway we are always remaking the
 # RPMs
 %.cfg: %.cfg.in .FORCE
-	python3 setup-requirements.py --distro $(DISTRO) --file $@
+	./setup-requirements.py --path $(dir $@)
 
 rpms-ttbd-zephyr: ttbd/zephyr/setup.cfg
 	mkdir -p $(RPMDIR)
