@@ -573,7 +573,10 @@ class driver(tc.report_driver_c):
             # commonl.tls_prefix_c and @of is a
             # commonl.io_tls_prefix_lines_c(), which prefixes _prefix
             # on each line.
-            of.write(message)
+            # the timestamp is a horrible hack which we have to fix
+            # properly by propagating it as a field in the temporary
+            # log so later the templates can decide how to render it
+            of.write(f"[+{delta:.1f}s] " + message)
         if attachments != None:
             # FIXME: \x01\x01 hack to denote an attachment, will
             # replace in _log_iterator() because the intermediate
