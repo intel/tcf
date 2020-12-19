@@ -792,6 +792,13 @@ class reporter_c(object):
         :param str domain: to which domain this measurement applies
           (eg: "Latency Benchmark %(type)s");
 
+          Well known domains:
+
+           - *Warnings [%(type)s]*: values would be accumulated over
+             how many times it has been reported
+
+           - *Recovered conditions [%(type)s]*
+
         :param str name: name of the value  (eg: "context switch
           (microseconds)"); it is recommended to always add the unit
           the measurement represents.
