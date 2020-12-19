@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 """
 Script for gathering os specific requirements for setup files
 """
@@ -6,22 +6,18 @@ Script for gathering os specific requirements for setup files
 # TODO: Add ability to list python packages with no distro package
 
 import argparse
-import glob
 import re
 import sys
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-a", "--all", action='store_true',
-                    help="install all dependencies not just required")
-parser.add_argument("-c", "--config", action='store_true',
-                    help="config requirements parsing")
-parser.add_argument("-p", "--path", default="./",
-                    help="path to requirements file")
+parser.add_argument("-c", "--config", required=False,
+                    help="path to config files")
 parser.add_argument("-d", "--distro", required=False)
 parser.add_argument("-v", "--version", required=False)
+parser.add_argument('filenames', metavar='file', type=str, nargs='+',
+                    help='requirements file(s)')
 
 args = vars(parser.parse_args())
-path = args["path"]
 
 # Pattern for finding the distro name
 pattern_distro = r"^ID=\"?(?P<distro>[a-z]+)\"?"
@@ -37,14 +33,9 @@ if not distro:
             result_distro = re.search(pattern_distro, line)
             if result_distro:
                 distro = result_distro.group("distro")
+                print("I: /etc/os-release: distro to be %s" % distro)
     if not distro:
         sys.exit("Cannot locate distro name, set manually with '-d'")
-
-# If all is selected, include all requirements files in folder
-if args["all"]:
-    filenames = glob.glob(path + '/requirements*.txt')
-else:
-    filenames += [path + '/requirements.txt']
 
 # Pattern for distro specific requirements
 pattern = distro + r"[a-zA-Z0-9\_\-,]*\:?(?P<package>[a-zA-Z0-9\_\-,]+)"
@@ -54,7 +45,7 @@ pattern_general = r"^[a-zA-Z0-9\_\- \t]*" + \
 
 # Parse the package requirements from the requirements file
 try:
-    for filename in filenames:
+    for filename in args["filenames"]:
         with open(filename, 'r') as f:
             for line in f:
                 result = re.search(pattern, line)
@@ -72,12 +63,12 @@ packages = sorted(set(packages))
 
 # If not manually installing requirements, set requirements in config file
 if args["config"]:
-    with open(path + "setup.cfg.in", "r") as f:
+    with open(args["config"] + ".in", "r") as f:
         data = f.read()
 
     data = data.replace("{{requirements}}", "\n    " + "\n    ".join(packages))
 
-    with open(path + "setup.cfg", "w") as f:
+    with open(args["config"], "w") as f:
         f.write(data)
 else:
     print(" ".join(packages))
