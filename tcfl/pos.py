@@ -1804,8 +1804,8 @@ cat > /tmp/deploy.ex
                     target, ic, "pos.deploy_timeout_per_gib", 30))
                 timeout = timeout_base + timeout_per_gib * size_gib
                 target.report_info(
-                    "POS: image deployment timeout %s"
-                    " (base %s, per GiB %s, %s GiB" % (
+                    "POS: image deployment timeout %s seconds"
+                    " (base %s, per GiB %s, %s GiB)" % (
                         timeout, timeout_base, timeout_per_gib, size_gib),
                     dlevel = 1)
                 # \x04 is EOF, like pressing Ctrl-D in the shell
