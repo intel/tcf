@@ -14,8 +14,9 @@ parser.add_argument("-c", "--config", required=False,
                     help="path to config files")
 parser.add_argument("-d", "--distro", required=False)
 parser.add_argument("-v", "--version", required=False)
-parser.add_argument('filenames', metavar='file', type=str, nargs='+',
-                    help='requirements file(s)')
+parser.add_argument("--nodistro", required=False, action="store_true")
+parser.add_argument("filenames", metavar="file", type=str, nargs="+",
+                    help="requirements file(s)")
 
 args = vars(parser.parse_args())
 
@@ -23,6 +24,7 @@ args = vars(parser.parse_args())
 pattern_distro = r"^ID=\"?(?P<distro>[a-z]+)\"?"
 filenames = []
 packages = []
+no_distro_packages = []
 
 distro = args["distro"]
 # if distro not set, find the distro through /etc/os-release
@@ -40,8 +42,10 @@ if not distro:
 # Pattern for distro specific requirements
 pattern = distro + r"[a-zA-Z0-9\_\-,]*\:?(?P<package>[a-zA-Z0-9\_\-,]+)"
 # Pattern for general requirements
-pattern_general = r"^[a-zA-Z0-9\_\- \t]*" + \
+pattern_general = r"^[a-zA-Z0-9\_\-\=\. \t]*" + \
                   r"# (?P<package>[a-zA-Z0-9\_\-,]+)(?:\||$)"
+# Pattern for requirements without distro packages
+pattern_nodistro = r"^(?P<package>[a-zA-Z0-9\_\-\=\.]+) *#?(?!" + distro + ")*"
 
 # Parse the package requirements from the requirements file
 try:
@@ -55,6 +59,9 @@ try:
                     result_general = re.search(pattern_general, line)
                     if result_general:
                         packages += result_general.group("package").split(",")
+                    elif re.search(pattern_nodistro, line):
+                        no_distro_packages.append(line.split(" ")[0].strip())
+
 except FileNotFoundError:
     print("No requirements file found: '%s'" % filename)
 
@@ -70,5 +77,7 @@ if args["config"]:
 
     with open(args["config"], "w") as f:
         f.write(data)
+elif args["nodistro"]:
+    print(" ".join(no_distro_packages))
 else:
     print(" ".join(packages))
