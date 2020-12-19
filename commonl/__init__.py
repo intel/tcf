@@ -1344,8 +1344,7 @@ def ipv4_len_to_netmask_ascii(length):
     return socket.inet_ntoa(struct.pack('>I', 0xffffffff ^ ((1 << (32 - length) ) - 1)))
 
 def password_get(domain, user, password):
-    """
-    Get the password for a domain and user
+    """Get the password for a domain and user
 
     This returns a password obtained from a configuration file, maybe
     accessing secure password storage services to get the real
@@ -1383,13 +1382,17 @@ def password_get(domain, user, password):
       configuration setting; can be *None*. If the *password* is
 
       - *KEYRING* will ask the accounts keyring for the password
-         for domain *domain* for username *user*
+        for domain *domain* for username *user*
 
-      - *KEYRING:DOMAIN* will ask the accounts keyring for the password
-         for domain *DOMAIN* for username *user*, ignoring the
-         *domain* parameter.
+      - *KEYRING=DOMAIN* (or *KEYRING:DOMAIN*) will ask the accounts
+        keyring for the password for domain *DOMAIN* for username
+        *user*, ignoring the *domain* parameter.
 
-      - *FILE:PATH* will read the password from filename *PATH*.
+      - *FILE=PATH* (or *FILE:PATH*) will read the password from
+        filename *PATH*.
+
+      Note that using the colon notation *FILE:PATH* can make some URL
+      parsing not work, hence you can default to using =
 
     :returns: the actual password to use
 
@@ -1430,8 +1433,22 @@ def password_get(domain, user, password):
         if password == None:
             raise RuntimeError("keyring: no password for user %s @ %s"
                                % (user, domain))
+    elif password and password.startswith("KEYRING="):
+        if keyring_available == False:
+            raise RuntimeError(
+                "keyring: functionality to load passwords not available,"
+                " please install keyring support")
+        _, domain = password.split("=", 1)
+        password = keyring.get_password(domain, user)
+        if password == None:
+            raise RuntimeError("keyring: no password for user %s @ %s"
+                               % (user, domain))
     elif password and password.startswith("FILE:"):
         _, filename = password.split(":", 1)
+        with open(filename) as f:
+            password = f.read().strip()
+    elif password and password.startswith("FILE="):
+        _, filename = password.split("=", 1)
         with open(filename) as f:
             password = f.read().strip()
     # fallthrough, if none of them, it's just a password
