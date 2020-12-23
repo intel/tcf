@@ -57,7 +57,7 @@ class _test(tcfl.pos.tc_pos_base):
         # "scan" for subcases (in our case, we know they'll be sub0 to sub9)
         for i in range(3):
             subcase = "sub%d" % i
-            self.subtc[subcase] = tcfl.tc.subtc_c(self.name + "." + subcase,
+            self.subtc[subcase] = tcfl.tc.subtc_c(self.name + "##" + subcase,
                                                   tc_file_path, origin, self)
 
     def eval_00(self, target):
