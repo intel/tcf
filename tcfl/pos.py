@@ -1881,7 +1881,10 @@ cat > /tmp/deploy.ex
                     % " ".join(reversed(target.pos.umount_list)))
             finally:
                 target.console.default = original_console_default
-                target.shell.prompt_regex = original_prompt
+                # we do not need to restore the prompt regex because
+                # we only change it if we were not given a pos_prompt
+                # and took the default prompt, which stays FIXME:
+                # remove that, unused?
                 testcase.tls.expect_timeout = original_timeout
 
             target.report_info("POS: deployed %(image)s" % kws)
