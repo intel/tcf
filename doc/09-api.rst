@@ -12,6 +12,7 @@ Test library (utilities for testcases)
 
 .. automodule:: tcfl.tl
 .. automodule:: tcfl.biosl
+.. automodule:: tcfl.bmc
 
 Provisioning/deploying/flashing PC-class devices with a Provisioning OS
 -----------------------------------------------------------------------
@@ -574,7 +575,6 @@ Daemons that can be started in the server as part of a power rail:
 Other interfaces
 ----------------
 
-.. automodule:: ttbl.buttons
 .. automodule:: ttbl.capture
 .. automodule:: ttbl.debug
 .. automodule:: ttbl.fastboot

@@ -5,8 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-"""
-Common utilities for configuring and dealing with BMCs/IPMI
+"""Common utilities for configuring and dealing with BMCs/IPMI
 ===========================================================
 
 BMCs (baseboard management controllers) are included on some machines,
@@ -20,12 +19,26 @@ testing and execution.
 When subject for testing and execution, the following information will
 be included in the inventory:
 
+BMC Inventory
+-------------
+
+.. _inventory_bmc:
+
+FIXME: this table has horrible formatting when rendered, figure out
+how to make the columns narrower so it is readable
+
 .. list-table:: BMC Inventory
    :header-rows: 1
+   :widths: 20 10 10 60
+   :width: 50%
 
    * - Field name
-     - Type (str, bool, integer, float, dictionary)
-     - Disposition (mandatory, recommended, optional[default])
+     - Type
+       (str, bool, integer,
+       float, dictionary)
+     - Disposition
+       (mandatory, recommended,
+       optional[default])
      - Description
 
    * - bmcs
@@ -84,6 +97,14 @@ be included in the inventory:
 
        Note subsequent user names would be configured using
        *bmcs.bmc1.user1.name*, *bmcs.bmc2.user.name* ...
+
+   * - bmcs.bmc0.user0.channels
+     - string
+     - Optional
+     - List of integers separated with colons (eg: 1:2:3) describing
+       on which channels this user entry shall be created; defaults to
+       those specifed in all the network entries
+       (*bmcs.bmcN.network\*.channel*).
 
    * - bmcs.bmc0.user0.uid
      - integer (>= 0)
@@ -200,17 +221,23 @@ inventory:
 >>>         ic.power.on()
 >>>         target.pos.boot_to_pos()
 >>> 
->>>         tcfl.bmc.setup_discover_ipmitool(target)
+>>>         tcfl.bmc.setup_discover_ipmitool(target, True)
 
 The base utilities use the *IPMI* protocol since when the BMC is not
 configured, there is no way to access it over the network to use
 protocols such as *Redfish*.
+
+See :func:`setup_discover_all_ipmitool`, :func:`setup_ipmitool` and
+:func:`discover_ipmitool` for more information on inventory requirements.
+
 
 PENDING
 -------
 
 - Use of redfish to pull most of the information
 
+BMC Utility functions
+---------------------
 """
 
 
@@ -384,11 +411,15 @@ def ipmitool_superuser_setup(target, uid, username, password,
     assert isinstance(uid, int) and uid >= 0
     assert isinstance(username, str)
     assert isinstance(password, str)
-    commonl.assert_list_of_types(channels, "list of channels", "channel", int)
+    commonl.assert_list_of_types(channels, "list of channels", "channel",
+                                 ( int, ))
     assert isinstance(bmc_id, int) and bmc_id >= 0
 
     # override whatever is there in the uid, so disable first
-    target.shell.run(f"ipmitool -d {bmc_id} user disable {uid}")
+    target.report_info(f"bmc{bmc_id}: adding {username} as UID {uid}",
+                       dlevel = 1)
+    # This might fail if the user is not yet created, so just go like this
+    target.shell.run(f"ipmitool -d {bmc_id} user disable {uid} || true")
     target.shell.run(f"ipmitool -d {bmc_id} user set name {uid} '{username}'")
     target.shell.run(f"ipmitool -d {bmc_id} user set password {uid} '{password}'")
     target.shell.run(f"ipmitool -d {bmc_id} user enable {uid}")
@@ -396,6 +427,8 @@ def ipmitool_superuser_setup(target, uid, username, password,
         target.shell.run(
             f"ipmitool -d {bmc_id} channel setaccess {channel} {uid}"
             " ipmi=on privilege=4")
+    target.report_info(f"bmc{bmc_id}: added {username} as UID {uid} in"
+                       " channels {','.join(channels}")
 
 
 def ipmitool_ipv4_static_setup(target, channel, ipaddr, netmask, gateway,
@@ -443,7 +476,7 @@ def ipmitool_ipv4_static_setup(target, channel, ipaddr, netmask, gateway,
     assert isinstance(netmask, str)
     assert isinstance(gateway, str)
     assert isinstance(bmc_id, int) and bmc_id >= 0
-    target.report_info(f"BMC{bmc_id}: configuring network channel {channel}")    
+    target.report_info(f"bmc{bmc_id}: configuring network channel {channel}")
     target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} access off")
     target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} ipsrc static")
     target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} ipaddr {ipaddr}")
@@ -453,7 +486,7 @@ def ipmitool_ipv4_static_setup(target, channel, ipaddr, netmask, gateway,
     target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} defgw ipaddr {gateway}")
     target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} access on")
     target.report_pass(
-        f"BMC{bmc_id}: configured network channel {channel}"
+        f"bmc{bmc_id}: configured network channel {channel}"
         f" to {ipaddr}/{netmask} via {gateway}"
     )
 
@@ -469,11 +502,11 @@ def ipmitool_ipv4_static_setup(target, channel, ipaddr, netmask, gateway,
     for s in musthave:
         if s not in output:
             raise tcfl.tc.failed_e(
-                f"BMC configuration w/ ipmitool failed, can't find "
+                f"bmc{bmc_id}: configuration w/ ipmitool failed, can't find "
                 f"expected string: {s}", dict(output = output))
     # FIXME: extract current MAC addr and update inventory?
     target.report_pass(
-        f"BMC{bmc_id}: configured network for channel {channel} verified")
+        f"bmc{bmc_id}: configuration of network channel {channel} verified")
 
 
 def ipmitool_mc_reset(target, bmc_id = 0, reset_type = "cold",
@@ -518,7 +551,7 @@ def ipmitool_mc_reset(target, bmc_id = 0, reset_type = "cold",
 
     target.shell.run(f"ipmitool {selector} mc reset {reset_type}")
     wait_period = 20
-    target.report_info(f"BMC{bmc_id}: waiting {wait_period}s for controller to reset")
+    target.report_info(f"bmc{bmc_id}: waiting {wait_period}s for controller to reset")
     time.sleep(wait_period)
     # Wait for BMC to be online again by just running the mc info
     # command until it works. If it fails, it'll return something
@@ -544,11 +577,11 @@ def ipmitool_mc_reset(target, bmc_id = 0, reset_type = "cold",
             # code way harder to follow, just power through
             # retrying and if it is a known bad condition, it will
             # timeout and break
-        target.report_info(f"BMC{bmc_id}: waiting {wait_period}s more"
+        target.report_info(f"bmc{bmc_id}: waiting {wait_period}s more"
                            f" ({count}/{top}) for MC to reset")
         time.sleep(wait_period)
     else:
-        raise tcfl.tc.error_e(f"BMC{bmc_id}: MC didn't come back from"
+        raise tcfl.tc.error_e(f"bmc{bmc_id}: MC didn't come back from"
                               f" cold reset after {wait_period * count}s")
 
 
@@ -562,42 +595,35 @@ def setup_ipmitool(target, bmc_id, bmc_name, bmc_data):
     target has *ipmitool* installed and the user has privilege to
     access the IPMI device node.
 
-    Setups up:
+    This needs at least in the inventory the following information for
+    each BMC (*bmcs.bmc0*, *bmcs.bmc1*, *bmcs.bmc2*, ...):
 
-    - basic IPv4 access on one or more channels
-    - one or more priviledged users to all the channels added before
+    - The ID field: *bmcs.bmc0.id: 0*
 
-    This would be as simple as creating a user for the values set in
-    the inventory in fields:
+    For basic static IPv4 access on one or more channels:
 
-      - bmcs.bmc0.user0.name
-      - bmcs.bmc0.user0.password
-      - bmcs.bmc0.user0.uid
+    - bmcs.bmc0.network0.
+    - bmcs.bmc0.network0.channel: 3
+    - bmcs.bmc0.network0.ipv4_addr: <IPADDRESS>
+    - bmcs.bmc0.network0.ipv4_netmask: <NETMASK>
+    - bmcs.bmc0.network0.ipv4_gateway: <GATEWAY'S IPADDRESS>
+    - bmcs.bmc0.network0.ipv4_src: static
 
-    but this considers:
+    For users to be configured, networking has to be configured and:
 
-      - the BMC given in the command line (so it could
-       be *bmcs.bmc1* if *bmc_id* is 1.
+    - bmcs.bmc0.user0.name: USERNAME
+    - bmcs.bmc0.user0.password: PASSWORD
+    - bmcs.bmc0.user0.uid: 2             # example
+    - bmcs.bmc0.user0.channel: 2:3:4     # example
 
-      - there might be more than one user (*user*, *user1*, *user2*...)
-
-    As well, for networks, the basic settings are from:
-
-      - bmcs.bmc0.network.
-      - bmcs.bmc0.network.channel: 3
-      - bmcs.bmc0.network.ipv4_addr: 10.219.139.6
-      - bmcs.bmc0.network.ipv4_gateway: 10.219.136.1
-      - bmcs.bmc0.network.ipv4_netmask: 255.255.252.0
-      - bmcs.bmc0.network.ipv4_src: static
-
-    but it will also configure *bmcs.bmc0.network1*,
-    *bmcs.bmc0.network2*...etc, if present.
+    if the uid is not given, 2 is used as default; if channels are not
+    given, the ones declared in the network section are used.
 
     """
     # This shall be a general BMC extraction function using
     # ipmitool and no Intel secret sauces
 
-    channels = []
+    network_channels = []
     networks = collections.OrderedDict()
     users = collections.OrderedDict()
     
@@ -611,13 +637,13 @@ def setup_ipmitool(target, bmc_id, bmc_name, bmc_data):
             if not 'channel' in value:
                 continue
             networks[key] = value
-            channels.append(value['channel'])
+            network_channels.append(value['channel'])
         elif key.startswith("user"):
             user = {}
             if not 'name' in value:
                 target.report_data(
                     "Warnings [%(type)s]",
-                    f"BMC: no field 'name' in user descriptor 'bmcs.{bmc_name}.{key}'",
+                    f"bmc{bmc_id}: no field 'name' in user descriptor 'bmcs.{bmc_name}.{key}'",
                     1
                 )
                 continue
@@ -625,7 +651,7 @@ def setup_ipmitool(target, bmc_id, bmc_name, bmc_data):
             if not 'password' in value:
                 target.report_data(
                     "Warnings [%(type)s]",
-                    f"BMC: no field 'password' in user descriptor 'bmcs.{bmc_name}.{key}'",
+                    f"bmc{bmc_id}: no field 'password' in user descriptor 'bmcs.{bmc_name}.{key}'",
                     1
                 )
                 continue
@@ -638,9 +664,23 @@ def setup_ipmitool(target, bmc_id, bmc_name, bmc_data):
 
     # okie, so we have all the user info now then
     for username, data in users.items():
-        ipmitool_superuser_setup(
-            target, data['uid'], username, data['password'],
-            channels, bmc_id = bmc_id)
+        channels = []
+        # specified as C1[:C2[:C3[:...]]]
+        for i in data.get('channels', '').split(":"):
+            if i:
+                channels.append(int(i))
+        if not channels:
+            # if we didn't specify user channels to set in the
+            # inventory, just use the ones declared in the network
+            # sections
+            target.report_info(f"BMC: user {username} configured in"
+                               " general network channels {':'.join(channels)}")
+            channels = network_channels
+        else:
+            target.report_info(f"BMC: user {username} configured in"
+                               " user-specific channels {':'.join(channels)}")
+        ipmitool_superuser_setup(target, data['uid'], username,
+                                 data['password'], channels, bmc_id = bmc_id)
 
     for network, data in networks.items():
         ipmitool_ipv4_static_setup(
@@ -659,7 +699,7 @@ def discover_ipmitool(target, bmc_id, selector, update_inventory = False):
     information in the trees:
     
     - *bmcs.bmc<BCM_ID>.mc*
-    - *bmcs.bmc<BCM_ID>.fru
+    - *bmcs.bmc<BCM_ID>.fru*
 
     :param tcfl.tc.target_c target: target on which to operate
 
@@ -693,8 +733,8 @@ def discover_ipmitool(target, bmc_id, selector, update_inventory = False):
     """
     # Gather mc info by both methods, compare them
     # Can we gather data via the network?
-    target.report_info("BMC: collecting MC and FRU information",
-                       level = 1)
+    target.report_info(f"bmc{bmc_id}: collecting MC and FRU information",
+                       dlevel = 1)
     target.shell.run(f"ipmitool {selector} mc info > /tmp/mc.info")
     target.shell.run(f"ipmitool {selector} fru print > /tmp/fru.info")
 
@@ -708,23 +748,31 @@ def discover_ipmitool(target, bmc_id, selector, update_inventory = False):
 
     bmc_name = f"bmc{bmc_id}"
 
-    target.report_info("BMC: updating inventory with MC and FRU information",
-                       level = 2)
+    target.report_info(f"bmc{bmc_id}: updating inventory with MC and FRU information",
+                       dlevel = 1)
     target.property_set(f"bmcs.{bmc_name}.id", bmc_id)
     # this dictionary is just single level
+    d = {}
     for key, value in mc_data.items():
+        # inventory supports only escalars or dicts, so lists are
+        # dicts of bools
         if isinstance(value, list):
             for i in value:
-                target.property_set(f"bmcs.{bmc_name}.mc.{key}.{i}", True)
+                d[f"bmcs.{bmc_name}.mc.{key}.{i}"] = True
         else:
-            target.property_set(f"bmcs.{bmc_name}.mc.{key}", value)
+            d[f"bmcs.{bmc_name}.mc.{key}"] = value
     for key, value in commonl.dict_to_flat(fru_data["FRU Device Description"]):
         if isinstance(value, list):
-            target.property_set(f"bmcs.{bmc_name}.fru." + key, ":".join(value))
+            d[f"bmcs.{bmc_name}.fru." + key] = ":".join(value)
         else:
-            target.property_set(f"bmcs.{bmc_name}.fru." + key, value)
-    target.report_pass("BMC: updated inventory with MC and FRU information")
+            d[f"bmcs.{bmc_name}.fru." + key] = value
+    # clean whatever is there now, re-populate it
+    target.property_set(f"bmcs.{bmc_name}.mc", None)
+    target.property_set(f"bmcs.{bmc_name}.fru", None)
+    target.properties_set(d)
+    target.report_pass(f"bmc{bmc_id}: updated inventory with MC and FRU information")
     return dict(mc = mc_data, fru = fru_data)
+
 
 def setup_discover_all_ipmitool(target, discover = True):
     """
@@ -732,7 +780,7 @@ def setup_discover_all_ipmitool(target, discover = True):
 
     This iterates over all the available BMCs in the system (as
     described by the inventory entries) *bmcs.bmc*, *bmcs.bmc1*,
-    *bmcs.bmc2*... and calls :func:`bmc_setup_ipmitool` (refer to it
+    *bmcs.bmc2*... and calls :func:`setup_ipmitool` (refer to it
     for more details).
 
     :param bool discover: (optional, default *True*) this function
@@ -764,3 +812,15 @@ def setup_discover_all_ipmitool(target, discover = True):
             d[bmc_name] = discover_ipmitool(target, bmc_id, f"-d {bmc_id}",
                                             update_inventory = True)
     return d
+
+
+def setup_all_ipmitool(target):
+    """
+    Setup all the local BMCs using *ipmitool*
+
+    This iterates over all the available BMCs in the system (as
+    described by the inventory entries) *bmcs.bmc*, *bmcs.bmc1*,
+    *bmcs.bmc2*... and calls :func:`setup_ipmitool` (refer to it
+    for more details).
+    """
+    setup_discover_all_ipmitool(target, False)
