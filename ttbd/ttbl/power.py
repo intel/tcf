@@ -1100,6 +1100,20 @@ class daemon_c(impl_c):
       expansion, where each field comes either from the *kws*
       dictionary or the target's metadata.
 
+    :param str path: (optional; defaults to first component of command
+      line) Path to the binary to execute.
+
+      .. warning:: this might be fully deprecated, since its use has
+                   been taken over by *check_path*
+
+    :param str check_path: (optional; defaults to *path*) binary path
+      to use when checking if the process is alive.
+
+      Some processes, after starting with a given binary, fork and
+      transform into another (eg: */usr/bin/program1* forks into
+      */usr/bin/program2* which runs for a long time). To check if the
+      component is running, we check for the PID we are monitoring
+      corresponding to */usr/bin/program2* instead of *program1*.
 
     :param str name: (optional) name of this component; defaults to
       the basename of the path to run.
@@ -1125,7 +1139,7 @@ class daemon_c(impl_c):
     #: Keywords to add for templating the arguments
     def __init__(self, cmdline,
                  precheck_wait = 0, env_add = None, kws = None,
-                 path = None, name = None,
+                 path = None, check_path = None, name = None,
                  pidfile = None, mkpidfile = True, paranoid = False,
                  **kwargs):
         assert isinstance(cmdline, list), \
@@ -1165,6 +1179,11 @@ class daemon_c(impl_c):
         else:
             assert isinstance(path, str)
             self.path = path
+        if check_path == None:
+            self.check_path = self.path
+        else:
+            assert isinstance(check_path, str) and os.path.isfile(check_path)
+            self.check_path = check_path
         if name == None:
             self.name = os.path.basename(self.path)
         else:
@@ -1294,7 +1313,7 @@ class daemon_c(impl_c):
 
         if self.precheck_wait:
             time.sleep(self.precheck_wait)
-        pid = commonl.process_started(pidfile, self.path,
+        pid = commonl.process_started(pidfile, self.check_path,
                                       component + "-" + self.name, target.log,
                                       self.verify,
                                       ( target, component, _cmdline, ))
@@ -1313,7 +1332,7 @@ class daemon_c(impl_c):
         kws['component'] = component
         pidfile = self.pidfile % kws
         try:
-            commonl.process_terminate(pidfile, path = self.path,
+            commonl.process_terminate(pidfile, path = self.check_path,
                                       tag = component + "-" + self.name)
         except OSError as e:
             if e != errno.ESRCH:
@@ -1326,7 +1345,7 @@ class daemon_c(impl_c):
         # bring in runtime properties (override the rest)
         kws.update(target.fsdb.get_as_dict())
         kws['component'] = component
-        return commonl.process_alive(self.pidfile % kws, self.path) != None
+        return commonl.process_alive(self.pidfile % kws, self.check_path) != None
 
 
 class delay_til_shell_cmd_c(impl_c):
