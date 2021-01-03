@@ -117,8 +117,10 @@ class pc(ttbl.power.daemon_c):
     def __init__(self, path = "/usr/sbin/dnsmasq"):
         cmdline = [
             path,
+            "--auth-server",
             "--keep-in-foreground",
             "--pid-file=%(path)s/dnsmasq.pid",
+            "--dhcp-leasefile=%(path)s/dnsmasq.leases",
             "--conf-file=%(path)s/dnsmasq.conf",
         ]
         ttbl.power.daemon_c.__init__(self, cmdline, precheck_wait =
