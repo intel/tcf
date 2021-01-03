@@ -25,6 +25,10 @@ Pending:
   - default route on/off
 
 - allowing adding more names/IP-addresses to the database at will
+
+Note configuration entries for DNSMASQ follow the command line names
+(without the leading --) and the source for DNSMASQ is at
+http://www.thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html.
 """
 import collections
 import ipaddress
@@ -82,10 +86,33 @@ class pc(ttbl.power.daemon_c):
                ( "dnsmasq", ttbl.dnsmasq.pc() ),
            ))
 
+    A console can be configured to see all the log messages reported
+    by *dnsmasq* with the following:
+
+    .. code-block:: python
+
+       target.console.impl_add(
+           "log-dnsmasq",
+           ttbl.console.logfile_c("dnsmasq.log")
+       )
+
+    (this works because :class:`ttbl.console.logfile_c` will read a
+    called *dnsmasq.log* in the target's state directory); running::
+
+      $ tcf console-read TARGETNAME -c log-dnsmasq
+
+    reads the log file; while::
+
+      $ tcf console-setup TARGETNAME -c log-dnsmasq
+
+    wipes the log file
+
+
     FIXME/PENDING:
      - ipv6 address binding.
      - interface name for --interface is hardcoded; need to obtain
        automatically from the IP address
+
     """
     def __init__(self, path = "/usr/sbin/dnsmasq"):
         cmdline = [
@@ -120,6 +147,7 @@ class pc(ttbl.power.daemon_c):
         shutil.rmtree(tftp_dirname, ignore_errors = True)
         commonl.makedirs_p(tftp_dirname, 0o0775)
         ttbl.pxe.setup_tftp_root(tftp_dirname)	# creates the dir
+        commonl.rm_f(os.path.join(ic.state_dir, "dnsmasq.log"))
 
         # Find the targets that connect to this interconnect and
         # collect their IPv4/6/MAC addresses to create the record and
@@ -192,6 +220,9 @@ class pc(ttbl.power.daemon_c):
                 # all files TFTP is to send have to be owned by the
                 # user running it (the same one running this daemon)
                 "tftp-secure",
+                # logging -- can be accessed with a console, see class doc
+                "log-dhcp",
+                "log-facility=%(path)s/dnsmasq.log",
             ]
 
             # Add stuff based on having ipv4/6 support
