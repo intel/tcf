@@ -1132,6 +1132,15 @@ class daemon_c(impl_c):
       adding to the interface. *NAME* is the name of this driver
       instance, see above.
 
+    :param bool close_fds: (optional; default *True*) close or not all
+      file descriptors before running the command; see
+      :python:`subprocess.Popen` for more information.
+
+      If set to *False*, you can select which file descriptors are
+      kept open with:
+
+      >>> os.setinheritable(FD, True)
+
     Other parameters as to :class:ttbl.power.impl_c.
 
     """
@@ -1141,11 +1150,14 @@ class daemon_c(impl_c):
                  precheck_wait = 0, env_add = None, kws = None,
                  path = None, check_path = None, name = None,
                  pidfile = None, mkpidfile = True, paranoid = False,
+                 close_fds = True,
                  **kwargs):
         assert isinstance(cmdline, list), \
             "cmdline has to be a list of strings; got %s" \
             % type(cmdline).__name__
         assert precheck_wait >= 0
+        assert isinstance(close_fds, bool)
+
         impl_c.__init__(self, paranoid = paranoid, **kwargs)
         self.cmdline = cmdline
         #: extra command line elements that can be added by anybody
@@ -1197,6 +1209,7 @@ class daemon_c(impl_c):
             self.pidfile = "%(path)s/%(component)s-%(name)s.pid"
         assert isinstance(mkpidfile, bool)
         self.mkpidfile = mkpidfile
+        self.close_fds = close_fds
 
 
     def verify(self, target, component, cmdline_expanded):
@@ -1284,7 +1297,8 @@ class daemon_c(impl_c):
         stderrf = open(stderrf_name, "w+")
         try:
             p = subprocess.Popen(_cmdline, env = env, cwd = target.state_dir,
-                                 stderr = stderrf, bufsize = 0, shell = False,
+                                 stdout = stderrf, close_fds = self.close_fds,
+                                 stderr = subprocess.STDOUT, bufsize = 0, shell = False,
                                  universal_newlines = False)
             if self.mkpidfile:
                 with open(pidfile, "w+") as pidf:
