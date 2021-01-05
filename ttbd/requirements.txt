@@ -15,10 +15,6 @@
 # sshpass
 # fedora,ubuntu:v4l-utils
 
-## Extra Python Requirements
-# python3-werkzeug
-# python3-pyOpenSSL|ubuntu:python3-openssl
-
 flask           # python3-flask
 flask-login     # python3-flask-login
 flask-principal # fedora,ubuntu:python3-flask-principal
@@ -27,7 +23,6 @@ netifaces       # python3-netifaces
 pexpect         # python3-pexpect
 ply             # python3-ply
 python-prctl
-pyghmi          # python3-pyghmi
 pyserial        # centos,fedora:python3-pyserial|ubuntu:python3-serial
 pysnmp          # centos,fedora:python3-pysnmp|ubuntu:python3-pysnmp4
 python_ldap     # centos,fedora:python3-ldap
