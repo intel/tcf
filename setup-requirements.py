@@ -3,7 +3,6 @@
 Script for gathering os specific requirements for setup files
 """
 # TODO: Add support for distro versions
-# TODO: Add ability to list python packages with no distro package
 
 import argparse
 import re
@@ -42,10 +41,11 @@ if not distro:
 # Pattern for distro specific requirements
 pattern = distro + r"[a-zA-Z0-9\_\-,]*\=?(?P<package>[a-zA-Z0-9\_\-,]+)"
 # Pattern for general requirements
-pattern_general = r"^[a-zA-Z0-9\_\-\=\. \t]*" + \
-                  r"# (?P<package>[a-zA-Z0-9\_\-,]+)(?: |$)"
+pattern_general = r"# package: (?P<package>[a-zA-Z0-9\_\-,]+)" \
+                  + r"(?: [a-zA-Z0-9\_\-,]+|$)"
 # Pattern for requirements without distro packages
-pattern_nodistro = r"^(?P<package>[a-zA-Z0-9\_\-\=\.]+) *#?(?!" + distro + ")*"
+pattern_nodistro = r"^(?P<package>[a-zA-Z0-9\_\-\=\.]+) *(\# package\: )?(?!" \
+                   + distro + r"|\=)*"
 
 # Parse the package requirements from the requirements file
 try:

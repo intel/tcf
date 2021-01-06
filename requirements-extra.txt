@@ -1,12 +1,12 @@
 asciimatics
-junit_xml               # fedora=python3-junit_xml ubuntu=python3-junitxml
-keyring                 # fedora,ubuntu=python3-keyring
-mariadb                 # fedora=python3-mariadb
-numpy                   # python3-numpy
+junit_xml               # package: fedora=python3-junit_xml ubuntu=python3-junitxml
+keyring                 # package: fedora,ubuntu=python3-keyring
+mariadb                 # package: fedora=python3-mariadb
+numpy                   # package: python3-numpy
 # CentOS7's pip3 is quite old, barfs at newer; but then 3.1.0.4 can't
 # be found on Ubuntu20...
-opencv-python==3.4.8.29 # fedora,ubuntu=python3-opencv
-pylint                  # python3-pylint,pylint
-pymongo                 # python3-pymongo
-sphinx                  # python3-sphinx
-sphinx_rtd_theme        # centos,fedora=python3-sphinx_rtd_theme ubuntu=python3-sphinx-rtd-theme
+opencv-python==3.4.8.29 # package: fedora,ubuntu=python3-opencv
+pylint                  # package: python3-pylint,pylint
+pymongo                 # package: python3-pymongo
+sphinx                  # package: python3-sphinx
+sphinx_rtd_theme        # package: centos,fedora=python3-sphinx_rtd_theme ubuntu=python3-sphinx-rtd-theme

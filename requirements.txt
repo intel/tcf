@@ -1,15 +1,15 @@
-## Non-Python Requirements 
-# centos,fedora,ubuntu=make
-# fedora=gvnc-tools
+# Non-Python Requirements 
+# package: make
+# package: fedora=gvnc-tools
 
-## Ubuntu 20.4 -- issue installing 3.x
-Jinja2==2.11.2      # python3-jinja2
-PyYAML              # centos,fedora=python3-pyyaml 
+# Ubuntu 20.4 -- issue installing 3.x
+Jinja2==2.11.2      # package: python3-jinja2
+PyYAML              # package: centos,fedora=python3-pyyaml 
 imutils
-ply                 # python3-ply
-pykwalify           # python3-pykwalify
-pyserial            # python3-pyserial ubuntu=python3-serial
-python-Levenshtein  # python3-Levenshtein
-requests            # python3-requests
-setuptools          # python3-setuptools
-tabulate            # python3-tabulate
+ply                 # package: python3-ply
+pykwalify           # package: python3-pykwalify
+pyserial            # package: python3-pyserial ubuntu=python3-serial
+python-Levenshtein  # package: python3-Levenshtein
+requests            # package: python3-requests
+setuptools          # package: python3-setuptools
+tabulate            # package: python3-tabulate
