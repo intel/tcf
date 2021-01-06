@@ -40,10 +40,10 @@ if not distro:
         sys.exit("Cannot locate distro name, set manually with '-d'")
 
 # Pattern for distro specific requirements
-pattern = distro + r"[a-zA-Z0-9\_\-,]*\:?(?P<package>[a-zA-Z0-9\_\-,]+)"
+pattern = distro + r"[a-zA-Z0-9\_\-,]*\=?(?P<package>[a-zA-Z0-9\_\-,]+)"
 # Pattern for general requirements
 pattern_general = r"^[a-zA-Z0-9\_\-\=\. \t]*" + \
-                  r"# (?P<package>[a-zA-Z0-9\_\-,]+)(?:\||$)"
+                  r"# (?P<package>[a-zA-Z0-9\_\-,]+)(?: |$)"
 # Pattern for requirements without distro packages
 pattern_nodistro = r"^(?P<package>[a-zA-Z0-9\_\-\=\.]+) *#?(?!" + distro + ")*"
 

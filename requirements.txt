@@ -1,14 +1,14 @@
 ## Non-Python Requirements 
-# centos,fedora,ubuntu:make
-# fedora:gvnc-tools
+# centos,fedora,ubuntu=make
+# fedora=gvnc-tools
 
 ## Ubuntu 20.4 -- issue installing 3.x
 Jinja2==2.11.2      # python3-jinja2
-PyYAML              # centos,fedora:python3-pyyaml 
+PyYAML              # centos,fedora=python3-pyyaml 
 imutils
 ply                 # python3-ply
 pykwalify           # python3-pykwalify
-pyserial            # python3-pyserial|ubuntu:python3-serial
+pyserial            # python3-pyserial ubuntu=python3-serial
 python-Levenshtein  # python3-Levenshtein
 requests            # python3-requests
 setuptools          # python3-setuptools
