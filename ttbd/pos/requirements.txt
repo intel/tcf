@@ -1,15 +1,16 @@
-# Non-Python Requirements
-# package: dhcp-server
-# package: dnsmasq 
-# package: httpd
-# package: mod_ssl
-# package: nfs-utils
-# package: rsync
-# package: syslinux
-# package: fedora:syslinux-efi64
-# package: syslinux-extlinux
-# package: syslinux-nonlinux
-# package: syslinux-extlinux-nonlinux
-# package: ipxe-bootimgs
-# package: syslinux-tftpboot
-# package: tftp-server
+## Non-Python Requirements
+# dhcp-server
+# dnsmasq 
+# httpd
+# livecd-tools
+# mod_ssl
+# nfs-utils
+# rsync
+# syslinux
+# fedora:syslinux-efi64
+# syslinux-extlinux
+# syslinux-nonlinux
+# syslinux-extlinux-nonlinux
+# ipxe-bootimgs
+# syslinux-tftpboot
+# tftp-server
