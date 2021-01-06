@@ -2,7 +2,6 @@
 """
 Script for gathering os specific requirements for setup files
 """
-# TODO: Add support for distro versions
 
 import argparse
 import re
@@ -26,6 +25,7 @@ packages = []
 no_distro_packages = []
 
 distro = args["distro"]
+version = args["version"]
 # if distro not set, find the distro through /etc/os-release
 if not distro:
     with open("/etc/os-release", "r") as f:
@@ -38,6 +38,10 @@ if not distro:
     if not distro:
         sys.exit("Cannot locate distro name, set manually with '-d'")
 
+if version:
+    # Pattern for version specific requirements
+    pattern_version = distro + r":" + version \
+                    + r"[a-zA-Z0-9\_\-,]*\=?(?P<package>[a-zA-Z0-9\_\-,]+)"
 # Pattern for distro specific requirements
 pattern = distro + r"[a-zA-Z0-9\_\-,]*\=?(?P<package>[a-zA-Z0-9\_\-,]+)"
 # Pattern for general requirements
@@ -52,15 +56,24 @@ try:
     for filename in args["filenames"]:
         with open(filename, 'r') as f:
             for line in f:
+                if version:
+                    result_version = re.search(pattern_version, line)
+                    if result_version:
+                        packages += result_version.group("package").split(",")
+                        continue
+
                 result = re.search(pattern, line)
                 if result:
                     packages += result.group("package").split(",")
-                else:
-                    result_general = re.search(pattern_general, line)
-                    if result_general:
-                        packages += result_general.group("package").split(",")
-                    elif re.search(pattern_nodistro, line):
-                        no_distro_packages.append(line.split(" ")[0].strip())
+                    continue
+
+                result_general = re.search(pattern_general, line)
+                if result_general:
+                    packages += result_general.group("package").split(",")
+                    continue
+
+                if re.search(pattern_nodistro, line):
+                    no_distro_packages.append(line.split(" ")[0].strip())
 
 except FileNotFoundError:
     print("No requirements file found: '%s'" % filename)
