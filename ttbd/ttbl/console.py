@@ -1337,6 +1337,117 @@ class netconsole_pc(ttbl.power.socat_pc, generic_c):
         return ttbl.power.socat_pc.get(self, target, component)
 
 
+
+class telnet_pc(ttbl.power.socat_pc, generic_c):
+    """Implement a serial port over a telnet connection
+
+    A telnet connection is open to the remote end, anything written to
+    the console is sent there, anything read is received and recorded
+    for the console interface to send to clients.
+
+    This class implements two interfaces:
+
+    - power interface: to start a telnet connection recorder in the
+      background as soon as the target is powered on.
+
+      The power interface is implemented by subclassing
+      :class:`ttbl.power.socat_pc`, which starts *socat* as daemon to
+      serve as a data recorder and to pass data to the connection
+      from the read file.
+
+      Anything read form the telnet connection is written to the
+      *console-NAME.read* file and anything written to it is written
+      to *console-NAME.write* file, which is sent to the remote
+      machine.
+
+    - console interface: interacts with the console interface by
+      exposing the data recorded in *console-NAME.read* file and
+      writing to the *console-NAME.write* file.
+
+    :params str hostname: IP address or hostname of the
+      target. A username can be specified with *username@hostname*;
+      passwords are not yet supported.
+
+    :params int port: (optional; default *23*) port number to connect
+      to.
+
+    Other parameters as to :class:`generic_c`.
+
+    FIXME: passwords are still not supported
+    """
+    def __init__(self, hostname, port = 23, crlf = '\r',
+                 **kwargs):
+        assert isinstance(port, int)
+        generic_c.__init__(self, **kwargs)
+        username, password, _hostname = commonl.split_user_pwd_hostname(hostname)
+        self.hostname = _hostname
+        ttbl.power.socat_pc.__init__(
+            self,
+            "PTY,link=console-%(component)s.write,rawer"
+            "!!CREATE:console-%(component)s.read",
+            # -a: try automatic login, pullin the user from the USER
+            #     env variable
+            # -c: no ~/.telnetrc
+            # -L -8: 8bit binary path on input and output, no translations
+            # -E: no escape characters
+            "EXEC:'telnet -a -c -L -8 -E %(hostname)s %(port)s'"
+            ",sighup,sigint,sigquit"
+        )
+        self.parameters_default = {
+            'user': username,
+        }
+        self.parameters.update(self.parameters_default)
+        # pass those fields to the socat_pc templating engine
+        self.kws['hostname'] = _hostname
+        self.kws['username'] = username
+        self.kws['port'] = port
+        self.paranoid_get_samples = 1
+        self.upid_set(f"console over telnet to {username}@{_hostname}:{port}",
+                      name = f"telnet:{username}@{_hostname}:{port}",
+                      username = username,
+                      hostname = _hostname,
+                      port = port)
+        )
+
+    def on(self, target, component):
+        telnet_user = target.fsdb.get(
+            "interfaces.console." + component + ".parameter_user", None)
+        telnet_port = target.fsdb.get(
+            "interfaces.console." + component + ".parameter_port", None)
+        telnet_password = target.fsdb.get(
+            "interfaces.console." + component + ".parameter_password", None)
+        # FIXME: validate port, username basic format
+        if telnet_user:
+            self.kws['username'] = telnet_user
+        if telnet_port:
+            self.kws['port'] = telnet_port
+        if telnet_password:
+            # if one was specified, use it
+            self.env_add['SSHPASS'] = telnet_password
+        ttbl.power.socat_pc.on(self, target, component)
+        generation_set(target, component)
+        generic_c.enable(self, target, component)
+
+    def off(self, target, component):
+        generic_c.disable(self, target, component)
+        ttbl.power.socat_pc.off(self, target, component)
+
+    def enable(self, target, component):
+        self.on(target, component)
+
+    def disable(self, target, component):
+        return self.off(target, component)
+
+    def state(self, target, component):
+        # we want to use this to gather state, since the generic_c
+        # implementation relies on the console-NAME.write file
+        # existing; this can linger if a process dies or not...
+        # but the ttbl.power.socat_pc.get() implementation checks if
+        # the process is alive looking at the PIDFILE
+        # COMPONENT-socat.pid and verifying that thing is still running
+        return ttbl.power.socat_pc.get(self, target, component)
+
+
 class logfile_c(impl_c):
     """
     A console that streams a logfile in the server
