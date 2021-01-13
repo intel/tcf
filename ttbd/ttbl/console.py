@@ -17,6 +17,7 @@ import fcntl
 import os
 import socket
 import stat
+import struct
 import sys
 import time
 
@@ -723,19 +724,31 @@ class generic_c(impl_c):
 
     def _escape(self, data):
         _data = type(data)()
-        for c in data:
-            if c in self.escape_chars:
-                _data += self.escape_chars[c] + c
-            else:
-                _data += c
+        if isinstance(data, bytes):
+            for c in data:
+                if c in self.escape_chars:
+                    _data += self.escape_chars[c] + struct.pack('B', c)
+                else:
+                    _data += struct.pack('B', c)
+        else:
+            for c in data:
+                if c in self.escape_chars:
+                    _data += self.escape_chars[c] + c
+                else:
+                    _data += c
         return _data
 
 
 
     def _write(self, fd, data):
+        # this is meant for an smallish chunk of data; FIXME: make
+        # data an iterator and encode/escape on the run? esp as we
+        # might have to chunk anyway
+
         # os.write expects a byestring, so convert data to bytes
-        data = data.encode('utf-8')
-        if self.escape_chars:
+        if not isinstance(data, bytes):
+            data = data.encode('utf-8')
+        if self.escape_chars:	# if we have to escape, escape
             data = self._escape(data)
         if self.chunk_size:
             # somethings have no flow control and you need to make
