@@ -10,6 +10,7 @@
 # package: fedora,ubuntu=openocd
 # package: centos,fedora=openssh-clients
 # package: parted
+# package: python3-devel ubuntu=python3-dev
 # package: qemu centos=qemu-kvm
 # package: socat
 # package: sshpass
