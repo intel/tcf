@@ -97,7 +97,8 @@ info "install required packages"
 #
 # FIXME: run DNF inside the chroot, in case we are doing this in a non
 #        DNF enabled system?
-sudo -E dnf --installroot=$IMAGEDIR install -y \
+. $IMAGEDIR/etc/os-release
+sudo -E dnf --installroot=$IMAGEDIR --releasever=$VERSION_ID install -y \
         dosfstools \
         efibootmgr \
         ipmitool \
@@ -107,7 +108,6 @@ sudo -E dnf --installroot=$IMAGEDIR install -y \
         net-tools \
         python3-cryptography \
         statserial \
-        strace \
         strace \
         wget \
         ${POS_PACKAGES:-}
