@@ -2038,12 +2038,20 @@ def str_invisible_escape(s):
 
     :returns str: translated string
     """
-    _s = ""
-    for c in s:
-        b = ord(c)
-        if b >= 0 and b < 0x20:	# printable chars
-            c = str_invisible_table[b]
-        _s += c
+    if isinstance(s, bytes):
+        _s = bytearray()
+        for b in s:
+            if b >= 0 and b < 0x20:	# printable chars
+                _s.extend(bytes(str_invisible_table[b], 'ascii'))
+            else:
+                _s.append(b)
+    else:
+        _s = ""
+        for c in s:
+            b = ord(c)
+            if b >= 0 and b < 0x20:	# printable chars
+                c = str_invisible_table[b]
+            _s += c
     return _s
 
 
