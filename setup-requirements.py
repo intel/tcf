@@ -34,7 +34,8 @@ if not distro:
             result_distro = re.search(pattern_distro, line)
             if result_distro:
                 distro = result_distro.group("distro")
-                print("I: /etc/os-release: distro to be %s" % distro)
+                print("I: /etc/os-release: distro to be %s" % distro,
+                      file = sys.stderr)
     if not distro:
         sys.exit("Cannot locate distro name, set manually with '-d'")
 
@@ -76,7 +77,7 @@ try:
                     no_distro_packages.append(line.split(" ")[0].strip())
 
 except FileNotFoundError:
-    print("No requirements file found: '%s'" % filename)
+    print("E: No requirements file found: '%s'" % filename, file = sys.stderr)
 
 # Remove duplicates and order alphabetically
 packages = sorted(set(packages))
