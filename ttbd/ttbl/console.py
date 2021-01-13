@@ -1407,7 +1407,6 @@ class telnet_pc(ttbl.power.socat_pc, generic_c):
                       username = username,
                       hostname = _hostname,
                       port = port)
-        )
 
     def on(self, target, component):
         telnet_user = target.fsdb.get(
