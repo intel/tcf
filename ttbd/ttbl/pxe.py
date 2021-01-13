@@ -191,38 +191,63 @@ def setup_tftp_root(tftp_rootdir):
 #: These are mapped to the *pos_image* attribute on a target; this is
 #: configured by the system administrator as different targets might
 #: need different command line arguments.
+#:
+#: - *tcf-live*: default POS boot option, and lists the boot options
+#:    needed to boot the TCF POS, which is basically Fedora Live with
+#:    some configuration tweaks booting off a read-only NFS. To
+#:    configure it, follow :ref:`the instructions<generate_tcf_live_iso>`.
+
 pos_cmdline_opts = {
     'tcf-live':  [
-        # no 'single' so it force starts getty on different ports
         # this needs an initrd
         "initrd=%(pos_http_url_prefix)sinitramfs-%(pos_image)s ",
-        # needed by Fedora running as live FS hack
-        "rd.live.image",
+
         # We need SELinux disabled--otherwise some utilities (eg:
         # rsync) can't operate properly on the SELinux attributes they need to
         # move around without SELinux itself getting on the way.
         "selinux=0", "audit=0",
-        # ip=dhcp so we get always the same IP address and NFS root
-        # info (in option root-path when writing the DHCP config file
-        # a few lines above in _dhcp_conf_write()); thus nfsroot
-        # defers to whatever we are given over DHCP, which has all the
-        # protocol and version settings
+
+        # Get info automatically using DHCP, so we get:
         #
-        # IP specification is needed so the kernel acquires an IP address
-        # and can syslog/nfsmount, etc Note we know the fields from the
-        # target's configuration, as they are pre-assigned
-        "ip=dhcp",
-        # The path to this is obtained if not given here (which we
-        # also can) from the DHCP root-path option given by the DHCP
-        # server -- look into dnsmasq.py or dhcp.py for root-path.
-        "root=/dev/nfs",		# we are NFS rooted
-        # no exotic storage options
-        "rd.luks=0", "rd.lvm=0", "rd.md=0", "rd.dm=0", "rd.multipath=0",
-        "ro",				# we are read only
-        "plymouth.enable=0 ",		# No installer to run
+        # - routing/netmask info
+        #
+        # - NFS root path for booting (set in dnsmasq.py or dhcp.py
+        #   FIXME: bring it here)
+        #
+        # - DNS info
+        # - ...
+        #
+        # and we manage that in a central spot. DHCP can be (is
+        # configured in the default network targets) to always provide
+        # the same IP address to the targets (as declared in the
+        # inventory).
+        #
+        # rd.ip=auto is like ip=dhcp
+        "rd.ip=auto", "root=nfs",		# we are NFS rooted
+        "ro",					# boot read only
+
 	# kernel, be quiet to avoid your messages polluting the serial
         # terminal
         "loglevel=2",
+
+        #
+        # Debugging tweaks:
+        #
+        # when booting dracut, commmand line described
+        # https://mirrors.edge.kernel.org/pub/linux/utils/boot/dracut/dracut.html#dracutcmdline7 can be used
+        # stuff https://freedesktop.org/wiki/Software/systemd/Debugging/#index1h1
+        #
+        #"debug",
+        "rd.shell",			# if it fails, drop to shell
+        #"rd.info",
+        #"rd.debug",
+        #"rd.live.debug=1",
+        #"systemd.log_level=debug",
+        #"systemd.log_target=console",
+        #"systemd.journald.forward_to_console=1",
+        "systemd.debug-shell=1",	# drop to shell on a VC
+        # if we do normal init, we can't log in
+        #"init=single",
     ]
 }
 
