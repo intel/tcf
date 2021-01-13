@@ -371,7 +371,7 @@ evaluating succesfully, so the ran was considered a sucess (*PASS*).
 Configure QEMU targets
 ----------------------
 
-QEMU targets can be configured to boot a VM with 
+QEMU targets can be configured to boot a VM with
 
 
 Configure physical test targets and power switches
@@ -389,17 +389,17 @@ Create a configuration file
 configuration statements as described in the links below:
 
 - :ref:`PDUs / power switches <conf_00_lib_pdu>`:
-  
+
   - :py:func:`Digital Loggers Web Power Switch 7
     <conf_00_lib_pdu.dlwps7_add>` PDUs / wall-power switches
-    
+
   - :py:func:`Raritan EMX
     <conf_00_lib_pdu.raritan_emx_add>` based PDUs  / wall-power
     switches
-    
+
   - :py:func:`YKUSH USB power switches <conf_00_lib_pdu.ykush_targets_add>`
     USB data/power switchable hub
-    
+
   - :py:func:`Devantech USB-RLY08B USB controlled relays
     <conf_00_lib_pdu.usbrly08b_targets_add>`
 
@@ -750,7 +750,7 @@ Once a target is configured in, run a quick healthcheck::
       and interfaces)
 
 
-      
+
 Configuring support information
 -------------------------------
 
@@ -801,9 +801,6 @@ POS needs, depending on the setup:
   that will allow to flash a 1G image in less than one minute on a
   normal harddrive.
 
-  Optional: use glusterfs to coordinate the distribution of images to
-  all the servers FIXME
-
 - A server providing:
 
   - the POS linux kernel and initrd over HTTP for targets to boot from
@@ -830,7 +827,7 @@ been tested yet, shall be similar.
 
      # dnf install -y --allowerasing ttbd-pos
 
-2. Ensure your user is member of the ``ttbd`` group::
+2. (if it is not) Ensure your user is member of the ``ttbd`` group::
 
      # usermod -aG ttbd YOURUSER
 
@@ -853,7 +850,7 @@ been tested yet, shall be similar.
      # firewall-cmd --permanent --add-service=ssh
 
    For the Provisioning services::
-   
+
      # firewall-cmd --permanent \
         --add-service=dhcp \
         --add-service=dhcpv6 \
@@ -870,13 +867,13 @@ been tested yet, shall be similar.
 
    For internal proxying from test networks to outside (if
    configured)::
-     
+
      # firewall-cmd --permanent --add-port=8888/tcp
 
    Ensure it works::
 
      # firewall-cmd --reload
-  
+
    You can alternatively, disable the firewall::
 
      # systemctl stop firewalld
@@ -899,7 +896,7 @@ been tested yet, shall be similar.
      .. warning:: do not tag */home/ttbd/images*; files in there will
                   have their own SELinux contexts based on what the
                   Linux distribution they represent needs.
-       
+
      Test this is working::
 
        # systemctl restart httpd
@@ -917,7 +914,7 @@ been tested yet, shall be similar.
 
    - tftp-server provides TFTP boot services (not in all
      installations)::
-     
+
        # systemctl enable --now tftp		# CentOS7
 
 POS: deploy PXE boot image to HTTP and NFS server locations
@@ -925,8 +922,8 @@ POS: deploy PXE boot image to HTTP and NFS server locations
 
 .. _generate_tcf_live_iso:
 
-Currently the Provisioning OS is implemented with a derivative of
-Fedora Linux.
+Currently the Provisioning OS is implemented by tweaking a Fedora
+Linux Workstation Live OS to boot off NFS.
 
 .. warning:: these steps are meant for an x86-64 platform and it has
              to be run in such. Steps for x86 (32-bits) or other
@@ -935,62 +932,21 @@ Fedora Linux.
 .. warning:: it is only possible to run these steps now in a Fedora
              platform; need to document steps to do it from another
              one.
-             
 
-a. Generate TCF-live on the fly::
+a. Download Fedora Linux::
 
-     $ /usr/share/tcf/live/mk-liveimg.sh
+     # wget https://download.fedoraproject.org/pub/fedora/linux/releases/33/Workstation/x86_64/iso/Fedora-Workstation-Live-x86_64-33-1.2.iso
 
-   Note:
+b. Extract the Fedora Linux Live image and do some tweaks; this will
+   ask for the *sudo* password and take a while while it extracts all
+   the data::
 
-   - needs sudo access; will ask for your password to gain *sudo* when
-     needed
+     $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/tcf-live/x86_64 Fedora-Workstation-Live-x86_64-33-1.2.iso
 
-   - downloads ~300 packages to create a Fedora-based image, so make
-     sure you have a good connection and plenty of disk space free.
+c. Do extra tweaks needed for the live image to boot off NFS (might
+   also ask for *sudo*)::
 
-     It will be cached in directory *tcf-live* so next time you run
-     less needs to be downloaded.
-
-     To use a closer mirror to you or add extra RPM repositories::
-
-       $ mdkir tcf-live
-       $ cat > tcf-live/tcf-live-mirror.ks <<EOF
-       # Repos needed to pick up TCF internal RPMs
-       repo --name=EXTRAREPO --baseurl=https://LOCATION/SOMEWHERE
-       # internal mirrors for getting RPMs
-       repo --name=fedora-local --cost=-100 --baseurl=http://MIRROR/fedora/linux/releases/$releasever/Everything/$basearch/os/
-       repo --name=updates-local --cost=-100 --baseurl=http://MIRROR/fedora/linux/releases/$releasever/Everything/$basearch/os/
-       EOF
-
-b. Extract the root file system from the ISO image to the
-   ``/home/ttbd/images`` directory; this is where the NFS server
-   will read-only root serve it from and also we'll be able to use
-   it to flash targets::
-
-     $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/tcf-live/x86_64/ tcf-live/tcf-live.iso
-     I: loop device /dev/loop0
-     NAME      MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
-     loop0       7:0    0  419M  0 loop
-     └─loop0p1 259:0    0  419M  0 loop
-     mount: /home/LOGIN/tcf-image-setup.sh-XEqBHG/iso: WARNING: device write-protected, mounted read-only.
-     I: mounted /dev/loop0p1 in tcf-image-setup.sh-XEqBHG/iso
-     I: mounted tcf-image-setup.sh-XEqBHG/iso/LiveOS/squashfs.img in tcf-image-setup.sh-XEqBHG/squashfs
-     I: mounted tcf-image-setup.sh-XEqBHG/squashfs/LiveOS/ext3fs.img in tcf-image-setup.sh-XEqBHG/root
-     I: created tcf-live, transferring
-     I: tcf-live: diffing verification
-     File tcf-image-setup.sh-XEqBHG/root/./dev/full is a character special file while file tcf-live/.
-     /dev/full is a character special file
-     ...
-     File tcf-image-setup.sh-XEqBHG/root/./dev/zero is a character special file while file tcf-live/.
-     /dev/zero is a character special file
-     I: unmounting tcf-image-setup.sh-XEqBHG/root
-     I: unmounting tcf-image-setup.sh-XEqBHG/squashfs
-     I: unmounting tcf-image-setup.sh-XEqBHG/iso
-     I: unmounting tcf-image-setup.sh-XEqBHG/root
-     umount: tcf-image-setup.sh-XEqBHG/root: not mounted.
-
-   (most of those warning messages during verification can be ignored)
+     $ /usr/share/tcf/tcf-pos-live-setup.sh /home/ttbd/images/tcf-live/x86_64
 
 c. Make the kernel and initrd for POS available via Apache for
    PXE-over-HTTP and PXE-over-TFTP booting:
@@ -998,11 +954,10 @@ c. Make the kernel and initrd for POS available via Apache for
    i. Copy the kernel::
 
         # cp /home/ttbd/images/tcf-live/x86_64/boot/vmlinuz-* \
-            /home/ttbd/public_html/x86_64/vmlinuz-tcf-live
+             /home/ttbd/public_html/x86_64/vmlinuz-tcf-live
 
    ii. Regenerate the *initrd* with nfs-root support, as the initrd
-       generated does not have nfs-root enabled (FIXME: figure out
-       the configuration to enable it straight up)::
+       generated does not have nfs-root enabled::
 
          # dracut -v -H --kver $(ls /home/ttbd/images/tcf-live/x86_64/lib/modules) \
                 -k /home/ttbd/images/tcf-live/x86_64/lib/modules/* \
@@ -1017,7 +972,7 @@ c. Make the kernel and initrd for POS available via Apache for
                     works with multiple machines is created.
 
        needed drivers:
-       
+
        - *ftdi_sio* drivers for FTDI USB serial ports
        - *igb*, *e1000e*, *i40e*: Intel adapters
        - *r8169* for some Realtek network cards
@@ -1025,13 +980,14 @@ c. Make the kernel and initrd for POS available via Apache for
 
        Note if you run as non-root (not using *sudo* or *su*) *dracut*
        will fail to generate the initrd properly due to some bugs.
-         
+
    iii. Make everything readable to the public::
 
           # chmod a+rX -R /home/ttbd/public_html
           # chcon -R -t httpd_sys_content_t /home/ttbd/public_html
 
-   iv. Copy the POS boot material to the TFTP directory::
+   iv. Copy the POS boot material to the TFTP directory (for units
+       that boot over TFTP)::
 
          # install -m 2775 -o ttbd -g ttbd -d \
               /var/lib/tftpboot/ttbd-production/efi-x86_64
@@ -1056,7 +1012,6 @@ c. Make the kernel and initrd for POS available via Apache for
        Note the name changes; as well, there is no need to copy it to
        the TFTP directory as new code paths do it for us.
 
-
    Ensure those two files work by pointing a browser to
    http://YOURSERVERNAME/ttbd-pos/ and verifying they can be downloaded.
 
@@ -1065,51 +1020,23 @@ d. Make the POS root image available over NFS as read-only; verify
    tells the NFS subsystem to export the POS images for the different
    architectures.
 
-   Manually, it can be created with::
+   This file is installed by package *ttbd-pos*; if manual
+   installation is needed::
 
-     # tee /etc/exports.d/ttbd-pos.exports <<EOF
-     /home/ttbd/images/tcf-live/x86_64 *(ro,no_root_squash)
-     EOF
+     # install -o root -g ttbd -m 0644 tcf.git/ttbd/pos/ttbd-pos.exports /etc/exports.d/ttbd-pos.exports
      # systemctl reload nfs-server		# use 'nfs' for RHEL
 
-     
    Verify the directory is exported::
 
      $ showmount -e SERVERNAME
      Export list for localhost:
      /home/ttbd/images/tcf-live/x86_64 *
 
-e. Perform final image setup:
-
-   - Allow login in via SSH--this is used when the serial console is
-     not very stable; allows us to do basic start via serial console
-     and switch to SSH to do the job:
-
-       1. Mount a FS read write where *sshd* can write its state::
-
-            $ cd /home/ttbd/images/tcf-live/x86_64/etc/
-            $ echo 'tmpfs /var/empty/sshd tmpfs defaults 0 0' | sudo tee -a fstab
-
-       1. Create *sshd*'s host keys::
-
-            $ cd /home/ttbd/images/tcf-live/x86_64/etc/ssh
-            $ for v in rsa ecdsa ed25519; do \
-                sudo ssh-keygen -f ssh_host_${v}_key -q -t $v -C '' -N ''; done
-
-       3. Allow SSH to login as root and with no password (note this
-          is safe in the POS environment since it is only being used
-          for provisioning the target)::
-
-            $ cat <<EOF | sudo tee -a sshd_config
-            PermitRootLogin yes
-            PermitEmptyPasswords yes
-            EOF
-
-f. Deploy content to the server that test content can / will use::
+e. Deploy content to the server that test content can / will use::
 
      $ install -m 0775 -d /home/ttbd/images/misc
      $ cp /usr/share/tcf/content/evemu.bin.*.tar.gz /home/ttbd/images/misc
-     
+
 .. _ttbd_pos_deploying_images:
 
 POS: Deploying other images
@@ -1134,10 +1061,10 @@ POS; for example:
 - CentOS::
 
     $ wget http://isoredirect.centos.org/centos/8/isos/x86_64/CentOS-8.1.1911-x86_64-dvd1.iso
-    $ /usr/share/tcf/kickstart-install.sh centos.qcow2 CentOS-8.1.1911-x86_64-dvd1.iso 
+    $ /usr/share/tcf/kickstart-install.sh centos.qcow2 CentOS-8.1.1911-x86_64-dvd1.iso
     $ BOOT_PARTITION=2 BOOT_MOUNTOPTS=noload ROOT_PARTITION=4 \
         /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/centos::8.1:1911:x86_64 centos.qcow2
-        
+
 - Clearlinux::
 
     $ wget https://cdn.download.clearlinux.org/releases/32310/clear/clear-32310-live-desktop.iso
@@ -1152,21 +1079,21 @@ POS; for example:
     $ /usr/share/tcf/tcf-image-setup.sh fedora:workstation:29::x86_64 Fedora-Workstation-Live-x86_64-29-1.2.iso
 
 - RHEL::
-    
-    $ /usr/share/tcf/kickstart-install.sh rhel.qcow2 RHEL-8.1.0-x86_64-dvd1.iso 
+
+    $ /usr/share/tcf/kickstart-install.sh rhel.qcow2 RHEL-8.1.0-x86_64-dvd1.iso
     $ BOOT_PARTITION=2 ROOT_PARTITION=4 \
-        /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/rhel::8.1:0:x86_64 rhel.qcow2 
+        /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/rhel::8.1:0:x86_64 rhel.qcow2
 
 - Ubuntu::
 
     $ wget http://releases.ubuntu.com/18.04/ubuntu-18.04.5-desktop-amd64.iso
-    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/ubuntu:desktop:18.04:5:x86_64 ubuntu-18.04.5-desktop-amd64.iso 
-    
+    $ /usr/share/tcf/tcf-image-setup.sh /home/ttbd/images/ubuntu:desktop:18.04:5:x86_64 ubuntu-18.04.5-desktop-amd64.iso
+
 - Yocto::
 
     $ wget http://downloads.yoctoproject.org/releases/yocto/yocto-2.5.1/machines/genericx86-64/core-image-minimal-genericx86-64.wic
     $ /usr/share/tcf/tcf-image-setup.sh yocto:core-image-minimal:2.5.1::x86_64 core-image-minimal-genericx86-64.wic
-    
+
 Otherwise, an image can be extracted and or setup manually and it
 consists of:
 
@@ -1188,7 +1115,7 @@ consists of:
 
 See mode details on how to :ref:`automate with kickstart
 <kickstart_install>` the creation of an image.
-  
+
 .. _ttbd_pos_network_config:
 
 POS: Configuring networks
@@ -1232,7 +1159,7 @@ using :func:`conf_00_lib_pos.nw_indexes`
        http_proxy = "http://192.%d.%d.1:8888" % (x, y),
        https_proxy = "http://192.%d.%d.1:8888" % (x, y),
    ))
-  
+
 by default the server is in *192.x.y.1* in that network, so if we
 configure *tinyproxy* to serve on port 8888, the targets can access it
 for proxy services.
@@ -1344,7 +1271,7 @@ network *nwa* so it can be flashed with POS.
    individual steps might have to be unfolded--look at the source of
    the configuration library (in your server configuration directory)
    for details.
-               
+
 Restart the server and verify *nuc-58a* works as expected::
 
   # systemctl restart ttbd@production
@@ -1385,7 +1312,7 @@ environment variable::
 :ref:`how to add more <ttbd_pos_deploying_images>`).
 
 .. _pos_network_config_details:
-     
+
 POS networks: harder details, adding extra services
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

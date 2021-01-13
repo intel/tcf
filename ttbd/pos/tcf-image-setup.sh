@@ -473,12 +473,12 @@ for file in $destdir/etc/pam.d/* $destdir/usr/share/pam.d/*; do
     info "$file: allowing login to accounts with no password (replacing 'nullok_secure')"
     selinux_relabel["${file##$destdir}"]=1
     sudo sed -i 's/nullok_secure/nullok/g' $file
-    grep -q "pam_unix.so.*nullok" $file && continue
+    #grep -q "pam_unix.so.*nullok" $file && continue
     # Some distros configure PAM to disallow passwordless root; we
     # change that so automation doesn't have to work through so many
     # hoops
     info "$file: allowing login to accounts with no password (adding 'nullok')"
-    sudo sed -i 's/pam_unix.so/pam_unix.so\tnullok /' $file
+    sudo sed -i 's/pam_unix.so *$/pam_unix.so\tnullok /' $file
 done
 
 if test -r $destdir/usr/share/defaults/etc/profile.d/50-prompt.sh; then
@@ -540,7 +540,7 @@ esac
 # Leave only which ever boot config file was defined to avoid
 # confusing the TCF POS client
 
-if ! [ -z "$BOOT_CONF_ENTRY" ]; then
+if ! [ -z "${BOOT_CONF_ENTRY:-}" ]; then
     # verify the single entry we are asking to keep alive exists
     if ! [ -r $destdir/boot/loader/entries/"$BOOT_CONF_ENTRY" ]; then
         entries=$(cd $destdir/boot/loader/entries && echo *.conf || true)
