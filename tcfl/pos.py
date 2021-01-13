@@ -1013,6 +1013,10 @@ timeout = 60
 uid = root
 gid = root
 EOF""")
+        # newer versions of rsyncd will use /proc/self/fd/<NUMBER> to
+        # change the mode of a file, so if /proc is not mounted in the
+        # chroot, then they fail.
+        target.shell.run("mount proc /mnt/proc -t proc    # rsyncd needs this")
         # start rsync in the background, save it's PID file as rsync makes
         # no pids and we might not have killall in the POS
         target.shell.run(
@@ -1256,6 +1260,7 @@ EOF""")
         # set -b: notify immediatelly so we get the Killed message
         # and it does not clobber the output of the next command.
         target.shell.run("set -b")
+        target.shell.run("umount -l /mnt/proc || false")
         target.send("kill -9 `cat /tmp/rsync.pid`")
         # this message comes asynchronous, maybe before or after the
         # prompt...hence why we don't use target.shell.run()
