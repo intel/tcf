@@ -1479,6 +1479,9 @@ class logfile_c(impl_c):
         assert isinstance(logfile_name, str)
         impl_c.__init__(self, **kwargs)
         self.logfile_name = logfile_name
+        self.upid_set(f"console for logfile {logfile_name}",
+                      name = logfile_name,
+        )
 
     # console interface)
     def _size(self, target, component, file_name):
@@ -1524,7 +1527,7 @@ class logfile_c(impl_c):
         except OSError as e:
             if e.errno != errno.ENOENT:
                 raise
-    
+
     def read(self, target, component, offset):
         # read the file; however, let's do a basic attempt at
         # detecting if it has been removed and created new  since the
