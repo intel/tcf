@@ -53,8 +53,12 @@ info "configuring password-less, auto-login"
 sudo chroot $IMAGEDIR passwd --delete root
 if ! grep -qe '--autologin root' $IMAGEDIR/usr/lib/systemd/system/serial-getty@.service;
 then
+    # --skip-login ensures we don't print the "login:" prompt, which
+    # we don't have to, since we are autologin--it also confuses the
+    # recovery code in the client side, which only expects it on the
+    # actual OS.
     sudo sed -i \
-        's|bin/agetty .*$|bin/agetty --autologin root -o "-p -- \\u" 115200 %I $TERM|' \
+        's|bin/agetty .*$|bin/agetty --skip-login --autologin root -o "-p -- \\u" 115200 %I $TERM|' \
         $IMAGEDIR/usr/lib/systemd/system/serial-getty@.service
 fi
 
