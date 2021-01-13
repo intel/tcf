@@ -883,7 +883,7 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
                       stop_bits = 1,
                       serial_port = serial_file_name,
         )
-        
+
     # console interface; state() is implemented by generic_c
     def on(self, target, component):
         ttbl.power.socat_pc.on(self, target, component)
@@ -908,6 +908,126 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
         # the process is alive looking at the PIDFILE
         # COMPONENT-socat.pid and verifying that thing is still running
         return ttbl.power.socat_pc.get(self, target, component)
+
+
+class general_pc(ttbl.power.socat_pc, generic_c):
+    """Implement a general console/data recorder
+
+    When an implementation creates a file we can write to to get data
+    into a console (represented as *STATEDIR/console-NAME.write*),
+    this implementation will write to said file on *write()* and
+    whatever is read from said file, will be recorded to
+    *STATEDIR/console-NAME.read*).
+
+    This class is different to similarly name
+    :class:`ttbl.console.generic_c` in that this implements a full
+    console and *generic_c* is a building block.
+
+    Use cases:
+
+    - QEMU/virtualized target which represents its console via a
+      Unix socket or PTY -- the driver target, before starting the
+      serial console symlinks *STATEDIR/console-NAME.write* to
+      */dev/pts/XYZ*, (see ttbl.qemu._qemu_console_on() as an
+      example).
+
+    Do not use this for:
+
+    - Serial port consoles (use :class:`serial_pc`)
+
+    - Consoles over SSH or telnet (use :class:`ssh_pc` or
+      :class:`telnet_pc`)
+
+    - Exposing logfiles (use :class:`logfile_c`)
+
+    This class, given a file where to capture from, implements two
+    interfaces:
+
+    - power interface: starts a a recorder in the background on power
+      on which will write to *console-NAME.read* anything read from
+      file *console-NAME.write*, which is assumed to exist.
+
+      The power interface is implemented by subclassing
+      :class:`ttbl.power.socat_pc`, which starts *socat* as daemon to
+      serve as a data recorder.
+
+    - console interface: interacts with the console interface by
+      exposing the data recorded in *console-NAME.read* file and
+      writing to the *console-NAME.write* file.
+
+    :params str file_name: (optional) name of file to use as source of
+      data and sink. Defaults to *console-NAME.write*, where *NAME*
+      is the name under which the console is registered.
+
+    For example, create a serial port recoder power control / console
+    driver and insert it into the power rail and the console of a
+    target:
+
+    >>> console_pc = ttbl.console.general_pc()
+    >>>
+    >>> ttbl.test_target.get(name).interface_add(
+    >>>     "power",
+    >>>     ttbl.power.interface(
+    >>>         ...
+    >>>         console_pc,
+    >>>         ...
+    >>>     )
+    >>> ttbl.test_target.get(name).interface_add(
+    >>>     "console",
+    >>>     ttbl.console.interface(
+    >>>         serial0 = console_pc,
+    >>>         default = "serial0",
+    >>>     )
+    >>> )
+
+    """
+    def __init__(self, file_name = None, **kwargs):
+        generic_c.__init__(self, **kwargs)
+        assert file_name == None or isinstance(file_name, str)
+        if file_name == None:
+            self.file_name = "console-%(component)s.write"
+        else:
+            self.file_name = file_name
+        ttbl.power.socat_pc.__init__(
+            self,
+            f"GOPEN:{self.file_name},rawer",
+            "CREATE:console-%(component)s.read",
+            # make it unidirectional; we only need to capture whatever
+            # comes in the .write file to the read file.
+            extra_cmdline = [ "-u" ])
+        if file_name:
+            self.upid_set(f"General console @{file_name}",
+                          name = f"general-console{file_name}",
+                          file_name = file_name,)
+        else:
+            self.upid_set("General console",
+                          name = "general-console")
+
+    # console interface; state() is implemented by generic_c
+    def on(self, target, component):
+        ttbl.power.socat_pc.on(self, target, component)
+        generation_set(target, component)
+        generic_c.enable(self, target, component)
+
+    def off(self, target, component):
+        generic_c.disable(self, target, component)
+        ttbl.power.socat_pc.off(self, target, component)
+
+    def enable(self, target, component):
+        self.on(target, component)
+
+    def disable(self, target, component):
+        return self.off(target, component)
+
+    def state(self, target, component):
+        # we want to use this to gather state, since the generic_c
+        # implementation relies on the console-NAME.write file
+        # existing; this can linger if a process dies or not...
+        # but the ttbl.power.socat_pc.get() implementation checks if
+        # the process is alive looking at the PIDFILE
+        # COMPONENT-socat.pid and verifying that thing is still running
+        return ttbl.power.socat_pc.get(self, target, component)
+
 
 class ssh_pc(ttbl.power.socat_pc, generic_c):
     """Implement a serial port over an SSH connection
