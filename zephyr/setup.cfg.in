@@ -4,23 +4,5 @@ install_data = /
 [bdist_rpm]
 release = 1
 packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
-requires =
+requires = {{requirements}}
          tcf == %%{version}-%%{release}
-         autoconf
-         automake
-         ccache
-         cmake
-         dfu-util
-         dtc
-         git
-         glibc-devel
-         gperf
-         libstdc++-devel
-         libtool
-         make
-         ninja-build
-         python3-pip
-         python3-ply
-         python3-pykwalify
-         python3-pyserial
-         python3-yaml

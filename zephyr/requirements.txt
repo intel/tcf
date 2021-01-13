@@ -1,0 +1,14 @@
+# Non-Python Requirements
+# package: autoconf
+# package: automake
+# package: ccache
+# package: cmake
+# package: fedora,ubuntu=dfu-util
+# package: dtc ubuntu=device-tree-compiler
+# package: git
+# package: centos,fedora=glibc-devel
+# package: gperf
+# package: centos,fedora=libstdc++-devel
+# package: libtool
+# package: make
+# package: ninja-build
