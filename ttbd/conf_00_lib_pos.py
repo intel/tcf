@@ -979,7 +979,7 @@ def target_qemu_pos_add(target_name,
         # - we cannot use unix:PATH fro VNC path, otherwise
         #   gvnccapture can't find it. We can't socat it into a port
         #   because QEMU removes the UNIX socket once closed.
-        "-display", "vnc=localhost:%(vnc-port)s",
+        "-display", "vnc=localhost:%(vnc.vnc0.port)s",
         # EFI BIOS
         "-drive", "if=pflash,format=raw,readonly,file=%(qemu-image-bios)s",
         "-drive", "if=pflash,format=raw,file=%(path)s/OVMF_VARS.fd",
@@ -988,20 +988,36 @@ def target_qemu_pos_add(target_name,
         "-boot", "order=nc",	# for POS over PXE
     ]
     # Create as many consoles as directed
+    consolel = []
     for console in consoles:
-        kws = { "console": console }
+        # record using socat as a separate process --
+        # ttbl.qemu.pc() detects we are powering on PTY consoles
+        # and upon power on, will symlink
+        # STATE_DIR/console-CONSOLE.write to /dev/pts/WHATEVER so
+        # ttbl.console_general_pc() can write to it and read from it.
         cmdline += [
-            "-chardev", "socket,id=%(console)s,server,nowait,path=%%(path)s/console-%(console)s.write,logfile=%%(path)s/console-%(console)s.read" % kws,
-            "-serial", "chardev:%(console)s" % kws
+            "-chardev", f"pty,id={console}",
+            "-serial", f"chardev:{console}"
         ]
+        console_pc = ttbl.console.general_pc(chunk_size = 8,
+                                             interchunk_wait = 0.15)
+        console_pc.crlf = "\r"
+        consolel.append(( console, console_pc ))
+
     cmdline += extra_cmdline.split()
-    qemu_pc = ttbl.qemu.pc(qemu_cmdline = cmdline, nic_model = "virtio")
+    qemu_pc = ttbl.qemu.pc(qemu_cmdline = cmdline)
 
     # The QEMU object exposes a power control interface to start/stop
     power_rail = []
     if nw_name:			# got networking?
         power_rail.append(( "tuntap-" + nw_name, ttbl.qemu.network_tap_pc() ))
     power_rail.append(( "AC", qemu_pc ))
+    for console in consoles:
+        # turn on recording from the console when we turn on the
+        # machine FIXME: we might loose a wee bit, we shall be able to
+        # do it before, but the problem is before the PTY
+        # device/socket for the console does not exist
+        power_rail.append(( console, console_pc ))
     target.interface_add("power", ttbl.power.interface(*power_rail))
 
     # The QEMU object exposes an image setting interface
@@ -1016,13 +1032,9 @@ def target_qemu_pos_add(target_name,
     # them as it takes as parameter the console name to read off/write
     # the QEMU generated cmdline in
     # STATE_DIR/console-NAME.{read,write}
-    console_pc = ttbl.console.generic_c(chunk_size = 8,
-                                        interchunk_wait = 0.15)
-    console_pc.crlf = "\r"
-    upid = qemu_pc.upid
-    del upid['name_long']
-    console_pc.upid_set(qemu_pc.name, **upid)
     ssh_pc = ttbl.console.ssh_pc("root@" + ipv4_addr)
+    upid = dict(qemu_pc.upid)
+    del upid['name_long']
     ssh_pc.upid_set(qemu_pc.name, **upid)
     consolel = []
     for console in consoles:

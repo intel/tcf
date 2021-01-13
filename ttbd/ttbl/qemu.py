@@ -35,6 +35,50 @@ that run as QEMU virtual machines:
   devices to a (virtual or physical) network device that represents a
   network.
 
+PENDING
+^^^^^^^
+
+- move all inventory entries to proper hierarchies, so we can support
+  multiple QEMU instances in the same target::
+
+    qemu.* -> qemu.COMPONENT.*:
+
+    qemu.AC.gdb-tcp.port
+    qemu.AC.image-bios
+    qemu.AC.pid
+    qemu.AC.qmp
+
+  Hinging on:
+
+  - qemu-gdb-tcp-port defined in the command line, so we might have to
+    update self.kws during on() to define those fixed from
+    qemu.COMPONENT.gdb-tcp-port > qemu-gdb-tcp-port
+
+  - same with the images; we need to improve the handling of this so
+    that we have a  kinda mapping of each QEMU instance which images
+    it takes / provides to the interface.
+
+  - vnc-* -> vnc.COMPONENT.{host,port,tcp-port}
+
+  - tuntap-IC -> interconnects[IC].tuntap?
+
+Known issues
+^^^^^^^^^^^^
+
+- as of version 5.1.? of QEMU, the console support that relied on
+  using *-chardev*'s *logfile* option no longer works:
+
+  - When combined with *socket*, it blocks until the write side is
+    written to, even when *nowait* is issued
+
+  - Switching to PTYs works, but at some point the the logfile stops
+    being updated--unknown reason
+
+  thus the implementation has been switched to not have QEMU write
+  the logfile but the consoles to use socat to either read/write the
+  unix socket or the PTY; adds another process, but removes on QEMU
+  quirkiness to the well tested socat implementation.
+
 """
 import errno
 import json
@@ -56,6 +100,14 @@ class qmp_c(object):
     """
     Simple handler for the Qemu Monitor Protocol that allows us to run
     basic QMP commands and report on status.
+
+    To use it from the (server's) command line for debugging, clone
+    QEMU's git tree (to get *qmp-shell*)::
+
+      $ git clone https://github.com/qemu/qemu qemu.git
+      $ ~/qemu.git/scripts/qmp/qmp-shell /var/lib/ttbd/production/targets/q3/qemu.qmp
+      QMP> system_reset
+
     """
     def __init__(self, sockfile, logfile = None):
         self.sockfile = sockfile
@@ -171,7 +223,7 @@ class qmp_c(object):
 class pc(ttbl.power.daemon_c,
          ttbl.images.impl_c,
          ttbl.debug.impl_c):
-    """Manage QEMU instances exposing interfaces for TCF to control it
+    """Power controller that manages a QEMU instance
 
     This object exposes:
 
@@ -189,8 +241,8 @@ class pc(ttbl.power.daemon_c,
     >>> target.interface_add("debug", ttbl.debug.interface(qemu_pc))
     >>> target.interface_add("images", ttbl.images.interface(qemu_pc))
 
-    For a complete, functional example see
-    :func:`conf_00_lib_pos.target_qemu_pos_add` or
+    For a complete, functional example that uses this to create
+    target/s see :func:`conf_00_lib_pos.target_qemu_pos_add` or
     :func:`conf_00_lib_mcu.target_qemu_zephyr_add`.
 
     :param list(str) qemu_cmdline: command line to start QEMU,
@@ -204,7 +256,9 @@ class pc(ttbl.power.daemon_c,
       properties of the target.
 
     :param str nic_model: (optional) Network Interface Card emulation
-      used to create a network interface.
+      used to create a network interface; defaults to
+      *virtio-net-pci*. Note this argument is passed to QEMU's
+      *-device*, so only those names will be valid.
 
     **General design notes**
 
@@ -255,30 +309,36 @@ class pc(ttbl.power.daemon_c,
     such as:
 
     >>> cmdline += [
-    >>>     "-chardev", "socket,id=NAME,server,nowait,path=%%(path)s/console-NAME.write,logfile=%%(path)s/console-NAME.read",
+    >>>     "-chardev", "pty,id=NAME",
     >>>     "-serial", "chardev:NAME"
     >>> ]
 
-    which makes QEMU write anything received on such serial console on
-    file *STATEDIR/console-NAME.read* and send to the virtual machine
-    anything written to socket *STATEDIR/console-NAME.write* (where
-    *STATEDIR* is the target specific state directory).
+    where *NAME* is the console name and must match the name it will
+    be registered as in the console interface later on with:
 
-    From there, a :class:`ttbl.console.generic_c` console interface
-    implementation can be added:
+    >>> console_pc = ttbl.console.general_pc()
+    >>> ttbl.console.impl_add(NAME, console_pc)
+    >>> ttbl.power.impl_add(NAME, console_pc)   # to auto-start on power-on
 
-    >>> target.interface_add("console", ttbl.console.interface(
-    >>>     ( "NAME", ttbl.console.generic_c() )
-    >>> )
-
-    the console handling code in :class:`ttbl.console.generic_c` knows
-    from *NAME* where the find the read/write files.
+    which makes QEMU create a PTY for each serial console we want to
+    define; on power on, *ttbl.qemy.pc._qemu_console_on()* will find
+    the PTY devices created and symlink
+    *TARGETSTATEDIR/console-NAME.write* to said PTY
+    device. :class:`ttbl.console.general_pc` will connect that to the
+    console subsystem for the console interface to be able to expose
+    QEMU's serial consoles.
 
     **Networking**
 
-    Most networking can rely on TCF creating a virtual network device
-    over a TAP device associated to each target and interconnect they
-    are connected to--look at :class:`ttbl.qemu.network_tap_pc`:
+    For a QEMU target to have networking, it has to be a member of a
+    network target (interconnect) [e.g. a network defined with
+    :class:`conf_00_lib.nw_pos_add`].
+
+    The general network support then relies on creating a virtual
+    network device over a TAP device associated to each target and
+    interconnect they are connected to (implemented by
+    :class:`ttbl.qemu.network_tap_pc`); the device is created upon
+    power on:
 
     >>> target = ttbl.test_target("name")
     >>> target.add_to_interconnect(
@@ -287,9 +347,11 @@ class pc(ttbl.power.daemon_c,
     >>>         ipv4_addr = "192.168.97.5",
     >>>         ipv6_addr = "fd:00:61::05")
     >>> qemu_pc = ttbl.qemu.pc([ "/usr/bin/qemu-system-x86_64", ... ])
-    >>> target.interface_add("power", ttbl.power.interface(
-    >>>     ( "tuntap-nwa", ttbl.qemu.network_tap_pc() ),
-    >>>     qemu_pc,
+    >>> target.interface_add(
+    >>>     "power",
+    >>>     ttbl.power.interface(
+    >>>         ( "tuntap-nwa", ttbl.qemu.network_tap_pc() ),
+    >>>         qemu_pc,
     >>> )
 
     the driver automatically adds the command line to add correspoding
@@ -297,9 +359,19 @@ class pc(ttbl.power.daemon_c,
 
     It is possible to do NAT or other networking setups; the command
     line needs to be specified manually though.
+
+    **Booting and Provisionining**
+
+    .. warning:: Fedora's syslinux 6.04 hangs when booted from QEMU;
+                 use 6.03::
+
+                   $ wget https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux/6.xx/syslinux-6.03.tar.xz
+                   $ tar xf syslinux-6.03.tar.xz
+                   $ sudo install -o root -g root -m 0644 syslinux-6.03/efi64/efi/syslinux.efi /usr/share/syslinux/efi64/syslinux.efi
+
     """
 
-    def __init__(self, qemu_cmdline, nic_model = "e1000"):
+    def __init__(self, qemu_cmdline, nic_model = "virtio-net-pci"):
         # Here we initialize part of the command line; the second part
         # is generated in on(), since the pieces we need are only
         # known at that time [e.g. network information, images to load].
@@ -321,7 +393,7 @@ class pc(ttbl.power.daemon_c,
             "-S",
             "-gdb", "tcp:0.0.0.0:%(qemu-gdb-tcp-port)s",
             # PID file that we use to test for the process and kill it
-            "-pidfile", "%(path)s/qemu.pid"
+            "-pidfile", "%(path)s/qemu.%(component)s.pid"
         ]
         self.nic_model = nic_model
         ttbl.power.daemon_c.__init__(
@@ -332,7 +404,7 @@ class pc(ttbl.power.daemon_c,
             # restarts to be automated if it fails for retryable
             # conditions such as race condition in port acquisition.
             paranoid = True,
-            pidfile = "%(path)s/qemu.pid",
+            pidfile = "%(path)s/qemu.%(component)s.pid",
             # qemu makes its own PID files
             mkpidfile = False)
         # set the power controller part to paranoid mode; this way if
@@ -344,6 +416,7 @@ class pc(ttbl.power.daemon_c,
         ttbl.images.impl_c.__init__(self)
         self.upid_set(
             "QEMU virtual machine",
+            name = "qemu",
             # if multiple virtual machines are created associated to a
             #   target, this shall generate a different ID for
             #   each...in most cases
@@ -427,12 +500,105 @@ class pc(ttbl.power.daemon_c,
                 return False
             raise
 
+    def _qemu_console_on(self, target, component):
+        # Run steps that are needed when we power on WRT to the
+        # consoles
+
+        console_interface = getattr(target, "console", None)
+        if console_interface == None:	# no console interface? skip
+            return
+
+        # set the generation for the consoles, so clients now the
+        # output is new
+        consolel = list(target.console.impls.keys())
+        for console in consolel:
+            ttbl.console.generation_set(target, console)
+
+        #
+        # Find out which PTS nodes have been allocated by QEMU
+        #
+        # If we have declared any consoles using PTYs (preferred
+        # method), a PTS pair has been allocated by the kernel and now
+        # we need to find which one is it, so the console can write to
+        # it. The generic console implementation expects a file in the
+        # target state directory called console-NAME.write where to
+        # write to.
+        #
+        # We'll symlink console-NAME.write -> /dev/pts/XYZ
+        #
+        # This function uses QMP to query QEMU for all the chardevs,
+        # then goes over each finding the ones that are using
+        # PTYs. Those that match a declared console implementation in
+        # the target.console interface will be symlinked.
+        #
+
+        with qmp_c(os.path.join(target.state_dir, "qemu.qmp")) as qmp:
+            # This will return a list such as:
+            #
+            ## [
+            ##     {"frontend-open": true, "filename": "gdb", "label": "#chr034"},
+            ##     {"frontend-open": true, "filename": "vc", "label": "parallel0"},
+            ##     {"frontend-open": true, "filename": "disconnected:tcp:0.0.0.0:62949,server", "label": "gdb"},
+            ##     {"frontend-open": true, "filename": "unix:.../qemu.qmp,server", "label": "compat_monitor0"}
+            ##     {"frontend-open": true, "filename": "pty:/dev/pts/5", "label": "ttyS0"},
+            ## ]
+            r = qmp.command("query-chardev")
+            for d in r:
+                # Each entry is a dictionary with a bunch of fields,
+                # for which we are interested in the *label* and
+                # *filename* fields.
+                #
+                ## {
+                ##     "frontend-open": true,
+                ##     "filename": "pty:/dev/pts/5",
+                ##     "label": "ttyS0"
+                ## }
+                #
+                # if no label or filename, log an error--malformed; if
+                # no pty or not declared as a console for ttbd, log an
+                # info, we just don't care about it.
+                label = d.get('label', None)
+                if label == None:
+                    target.log.error(
+                        "QEMU:%s/console: ignoring entry missing label: %s",
+                        component, json.dumps(d, skipkeys = True))
+                    continue
+                filename = d.get('filename', None)
+                if filename == None:
+                    target.log.error(
+                        "QEMU:%s/console: ignoring entry '%s': missing filename",
+                        component, label)
+                    continue
+                if not filename.startswith("pty:"):
+                    target.log.info(
+                        "QEMU:%s/console: ignoring entry '%s': no pty (%s)",
+                        component, label, filename)
+                    continue
+                _, pts_name = filename.split(":", 1)
+                console_impl = console_interface.impls.get(label, None)
+                if console_impl == None:
+                    target.log.debug(
+                        "QEMU:%s/console: ignoring entry '%s': no console declared for it",
+                        component, label)
+                    continue
+                write_filename = os.path.join(target.state_dir,
+                                              "console-" + label + ".write")
+                target.log.info("QEMU/%s/console: '%s' uses PTS %s",
+                                component, label, pts_name)
+                commonl.rm_f(write_filename)
+                os.symlink(pts_name, write_filename)
+                # the console implementation will set the TTY to raw
+                # mode befor writing; see ttbl.console.generic_c.write()
+
+
     def on(self, target, component):
         # Start QEMU
         #
         # We first assign a port for GDB debugging, if someone takes
         # it before we do, start will fail and paranoid mode (see
         # above) will restart it.
+        # FIXME: allocate ports for VNC only if there is a vnc= in the
+        # command line
         base = ttbl.config.tcp_port_range[0]
         top = ttbl.config.tcp_port_range[1]
         if base < 5900:		# we need ports >= 5900 for VNC
@@ -452,12 +618,18 @@ class pc(ttbl.power.daemon_c,
                 "complaining about 'vnc-port' not defined",
                 ttbl.config.tcp_port_range)
         else:
+            # FIXME: move to vnc.vnc0.{host,port,tcp-port}
             # set this for general information; the VNC screenshotter
             # also uses it
             target.fsdb.set("vnc-host", "localhost")
             target.fsdb.set("vnc-port", "%s" % (tcp_port_base + 1 - 5900))
             # this one is the raw port number
             target.fsdb.set("vnc-tcp-port", "%s" % (tcp_port_base + 1))
+            # New form
+            target.fsdb.set("vnc.vnc0.host", "localhost")
+            target.fsdb.set("vnc.vnc0.port", "%s" % (tcp_port_base + 1 - 5900))
+            # this one is the raw port number
+            target.fsdb.set("vnc.vnc0.tcp-port", "%s" % (tcp_port_base + 1))
 
         self.cmdline_extra = []
         image_keys = target.fsdb.keys("qemu-image-*")
@@ -505,84 +677,38 @@ class pc(ttbl.power.daemon_c,
         #   drivers/ethernet/Kconfig.smsc911x:13:config ETH_NIC_MODEL$
         #   drivers/ethernet/Kconfig.stellaris:15:config ETH_NIC_MODEL$
         #   drivers/ethernet/Kconfig.e1000:16:config ETH_NIC_MODEL$
-        fds = []
-        try:
-            for tap, if_name in target.fsdb.get_as_dict("tuntap-*").items():
-                # @tap is tuntap-NETWORK, the property set by
-                # powe rail component network_tap_pc.
-                _, ic_name = tap.split("-", 1)
-                mac_addr = target.tags['interconnects'][ic_name]['mac_addr']
-                model = commonl.name_make_safe(
-                    target.fsdb.get("qemu-model-" + ic_name,
-                                    target.fsdb.get("qemu-model",
-                                                    self.nic_model)))
+        for tap, if_name in target.fsdb.get_as_dict("tuntap-*").items():
+            # @tap is tuntap-NETWORK, the property set by
+            # powe rail component network_tap_pc.
+            _, ic_name = tap.split("-", 1)
+            mac_addr = target.tags['interconnects'][ic_name]['mac_addr']
+            model = commonl.name_make_safe(
+                target.fsdb.get("qemu-model-" + ic_name,
+                                target.fsdb.get("qemu-model",
+                                                self.nic_model)))
+            self.cmdline_extra += [
+                "-device",
+                #
+                # romfile= UNSET for using virtio-net
+                #  - https://wiki.syslinux.org/wiki/index.php?title=Development/Testing
+                #    Workaround using virtio
+                f"{model},netdev={ic_name},mac={mac_addr},romfile=",
+                "-netdev",
+                f"tap,id={ic_name},script=no,ifname={if_name}"
+            ]
 
-                # There is no way to cahole QEMU to say: hey, we
-                # already have a tap interface configured for you, use
-                # it...other than to open it and pass the file
-                # descriptor to it.
-                # So this finds the /dev/tap* file which matches the
-                # interface created with tuntap- (class
-                # network_tap_pc), opens it and passes the descriptor
-                # along to qemu, then closes the FD, since we don't
-                # need it.
-                tapindex = commonl.if_index(if_name)
-                # Need to wait for udev to reconfigure this for us to have
-                # access; this is done by a udev rule installed
-                # (/usr/lib/udev/rules.d/80-ttbd.rules)
-                tapdevname = "/dev/tap%d" % tapindex
-                ts0 = time.time()
-                ts = ts0
-                timeout = 5
-                fd = None
-                while ts - ts0 < timeout:
-                    try:
-                        fd = os.open(tapdevname, os.O_RDWR, 0)
-                        fds.append(fd)
-                        break
-                    except OSError as e:
-                        target.log.error(
-                            "%s: couldn't open %s after"
-                            " +%.1f/%.1fs, retrying: %s",
-                            ic_name, tapdevname, ts - ts0, timeout, e)
-                        time.sleep(0.25)
-                        ts = time.time()
-                else:
-                    raise RuntimeError(
-                        "%s: timedout (%.1fs) opening /dev/tap%d's;"
-                        " udev's /usr/lib/udev/rules.d/80-ttbd.rules"
-                        " didn't set permissions?"
-                        % (ic_name, timeout, tapindex))
+        #
+        # Ok, so do actually start
+        #
+        # if the debug port is snatched before we start by someone
+        # else, this will fail and we'll have to retry--this is
+        # why the power component is set to paranoid mode, so the
+        # power interface automatically retries it if it fails.
+        ttbl.power.daemon_c.on(self, target, component)
 
-                self.cmdline_extra += [
-                    "-nic",
-                    "tap,fd=%d,id=%s,model=%s,mac=%s,br=_b%s" \
-                    % (fd, ic_name, model, mac_addr, ic_name )
-                ]
+        # run console/on steps
+        self._qemu_console_on(target, component)
 
-            if not fds:
-                # No tuntap network attachments -> no network
-                # support. Cap it.
-                self.cmdline_extra += [ '-nic', 'none' ]
-
-            #
-            # Ok, so do actually start
-            #
-            # if the debug port is snatched before we start by someone
-            # else, this will fail and we'll have to retry--this is
-            # why the power component is set to paranoid mode, so the
-            # power interface automatically retries it if it fails.
-            ttbl.power.daemon_c.on(self, target, component)
-
-            # Those consoles? update their generational counts so the
-            # clients can know they restarted
-            if hasattr(target, "console"):
-                for console in list(target.console.impls.keys()):
-                    ttbl.console.generation_set(target, console)
-
-        finally:
-            for fd in fds:		# close fds we opened for ...
-                os.close(fd)            # ... networking, unneeded now
         #
         # Debugging interface--if the target is not in debugging mode,
         # tell QEMU to start right away
@@ -768,12 +894,6 @@ class network_tap_pc(ttbl.power.impl_c):
     """
     def __init__(self, **kwargs):
         ttbl.power.impl_c.__init__(self, **kwargs)
-        if not commonl.prctl_cap_get_effective() & 1 << 12:
-            # If we don't have network setting privilege,
-            # don't even go there
-            # CAP_NET_ADMIN is 12 (from /usr/include/linux/prctl.h
-            raise RuntimeError("daemon lacks CAP_NET_ADMIN: unable to"
-                               " add networking capabilities ")
 
 
     @staticmethod
@@ -807,46 +927,35 @@ class network_tap_pc(ttbl.power.impl_c):
 
 
     def on(self, target, component):
+        if not commonl.prctl_cap_get_effective() & 1 << 12:
+            # If we don't have network setting privilege,
+            # don't even go there
+            # CAP_NET_ADMIN is 12 (from /usr/include/linux/prctl.h.
+            #
+            # Fail here (upon use) instead of during server startup,
+            # because maybe we don't really care about it and we have
+            # a default configuration with the thargets that would
+            # need this.
+            raise RuntimeError("daemon lacks CAP_NET_ADMIN: unable to"
+                               " add networking capabilities ")
         if_name, ic_name = self._component_validate(target, component)
 
-        kws = dict(
-            id = target.id,
-            ic_name = ic_name,
-            if_name = if_name,
-        )
-        ic_data = target.tags['interconnects'][ic_name]
-        try:
-            kws['ipv4_addr'] = ic_data['ipv4_addr']
-            kws['ipv4_prefix_len'] = ic_data['ipv4_prefix_len']
-            kws['ipv6_addr'] = ic_data['ipv6_addr']
-            kws['ipv6_prefix_len'] = ic_data['ipv6_prefix_len']
-            kws['mac_addr'] = ic_data['mac_addr']
-        except KeyError as e:
-            raise ValueError(
-                "%s: can't create TAP interface:"
-                " target '%s' declares connection to interconnect '%s'"
-                " but is missing field '%s'"
-                % (component, target.id, ic_name, str(e)))
-
-        if not commonl.if_present("_b%(ic_name)s" % kws):
-            target.log.info("%(ic_name)s: assuming network off since netif "
-                            "_b%(ic_name)s is not present", kws)
+        if not commonl.if_present(f"b{ic_name}"):
+            target.log.info(f"{ic_name}: assuming network off since netif "
+                            "b{ic_name} is not present")
             return
 
         commonl.if_remove_maybe(if_name)	# ensure no leftovers
         subprocess.check_call(
-            "ip link add "
-            "  link _b%(ic_name)s"		# created by the interconnect
-            "  name %(if_name)s"
-            "  address %(mac_addr)s"
-            "  up"
-            "  type macvtap mode bridge" % kws,
-            shell = True, stderr = subprocess.STDOUT)
+            [ "ip",  "tuntap", "add", if_name, "mode", "tap" ],
+            stderr = subprocess.STDOUT)
         subprocess.check_call(
-            "ip link set %(if_name)s"
-            "  promisc on "	# needed so we can wireshark in
-            "  up" % kws,
-            shell = True, stderr = subprocess.STDOUT)
+            [ "ip", "link", "set" ,if_name, "master", "b" + ic_name ],
+            stderr = subprocess.STDOUT)
+        # promisc on: needed so we can wireshark in
+        subprocess.check_call(
+            [ "ip", "link", "set", if_name, "promisc", "on", "up" ],
+            stderr = subprocess.STDOUT)
         # We don't assign IP addresses here -- we leave it for the
         # client; if we do, for example QEMU won't work as it is just
         # used to associate the interface

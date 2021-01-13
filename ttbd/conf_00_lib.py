@@ -32,20 +32,14 @@ import ttbl.usbrly08b
 class vlan_pci(ttbl.power.impl_c):
     """Power controller to implement networks on the server side.
 
-    Supports:
+    This allows to:
 
-    - connecting the server to a physical net physical networks with
-      physical devices (normal or VLAN networks)
+    - connect a server to a test network (NUT) to provide services
+      suchs as DHCP, HTTP, network tapping, proxying between NUT and
+      upstream networking, etc
 
-    - creating internal virtual networks with `macvtap
-      http://virt.kernelnewbies.org/MacVTap` so VMs running in the
-      host can get into said networks.
-
-      When a physical device is also present, it is used as the upper
-      device (instead of a bridge) so traffic can flow from physical
-      targets to the virtual machines in the network.
-
-    - *tcpdump* capture of network traffic
+    - connect virtual machines running inside virtual networks in the
+      server to physical virtual networks.
 
     This behaves as a power control implementation that when turned:
 
@@ -55,6 +49,8 @@ class vlan_pci(ttbl.power.impl_c):
 
 
     **Capturing with tcpdump**
+
+    FIXME: deprecate and replace with capture interface
 
     Can be enabled setting the target's property *tcpdump*::
 
@@ -93,36 +89,19 @@ class vlan_pci(ttbl.power.impl_c):
     Now QEMU targets (for example), can declare they are part of this
     network and upon start, create a tap interface for themselves::
 
-      $ ip link add link _bnwa name tnwaTARGET type macvtap mode bridge
-      $ ip link set tnwaTARGET address 02:01:00:00:00:IC_INDEX up
+      $ ip tuntap add IFNAME mode tap
+      $ ip link set IFNAME up master bnwa
+      $ ip link set IFNAME promisc on up
 
-    which then is given to QEMU as an open file descriptor::
+    which then is given to QEMU as::
 
-      -net nic,model=virtio,macaddr=02:01:00:00:00:IC_INDEX
-      -net tap,fd=FD
+      -device virtio-net-pci,netdev=nwa,mac=MACADDR,romfile=
+      -netdev tap,id=nwa,script=no,if_name=IFNAME
 
     (targets implemented by
     :func:`conf_00_lib_pos.target_qemu_pos_add` and
     :py:func:`conf_00_lib_mcu.target_qemu_zephyr_add` with VMs
     implement this behaviour).
-
-    Notes:
-
-    - keep target names short, as they will be used to generate
-      network interface names and those are limited in size (usually to
-      about 12 chars?), eg tnwaTARGET comes from *nwa* being the
-      name of the network target/interconnect, TARGET being the target
-      connected to said interconnect.
-
-    - IC_INDEX: is the index of the TARGET in the interconnect/network;
-      it is recommended, for simplicty to make them match with the mac
-      address, IP address and target name, so for example:
-
-      - targetname: pc-04
-      - ic_index: 04
-      - ipv4_addr: 192.168.1.4
-      - ipv6_addr: fd:00:01:::4
-      - mac_addr: 02:01:00:00:00:04
 
     If a tag named *mac_addr* is given, containing the MAC address
     of a physical interface in the system, then it will be taken over
@@ -130,6 +109,8 @@ class vlan_pci(ttbl.power.impl_c):
     any virtual machine in this network will be extended to said
     network interface, effectively connecting the physical and virtual
     targets.
+
+    .. warning:: PHYSICAL mode (mac_addr) not re-tested
 
     .. warning:: DISABLE Network Manager's (or any other network
                  manager) control of this interface, otherwise it will
@@ -319,30 +300,22 @@ class vlan_pci(ttbl.power.impl_c):
                 shell = True)
             self._if_rename(target)
         elif mode == 'virtual':
-            # We do not have a physical device, a bridge, to serve as
-            # lower
-            if not commonl.if_present("b%(id)s" % target.kws) \
-               or not commonl.if_present("_b%(id)s" % target.kws):
+            # We create a bridge, to serve as lower
+            if not commonl.if_present("b%(id)s" % target.kws):
                 # Do create the new interface only if not already
                 # created, otherwise daemons that are already running
                 # will stop operating
                 # This function might be being called to restablish a
                 # half baced operating state.
-                commonl.if_remove_maybe("_b%(id)s" % target.kws)
-                subprocess.check_call(
-                    "/usr/sbin/ip link add"
-                    "  name _b%(id)s"
-                    "  type bridge"
-                    % target.kws, shell = True)
                 commonl.if_remove_maybe("b%(id)s" % target.kws)
                 subprocess.check_call(
                     "/usr/sbin/ip link add"
-                    "  link _b%(id)s name b%(id)s"
-                    "  type macvlan mode bridge; "
+                    "  name b%(id)s"
+                    "  type bridge"
                     % target.kws, shell = True)
                 subprocess.check_call(	# bring lower up
                     "/usr/sbin/ip link set"
-                    "  dev _b%(id)s"
+                    "  dev b%(id)s"
                     "  up promisc on"
                     % target.kws, shell = True)
         else:
@@ -395,7 +368,7 @@ class vlan_pci(ttbl.power.impl_c):
             logfile = os.path.join(target.state_dir, "tcpdump.log")
             cmdline = [
                 "/usr/sbin/tcpdump", "-U",
-                "-i", "_b%(id)s" % target.kws,
+                "-i", "b%(id)s" % target.kws,
                 "-w", capfile
             ]
             try:
@@ -443,8 +416,6 @@ class vlan_pci(ttbl.power.impl_c):
             pass
         elif mode == 'virtual':
             commonl.if_remove_maybe("b%(id)s" % target.kws)
-            # remove the lower we created
-            commonl.if_remove_maybe("_b%(id)s" % target.kws)
         else:
             raise AssertionError("Unknown mode %s" % mode)
 
@@ -470,9 +441,7 @@ class vlan_pci(ttbl.power.impl_c):
         elif mode == 'physical':
             pass
         elif mode == 'virtual':
-            # check _bNWNAME exists
-            if not os.path.isdir("/sys/class/net/_b" + target.id):
-                return False
+            pass
         else:
             raise AssertionError("Unknown mode %s" % mode)
 
