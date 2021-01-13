@@ -42,14 +42,14 @@ if not distro:
 if version:
     # Pattern for version specific requirements
     pattern_version = distro + r":" + version \
-                    + r"[a-zA-Z0-9\_\-,]*\=?(?P<package>[a-zA-Z0-9\_\-,]+)"
+                    + r"[a-zA-Z0-9\_\-,]*\=?(?P<package>[a-zA-Z0-9\_\-\+,]+)"
 # Pattern for distro specific requirements
-pattern = distro + r"[a-zA-Z0-9\_\-,]*\=?(?P<package>[a-zA-Z0-9\_\-,]+)"
+pattern = distro + r"[a-zA-Z0-9\_\-,]*\=?(?P<package>[a-zA-Z0-9\_\-\+,]+)"
 # Pattern for general requirements
-pattern_general = r"# package: (?P<package>[a-zA-Z0-9\_\-,]+)" \
+pattern_general = r"# package: (?P<package>[a-zA-Z0-9\_\-\+,]+)" \
                   + r"(?: [a-zA-Z0-9\_\-,]+|$)"
 # Pattern for requirements without distro packages
-pattern_nodistro = r"^(?P<package>[a-zA-Z0-9\_\-\=\.]+) *(\# package\: )?(?!" \
+pattern_nodistro = r"^(?P<package>[a-zA-Z0-9\_\-\=\.\+]+) *(\# package\: )?(?!" \
                    + distro + r"|\=)*"
 
 # Parse the package requirements from the requirements file
