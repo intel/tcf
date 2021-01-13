@@ -835,6 +835,7 @@ def target_qemu_pos_add(target_name,
 
     Add to a server configuration file ``/etc/ttbd-*/conf_*.py``
 
+    >>> nw_pos_add("nwa")
     >>> target = target_qemu_pos_add("qu-05a"
     >>>                              "nwa",
     >>>                              mac_addr = "02:61:00:00:00:05",
@@ -872,8 +873,10 @@ def target_qemu_pos_add(target_name,
 
       >>> 02:HX:00:00:00:HY
 
-      where HX and HY are two hex digits; *02:...* is a valid ethernet
-      space.
+      where *HX* and *HY* are two hex digits; *02:...* is a valid ethernet
+      space. To simplify, it is recommended *HX* is the same for all
+      the machines connected to the same network and *HY* matches some
+      index in the target's name (eg *04* if target is called *q04*).
 
     :param str ipv4_addr: IPv4 Address (32bits, *DDD.DDD.DDD.DDD*, where
       *DDD* are decimal integers 0-255) that will be assigned to this
