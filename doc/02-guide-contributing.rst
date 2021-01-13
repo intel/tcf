@@ -1,4 +1,3 @@
-
 Contributing
 ============
 
@@ -125,7 +124,6 @@ running locally on your machine:
          python3-werkzeug \
          python3-devel \
          python3-keyring \
-         python3-pyghmi \
          python3-pysnmp \
          python3-pyusb \
          qemu \

@@ -133,6 +133,9 @@ targets over HTTP to be controlled by the TCF client.
             'hw-healthmonitor/ttbd-hw-healthmonitor-driver-rebind.py',
             'setup-efi-grub2-elf.sh'
         ]),
+        ('@prefix@/share/tcf/ttbd',[
+            'requirements.txt',
+        ]),
         ('@prefix@/lib/udev/rules.d', [ '80-ttbd.rules' ]),
         ('var/lib/ttbd', [ 'frdm_k64f_recovery.bin' ]),
     ]

@@ -58,5 +58,8 @@ imaging on PC-class targets via DHCP / TFTP.
             'evemu.bin.armv7l.tar.gz',
             'evemu.bin.x86_64.tar.gz',
         ]),
+        ( '@prefix@/share/tcf/ttbd/pos', [
+            'requirements.txt',
+        ]),
     ],
 )

@@ -111,6 +111,10 @@ This is the client and meta-testcase runner for the TCF test case framework.
              "report.j2.txt",
              "junit-base.j2.xml",
              "junit.j2.xml",
+             "requirements.txt",
+             "requirements-extra.txt",
+             "requirements-lintall.txt",
+             "setup-requirements.py"
          ]
         ),
         ( '@prefix@/share/tcf/content', [
