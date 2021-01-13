@@ -14,12 +14,14 @@ import codecs
 import contextlib
 import errno
 import fcntl
+import numbers
 import os
 import socket
 import stat
 import struct
 import sys
 import time
+import tty
 
 import commonl
 import ttbl
@@ -774,7 +776,8 @@ class generic_c(impl_c):
                                  "console-%s.write" % component)
         target.log.debug("%s: writing %dB to console (%s)",
                          component, len(data), data.encode('unicode-escape'))
-        if stat.S_ISSOCK(os.stat(file_name).st_mode):
+        stat_info = os.stat(file_name)
+        if stat.S_ISSOCK(stat_info.st_mode):
             # consoles whose input is implemented as a socket
             with contextlib.closing(socket.socket(socket.AF_UNIX,
                                                   socket.SOCK_STREAM)) as f:
@@ -782,16 +785,23 @@ class generic_c(impl_c):
                 self._write(f.fileno(), data)
         else:
             while True:
+                mode = "a"
                 try:
-                    with contextlib.closing(open(file_name, "a")) as f:
+                    with contextlib.closing(open(file_name, mode)) as f:
+                        if stat.S_ISCHR(stat_info.st_mode):
+                            # if we are writing to a terminal, disable
+                            # all translations and buffering, we'll do
+                            # them
+                            tty.setraw(f.fileno())
                         self._write(f.fileno(), data)
                         break
                 except EnvironmentError as e:
                     # Open in write mode if the file does not allow seeking
                     if e.errno == errno.ESPIPE:
-                        with contextlib.closing(open(file_name, "w")) as f:
-                            self._write(f.fileno(), data)
-                            break
+                        target.log.warning(
+                            "console %s: changing open mode to 'w'", component)
+                        mode = "w"
+                        continue
                     if e.errno == errno.ENOENT \
                        and target.property_get(
                            "console-" + component + ".state"):
