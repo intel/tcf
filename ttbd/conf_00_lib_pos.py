@@ -205,6 +205,14 @@ def nw_pos_add(nw_name, power_rail = None,
                 ( "dnsmasq", ttbl.dnsmasq.pc() ),
             ]))
 
+    # Consoles to read misc log files
+    interconnect.interface_add(
+        "console",
+        ttbl.console.interface(**{
+            "log-dnsmasq": ttbl.console.logfile_c("dnsmasq.log")
+        })
+    )
+
     tags = dict(
         ipv6_addr = 'fd:%02x:%02x::1' % (x, y),
         ipv6_prefix_len = ipv6_prefix_len,
