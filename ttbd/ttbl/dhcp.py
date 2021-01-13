@@ -301,7 +301,7 @@ host %(hostname)s {
         # FIXME: parameter?
         # Also UDP, more resilient for our use and soft so we can
         # recover in some cases more easily
-        option root-path "%(pos_nfs_server)s:%(pos_nfs_path)s,udp,soft,nfsvers=3";
+        option root-path "%(pos_nfs_server)s:%(pos_nfs_path)s,soft,nfsvers=4";
 }
 """
                 else:
@@ -315,7 +315,7 @@ host %(hostname)s {
         # Also UDP, more resilient for our use and soft so we can
         # recover in some cases more easily
         # FIXME: pos_nfs_server6?
-        option root-path "%(pos_nfs_server)s:%(pos_nfs_path)s,udp,soft,nfsvers=3";
+        option root-path "%(pos_nfs_server)s:%(pos_nfs_path)s,soft,nfsvers=4";
 }
 """
                 f.write(template_rexpand(config, kws))

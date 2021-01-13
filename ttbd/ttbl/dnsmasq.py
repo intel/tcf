@@ -298,8 +298,16 @@ class pc(ttbl.power.daemon_c):
                 ttbl.pxe.tag_get_from_ic_target(kws, 'pos_nfs_server', ic, target)
                 ttbl.pxe.tag_get_from_ic_target(kws, 'pos_nfs_path', ic, target)
 
+                # FIXME: this is very confusing here, since it is what
+                # ttbl.pxe.pos_cmdline_opts is relaying on in a way
+                # and we'd need a way to make it machine specific too;
+                # as well, in some places like for pos_mode==pxe this
+                # is all set in the server sides, while the client in
+                # tcfl.pos has a lot of it in the client side; we need
+                # a unified source.
+
                 f.write(
-                    "dhcp-option=tag:%(id)s,option:root-path,%(pos_nfs_server)s:%(pos_nfs_path)s,udp,soft,nfsvers=3\n"
+                    "dhcp-option=tag:%(id)s,option:root-path,%(pos_nfs_server)s:%(pos_nfs_path)s,soft,nfsvers=4\n"
                     % kws)
 
                 # If the target declares a BSP (at this point of the
