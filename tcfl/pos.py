@@ -1874,8 +1874,10 @@ cat > /tmp/deploy.ex
                 # good hearted attempt at cleaning up
                 target.shell.run(
                     "sync; "
-                    "which lsof"
-                    " && kill -9 `lsof -Fp  /home | sed -n '/^p/{s/^p//;p}'`; "
+                    # lsof lists PIDs using /home, xargs -r calls kill
+                    # only if we have results, -n 10 in batches of 10
+                    # PIDs to be killed with a -9
+                    "lsof -ta +D /home | xargs -rn 10 kill -9; "
                     "cd /; "
                     "for device in %s; do umount -l $device || true; done"
                     % " ".join(reversed(target.pos.umount_list)))
