@@ -130,6 +130,8 @@ capture_screenshot_ffmpeg_v4l = ttbl.capture.generic_snapshot(
 #: Note the fields are target's tags and others specified in
 #: :class:`ttbl.capture.generic_snapshot` and
 #: :class:`ttbl.capture.generic_stream`.
+#:
+#: Deprecated in favour of :func:`mc_capture_screenshot_vnc`
 capture_screenshot_vnc = ttbl.capture.generic_snapshot(
     # dont set the port for the name, otherwise the UPID keeps
     # changing
@@ -142,6 +144,42 @@ capture_screenshot_vnc = ttbl.capture.generic_snapshot(
     mimetype = "image/png",
     extension = ".png"
 )
+
+#: Create a VNC screenshot capturer that captures off a VNC source
+#: declared in inventory entry *vncs.NAME*
+#:
+#: Note the fields are target's tags and others specified in
+#: :class:`ttbl.capture.generic_snapshot` and
+#: :class:`ttbl.capture.generic_stream`.
+#:
+#: to use, add in a :ref:`server configuration file
+#: <ttbd_configuration>` to any target that offers a VNC source:
+#:
+#: >>> target.interface_add("capture", ttbl.capture.interface(
+#: >>>     vnc0_screenshot = mk_capture_screenshot_vnc("vnc0"),
+#: >>>     screen = "vnc0_screenshot",
+#: >>> ))
+
+def mk_capture_screenshot_vnc(name):
+    assert isinstance(name, str)
+    # note the %(FIELD)s will be mapped to entries in the target's
+    # inventory when the capture is going to be done, so if name is
+    # ABC, it will capture off vncs.ABC,host
+    return ttbl.capture.generic_snapshot(
+        # dont set the port for the name, otherwise the UPID keeps
+        # changing
+        f"VNC %(id)s@%(vncs.{name}.host)s",
+        # need to make sure vnc-host/port are defined in the target's tags
+        # needs the .png, otherwise it balks at guessing extensions
+        # don't do -q, otherwise when it fails, it fails silently; for
+        # QEMU, it is *localhost*.
+        f"gvnccapture %(vncs.{name}.host)s:%(vncs.{name}.port)s %(output_file_name)s",
+        mimetype = "image/png",
+        extension = ".png"
+    )
+
+#: Capture a screenshot off VNC port declared in inventory *vncs.vnc0*
+capture_screenshot_vnc0 = mk_capture_screenshot_vnc("vnc0")
 
 
 #: Capture video off a v4l device using ffmpeg
