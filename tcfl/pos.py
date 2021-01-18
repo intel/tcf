@@ -2652,6 +2652,7 @@ from . import pos_uefi		# pylint: disable = wrong-import-order,wrong-import-posi
 capability_register('mount_fs', 'multiroot', pos_multiroot.mount_fs)
 capability_register('boot_to_pos', 'pxe', target_power_cycle_to_pos_pxe)
 capability_register('boot_to_normal', 'pxe', target_power_cycle_to_normal)
+capability_register('boot_to_normal', 'normal', target_power_cycle_to_normal)
 capability_register('boot_config', 'uefi', pos_uefi.boot_config_multiroot)
 capability_register('boot_config_fix', 'uefi', pos_uefi.boot_config_fix)
 
