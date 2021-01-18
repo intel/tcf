@@ -56,17 +56,19 @@ echo "I: image size ${megs}MB" 1>&2
 if [ "$megs" -lt 105 ]; then
     # apparently mininum ~100MiB
     megs=105;
+else
+    megs=$(($megs + 10))
 fi
 rm -f $imgfile
 echo "I: image size estimated at ${megs}MB" 1>&2
 dd  if=/dev/zero of=$imgfile bs=$((1024 * 1024)) count=$megs > /dev/null
-mkfs.fat -F16 -n "SYSTEM" $imgfile
+/usr/sbin/mkfs.fat -F16 -n "SYSTEM" $imgfile
 echo "I: mounting creating drive image" 1>&2
 
 echo "I: copying EFI shell to efi/boot/" 1>&2
 mmd -i $imgfile ::efi
 mmd -i $imgfile ::efi/boot
-dmcopy -i $imgfile /usr/share/edk2/ovmf/Shell.efi ::efi/boot/bootx64.efi
+mcopy -i $imgfile ${BOOT_X64_EFI:-/usr/share/edk2/ovmf/Shell.efi} ::efi/boot/bootx64.efi
 mcopy -i $imgfile /usr/share/edk2/ovmf/Shell.efi ::efi/boot/shellx64.efi
 for content in "$@"; do
     echo "I: copying $content to root of image" 1>&2
