@@ -1,6 +1,7 @@
 # Non-Python Requirements 
 # package: make
 # package: fedora=gvnc-tools
+# package: dosfstools
 
 # Ubuntu 20.4 -- issue installing 3.x
 Jinja2==2.11.2      # package: python3-jinja2
