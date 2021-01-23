@@ -1825,7 +1825,7 @@ cat > /tmp/deploy.ex
                     # 500s bc rsync takes a long time, but FIXME, we need
                     # to break this up and just increase timeout on the
                     # rsyncs -- and maybe guesstimate from the image size?
-                    timeout = 500, output = True)
+                    timeout = timeout, output = True)
                 # see above on time -p
                 kpi_regex = re.compile(r"^real[ \t]+(?P<seconds>[\.0-9]+)$",
                                        re.MULTILINE)
