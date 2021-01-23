@@ -1080,7 +1080,7 @@ def target_qemu_pos_add(target_name,
                      pos_boot_dev, consoles[0],
                      boot_config = 'uefi',
                      boot_config_fix = None,
-                     boot_to_normal = 'pxe',
+                     boot_to_normal = 'normal',
                      boot_to_pos = 'pxe',
                      mount_fs = 'multiroot',
                      pos_partsizes = mr_partsizes)
