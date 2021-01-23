@@ -148,6 +148,12 @@ EOF
 # ensure the service is enabled and run
 sudo systemctl --root $IMAGEDIR enable rootrw-overlay.service
 
+# things we definitely do not need
+sudo systemctl --root $IMAGEDIR disable firewalld.service
+sudo systemctl --root $IMAGEDIR disable cups.service
+sudo systemctl --root $IMAGEDIR disable ModemManager.service
+sudo systemctl --root $IMAGEDIR disable flatpak-add-fedora-repos.service
+
 # We don't need graphical, so boot only text mode, it is way faster
 info "configure text-mode boot only"
 sudo systemctl --root=$IMAGEDIR set-default multi-user.target
