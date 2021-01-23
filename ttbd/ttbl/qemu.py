@@ -629,7 +629,7 @@ class pc(ttbl.power.daemon_c,
             target.fsdb.set("vnc.vnc0.host", "localhost")
             target.fsdb.set("vnc.vnc0.port", "%s" % (tcp_port_base + 1 - 5900))
             # this one is the raw port number
-            target.fsdb.set("vnc.vnc0.tcp-port", "%s" % (tcp_port_base + 1))
+            target.fsdb.set("vnc.vnc0.tcp_port", "%s" % (tcp_port_base + 1))
 
         self.cmdline_extra = []
         image_keys = target.fsdb.keys("qemu-image-*")
@@ -942,7 +942,7 @@ class network_tap_pc(ttbl.power.impl_c):
 
         if not commonl.if_present(f"b{ic_name}"):
             target.log.info(f"{ic_name}: assuming network off since netif "
-                            "b{ic_name} is not present")
+                            f"b{ic_name} is not present")
             return
 
         commonl.if_remove_maybe(if_name)	# ensure no leftovers
