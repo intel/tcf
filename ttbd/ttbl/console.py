@@ -1376,9 +1376,10 @@ class telnet_pc(ttbl.power.socat_pc, generic_c):
     FIXME: passwords are still not supported
     """
     def __init__(self, hostname, port = 23, crlf = '\r',
+                 socat_pc_kwargs = None,
                  **kwargs):
         assert isinstance(port, int)
-        generic_c.__init__(self, **kwargs)
+        generic_c.__init__(self)
         username, password, _hostname = commonl.split_user_pwd_hostname(hostname)
         self.hostname = _hostname
         ttbl.power.socat_pc.__init__(
@@ -1391,7 +1392,8 @@ class telnet_pc(ttbl.power.socat_pc, generic_c):
             # -L -8: 8bit binary path on input and output, no translations
             # -E: no escape characters
             "EXEC:'telnet -a -c -L -8 -E %(hostname)s %(port)s'"
-            ",sighup,sigint,sigquit"
+            ",sighup,sigint,sigquit",
+            **socat_pc_kwargs
         )
         self.parameters_default = {
             'user': username,
