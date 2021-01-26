@@ -23,13 +23,12 @@ keyring         # package: fedora,ubuntu=python3-keyring
 netifaces       # package: python3-netifaces
 pexpect         # package: python3-pexpect
 ply             # package: python3-ply
-python-prctl
+python-prctl    # package: ubuntu=python3-prctl
 pyserial        # package: centos,fedora=python3-pyserial ubuntu=python3-serial
 pysnmp          # package: centos,fedora=python3-pysnmp ubuntu=python3-pysnmp4
 python_ldap     # package: centos,fedora=python3-ldap
 pyusb           # package: centos,fedora=python3-pyusb ubuntu=python3-usb
 requests        # package: python3-requests
-sdnotify
 setuptools      # package: python3-setuptools
-systemd         # package: python3-systemd
+systemd-python  # package: python3-systemd
 tornado         # package: python3-tornado

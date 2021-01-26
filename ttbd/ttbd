@@ -70,8 +70,8 @@ import ttbl.config
 import ttbl.allocation
 
 try:
-    import sdnotify
-    sd_notify = sdnotify.SystemdNotifier()
+    import systemd.daemon
+    sd_notify = systemd.daemon
     systemd_available = True
 except ImportError as e:
     class fake_SystemdNotifier(object):
