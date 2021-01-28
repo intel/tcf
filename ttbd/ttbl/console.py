@@ -334,7 +334,8 @@ class impl_c(ttbl.tt_interface_impl_c):
             flag = fcntl.fcntl(rfd, fcntl.F_GETFL)
             fcntl.fcntl(rfd, fcntl.F_SETFL, flag | os.O_NONBLOCK)
             expect = pexpect.fdpexpect.fdspawn(rf, logfile = logf,
-                                               timeout = timeout)
+                                               timeout = timeout,
+                                               encoding='utf-8')
             count = 0
             for command, response in self.command_sequence:
                 if isinstance(command, (int, float)):
