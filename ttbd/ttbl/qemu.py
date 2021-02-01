@@ -894,6 +894,10 @@ class network_tap_pc(ttbl.power.impl_c):
     """
     def __init__(self, **kwargs):
         ttbl.power.impl_c.__init__(self, **kwargs)
+        self.upid_set(
+            "Virtual network over tun/tap device",
+            name = "tuntap",
+        )
 
 
     @staticmethod
