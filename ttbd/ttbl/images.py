@@ -677,10 +677,10 @@ class interface(ttbl.tt_interface):
                         if img_name.startswith(path):
                             img_name = img_name.replace(path, path_translated, 1)
                             break
-                        else:
-                            raise PermissionError(
-                                "%s: absolute image path tries to read from"
-                                " a location that is not allowed" % img_name)
+                    else:
+                        raise PermissionError(
+                            "%s: absolute image path tries to read from"
+                            " a location that is not allowed" % img_name)
                     file_name = img_name
                 # we need to lock, since other processes might be
                 # trying to decompress the file at the same time
