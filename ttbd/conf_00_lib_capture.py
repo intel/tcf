@@ -146,7 +146,7 @@ capture_screenshot_vnc = ttbl.capture.generic_snapshot(
 )
 
 #: Create a VNC screenshot capturer that captures off a VNC source
-#: declared in inventory entry *vncs.NAME*
+#: declared in inventory entry *vnc.NAME*
 #:
 #: Note the fields are target's tags and others specified in
 #: :class:`ttbl.capture.generic_snapshot` and
@@ -164,21 +164,21 @@ def mk_capture_screenshot_vnc(name):
     assert isinstance(name, str)
     # note the %(FIELD)s will be mapped to entries in the target's
     # inventory when the capture is going to be done, so if name is
-    # ABC, it will capture off vncs.ABC,host
+    # ABC, it will capture off vnc.ABC,host
     return ttbl.capture.generic_snapshot(
         # dont set the port for the name, otherwise the UPID keeps
         # changing
-        f"VNC %(id)s@%(vncs.{name}.host)s",
+        f"VNC %(id)s@%(vnc.{name}.host)s",
         # need to make sure vnc-host/port are defined in the target's tags
         # needs the .png, otherwise it balks at guessing extensions
         # don't do -q, otherwise when it fails, it fails silently; for
         # QEMU, it is *localhost*.
-        f"gvnccapture %(vncs.{name}.host)s:%(vncs.{name}.port)s %(output_file_name)s",
+        f"gvnccapture %(vnc.{name}.host)s:%(vnc.{name}.port)s %(output_file_name)s",
         mimetype = "image/png",
         extension = ".png"
     )
 
-#: Capture a screenshot off VNC port declared in inventory *vncs.vnc0*
+#: Capture a screenshot off VNC port declared in inventory *vnc.vnc0*
 capture_screenshot_vnc0 = mk_capture_screenshot_vnc("vnc0")
 
 
