@@ -141,9 +141,9 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
     return allocid, new_state, group_allocated
 
 
-def _alloc_hold(rtb, allocid, state, ts0, max_hold_time):
+def _alloc_hold(rtb, allocid, state, ts0, max_hold_time, keep_alive_period):
     while True:
-        time.sleep(2)
+        time.sleep(keep_alive_period)
         ts = time.time()
         if max_hold_time > 0 and ts - ts0 > max_hold_time:
             # maximum hold time reached, release it
@@ -218,7 +218,7 @@ def _cmdline_alloc_targets(args):
                 ts = time.time()
             if args.hold == None:	# user doesn't want us to ...
                 return			# ... keepalive while active
-            _alloc_hold(rtb, allocid, state, ts0, args.hold)
+            _alloc_hold(rtb, allocid, state, ts0, args.hold, args.keepalive_period)
         except KeyboardInterrupt:
             ts = time.time()
             if allocid:
@@ -726,6 +726,10 @@ def _cmdline_setup(arg_subparsers):
         nargs = "?", type = int, default = None,
         help = "Keep the reservation alive for this many seconds, "
         "then release it")
+    ap.add_argument(
+        "--keepalive-period", action = "store", metavar = "SECONDS",
+        type = int, default = 5,
+        help = "Send keepalives every SECONDS seconds (default: %(default)ds)")
     ap.add_argument(
         "-w", "--wait", action = "store_true", dest = 'queue', default = True,
         help = "(default) Wait until targets are assigned")
