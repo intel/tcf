@@ -1568,6 +1568,16 @@ class test_target(object):
                 r.setdefault('_alloc', {})
                 r['_alloc']['queue_preemption'] = preempt_in_queue
 
+        # Timestamp comes from the allocation database, since when we
+        # refresh on any operation, it is refreshed there.
+        # Note there is corresponding code in
+        # ttbl.test_target.property_*() to handle this exception
+        if commonl.field_needed('timestamp', projections):
+            # COMPAT: timestamp field; all new code shall move to
+            # _alloc.timestamp
+            r['timestamp'] = self.timestamp_get()
+        if commonl.field_needed('_alloc.timestamp', projections):
+            r.setdefault('_alloc', {})['timestamp'] = self.timestamp_get()
         return r
 
 
@@ -1956,6 +1966,11 @@ class test_target(object):
         if a property *a.b* is set, any property called *a.b.NAME*
         will be cleared out.
         """
+        # See ttbl.test_target.to_dict(): these properties are
+        # generated, not allowed to set them
+        if prop in ( 'timestamp', '_alloc.timestamp' ):
+            raise RuntimeError("property '%s' cannot be set" % prop)
+
         self.fsdb.set(prop, value)
         for key in self.fsdb.keys(prop + ".*"):
             self.fsdb.set(key, None)
@@ -1980,6 +1995,10 @@ class test_target(object):
         :param str who: User that is claiming the target
         :param str prop: Property name
         """
+        # See ttbl.test_target.to_dict(): these properties are
+        # generated, not allowed to set them
+        if prop in ( 'timestamp', prop == '_alloc.timestamp' ):
+            return self.timestamp_get()
         r = self.fsdb.get(prop)
         if r == None and default != None:
             return default

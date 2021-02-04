@@ -264,7 +264,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
         # FIXME: define well how are we going to define the TTL
         ttl = self.get("ttl", 0)
         if ttl > 0:
-            ts_start = int(self.get('_alloc.ts_start'))
+            ts_start = int(self.get('_alloc.timestamp_start'))
             if ts_now - ts_start > ttl:
                 self.delete('overtime')
                 return
@@ -309,7 +309,8 @@ class allocation_c(ttbl.fsdb_symlink_c):
                     # value, then we have it allocated
                     # Sort here because everywhere else we need a set
                     self.set("group_allocated", ",".join(sorted(group)))
-                    self.set("ts_start", time.time())
+                    self.set("timestamp_start", time.time())
+                    self.set("ts_start", time.time())	# COMPAT
                     self.state_set("active")
                     #logging.error("DEBUG: %s: group %s complete, state %s",
                     #              self.allocid, group_name,
@@ -617,7 +618,10 @@ def _target_allocate_locked(target, current_allocdb, waiters, preempt):
     target.fsdb.set("_alloc.priority", priority_waiter)
     target.fsdb.set("owner", allocdb.get('user'))
     target.fsdb.set("_alloc.id", allocdb.allocid)
-    target.fsdb.set("_alloc.ts_start", time.strftime("%Y%m%d%H%M%S"))
+    ts = time.strftime("%Y%m%d%H%M%S")
+    target.fsdb.set("_alloc.ts_start", ts)	# COMPAT
+    target.fsdb.set("_alloc.timestamp_start", ts)
+    target.fsdb.set("timestamp", ts)
     # remove the waiter from the queue
     target.fsdb.set(waiter[4], None)
     # ** This waiter is the owner now **
