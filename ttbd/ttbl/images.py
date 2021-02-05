@@ -1815,7 +1815,7 @@ class quartus_pgm_c(flash_shell_cmd_c):
             # cwd to %(file_path)s. Reason is some of our paths might
             # include @, which the tool considers illegal as it uses
             # it to separate arguments--see below --operation
-            'file_path': os.path.dirname(images.values()[0]),
+            'file_path': os.path.dirname(list(images.values())[0]),
             'device_path': "%s [%s]" % (product, usb_path)
             # flash_shell_cmd_c.flash_start() will add others
         }
@@ -2001,8 +2001,8 @@ class sf100linux_c(flash_shell_cmd_c):
         # we chdir into where the image is and run with a basename
         context['kws'] = {
             # note this only works with #1 image
-            'file_path': os.path.dirname(images.values()[0]),
-            'file_name': os.path.basename(images.values()[0]),
+            'file_path': os.path.dirname(list(images.values())[0]),
+            'file_name': os.path.basename(list(images.values())[0]),
         }
         flash_shell_cmd_c.flash_start(self, target, images, context)
         
