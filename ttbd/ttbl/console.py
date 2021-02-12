@@ -784,8 +784,8 @@ class generic_c(impl_c):
                 f.connect(file_name)
                 self._write(f.fileno(), data)
         else:
+            mode = "a"
             while True:
-                mode = "a"
                 try:
                     with contextlib.closing(open(file_name, mode)) as f:
                         if stat.S_ISCHR(stat_info.st_mode):
