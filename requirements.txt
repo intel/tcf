@@ -10,7 +10,7 @@ imutils
 ply                 # package: python3-ply
 pykwalify           # package: python3-pykwalify
 pyserial            # package: python3-pyserial ubuntu=python3-serial
-python-Levenshtein  # package: python3-Levenshtein
+python-Levenshtein  # package: python3-Levenshtein ubuntu=python3-levenshtein
 requests            # package: python3-requests
 setuptools          # package: python3-setuptools
 tabulate            # package: python3-tabulate
