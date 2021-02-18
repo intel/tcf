@@ -3,9 +3,8 @@
 # Copyright (c) 2017 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
-"""
-Stream and snapshot capture interace
-------------------------------------
+"""Stream and snapshot capture interface
+-------------------------------------
 
 This module implements an interface to capture things in the server
 and then return them to the client.
@@ -29,6 +28,56 @@ This can be used to, for example:
 
 - capture network traffic with tcpdump
 
+
+Capturing conventions
+^^^^^^^^^^^^^^^^^^^^^
+
+Different data has different formats and not all fit the same process;
+these conventions provide for the current ones decided:
+
+.. _capture_json_format:
+
+Common JSON format
+~~~~~~~~~~~~~~~~~~
+
+Some capturing drivers just need to report data in an easy to parse
+way, which has been standarized around this format which works for
+both streams and snapshots:
+
+The stream of data capture will be reported as a JSON list of
+dictionaries on the form::
+
+  [ DICT1, DICT2, DICT3 ... ]
+
+with every dictionary describing a sample or set of samples that were
+taken at the same time and contaning the following fields::
+
+- *sequence*: (mandatory) a monotonically increase sequence
+
+- *timestamp*: (mandatory) a UTC timestamp **string* of when the
+  sample was taken, in the format *YYYYmmddHHMMSS[MMM]*
+  (year/month/day/hour/minute/second/milliseconds). Note the length is
+  always either 14 chars or 17 if it includes millisecond precission.
+
+- *raw*: (optional) a subdictionary with raw data from the instrument
+  that took the measurement; this is instrument specific and the
+  implementation is free to put in here whichever data considers necessary.
+
+The rest of the fields are standarized on their own sections
+
+.. _capture_power_consumption:
+
+Power consumption measurements
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For Smart PDUs and other devices that can measure power consumption,
+the reporting format (mediatype) shall be conformat to the :ref:`Common JSON
+format <capture_json_format>` with the following fields:
+
+- *power (watt)*: integer/float indicates current power consumption in
+  Watts
+
+- *voltage (volt)*: integer/float indicating current voltage
 
 """
 
@@ -173,15 +222,12 @@ class interface(ttbl.tt_interface):
         Called when the interface is added to a target to initialize
         the needed target aspect (such as adding tags/metadata)
         """
-        capturers = []
-        publish_dict = target.tags['interfaces'][iface_name]
         for capturer, impl in self.impls.items():
             ctype = "stream" if impl.stream else "snapshot"
-            publish_dict[capturer]['type'] = ctype
-            descr = capturer + ":" + ctype
+            target.fsdb.set(f"interfaces.{iface_name}.{capturer}.type", ctype)
             if impl.mimetype:
-                descr += ":" + impl.mimetype
-                publish_dict[capturer]['mimetype'] = impl.mimetype
+                target.fsdb.set(f"interfaces.{iface_name}.{capturer}.mimetype",
+                                impl.mimetype)
 
     def start(self, who, target, capturer):
         """

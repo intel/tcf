@@ -603,8 +603,9 @@ class extension(tc.target_extension_c):
 
         :returns: dictionary of capturers and their state
         """
-        r = self.target.ttbd_iface_call("capture", "list", method = "GET")
-        return r['capturers']
+        r = self.target.ttbd_iface_call(
+            "capture", "list", method = "GET")
+        return list(r.get('components', {}).keys())
 
     def _healthcheck(self):
         # not much we can do here without knowing what the interfaces
