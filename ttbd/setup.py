@@ -131,7 +131,8 @@ targets over HTTP to be controlled by the TCF client.
         ('etc/tcf', [ 'conf_local.py' ]),
         ('@prefix@/share/tcf', [
             'hw-healthmonitor/ttbd-hw-healthmonitor-driver-rebind.py',
-            'setup-efi-grub2-elf.sh'
+            'setup-efi-grub2-elf.sh',
+            "raritan-power-capture.py",
         ]),
         ('@prefix@/share/tcf/ttbd',[
             'requirements.txt',

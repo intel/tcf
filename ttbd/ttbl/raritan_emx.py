@@ -8,17 +8,21 @@
 #
 # pylint: disable = missing-docstring
 
+import logging
+import datetime
+import subprocess
 import urllib.parse
 
 import commonl
 
 import ttbl
 import ttbl.power
+import ttbl.capture
 import raritan
 import raritan.rpc
 import raritan.rpc.pdumodel
 
-class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
+class pci(ttbl.power.impl_c, ttbl.capture.impl_c): # pylint: disable = abstract-method
     """
     Power control interface for the Raritan EMX family of PDUs (eg: PX3-\*)
 
@@ -27,10 +31,28 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
     In any place in the TCF server configuration where a power control
     implementation is needed and served by this PDU, thus insert:
 
+    >>> sys.path.append("/usr/local/lib/python3.9/site-packages")
     >>> import ttbl.raritan_emx
     >>>
-    >>> ...
-    >>>    ttbl.raritan_emx.pci('https://USER:PASSWORD@HOSTNAME', OUTLET#)
+    >>> pc = ttbl.raritan_emx.pci('https://USER@HOSTNAME', OUTLET#,
+    >>>                           password = "MYPASSOWRD")
+    >>>
+    >>> target.interface_add("power", ttbl.power.interface(AC = pc))
+
+    Note this also provides an interface for capture power consumption
+    measurements on units that support it.
+
+    >>> target.interface_add("capture", ttbl.capture.interface(AC = pc))
+
+    Power consumption can now be sampled (depending on network, about
+    one sample per second)::
+
+      $ tcf capture-start TARGETNAME AC
+      $ sleep 10s
+      $ tcf capture-stop-and-get TARGETNAME AC output.json
+
+    or using the capture APIs from scripting described in
+    :mod:`tcfl.target_ext_capture`.
 
     :param str url: URL to access the PDU in the form::
 
@@ -122,6 +144,10 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
         assert password == None or isinstance(password, str)
 
         ttbl.power.impl_c.__init__(self, **kwargs)
+        self.capture_program = commonl.ttbd_locate_helper(
+            "raritan-power-capture.py", log = logging, relsrcpath = ".")
+        ttbl.capture.impl_c.__init__(
+            self, stream = True, mimetype = "application/json")
         self.url = urllib.parse.urlparse(url)
         if password:
             self.password = commonl.password_get(
@@ -185,3 +211,37 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
         if state == 0:
             return False
         return True
+
+    #
+    # ttbl.capture.impl_c: power capture stats
+    #
+    def start(self, target, capturer):
+        ttbl.capture.impl_c.start(self, target, capturer)
+        # no need for a timestamp because we can only capture one at the time
+        file_name = f"{self.user_path}/{target.id}-{capturer}.capture"
+        pidfile = f"{target.state_dir}/capture-{capturer}.pid"
+        logging.error("DEBUG starting pid@{pidfile}")
+        p = subprocess.Popen(
+            [
+                self.capture_program,
+                f"{self.url.scheme}://{self.url.username}@{self.url.hostname}",
+                "environment",
+                # the indexes the command line tool expects are
+                # 1-based, whereas we stored zero based (what the API likes)
+                str(self.outlet_number + 1),
+                file_name,
+            ], close_fds = True, shell = False, stderr = subprocess.STDOUT,
+            env = { 'RARITAN_PASSWORD': self.password })
+        with open(pidfile, "w+") as pidf:
+            pidf.write("%s" % p.pid)
+        ttbl.daemon_pid_add(p.pid)
+        return {}
+
+    def stop_and_get(self, target, capturer):
+        ttbl.capture.impl_c.stop_and_get(self, target, capturer)
+        pidfile = f"{target.state_dir}/capture-{capturer}.pid"
+        commonl.process_terminate(pidfile, tag = "capture:" + capturer,
+                                  wait_to_kill = 2)
+        return dict(stream_file =
+                    f"{self.user_path}/{target.id}-{capturer}.capture")
+
