@@ -17,12 +17,6 @@ wait for things to be found when such captures, such as images on screenshots.
 """
 # Roadmap:
 #
-# Primitives for accessing the capture interface
-#
-#   _rest_tb_target_capture_start()
-#   _rest_tb_target_capture_stop_and_get()
-#   _rest_tb_target_capture_list()
-#
 # Extension to the TCF client API
 #
 #   extension
@@ -64,9 +58,6 @@ try:
 except ImportError as e:
     image_expectation_works = False
 
-def _rest_tb_target_capture_list(rtb, rt, ticket = ''):
-    return rtb.send_request("GET", "targets/%s/capture/list" % rt['id'],
-                            data = { 'ticket': ticket })
 
 
 
@@ -532,12 +523,12 @@ class extension(tc.target_extension_c):
         :returns: dictionary of values passed by the server
         """
         self.target.report_info("%s: starting capture" % capturer, dlevel = 3)
-        r = self.target.ttbd_iface_call("capture", "start", method = "POST",
+        r = self.target.ttbd_iface_call("capture", "start", method = "PUT",
                                         capturer = capturer)
         self.target.report_info("%s: started capture" % capturer, dlevel = 2)
         return r
 
-    def stop_and_get(self, capturer, local_filename):
+    def stop_and_get(self, capturer, local_filename = None):
         """
         If this is a streaming capturer, stop streaming and return the
         captured data or if no streaming, take a snapshot and return it.
@@ -548,15 +539,36 @@ class extension(tc.target_extension_c):
 
         :param str capturer: capturer to use, as listed in the
           target's *capture*
-        :param str local_filename: file to which to write the capture.
+
+        :param str local_filename: (optional; default *None*) file to
+          which to write the capture. If *None*, the data is not
+          captured (nor transmitted).
+
+          If *False*, it is not written to a file, but returned as
+          JSON.
+
+          .. warning: **DO NOT** use for large amounts of data
+
         :returns: dictionary of values passed by the server
         """
+        assert isinstance(local_filename, (bool, type(None), str))
         self.target.report_info("%s: stopping capture" % capturer, dlevel = 3)
+
+        if local_filename == False:
+            # stop and get, return the capture as json
+            r = self.target.ttbd_iface_call(
+                "capture", "stop_and_get", method = "PUT",
+                capturer = capturer)
+            self.target.report_info(
+                f"{capturer}: stopped capture, read RAW {len(r)}B",
+                dlevel = 2)
+            return r
+
         if local_filename != None:
             with open(local_filename, "wb") as of, \
                  contextlib.closing(
                      self.target.ttbd_iface_call(
-                         "capture", "stop_and_get", method = "POST",
+                         "capture", "stop_and_get", method = "PUT",
                          capturer = capturer,
                          stream = True, raw = True)) as r:
                 # http://docs.python-requests.org/en/master/user/quickstart/#response-content
@@ -570,7 +582,7 @@ class extension(tc.target_extension_c):
                                         % (capturer, read_bytes), dlevel = 2)
         else:
             self.target.ttbd_iface_call(
-                "capture", "stop_and_get", method = "POST",
+                "capture", "stop_and_get", method = "PUT",
                 capturer = capturer, stream = True, raw = True)
             self.target.report_info("%s: stopped capture" % capturer,
                                     dlevel = 2)
@@ -601,7 +613,11 @@ class extension(tc.target_extension_c):
         >>> print r
         >>> { 'screen': None, 'audio': False, 'screen_stream': True }
 
-        :returns: dictionary of capturers and their state
+        :returns: dictionary of capturers and their state:
+
+          - *None*: snapshot capturer, no state
+          - *True*: streaming capturer, currently capturing
+          - *False*: streaming capturer, currently not-capturing
         """
         r = self.target.ttbd_iface_call(
             "capture", "list", method = "GET")

@@ -29,24 +29,25 @@ class _snapshot_c(ttbl.capture.impl_c):
 
 
 
-target = ttbl.test_target("t0")
-ttbl.config.target_add(
-    target,
-    tags = {
-        'bsp_models': {
-            'bsp1': None,
-        },
-        'bsps' : {
-            "bsp1": dict(val = 1),
-        },
-        'skip_cleanup' : True,
-    }
-)
-
-target.interface_add(
-    "capture",
-    ttbl.capture.interface(
-        stream = _stream_c(True, "application/json"),
-        snapshot = _snapshot_c(False, "application/json")
+for c in range(2):
+    target = ttbl.test_target(f"t{c}")
+    ttbl.config.target_add(
+        target,
+        tags = {
+            'bsp_models': {
+                'bsp1': None,
+            },
+            'bsps' : {
+                "bsp1": dict(val = 1),
+            },
+            'skip_cleanup' : True,
+        }
     )
-)
+
+    target.interface_add(
+        "capture",
+        ttbl.capture.interface(
+            stream0 = _stream_c(True, "application/json"),
+            snapshot0 = _snapshot_c(False, "application/json")
+        )
+    )

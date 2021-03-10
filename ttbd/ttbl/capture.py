@@ -136,6 +136,27 @@ class impl_c(ttbl.tt_interface_impl_c):
         assert isinstance(capturer, str)
         # must return a dict
 
+    def get(self, target, capturer):
+        """
+        If this is a streaming capturer, return the currently captured
+        data (which might be partial).
+
+        :param ttbl.test_target target: target on which we are capturing
+        :param str capturer: name of this capturer
+        :returns: dictionary of values to pass to the client,
+          including the data; to stream a large file, include a member
+          in this dictionary called *stream_file* pointing to the
+          file's path; eg:
+
+          >>> return dict(stream_file = CAPTURE_FILE)
+
+          If a file to stream is given, no other data will be passed.
+        """
+        assert isinstance(target, ttbl.test_target)
+        assert isinstance(capturer, str)
+        return NotImplementedError
+        # must return a dict
+
     def stop_and_get(self, target, capturer):
         """
         If this is a streaming capturer, stop streaming and return the
@@ -152,6 +173,8 @@ class impl_c(ttbl.tt_interface_impl_c):
           file's path; eg:
 
           >>> return dict(stream_file = CAPTURE_FILE)
+
+          If a file to stream is given, no other data will be passed.
         """
         assert isinstance(target, ttbl.test_target)
         assert isinstance(capturer, str)
@@ -245,12 +268,12 @@ class interface(ttbl.tt_interface):
         with target.target_owned_and_locked(who):
             if impl.stream == False:
                 # doesn't need starting
-                return { 'result' : 'capture start not needed'}
+                raise RuntimeError(f'{capturer}: starting not valid in snapshot capturers')
             capturing = target.property_get("capturer-%s-started" % capturer)
             impl.user_path = user_path
             if not capturing:
                 target.property_set("capturer-%s-started" % capturer, "True")
-                return { 'result' : 'capture started'}
+                return { }
             # if we were already capturing, restart it--maybe
             # someone left it capturing by mistake or who
             # knows--but what matters is what the current user wants.
@@ -258,7 +281,7 @@ class interface(ttbl.tt_interface):
             impl.stop_and_get(target, capturer)
             impl.start(target, capturer)
             target.property_set("capturer-%s-started" % capturer, "True")
-            return { 'result' : 'capture started'}
+            return { }
 
     post_start = put_start	# BACKWARD compat
 
@@ -284,7 +307,7 @@ class interface(ttbl.tt_interface):
                 impl.user_path = self.user_path
                 target.property_set("capturer-%s-started" % capturer, None)
                 return impl.stop_and_get(target, capturer)
-            return { 'result' : 'it is not capturing, can not stop'}
+            raise RuntimeError(f'{capturer} is not capturing, can not stop')
 
     post_stop_and_get = put_stop_and_get	# BACKWARD compat
 
