@@ -599,13 +599,13 @@ class extension(tc.target_extension_c):
 
         >>> r = target.capture.list()
         >>> print r
-        >>> {'screen': 'ready', 'audio': 'not-capturing', 'screen_stream': 'capturing'}
+        >>> { 'screen': None, 'audio': False, 'screen_stream': True }
 
         :returns: dictionary of capturers and their state
         """
         r = self.target.ttbd_iface_call(
             "capture", "list", method = "GET")
-        return list(r.get('components', {}).keys())
+        return r.get('components', {})
 
     def _healthcheck(self):
         # not much we can do here without knowing what the interfaces
@@ -639,7 +639,7 @@ class extension(tc.target_extension_c):
             if capture_spec[capturer][0] == "stream":
                 states = target.capture.list()
                 state = states[capturer]
-                if state == "capturing":
+                if state == True:
                     target.report_pass(
                         "capturer %s is in expected streaming state" % capturer)
                 else:
@@ -829,6 +829,11 @@ def _cmdline_capture_stop(args):
         target.capture.stop_and_get(args.capturer, None)
 
 def _cmdline_capture_list(args):
+    state_to_str = {
+        False: "not capturing",
+        True: "capturing",
+        None: "ready"
+    }
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
         capturers = target.capture.list()
@@ -837,8 +842,13 @@ def _cmdline_capture_list(args):
             in target.rt.get('interfaces', {}).get('capture', {}).items():
             capture_spec[capturer] = (data['type'], data['mimetype'])
         for name, state in capturers.items():
-            print("%s:%s:%s:%s" % (
-                name, capture_spec[name][0], capture_spec[name][1], state))
+            print(
+                "%s:%s:%s:%s" % (
+                    name, capture_spec[name][0], capture_spec[name][1],
+                    state_to_str.get(state,
+                                     f"BUG: unknown state type {type(state)}")
+                )
+            )
 
 
 def cmdline_setup(argsp):

@@ -299,12 +299,12 @@ class interface(ttbl.tt_interface):
                 capturing = target.property_get("capturer-%s-started"
                                                 % name)
                 if capturing:
-                    res[name] = "capturing"
+                    res[name] = True
                 else:
-                    res[name] = "not-capturing"
+                    res[name] = False
             else:
-                res[name] = "ready"
-        return dict(capturers = res)
+                res[name] = None
+        return dict(components = res)
 
 
     def _release_hook(self, target, _force):
