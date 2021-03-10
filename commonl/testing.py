@@ -741,7 +741,7 @@ host = '127.0.0.1'
             fd.seek(0, 0)
             count = 0
             for line in fd:
-                print("  %d: %s" % (count, line), file=sys.stderr)
+                print("  %d: %s" % (count, line), file=sys.stderr, end = "")
                 count += 1
 
     def check_log_for_issues(self, testcase = None):
@@ -755,7 +755,7 @@ host = '127.0.0.1'
         try:
             issues = []
             if os.path.isfile(self.stdout):
-                with open(self.stdout, 'a+') as stdout:
+                with open(self.stdout) as stdout:
                     cnt = 0
                     for line in stdout:
                         if self._check_log_line_for_issues(line):
@@ -766,7 +766,7 @@ host = '127.0.0.1'
 
             issues = []
             if os.path.isfile(self.stderr):
-                with open(self.stderr, 'a+') as stderr:
+                with open(self.stderr) as stderr:
                     cnt = 0
                     for line in stderr:
                         if self._check_log_line_for_issues(line):
