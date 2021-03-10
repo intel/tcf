@@ -696,8 +696,8 @@ host = '127.0.0.1'
         r"DEBUG",
         r"FIXME",
     ]
-    error_regex = re.compile(r"(E\[|error|Error)")
-    warning_regex = re.compile(r"(W\[|warning|Warning)")
+    error_regex = re.compile("(error|Error)")
+    warning_regex = re.compile("(warning|Warning)")
     def _check_log_line_for_issues(self, line):
         line = line.strip()
         for bad_string in self.bad_strings:
