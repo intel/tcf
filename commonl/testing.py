@@ -11,6 +11,7 @@ Library of functions mainly useful for testing
 """
 
 import argparse
+import atexit
 import errno
 import inspect
 import logging
@@ -643,7 +644,10 @@ host = '127.0.0.1'
             self._check_if_alive()
         finally:
             self.check_log_for_issues()
-        #atexit.register(self.terminate)
+        # if we call self.terminate() from __del__, the garbage
+        # collector has started to wipe things, so we can't use, ie:
+        # open() to check the log file
+        atexit.register(self.terminate)
 
     def _check_if_alive(self):
         timeout = 5
@@ -824,8 +828,6 @@ host = '127.0.0.1'
             logging.warning("keeping TTBD #%s temporary directory @ %s\n",
                             self.port, self.tmpdir)
 
-    def __del__(self):
-        self.terminate()
 
 
 class shell_client_base(tcfl.tc.tc_c):
