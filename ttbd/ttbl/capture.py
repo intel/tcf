@@ -229,7 +229,7 @@ class interface(ttbl.tt_interface):
                 target.fsdb.set(f"interfaces.{iface_name}.{capturer}.mimetype",
                                 impl.mimetype)
 
-    def start(self, who, target, capturer):
+    def put_start(self, target, who, args, _files, user_path):
         """
         If this is a streaming capturer, start capturing the stream
 
@@ -239,29 +239,30 @@ class interface(ttbl.tt_interface):
           :class:`ttbl.capture.interface`.
         :returns: dictionary of values to pass to the client
         """
-        assert capturer in list(self.impls.keys()), "capturer %s unknown" % capturer
+        impl, capturer = self.arg_impl_get(args, "capturer")
+        assert capturer in list(self.impls.keys()), \
+            "capturer '%s' unknown" % capturer
         with target.target_owned_and_locked(who):
-            impl = self.impls[capturer]
             if impl.stream == False:
                 # doesn't need starting
                 return { 'result' : 'capture start not needed'}
             capturing = target.property_get("capturer-%s-started" % capturer)
-            impl.user_path = self.user_path
+            impl.user_path = user_path
             if not capturing:
                 target.property_set("capturer-%s-started" % capturer, "True")
                 return { 'result' : 'capture started'}
-            else:
-                # if we were already capturing, restart it--maybe
-                # someone left it capturing by mistake or who
-                # knows--but what matters is what the current user wants.
-                target.property_set("capturer-%s-started" % capturer, None)
-                impl.stop_and_get(target, capturer)
-                impl.start(target, capturer)
-                target.property_set("capturer-%s-started" % capturer, "True")
-                return { 'result' : 'capture started'}
+            # if we were already capturing, restart it--maybe
+            # someone left it capturing by mistake or who
+            # knows--but what matters is what the current user wants.
+            target.property_set("capturer-%s-started" % capturer, None)
+            impl.stop_and_get(target, capturer)
+            impl.start(target, capturer)
+            target.property_set("capturer-%s-started" % capturer, "True")
+            return { 'result' : 'capture started'}
 
+    post_start = put_start	# BACKWARD compat
 
-    def stop_and_get(self, who, target, capturer):
+    def put_stop_and_get(self, target, who, args, _files, user_path):
         """
         If this is a streaming capturer, stop streaming and return the
         captured data or if no streaming, take a snapshot and return it.
@@ -272,22 +273,22 @@ class interface(ttbl.tt_interface):
           :class:`ttbl.capture.interface`.
         :returns: dictionary of values to pass to the client
         """
-        assert capturer in list(self.impls.keys()), "capturer %s unknown" % capturer
+        impl, capturer = self.arg_impl_get(args, "capturer")
         with target.target_owned_and_locked(who):
             impl = self.impls[capturer]
             if impl.stream == False:
-                impl.user_path = self.user_path
+                impl.user_path = user_path
                 return impl.stop_and_get(target, capturer)
             capturing = target.property_get("capturer-%s-started" % capturer)
             if capturing:
                 impl.user_path = self.user_path
                 target.property_set("capturer-%s-started" % capturer, None)
                 return impl.stop_and_get(target, capturer)
-            else:
-                return { 'result' : 'it is not capturing, can not stop'}
+            return { 'result' : 'it is not capturing, can not stop'}
 
+    post_stop_and_get = put_stop_and_get	# BACKWARD compat
 
-    def list(self, target):
+    def get_list(self, target, _who, _args, _files, _user_path):
         """
         List capturers available on a target
 
@@ -312,26 +313,6 @@ class interface(ttbl.tt_interface):
             if impl.stream == True:
                 impl.stop_and_get(target, name)
 
-
-    def request_process(self, target, who, method, call, args, _files,
-                        _user_path):
-        # called by the daemon when a METHOD request comes to the HTTP path
-        # /ttb-vVERSION/targets/TARGET/interface/capture/CALL
-        self.user_path = _user_path
-        ticket = args.get('ticket', "")
-        if call == "start" and method == "POST":
-            capturer = self.arg_get(args, "capturer", str)
-            self.start(who, target, capturer)
-            r = {}
-        elif call == "stop_and_get" and method == "POST":
-            capturer = self.arg_get(args, "capturer", str)
-            r = self.stop_and_get(who, target, capturer)
-        elif method == "GET" and call == "list":
-            r = self.list(target)
-        else:
-            raise RuntimeError("%s|%s: unsuported" % (method, call))
-        target.timestamp()	# If this works, it is acquired and locked
-        return r
 
 
 class generic_snapshot(impl_c):
