@@ -20,11 +20,11 @@ while getopts ":d:v:t:p:i:" o; do
     esac
 done
 
-VERSION=$(git describe | sed 's/^v\([0-9]\+\)/\1/')
+VERSION=${VERSION:-$(git describe | sed 's/^v\([0-9]\+\)/\1/' | sed 's/-/_/g')}
 
 # Use docker if a container is specified, otherwise just run locally
 if [ "${CONTAINER}" == "None" ]; then
-    BDIST_OPTS="--dist-dir=${RPMDIR}/ --bdist-base=${PWD}/dist/"
+    BDIST_OPTS="--dist-dir=${RPM_DIR}/ --bdist-base=${PWD}/dist/"
     cd ${PWD}/${TARGET_DIR} && VERSION=${VERSION} python3 ./setup.py bdist_rpm ${BDIST_OPTS}
 else
     BUILD_DEPS="dnf install -y python3 rpm-build"
