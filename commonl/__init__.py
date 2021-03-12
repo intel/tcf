@@ -1129,8 +1129,9 @@ def version_get(module, name):
     try:
         git_version = subprocess.check_output(
             "git describe --tags --always --abbrev=7 --dirty".split(),
-            cwd = _srcdir, stderr = subprocess.STDOUT)
-        return git_version.strip().decode('utf-8')
+            cwd = _srcdir, stderr = subprocess.STDOUT, encoding = 'utf-8')
+        # RPM versions can't have dash (-), so use underscores (_)
+        return git_version.strip().replace("-", "_")
     except subprocess.CalledProcessError as _e:
         # At this point, logging is still not initialized
         raise RuntimeError("Unable to determine %s (%s) version: %s"

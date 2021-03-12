@@ -161,6 +161,7 @@ doctest:
 tests:
 	python3 -m unittest discover -vv
 
+# RPM versions can't have dash (-), so use underscores (_)
 export VERSION ?= $(shell git describe | sed 's/^v\([0-9]\+\)/\1/' | sed 's/-/_/g')
 
 export DISTRO        ?= $(shell source /etc/os-release && echo $$ID)

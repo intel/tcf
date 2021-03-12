@@ -150,6 +150,7 @@ else:
         version = subprocess.check_output(
             "git describe --tags --always --abbrev=7 --dirty".split(),
             cwd = _srcdir, stderr = subprocess.PIPE, encoding = "utf-8")
+        # RPM versions can't have dash (-), so use underscores (_)
         version = version.strip().replace("-", "_")
         if re.match("^v[0-9]+.[0-9]+", version):
             version = version[1:]
