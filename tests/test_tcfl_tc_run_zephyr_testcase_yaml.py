@@ -8,7 +8,7 @@
 
 import os
 
-from tcfl import commonl.testing
+import commonl.testing
 import tcfl.tc
 import tcfl.tc_zephyr_sanity
 import tcfl.tl

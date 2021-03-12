@@ -9,7 +9,7 @@
 import os
 import re
 
-from tcfl import commonl.testing
+import commonl.testing
 import tcfl.tc
 import tcfl.tl
 

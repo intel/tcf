@@ -10,7 +10,7 @@ import os
 import sys
 import unittest
 
-from tcfl import commonl.testing
+import commonl.testing
 import tcfl.tc
 
 zephyr_vars = set(['ZEPHYR_BASE', 'ZEPHYR_SDK_INSTALL_DIR',

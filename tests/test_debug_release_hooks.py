@@ -8,7 +8,7 @@
 
 import os
 
-from tcfl import commonl.testing
+import commonl.testing
 import tcfl
 import tcfl.tc
 

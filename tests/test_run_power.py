@@ -10,7 +10,7 @@ import os
 import sys
 import unittest
 
-from tcfl import commonl.testing
+import commonl.testing
 import tcfl.tc
 
 _src = os.path.abspath(__file__)

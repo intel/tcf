@@ -10,7 +10,7 @@ import unittest
 
 import requests
 
-from tcfl import commonl.testing
+import commonl.testing
 import tcfl.tc
 import ttbl.fsdb
 

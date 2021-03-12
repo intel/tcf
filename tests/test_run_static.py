@@ -11,7 +11,7 @@ import re
 import sys
 import unittest
 
-from tcfl import commonl.testing
+import commonl.testing
 import tcfl
 import tcfl.tc
 
