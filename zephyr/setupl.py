@@ -36,7 +36,6 @@ def mk_version_py(base_dir, version):
     Create a version.py file in a directory with whichever version
     string is passed.
     """
-    print(f"DEBUG version {version}")
     with open(os.path.join(base_dir, "version.py"), "w") as f:
         f.write("""\
 #! /usr/bin/python3
