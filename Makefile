@@ -161,12 +161,12 @@ doctest:
 tests:
 	python3 -m unittest discover -vv
 
-VERSION := $(shell git describe | sed 's/^v\([0-9]\+\)/\1/')
+export VERSION ?= $(shell git describe | sed 's/^v\([0-9]\+\)/\1/' | sed 's/-/_/g')
 
-DISTRO        = fedora
-DISTROVERSION = 29
+export DISTRO        ?= $(shell source /etc/os-release && echo $$ID)
+export DISTRONAME    ?= $(shell echo $(DISTRO) | tr A-Z a-z)
+export DISTROVERSION ?= $(shell source /etc/os-release && echo $$VERSION_ID)
 
-DISTRONAME  := $(shell echo $(DISTRO) | tr A-Z a-z)
 BASE        := $(PWD)
 RPMDIR      ?= $(BASE)/dist
 CONTAINER   ?= True
