@@ -1,3 +1,5 @@
+# Non-Python Requirements
+# package: fedora,centos,rhel=rpm-build
 asciimatics
 junit_xml               # package: fedora=python3-junit_xml ubuntu=python3-junitxml
 keyring                 # package: fedora,ubuntu=python3-keyring
