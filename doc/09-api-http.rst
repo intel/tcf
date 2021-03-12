@@ -1,8 +1,5 @@
 .. _ttbd_api_http:
 
-Common API HTTP specification
-=============================
-
 Introduction
 ------------
 
