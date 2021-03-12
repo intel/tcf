@@ -8,6 +8,8 @@ Access target's serial consoles / bidirectional channels
 --------------------------------------------------------
 
 Implemented by :class:`ttbl.console.interface`.
+
+HTTP protocol description :ref:`<http_target_console>`.
 """
 
 import codecs
