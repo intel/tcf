@@ -79,7 +79,7 @@ This is the client and meta-testcase runner for the TCF test case framework.
     data_files = [
         # No default configuration files; confusing
         ('@sysconfigdir@/tcf/', [
-            'conf_global.py',
+            './conf_global.py',
         ]),
         # ('etc/tcf', glob.glob("conf_*.py")),
         ('@prefix@/share/tcf', [

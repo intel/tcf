@@ -5,6 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+import sys
+import os
 import fileinput
 
 import distutils.command.install_data

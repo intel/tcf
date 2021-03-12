@@ -13,6 +13,7 @@
 #
 import fileinput
 import os
+import sys
 
 import distutils
 import distutils.command.bdist_rpm
@@ -104,15 +105,15 @@ targets over HTTP to be controlled by the TCF client.
         bdist_rpm = _bdist_rpm
     ),
     data_files = [
-        ('etc/systemd/system', [
+        ('@sysconfigdir@/systemd/system', [
             'ttbd@.service',
             'hw-healthmonitor/ttbd-hw-healthmonitor.service'
         ]),
-        ('etc/sudoers.d', [
+        ('@sysconfigdir@/sudoers.d', [
             'ttbd_sudo',
             'hw-healthmonitor/ttbd_hw_healthmonitor_sudo'
         ]),
-        ('etc/ttbd-production', [
+        ('@sysconfigdir@/ttbd-production', [
             'conf_00_lib.py',
             'conf_00_lib_capture.py',
             'conf_00_lib_mcu.py',
@@ -124,11 +125,11 @@ targets over HTTP to be controlled by the TCF client.
             'example_conf_05_auth_localdb.py',
             'example_conf_05_auth_ldap.py',
         ]),
-        ('etc/ttbd-hw-healthmonitor', [
+        ('@sysconfigdir@/ttbd-hw-healthmonitor', [
             'hw-healthmonitor/example_conf_50_xhci.py',
         ]),
         # We install a local server, also a TCF config for it
-        ('etc/tcf', [ 'conf_local.py' ]),
+        ('@sysconfigdir@/tcf', [ 'conf_local.py' ]),
         ('@prefix@/share/tcf', [
             'hw-healthmonitor/ttbd-hw-healthmonitor-driver-rebind.py',
             'setup-efi-grub2-elf.sh',
@@ -138,7 +139,6 @@ targets over HTTP to be controlled by the TCF client.
             'requirements.txt',
         ]),
         ('@prefix@/lib/udev/rules.d', [ '80-ttbd.rules' ]),
-        ('var/lib/ttbd', [ 'frdm_k64f_recovery.bin' ]),
     ]
 )
 

@@ -12,6 +12,7 @@
 #
 #
 import os
+import sys
 
 import distutils
 import distutils.command.bdist_rpm
@@ -40,13 +41,13 @@ imaging on PC-class targets via DHCP / TFTP.
     packages = [ ],
     scripts = [ ],
     data_files = [
-        ( 'etc/systemd/system/ttbd@.service.d/', [
+        ( '@sysconfigdir@/systemd/system/ttbd@.service.d/', [
             'pos.conf'
         ]),
-        ( '/etc/httpd/conf.d/', [
+        ( '@sysconfigdir@/httpd/conf.d/', [
             'ttbd.conf',
         ]),
-        ( '/etc/exports.d/', [
+        ( '@sysconfigdir@/exports.d/', [
             'ttbd-pos.exports',
         ]),
         ( '@prefix@/share/tcf/', [
