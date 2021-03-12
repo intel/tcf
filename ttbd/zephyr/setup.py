@@ -11,12 +11,11 @@
 # VERSION=$(git describe) python ./setup.py bdist_rpm
 #
 #
-import fileinput
-import os
 
-import distutils.command.install_data
+import os
+import sys
+
 import distutils.core
-import distutils.sysconfig
 
 import setupl
 
@@ -33,8 +32,11 @@ This is the TCF's TTBD for running Zephyr OS in targets
     # This is needed so when data is to be installed, our
     # _install_data class is used.
     cmdclass = dict(
+        install_data = setupl._install_data,
     ),
     data_files = [
-        ('etc/ttbd-production/', [ 'conf_06_zephyr.py' ]),
+        ('@sysconfigdir@/ttbd-production/', [ 'conf_06_zephyr.py' ]),
+        # do not @prefix@ this, it always has to be in var/lib/ttbd
+        ('/var/lib/ttbd', [ 'frdm_k64f_recovery.bin' ]),
     ],
 )
