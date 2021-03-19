@@ -138,6 +138,8 @@ targets over HTTP to be controlled by the TCF client.
         ('@prefix@/share/tcf/ttbd',[
             'requirements.txt',
         ]),
+        ('/var/lib/ttbd',[
+        ]),
         ('@prefix@/lib/udev/rules.d', [ '80-ttbd.rules' ]),
     ]
 )
