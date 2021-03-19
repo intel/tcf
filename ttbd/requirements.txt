@@ -4,6 +4,7 @@
 # package: dnsmasq
 # package: dosfstools
 # package: centos,fedora=edk2-ovmf
+# package: gcc
 # package: ipmitool
 # package: libcap-devel ubuntu=libcap-dev
 # package: fedora=livecd-tools
@@ -16,6 +17,7 @@
 # package: sshpass
 # package: fedora,ubuntu=v4l-utils
 
+blinker         # package: python3-blinker
 flask           # package: python3-flask
 flask-login     # package: python3-flask-login
 flask-principal # package: fedora,ubuntu=python3-flask-principal
@@ -23,6 +25,7 @@ keyring         # package: fedora,ubuntu=python3-keyring
 netifaces       # package: python3-netifaces
 pexpect         # package: python3-pexpect
 ply             # package: python3-ply
+pyOpenSSL       # package: centos,fedora=python3-pyOpenSSL ubuntu=python3-openssl
 python-prctl    # package: ubuntu=python3-prctl
 pyserial        # package: centos,fedora=python3-pyserial ubuntu=python3-serial
 pysnmp          # package: centos,fedora=python3-pysnmp ubuntu=python3-pysnmp4
