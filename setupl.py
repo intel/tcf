@@ -57,7 +57,7 @@ class _install_data(distutils.command.install_data.install_data):
         #
         # If prefix is given (via --user or via --prefix), then
         # extract it and add it to the paths in self.data_files;
-        # otherwise, default to /usr/local.
+        # otherwise, default to /usr.
         install = self.distribution.command_options.get('install', {})
         if 'user' in install:
             # this means --user was given
@@ -72,7 +72,7 @@ class _install_data(distutils.command.install_data.install_data):
                 sysconfigdir = os.path.join(self.prefix, 'etc')
         else:
             # these have to be absolute, otherwise they will be prefixed again
-            self.prefix = '/usr/local'
+            self.prefix = '/usr'
             sysconfigdir = '/etc'
         new_data_files = []
         for entry in self.data_files:
