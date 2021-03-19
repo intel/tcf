@@ -267,7 +267,7 @@ class impl_c(ttbl.tt_interface_impl_c):
                  log_name = None,
                  estimated_duration = 60):
         assert isinstance(estimated_duration, int)
-        assert log_name == None or isinstance(log_name, basestring)
+        assert log_name == None or isinstance(log_name, str)
 
         commonl.assert_none_or_list_of_strings(
             consoles_disable, "consoles_disable", "console name")
