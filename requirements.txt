@@ -13,7 +13,7 @@ imutils==0.5.3
 junit_xml==1.9
 numpy==1.7.1
 # ascimatics will pull this and 
-Pillow==6.2.2
+Pillow==8.1.1
 ply==3.11
 pykwalify==1.7.0
 pymongo==3.11.0
