@@ -646,11 +646,13 @@ class report_driver_c(object):
         """
         If any looks like:
 
-          RUNID:HASHID[SOMETHING]
+          RUNID[-:]HASHID[SOMETHING]
 
         simplify it by returning *SOMETHING*
         """
-        if ident.startswith(runid + ":"):
+        if ident.startswith(runid + report_runid_hashid_file_separator):
+            ident = ident[len(runid) + 1:]
+        elif ident.startswith(runid + report_runid_hashid_separator):
             ident = ident[len(runid) + 1:]
         if ident.startswith(hashid):
             ident = ident[len(hashid):]
@@ -7043,10 +7045,21 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
             self._kw_set("tmpdir", self.tmpdir)
             self._kw_set("tc_hash", self.ticket)
+
+            # Calculate the report file prefix
             global log_dir
-            self.report_file_prefix = os.path.join(
-                log_dir, "report-%(runid)s:%(tc_hash)s." % self.kws)
-            with msgid_c(self.ticket, depth = 1, l = self.hashid_len) as msgid:
+            if self.runid:
+                # see the doc in report_runid_hashid_file_separator
+                # for why this.
+                prefix = f"{self.runid}{report_runid_hashid_separator}{self.ticket}"
+                file_prefix = f"{self.runid}{report_runid_hashid_file_separator}{self.ticket}"
+            else:
+                prefix = self.ticket
+                file_prefix = self.ticket
+            self.report_file_prefix = os.path.join(log_dir, f"report-{file_prefix}.")
+            self.kws['report_file_prefix'] = self.report_file_prefix
+
+            with msgid_c(prefix, depth = 1, l = self.hashid_len) as msgid:
                 self._ident = msgid_c.ident()
                 try:
                     self.report_info(
@@ -7908,8 +7921,9 @@ class subtc_c(tc_c):
                 self, "subcase run summary: %s"
                 % (self.summary if self.summary else "<not provided>"),
                 dlevel = 2, attachments = self.attachments)
+        # yeah f-strings and %() fields. bite me
         self.result.report(self, "NOTE: this is a subtestcase of %(tc_name)s "
-                           "(%(runid)s:%(tc_hash)s); refer to it for full "
+                           f"(%(runid)s{report_runid_hashid_file_separator}%(tc_hash)s); refer to it for full "
                            "information" % self.parent.kws, dlevel = 1)
         return self.result
 
@@ -8160,6 +8174,25 @@ from . import report_console
 from . import report_jinja2
 from . import report_taps
 from . import report_data_json
+
+
+#: Character used to separate RUNID/HASHID in reports
+#:
+#: This is the consequence of a very bad past design decisison which
+#: called for a filename *report-RUNID:HASHID.txt* and of course,
+#: colons are bad because they are used to mean a lot of things.
+#:
+#: Trying to move to hashes, but there is a lot of legacy, so these
+#: variables allow to quickly to new behaviour via configuration.
+#:
+#: Defaults to existing *:*
+report_runid_hashid_separator = ":"
+
+#: Character used to separate RUNID/HASHID in filenames
+#:
+#: Defaults to existing *:* (see comments for
+#: data:`report_runid_hashid_separator`)
+report_runid_hashid_file_separator = ":"
 
 # list of allocation IDs we have currently reserved; this list is
 # local to each thread so when we interrupt it with a signal, we can

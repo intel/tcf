@@ -248,7 +248,7 @@ class driver(tc.report_driver_c):
     templates = {
         "text" : dict(
             name = 'report.j2.txt',
-            output_file_name = 'report-%(runid)s:%(tc_hash)s.txt',
+            output_file_name = '%(report_file_prefix)stxt',
             report_pass = False,
             report_skip = False,
             report_error = True,
@@ -257,7 +257,7 @@ class driver(tc.report_driver_c):
         ),
         "junit" : dict(
             name = 'junit.j2.xml',
-            output_file_name = 'junit-%(runid)s:%(tc_hash)s.xml',
+            output_file_name = '%(report_file_prefix)stxt',
             report_pass = False,
             report_skip = False,
             report_error = False,
