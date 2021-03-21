@@ -2150,22 +2150,19 @@ def ipxe_seize(target):
     # do this as soon as we see the boot message from iPXE because
     # otherwise by the time we see the other message, it might already
     # be trying to boot pre-programmed instructions--we'll see the
-    # Ctrl-B message anyway, so we expect for it.
+    # Ctrl-B message anyway, so we expect it.
     #
     # before sending these "Ctrl-B" keystrokes in ANSI, but we've seen
     # sometimes the timing window being too tight, so we just blast
     # the escape sequence to the console.
-    target.console.write("\x02\x02")	# use this iface so expecter
-    time.sleep(0.3)
-    target.console.write("\x02\x02")	# use this iface so expecter
-    time.sleep(0.3)
-    target.console.write("\x02\x02")	# use this iface so expecter
-    time.sleep(0.3)
+    for _ in range(5):
+        target.console.write("\x02\x02")	# use this iface so expecter
+        time.sleep(0.3)
     target.expect("Ctrl-B", target.kws.get('ipxe.ctrl_b_timeout', 30))
-    target.console.write("\x02\x02")	# use this iface so expecter
-    time.sleep(0.3)
-    target.console.write("\x02\x02")	# use this iface so expecter
-    time.sleep(0.3)
+    for _ in range(5):
+        target.console.write("\x02\x02")	# use this iface so expecter
+        time.sleep(0.3)
+
     target.expect("iPXE>")
     ts_prompt = time.time()
     target.report_data("Boot statistics %(type)s",
