@@ -188,8 +188,6 @@ class rest_target_broker(object):
         self.server_version_pl = 0
         #: Changes since the major/minor version tag
         self.server_version_changes = None
-        #: Commit ID of the server code
-        self.server_version_commit = None
         
         #: Server can take all arguments JSON encoded
         #:
@@ -202,10 +200,13 @@ class rest_target_broker(object):
         #: to the code or hard dependencies.
         self.server_json_capable = True
 
+    # Make sure we support
+    # vN.N.N-N-STR[MORESTUFF]	older
+    # vN.N.N.N.STR[MORESTUFF]	newer (to support RPM)
     _server_version_regex = re.compile(
         r"v?(?P<major>[0-9]+)\.(?P<minor>[0-9]+)(\.(?P<pl>[0-9]+))?"
-        r"(-(?P<changes>[0-9]+))?"
-        r"(-g(?P<commit>[a-f0-9]+))?")
+        r"([\.-](?P<changes>[0-9]+))?"
+        r"([\.-](?P<rest>.+))?$")
 
     def _server_tweaks(self, version):
         if self.server_version != None:
@@ -223,12 +224,16 @@ class rest_target_broker(object):
         if not m:
             return
         gd = m.groupdict()
-        self.server_version_major = int(gd['major'])
-        self.server_version_minor = int(gd['minor'])
-        if gd['pl']:
-            self.server_version_pl = int(gd['pl'])
-        self.server_version_changes = int(gd['changes'])
-        self.server_version_commit = gd['commit']
+
+        # remove anything that wasn't found (value None) so we can get
+        # defaults, because otherwise is filled as a value of None
+        for k, v in list(gd.items()):
+            if v == None:
+                del gd[k]
+        self.server_version_major = int(gd.get('major', 0))
+        self.server_version_minor = int(gd.get('minor', 0))
+        self.server_version_pl = gd.get('pl', 0)
+        self.server_version_changes = int(gd.get('changes', 0))
 
         if self.server_version_major == 0:
             if self.server_version_minor == 13:
