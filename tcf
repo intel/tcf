@@ -292,7 +292,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "-t", "--ticket", metavar = "TICKET",
         action = "store", default = '',
-        help = "Ticket used for target operations")
+        help = "DEPRECATED & IGNORED")
 
     arg_parser.add_argument(
         "-a", "--allocid", metavar = "ALLOCATIONID",
