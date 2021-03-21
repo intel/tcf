@@ -553,9 +553,7 @@ class driver(tc.report_driver_c):
 
         # Remove the ticket from the ident string, as it will be
         # the same for all and makes no sense to have it.
-        ident = self.ident_simplify(tcfl.msgid_c.ident(),
-                                    reporter.kws.get('runid', ''),
-                                    reporter.kws.get('tc_hash', ""))
+        ident = testcase.ident()
         if ident == "":
             # If empty, give it a to snip token that we'll replace
             # later in mkreport

@@ -232,12 +232,14 @@ class driver(tcfl.tc.report_driver_c):
             target_server = reporter.rtb.aka
             target_type = reporter.type
             tc_name = reporter.testcase.name
+            testcase = reporter.testcase
         elif isinstance(reporter, tcfl.tc.tc_c):
             fullid = None
             target_name = None
             target_server = None
             target_type = None
             tc_name = reporter.name
+            testcase = reporter
         else:
             raise AssertionError(
                 "reporter is not tcfl.tc.{tc,target}_c but %s" % type(reporter))
@@ -245,15 +247,9 @@ class driver(tcfl.tc.report_driver_c):
         doc = self.docs.setdefault((runid, hashid, tc_name),
                                    dict(results = [], data = {}))
 
-        # Summarize the current ident by removing the
-        # runid:hashid, which is common to the whole report
-        # Otherwise we repeat it all the time, and it doesn't make
-        # sense because it is at the top level doc[runid] and
-        # doc[hashid] plus it's ID in the DB.
-        ident = self.ident_simplify(tcfl.msgid_c.ident(), runid, hashid)
         result = dict(
             timestamp = datetime.datetime.utcnow(),
-            ident = ident,
+            ident = testcase.ident(),
             level = level,
             tag = tag,
             # MongoDB doesn't like bad UTF8, so filter a wee bit

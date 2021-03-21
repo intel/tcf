@@ -447,6 +447,25 @@ class target_extension_c(object):
         pass
 
 
+#: Character used to separate RUNID/HASHID in reports
+#:
+#: This is the consequence of a very bad past design decisison which
+#: called for a filename *report-RUNID:HASHID.txt* and of course,
+#: colons are bad because they are used to mean a lot of things.
+#:
+#: Trying to move to hashes, but there is a lot of legacy, so these
+#: variables allow to quickly to new behaviour via configuration.
+#:
+#: Defaults to existing *:*
+report_runid_hashid_separator = ":"
+
+#: Character used to separate RUNID/HASHID in filenames
+#:
+#: Defaults to existing *:* (see comments for
+#: data:`report_runid_hashid_separator`)
+report_runid_hashid_file_separator = ":"
+
+
 class report_driver_c(object):
     """Reporting driver interface
 
@@ -640,23 +659,6 @@ class report_driver_c(object):
         """
         assert isinstance(obj, cls)
         cls._drivers.remove(obj)
-
-    @classmethod
-    def ident_simplify(cls, ident, runid, hashid):
-        """
-        If any looks like:
-
-          RUNID[-:]HASHID[SOMETHING]
-
-        simplify it by returning *SOMETHING*
-        """
-        if ident.startswith(runid + report_runid_hashid_file_separator):
-            ident = ident[len(runid) + 1:]
-        elif ident.startswith(runid + report_runid_hashid_separator):
-            ident = ident[len(runid) + 1:]
-        if ident.startswith(hashid):
-            ident = ident[len(hashid):]
-        return ident
 
 
 class reporter_c(object):
@@ -982,9 +984,6 @@ class target_c(reporter_c):
         self._kws_bsp = {}
         #: Origin of keys defined in self._kws
         self._kws_origin = {}
-
-        # Combination of runid/ident string
-        self._ident = ""
 
         #: Temporary directory where to store files -- this is the same
         #: as the testcase's -- it is needed for the report driver to
@@ -3770,9 +3769,14 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
         #: Expect loop to wait for things to happen
         self.tls.expect_timeout = 60
-        # FIXME: alias self.tls.expecter.timeout for backwards compat
-        # Ticket ID for this testcase / target group
+        #: (DEPRECATED) Ticket ID for this testcase / target group
         self.ticket = None
+        #: Testcase identifier including the Run ID (if specified)
+        #:
+        #: This can be used by reporting drivers/engines to get a
+        #: string looking like RUNID:HASHID that uniquely identifies
+        #: the testcase amongst many runs.
+        self.runid_hashid = None	        # updated by mkticket()
         # The group of targets where the TC is running
         self._target_group = None
         #: :class:`Target objects <tcfl.tc.target_c>`) in which this
@@ -3806,9 +3810,6 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         #: we might need to look at this in other testcases executed
         #: inmediately after (as added with :meth:`post_tc_append`).
         self.result = result_c(0, 0, 0, 0, 0)
-
-        # Combination of runid/ident string
-        self._ident = ""
 
         # Testcases we need to run when we are done running this one
         self._tcs_post = []
@@ -4526,7 +4527,39 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     #
     # Linkage into the report API and support for it
     #
+    @staticmethod
+    def ident():
+        """
+        Returns the current phase identifier for the testcase
 
+        The phase identifier is accumulated per thread and the user
+        can add more to it by running:
+
+        >>> with tcfl.msgid_c("L1"):
+        >>>    ...more code...
+
+        Any calls inside the *with* block will be reported as:
+
+          RUNID:HASHIDL1
+
+        If a second with is done (eg: inside another function):
+
+        >>> with tcfl.msgid_c("L1"):
+        >>>    ...more code...
+        >>>    with tcfl.msgid_c("L2"):
+        >>>        ...more code...
+
+        It would be reported as:
+
+          RUNID:HASHIDL2L3
+
+        :returns: a string with the current accumulated phase
+          identifier.
+        """
+        return msgid_c.ident()
+
+
+    # OLD, deprecated
     def _report_mk_prefix(self):
         """
         Update the prefix we use for the logging/reports when some
@@ -4905,7 +4938,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         # Because we are in the context of a newly initialized thread,
         # we need to initialize some things
         try:
-            with msgid_c(parent = msgid, l = 2):
+            with msgid_c(parent = msgid):
                 self.__thread_init__(tls_parent)
                 return (
                     self.__method_trampoline_call(fname, fn, _type, targets),
@@ -4958,13 +4991,15 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             # stuff
             thread_pool = _multiprocessing_method_pool_c(processes = 10)
             threads = {}
+            count = 0
             for fname, fn, _type, args in parallel_list:
                 targets = self._mk_target_args_for_fn(fn, args)
                 threads[fname] = thread_pool.apply_async(
                     self.__method_trampoline_thread,
-                    (msgid_c(l = 2), fname, fn, _type, targets,
+                    (msgid_c(f"{count:02d}"), fname, fn, _type, targets,
                      _simple_namespace(self.tls.__dict__))
                 )
+                count += 1
                 # so we can Ctrl-C right away--the system is designed
                 # to cleanup top bottom, with everything being
                 # expendable
@@ -5839,7 +5874,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                 # args[-1] is always kwargs
                 parent_msgid = kwargs.pop('parent_msgid', None)
                 parent_tls = kwargs.pop('parent_tls', None)
-                with msgid_c(parent = parent_msgid, l = 2) as msgid:
+                with msgid_c(parent = parent_msgid) as msgid:
                     msgid._depth -= 1
                     self.__thread_init__(parent_tls)
                     result = fn(*args, **kwargs)
@@ -5953,7 +5988,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         for target_role in targets:
             target = self.target_group.targets[target_role]
             kwargs['parent_tls'] = _simple_namespace(self.tls.__dict__)
-            kwargs['parent_msgid'] = msgid_c(l = 2)
+            kwargs['parent_msgid'] = msgid_c()
             threads[target_role] = \
                 thread_pool.apply_async(function, (target, ) + args, kwargs, )
 
@@ -7009,19 +7044,24 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         self._cleanup()
 
     def mkticket(self):
+        # FIXME: rename to internal API, _mkid
+        #        rename ticket to hashid
+        #        remove passing of ticket to server? we don't really
+        #        use it anymore
+        #
         # Note we use this msgid's string as tc_hash for subsitution,
         # it is a unique name based on target name and BSP model, test
         # case name (which might be more than just the tescase path if
         # a single file yields multiple test cases).
-        global ticket
         target_group_name = self.target_group.name \
                             if self.target_group else 'n/a'
-        if ticket == None:
-            self.ticket = msgid_c.encode(
-                self._hash_salt + self.name + target_group_name,
-                self.hashid_len).decode('UTF-8')
+        self.ticket = msgid_c.encode(
+            self._hash_salt + self.runid_visible + self.name + target_group_name,
+            self.hashid_len).decode('UTF-8')
+        if self.runid == None:
+            self.runid_hashid = self.ticket
         else:
-            self.ticket = self._ident.decode('UTF-8')
+            self.runid_hashid = f"{self.runid_visible}{report_runid_hashid_separator}{self.ticket}"
 
     def _run(self, msgid, tls_parent):
         """
@@ -7051,16 +7091,13 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             if self.runid:
                 # see the doc in report_runid_hashid_file_separator
                 # for why this.
-                prefix = f"{self.runid}{report_runid_hashid_separator}{self.ticket}"
                 file_prefix = f"{self.runid}{report_runid_hashid_file_separator}{self.ticket}"
             else:
-                prefix = self.ticket
-                file_prefix = self.ticket
+                file_prefix = self.runid_hashid
             self.report_file_prefix = os.path.join(log_dir, f"report-{file_prefix}.")
             self.kws['report_file_prefix'] = self.report_file_prefix
 
-            with msgid_c(prefix, depth = 1, l = self.hashid_len) as msgid:
-                self._ident = msgid_c.ident()
+            with msgid_c(depth = 1) as msgid:
                 try:
                     self.report_info(
                         "will run on target group '%s' (PID %d / TID %x)"
@@ -7086,7 +7123,6 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                             bsp_model = _target.bsp_model
                         _target.kw_set('tg_hash', msgid_c.encode(
                             self.ticket + _target.fullid + bsp_model, 4))
-                        _target._ident = msgid_c.ident()
                     result += self._run_on_target_group(msgid)
                 except Exception as e:
                     self.log.error(
@@ -7102,7 +7138,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         except Exception as e:
             # This msgid_c context is a hack so that this exception
             # report has a proper RUNID and HASH prefix
-            with msgid_c(self.ticket, depth = 0, l = self.hashid_len) as msgid:
+            with msgid_c(depth = 0) as msgid:
                 self.report_blck(
                     "BUG exception: %s %s" % (type(e).__name__, e),
                     { 'exception info': traceback.format_exc() },
@@ -7733,9 +7769,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             # new one all the time, in case we use it and close it
             tc_fake = tc_c(tc_name, file_name, "builtin")
             tc_fake.mkticket()
-            tc_fake._ident = msgid_c.ident()
-            with msgid_c(tc_fake.ticket, depth = 1, l = cls.hashid_len) \
-                 as _msgid:
+            with msgid_c(depth = 1) as _msgid:
                 cwd_original = os.getcwd()
                 try:
                     tc_instances += _is_testcase_call(_tc_driver, tc_name,
@@ -7941,6 +7975,7 @@ class subtc_c(tc_c):
 tc_global = tc_c("toplevel", "", "builtin")
 tc_global.skip_reports = True
 
+
 def _testcase_match_tags(tc, tags_spec, origin = None):
     """
     :param str tags: string describing tag selection expression
@@ -8054,8 +8089,7 @@ def testcases_discover(tcs_filtered, args):
             tcs_filtered[tc_path] = tc
         except exception as e:
             tc.mkticket()
-            with msgid_c(tc.ticket, l = tc_c.hashid_len) as _msgid:
-                tc._ident = msgid_c.ident()
+            with msgid_c() as _msgid:
                 result += result_c.report_from_exception(tc, e)
 
     if not tcs_filtered:
@@ -8175,25 +8209,6 @@ from . import report_jinja2
 from . import report_taps
 from . import report_data_json
 
-
-#: Character used to separate RUNID/HASHID in reports
-#:
-#: This is the consequence of a very bad past design decisison which
-#: called for a filename *report-RUNID:HASHID.txt* and of course,
-#: colons are bad because they are used to mean a lot of things.
-#:
-#: Trying to move to hashes, but there is a lot of legacy, so these
-#: variables allow to quickly to new behaviour via configuration.
-#:
-#: Defaults to existing *:*
-report_runid_hashid_separator = ":"
-
-#: Character used to separate RUNID/HASHID in filenames
-#:
-#: Defaults to existing *:* (see comments for
-#: data:`report_runid_hashid_separator`)
-report_runid_hashid_file_separator = ":"
-
 # list of allocation IDs we have currently reserved; this list is
 # local to each thread so when we interrupt it with a signal, we can
 # ask the server to drop those reservations
@@ -8241,6 +8256,8 @@ def _run(args):
             args.log_file = tc_c.runid + shards_log + ".log"
     else:
         tc_c.runid_visible = ""
+    # tc_global, when reporting, doesn't print the HASHID
+    tc_global.runid_hashid = tc_c.runid_visible
 
     for id_extra in args.id_extra:
         if '=' in id_extra:
@@ -8348,13 +8365,6 @@ def _run(args):
     tc_c.reason = args.reason
     tc_c.obo = args.obo
 
-    global ticket
-    if args.ticket == '':	# default for tcf run means generate a ticket
-        ticket = None
-    elif args.ticket == ' ':	# default for tcf run means generate a ticket
-        ticket = ""
-    else:
-        ticket = args.ticket	# Or use this ticket
     if args.allocid:			# Meaning I have them allocated ... 
         tc_c.allocid = args.allocid	# ... use this allocid
     tc_c.release = args.release
@@ -8407,7 +8417,7 @@ def _run(args):
         tc_c._phases.pop('clean', None)
         tc_c._phases_skip["clean"].add('command line')
 
-    with msgid_c(root = tc_c.runid, s = ""):
+    with msgid_c():
         tc_global.report_info("version %s" % version, dlevel = 3)
 
         tcs_filtered = {}
@@ -8479,8 +8489,7 @@ def _run(args):
         for tc in list(tcs_filtered.values()):
             tc.mkticket()
             tc.report_info("queuing for pairing", dlevel = 3)
-            with msgid_c(tc.ticket, l = tc_c.hashid_len) as _msgid:
-                tc._ident = msgid_c.ident()
+            with msgid_c() as _msgid:
                 _threads = tc._run_on_targets(tp, rt_all,
                                               rt_selected, ic_selected)
                 del tc	# we don't need it anymore
@@ -8510,7 +8519,7 @@ def _run(args):
                 continue
             else:
                 seen_classes.add(cls)
-                with msgid_c(tc.ticket, l = tc_c.hashid_len, depth = 0,
+                with msgid_c(depth = 0,
                              phase = "class_teardown") as _msgid:
                     result += tc._class_teardowns_run()
         # If something failed or blocked, report totals verbosely

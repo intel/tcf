@@ -196,10 +196,17 @@ class driver(tc.report_driver_c):
         # (with commonl.tls_prefix_c), where it is picked up by the
         # stream buffer object commonl.io_tls_prefix_lines_c. This,
         # before printing, adds the prefix to each line.
-        _prefix = "%s%d/%s\t%s [+%.1fs]: " % (
-            tag, level, msgid_c.ident(),
-            reporter._report_prefix, delta
-        )
+        if isinstance(reporter, tc.target_c):
+            testcase = reporter.testcase
+        elif isinstance(reporter, tc.tc_c):
+            testcase = reporter
+        else:
+            raise AssertionError(
+                "reporter is not tcfl.tc.{tc,target}_c but %s" % type(reporter))
+
+        _prefix = \
+            f"{tag}{level}/{testcase.runid_hashid}{testcase.ident()}" \
+            f" {reporter._report_prefix} [+{delta:0.1f}s]: "
         with commonl.tls_prefix_c(self.tls, _prefix):
             console_p, logfile_p = self._shall_do(level)
             message += "\n"
@@ -212,10 +219,12 @@ class driver(tc.report_driver_c):
             assert isinstance(attachments, dict)
             console_p, logfile_p = self._shall_do(alevel)
             if console_p or logfile_p:
-                _aprefix = "%s%d/%s\t%s [+%.1fs]:    " % (
-                    tag, alevel, msgid_c.ident(),
-                    reporter._report_prefix, delta
-                )
+                # note the extra two spaces at the end, those are so
+                # the attachments are printed indented; it's much
+                # easier to read
+                _aprefix = \
+                    f"{tag}{alevel}/{testcase.runid_hashid}{testcase.ident()}"  \
+                    f" {reporter._report_prefix} [+{delta:0.1f}s]:   "
                 with commonl.tls_prefix_c(self.tls, _aprefix):
                     if console_p:
                         commonl.data_dump_recursive_tls(attachments, self.tls,

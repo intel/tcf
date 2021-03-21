@@ -62,6 +62,7 @@ class driver(tc.report_driver_c):
         if not message.startswith("COMPLETION"):
             return
         assert isinstance(reporter, tc.tc_c)
+        testcase = reporter
 
         # translate from TCF result to TAPS result
         tag_prefix = ""
@@ -88,6 +89,6 @@ class driver(tc.report_driver_c):
         else:
             location = ""
         print("%s %d %s %s/%s %s %s %s\n" \
-            % (result, self.count, tag_prefix, tag, reporter._ident,
+            % (result, self.count, tag_prefix, tag, testcase.ident(),
                reporter.name, location, tag_suffix))
         self.count += 1

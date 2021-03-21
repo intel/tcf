@@ -9,6 +9,7 @@ import inspect
 import base64
 import hashlib
 import random
+import sys
 import threading
 
 class msgid_c(object):
@@ -51,7 +52,7 @@ class msgid_c(object):
     def cls_init(cls):
         cls.tls.msgid_lifo = []
 
-    def __init__(self, s = None, s_encode = None, l = 4, root = None,
+    def __init__(self, s = None,
                  phase = None, depth = None, parent = None):
         cls = type(self)
         if not hasattr(cls.tls, "msgid_lifo"):
@@ -75,23 +76,12 @@ class msgid_c(object):
             self._phase = None
             self._depth = 0
 
-        # First call, set the root if we have it
-        if root:
-            assert isinstance(root, str)
-            self._ident += root
         # that then can be overriden
-        if s != None:
+        if s:
             if not isinstance(s, str):
                 raise TypeError('expected str, but got {!r}'.format(type(s)))
-            if root:
-                self._ident += ":" + s
-            else:
-                self._ident += s
-        elif s_encode:
-            assert isinstance(s_encode, str)
-            self._ident += self.encode(hashlib.sha256(s_encode).digest(), l)
-        else:
-            self._ident += self.generate(l).decode('utf-8')
+            self._ident += s
+
         if phase:
             assert isinstance(phase, str)
             self._phase = phase

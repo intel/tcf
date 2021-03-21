@@ -643,7 +643,7 @@ class shell(tc.target_extension_c):
             for i in range(0, len(s), 64):
                 # increase the log level to report each chunk of the
                 # file we are transmitting
-                with msgid_c("C.%d" % i, l = 3):
+                with msgid_c("C.%d" % i):
                     self.run("echo -n %s  >> /tmp/file.b64"
                              % s[i:i+64].decode('utf-8').strip())
 
