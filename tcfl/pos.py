@@ -1016,7 +1016,7 @@ EOF""")
         # newer versions of rsyncd will use /proc/self/fd/<NUMBER> to
         # change the mode of a file, so if /proc is not mounted in the
         # chroot, then they fail.
-        target.shell.run("mount proc /mnt/proc -t proc    # rsyncd needs this")
+        target.shell.run("mkdir -p /mnt/proc && mount proc /mnt/proc -t proc    # rsyncd needs this")
         # start rsync in the background, save it's PID file as rsync makes
         # no pids and we might not have killall in the POS
         target.shell.run(
