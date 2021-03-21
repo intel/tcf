@@ -227,6 +227,15 @@ provides access to functions to set TCF's configuration.
 You can add new paths to parse with ``--config-path`` and force
 specific files to be read with ``--config-file``. See *tcf --help*.
 
+The most common use of the configuration file is to add servers:
+
+.. code-block:: python
+
+   tcfl.config.url_add('https://HOSTNAME1:5000', ssl_ignore = True)
+   tcfl.config.url_add('https://HOSTNAME2:5000', ssl_ignore = True)
+   ...
+
+
 How do I list which targets I own?
 ----------------------------------
 
