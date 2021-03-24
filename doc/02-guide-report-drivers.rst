@@ -25,6 +25,7 @@ each driver.
 Read on about reporting drivers provided by default
 
 .. automodule:: tcfl.report_console
+.. automodule:: tcfl.report_elastic
 .. automodule:: tcfl.report_jinja2
 .. automodule:: tcfl.report_mariadb
 .. automodule:: tcfl.report_mongodb
