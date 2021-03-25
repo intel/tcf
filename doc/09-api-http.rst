@@ -205,7 +205,7 @@ See :class:`ttbl.user_control.User` for a deeper description of
 
 **Example**::
 
-  $ curl -sb -b cookies.txt -X GET https://SERVERNAME:5000/ttb-v2/users/ \
+  $ curl -sk -b cookies.txt -X GET https://SERVERNAME:5000/ttb-v2/users/ \
     | python -m json.tool
   {
       "USERNAME": {
@@ -259,7 +259,7 @@ the call *GET /users*
 
 **Example**::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X GET https://SERVERNAME:5000/ttb-v2/users/USERNAME \
     | python -m json.tool
   {
@@ -272,7 +272,7 @@ the call *GET /users*
       }
   }
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X GET https://SERVERNAME:5000/ttb-v2/users/OTHERUSER \
     | python -m json.tool
   {
@@ -310,20 +310,20 @@ priviledge to logout another user or the user does not exist.
 
 **Example** to logout the currently logged in user::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X PUT https://SERVERNAME:5000/ttb-v2/logout \
   {"_message":"session closed"}
 
 or also::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X DELETE https://SERVERNAME:5000/ttb-v2/users/ \
   {"_message":"session closed"}
 
 or also, which can be used to login another user (only users with
 *admin* role)::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X DELETE https://SERVERNAME:5000/ttb-v2/users/USERNAME \
   {"_message":"session closed"}
 
@@ -365,7 +365,7 @@ or lack of permission::
 
 **Example**::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X PUT https://SERVERNAME:5000/ttb-v2/users/USERNAME/drop/admin
   {"_message":"user 'USERNAME' dropped role 'admin'"}
 
@@ -405,7 +405,7 @@ other user’s roles, otherwise a 403 error code will be returned.
 
 **Example**::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X GET https://SERVERNAME:5000/ttb-v2/users/USERNAME/gain/admin
   {"result":"user 'USERNAME' gained role 'admin'"}
 
@@ -605,7 +605,7 @@ empty list, then no data will be returned for said target.
 
 obtaining a list of fields for all targets::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X GET https://SERVERNAME:5000/ttb-v2/targets/ \
     -d projections='["id","type","interfaces.power"]'
     | python -m json.tool
@@ -642,7 +642,7 @@ In Python:
 
 Obtaining all fields for all targets::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X GET https://SERVERNAME:5000/ttb-v2/targets/ \
     | python -m json.tool
   {
@@ -834,13 +834,13 @@ To set a dictionary::
 
 it could be done with form arguments::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X PATCH https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME \
     -d a.b1.c.d=value -d a.b2=2 -d a.b3=3
 
 which yields::
 
-  $ curl -sb -b cookies.txt  -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME \
+  $ curl -sk -b cookies.txt  -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME \
     -d projections='["a"]' \
     | python -m json.tool
   {
@@ -857,12 +857,12 @@ which yields::
 
 to wipe everything under *a.b1.c*, set it to *null*::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X PATCH https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME -d a.b1.c=null
 
 after that::
 
-  $ curl -sb -b cookies.txt -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME \
+  $ curl -sk -b cookies.txt -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME \
     -d projections='["a"]' \
     | python -m json.tool
   {
@@ -876,7 +876,7 @@ Instead of using form arguments, it can also be fed a JSON dictionary
 on the request body::
 
   $ echo '{"a": { "b1": { "c": { "d": "value" } } }, "b2": 2, "b3": 3 }' \
-    | curl -sb -b cookies.txt \
+    | curl -sk -b cookies.txt \
        -X PATCH https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME \
        -H "Content-Type: application/json" \
        --data-binary @/dev/stdin
@@ -1457,7 +1457,7 @@ depending on the allocation and its state):
 
 Make an allocation, ask for two targets out of any of two groups::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X PUT https://SERVERNAME:5000/ttb-v2/allocation \
     -d queue=true \
     -d groups='{"group1": [ "TARGETNAME1", "TARGETNAME2" ], "group1": [ "TARGETNAME3", "TARGETNAME2" ]}' \
@@ -1471,7 +1471,7 @@ Make an allocation, ask for two targets out of any of two groups::
 
 Now querying::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X GET https://SERVERNAME:5000/ttb-v2/allocation/ \
     |  python -m json.tool
   {
@@ -1549,13 +1549,13 @@ Remove an existing allocation
 
 Remove an invalid allocation fails::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X DELETE https://SERVERNAME:5000/ttb-v2/allocation/BADALLOC
   {"_message":"BADALLOC: invalid allocation"}
 
 Remove an existing allocation::
 
-  $ curl -sb -b cookies.txt -X DELETE https://SERVERNAME:5000/ttb-v2/allocation/ypf77J
+  $ curl -sk -b cookies.txt -X DELETE https://SERVERNAME:5000/ttb-v2/allocation/ypf77J
   {"state":"removed","_message":"allocation has been removed by the user"}
 
 With the TCF client, use *tcf alloc-rm ALLOCATIONID*.
@@ -1637,7 +1637,7 @@ those who are different to the expected state.
 
 Allocate a target::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X PUT https://SERVERNAME:5000/ttb-v2/allocation \
     -d queue=true -d groups='{"group1": [ "TARGETNAME" ] }' \
   | python -m json.tool
@@ -1650,7 +1650,7 @@ Allocate a target::
 
 Send a keepalive assuming allocation ID *q8Ghpp* is *queued*::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X PUT https://SERVERNAME:5000/ttb-v2/keepalive \
     -d q8Ghpp=queued \
   | python -m json.tool
@@ -1663,7 +1663,7 @@ Send a keepalive assuming allocation ID *q8Ghpp* is *queued*::
 
 Now we send a keepalive assuming the same allocation ID is *active*::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X PUT https://SERVERNAME:5000/ttb-v2/keepalive \
     -d q8Ghpp=active
   | python -m json.tool
@@ -1702,14 +1702,14 @@ might have not logged in yet.
 
 For an existing allocation *ALLOCID*, add guest *NEWUSER*::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X PATCH https://SERVERNAME:5000/ttb-v2/allocation/ALLOCID/NEWUSER
   {}
 
 if now we get the allocation ID, we will find the NEWUSER in the list
 of guests::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X GET https://SERVERNAME:5000/ttb-v2/allocation/fPK8Ab \
     | python -m json.tool
   {
@@ -1758,7 +1758,7 @@ error condition
 Following the example from the *PUT /allocation/ALLOCATIONID/USERNAME*
 section above::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X DELETE https://SERVERNAME:5000/ttb-v2/allocation/_uUtZh/NEWUSER
   {}
 
@@ -1782,7 +1782,7 @@ On error non-200 HTTP status code and JSON dictionary with more details
 
 ::
 
-   $ curl -sb -b cookies.txt \
+   $ curl -sk -b cookies.txt \
      -X PUT https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/release
    {}
 
@@ -1918,7 +1918,7 @@ Listing active tunnels
 Currently active tunnels are available from the inventory under the
 *interfaces.tunnel* hierachy::
 
-  $ curl -sb -b cookies.txt \
+  $ curl -sk -b cookies.txt \
     -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETID \
     -d projections='["interfaces.tunnel"]'
     | python -m json.tool
@@ -1996,7 +1996,7 @@ their own storage area.
 
 ::
 
-  $ curl -sb -b cookies.txt -X POST \
+  $ curl -sk -b cookies.txt -X POST \
     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/store/file \
     --form-string file_path=REMOTEFILENAME  -F file=@LOCALFILENAME
 
@@ -2069,7 +2069,7 @@ their own storage area and of common areas.
 
 ::
 
-   $ curl -sb -b cookies.txt -X GET \
+   $ curl -sk -b cookies.txt -X GET \
      https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/store/list \
      | python -m json.tool
    {
@@ -2106,7 +2106,7 @@ their own storage area.
 
 ::
 
-   $ curl -sb -b cookies.txt -X GET \
+   $ curl -sk -b cookies.txt -X GET \
      https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/store/file \
      -d file_path="bios.bin.xz" > bios.bin.xz
    $ file bios.bin.xz
@@ -2138,7 +2138,7 @@ their own storage area.
 
 ::
 
-   $ curl -sb -b cookies.txt -X DELETE \
+   $ curl -sk -b cookies.txt -X DELETE \
      https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/store/file \
      -d file_path="bios.bin.xz"
 
@@ -2319,7 +2319,7 @@ so it shall not be used for hard evaluation.
 
 ::
 
-  $ curl -sb -b cookies.txt --max-time 800 -X GET \
+  $ curl -sk -b cookies.txt --max-time 800 -X GET \
     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/power/list \
     | python -m json.tool
   {
@@ -2395,13 +2395,13 @@ before power on (and after power on, on success) are executed.
 
 ::
 
-   $ curl -sb -b cookies.txt -X PUT \
+   $ curl -sk -b cookies.txt -X PUT \
      https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/power/on
    {
        "_diagnostics": ...
    }
 
-   $ curl -sb -b cookies.txt -X PUT \
+   $ curl -sk -b cookies.txt -X PUT \
      https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/power/on \
      -d component="AC1"
    {
@@ -2460,7 +2460,7 @@ in that the consoles are all disabled.
 
 ::
 
-   $ curl -sb -b cookies.txt -X PUT \
+   $ curl -sk -b cookies.txt -X PUT \
      https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/power/off
    {
        "_diagnostics": ...
@@ -2555,7 +2555,7 @@ the ON or OFF operations will happen.
 
 ::
 
-   $ curl -sb -b cookies.txt -X PUT \
+   $ curl -sk -b cookies.txt -X PUT \
        https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/power/sequence \
        -d sequence='[ [ "off", "AC1" ], [ "wait", 2 ], [ "on", "AC1"] ]'
    {
@@ -2685,10 +2685,10 @@ allocation that has this target allocated.
 Compress and upload files *bios.bin.xz* and *bmc.bin.xz*::
 
   $ xz bios.bin bmc.bin
-  $ curl -sb -b cookies.txt -X POST \
+  $ curl -sk -b cookies.txt -X POST \
     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/store/file \
     --form-string file_path=bios.bin.xz  -F file=@bios.bin.xz
-  $ curl -sb -b cookies.txt -X POST \
+  $ curl -sk -b cookies.txt -X POST \
     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/store/file \
     --form-string file_path=bmc.bin.xz  -F file=@bmc.bin.xz
 
@@ -2696,7 +2696,7 @@ flash files; from the inventory report we have seen destinations
 *bios* and *bmc* report a duration of 400 each, so we set the timeout
 to 800::
 
-  $ curl -sb -b cookies.txt --max-time 800 -X PUT \
+  $ curl -sk -b cookies.txt --max-time 800 -X PUT \
     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/images/flash \
     -d images='{"bios":"bios.bin.xz", "bmc":"bmc.bin.xz"}' \
     | python -m json.tool
@@ -2930,7 +2930,7 @@ section (which gets updated by the server during operation):
 
 ::
 
-  $ curl -sb cookies.txt -k -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/console/list \
+  $ curl -sk cookies.txt -k -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/console/list \
     | python -m json.tool
   {
       "aliases": {
@@ -2951,7 +2951,7 @@ be obtained from from the inventory with (note we have asked to get
 only a partial piece of the inventory contaning the console
 information)::
 
-  $ curl -sb cookies.txt -k -X GET https://localhost:5000/ttb-v2/targets/s04 -d projections='["interfaces.console"]' \
+  $ curl -sk cookies.txt -k -X GET https://localhost:5000/ttb-v2/targets/s04 -d projections='["interfaces.console"]' \
      | python -m json.tool
   {
       "interfaces": {
@@ -3015,7 +3015,7 @@ Return the amount of bytes that have been read so far for a console
 
 ::
 
-  $ curl -sb cookies.txt -k -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/console/state \
+  $ curl -sk cookies.txt -k -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/console/state \
         -d component=ssh0 \
     | python -m json.tool
   {
@@ -3084,7 +3084,7 @@ that came out of it. This call allows the user to query that data. See
 
 ::
 
-  $ curl -sb cookies.txt -k -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/console/read \
+  $ curl -sk cookies.txt -k -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/console/read \
         -d component=ssh0 -d offset=10
   ...
   Ubuntu 18.04.4 LTS nuc-81o ttyUSB0
@@ -3123,7 +3123,7 @@ has this target allocated.
 Send Ctrl-C (the interrupt character, hex 0x03) followed by a pressing
 the carriage return (\\r\\n)::
 
-   $ curl -sb cookies.txt -k -X PUT https://localhost:5000/ttb-v2/targets/TARGETNAME/console/write \
+   $ curl -sk cookies.txt -k -X PUT https://localhost:5000/ttb-v2/targets/TARGETNAME/console/write \
          -d component=CONSOLENAME -d data="\\u0003\\r\\n" \
      | python -m json.tool
    {
@@ -3170,7 +3170,7 @@ has this target allocated.
 
 ::
 
-   $ curl -sb cookies.txt -k -X PUT https://localhost:5000/ttb-v2/targets/TARGETNAME/console/enable \
+   $ curl -sk cookies.txt -k -X PUT https://localhost:5000/ttb-v2/targets/TARGETNAME/console/enable \
          -d component=CONSOLENAME \
      | python -m json.tool
    {
@@ -3211,7 +3211,7 @@ has this target allocated.
 
 ::
 
-   $ curl -sb cookies.txt -k -X PUT https://localhost:5000/ttb-v2/targets/TARGETNAME/console/disable \
+   $ curl -sk cookies.txt -k -X PUT https://localhost:5000/ttb-v2/targets/TARGETNAME/console/disable \
          -d component=CONSOLENAME \
      | python -m json.tool
    {
@@ -3269,7 +3269,7 @@ If no *KEY*s are passed, all keys will be reset to their default values.
 
 set the parameter *user* on an SSH console::
 
-   $ curl -sb cookies.txt -k -X PUT https://localhost:5000/ttb-v2/targets/TARGETNAME/console/setup \
+   $ curl -sk cookies.txt -k -X PUT https://localhost:5000/ttb-v2/targets/TARGETNAME/console/setup \
        -d component=ssh0 -d user=hlamarr \
      | python -m json.tool
    {
@@ -3278,7 +3278,7 @@ set the parameter *user* on an SSH console::
 
 after this, querying the inventory for said console::
 
-  $ curl -sb cookies.txt -k -X GET https://localhost:5000/ttb-v2/targets/TARGETNAME \
+  $ curl -sk cookies.txt -k -X GET https://localhost:5000/ttb-v2/targets/TARGETNAME \
        -d projections='["interfaces.console.ssh0"]' \
     | python -m json.tool
   {
@@ -3333,7 +3333,7 @@ Return setup parameters for the current console
 
 ::
 
-  $ curl -sb cookies.txt -k -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/console/setup \
+  $ curl -sk cookies.txt -k -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/console/setup \
         -d component=ssh0 \
     | python -m json.tool
   {
@@ -3371,7 +3371,7 @@ Return a console's enabled/disabled state
 
 ::
 
-  $ curl -sb cookies.txt -k -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/console/state \
+  $ curl -sk cookies.txt -k -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/console/state \
         -d component=ssh0 \
     | python -m json.tool
   {
