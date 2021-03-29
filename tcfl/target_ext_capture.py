@@ -663,8 +663,19 @@ class extension(tc.target_extension_c):
                         "capturer %s is not in expected streaming mode, but %s"
                         % (capturer, state))
 
-        for capturer, _state in capturers.items():
+        for capturer, state in capturers.items():
 
+            if state == None:
+                # snapshot type, just snapshot it
+                target.capture.stop_and_get(capturer, "/dev/null")
+                target.report_pass("capturer %s: stops and gets to /dev/null"
+                                   % capturer)
+                target.capture.get(capturer, "/dev/null")
+                target.report_pass("capturer %s: gets to /dev/null"
+                                   % capturer)
+                continue
+
+            # streaming type, try start and stopping
             _start_and_check(capturer)
             try:
                 target.capture.stop_and_get(capturer, "/dev/null")
