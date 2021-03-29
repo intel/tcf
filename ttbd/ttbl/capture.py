@@ -299,12 +299,11 @@ class interface(ttbl.tt_interface):
         impl, capturer = self.arg_impl_get(args, "capturer")
         with target.target_owned_and_locked(who):
             impl = self.impls[capturer]
+            impl.user_path = user_path
             if impl.stream == False:
-                impl.user_path = user_path
                 return impl.stop_and_get(target, capturer)
             capturing = target.property_get("capturer-%s-started" % capturer)
             if capturing:
-                impl.user_path = self.user_path
                 target.property_set("capturer-%s-started" % capturer, None)
                 return impl.stop_and_get(target, capturer)
             raise RuntimeError(f'{capturer} is not capturing, can not stop')
