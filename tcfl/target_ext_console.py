@@ -68,7 +68,6 @@ would need a different context:
 import collections
 import contextlib
 import errno
-import fcntl
 import getpass
 import io
 import logging
@@ -78,11 +77,9 @@ import numbers
 import os
 import re
 import sys
-import termios
 import threading
 import time
 import traceback
-import tty
 import typing
 
 import requests
@@ -91,6 +88,41 @@ import commonl
 
 from . import tc
 from . import msgid_c
+
+if sys.platform == "win32":
+
+    def term_flags_get():
+        return '\r', 0
+
+    def term_flags_reset(flags):
+        pass
+
+    def term_raw_set():
+        # FIXME: we need to figure this out
+        pass
+
+else:
+
+    import fcntl
+    import termios
+    import tty
+
+    def term_flags_get():
+        flags = termios.tcgetattr(sys.stdin.fileno())
+        if flags[0] & termios.ICRNL:
+            nl = '\r'
+        else:
+            nl = '\n'
+        return nl, flags
+
+    def term_flags_reset(flags):
+        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, flags)
+
+    def term_raw_set():
+        tty.setraw(sys.stdin.fileno())
+        flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFD)
+        fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
 
 def _poll_context(target, console):
     # we are polling from target with role TARGET.WANT_NAME from
@@ -1423,8 +1455,7 @@ def _console_read_thread_fn(target, console, fd, offset):
                 raise
             finally:
                 if _flags_set:
-                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN,
-                                      _flags_old)
+                    term_flags_reset(_flags_old)
 
 
 def _cmdline_console_write_interactive(target, console, crlf, offset):
@@ -1449,7 +1480,8 @@ WARNING: This is a very limited interactive console
     class _done_c(Exception):
         pass
 
-    _flags_old = termios.tcgetattr(sys.stdin.fileno())
+    # ask the terminal what does it consider a line feed and current flags
+    nl, _flags_old = term_flags_get()
     if sys.stdin.isatty():
         _flags_set = True
     else:
@@ -1457,14 +1489,7 @@ WARNING: This is a very limited interactive console
     try:
         one_escape = False
         if _flags_set:
-            tty.setraw(sys.stdin.fileno())
-            flags = fcntl.fcntl(sys.stdin.fileno(), fcntl.F_GETFD)
-            fcntl.fcntl(sys.stdin.fileno(), fcntl.F_SETFL, flags | os.O_NONBLOCK)
-        # ask the terminal what does it consider a line feed
-        if _flags_old[0] & termios.ICRNL:
-            nl = '\r'
-        else:
-            nl = '\n'
+            term_raw_set()
         if 'INSIDE_EMACS' in os.environ:
             # I've given up -- I can't figure out how to ask stty to
             # tell me emacs does \n
@@ -1499,8 +1524,8 @@ WARNING: This is a very limited interactive console
                 time.sleep(0.25)
     finally:
         if _flags_set:
-            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN,
-                              _flags_old)
+            term_flags_reset(_flags_old)
+
 
 def _cmdline_console_write(args):
     with msgid_c("cmdline"):
