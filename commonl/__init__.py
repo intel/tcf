@@ -23,7 +23,6 @@ import bisect
 import collections
 import contextlib
 import errno
-import fcntl
 import fnmatch
 import glob
 import hashlib
@@ -44,7 +43,6 @@ import struct
 import subprocess
 import sys
 import tempfile
-import termios
 import threading
 import time
 import traceback
@@ -645,11 +643,9 @@ def progress(msg):
     if not sys.stderr.isatty() or not sys.stdout.isatty():
         return
 
-    _h, w, _hp, _wp = struct.unpack(
-        'HHHH', fcntl.ioctl(0, termios.TIOCGWINSZ,
-                            struct.pack('HHHH', 0, 0, 0, 0)))
-    if len(msg) < w:
-        w_len = w - len(msg)
+    ts = os.get_terminal_size()
+    if len(msg) < ts.columns:
+        w_len = ts.columns - len(msg)
         msg += w_len * " "
     sys.stderr.write(msg + "\r")
     sys.stderr.flush()
