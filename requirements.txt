@@ -10,7 +10,10 @@ imutils
 ply                 # package: python3-ply
 pykwalify           # package: python3-pykwalify
 pyserial            # package: python3-pyserial ubuntu=python3-serial
-python-Levenshtein  # package: python3-Levenshtein ubuntu=python3-levenshtein
+# This has to build, so in windows take one that is built, otherwise
+# we need a lot of extra deps
+python-Levenshtein-wheels; sys_platform == "win32"
+python-Levenshtein; sys_platform != "win32"  # package: python3-Levenshtein ubuntu=python3-levenshtein
 requests            # package: python3-requests
 setuptools          # package: python3-setuptools
 tabulate            # package: python3-tabulate
