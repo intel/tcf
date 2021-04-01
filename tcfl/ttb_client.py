@@ -33,7 +33,6 @@ import pickle
 import collections
 import contextlib
 import errno
-import fcntl
 import getpass
 import hashlib
 import json
@@ -46,10 +45,8 @@ import requests
 import requests.exceptions
 import struct
 import sys
-import termios
 import threading
 import time
-import tty
 import urllib.parse
 
 import requests
@@ -838,9 +835,8 @@ def rest_target_list_table(targetl):
     # max two characters, separated from the target name with a
     # space and we must leave another space for the next column (hence
     # +4).
-    _h, display_w, _hp, _wp = struct.unpack(
-        'HHHH', fcntl.ioctl(0, termios.TIOCGWINSZ,
-                            struct.pack('HHHH', 0, 0, 0, 0)))
+    ts = os.get_terminal_size()
+    display_w = ts.columns
 
     maxlen = max([len(i[0]) for i in l])
     columns = int(math.floor(display_w / (maxlen + 4)))
