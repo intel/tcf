@@ -563,15 +563,17 @@ def ykush_targets_add(ykush_serial, pc_url = None, powered_on_start = None):
     """
     assert isinstance(ykush_serial, str)
     if pc_url != None:
-        assert isinstance(pc_url, str)
+        assert isinstance(pc_url, (str, ttbl.power.impl_c))
     if powered_on_start != None:
         assert isinstance(powered_on_start, bool)
 
     # Now try to add the one that expects to find the USB device; this
     # can fail if the USB device doesn't show up for whichever reason
     pcl = []
-    if pc_url:
+    if isinstance(pc_url, str):		# LEGACY
         pcl.append(( "main", ttbl.pc.dlwps7(pc_url) ))
+    elif isinstance(pc_url, ttbl.power.impl_c):
+        pcl.append(( "main", pc_url ))
     pcl.append(( "usb-device-check",
                  ttbl.pc.delay_til_usb_device(serial = ykush_serial)))
 
