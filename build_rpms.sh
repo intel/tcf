@@ -26,7 +26,7 @@ VERSION=${VERSION:-$(git describe | sed 's/^v\([0-9]\+\)/\1/' | sed 's/-/./g')}
 if [ "${CONTAINER}" == "None" ]; then
     BDIST_OPTS="--dist-dir=${RPM_DIR}/ --bdist-base=${PWD}/dist/"
     cd ${PWD}/${TARGET_DIR} && VERSION=${VERSION} python3 ./setup.py bdist_rpm ${BDIST_OPTS}
-else
+elif [ "${CONTAINER}" == "True" ]; then
     BUILD_DEPS="dnf install -y python3 rpm-build"
 
     # Add necessary dependencies depending on the distro and build target
@@ -59,4 +59,13 @@ else
             su - ${USER} -c \
             'export http_proxy=${http_proxy} && export https_proxy=${https_proxy} &&\
             cd /home/tcf/${TARGET_DIR} && ${RUN_SETUP}'"
+else
+    BDIST_OPTS="--dist-dir=/home/rpms/ --bdist-base=/home/tcf/dist/"
+    RUN_SETUP="VERSION=${VERSION} python3 ./setup.py bdist_rpm ${BDIST_OPTS}"
+
+    docker run -i --rm --user=${USER}\
+            -v ${PWD}:/home/tcf -v ${RPM_DIR}:/home/rpms \
+            ${CONTAINER}:${DISTROVERSION} \
+            /bin/bash -c \
+            "cd /home/tcf/${TARGET_DIR} && ${RUN_SETUP}"
 fi
