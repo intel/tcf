@@ -272,9 +272,9 @@ if __name__ == "__main__":
         help = "Ignore server SSL certificate")
     # This is made a global argument, even if only 'run' uses it
     # because it makes it easier to generate the sub-command without
-    # having to much with 'run's sub-arguments
+    # having to muck with 'run's sub-arguments
     arg_parser.add_argument(
-        "--make-jobserver", action = "store", default = None,
+        "--make-jobserver", action = "store", default = False,
         help = "[internal] used to re-execute under a make jobserver.")
     arg_parser.add_argument(
         "--no-make-jobserver", action = "store_false",
