@@ -1129,9 +1129,16 @@ def version_get(module, name):
         # RPM versions can't have dash (-), so use underscores (_)
         return git_version.strip().replace("-", ".")
     except subprocess.CalledProcessError as _e:
-        # At this point, logging is still not initialized
-        raise RuntimeError("Unable to determine %s (%s) version: %s"
-                           % (name, _srcdir, _e.output))
+        print("Unable to determine %s (%s) version: %s"
+              % (name, _srcdir, _e.output), file = sys.stderr)
+        return "vNA"
+    except OSError as e:
+        # At this point, logging is still not initialized; don't
+        # crash, just report a dummy version
+        print("Unable to determine %s (%s) version "
+              " (git not installed?): %s" % (name, _srcdir, e),
+              file = sys.stderr)
+        return "vNA"
 
 def tcp_port_busy(port):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
