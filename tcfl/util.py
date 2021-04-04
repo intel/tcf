@@ -7,7 +7,7 @@
 
 import logging
 
-from . import commonl
+import commonl
 from . import tcfl
 
 

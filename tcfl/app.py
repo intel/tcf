@@ -89,7 +89,7 @@ elif mp.lower() == 'pathos':
 else:
     raise RuntimeError('Invalid value to TCF_USE_MP (%s)' % mp)
 
-from . import commonl
+import commonl
 from . import tc
 
 def _app_src_validate(app_name, app_src):

@@ -46,7 +46,7 @@ import os
 import shutil
 import time
 
-from . import commonl
+import commonl
 from . import tc
 from . import msgid_c
 

@@ -13,7 +13,7 @@ Run commands to the target and copy files back and forth using SSH
 import os
 import subprocess
 
-from . import commonl
+import commonl
 from . import tc
 
 class ssh(tc.target_extension_c):

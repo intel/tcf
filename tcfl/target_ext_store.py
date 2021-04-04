@@ -18,7 +18,7 @@ import io
 import pprint
 import tabulate
 
-from . import commonl
+import commonl
 from . import tc
 from . import msgid_c
 

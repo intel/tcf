@@ -47,7 +47,7 @@ import traceback
 
 import requests.exceptions
 
-from . import commonl
+import commonl
 from . import tc
 from . import tcfl
 

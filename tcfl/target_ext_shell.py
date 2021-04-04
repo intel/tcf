@@ -48,7 +48,7 @@ import time
 import traceback
 import typing
 
-from . import commonl
+import commonl
 from . import tc
 
 from . import msgid_c

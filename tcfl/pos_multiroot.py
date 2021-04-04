@@ -73,7 +73,7 @@ import re
 
 import Levenshtein
 
-from . import commonl
+import commonl
 from . import pos
 from . import tc
 

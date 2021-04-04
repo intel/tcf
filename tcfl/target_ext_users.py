@@ -16,7 +16,7 @@ import pprint
 
 import tabulate
 
-from . import commonl
+import commonl
 from . import tc
 from . import ttb_client
 from . import msgid_c

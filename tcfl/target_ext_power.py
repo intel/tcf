@@ -16,7 +16,7 @@ import collections
 import json
 import re
 
-from . import commonl
+import commonl
 from . import tc
 from . import msgid_c
 

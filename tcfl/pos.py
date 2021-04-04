@@ -73,8 +73,8 @@ import distutils.version
 import Levenshtein
 
 from . import biosl
-from . import commonl
-from .commonl import yamll
+import commonl
+import commonl.yamll
 from . import tc
 from . import tl
 from . import msgid_c
