@@ -2085,6 +2085,12 @@ class generator_factory_c(object):
         self.args = args
         self.kwargs = kwargs
 
+    def __call__(self):
+        """
+        Create and return a generator
+        """
+        return self.fn(*self.args, **self.kwargs)
+
     def make_generator(self):
         """
         Create and return a generator
@@ -2311,3 +2317,55 @@ def cmdline_str_to_value(value):
         # string that might start with s: or empty
         return value.split(":", 1)[1]
     return value
+
+def str_cast_maybe(s):
+    """
+    If given a bytes string, convert to UTF-8; otherwise pass as is
+
+    :param s: string of any type; if bytes, it will be encoded.
+    :returns str: converted string
+    """
+    if isinstance(s, bytes):
+        s.encode('utf-8')
+    return s
+
+def str_bytes_cast(s, like):
+    """
+    Convert a string (bytes or str) to be the same type as another one
+    using UTF-8
+
+    :param s: string or bytes to convert
+    :param str|bytes|type like: another string (str or bytes) to serve
+      as the destination type; can also be a type
+    :returns: *s* converted into the same type as *like* using UTF-8
+    """
+    assert isinstance(s, (str, bytes))
+    if isinstance(like, type):
+        assert like in (str, bytes)
+        dest_type = like
+    else:
+        assert isinstance(like, (str, bytes))
+        dest_type = type(like)
+    if isinstance(s, str):		# s is str
+        if dest_type == str:	# like is is str, so nthing
+            return s
+        return s.encode('utf-8')	# ...like is bytes, encode s to bytes
+    if dest_type == bytes:	    	# s is bytes
+        return s		        # like is bytes, so nothing
+    return s.decode('utf-8')		# ... like is str, so decode s to str
+
+
+def removeprefix(s, prefix):
+    """
+    Remove a prefix from a string
+
+    :param s: string
+    :param prefix: prefix to remove
+    :returns: the string with the prefix removed
+    """
+    if hasattr(s, "removeprefix"):
+        # python >= 3.9
+        return s.removeprefix(prefix)
+    if s.startswith(prefix):
+        return s[len(prefix):]
+    return s
