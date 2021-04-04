@@ -44,6 +44,7 @@ import inspect
 import logging
 import os
 import shutil
+import time
 
 from . import commonl
 from . import tc
@@ -677,6 +678,7 @@ class extension(tc.target_extension_c):
 
             # streaming type, try start and stopping
             _start_and_check(capturer)
+            time.sleep(3)		# give it some time to record sth
             try:
                 target.capture.stop_and_get(capturer, "/dev/null")
                 target.report_pass("capturer %s: stops and gets to /dev/null"
@@ -687,6 +689,7 @@ class extension(tc.target_extension_c):
                     dict(exception = e))
 
             _start_and_check(capturer)
+            time.sleep(3)		# give it some time to record sth
             try:
                 target.capture.get(capturer, "/dev/null")
                 target.report_pass("capturer %s: gets to /dev/null" % capturer)
