@@ -132,24 +132,7 @@ class expect_text_on_console_c(tc.expectation_c):
                                   raise_on_found = raise_on_found)
         assert name == None or isinstance(name, str)
 
-        if isinstance(text_or_regex, str):
-            # we do out work in bytes, since we don't really know what
-            # we get the consoles
-            text_or_regex = text_or_regex.encode('utf-8')
-            self.regex = re.compile(re.escape(text_or_regex), re.MULTILINE)
-        elif isinstance(text_or_regex, bytes):
-            self.regex = re.compile(re.escape(text_or_regex), re.MULTILINE)
-        elif isinstance(text_or_regex, typing.Pattern):
-            if isinstance(text_or_regex.pattern, str):
-                # see above for isinstance(, str) on why we do this
-                pattern = text_or_regex.pattern.encode(	# convert to bytes
-                    'utf-8', errors = 'surrogatencode')
-                text_or_regex = re.compile(pattern, re.MULTILINE)
-            self.regex = text_or_regex
-        else:
-            raise AssertionError(
-                "text_or_regex must be a string or compiled regex, got %s" \
-                % type(text_or_regex).__name__)
+        self.regex_set(text_or_regex)
         if name:
             self.name = name
         else:
@@ -164,6 +147,36 @@ class expect_text_on_console_c(tc.expectation_c):
         self.previous_max = previous_max
         self.detect_context = detect_context
         self.report = report
+
+    def regex_set(self, text_or_regex):
+        if isinstance(text_or_regex, str):
+            # we do out work in bytes, since we don't really know what
+            # we get the consoles
+            text_or_regex = text_or_regex.encode('utf-8')
+            self.regex = re.compile(re.escape(text_or_regex), re.MULTILINE)
+            return
+        if isinstance(text_or_regex, bytes):
+            self.regex = re.compile(re.escape(text_or_regex), re.MULTILINE)
+            return
+
+        if isinstance(text_or_regex, typing.Pattern) \
+            and isinstance(text_or_regex.pattern, str):
+                # see above for isinstance(, str) on why we do this
+                pattern = text_or_regex.pattern.encode(	# convert to bytes
+                    'utf-8', errors = 'surrogatencode')
+                text_or_regex = re.compile(pattern, re.MULTILINE)
+                self.regex = text_or_regex
+                return
+
+        if isinstance(text_or_regex, typing.Pattern) \
+            and isinstance(text_or_regex.pattern, bytes):
+                self.regex = text_or_regex
+                return
+
+        raise AssertionError(
+            "text_or_regex must be a string or compiled regex, got %s" \
+            % type(text_or_regex).__name__)
+
 
     @property
     def console(self):
