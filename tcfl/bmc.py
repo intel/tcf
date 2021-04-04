@@ -674,11 +674,11 @@ def setup_ipmitool(target, bmc_id, bmc_name, bmc_data):
             # inventory, just use the ones declared in the network
             # sections
             target.report_info(f"BMC: user {username} configured in"
-                               " general network channels {':'.join(channels)}")
+                               f" general network channels {':'.join(channels)}")
             channels = network_channels
         else:
             target.report_info(f"BMC: user {username} configured in"
-                               " user-specific channels {':'.join(channels)}")
+                               f" user-specific channels {':'.join(channels)}")
         ipmitool_superuser_setup(target, data['uid'], username,
                                  data['password'], channels, bmc_id = bmc_id)
 
