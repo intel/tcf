@@ -2190,7 +2190,7 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
       *URL/initrd-POSIMAGE*.
 
       By default, this is taken from the target's keywords
-      (*pos_http_url_prefix*) or from the boot interconnect.
+      (*pos.http_url_prefix*) or from the boot interconnect.
 
     :param str pos_image: (optional; default *tcf-live*) name of the
       POS image to load.
@@ -2286,7 +2286,8 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
         kws['pos_cmdline_opts1'] = " ".join(cmdline1) % kws
         kws['pos_cmdline_opts2'] = " ".join(cmdline2) % kws
         if url == None:
-            url = target.kws['pos_http_url_prefix']
+            url = target.kws.get('pos.http_url_prefix',
+                                 target.kws.get('pos_http_url_prefix', None))
 
         target.shell.run("set base %s" % url)
         # command line options in a variable so later the command line
