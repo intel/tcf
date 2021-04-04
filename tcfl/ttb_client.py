@@ -199,7 +199,7 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
             self.aka = aka
         # Load state
         url_safe = commonl.file_name_make_safe(url)
-        file_name = state_path + "/cookies-%s.pickle" % url_safe
+        file_name = os.path.join(state_path, "cookies-%s.pickle" % url_safe)
         try:
             with open(file_name, "rb") as f:
                 self.cookies = pickle.load(f)
@@ -357,7 +357,7 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
         if not os.path.isdir(filepath):
             logger.warning("%s: created state storage directory", filepath)
             os.mkdir(filepath)
-        fname = filepath + "/cookies-%s.pickle" % url_safe
+        fname = os.path.join(filepath, "cookies-%s.pickle" % url_safe)
         if self.cookies == {}:
             logger.debug("%s: state deleted (no cookies)", self._url)
             commonl.rm_f(fname)
