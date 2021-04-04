@@ -1510,6 +1510,7 @@ class flash_shell_cmd_c(impl2_c):
             with open(logfile_name, "w+") as logf:
                 self.p = subprocess.Popen(
                     cmdline, env = env, stdin = None, cwd = cwd,
+                    buffering = 0,	# output right away, to monitor
                     stderr = subprocess.STDOUT, stdout = logf)
             with open(pidfile, "w+") as pidf:
                 pidf.write("%s" % self.p.pid)
