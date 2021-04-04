@@ -248,6 +248,8 @@ class interface(ttbl.tt_interface):
         for capturer, impl in self.impls.items():
             ctype = "stream" if impl.stream else "snapshot"
             target.fsdb.set(f"interfaces.{iface_name}.{capturer}.type", ctype)
+            # wipe leftover state
+            target.property_set(f"interfaces.capture.{capturer}.streaming", None)
             if impl.mimetype:
                 target.fsdb.set(f"interfaces.{iface_name}.{capturer}.mimetype",
                                 impl.mimetype)
@@ -269,18 +271,22 @@ class interface(ttbl.tt_interface):
             if impl.stream == False:
                 # doesn't need starting
                 raise RuntimeError(f'{capturer}: starting not valid in snapshot capturers')
-            capturing = target.property_get("capturer-%s-started" % capturer)
+            capturing = target.property_get(f"interfaces.capture.{capturer}.streaming", False)
             impl.user_path = user_path
-            if not capturing:
-                target.property_set("capturer-%s-started" % capturer, "True")
-                return { }
-            # if we were already capturing, restart it--maybe
-            # someone left it capturing by mistake or who
-            # knows--but what matters is what the current user wants.
-            target.property_set("capturer-%s-started" % capturer, None)
-            impl.stop_and_get(target, capturer)
+            if capturing:
+                # if we were already capturing, restart it--maybe
+                # someone left it capturing by mistake or who
+                # knows--but what matters is what the current user wants.
+                try:
+                    target.log.info(
+                        "capture/start: %s: stopping to clear state",
+                        capturer)
+                    impl.stop_and_get(target, capturer)
+                except:
+                    pass	                # not care about errors here, resetting state
             impl.start(target, capturer)
-            target.property_set("capturer-%s-started" % capturer, "True")
+            target.property_set(f"interfaces.capture.{capturer}.streaming", True)
+            target.log.info("capture/start: %s: started", capturer)
             return { }
 
     post_start = put_start	# BACKWARD compat
@@ -302,9 +308,10 @@ class interface(ttbl.tt_interface):
             impl.user_path = user_path
             if impl.stream == False:
                 return impl.stop_and_get(target, capturer)
-            capturing = target.property_get("capturer-%s-started" % capturer)
+            capturing = target.property_get(f"interfaces.capture.{capturer}.streaming", False)
             if capturing:
-                target.property_set("capturer-%s-started" % capturer, None)
+                target.property_set(f"interfaces.capture.{capturer}.streaming", None)
+                target.log.info("capture/start: %s: stopping", capturer)
                 return impl.stop_and_get(target, capturer)
             raise RuntimeError(f'{capturer} is not capturing, can not stop')
 
@@ -317,23 +324,24 @@ class interface(ttbl.tt_interface):
         :param ttbl.test_target target: target on which we are capturing
         """
         res = {}
-        for name, impl in list(self.impls.items()):
+        for capturer, impl in list(self.impls.items()):
             if impl.stream:
-                capturing = target.property_get("capturer-%s-started"
-                                                % name)
+                capturing = target.property_get(
+                    f"interfaces.capture.{capturer}.streaming", False)
                 if capturing:
-                    res[name] = True
+                    res[capturer] = True
                 else:
-                    res[name] = False
+                    res[capturer] = False
             else:
-                res[name] = None
+                res[capturer] = None
         return dict(components = res)
 
 
     def _release_hook(self, target, _force):
-        for name, impl in list(self.impls.items()):
+        for capturer, impl in list(self.impls.items()):
             if impl.stream == True:
-                impl.stop_and_get(target, name)
+                target.property_set(f"interfaces.capture.{capturer}.streaming", None)
+                impl.stop_and_get(target, capturer)
 
 
 
