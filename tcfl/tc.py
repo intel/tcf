@@ -8500,7 +8500,8 @@ def _run(args):
             sys.exit(1)
 
         signal.signal(signal.SIGINT, _sigint_handler)
-        signal.signal(signal.SIGQUIT, _sigint_handler)
+        if sys.platform != "win32":
+            signal.signal(signal.SIGQUIT, _sigint_handler)
 
         # we do oly two executions per process--it doesn't matter in
         # terms of the cost of bringing up the new process, since the
