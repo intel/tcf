@@ -247,22 +247,23 @@ if __name__ == "__main__":
     # or /, or whatever -- see setupl.py -- yes, maybe we should use
     # package resources, but this is simpler...for now.
     # DO NOT MAKE THESE LINES MULTILINES!
-    install_time_etc_tcf = bindir + ":" + os.path.join(bindir + "zephyr")
+    install_time_etc_tcf = os.pathsep.join([ bindir, os.path.join(bindir, "zephyr") ])
     install_time_share_tcf = bindir
     arg_parser.add_argument(
         "-p", "--config-path",
         action = "append", dest = "config_path",
         default = [
-            install_time_etc_tcf
-            + ":" + os.path.join(os.path.expanduser("~"), ".tcf")
-            + ":.tcf"
+            install_time_etc_tcf,
+            os.path.join(os.path.expanduser("~"), ".tcf"),
+            ".tcf"
         ],
-        help = "List of colon separated paths from where to load conf_.*.py "
-        "configuration files (in alphabetic order)")
+        help = f"List of '{os.pathsep}' separated paths from where"
+        " to load conf_.*.py configuration files in alphabetic order"
+        " (%(default)s)")
     arg_parser.add_argument(
         "--state-path", action = "store",
         default = os.path.join(os.path.expanduser("~"), ".tcf"),
-        help = "Directory where to save state")
+        help = "Directory where to save state (%(default)s)")
     arg_parser.add_argument(
         "-u", "--url", action = "append", default = [],
         help = "URL to the test broker (multiple may be specified)")
