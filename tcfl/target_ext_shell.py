@@ -33,7 +33,7 @@ Problems:
   expression metacharacteds.
 
 - ANSI sequences, human doesn't see/notice them, but to the computer /
-  regular expression they are 
+  regular expression they are
 
 Thus, resorting to match a single line is the best bet; however, it is
 almost impossible to guarantee that it is the last one as the multiple
@@ -43,6 +43,7 @@ formats of prompts could be matching other text.
 import binascii
 import collections
 import re
+import threading
 import time
 import traceback
 import typing
@@ -78,6 +79,52 @@ shell_prompts = [
     r'[^:]+:.*[#\$>]',
 ]
 
+class _context_c:
+    # Encapsulates a context change
+    #
+    # when using this to enter a with block associated to a
+    # target.shell object, this pushes the current contect name,
+    # prompt regexs and fixups in a LIFO stack.
+
+    # New fixups matching the context are loaded
+    #
+    # On exit, the prompt regexes and fixups from the previous context
+    # are restored
+
+    def __init__(self, shell, context_name):
+        self.shell = shell
+        self.context_name = context_name
+
+    def __enter__(self):
+        setattr(self.shell.tls, "contexts", [])
+        setattr(self.shell.tls, "prompt_regexs", [])
+        setattr(self.shell.tls, "fixups", [])
+
+        self.shell.tls.contexts.append(self.context_name)
+        self.shell.tls.prompt_regexs.append(self.shell.prompt_regex)
+
+        target = self.shell.target
+
+        self.shell.tls.fixups.append(self.shell._fixups)
+        self.shell._fixups = {}
+        # Load fixups
+        # shell.fixups.CONTEXTNAME.FIXUP1: REGEX1
+        # shell.fixups.CONTEXTNAME.FIXUP2: REGEX2..
+        #
+        # Generate a fixup console expecter for each that _run() will use
+        fixups = target.kws.get("shell", {}).get("fixups", {}).get(self.context_name, {})
+        for name, regex in fixups.items():
+            self.shell._fixups[name] = target.shell.fixup_c(
+                re.compile(regex), name = name,
+                target = self.shell.target, timeout = 0)
+
+
+    def __exit__(self, *args, **kwargs):
+        self.shell.tls.contexts.pop()
+        self.shell.prompt_regex = self.shell.tls.prompt_regexs.pop()
+        self.shell._fixups = self.shell.tls.fixups.pop()
+
+
 class shell(tc.target_extension_c):
     """
     Extension to :py:class:`tcfl.tc.target_c` for targets that support
@@ -109,6 +156,36 @@ class shell(tc.target_extension_c):
         if 'console' not in target.rt['interfaces']:
             raise self.unneeded
         tc.target_extension_c.__init__(self, target)
+        self.tls = threading.local()
+        self.tls.contexts = []
+        self.tls.prompt_regexs = []
+        self.tls.fixups = []
+        self._fixups = {}
+
+    def context(self, context_name):
+        """
+        Switch to a new context
+
+        A shell object has a context defined by:
+
+        - a name
+        - the current prompt regular expression (:data:`prompt_regex`)
+        - the current fixups (loaded from the inventory)
+
+        With this, the context can be associated to a with block:
+
+        >>> with target.shell.context("iPXE booting"):
+        >>>    target.shell.prompt_regex = "iPXE>"
+        >>>    ...
+
+        In the block, any fixups the shell module does are those
+        associated to the *iPXE* context (from the inventory
+        *shell.fixups.iPXE booting* section).
+
+        Upon exit the previous prompt regex is automatically restored,
+        as well as previous fixups.
+        """
+        return _context_c(self, context_name)
 
     prompt_regex_default = \
         re.compile('(TCF-[0-9a-zA-Z]{4})?(' + "|".join(shell_prompts) + ')')
@@ -336,7 +413,7 @@ class shell(tc.target_extension_c):
         assert isinstance(shell_setup, bool) or callable(shell_setup)
         assert timeout == None or timeout > 0
         assert console == None or isinstance(console, str)
-    
+
         target = self.target
         testcase = target.testcase
         if timeout == None:
@@ -604,7 +681,7 @@ class shell(tc.target_extension_c):
         Remove a remote file (if the target supports it)
         """
         assert isinstance(remote_filename, str)
-        
+
         self.run("rm -f " + remote_filename)
 
     def files_remove(self, *remote_filenames):
