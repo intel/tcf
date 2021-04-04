@@ -111,7 +111,7 @@ def path_expand(path_list):
     # Compose the path list
     _list = []
     for _paths in path_list:
-        paths = _paths.split(":")
+        paths = _paths.split(os.pathsep)
         for path in paths:
             if path == "":
                 _list = []
