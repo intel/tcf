@@ -3442,6 +3442,36 @@ class expectation_c(object):
             attachments)
 
 
+    def on_found(self, run_name, poll_context, buffers_poll, buffers,
+                 ellapsed, timeout, match_data):
+        """
+        Perform an action when the expectation is found
+
+        Called by the innards of the expect engine when the expectation
+        is found; by default, raises the exception set in
+        :data:raise_on_found, but can be overriden to do any other
+        action.
+
+        Parameter description as on :meth:`flush`.
+
+        :param dict match_data: this is whatever the :meth:`detect`
+          method returned that made this expectation be considered as
+          found.
+        """
+        if not self.raise_on_found:
+            return
+        self.raise_on_found.attachments = {
+            'origin': self.origin,
+            'match_data': match_data,
+        }
+        self.raise_on_found.attachments_update(match_data)
+        if self.origin:
+            self.raise_on_found.attachments_update({
+                'origin': self.origin
+            })
+        raise self.raise_on_found
+
+
 #
 # Metaclass for tc_c, to initialize class specific fields
 #
@@ -5772,13 +5802,10 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                             expectations_pending.remove(exp)
                             if exp in expectations_required:
                                 expectations_required.remove(exp)
-                            if exp.raise_on_found:	# attach context
-                                exp.raise_on_found.attachments_update(r)
-                                if exp.origin:
-                                    exp.raise_on_found.attachments_update({
-                                        'origin': exp.origin
-                                    })
-                                raise exp.raise_on_found
+                            with poll_state.lock:
+                                exp.on_found(run_name, poll_context,
+                                             poll_state.buffers, buffers,
+                                             ellapsed, timeout, r)
                         if exp.timeout > 0 and ellapsed > exp.timeout:
                             # timeout for this specific expectation
                             with poll_state.lock:
