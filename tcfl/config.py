@@ -24,6 +24,8 @@ from . import _install
 logger = logging.getLogger("tcfl.config")
 #: The list of paths where we find configuration information
 path = []
+#: The list of config files we have imported
+loaded_files = []
 #: Path where shared files are stored
 share_path = None
 #: Path where state files are stored
@@ -94,12 +96,15 @@ def load(config_path = None, config_files = None,
         config_files = []
 
     global path
-    path = config_path
+    path = [ i for i in reversed(config_path) ]
 
+    global loaded_files
     logger.info("configuration path %s", path)
-    commonl.config_import(path, re.compile("^conf[-_].*.py$"))
+    commonl.config_import(path, re.compile("^conf[-_].*.py$"),
+                          imported_files = loaded_files)
     for config_file in config_files:
         commonl.config_import_file(config_file, "__main__")
+        loaded_files.append(config_file)
 
     if urls == []:
         logger.warning(

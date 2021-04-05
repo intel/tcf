@@ -19,6 +19,7 @@ import getpass
 import inspect
 import json
 import os
+import platform
 import re
 import requests
 import shutil
@@ -67,11 +68,22 @@ tcfl: {inspect.getfile(tcfl)}
 commonl: {inspect.getfile(commonl)}
 share path: {tcfl.config.share_path}
 state path: {tcfl.config.state_path}
-config path: {os.pathsep.join(tcfl.config.path)}
+config path: {os.pathsep.join(tcfl.config.path)}""")
+    count = 0
+    for config_file in tcfl.config.loaded_files:
+        print(f"config file {count}: {config_file}")
+        count += 1
+    print(f"""\
 version: {tcfl.tc.version}
+python: {" ".join(sys.version.splitlines())}""")
+    commonl.data_dump_recursive(platform.uname()._asdict(), "uname")
+    print(f"""\
 servers:""")
+    count = 0
     for url in tcfl.config.urls:
-        print(" - " + url[0])
+        print(f"server {count}: {url[0]}")
+        count += 1
+
 
 def _target_get(args):
     # pure target get w/o going through the cache

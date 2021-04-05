@@ -120,7 +120,7 @@ def path_expand(path_list):
     return _list
 
 def config_import(path_list, file_regex, namespace = "__main__",
-                  raise_on_fail = True):
+                  raise_on_fail = True, imported_files = None):
     """Import Python [configuration] files that match file_regex in any of
     the list of given paths into the given namespace.
 
@@ -165,7 +165,10 @@ def config_import(path_list, file_regex, namespace = "__main__",
                 if not file_regex.match(filename):
                     logging.log(6, "%s/%s: ignored", path, filename)
                     continue
-                config_import_file(path + "/" + filename, namespace)
+                config_file_path = os.path.join(path, filename)
+                config_import_file(config_file_path, namespace)
+                if imported_files != None:
+                    imported_files.append(config_file_path)
         except Exception:	# pylint: disable = W0703
             # throw a wide net to catch any errors in filename
             logging.error("%s: can't load config files", path)
