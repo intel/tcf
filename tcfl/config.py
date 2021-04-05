@@ -64,9 +64,6 @@ def load(config_path = None, config_files = None,
     """
     Load the TCF Library configuration
 
-    This is needed before you can access from your client program any
-    other module.
-
     :param config_path: list of strings containing UNIX-style paths
         (DIR:DIR), DIR;DIR on Windows, to look for config files
         (conf_*.py) that will be loaded in alphabetical order. An
@@ -125,3 +122,49 @@ def load(config_path = None, config_files = None,
                              url, ssl_ignore, aka)
 
     tcfl.msgid_c.cls_init()
+
+
+def setup(*args,
+          report_drivers = None, verbosity = 2, logfile_name = "run.log",
+          **kwargs):
+    """
+    Setup and Load the TCF Library configuration for standalone execution
+
+    This is needed before you can access from your client program any
+    other module.
+
+    :param int verbosity: (optional, default 2) verbosity of output to
+      the console
+
+    :param str logfile_name: (optional, default *run.log*) where to
+      log the detailed output to.
+
+    :param list(tcfl.tc.report_driver_c) report_drivers: (optional)
+      list of drivers for reporting execution data.
+
+      By default, drivers that logs to a logfile, to report files and
+      to json files are loaded for you.
+
+    Other arguments as :func:`load`.
+
+    """
+    # Do a partial initialzation of the testcase management system
+    tcfl.tc.tc_c.tmpdir = "tmp"
+    tcfl.tc.tc_c.ticket = "TICKET"
+    if not report_drivers:
+        tcfl.tc.report_driver_c.add(
+            tcfl.tc.report_jinja2.driver("."),
+            name = "jinja2")
+        tcfl.tc.report_driver_c.add(
+            tcfl.tc.report_console.driver(
+                verbosity,
+                logfile_name, verbosity_logf = 100),
+            name = "console")
+        tcfl.tc.report_driver_c.add(
+            tcfl.tc.report_data_json.driver(),
+            name = "json")
+    else:
+        for report_driver in report_drivers:
+            tcfl.tc.report_driver_c.add(report_driver)
+    load(*args, **kwargs)
+    tcfl.msgid_c.tls.msgid_lifo.append(tcfl.msgid_c("standalone"))
