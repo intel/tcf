@@ -466,8 +466,12 @@ class expect_text_on_console_c(tc.expectation_c):
         # file line by line and (b) share file pointers -- we'll look
         # to our own offset instead of relying on that. Other
         # expectations might be looking at this file in parallel.
+        if sys.platform == "win32":
+            extra_args = [ None, mmap.ACCESS_READ, 0 ] # just offset
+        else:
+            extra_args = [ mmap.MAP_PRIVATE, mmap.PROT_READ, 0 ]
         with contextlib.closing(
-                mmap.mmap(ofd, 0, mmap.MAP_PRIVATE, mmap.PROT_READ, 0)) \
+                mmap.mmap(ofd, 0, *extra_args)) \
                 as mapping:
             target.report_info(
                 "%s/%s: looking for `%s` in console %s:%s @%d-%d [%s]"

@@ -371,8 +371,11 @@ def _stc_scan_file(inf_name):
     warnings = None
 
     with open(inf_name) as inf:
-        with contextlib.closing(mmap.mmap(inf.fileno(), 0, mmap.MAP_PRIVATE,
-                                          mmap.PROT_READ, 0)) as main_c:
+        if sys.platform == "win32":
+            extra_args = [ None, mmap.ACCESS_READ, 0 ] # just offset
+        else:
+            extra_args = [ mmap.MAP_PRIVATE, mmap.PROT_READ, 0 ]
+        with contextlib.closing(mmap.mmap(inf.fileno(), 0, *extra_args)) as main_c:
             suite_regex_match = suite_regex.search(main_c)
             if not suite_regex_match:
                 # can't find ztest_test_suite

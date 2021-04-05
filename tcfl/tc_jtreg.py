@@ -373,8 +373,11 @@ def _file_scan_regex(filename, regex):
         stat_info = os.fstat(f.fileno())
         if stat_info.st_size == 0:
             return None				# empty, ignore
-        with contextlib.closing(mmap.mmap(f.fileno(), 0, mmap.MAP_PRIVATE,
-                                          mmap.PROT_READ, 0)) as data:
+        if sys.platform == "win32":
+            extra_args = [ None, mmap.ACCESS_READ, 0 ] # just offset
+        else:
+            extra_args = [ mmap.MAP_PRIVATE, mmap.PROT_READ, 0 ]
+        with contextlib.closing(mmap.mmap(f.fileno(), 0, *extra_args)) as data:
             return regex.search(data)
 
 @tcfl.tc.interconnect("ipv4_addr",
