@@ -17,13 +17,17 @@ import re
 import urllib.parse
 
 import commonl
+import tcfl
 from . import ttb_client
+from . import _install
 
 logger = logging.getLogger("tcfl.config")
 #: The list of paths where we find configuration information
 path = []
 #: Path where shared files are stored
 share_path = None
+#: Path where state files are stored
+state_path = None
 #: List of URLs to servers we are working with
 #:
 #: each entry is a tuple of:
@@ -52,32 +56,48 @@ def url_add(url, ssl_ignore = False, aka = None, ca_path = None):
     logger.info("%s: Added server URL %s", origin, url)
     urls.append((url, ssl_ignore, aka, ca_path))
 
+
 def load(config_path = None, config_files = None,
-         state_path = "~/.tcf", ignore_ssl = True):
-    """Load the TCF Library configuration
+         state_dir = None, ignore_ssl = True):
+    """
+    Load the TCF Library configuration
 
     This is needed before you can access from your client program any
     other module.
 
-    :param config_path: list of strings containing UNIX-style
-        paths (DIR:DIR) to look for config files (conf_*.py) that will
-        be loaded in alphabetical order. An empty path clears the
-        current list.
+    :param config_path: list of strings containing UNIX-style paths
+        (DIR:DIR), DIR;DIR on Windows, to look for config files
+        (conf_*.py) that will be loaded in alphabetical order. An
+        empty path clears the current list.
+
     :param config_files: list of extra config files to load
     :param str state_path: (optional) path where to store state
     :param bool ignore_ssl: (optional) wether to ignore SSL
         verification or not (useful for self-signed certs)
 
     """
-    if not config_path:
-        config_path = [ "/etc/tcf:~/.tcf:.tcf" ]
+    if config_path == None:
+        config_path = [
+            ".tcf", os.path.join(os.path.expanduser("~"), ".tcf"),
+        ] + _install.sysconfig_paths
+
+    global state_path
+    if state_dir:
+        state_path = state_dir
+    else:
+        state_path = os.path.join(os.path.expanduser("~"), ".tcf")
+
+    global share_path
+    share_path = os.path.expanduser(_install.share_path)
+
     if not config_files:
         config_files = []
-    if config_path != "":
-        global path
-        path = commonl.path_expand(config_path)
-        logger.info("configuration path %s", path)
-        commonl.config_import(path, re.compile("^conf[-_].*.py$"))
+
+    global path
+    path = config_path
+
+    logger.info("configuration path %s", path)
+    commonl.config_import(path, re.compile("^conf[-_].*.py$"))
     for config_file in config_files:
         commonl.config_import_file(config_file, "__main__")
 
@@ -98,3 +118,5 @@ def load(config_path = None, config_files = None,
             aka = None
         ttb_client.rest_init(os.path.expanduser(state_path),
                              url, ssl_ignore, aka)
+
+    tcfl.msgid_c.cls_init()
