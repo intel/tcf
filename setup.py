@@ -72,6 +72,7 @@ This is the client and meta-testcase runner for the TCF test case framework.
         build_py = _build_py,
         install_scripts = setupl._install_scripts,
         install_data = setupl._install_data,
+        install_lib = setupl._install_lib,
         sdist = _sdist,
     ),
     package_data = {'': ['LICENSE']},
@@ -85,7 +86,7 @@ This is the client and meta-testcase runner for the TCF test case framework.
         ( os.path.join('@prefix@', "share", 'tcf'), [
             os.path.join('tcfl', 'img-metadata.schema.yaml'),
         ]),
-        ( os.path.join('@prefix@' 'share', 'tcf', 'examples'),
+        ( os.path.join('@prefix@', 'share', 'tcf', 'examples'),
          [ ] \
          + glob.glob(os.path.join("examples" , "*.py")) \
          + glob.glob(os.path.join("examples", ".ino")),

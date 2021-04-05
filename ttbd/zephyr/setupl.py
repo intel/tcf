@@ -30,8 +30,11 @@ import time
 
 import distutils.command.install_data
 import distutils.command.install_scripts
+import distutils.command.install_lib
 
 def mk_installs_py(base_dir, sysconfigdir, sharedir):
+    _sysconfigdir = os.path.join(sysconfigdir, "tcf").replace("\\", "\\\\")
+    _share_path = os.path.join(sharedir, "tcf").replace("\\", "\\\\")
     with open(os.path.join(base_dir, "_install.py"), "w") as f:
         f.write(f"""
 #! /usr/bin/python3
@@ -47,9 +50,9 @@ import sys
 
 # when running from source, we want the toplevel source dir
 sysconfig_paths = [
-    "{os.path.join(sysconfigdir, "tcf")}",
+    "{_sysconfigdir}",
 ]
-share_path = "{os.path.join(sharedir, "tcf")}"
+share_path = "{_share_path}"
 """
 )
 
@@ -88,7 +91,7 @@ def get_install_paths(
             pass
         else:
             if installer.prefix == "/usr":
-                sysconfigdir = "/etc/"
+                sysconfigdir = "/etc"
             else:
                 sysconfigdir = os.path.join(installer.prefix, 'etc')
         sharedir = os.path.join(installer.prefix, "share")
@@ -100,7 +103,7 @@ def get_install_paths(
         else:
             # these have to be absolute, otherwise they will be prefixed again
             sysconfigdir = "/etc"
-            sharedir = os.path.join("usr", "share")
+            sharedir = os.path.join("/usr", "share")
             installer.prefix = '/usr'
 
     return sysconfigdir, sharedir
@@ -128,6 +131,10 @@ class _install_data(distutils.command.install_data.install_data):
 # Run a post-install on installed data file replacing paths as we need
 class _install_scripts(distutils.command.install_scripts.install_scripts):
     def run(self):
+        distutils.command.install_scripts.install_scripts.run(self)
+
+class _install_lib(distutils.command.install_lib.install_lib):
+    def run(self):
         # Workaround that install_data doesn't respect --prefix
         #
         # If prefix is given (via --user or via --prefix), then
@@ -136,10 +143,10 @@ class _install_scripts(distutils.command.install_scripts.install_scripts):
         sysconfigdir, sharedir = get_install_paths(
             self,
             self.distribution.command_options.get('install', {}))
-        distutils.command.install_scripts.install_scripts.run(self)
+        distutils.command.install_lib.install_lib.run(self)
         # generate a new _install.py for an installed system
         mk_installs_py(
-            os.path.join(self.install_lib, "tcfl"),
+            os.path.join(self.install_dir, "tcfl"),
             sysconfigdir, sharedir)
 
 # A glob that filters symlinks
