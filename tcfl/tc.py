@@ -1985,6 +1985,23 @@ class target_c(reporter_c):
             target.ticket = None	# target_c.__init__ inits this
         return target
 
+    @staticmethod
+    def create(target_name):
+        """
+        Create a :class:`tcfl.tc.target_c` object for a direct test
+
+        :param str target_name: name of the target; this can be just
+          an ID or a fullid (SERVER/ID).
+        """
+        _rtb, rt = ttb_client._rest_target_find_by_id(target_name)
+        target = target_c(rt, tc_global, None, "target")
+        target.testcase.ticket = "TICKET"
+        target.ticket = target.testcase.ticket
+        target.testcase.__init_shallow__(target.testcase)
+        target.testcase.__thread_init__(None)
+        return target
+
+
     def ttbd_iface_call(self, interface, call, method = "PUT",
                         component = None, stream = False, raw = False,
                         files = None, timeout = 160,
