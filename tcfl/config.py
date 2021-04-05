@@ -17,7 +17,7 @@ import re
 import urllib.parse
 
 import commonl
-import tcfl
+import tcfl.tc
 from . import ttb_client
 from . import _install
 
