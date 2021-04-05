@@ -1703,7 +1703,7 @@ class tls_prefix_c(object):
 
 
 def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
-                        depth_limit = 10):
+                        depth_limit = 20):
     """
     Dump a general data tree to stdout in a recursive way
 
@@ -1752,7 +1752,7 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
     """
     assert isinstance(prefix, str)
     assert isinstance(separator, str)
-    assert depth_limit > 0
+    assert depth_limit > 0, f"depth_limit: expected >0, got {depth_limit}"
 
     if isinstance(d, dict) and depth_limit > 0:
         if prefix.strip() != "":
