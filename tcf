@@ -16,6 +16,7 @@
 import argparse
 import collections
 import getpass
+import inspect
 import json
 import os
 import re
@@ -30,6 +31,7 @@ import tcfl
 import tcfl.ttb_client as ttb_client
 import tcfl.config
 import tcfl.tc
+import tcfl._install
 
 # I bet there is a better way to do this...but we need the symbol to
 # be in the logging module so that it is not included in the "function
@@ -56,6 +58,20 @@ def join_args_for_make_shell_command(args):
         _arg = re.sub(r'(\$)', r'$$', _arg)
         s += " '" + _arg + "'"
     return s
+
+def _config(_args):
+    print(f"""\
+tcf: {sys.argv[0]}
+tcf/realpath: {os.path.realpath(sys.argv[0])}
+tcfl: {inspect.getfile(tcfl)}
+commonl: {inspect.getfile(commonl)}
+share path: {tcfl.config.share_path}
+state path: {tcfl.config.state_path}
+config path: {os.pathsep.join(tcfl.config.path)}
+version: {tcfl.tc.version}
+servers:""")
+    for url in tcfl.config.urls:
+        print(" - " + url[0])
 
 def _target_get(args):
     # pure target get w/o going through the cache
@@ -242,21 +258,12 @@ if __name__ == "__main__":
         default = [ ],
         help = "Files to parse as configuration (this is used for testing, "
         "along with --config-path \"\"")
-    bindir = os.path.dirname(__file__)
-    # This gets replaced during install time to $PREFIX/etc (~/.local,
-    # or /, or whatever -- see setupl.py -- yes, maybe we should use
-    # package resources, but this is simpler...for now.
-    # DO NOT MAKE THESE LINES MULTILINES!
-    install_time_etc_tcf = os.pathsep.join([ bindir, os.path.join(bindir, "zephyr") ])
-    install_time_share_tcf = bindir
     arg_parser.add_argument(
         "-p", "--config-path",
         action = "append", dest = "config_path",
-        default = [
-            install_time_etc_tcf,
-            os.path.join(os.path.expanduser("~"), ".tcf"),
-            ".tcf"
-        ],
+        default =  [
+            ".tcf", os.path.join(os.path.expanduser("~"), ".tcf"),
+        ] + tcfl._install.sysconfig_paths,
         help = f"List of '{os.pathsep}' separated paths from where"
         " to load conf_.*.py configuration files in alphabetic order"
         " (%(default)s)")
@@ -310,6 +317,10 @@ if __name__ == "__main__":
         dest = "chdir",
         help = "Change to DIR before starting")
     arg_subparsers = arg_parser.add_subparsers(help = "commands")
+
+    ap = arg_subparsers.add_parser(
+        "config", help = "Print information about configuration")
+    ap.set_defaults(func = _config)
 
     ap = arg_subparsers.add_parser("login",
                                    help = "Login to the different servers")
@@ -549,13 +560,12 @@ tcf-jobserver-run:
             ssl_ignore = _url[1]
         tcfl.config.urls.append((url, ssl_ignore,))
 
-    tcfl.config.state_path = os.path.expanduser(args.state_path)
-    tcfl.config.share_path = os.path.expanduser(install_time_share_tcf)
-    logi("share path: %s" % install_time_share_tcf)
     tcfl.config.load(config_path = args.config_path,
                      config_files = args.config_files,
-                     state_path = tcfl.config.state_path,
+                     state_dir = args.state_path,
                      ignore_ssl = args.ignore_ssl)
+    logi("state path: %s" % tcfl.config.state_path)
+    logi("share path: %s" % tcfl.config.share_path)
 
     if 'func' in args:
         try:

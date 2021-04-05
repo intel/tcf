@@ -31,6 +31,29 @@ import time
 import distutils.command.install_data
 import distutils.command.install_scripts
 
+def mk_installs_py(base_dir, sysconfigdir, sharedir):
+    with open(os.path.join(base_dir, "_install.py"), "w") as f:
+        f.write(f"""
+#! /usr/bin/python3
+#
+# Copyright (c) 2021 Intel Corporation
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# Note this file gets rewritten during installation
+# By default, we point to the source
+import os
+import sys
+
+# when running from source, we want the toplevel source dir
+sysconfig_paths = [
+    "{os.path.join(sysconfigdir, "tcf")}",
+]
+share_path = "{os.path.join(sharedir, "tcf")}"
+"""
+)
+
+
 def mk_version_py(base_dir, version):
     """
     Create a version.py file in a directory with whichever version
@@ -49,6 +72,38 @@ def mk_version_py(base_dir, version):
 version_string = "%s"
 """ % (__file__, time.asctime(), version))
 
+def get_install_paths(
+        installer,
+        install, # = self.distribution.command_options.get('install', {}),
+):
+    if 'user' in install:
+        # this means --user was given
+        installer.prefix = site.getuserbase()
+        sysconfigdir = os.path.join(installer.prefix, ".local", 'etc')
+        sharedir = os.path.join(installer.prefix, ".local", "share")
+    elif 'prefix' in install:
+        # this means --prefix was given
+        installer.prefix = install.get('prefix', (None, None))[1]
+        if sys.platform == "win32":
+            pass
+        else:
+            if installer.prefix == "/usr":
+                sysconfigdir = "/etc/"
+            else:
+                sysconfigdir = os.path.join(installer.prefix, 'etc')
+        sharedir = os.path.join(installer.prefix, "share")
+    else:
+        if sys.platform == "win32":
+            sysconfigdir = 'C:\\Program Data\\tcf'
+            installer.prefix = 'C:\\Program Files\\'
+            sharedir = os.path.join(installer.prefix, "share")
+        else:
+            # these have to be absolute, otherwise they will be prefixed again
+            sysconfigdir = "/etc"
+            sharedir = os.path.join("usr", "share")
+            installer.prefix = '/usr'
+
+    return sysconfigdir, sharedir
 
 # Run a post-install on installed data file replacing paths as we need
 class _install_data(distutils.command.install_data.install_data):
@@ -58,22 +113,9 @@ class _install_data(distutils.command.install_data.install_data):
         # If prefix is given (via --user or via --prefix), then
         # extract it and add it to the paths in self.data_files;
         # otherwise, default to /usr.
-        install = self.distribution.command_options.get('install', {})
-        if 'user' in install:
-            # this means --user was given
-            self.prefix = site.getuserbase()
-            sysconfigdir = os.path.join(self.prefix, 'etc')
-        elif 'prefix' in install:
-            # this means --prefix was given
-            self.prefix = install.get('prefix', (None, None))[1]
-            if self.prefix == "/usr":
-                sysconfigdir = "/etc/"
-            else:
-                sysconfigdir = os.path.join(self.prefix, 'etc')
-        else:
-            # these have to be absolute, otherwise they will be prefixed again
-            self.prefix = '/usr'
-            sysconfigdir = '/etc'
+        sysconfigdir, _sharedir = get_install_paths(
+            self,
+            self.distribution.command_options.get('install', {}))
         new_data_files = []
         for entry in self.data_files:
             dest_path = entry[0].replace('@prefix@', self.prefix)
@@ -81,6 +123,7 @@ class _install_data(distutils.command.install_data.install_data):
             new_data_files.append((dest_path,) + entry[1:])
         self.data_files = new_data_files
         distutils.command.install_data.install_data.run(self)
+
 
 # Run a post-install on installed data file replacing paths as we need
 class _install_scripts(distutils.command.install_scripts.install_scripts):
@@ -90,37 +133,15 @@ class _install_scripts(distutils.command.install_scripts.install_scripts):
         # If prefix is given (via --user or via --prefix), then
         # extract it and add it to the paths in self.data_files;
         # otherwise, default to /usr/local.
-        install = self.distribution.command_options.get('install', {})
-        if 'user' in install:
-            # this means --user was given
-            sysconfigdir = "~/.local/etc"
-            sharedir = "~/.local/share"
-        elif 'prefix' in install:
-            # this means --prefix was given
-            prefix = install.get('prefix', (None, None))[1]
-            sysconfigdir = os.path.join(prefix, "etc")
-            sharedir = os.path.join(prefix, "etc")
-        else:
-            sysconfigdir = "/etc"
-            sharedir = "/usr/share"
+        sysconfigdir, sharedir = get_install_paths(
+            self,
+            self.distribution.command_options.get('install', {}))
         distutils.command.install_scripts.install_scripts.run(self)
-        for filename in self.outfiles:
-            try:
-                subprocess.check_call(
-                    [
-                        'sed', '-i',
-                        '-e',
-                        's|install_time_etc_tcf = .*$' \
-                        '|install_time_etc_tcf = "' + sysconfigdir + '/tcf"|g',
-                        '-e',
-                        's|install_time_share_tcf = .*$' \
-                        '|install_time_share_tcf = "' + sharedir + '/tcf"|g',
-                        filename
-                    ])
-            except subprocess.CalledProcessError as e:
-                sys.stderr.write("FAILED: sed failed\n")
-                raise
-            
+        # generate a new _install.py for an installed system
+        mk_installs_py(
+            os.path.join(self.install_lib, "tcfl"),
+            sysconfigdir, sharedir)
+
 # A glob that filters symlinks
 def glob_no_symlinks(pathname):
     l = []
@@ -153,6 +174,14 @@ else:
         version = version.strip().replace("-", ".")
         if re.match("^v[0-9]+.[0-9]+", version):
             version = version[1:]
-    except subprocess.CalledProcessError as e:
-        sys.stderr.write("FAILED: git failed: %s" % e.output)
+    except subprocess.CalledProcessError as _e:
+        print("Unable to determine %s (%s) version: %s"
+              % ("tcf", _srcdir, _e.output), file = sys.stderr)
+        version = "vNA"
+    except OSError as e:
+        # At this point, logging is still not initialized; don't
+        # crash, just report a dummy version
+        print("Unable to determine %s (%s) version "
+              " (git not installed?): %s" % ("tcf", _srcdir, e),
+              file = sys.stderr)
         version = "vNA"
