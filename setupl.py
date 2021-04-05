@@ -32,6 +32,8 @@ import distutils.command.install_data
 import distutils.command.install_scripts
 
 def mk_installs_py(base_dir, sysconfigdir, sharedir):
+    _sysconfigdir = os.path.join(sysconfigdir, "tcf").replace("\\", "\\\\")
+    _share_path = os.path.join(sharedir, "tcf").replace("\\", "\\\\")
     with open(os.path.join(base_dir, "_install.py"), "w") as f:
         f.write(f"""
 #! /usr/bin/python3
@@ -47,9 +49,9 @@ import sys
 
 # when running from source, we want the toplevel source dir
 sysconfig_paths = [
-    "{os.path.join(sysconfigdir, "tcf")}",
+    "{_sysconfigdir}",
 ]
-share_path = "{os.path.join(sharedir, "tcf")}"
+share_path = "{_share_path}"
 """
 )
 
@@ -88,7 +90,7 @@ def get_install_paths(
             pass
         else:
             if installer.prefix == "/usr":
-                sysconfigdir = "/etc/"
+                sysconfigdir = "/etc"
             else:
                 sysconfigdir = os.path.join(installer.prefix, 'etc')
         sharedir = os.path.join(installer.prefix, "share")
