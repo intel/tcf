@@ -2116,8 +2116,7 @@ pos_cmdline_opts = {
         "plymouth.enable=0 ",		# No installer to run
         # so syscfg BIOS config utility can run in POS environment
         "iomem=relaxed",
-        "root=/dev/nfs",
-        "nfsroot=%(pos_nfs_server)s:%(pos_nfs_path)s,soft,nolock,nfsvers=3",
+        "root=nfs:%(pos_nfs_server)s:%(pos_nfs_path)s,soft,nolock",
     ]
 }
 
