@@ -78,33 +78,33 @@ This is the client and meta-testcase runner for the TCF test case framework.
     include_package_data=True,
     data_files = [
         # No default configuration files; confusing
-        ('@sysconfigdir@/tcf/', [
-            './conf_global.py',
+        ( os.path.join('@sysconfigdir@', 'tcf'), [
+            'conf_global.py',
         ]),
         # ('etc/tcf', glob.glob("conf_*.py")),
-        ('@prefix@/share/tcf', [
-            'tcfl/img-metadata.schema.yaml',
+        ( os.path.join('@prefix@', "share", 'tcf'), [
+            os.path.join('tcfl', 'img-metadata.schema.yaml'),
         ]),
-        ('@prefix@/share/tcf/examples',
+        ( os.path.join('@prefix@' 'share', 'tcf', 'examples'),
          [ ] \
-         + glob.glob("examples/*.py") \
-         + glob.glob("examples/*.ino"),
+         + glob.glob(os.path.join("examples" , "*.py")) \
+         + glob.glob(os.path.join("examples", ".ino")),
         ),
-        ('@prefix@/share/tcf/tests',
-         setupl.glob_no_symlinks("tests/*.py")
-         + glob.glob("tests/*.sh")
-         + glob.glob("tests/*.sh")
-         + glob.glob("tests/*.txt")
+        ( os.path.join('@prefix@', 'share', 'tcf', 'tests'),
+         setupl.glob_no_symlinks(os.path.join("tests", "*.py"))
+         + glob.glob(os.path.join("tests", "*.sh"))
+         + glob.glob(os.path.join("tests", "/*.sh"))
+         + glob.glob(os.path.join("tests", "*.txt"))
          # These map to symlinked files in tests/
          + [
-             'ttbd/conf_00_lib.py',
+             os.path.join('ttbd', 'conf_00_lib.py'),
          ]
         ),
-        ('@prefix@/share/tcf/lint',
+        ( os.path.join('@prefix@', "share", "tcf", "lint"),
          setupl.glob_no_symlinks(".lint.*.py")
          + [ "lint-all.py" ]
         ),
-        ('@prefix@/share/tcf/',
+        ( os.path.join('@prefix@', 'share', 'tcf'),
          [
              "mk-efi-image.sh",
              "report-base.j2.txt",
@@ -117,8 +117,8 @@ This is the client and meta-testcase runner for the TCF test case framework.
              "setup-requirements.py"
          ]
         ),
-        ( '@prefix@/share/tcf/content', [
-            'tcfl/evemu.bin.tar.gz',
+        ( os.path.join('@prefix@', 'share', 'tcf', 'content'), [
+            os.path.join('tcfl', 'evemu.bin.tar.gz'),
         ]),
     ],
 )
