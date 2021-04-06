@@ -150,7 +150,9 @@ class _install_scripts(distutils.command.install_scripts.install_scripts):
             target_dir = os.path.join(os.path.dirname(sys.executable),"Scripts")
             # If --user is specified, need to change path to where the script is
             if 'user' in install:
-                script_dir = os.path.join(site.USER_BASE, "Python39", "Scripts")
+                python_version = ''.join(str(i) for i in sys.version_info[:2])
+                python_folder = 'Python' + python_version
+                script_dir = os.path.join(site.USER_BASE, python_folder, "Scripts")
                 mk_windows_bat(target_dir, script_dir)
             else:
                 mk_windows_bat(target_dir, target_dir)
