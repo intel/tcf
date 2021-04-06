@@ -1176,6 +1176,9 @@ if __name__ == "__main__":
 
     log_format = "%(levelname)s %(module)s.%(funcName)s():%(lineno)d: %(message)s"
     log_format = commonl.log_format_compose(log_format, True)
+    # wipe any existing config, reinitialize our way
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
     logging.basicConfig(format = log_format, level = args.level)
 
     # Cut down on verbosity from different packages
