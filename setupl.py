@@ -75,6 +75,15 @@ def mk_version_py(base_dir, version):
 version_string = "%s"
 """ % (__file__, time.asctime(), version))
 
+def mk_windows_bat(base_dir, tcf_path):
+    """
+    Create a windows .bat file to allow tcf to run without using "python tcf"
+    """
+    with open(os.path.join(base_dir, "tcf.bat"), "w") as f:
+        f.write(f"""\
+@py -3.9 {tcf_path}\\tcf %*
+""")
+
 def get_install_paths(
         installer,
         install, # = self.distribution.command_options.get('install', {}),
@@ -82,8 +91,12 @@ def get_install_paths(
     if 'user' in install:
         # this means --user was given
         installer.prefix = site.getuserbase()
-        sysconfigdir = os.path.join(installer.prefix, ".local", 'etc')
-        sharedir = os.path.join(installer.prefix, ".local", "share")
+        if sys.platform == "win32":
+            sysconfigdir = os.path.join(installer.prefix, 'etc')
+            sharedir = os.path.join(installer.prefix, "share")
+        else:
+            sysconfigdir = os.path.join(installer.prefix, ".local", 'etc')
+            sharedir = os.path.join(installer.prefix, ".local", "share")
     elif 'prefix' in install:
         # this means --prefix was given
         installer.prefix = install.get('prefix', (None, None))[1]
@@ -97,7 +110,7 @@ def get_install_paths(
         sharedir = os.path.join(installer.prefix, "share")
     else:
         if sys.platform == "win32":
-            sysconfigdir = 'C:\\Program Data\\tcf'
+            sysconfigdir = 'C:\\ProgramData'
             installer.prefix = 'C:\\Program Files\\'
             sharedir = os.path.join(installer.prefix, "share")
         else:
@@ -116,9 +129,8 @@ class _install_data(distutils.command.install_data.install_data):
         # If prefix is given (via --user or via --prefix), then
         # extract it and add it to the paths in self.data_files;
         # otherwise, default to /usr.
-        sysconfigdir, _sharedir = get_install_paths(
-            self,
-            self.distribution.command_options.get('install', {}))
+        install = self.distribution.command_options.get('install', {})
+        sysconfigdir, _sharedir = get_install_paths(self, install)
         new_data_files = []
         for entry in self.data_files:
             dest_path = entry[0].replace('@prefix@', self.prefix)
@@ -131,6 +143,18 @@ class _install_data(distutils.command.install_data.install_data):
 # Run a post-install on installed data file replacing paths as we need
 class _install_scripts(distutils.command.install_scripts.install_scripts):
     def run(self):
+        install = self.distribution.command_options.get('install', {})
+        # Create a .bat file for windows to run tcf without invoking python first
+        if sys.platform == "win32":
+            # target_dir is the scripts folder in the python installation
+            target_dir = os.path.join(os.path.dirname(sys.executable),"Scripts")
+            # If --user is specified, need to change path to where the script is
+            if 'user' in install:
+                script_dir = os.path.join(site.USER_BASE, "Python39", "Scripts")
+                mk_windows_bat(target_dir, script_dir)
+            else:
+                mk_windows_bat(target_dir, target_dir)
+
         distutils.command.install_scripts.install_scripts.run(self)
 
 class _install_lib(distutils.command.install_lib.install_lib):
