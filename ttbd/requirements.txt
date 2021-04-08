@@ -1,19 +1,21 @@
-flask
-flask-login
-flask-principal
-ipaddress
-keyring
-netifaces
-pexpect
-ply
-python-prctl
-pyghmi
-pyserial
-pysnmp
-python_ldap
-pyusb # ubuntu:python-usb
-requests
+netifaces==0.10.4
+tornado==4.2.1
+python-ldap==2.4.15
+pyusb==1.0.0
+pysnmp==4.2.5
+werkzeug==0.9.1
+pexpect==2.4
+ply==3.4
+pyOpenSSL==0.14  # from 0.13.1 fails to compile
+flask==0.10.1
+pyserial==2.6
+requests==2.6.0
+ipaddress==1.0.16
+#keyring==5.0
+systemd==0.16.1
+backports.functools_lru_cache
+flask-login==0.3.0
+flask-principal==0.4.0
+pyroute2
+prctl
 sdnotify
-setuptools
-systemd
-tornado	# ubuntu:python-tornado
