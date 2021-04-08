@@ -155,13 +155,9 @@ class extension(tc.target_extension_c):
         # remove elements we knew existed (there might be other
         # processes in parallel using this )
         l = list(set(l) - set(l0))
-        if len(l) != 1:
+        if tmpname in l:
             raise tc.failed_e(
-                "after uploading one file, %d are listed; expected 1" % len(l),
-                dict(l = l))
-        if l[0] != tmpname:
-            raise tc.failed_e(
-                "after uploading file, name differs, expected %s" % tmpname,
+                "after uploading %s, it is not listed" % tmpname,
                 dict(l = l))
         target.report_pass("listed afer uploading one")
 
@@ -169,15 +165,9 @@ class extension(tc.target_extension_c):
         target.store.upload(tmpname2, __file__)
         target.report_pass("uploaded second file %s" % tmpname2)
         l = target.store.list()
-        l = list(set(l) - set(l0))
-        if len(l) != 2:
-            raise tc.failed_e(
-                "after uploading another file, %d are listed, expected 2" % len(l),
-                dict(l = l))
         if tmpname2 not in l:
             raise tc.failed_e(
-                "after uploading file, can't find %s" % tmpname2,
-                dict(l = l))
+                "after uploading another file %s, it is not listed" % tmpname,
         target.report_pass("listed after uploading second file", dict(l = l))
 
         target.store.delete(tmpname)
@@ -194,10 +184,6 @@ class extension(tc.target_extension_c):
             raise tc.failed_e(
                 "after removing %s, still can find it in listing" % tmpname2,
                 dict(l = l))
-        l = list(set(l) - set(l0))
-        if l:
-            raise tc.failed_e(
-                "after removing all, list is not empty", dict(l = l))
         target.report_pass("all files removed report empty list")
 
 def _cmdline_store_upload(args):
