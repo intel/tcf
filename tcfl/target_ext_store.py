@@ -167,7 +167,7 @@ class extension(tc.target_extension_c):
         l = target.store.list()
         if tmpname2 not in l:
             raise tc.failed_e(
-                "after uploading another file %s, it is not listed" % tmpname,
+                "after uploading another file %s, it is not listed" % tmpname)
         target.report_pass("listed after uploading second file", dict(l = l))
 
         target.store.delete(tmpname)
