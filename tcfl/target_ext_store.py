@@ -155,7 +155,7 @@ class extension(tc.target_extension_c):
         # remove elements we knew existed (there might be other
         # processes in parallel using this )
         l = list(set(l) - set(l0))
-        if tmpname in l:
+        if tmpname not in l:
             raise tc.failed_e(
                 "after uploading %s, it is not listed" % tmpname,
                 dict(l = l))
