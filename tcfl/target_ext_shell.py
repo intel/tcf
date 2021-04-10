@@ -5,11 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
-"""
-Run commands a shell available on a target's serial console
+"""Run commands a shell available on a target's serial console
 -----------------------------------------------------------
-
-Also allows basic file transmission over serial line.
 
 Shell prompts
 ^^^^^^^^^^^^^
@@ -26,7 +23,7 @@ Problems:
   conventions, a misplaced newline or carriage return can break havoc.
 
   As well, if a background process / kernel prints a message after the
-  prompt is printed, a ``$`` will no longer match. The ``\Z`` regex
+  prompt is printed, a ``$`` will no longer match. The ``\\Z`` regex
   operator cannot be used for the same reason.
 
 - CRLF conventions make it harder to use the ``^`` and ``$`` regex
@@ -38,6 +35,35 @@ Problems:
 Thus, resorting to match a single line is the best bet; however, it is
 almost impossible to guarantee that it is the last one as the multiple
 formats of prompts could be matching other text.
+
+Fixups
+^^^^^^
+
+Some shells need to deal with output from background processes that
+interrupts the shell; fixups provide a way to deal with it by
+recognizing that output, reporting it and continuing typing.
+
+For hard coding into the inventory, add to the inventory keys such
+as::
+
+  shell.fixups.CONTEXTNAME.NAME: PYTHONREGEXPATTERN
+
+For coding in the tescase:
+
+  >>> target.kws['shell']['fixups'][CONTEXTNAME][NAME] = PYTHONREGEXPATTERN
+
+Where *CONTEXTNAME* is the name of a shell :ref:`context
+<shell_c.context>` where this fixup will apply, *NAME* is a name that
+will be used for reporting when *PYTHONREGEXPATTERN* is found in the
+output (which is this is a Python regex pattern).
+
+For each, a fixup object will be created when the shell is moved to
+use the right context.
+
+When found while typing a command, the :ref:`fixup <shell_c.fixup_c>`
+object will detect it, report the occurrence of the output and then
+keep typing whichever command was being typed halfway.
+
 """
 
 import binascii
@@ -50,6 +76,7 @@ import typing
 
 import commonl
 from . import tc
+from . import target_ext_console
 
 from . import msgid_c
 
@@ -104,7 +131,6 @@ class _context_c:
         self.shell.tls.prompt_regexs.append(self.shell.prompt_regex)
 
         target = self.shell.target
-
         self.shell.tls.fixups.append(self.shell._fixups)
         self.shell._fixups = {}
         # Load fixups
@@ -521,6 +547,91 @@ class shell(tc.target_extension_c):
         # don't set a timeout here, leave it to whatever it was defaulted
         return
 
+
+    class fixup_c(target_ext_console.expect_text_on_console_c):
+        """Assist in restarting partially interrupted commands
+
+        In some shells, when typing commands into the console, messages
+        are suddenly printed and the typing is interrupted halfway.
+
+        This object is a expecter used to catch those messages and
+        continue the typing without loosing the command. Working in
+        coordination with :meth:`run` analyze how much of the command
+        was echoed back to then continue
+
+        This only works when the other side echoes; the flow is
+        something like this::
+
+          PROMPT> I am typing this command
+
+        halfway through it, an error would be printed and the console
+        output would look like::
+
+          PROMPT> ERRORMESSAGEI am typing
+
+        note at this point the sendind side has sent the whole::
+
+          I am typing this command
+
+        string but only the::
+
+          I am typing
+
+        part is echoed. This object will identify the error, report it
+        as a recoverable condition and then adjust the expectation for
+        target.shell.run() so it can re-type the rest.
+
+        """
+
+        def on_found(self, run_name, poll_context, buffers_poll, buffers,
+                     ellapsed, timeout, match_data):
+            testcase = self.target.testcase
+            # these are matches specific to
+            # tcfl.target_ext_console.expect_text_on_console_c; look at
+            # its doc for details
+            of = buffers_poll['of']
+            start = match_data['offset_match_start']
+            end = match_data['offset_match_end']
+            # @of is the file that has what was read from the console,
+            # @start is where the match start, @ends is ... guess it :)
+            of.seek(start)
+            text = of.read(end - start).strip().decode('utf-8')
+            rest = of.read().decode('utf-8')
+            # We'll file this under a buffer to keep track of how many are
+            # found during execution
+            name = f"shell fixup: {self.name} [{text}]"
+            with testcase.lock:
+                testcase.buffers.setdefault(name, 0)
+                testcase.buffers[name] += 1
+                count = testcase.buffers[name]
+            # And each time we report it as a new KPI; this serves two
+            # purposes; it reports them as it happened with a timestamp
+            # and the last one serves as a count of how many times we
+            # recovered each error message.
+            self.target.report_data("Recovered conditions [%(type)s]", name, count)
+
+            # Now, did this happen in the middle of sending a command with
+            # target.shell.run?
+            #
+            # We need to recover so that target.shell.run() can keep
+            # running. We got echo of how much was received, so let's get
+            # the echo expecter to be happy with receiving only what was
+            # received before being interrupted so that target.shell.run()
+            # can send the rest.
+            if testcase.tls.echo_cmd:
+                # this is a hack, but we might have CRLFs (\r\n) or
+                # similar in the beginning, so just wipe it
+                rest = rest.lstrip()
+                if rest < testcase.tls.echo_cmd:
+                    testcase.tls.echo_cmd_leftover = commonl.removeprefix(
+                        testcase.tls.echo_cmd, rest)
+                    testcase.tls.echo_waiter.regex_set(rest)
+            # this ends here and processing continues in target.shell.run
+            # when it called testcase.expect(); the loop will be run again
+            # and next time, the echo waiter will process only the part we
+            # have seen received.
+
+
     def _run(self, cmd = None, expect = None, prompt_regex = None,
              output = False, output_filter_crlf = True, trim = False,
              console = None, origin = None):
@@ -540,12 +651,52 @@ class shell(tc.target_extension_c):
             assert isinstance(origin, str)
 
         target = self.target
+        testcase = target.testcase
 
         if output:
             offset = self.target.console.size(console = console)
 
-        if cmd:
+        # the protocol needs UTF-8 anyway
+        cmd = commonl.str_cast_maybe(cmd)
+        if cmd and not self._fixups:
             self.target.send(cmd, console = console)
+        if cmd and self._fixups:
+            # we have to handle CRLF at the end ourselves here, we
+            # can't defer to target.send() -- see that for how we get
+            # crlf.
+            if console == None:
+                console = target.console.default
+            crlf = target.console.crlf.get(console, None)
+            cmd += crlf
+
+            try:
+                # send the command, doing echo verification if
+                if origin == None:
+                    origin = commonl.origin_get(2)
+                testcase.tls.echo_cmd = cmd
+                testcase.tls.echo_waiter = self.target.console.text(
+                    cmd, name = "shell echo",
+                    console = console, timeout = 10,
+                )
+                while True:
+                    testcase.tls.echo_cmd_leftover = None
+                    self.target.send(testcase.tls.echo_cmd,
+                                     crlf = None, console = console)
+                    testcase.tls.echo_waiter.regex_set(testcase.tls.echo_cmd)
+                    testcase.expect(
+                        testcase.tls.echo_waiter,
+                        **self._fixups,
+                    )
+                    if testcase.tls.echo_cmd_leftover == None:
+                        break
+                    self.target.report_info(
+                        "shell/fixup: resuming partially interrupted command"
+                        " by message printed in console; sending: "
+                        + commonl.str_bytes_cast(testcase.tls.echo_cmd, str))
+                    testcase.tls.echo_cmd = testcase.tls.echo_cmd_leftover
+                    continue
+            finally:
+                testcase.tls.echo_cmd = None
         if expect:
             if isinstance(expect, list):
                 for expectation in expect:

@@ -900,8 +900,7 @@ def boot_config_fix(target):
     # In the case of UEFI systems, this booted into a OS because the
     # EFI bootmgr order got munged, so let's try to get that fixed
     # (IPv4 and IPv6 boot first).
-    prompt_orig = target.shell.prompt_regex
-    try:
+    with target.shell.context("boot config fix"):
         # get the super-generic prompt -- not a really good fix, but
         # will do for now
         target.shell.prompt_regex = target.shell.prompt_regex_default
@@ -917,5 +916,3 @@ def boot_config_fix(target):
             "test -x /usr/bin/efibootmgr.disabled"
             " && alias efibootmgr=/usr/bin/efibootmgr.disabled || true")
         _efibootmgr_setup(target, target.kws['pos_boot_dev'], 1)
-    finally:
-        target.shell.prompt_regex = prompt_orig

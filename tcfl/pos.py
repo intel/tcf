@@ -1690,6 +1690,8 @@ EOF""")
         else:
             _pos_prompt = pos_prompt
         boot_dev = self._boot_dev_guess(boot_dev)
+        # do not set target.shell.context("POS"), as we want to leave
+        # the same prompt REGEX for other code that will run after this
         with msgid_c("POS"):
 
             original_timeout = testcase.tls.expect_timeout
@@ -1887,7 +1889,11 @@ cat > /tmp/deploy.ex
                     "for device in %s; do umount -l $device || true; done"
                     % " ".join(reversed(target.pos.umount_list)))
             finally:
-                target.console.default = original_console_default
+                # Do not restore the original console, as other code
+                # might be running now to do stuff in the current
+                # console-- besides, the original console doesn't have
+                # the right prompt either
+                #target.console.default = original_console_default
                 # we do not need to restore the prompt regex because
                 # we only change it if we were not given a pos_prompt
                 # and took the default prompt, which stays FIXME:
@@ -2197,7 +2203,7 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
     """
     ipxe_seize(target)
     prompt_orig = target.shell.prompt_regex
-    try:
+    with target.shell.context("iPXE boot"):
         #
         # When matching end of line, match against \r, since depends
         # on the console it will send one or two \r (SoL vs SSH-SoL)
@@ -2206,6 +2212,7 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
         #
         # FIXME: block on anything here? consider infra issues
         # on "Connection timed out", http://ipxe.org...
+        # exiting the context restores this to what it was before
         target.shell.prompt_regex = "iPXE>"
         kws = dict(target.kws)
         boot_ic = target.kws['pos_boot_interconnect']
@@ -2329,8 +2336,6 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
             re.compile(r"\.\.\..* ok"))
         target.send("boot")
         # now the kernel boots
-    finally:
-        target.shell.prompt_regex = prompt_orig
 
 
 # FIXME: when tc.py's import hell is fixed, this shall move to tl.py?
