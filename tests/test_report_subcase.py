@@ -6,6 +6,7 @@
 #
 
 
+import tcfl
 import tcfl.tc
 
 class _test(tcfl.tc.tc_c):
@@ -24,4 +25,8 @@ class _test(tcfl.tc.tc_c):
         self.report_skip("this one failed", subcase = "sub6")
         self.report_data("domain", "name", "value", subcase = "sub7")
 
-        raise tcfl.tc.pass_e("exception passed", dict(subcase = sub8))
+        with tcfl.msgid_c(subcase = "sub9"):
+            self.report_fail("8 failed")
+
+
+        raise tcfl.tc.pass_e("exception passed", dict(subcase = "sub8"))
