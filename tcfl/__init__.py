@@ -55,7 +55,8 @@ class msgid_c(object):
         cls.tls.msgid_lifo = []
 
     def __init__(self, s = None,
-                 phase = None, depth = None, parent = None):
+                 phase = None, depth = None, parent = None,
+                 subcase = None):
         cls = type(self)
         if not hasattr(cls.tls, "msgid_lifo"):
             cls.cls_init()
@@ -68,15 +69,18 @@ class msgid_c(object):
             self._ident = parent._ident
             self._depth = parent._depth
             self._phase = parent._phase
+            self._subcase = parent._subcase
         elif cls.tls.msgid_lifo:	# init from the first in the stack
             f = cls.tls.msgid_lifo[-1]
             self._ident = f._ident
             self._depth = f._depth + 1
             self._phase = f._phase
+            self._subcase = f._subcase
         else:
             self._ident = ""
             self._phase = None
             self._depth = 0
+            self._subcase = None
 
         # that then can be overriden
         if s:
@@ -90,6 +94,10 @@ class msgid_c(object):
         if depth != None:
             assert isinstance(depth, int)
             self._depth = depth
+
+        if subcase != None:
+            self._subcase = subcase
+
 
     def __enter__(self):
         cls = type(self)
@@ -136,6 +144,14 @@ class msgid_c(object):
         if cls.tls.msgid_lifo:
             f = cls.tls.msgid_lifo[-1]
             return f._ident
+        else:
+            return None
+
+    @classmethod
+    def subcase(cls):
+        if cls.tls.msgid_lifo:
+            f = cls.tls.msgid_lifo[-1]
+            return f._subcase
         else:
             return None
 

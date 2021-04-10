@@ -724,12 +724,17 @@ class reporter_c(object):
         ts = time.time()
         delta = ts - self.ts_start
 
+        if subcase == None:
+            # No subcase context? is there any in the thread context?
+            subcase = msgid_c.subcase()
+
         if subcase:
             if subcase in self.subtc:
                 subtc = self.subtc[subcase]
             else:
                 # messed up we don't keep tc_file_path as is
-                subtc = subtc_c(self.name + "#" + subcase, self.kws['thisfile'], self.origin, self)
+                # Convention is we separate subcase names with ##
+                subtc = subtc_c(self.name + "##" + subcase, self.kws['thisfile'], self.origin, self)
                 self.subtc[subcase] = subtc
             if tag == "PASS":
                 subtc.result.passed += 1
