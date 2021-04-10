@@ -761,6 +761,61 @@ class reporter_c(object):
 
     def report_pass(self, message, attachments = None,
                     level = None, dlevel = 0, alevel = 2, subcase = None):
+        """Report a check has passed (a positive condition we were
+        looking for was found).
+
+        >>> report_pass("this thing worked ok",
+        >>>             dict(
+        >>>                 measurement1 = 34,
+        >>>                 log = commonl.generator_factory_c(
+        >>>                     commonl.file_iterator, "LOGILENAME")
+        >>>             ),
+        >>>             subcase = "subtest1")
+
+        A check, described by *message* has passed
+
+        :param str message: message describing the check or condition
+          that has passed
+
+        :param dict attachments: (optional) a dictionary of extra data
+          to append to the report, keyed by string. Stick to simple
+          values (bool, int, float, string, nested dict of the same )
+          for all report drivers to be able to handle it.
+
+          Additionally, use class:`commonl.generator_factory_c` for
+          generators (since the report drivers will have to spin the
+          generator once each).
+
+        :param str subcase: (optional, default *None*) report this
+          message as coming from a subcase
+          the attachments to this message relative to level (normally
+          to the default level).
+
+          The attachments might contain a lot of extra data that in
+          some cases is not necessary unless more verbosity is
+          declared.
+
+        :param int level: (optional, default set by
+          :class:`tcfl.msgid_c` context depth) verbosity level of this
+          message. Must be a zero or positive integer. 0 is most
+          important. Usually you want to set *dlevel*.
+
+        :param int dlevel: (optional, default 0) verbosity level of
+          this message relative to level (normally to the default
+          level).
+
+          Eg: if given -2 and level resolves to 4, the verbosity level
+          would be 2.
+
+        :param int alevel: (optional, default 2) verbosity level of
+          the attachments to this message relative to level (normally
+          to the default level).
+
+          The attachments might contain a lot of extra data that in
+          some cases is not necessary unless more verbosity is
+          declared.
+
+        """
         if level == None:		# default args are computed upon def'on
             level = msgid_c.depth()
         self._argcheck(message, attachments, level, dlevel, alevel)
@@ -770,6 +825,12 @@ class reporter_c(object):
 
     def report_fail(self, message, attachments = None,
                     level = None, dlevel = 0, alevel = 2, subcase = None):
+        """
+        Report a check that has failed (an negative condition we were
+        looking for was found).
+
+        Same parameters as :meth:`report_pass`.
+        """
         if level == None:		# default args are computed upon def'on
             level = msgid_c.depth()
         self._argcheck(message, attachments, level, dlevel, alevel)
@@ -779,6 +840,12 @@ class reporter_c(object):
 
     def report_error(self, message, attachments = None,
                      level = None, dlevel = 0, alevel = 2, subcase = None):
+        """
+        Report a check that has errored (a negative condition we were
+        not looking for was found).
+
+        Same parameters as :meth:`report_pass`.
+        """
         if level == None:		# default args are computed upon def'on
             level = msgid_c.depth()
         self._argcheck(message, attachments, level, dlevel, alevel)
@@ -788,6 +855,13 @@ class reporter_c(object):
 
     def report_blck(self, message, attachments = None,
                     level = None, dlevel = 0, alevel = 2, subcase = None):
+        """
+        Report a check that has blocked (something has happened most
+        likely in infrastructure that disallows us for checking
+        conditions to determine pass/fail/error/skip).
+
+        Same parameters as :meth:`report_pass`.
+        """
         if level == None:		# default args are computed upon def'on
             level = msgid_c.depth()
         self._argcheck(message, attachments, level, dlevel, alevel)
@@ -797,6 +871,12 @@ class reporter_c(object):
 
     def report_skip(self,  message, attachments = None,
                     level = None, dlevel = 0, alevel = 2, subcase = None):
+        """
+        Report a check that has skipped (the conditions needed to test
+        are not met).
+
+        Same parameters as :meth:`report_pass`.
+        """
         if level == None:		# default args are computed upon def'on
             level = msgid_c.depth()
         self._argcheck(message, attachments, level, dlevel, alevel)
@@ -806,6 +886,11 @@ class reporter_c(object):
 
     def report_info(self, message, attachments = None,
                     level = None, dlevel = 0, alevel = 2, subcase = None):
+        """
+        Report an informational progress message.
+
+        Same parameters as :meth:`report_pass`.
+        """
         if level == None:		# default args are computed upon def'on
             level = msgid_c.depth()
         self._argcheck(message, attachments, level, dlevel, alevel)
@@ -837,7 +922,18 @@ class reporter_c(object):
            - *Warnings [%(type)s]*: values would be accumulated over
              how many times it has been reported
 
-           - *Recovered conditions [%(type)s]*
+             >>> # self is a tcfl.tc.tc_c
+             >>> condition = "SOMENAME"
+             >>> with self.lock:
+             >>>     self.buffers.setdefault(condition, 0)
+             >>>     self.buffers[condition] += 1
+             >>> self.report_data("Warnings [%(type)s]", condition,
+             >>>     self.buffers[condition])
+
+           - *Recovered conditions [%(type)s]*: values would be
+             accumulated over how many times it has been reported
+
+             Same reporting example as for *Warnings* above.
 
         :param str name: name of the value  (eg: "context switch
           (microseconds)"); it is recommended to always add the unit
