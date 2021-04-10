@@ -12,6 +12,8 @@ import random
 import sys
 import threading
 
+import commonl
+
 class msgid_c(object):
     """
     Accumulate data local to the current running thread.
@@ -149,3 +151,33 @@ class msgid_c(object):
         if len(cls.tls.msgid_lifo) > 1:
             return cls.tls.msgid_lifo[-2]
         return None
+
+
+def inventory_keys_fix(d):
+    """
+    Given a dictionary, transform the keys so it is valid as a TCF inventory
+
+    :param dict d: dictionary where all the keys are strings
+    """
+    # convert all keys to have only chars in the -_A-Za-z0-9 set
+    seen = set()
+    current_keys = list(d.keys())
+    for key in current_keys:
+        safe = commonl.name_make_safe(key)
+        # safe making looses data, key 1:2 will be converted to 1_2; if
+        # there is already a 1_2...it would overwrite it. So we append
+        # a counter until it is different. Note we also do this with
+        # keys made safe, othrewise 1:2 would be overriden by 1/2.
+        count = 0
+        while safe in seen or (safe != key and safe in current_keys):
+            count += 1
+            safe = f"{safe}.{count}"
+        seen.add(safe)
+        value = d[key]
+        if safe != key:
+            if isinstance(value, dict):
+                d[safe] = inventory_keys_fix(value)
+            else:
+                d[safe] = value
+            del d[key]
+    return d
