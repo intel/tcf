@@ -1690,13 +1690,18 @@ class target_c(reporter_c):
           replace with *crlf*
 
         """
-        assert isinstance(data, str)
+        assert isinstance(data, (str, bytes))
+
         if crlf == None:
             if console == None:
                 console = self.console.default
             # note that target_ext_console.extension.__init__ might
             # have initialized this from server info
             crlf = self.console.crlf.get(console, None)
+
+        if isinstance(data, bytes):
+            # data has to be astring to be JSON encoded anyway...
+            data = data.decode('utf-8')
 
         self.console.send_expect_sync(console, detect_context)
         if crlf:
