@@ -715,70 +715,101 @@ class reporter_c(object):
         assert dlevel >= 0 or dlevel < 0
         assert alevel >= 0 or alevel < 0
 
-    def _report(self, level, alevel, tag, message, attachments):
+    def _report(self, level, alevel, tag, message,
+                attachments, subcase = None):
+        assert subcase == None or isinstance(subcase, str), \
+            f"subcase: expected short string; got {type(subcase)}"
         if self.report_level_max != None and level >= self.report_level_max:
             return
         ts = time.time()
         delta = ts - self.ts_start
+
+        if subcase:
+            if subcase in self.subtc:
+                subtc = self.subtc[subcase]
+            else:
+                # messed up we don't keep tc_file_path as is
+                subtc = subtc_c(self.name + "#" + subcase, self.kws['thisfile'], self.origin, self)
+                self.subtc[subcase] = subtc
+            if tag == "PASS":
+                subtc.result.passed += 1
+            elif tag == "FAIL":
+                subtc.result.failed += 1
+            elif tag == "ERRR":
+                subtc.result.errors += 1
+            elif tag == "BLCK":
+                subtc.result.blocked += 1
+            elif tag == "SKIP":
+                subtc.result.skipped += 1
+            report_on = subtc
+        else:
+            report_on = self
+
         for driver in report_driver_c._drivers:
             if driver.name:
                 level_driver_max = self.report_level_driver_max.get(driver.name, None)
                 if level_driver_max != None and level >= level_driver_max:
                     continue
             driver.report(
-                self, tag, ts, delta, level, commonl.mkutf8(message),
+                report_on, tag, ts, delta, level, commonl.mkutf8(message),
                 alevel, attachments)
 
     def report_pass(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2):
+                    level = None, dlevel = 0, alevel = 2, subcase = None):
         if level == None:		# default args are computed upon def'on
             level = msgid_c.depth()
         self._argcheck(message, attachments, level, dlevel, alevel)
         level += dlevel
-        self._report(level, level + alevel, "PASS", message, attachments)
+        self._report(level, level + alevel, "PASS", message,
+                     attachments, subcase = subcase)
 
     def report_fail(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2):
+                    level = None, dlevel = 0, alevel = 2, subcase = None):
         if level == None:		# default args are computed upon def'on
             level = msgid_c.depth()
         self._argcheck(message, attachments, level, dlevel, alevel)
         level += dlevel
-        self._report(level, level + alevel, "FAIL", message, attachments)
+        self._report(level, level + alevel, "FAIL", message,
+                     attachments, subcase = subcase)
 
     def report_error(self, message, attachments = None,
-                     level = None, dlevel = 0, alevel = 2):
+                     level = None, dlevel = 0, alevel = 2, subcase = None):
         if level == None:		# default args are computed upon def'on
             level = msgid_c.depth()
         self._argcheck(message, attachments, level, dlevel, alevel)
         level += dlevel
-        self._report(level, level + alevel, "ERRR", message, attachments)
+        self._report(level, level + alevel, "ERRR", message,
+                     attachments, subcase = subcase)
 
     def report_blck(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2):
+                    level = None, dlevel = 0, alevel = 2, subcase = None):
         if level == None:		# default args are computed upon def'on
             level = msgid_c.depth()
         self._argcheck(message, attachments, level, dlevel, alevel)
         level += dlevel
-        self._report(level, level + alevel, "BLCK", message, attachments)
+        self._report(level, level + alevel, "BLCK", message,
+                     attachments, subcase = subcase)
 
     def report_skip(self,  message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2):
+                    level = None, dlevel = 0, alevel = 2, subcase = None):
         if level == None:		# default args are computed upon def'on
             level = msgid_c.depth()
         self._argcheck(message, attachments, level, dlevel, alevel)
         level += dlevel
-        self._report(level, level + alevel, "SKIP", message, attachments)
+        self._report(level, level + alevel, "SKIP", message,
+                     attachments, subcase = subcase)
 
     def report_info(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2):
+                    level = None, dlevel = 0, alevel = 2, subcase = None):
         if level == None:		# default args are computed upon def'on
             level = msgid_c.depth()
         self._argcheck(message, attachments, level, dlevel, alevel)
         level += dlevel
-        self._report(level, level + alevel, "INFO", message, attachments)
+        self._report(level, level + alevel, "INFO", message,
+                     attachments, subcase = subcase)
 
     def report_data(self, domain, name, value, expand = True,
-                    level = 2, dlevel = 0):
+                    level = 2, dlevel = 0, subcase = None):
         """Report measurable data
 
         When running a testcase, if data is collected that has to be
@@ -830,15 +861,17 @@ class reporter_c(object):
             name = name % self.kws
         level += dlevel
 
-        self._report(level, 1000, "DATA",
-                     domain + "::" + name + "::%s" % value,
-                     dict(domain = domain, name = name, value = value))
+        self._report(
+            level, 1000, "DATA",
+            domain + "::" + name + "::%s" % value, subcase = subcase,
+            attachments = dict(domain = domain, name = name, value = value))
 
     def report_tweet(self, what, result, extra_report = "",
                      ignore_nothing = False, attachments = None,
                      level = None, dlevel = 0, alevel = 2,
                      dlevel_failed = 0, dlevel_blocked = 0,
-                     dlevel_passed = 0, dlevel_skipped = 0, dlevel_error = 0):
+                     dlevel_passed = 0, dlevel_skipped = 0, dlevel_error = 0,
+                     subcase = None):
         if level == None:		# default args are computed upon def'on
             level = msgid_c.depth()
         self._argcheck(what, attachments, level, dlevel, alevel)
@@ -875,10 +908,12 @@ class reporter_c(object):
             if ignore_nothing == True:
                 return True
             self._report(level, level + alevel, "BLCK",
-                         what + " / nothing ran " + extra_report, attachments)
+                         what + " / nothing ran " + extra_report,
+                         attachments, subcase = subcase)
             return False
         self._report(level, level + alevel,
-                     tag, what + " " + msg + " " + extra_report, attachments)
+                     tag, what + " " + msg + " " + extra_report,
+                     attachments, subcase = subcase)
         return r
 
 
@@ -2554,6 +2589,10 @@ class result_c():
         testcase can be told to consider specific exceptions as others
         per reporting using the :attr:`tcfl.tc.tc_c.exception_to_result`.
 
+        Attachments:
+
+         - *subcase* (str): the name of a subcase as which to report this
+
         :param bool force_result: force the exception to be
           interpreted as :exc:`tcfl.tc.pass_e`, :exc:`error_e`,
           :exc:`failed_e`, :exc:`tcfl.tc.blocked_e`, or :exc:`skip_e`; note
@@ -2569,6 +2608,7 @@ class result_c():
             phase = phase + " "
         _e = result_c._e_maybe_info(e, attachments)
         reporter = attachments.pop('target', _tc)
+        subcase = attachments.pop('subcase', None)
         _alevel = attachments.pop('alevel', 1)
         dlevel = attachments.pop('dlevel', 0)
         level = attachments.pop('level', None)
@@ -2614,8 +2654,9 @@ class result_c():
             "%s%s trace" % (phase, tag) : traceback.format_exc()
         }
         _attachments.update(attachments)
-        report_fn("%s%s: %s" % (phase, tag, _e), _attachments,
-                  level = level, dlevel = dlevel, alevel = trace_alevel)
+        report_fn(
+            "%s%s: %s" % (phase, tag, _e), _attachments, subcase = subcase,
+            level = level, dlevel = dlevel, alevel = trace_alevel)
         return result
 
     @staticmethod
@@ -7945,6 +7986,13 @@ class subtc_c(tc_c):
     executed, multiple subcases that are always executed. Then the
     output is parsed and reported as individual testcases.
 
+    A simple way is using:
+
+    >>> target.report_info("some message", subcase = "case1")
+    >>> target.report_fail("error X", subcase = "case4")
+
+    when reporting, NAME#case1 and NAME#case4 will be reported as subtestcases
+
     As well as the parameters in :class:`tcfl.tc.tc_c`, the
     following parameter is needed:
 
@@ -7967,7 +8015,6 @@ class subtc_c(tc_c):
 
         tc_c.__init__(self, name, tc_file_path, origin)
         self.parent = parent
-        self.result = None	# FIXME: already there?
         self.summary = None
         # we don't need to acquire our targets, won't use them
         self.do_acquire = False
