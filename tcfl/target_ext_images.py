@@ -16,6 +16,8 @@ import os
 import string
 import re
 import time
+import io
+import contextlib
 
 import requests
 
@@ -55,6 +57,33 @@ class extension(tc.target_extension_c):
         """
         r = self.target.ttbd_iface_call("images", "list", method = "GET")
         return r['result']
+
+
+    def read(self, image, file_name, image_offset = 0, read_bytes = None):
+        """
+        Reads data from the SPI
+        """
+
+        with io.open(file_name, "wb+") as of, \
+             contextlib.closing(self.target.ttbd_iface_call("images",
+                                                            "flash",
+                                                            method = "GET",
+                                                            stream = True,
+                                                            raw = True,
+                                                            image=image,
+                                                            image_offset=image_offset,
+                                                            read_bytes=read_bytes)) as r:
+            # http://docs.python-requests.org/en/master/user/quickstart/#response-content
+            chunk_size = 4096
+            total = 0
+            for chunk in r.iter_content(chunk_size):
+                of.write(chunk)
+                total += len(chunk)	# not chunk_size, it might be less
+            return total
+
+        return r['result']
+
+
 
 
     def flash(self, images, upload = True, timeout = None, soft = False,
@@ -130,7 +159,7 @@ class extension(tc.target_extension_c):
                 timeout += image_data.get("estimated_duration", 60)
         else:
             assert isinstance(timeout, int)
-        
+
         # if we have to upload them, then we'll transform the names to
         # point to the names we got when uploading
         if upload:
@@ -198,7 +227,7 @@ class extension(tc.target_extension_c):
             target.report_info("flashed: " + images_str, dlevel = 1)
         else:
             target.report_info("flash: all images soft flashed", dlevel = 1)
-            
+
     # match: [no-]upload [no-]soft IMGTYPE1:IMGFILE1 IMGTYPE2:IMGFILE2 ...
     _image_flash_regex = re.compile(
         r"((no-)?(soft|upload)\s+)*((\S+:)?\S+\s*)+")
@@ -362,6 +391,11 @@ class extension(tc.target_extension_c):
 
         return image_flash, upload, soft
 
+def _cmdline_images_read(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args, iface = "images")
+        target.images.read(args.image, args.filename, args.offset, args.bytes)
+
 def _cmdline_images_list(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "images")
@@ -414,3 +448,25 @@ def _cmdline_setup(arg_subparser):
                     help = "timeout in seconds [default taken from"
                     " what the server declares or 1m if none]")
     ap.set_defaults(func = _cmdline_images_flash)
+
+
+
+    ap = arg_subparser.add_parser(
+        "images-read",
+        help = "Read image from the target")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target's name")
+    ap.add_argument("image", metavar = "TYPE",
+                    action = "store", default = None,
+                    help = "Image we are reading from")
+    ap.add_argument("filename", metavar = "FILENAME",
+                    action = "store", default = None,
+                    help = "File to create and write to")
+    ap.add_argument("-o", "--offset",
+                    action = "store", default = 0, type = int,
+                    help = "Base offset from 0 bytes to read from")
+    ap.add_argument("-b", "--bytes",
+                    action = "store", default = None, type = int,
+                    help = "Bytes to read from the image"
+                    " (Defaults to reading the whole image)")
+    ap.set_defaults(func = _cmdline_images_read)

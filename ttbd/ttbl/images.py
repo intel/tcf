@@ -305,6 +305,32 @@ class impl_c(ttbl.tt_interface_impl_c):
         assert isinstance(images, dict)
         raise NotImplementedError
 
+    def flash_read(self, target, image, file_name, image_offset = 0, read_bytes = None):
+        """
+        Read a flash image
+
+        :param ttbl.test_target target: target where to flash
+
+        :param str image: name of the image to read.
+
+        :param str file_name: name of file where to dump the image;
+          the implementation shall overwrite it by any means
+          necessary. Parent directories can be assumed to exist.
+
+        :param int offset: (optional, defaults to zero) offset in
+          bytes from which to start reading relative to the image's
+          beginning.
+
+        :param int size: (optional, default all) number of bytes to
+          read from offset.
+
+        If the implementation does not support reading, it can raise a
+        NotImplementedError (maybe we need a better exception).
+        """
+        assert isinstance(target, ttbl.test_target)
+        assert isinstance(image, basestring)
+        raise NotImplementedError("reading not implemented")
+
 
 class impl2_c(impl_c):
     """
@@ -735,6 +761,31 @@ class interface(ttbl.tt_interface):
                                      self.power_sequence_pre,
                                      self.power_sequence_post)
             return {}
+
+
+    def get_flash(self, target, who, args, _files, user_path):
+        image = self.arg_get(args, 'image', basestring)
+        image_offset = self.arg_get(args, 'image_offset', int,
+                                    allow_missing = True, default = 0)
+        read_bytes = self.arg_get(args, 'read_bytes', int,
+                                  allow_missing = True, default = None)
+        file_name = "FIXME_temp"
+
+        with target.target_owned_and_locked(who):
+            impl, img_type_real = self.impl_get_by_name(image, "image type")
+
+            # FIXME: file_name needs making safe
+            real_file_name = os.path.join(user_path, file_name)
+            # FIXME: make parent dirs of real_file_name
+            # FIXME: should we lock so we don't try to write also? or
+            # shall that be left to the impl?
+            # we write the content to the user's storage area, that
+            # gets cleaned up regularly
+
+            impl.flash_read(target, img_type_real, real_file_name,
+                            image_offset, read_bytes)
+
+            return dict(stream_file = real_file_name)
 
     # FIXME: save the names of the last flashed in fsdb so we can
     # query them? relative to USERDIR or abs to system where allowed
@@ -1750,7 +1801,7 @@ class quartus_pgm_c(flash_shell_cmd_c):
 
     - *Warning (16328): The real-time ISP option for Max 10 is
       selected. Ensure all Max 10 devices being programmed are in user
-      mode when requesting this programming option* 
+      mode when requesting this programming option*
 
       Followed by:
 
@@ -1762,7 +1813,7 @@ class quartus_pgm_c(flash_shell_cmd_c):
       It needs a special one-time recovery; currently the
       workaround seems to run the flashing with out the *--bgp* switch
       that as of now is hardcoded.
-    
+
       FIXME: move the --bgp and --mode=JTAG switches to the args (vs
       hardcoded) so a recovery target can be implemented as
       NAME-nobgp
@@ -2067,8 +2118,8 @@ class sf100linux_c(flash_shell_cmd_c):
             self.env_add["DPCMD_USB_BUSNUM"] = busnum
             self.env_add["DPCMD_USB_DEVNUM"] = devnum
         flash_shell_cmd_c.flash_start(self, target, images, context)
-        
-        
+
+
     #: Path to *dpcmd*
     #:
     #: We need to use an ABSOLUTE PATH, as *dpcmd* relies on it to
@@ -2100,3 +2151,17 @@ class sf100linux_c(flash_shell_cmd_c):
                     target.id, type(self),
                     len(images), ", ".join(images.keys())))
         return flash_shell_cmd_c.flash_post_check(self, target, images, context)
+
+
+    def flash_read(self, _target, _image, file_name, image_offset = 0, read_bytes = None):
+        """
+        Reads data from the SPI and writes them to 'file_name'
+        """
+
+        cmdline = [ self.path,  "--device", self.dediprog_id,
+                    "-r", file_name, "-a", str(image_offset) ]
+
+        if read_bytes != None:
+            cmdline += [ "-l", str(read_bytes) ]
+
+        subprocess.check_output(cmdline, shell = False)
