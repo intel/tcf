@@ -48,6 +48,8 @@ import time
 import traceback
 import types
 
+import tcfl._install
+
 if False:
     # disabling all this until we have a proper fix for the import
     # mess they keyring package has
@@ -1300,7 +1302,7 @@ def ttbd_locate_helper(filename, log = logging, relsrcpath = ""):
     if os.path.exists(cmd_path):
         return cmd_path
     # System-wide install in the same prefix -> ../share/tcf
-    cmd_path = os.path.join(_srcdir, "..", "share", "tcf", filename)
+    cmd_path = os.path.join(tcfl._install.share_path, filename)
     log.debug("looking for %s" % cmd_path)
     if os.path.exists(cmd_path):
         return cmd_path
