@@ -4,7 +4,7 @@
 # Won't be needed once moved to Python3 and we have some control over
 # installations--yep, need proper package management and stuff, but
 # this is what we tested with.
-pyopenssl==0.14
+pyopenssl
 asciimatics==1.11.0
 Jinja2==2.7.2
 PyYAML==5.3.1
