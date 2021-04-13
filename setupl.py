@@ -91,12 +91,8 @@ def get_install_paths(
     if 'user' in install:
         # this means --user was given
         installer.prefix = site.getuserbase()
-        if sys.platform == "win32":
-            sysconfigdir = os.path.join(installer.prefix, 'etc')
-            sharedir = os.path.join(installer.prefix, "share")
-        else:
-            sysconfigdir = os.path.join(installer.prefix, ".local", 'etc')
-            sharedir = os.path.join(installer.prefix, ".local", "share")
+        sysconfigdir = os.path.join(installer.prefix, 'etc')
+        sharedir = os.path.join(installer.prefix, "share")
     elif 'prefix' in install:
         # this means --prefix was given
         installer.prefix = install.get('prefix', (None, None))[1]
