@@ -257,7 +257,7 @@ class driver(tc.report_driver_c):
         ),
         "junit" : dict(
             name = 'junit.j2.xml',
-            output_file_name = '%(report_file_prefix)stxt',
+            output_file_name = '%(report_file_prefix)sxml',
             report_pass = False,
             report_skip = False,
             report_error = False,
@@ -550,7 +550,6 @@ class driver(tc.report_driver_c):
         # the reporter.tmpdir, which might be different (if the
         # reporter is a target)
         of = self._get_fd(reporter.ticket, testcase.tmpdir)
-
         # Remove the ticket from the ident string, as it will be
         # the same for all and makes no sense to have it.
         ident = testcase.ident()
