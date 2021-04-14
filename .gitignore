@@ -12,8 +12,14 @@ __pycache__
 _doc/
 build
 dist
-repo/
-report-:*
-setup.cfg
+tmp
 tags
 ttbd/ttbl/version.py
+repo/
+report-*.txt
+!report-base.j2.txt
+!report.j2.txt
+report-*.xml
+report-*.data.json
+run.log
+setup.cfg
