@@ -2773,6 +2773,41 @@ class result_c():
         )
 
     @staticmethod
+    def call_fn_handle_exception(fn, *args, **kwargs):
+
+        _tc = args[0] # The `self`  argument to the test case
+        try:
+            r = fn(*args, **kwargs)
+            if r == None:
+                return result_c(1, 0, 0, 0, 0)
+            return r
+        # Some exceptions that are common and we know about, so we
+        # can print some more info that will be helpful
+        except AssertionError as e:
+            if isinstance(e.args, tuple) and len(e.args) > 0 \
+               and len(e.args[0]) == 2:
+                # if you raise AssertionError and the second
+                # expression is a tupple (str, dict), we convert
+                # that to a blocke_d(str, attachments = dict)
+                if isinstance(e.args[0][1], dict):
+                    newe = tcfl.tc.blocked_e(e.args[0][0], e.args[0][1])
+                    return result_c.report_from_exception(_tc, newe)
+            return result_c.report_from_exception(_tc, e)
+        except subprocess.CalledProcessError as e:
+            return result_c.from_exception_cpe(_tc, e)
+        except OSError as e:
+            attachments = dict(
+                errno = e.errno,
+                strerror = e.strerror
+            )
+            if e.filename:
+                attachments['filename'] = e.filename
+            return result_c.report_from_exception(_tc, e, attachments)
+        except Exception as e:
+            return result_c.report_from_exception(_tc, e)
+
+
+    @staticmethod
     def from_exception(fn):
         """
         Call a phase function to translate exceptions into
@@ -2787,40 +2822,7 @@ class result_c():
         it.
         """
         def _decorated_fn(*args, **kwargs):
-
-            _tc = args[0] # The `self`  argument to the test case
-            try:
-                r = fn(*args, **kwargs)
-                if r == None:
-                    return result_c(1, 0, 0, 0, 0)
-                else:
-                    return r
-            # Some exceptions that are common and we know about, so we
-            # can print some more info that will be helpful
-            except AssertionError as e:
-                if isinstance(e.args, tuple) and len(e.args) > 0 \
-                   and len(e.args[0]) == 2:
-                    # if you raise AssertionError and the second
-                    # expression is a tupple (str, dict), we convert
-                    # that to a blocke_d(str, attachments = dict)
-                    if isinstance(e.args[0][1], dict):
-                        newe = tcfl.tc.blocked_e(e.args[0][0], e.args[0][1])
-                        return result_c.report_from_exception(_tc, newe)
-                # not something we recognize we can easily convert to
-                # blocked_e, so just pass it along
-                raise
-            except subprocess.CalledProcessError as e:
-                return result_c.from_exception_cpe(_tc, e)
-            except OSError as e:
-                attachments = dict(
-                    errno = e.errno,
-                    strerror = e.strerror
-                )
-                if e.filename:
-                    attachments['filename'] = e.filename
-                return result_c.report_from_exception(_tc, e, attachments)
-            except Exception as e:
-                return result_c.report_from_exception(_tc, e)
+            return result_c.call_fn_handle_exception(fn, *args, **kwargs)
 
         return _decorated_fn
 
