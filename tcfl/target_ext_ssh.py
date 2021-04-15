@@ -211,7 +211,7 @@ class ssh(tc.target_extension_c):
             ql = []
         if self.password == None:
             ql += [ '-o', "BatchMode yes" ]
-        cmdline = [ "/usr/bin/ssh", "-p", str(self._ssh_port) ] \
+        cmdline = [ "ssh", "-p", str(self._ssh_port) ] \
             + self._ssh_cmdline_options + ql \
             + [ self.login + "@" + self._ssh_host, "-t", _cmd ]
         self.target.report_info("running SSH command: %s"
@@ -319,7 +319,7 @@ class ssh(tc.target_extension_c):
             options += "B"
         try:
             cmdline += \
-                [ "/usr/bin/scp", options, "-P", str(self._ssh_port) ] \
+                [ "scp", options, "-P", str(self._ssh_port) ] \
                 + self._ssh_cmdline_options \
                 + [ src, self.login + "@" + self._ssh_host + ":" + dst ]
             self.target.report_info("running SCP command: %s"
@@ -374,7 +374,7 @@ class ssh(tc.target_extension_c):
                 cmdline = []
                 options += "B"
             cmdline += \
-                [ "/usr/bin/scp", options, "-P", str(self._ssh_port) ] \
+                [ "scp", options, "-P", str(self._ssh_port) ] \
                 + self._ssh_cmdline_options \
                 + [ self.login + "@" + self._ssh_host + ":" + src, dst ]
             self.target.report_info("running SCP command: %s"
