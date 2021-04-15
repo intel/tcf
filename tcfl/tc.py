@@ -4077,6 +4077,11 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         #: cases, they do not.
         self.do_acquire = True
 
+        # Do actually execute the steps? This is used by the subcase
+        # handling system when we are just reporting using @subcase;
+        # later on, we don't actually need to execute those subtcs,
+        # just report on them.
+        self._execute = True
         #: Lock to access :attr:`buffers` safely from multiple threads
         #: at the same time for the same testcase.
         self.lock = None	# initialized by __init_shallow__()
@@ -7294,15 +7299,6 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
             with msgid_c(depth = 1) as msgid:
                 try:
-                    self.report_info(
-                        "will run on target group '%s' (PID %d / TID %x)"
-                        % (
-                            self.target_group.descr, os.getpid(),
-                            threading.current_thread().ident
-                        ),
-                        # be less verbose for subcases,
-                        # since we know this info already
-                        dlevel = 2 if self.parent else 0 )
                     for _target in list(self.target_group.targets.values()):
                         # We need to update all the target's KWS, as we
                         # have added KWS to the tescase (tc_hash and
@@ -7318,7 +7314,30 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                             bsp_model = _target.bsp_model
                         _target.kw_set('tg_hash', msgid_c.encode(
                             self.ticket + _target.fullid + bsp_model, 4))
-                    result += self._run_on_target_group(msgid)
+                    if self._execute:
+                        self.report_info(
+                            "will run on target group '%s' (PID %d / TID %x)"
+                            % (
+                                self.target_group.descr, os.getpid(),
+                                threading.current_thread().ident
+                            ),
+                            # be less verbose for subcases,
+                            # since we know this info already
+                            dlevel = 2 if self.parent else 0 )
+                        # this is a subtestcase created just to collect
+                        # reports, so we just need to finalize it
+                        result += self._run_on_target_group(msgid)
+                    else:
+                        self.report_info(
+                            "ran on target group '%s' (PID %d / TID %x)"
+                            % (
+                                self.target_group.descr, os.getpid(),
+                                threading.current_thread().ident
+                            ),
+                            # be less verbose for subcases,
+                            # since we know this info already
+                            dlevel = 2 if self.parent else 0 )
+                        result = self.result
                 except Exception as e:
                     self.log.error(
                         "exception: %s %s\n%s" %
