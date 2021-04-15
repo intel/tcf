@@ -2140,6 +2140,7 @@ class target_c(reporter_c):
         target.ticket = target.testcase.ticket
         target.testcase.__init_shallow__(target.testcase)
         target.testcase.__thread_init__(None)
+        target._kws_update()
         return target
 
 
@@ -4160,6 +4161,9 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             self.tls._expectations = []
         if tls_parent:
             self.tls.expect_timeout = tls_parent.expect_timeout
+        else:
+            # this is a hack
+            self.tls.expect_timeout = 60
 
     def is_static(self):
         """
@@ -7249,6 +7253,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         self.ticket = msgid_c.encode(
             self._hash_salt + self.runid_visible + self.name + target_group_name,
             self.hashid_len).decode('UTF-8')
+        self._kw_set("tc_hash", self.ticket)
         if self.runid == None:
             self.runid_hashid = self.ticket
         else:
@@ -7275,7 +7280,6 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                 os.makedirs(self.tmpdir)
 
             self._kw_set("tmpdir", self.tmpdir)
-            self._kw_set("tc_hash", self.ticket)
 
             # Calculate the report file prefix
             global log_dir
@@ -8118,8 +8122,10 @@ class subtc_c(tc_c):
         self.parent = parent
         self.summary = None
         # we don't need to acquire our targets, won't use them
+        self.target_group = parent.target_group
         self.do_acquire = False
         self.attachments = None
+        self.mkticket()	# ensure data w/ target_group is updated!
 
     def update(self, result, summary, output = None, **attachments):
         """
