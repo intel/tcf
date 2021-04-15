@@ -204,7 +204,7 @@ def logfile_open(tag, cls = None, delete = True, bufsize = 0,
     else:
         clstag = ''
     return tempfile.NamedTemporaryFile(
-        prefix = os.path.basename(sys.argv[0]) + ":"
+        prefix = os.path.basename(sys.argv[0]) + "__"
         + clstag + who + "-" + tag,
         suffix = suffix, delete = delete, buffering = bufsize, dir = directory)
 
