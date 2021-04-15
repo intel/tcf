@@ -196,7 +196,7 @@ def logfile_open(tag, cls = None, delete = True, bufsize = 0,
     assert isinstance(tag, str)
     if who == None:
         frame = inspect.stack(0)[1][0]
-        who = frame.f_code.co_name + ":%d" % frame.f_lineno
+        who = frame.f_code.co_name + "__%d" % frame.f_lineno
     if tag != "":
         tag += "-"
     if cls != None:
