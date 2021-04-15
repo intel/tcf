@@ -203,10 +203,18 @@ def logfile_open(tag, cls = None, delete = True, bufsize = 0,
         clstag = cls.__name__ + "."
     else:
         clstag = ''
-    return tempfile.NamedTemporaryFile(
-        prefix = os.path.basename(sys.argv[0]) + "__"
-        + clstag + who + "-" + tag,
-        suffix = suffix, delete = delete, buffering = bufsize, dir = directory)
+    # can't use tempfile.NamedTemporaryFile bc then Windows doesn't
+    # let us opent it again
+    return open(
+        os.path.join(
+            directory,
+            os.path.basename(sys.argv[0]) + "__" + clstag + who + "-" + tag
+            + f"{random.randrange(0, 100000):05d}"
+            + suffix
+        ),
+        "w+b",
+        bufsize
+    )
 
 def argparser_add_aka(ap, name, aka):
     # UGLY, but...
