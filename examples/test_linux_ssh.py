@@ -67,17 +67,7 @@ class _test(tcfl.pos.tc_pos_base):
     def eval_00_setup(self, ic, target):
         # setup the SSH server to allow login as root with no password
         tcfl.tl.linux_ssh_root_nopwd(target)
-        target.shell.run("systemctl restart sshd")
-        target.shell.run(		# wait for sshd to be ready
-            "while ! curl -s http://localhost:22 | /usr/bin/fgrep SSH-2.0; do"
-            " sleep 1s; done", timeout = 10)
-        # Tell the tunnelling system which IP address to use
-        # Note the client running this can't connect directly to the
-        # DUT because the DUT is connected to an isolated
-        # NUT. However, the server is connceted to the NUT and can
-        # bridge us. With this we tell the tunneling system which ip
-        # address to use.
-        target.tunnel.ip_addr = target.addr_get(ic, "ipv4")
+        tcfl.tl.linux_sshd_restart(ic, target)
 
     def eval_01_run_ssh_commands(self, target):
         #
@@ -87,7 +77,7 @@ class _test(tcfl.pos.tc_pos_base):
         #target.ssh._ssh_cmdline_options.append("-v")	# DEBUG login problems
         #target.ssh._ssh_cmdline_options.append("-v")	# DEBUG login problems
         output = target.ssh.check_output("echo hello")
-        assert 'hello' in output
+        assert b'hello' in output
 
         # Alternative way to do it https://intel.github.io/tcf/doc/04-HOWTOs.html?highlight=ssh#linux-targets-ssh-login-from-a-testcase-client
         # by hand
@@ -102,7 +92,7 @@ class _test(tcfl.pos.tc_pos_base):
         # this is done behind the doors of TCF, it doesn't know that
         # it was run, so report about it
         target.report_info("Ran SSH: %s" % output)
-        assert 'hello' in output
+        assert b'hello' in output
 
     def eval_02_call(self, target):
         self.ts = "%f" % time.time()
