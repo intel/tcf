@@ -93,7 +93,13 @@ def load(config_path = None, config_files = None,
         config_files = []
 
     global path
-    path = [ i for i in reversed(config_path) ]
+    _path = []
+    for i in config_path:
+        if i == "":
+            _path = []
+        else:
+            _path.append(i)
+    path = [ i for i in reversed(_path) ]
 
     global loaded_files
     logger.info("configuration path %s", path)
