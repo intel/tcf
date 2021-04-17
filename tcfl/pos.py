@@ -2204,6 +2204,8 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
     ipxe_seize(target)
     prompt_orig = target.shell.prompt_regex
     with target.shell.context("iPXE boot"):
+        # FIXME: install context - level handler which errors out on
+        # - command not found
         #
         # When matching end of line, match against \r, since depends
         # on the console it will send one or two \r (SoL vs SSH-SoL)
@@ -2507,7 +2509,7 @@ class tc_pos0_base(tc.tc_c):
             return
 
         self.image_flash, upload, soft = target.images.flash_spec_parse(
-            self.image_flash_requested)
+            self.testcase.image_flash_requested)
 
         if self.image_flash:
             if upload:
