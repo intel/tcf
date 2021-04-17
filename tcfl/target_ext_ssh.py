@@ -198,7 +198,7 @@ class ssh(tc.target_extension_c):
         _cmd = cmd % self.target.kws
         self.target.report_info("running SSH command '%s'" % _cmd, dlevel = 1)
         log_stderr = commonl.logfile_open(
-            tag = "stdin", directory = self.target.testcase.tmpdir)
+            tag = "stderr", directory = self.target.testcase.tmpdir)
         log_stdout = commonl.logfile_open(
             tag = "stdout", directory = self.target.testcase.tmpdir)
         # We always run check_output to capture the output and
