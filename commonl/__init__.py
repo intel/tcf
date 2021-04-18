@@ -1741,7 +1741,7 @@ def data_dump_recursive(d, prefix = u"", separator = u".", of = sys.stdout,
 
     - if an attachment is a generator, it is iterated to gather the data.
 
-    - if an attachment is of :class:generator_factory_c, the method
+    - if an attachment is of :class:`generator_factory_c`, the method
       for creating the generator is called and then the generator
       iterated to gather the data.
 
@@ -2139,6 +2139,7 @@ def file_iterator(filename, chunk_size = 4096):
                 break
             yield data
 
+
 def assert_list_of_strings(l, list_name, item_name):
     assert isinstance(l, ( tuple, list )), \
         "'%s' needs to be None or a list of strings (%s); got %s" % (
@@ -2385,3 +2386,63 @@ def removeprefix(s, prefix):
     if s.startswith(prefix):
         return s[len(prefix):]
     return s
+
+
+class late_resolve_realpath(str):
+    """
+    Given a file (symlink or others), resolve it to the file it points
+    to when we are trying to use it.
+
+    :param str name: file path
+
+    When converting to a string (and only when doing that) the file
+    will be resolved to what it is (eg: symlinks will be resolved,
+    etc).
+    """
+    def __init__(self, name):
+        self.name = name
+
+    def __str__(self):
+        return os.path.realpath(self.name)
+
+
+def _sysfs_read(filename):
+    try:
+        with open(filename) as fr:
+            return fr.read().strip()
+    except IOError as e:
+        if e.errno != errno.ENOENT:
+            raise
+
+
+class late_resolve_usb_path_by_serial(str):
+    """
+    Given a USB serial number, resolve it to a USB path only when we
+    are trying to use it.
+
+    :param str serial_number: USB Serial Number
+
+    When converting to a string (and only when doing that) it will be
+    resolved to a USB path. If no such USB device is present, *None*
+    will be returned; otherwise, something like:
+
+      */sys/bus/usb/devices/1-3.4.3.4*
+    """
+    def __init__(self, serial_number):
+        assert isinstance(serial_number, str)
+        self.serial_number = serial_number
+
+    def __str__(self):
+        # Look for the serial number, kinda like:
+        #
+        ## $ grep -r YK18738 /sys/bus/usb/devices/*/serial
+        ## /sys/bus/usb/devices/1-3.4.3.4/serial:YK18738
+        for fn_serial in glob.glob("/sys/bus/usb/devices/*/serial"):
+            serial = _sysfs_read(fn_serial)
+            if serial == self.serial_number:
+                devpath = os.path.dirname(fn_serial)
+                if not os.path.isdir(devpath):
+                    break
+                return devpath
+
+        return None
