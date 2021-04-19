@@ -772,6 +772,19 @@ if test -r $destdir/etc/fstab && grep -q UUID= $destdir/etc/fstab; then
 fi
 
 
+# Well, general swap fixes -- we just remove all and let the boot code
+# pick up the swap devices we make
+if test -r $destdir/etc/fstab && grep -q '^\s*[^#].*\sswap\s' $destdir/etc/fstab; then
+    info fstab: comment swap entries, let them auto detect
+    # any line that has some sort of " swap " entry and is not
+    # commented, just comment it out
+    sudo sed -i \
+       -e '/[^#].*\sswap\s/s|^|# <commented out by tcf-image-setup.sh> \0|'  \
+       $destdir/etc/fstab
+    selinux_relabel["etc/fstab"]=1
+fi
+
+
 #
 # Fixup / harcode serial login consoles
 #
