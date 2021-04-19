@@ -37,16 +37,25 @@ IMAGETYPE: force image detection
 Forcing things (set environment variables)
 
 ROOT_PARTITION   force the root partition to be that number (1, 2, 3...)
-BOOT_PARTITION   force the boot partition to be that number (1, 2, 3...)
+
+ROOT_DEV         force the root partition to be taken from a given
+                 device name (this comes handy when the image has a
+                 volume group inside, eg /dev/mapper/something)
 
 ROOT_MOUNTOPTS   use these root mount options (default to ext*'s
                  noload; use norecovery for xfs)
+
+BOOT_PARTITION   force the boot partition to be that number (1, 2, 3...)
+
+BOOT_DEV         force the boot partition to be taken from a given
+                 device name (this comes handy when the image has a
+                 volume group inside, eg /dev/mapper/something)
 
 BOOT_MOUNTOPTS   use these boot mount options (default to empty)
 
 BOOT_CONF_ENTRY  if defined, this is the full file name of a file under
                  the rootfs boot/loader/entries; any file in there that
-                 is not this one will be rmeoved
+                 is not this one will be removed
 
 See more at https://inakypg.github.io/tcf/doc/04-HOWTOs.html#pos_image_creation
 EOF
@@ -220,6 +229,23 @@ else
     info loop device $loop_dev
     lsblk $loop_dev
 fi
+
+
+# full blown override; this comes handy when it turns out the image
+# has a volume group inside, that shows up in /dev/mapper
+if ! [ -z "${ROOT_DEV:-}" ]; then
+    root_part="ROOT_DEV"
+    info "ROOT DEVICE is $root_part (from \$ROOT_DEV)"
+else
+    info "ROOT DEVICE is $root_part"
+fi
+if ! [ -z "${BOOT_DEV:-}" ]; then
+    root_part="BOOT_DEV"
+    info "BOOT DEVICE is $root_part (from \$BOOT_DEV)"
+else
+    info "BOOT DEVICE is $root_part"
+fi
+
 
 #
 # PHASE: live OS mount
