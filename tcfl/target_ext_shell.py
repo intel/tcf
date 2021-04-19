@@ -478,6 +478,7 @@ class shell(tc.target_extension_c):
             ts0 = time.time()
             ts = ts0
             inner_timeout = 3 * timeout / 20
+            logged_in = False
             while ts - ts0 < 3 * timeout:
                 # if this was an SSH console that was left
                 # enabled, it will die and auto-disable when
@@ -502,10 +503,13 @@ class shell(tc.target_extension_c):
                             "shell-up: %s: success at +%.1fs"
                             % (action, ts - ts0), dlevel = 2)
                     if not console.startswith("ssh"):
-                        if user:
+                        if user and not logged_in:
                             action = "login in via console %s" % console
                             # _login uses this 'console' definition
                             _login(self.target)
+                            # no need to wait for a login prompt again
+                            # next time we retry
+                            logged_in = True
                             ts = time.time()
                             target.report_info(
                                 "shell-up: %s: success at +%.1fs"
@@ -528,6 +532,20 @@ class shell(tc.target_extension_c):
                     ts = time.time()
                     if console.startswith("ssh"):
                         target.console.disable(console = console)
+                    if login_regex and user:
+                        # sometimes the kernel spews stuff when we are
+                        # trying to login and we can't find the
+                        # prompt, so send a couple of blind <CRLFs>
+                        # see if the prompt shows up propelry
+                        target.report_info(
+                            "shell-up: sending a couple of blind CRLFs"
+                            " to clear the command line")
+                        # ntoe we do not use target.send(), because we
+                        # don't want to reset the send/expect markers
+                        time.sleep(0.5)
+                        target.console.write("\r\n")
+                        time.sleep(0.5)
+                        target.console.write("\r\n")
                     continue
             else:
                 raise tc.error_e(
