@@ -230,20 +230,22 @@ else
     lsblk $loop_dev
 fi
 
+info current block devices
+lsblk
 
 # full blown override; this comes handy when it turns out the image
 # has a volume group inside, that shows up in /dev/mapper
 if ! [ -z "${ROOT_DEV:-}" ]; then
-    root_part="ROOT_DEV"
+    root_part="$ROOT_DEV"
     info "ROOT DEVICE is $root_part (from \$ROOT_DEV)"
 else
     info "ROOT DEVICE is $root_part"
 fi
 if ! [ -z "${BOOT_DEV:-}" ]; then
-    root_part="BOOT_DEV"
-    info "BOOT DEVICE is $root_part (from \$BOOT_DEV)"
+    root_part="$BOOT_DEV"
+    info "BOOT DEVICE is $boot_part (from \$BOOT_DEV)"
 else
-    info "BOOT DEVICE is $root_part"
+    info "BOOT DEVICE is $boot_part"
 fi
 
 
