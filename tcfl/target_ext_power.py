@@ -277,6 +277,14 @@ class extension(tc.target_extension_c):
           - *wait*: *ARGUMENT* is a number describing how many seconds
             to wait
 
+          For example:
+
+          >>> [ ( 'off', 'full' ), ( 'wait', 2 ), ( 'on', 'all' ) ]
+
+          powers off every single component of the power rail, waits
+          two seconds and then powers on all the components needed for
+          normal system's power on.
+
         :param float timeout: (optional) maximum seconds to wait
           before giving up; default is whatever calculated based on
           how many *wait* operations are given or if none, whatever
