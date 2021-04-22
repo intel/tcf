@@ -130,7 +130,11 @@ class ssh(tc.target_extension_c):
         self._ssh_host = None
 
         self._ssh_cmdline_options = [
+            # Most of the machines used for testing get provisioned
+            # and re-provisioned over and over again, with no stable
+            # SSH key, so mo point on checking it
             "-o", "StrictHostKeyChecking no",
+            "-o", "CheckHostIP no",
         ]
 
     def _tunnel(self):
@@ -328,6 +332,13 @@ class ssh(tc.target_extension_c):
                                         shell = False)
         except subprocess.CalledProcessError as e:
             self._returncode_eval(e.returncode)
+            self.target.report_error(
+                f"error runing SCP local:{src} -> target:{dst}",
+                dict(returncode = e.returncode,
+                     output = e.output,
+                     src = src, dst = dst, recursive = recursive,
+                     ssh_cmd = " ".join(e.cmd),
+                     target = self.target))
             commonl.raise_from(nonzero_e(
                 "failed SCP local:%s -> target:%s" % (src, dst),
                 dict(returncode = e.returncode,
