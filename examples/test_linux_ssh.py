@@ -57,7 +57,12 @@ import tcfl.tc
 import tcfl.tl
 import tcfl.pos
 
-class _test(tcfl.pos.tc_pos_base):
+@tcfl.tc.interconnect('ipv4_addr', mode = os.environ.get('MODE', 'all'))
+@tcfl.tc.target('pos_capable and ic.id in interconnects',
+                mode = os.environ.get('MODE', 'all'))
+                # For example, it could add
+                # ' and interfaces.capture.screen.type == "snapshot"')
+class _test(tcfl.pos.tc_pos0_base):
     """
     Exercise different SSH calls with the SSH extension on a PC target
     that is provisioned to a Linux OS (Clear, by default)
@@ -69,7 +74,8 @@ class _test(tcfl.pos.tc_pos_base):
         tcfl.tl.linux_ssh_root_nopwd(target)
         tcfl.tl.linux_sshd_restart(ic, target)
 
-    def eval_01_run_ssh_commands(self, target):
+    def eval_01_run_ssh_commands(self, ic, target):
+        tcfl.tl.linux_wait_online(ic, target)
         #
         # Run commands over SSH
         #
