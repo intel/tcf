@@ -4047,7 +4047,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         #: will produce *LOGDIR/report-RUNID:HASHID.screenshot.png*
         #:
         self.report_file_prefix = os.path.join(
-            _log_dir, "report-%(runid)s:%(tc_hash)s." % self.kws)
+            _log_dir, "report-" + self.runid_hashid + ".")
 
         # Always before we start, run the site hook
         for hook in self.hook_pre:
