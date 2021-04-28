@@ -56,10 +56,20 @@ class msgid_c(object):
 
     def __init__(self, s = None,
                  phase = None, depth = None, parent = None,
+                 depth_relative = None,
                  subcase = None):
         cls = type(self)
         if not hasattr(cls.tls, "msgid_lifo"):
             cls.cls_init()
+
+        if depth_relative == None:
+            # if a subcase is given but no relative depth, mostly this
+            # is used to set hte case, not to increase verbosity
+            # depth, so keep it at zero
+            if subcase:
+                depth_relative = 0
+            else:
+                depth_relative = 1
 
         # Init from parent or first in the stack or defaults
         if parent:
@@ -73,7 +83,7 @@ class msgid_c(object):
         elif cls.tls.msgid_lifo:	# init from the first in the stack
             f = cls.tls.msgid_lifo[-1]
             self._ident = f._ident
-            self._depth = f._depth + 1
+            self._depth = f._depth + depth_relative
             self._phase = f._phase
             self._subcase = f._subcase
         else:
