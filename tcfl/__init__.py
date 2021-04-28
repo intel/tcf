@@ -105,8 +105,14 @@ class msgid_c(object):
             assert isinstance(depth, int)
             self._depth = depth
 
-        if subcase != None:
-            self._subcase = subcase
+        subl = []
+        if cls.tls.msgid_lifo:
+            f = cls.tls.msgid_lifo[-1]
+            if f._subcase:
+                subl.append(f._subcase)
+        if subcase:
+            subl.append(subcase)
+        self._subcase = "##".join(subl)
 
 
     def __enter__(self):
@@ -116,6 +122,11 @@ class msgid_c(object):
 
     def __exit__(self, exct_type, exce_value, traceback):
         cls = type(self)
+        if exce_value:
+            # set this for tcfl.tc.result_c.from_exception()--when we
+            # raise any exception from inside a msgid_c context, we
+            # want it to be reported with the right subcase
+            setattr(exce_value, "_subcase_base", cls.subcase())
         cls.tls.msgid_lifo.pop()
 
     @classmethod
