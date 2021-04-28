@@ -96,9 +96,14 @@ info "install required packages"
 #  - strace: for diagnosing misc issues
 #
 # FIXME: run DNF inside the chroot, in case we are doing this in a non
-#        DNF enabled system?
+#        DNF enabled system? this needs a lot of setup though, but
+#        solve it even running on too old systems with newer RPM deps
+#
+# --nogpgcheck: needed so if we are adding a new repo key it doesn't
+# fail. Yeah, security...hmm
 . $IMAGEDIR/etc/os-release
-sudo -E dnf --installroot=$IMAGEDIR --releasever=$VERSION_ID install -y \
+sudo -E dnf --nogpgcheck --installroot=$IMAGEDIR --releasever= $VERSION_ID install -y \
+        chntpw \
         dosfstools \
         efibootmgr \
         ipmitool \
@@ -106,10 +111,12 @@ sudo -E dnf --installroot=$IMAGEDIR --releasever=$VERSION_ID install -y \
         minicom \
         ncurses-compat-libs \
         net-tools \
+        ntfsprogs \
         python3-cryptography \
         statserial \
         strace \
         wget \
+        wimlib-utils \
         ${POS_PACKAGES:-}
 
 # Setup the RW over RO NFS--we need to install it in the system
