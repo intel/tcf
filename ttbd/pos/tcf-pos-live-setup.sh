@@ -102,7 +102,7 @@ info "install required packages"
 # --nogpgcheck: needed so if we are adding a new repo key it doesn't
 # fail. Yeah, security...hmm
 . $IMAGEDIR/etc/os-release
-sudo -E dnf --nogpgcheck --installroot=$IMAGEDIR --releasever= $VERSION_ID install -y \
+sudo -E dnf --nogpgcheck --installroot=$IMAGEDIR --releasever=$VERSION_ID install -y \
         chntpw \
         dosfstools \
         efibootmgr \
