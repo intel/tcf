@@ -171,6 +171,22 @@ class _install_lib(distutils.command.install_lib.install_lib):
             os.path.join(self.install_dir, "tcfl"),
             sysconfigdir, sharedir)
 
+class _install_ttbd_lib(distutils.command.install_lib.install_lib):
+    def run(self):
+        # Workaround that install_data doesn't respect --prefix
+        #
+        # If prefix is given (via --user or via --prefix), then
+        # extract it and add it to the paths in self.data_files;
+        # otherwise, default to /usr/local.
+        sysconfigdir, sharedir = get_install_paths(
+            self,
+            self.distribution.command_options.get('install', {}))
+        distutils.command.install_lib.install_lib.run(self)
+        # generate a new _install.py for an installed system
+        mk_installs_py(
+            os.path.join(self.install_dir, "ttbl"),
+            sysconfigdir, sharedir)
+
 # A glob that filters symlinks
 def glob_no_symlinks(pathname):
     l = []

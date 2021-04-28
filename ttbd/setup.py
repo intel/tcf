@@ -102,6 +102,7 @@ targets over HTTP to be controlled by the TCF client.
     cmdclass = dict(
         sdist = _sdist,
         install_data = _install_data,
+        install_lib = setupl._install_ttbd_lib,
         bdist_rpm = _bdist_rpm
     ),
     data_files = [

@@ -75,6 +75,7 @@ import Levenshtein
 from . import biosl
 import commonl
 import commonl.yamll
+import tcfl._install
 from . import tc
 from . import tl
 from . import msgid_c
@@ -611,6 +612,7 @@ def _metadata_schema_yaml_load():
     if _metadata_schema_yaml:	# already loaded
         return
     schema_path = commonl.ttbd_locate_helper("img-metadata.schema.yaml",
+                                             tcfl._install,
                                              logging, "tcfl")
     _metadata_schema_yaml = commonl.yamll.load(schema_path)
     logging.info("POS: loaded image YAML schema from %s", schema_path)

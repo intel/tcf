@@ -48,7 +48,6 @@ import time
 import traceback
 import types
 
-import tcfl._install
 
 if False:
     # disabling all this until we have a proper fix for the import
@@ -1293,12 +1292,13 @@ def which(cmd, mode = os.F_OK | os.X_OK, path = None):
                     return name
     return None
 
-def ttbd_locate_helper(filename, log = logging, relsrcpath = ""):
+def ttbd_locate_helper(filename, share_path, log = logging, relsrcpath = ""):
     """
     Find the path to a TTBD file, depending on we running from source
     or installed system wide.
 
     :param str filename: name of the TTBD file we are looking for.
+    :param str share_path: path where share data will be installed
     :param str relsrcpath: path relative to the running binary in the source
     """
     # Simics needs an image with a bootloader, we use grub2 and we
@@ -1310,7 +1310,7 @@ def ttbd_locate_helper(filename, log = logging, relsrcpath = ""):
     if os.path.exists(cmd_path):
         return cmd_path
     # System-wide install in the same prefix -> ../share/tcf
-    cmd_path = os.path.join(tcfl._install.share_path, filename)
+    cmd_path = os.path.join(share_path, filename)
     log.debug("looking for %s" % cmd_path)
     if os.path.exists(cmd_path):
         return cmd_path

@@ -27,6 +27,7 @@ import time
 
 import systemd.journal
 import systemd.daemon
+import ttbl._install
 import commonl
 
 
@@ -610,6 +611,7 @@ logging.basicConfig(
 
 _ttbd_hw_health_monitor_driver_rebind_path = \
     commonl.ttbd_locate_helper("ttbd-hw-healthmonitor-driver-rebind.py",
+                               ttbl._install.share_path,
                                log = logging)
 logging.debug("Found helper %s", _ttbd_hw_health_monitor_driver_rebind_path)
 
