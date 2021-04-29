@@ -320,9 +320,26 @@ class expect_text_on_console_c(tc.expectation_c):
             # the capture must be raw, no translations -- otherwise it
             # is going to be a mess to keep offsets right
             newline = ''
-            generation, new_offset, total_bytes = \
-                target.console.read_full(self.console, read_offset,
-                                         self.max_size, of, newline = newline)
+            retry_count = -1
+            last_e = None
+            while retry_count < 3:
+                retry_count += 1
+                try:
+                    generation, new_offset, total_bytes = \
+                        target.console.read_full(self.console, read_offset,
+                                                 self.max_size, of, newline = newline)
+                    break
+                except requests.exceptions.ReadTimeout as e:
+                    last_e = e
+                    name = f"HTTP read timeouts from console {self.console}"
+                    testcase = target.testcase
+                    with testcase.lock:
+                        testcase.buffers.setdefault(name, 0)
+                        testcase.buffers[name] += 1
+                        count = testcase.buffers[name]
+                    target.report_data("Warnings [%(type)s]", name, count)
+            else:
+                raise last_e
             generation_prev = buffers_poll.get('generation', None)
             if generation_prev == None:
                 buffers_poll['generation'] = generation
