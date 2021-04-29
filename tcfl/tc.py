@@ -7410,7 +7410,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                         # generated it; normally we don't need this on
                         # the console, so we verbose level it one up
                         f"client version {version}",
-                        dlevel = 1)
+                        dlevel = 3 if self.parent else 1)
                     for _target in list(self.target_group.targets.values()):
                         # We need to update all the target's KWS, as we
                         # have added KWS to the tescase (tc_hash and
