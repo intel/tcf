@@ -1183,6 +1183,11 @@ class extension(tc.target_extension_c):
            \\r to \\r\\n or \\n to \\r\\n, etc). For that, look into
            :meth:`target.send <tcfl.tc.target_c.send>`.
         """
+        assert isinstance(data, (str, bytes))
+        if isinstance(data, bytes):
+            # to send the data over the wire we need to convert it to
+            # UTF-8 anyway, so we might as well do it now.
+            data = data.encode('utf-8')
         assert chunk_size == None or isinstance(chunk_size, int)
         assert interchunk_wait == None \
             or isinstance(interchunk_wait, numbers.Real)
