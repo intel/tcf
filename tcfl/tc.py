@@ -93,6 +93,7 @@ import contextlib
 import copy
 import datetime
 import errno
+import functools
 import imp
 import inspect
 import json
@@ -346,6 +347,21 @@ valid_results = dict(
     SKIP = ( 'skip', 'skipped' ),
 )
 
+
+# classes inheriting tc_c can have methos called any of these NAME*
+# which will be run as test steps
+
+_method_phase_prefixes = frozenset({
+    'configure',
+    'build',
+    'deploy',
+    'setup',
+    'start',
+    'eval',
+    'teardown',
+    'class_teardown',
+    'clean',
+})
 
 class _simple_namespace:
     def __init__(self, kw):
@@ -719,7 +735,7 @@ class reporter_c(object):
         assert alevel >= 0 or alevel < 0
 
     def _report(self, level, alevel, tag, message,
-                attachments, subcase = None):
+                attachments, subcase = None, subcase_base = None):
         assert subcase == None or isinstance(subcase, str), \
             f"subcase: expected short string; got {type(subcase)}"
         if self.report_level_max != None and level >= self.report_level_max:
@@ -727,18 +743,31 @@ class reporter_c(object):
         ts = time.time()
         delta = ts - self.ts_start
 
-        if subcase == None:
-            # No subcase context? is there any in the thread context?
-            subcase = msgid_c.subcase()
+        testcase = self.testcase
+        subl = []
+        # If there is no subcase_base, then we take it from the TLS
+        # stack; this is normally used when we raise an exception that
+        # has to be reported in a different subcase path, not in the
+        # current one in the stack. That is done by tcfl.msgid_c.__exit__
+        if subcase_base == None:
+            subcase_base = msgid_c.subcase()
+        if subcase_base:
+            subl.append(subcase_base)
+        if subcase:
+            subl.append(subcase)
+        subcase = "##".join(subl)
 
         if subcase:
-            if subcase in self.subtc:
-                subtc = self.subtc[subcase]
+            if subcase in testcase.subtc:
+                subtc = testcase.subtc[subcase]
             else:
                 # messed up we don't keep tc_file_path as is
                 # Convention is we separate subcase names with ##
-                subtc = subtc_c(self.name + "##" + subcase, self.kws['thisfile'], self.origin, self)
-                self.subtc[subcase] = subtc
+                subtc = subtc_c(testcase.name + "##" + subcase,
+                                testcase.kws['thisfile'],
+                                testcase.origin, testcase)
+                subtc._execute = False
+                testcase.subtc[subcase] = subtc
             if tag == "PASS":
                 subtc.result.passed += 1
             elif tag == "FAIL":
@@ -2512,7 +2541,7 @@ class target_group_c(object):
 assign_period = 5
 poll_period = 0.25
 
-class result_c():
+class result_c:
     def __init__(self, passed = 0, errors = 0, failed = 0,
                  blocked = 0, skipped = 0):
         self.passed = passed
@@ -2714,9 +2743,14 @@ class result_c():
         _e = result_c._e_maybe_info(e, attachments)
         reporter = attachments.pop('target', _tc)
         subcase = attachments.pop('subcase', None)
-        _alevel = attachments.pop('alevel', 1)
+        alevel = attachments.pop('alevel', 1)
         dlevel = attachments.pop('dlevel', 0)
-        level = attachments.pop('level', None)
+        level = attachments.pop('level', msgid_c.depth())
+
+        # this is created by tcfl.msgid_c.__exit__() if it catches an
+        # exception flying up, so we can report it with proper subcase
+        # context
+        subcase_base = getattr(e, '_subcase_base', None)
 
         if isinstance(_tc, target_c):
             tc = _tc.testcase
@@ -2728,40 +2762,40 @@ class result_c():
         if force_result == None:
             force_result = tc.exception_to_result.get(type(e), None)
         if isinstance(e, pass_e) or force_result == pass_e:
-            report_fn = reporter.report_pass
+            msg_tag = "PASS"
             tag = valid_results['PASS'][1]
             result = result_c(1, 0, 0, 0, 0)
         elif isinstance(e, error_e) or force_result == error_e:
-            report_fn = reporter.report_error
+            msg_tag = "ERRR"
             tag = valid_results['ERRR'][1]
             result = result_c(0, 1, 0, 0, 0)
         elif isinstance(e, failed_e) or force_result == failed_e:
-            report_fn = reporter.report_fail
+            msg_tag = "FAIL"
             tag = valid_results['FAIL'][1]
             result = result_c(0, 0, 1, 0, 0)
         elif isinstance(e, blocked_e) or force_result == blocked_e:
-            report_fn = reporter.report_blck
+            msg_tag = "BLCK"
             tag = valid_results['BLCK'][1]
             result = result_c(0, 0, 0, 1, 0)
         elif isinstance(e, skip_e) or force_result == skip_e:
-            report_fn = reporter.report_skip
+            msg_tag = "SKIP"
             tag = valid_results['SKIP'][1]
             result = result_c(0, 0, 0, 0, 1)
         else:
-            report_fn = reporter.report_blck
+            msg_tag = "BLCK"
             tag = 'blocked: exception'
             result = result_c(0, 0, 0, 1, 0)
             # This is bad, report as high as we can
             dlevel = 0
-            alevel = 0
             trace_alevel = 0
-        _attachments = {
-            "%s%s trace" % (phase, tag) : traceback.format_exc()
-        }
+        _attachments = { "trace": traceback.format_exc() }
         _attachments.update(attachments)
-        report_fn(
-            "%s%s: %s" % (phase, tag, _e), _attachments, subcase = subcase,
-            level = level, dlevel = dlevel, alevel = trace_alevel)
+        reporter._report(
+            level + dlevel, level + dlevel + alevel + trace_alevel, msg_tag,
+            "%s%s: %s" % (phase, tag, _e),
+            _attachments,
+            subcase = subcase, subcase_base = subcase_base,
+        )
         return result
 
     @staticmethod
@@ -2919,6 +2953,66 @@ def concurrently():
         setattr(fn, "execution_mode", 'parallel')
         return fn
     return decorate_fn
+
+def subcase(subcase = None, break_on_non_pass = False):
+    """
+    Decorate a testcase method as a subcase
+
+    A subcase will be reported as a separate testcase, under the
+    current testcase.
+
+    >>> class _test(tcfl.tc.tc_c):
+    >>>     ...
+    >>>     def eval_20(self):
+    >>>         # test something
+    >>>
+    >>>     @tcfl.tc.subcase("subcase1")
+    >>>     def eval_30(self):
+    >>>         # test subcase 1
+    >>>
+
+    This will yield two testcases, *_test* and *_test##subcase1*, but
+    it is all a reporting trick, the execution happens the same, they
+    are just reported to a different name.
+
+    :param str subcase: (optional) name of the subcase; defaults to
+      the name of the method with the phase name removed (eg,
+      *eval_20_subcase1* becomes *20_subcase1*).
+
+    :param bool break_on_non_pass: (optional; default *False*) stop all
+      execution if anything inside the subcase fails, otherwise,
+      continue execution to the next method.
+    """
+    assert subcase == None or isinstance(subcase, str), \
+        f"subcase: expected string; got {type(subcase)}"
+    assert isinstance(break_on_non_pass, bool), \
+        f"break_on_non_pass: expected bool; got {type(break_on_non_pass)}"
+
+    def wrapper(method):
+        assert callable(method), \
+            "tcfl.subcase can only decorate methods of classes" \
+            f" derived from tcfl.tc._c; got {type(method)}"
+        if subcase == None:
+            method_name = method.__name__
+            for prefix in _method_phase_prefixes:
+                prefix += "_"
+                if method_name != prefix and method_name.startswith(prefix):
+                    method_name = method_name[len(prefix):]
+            _subcase = method_name
+        else:
+            _subcase = subcase
+        # this signals the execution system to keep going if someting
+        # fails, as we consider it an isolated subcase that shan't
+        # interrupt the flow
+        setattr(method, "break_on_non_pass", break_on_non_pass)
+        @functools.wraps(method)
+        def wrapped(*args, **kwargs):
+            with msgid_c(subcase = _subcase, depth_relative = 0):
+                return result_c.call_fn_handle_exception(method, *args, **kwargs)
+                #return method(self, *args, **kwargs)
+        return wrapped
+    return wrapper
+
 
 def _target_app_setup(obj, cls_name, target_want_name):
     """
@@ -4846,7 +4940,10 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         # Verifies that methods that declare variables match targets
         # that have beend declared.
         cls = type(self)
-        argnames = list(fn.__code__.co_varnames[:fn.__code__.co_argcount])
+        # FIXME: maybe this should dig into the function chain until
+        # no more __wrappeds__ are there?
+        real_fn = getattr(fn, "__wrapped__", fn)
+        argnames = list(real_fn.__code__.co_varnames[:real_fn.__code__.co_argcount])
         if inspect.ismethod(fn):
             if fn.__self__ is cls:
                 _type = False
@@ -5183,15 +5280,17 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             for fname, fn, _type, args in sorted(serial_list + parallel_list):
                 retval = self._method_run(fname, fn, _type, args)
                 result += retval
-                if retval.errors or retval.failed \
-                   or retval.blocked or retval.skipped:
+                break_on_non_pass = getattr(fn, "break_on_non_pass", True)
+                if break_on_non_pass and ( retval.errors or retval.failed
+                   or retval.blocked or retval.skipped ):
                     return result
         else:
             for fname, fn, _type, args in serial_list:
                 retval = self._method_run(fname, fn, _type, args)
                 result += retval
-                if retval.errors or retval.failed \
-                   or retval.blocked or retval.skipped:
+                break_on_non_pass = getattr(fn, "break_on_non_pass", True)
+                if break_on_non_pass and ( retval.errors or retval.failed \
+                   or retval.blocked or retval.skipped ):
                     return result
             # FIXME: set from from config
             # All these are supposedly I/O bound jobs as either they
