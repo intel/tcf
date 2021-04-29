@@ -7123,7 +7123,8 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                         dlevel = 1)
                 else:
                     self.report_info(
-                        "NOTE: this testcase does not unfold subcases",
+                        "NOTE: this testcase does not unfold subcases"
+                        " (it may later)",
                         dlevel = 3)
                 with msgid_c("C", phase = 'config'):
                     retval = self._methods_call("configure")
@@ -7301,6 +7302,13 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
             with msgid_c(depth = 1) as msgid:
                 try:
+                    self.report_info(
+                        # report this for the reports to databases and
+                        # files, so triagers can know which version
+                        # generated it; normally we don't need this on
+                        # the console, so we verbose level it one up
+                        f"client version {version}",
+                        dlevel = 1)
                     for _target in list(self.target_group.targets.values()):
                         # We need to update all the target's KWS, as we
                         # have added KWS to the tescase (tc_hash and
