@@ -969,6 +969,9 @@ class extension(tc.target_extension_c):
                         component = console, offset = offset,
                         stream = True, raw = True)) as r:
                 # http://docs.python-requests.org/en/master/user/quickstart/#response-content
+                # when doing raw streaming, the call returns
+                # bytes--it's up to the customer to pass the right
+                # file descriptor
                 chunk_size = 1024
                 total = 0
                 for chunk in r.iter_content(chunk_size):
@@ -1027,6 +1030,8 @@ class extension(tc.target_extension_c):
         :param int fd: (optional) file descriptor to which to write
           the output (in which case, it returns the bytes read).
 
+          This file needs to be opened in binary mode.
+
         :param int max_size: (optional) if *fd* is given, maximum
           amount of data to read
 
@@ -1068,6 +1073,8 @@ class extension(tc.target_extension_c):
 
         :param int fd: (optional) file descriptor to which to write
           the output (in which case, it returns the bytes read).
+
+          This file needs to be opened in binary mode.
 
         :param int max_size: (optional) if *fd* is given, maximum
           amount of data to read
