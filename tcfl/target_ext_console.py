@@ -897,20 +897,42 @@ class extension(tc.target_extension_c):
 
     # \r+\n is because some transports pile \rs on top of each other...
     _crlf_regex_universal = re.compile("(\r+\n|\r|\n)")
+    _crlf_regex_universal_b = re.compile(b"(\r+\n|\r|\n)")
 
     @classmethod
     def _newline_convert(cls, data, newline):
-        if newline == '':
+        # This function handles strings and bytes so we don't need to
+        # worry about what it is. Dirty. Bite me.
+        # I am sure there is an smarter or more pythonic way to do
+        # this...open ears
+        if isinstance(data, bytes):
+            data_type = bytes
+            empty = b''
+            new_newline = b'\n'
+            regex = cls._crlf_regex_universal_b
+            # newline at this point can be None or other stuff, but to
+            # avoid complicating it, we do it here)
+            if newline != None and isinstance(newline, str):
+                newline = newline.encode('utf-8')
+        else:
+            data_type = str
+            empty = ''
+            new_newline = '\n'
+            regex = cls._crlf_regex_universal
+            if newline != None and isinstance(newline, bytes):
+                newline = newline.decode('utf-8')
+        if newline == empty:
             return data
         if newline == None:
-            return re.sub(cls._crlf_regex_universal, "\n", data)
+            return re.sub(regex, new_newline, data)
         if isinstance(newline, re.Pattern):
-            return re.sub(newline, "\n", data)
-        if isinstance(newline, str):
-            return data.replace(newline, "\n")
+            return re.sub(newline, new_newline, data)
+        if isinstance(newline, data_type):
+            return data.replace(newline, new_newline)
         raise AssertionError(
-            "can't understand newline of type %s; expected none, '',"
-            " regex or string" % type(newline))
+            f"can't understand newline of type {type(newline)};"
+            f" expected none, empty string, regex, bytes or string"
+            f" (data_type {data_type})")
 
     def _read(self, console = None, offset = 0, max_size = 0, fd = None,
               newline = None):
@@ -980,9 +1002,8 @@ class extension(tc.target_extension_c):
             r = target.ttbd_iface_call("console", "read", method = "GET",
                                        component = console, offset = offset,
                                        raw = True)
-            ret = r.text
+            ret = self._newline_convert(r.text, newline)
             l = len(ret)
-            ret = self._newline_convert(ret, newline)
         target.report_info("%s: read %dB from console @%d"
                            % (console, l, offset), dlevel = 3)
         generation_s, offset_s = \
