@@ -1464,48 +1464,102 @@ def f_write_retry_eagain(fd, data):
 _flags_set = None
 _flags_old = None
 
-def _console_read_thread_fn(target, console, fd, offset):
+class _console_reader_c:
+    def __init__(self, target, console, fd, offset,
+                 backoff_wait_max, server_connection_errors_max):
+        self.target = target
+        self.console = console
+        self.fd = fd
+        self.offset = offset
+        self.server_connection_errors = 0
+        self.server_connection_errors_max = server_connection_errors_max
+        self.backoff_wait = 0.1
+        self.backoff_wait_max = backoff_wait_max
+        self.generation_prev = None
+
+    def read(self, flags_restore = None):
+        data_len = 0
+        try:
+            # Instead of reading and sending directy to the
+            # stdout, we need to break it up in chunks; the
+            # console is in non-blocking mode (for reading
+            # keystrokes) and also in raw mode, so it doesn't do
+            # \n to \r\n xlation for us.
+            # So we chunk it and add the \r ourselves; there might
+            # be a better method to do this.
+            generation, self.offset, data = \
+                self.target.console.read_full(
+                    self.console, self.offset, 4096)
+            if self.generation_prev != None and self.generation_prev != generation:
+                sys.stderr.write(
+                    "\n\r\r\nWARNING: console was restarted\r\r\n\n")
+                self.offset = len(data)
+            self.generation_prev = generation
+
+            if data:
+                # add CR, because the console is in raw mode
+                for line in data.splitlines(True):
+                    # note line is strings, UTF-8 encode, which is
+                    # what we get from the protocol
+                    f_write_retry_eagain(self.fd, line.encode('utf-8'))
+                    if '\n' in line:
+                        f_write_retry_eagain(self.fd, b"\r")
+                self.fd.flush()
+                data_len = len(data)
+
+            if data_len == 0:
+                self.backoff_wait *= 2
+            else:
+                self.backoff_wait = 0.1
+            # in interactive mode we want to limit the backoff to
+            # one second so we have time to react
+            if self.backoff_wait >= self.backoff_wait_max:
+                self.backoff_wait = self.backoff_wait_max
+            time.sleep(self.backoff_wait)	# no need to bombard the server..
+            if self.server_connection_errors > 0:
+                self.server_connection_errors = 0	# successful, restart the count
+                self.backoff_wait = 0.1
+        except requests.exceptions.ConnectionError:
+            self.server_connection_errors += 1
+            if self.server_connection_errors >= self.server_connection_errors_max:
+                if flags_restore:		# need to do this before printing
+                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN,
+                                      flags_restore)
+                raise
+            # connection error, server might be down, retry
+            print(f"\n\r\r\nWARNING: server connection timedout,"
+                  f" retry #{self.server_connection_errors+1}/{self.server_connection_errors_max}"
+                  f" after {self.backoff_wait:.1f}s\r\r\n\n",
+                  file = sys.stderr)
+            time.sleep(self.backoff_wait)	# no need to bombard the server..
+            self.backoff_wait *= 2
+            if self.backoff_wait >= self.backoff_wait_max:
+                self.backoff_wait = self.backoff_wait_max
+
+        return data_len
+
+
+def _console_read_thread_fn(target, console, fd, offset, backoff_wait_max,
+                            _flags_restore):
     # read in the background the target's console output and print it
     # to stdout
     offset = target.console.offset_calc(target, console, int(offset))
     with msgid_c("cmdline"):
-        generation = 0
-        generation_prev = None
-        backoff_wait = 0.1
+        # limit how much time we keep retrying due to server connection errors
+        console_reader = _console_reader_c(target, console, fd, offset,
+                                           backoff_wait_max, 10)
         while True:
             try:
-                # Instead of reading and sending directy to the
-                # stdout, we need to break it up in chunks; the
-                # console is in non-blocking mode (for reading
-                # keystrokes) and also in raw mode, so it doesn't do
-                # \n to \r\n xlation for us.
-                # So we chunk it and add the \r ourselves; there might
-                # be a better method to do this.
-                generation, offset, data = \
-                    target.console.read_full(console, offset, 4096)
-                if generation_prev != None and generation_prev != generation:
-                    sys.stderr.write(
-                        "\n\r\r\nWARNING: console was restarted\r\r\n\n")
-                generation_prev = generation
-
-                if data:
-                    # add CR, because the console is in raw mode
-                    for line in data.splitlines(True):
-                        f_write_retry_eagain(fd, line)
-                        if '\n' in line:
-                            f_write_retry_eagain(fd, "\r")
-                    fd.flush()
-
-                if len(data) == 0:
-                    backoff_wait *= 2
-                else:
-                    backoff_wait = 0.1
-                # in interactive mode we want to limit the backoff to
-                # one second so we have time to react
-                if backoff_wait >= 0.7:
-                    backoff_wait = 0.7
-                time.sleep(backoff_wait)	# no need to bombard the server..
+                console_reader.read(flags_restore = _flags_restore)
             except Exception as e:	# pylint: disable = broad-except
+                if _flags_restore:
+                    # We only restore when we error out
+                    # need to do this before printing--otherwise it
+                    # looks staricasey and it is a mess, hence why it
+                    # is duplicated
+                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN,
+                                      _flags_restore)
+                    _flags_restore = False
                 logging.exception(e)
                 raise
             finally:
@@ -1513,7 +1567,8 @@ def _console_read_thread_fn(target, console, fd, offset):
                     term_flags_reset(_flags_old)
 
 
-def _cmdline_console_write_interactive(target, console, crlf, offset):
+def _cmdline_console_write_interactive(target, console, crlf,
+                                       offset, max_backoff_wait):
 
     #
     # Poor mans interactive console
@@ -1525,13 +1580,6 @@ WARNING: This is a very limited interactive console
          Escape character twice ^[^[ to exit; using console '%s' with CRLF %s
 """ % (console, repr(crlf)))
     time.sleep(1)
-    fd = os.fdopen(sys.stdout.fileno(), "w")
-    console_read_thread = threading.Thread(
-        target = _console_read_thread_fn,
-        args = (target, console, fd, offset))
-    console_read_thread.daemon = True
-    console_read_thread.start()
-
     class _done_c(Exception):
         pass
 
@@ -1549,6 +1597,16 @@ WARNING: This is a very limited interactive console
             # I've given up -- I can't figure out how to ask stty to
             # tell me emacs does \n
             nl = '\n'
+
+        fd = os.fdopen(sys.stdout.fileno(), "wb")
+        console_read_thread = threading.Thread(
+            target = _console_read_thread_fn,
+            args = ( target, console, fd, offset, max_backoff_wait,
+                     _flags_old )
+        )
+        console_read_thread.daemon = True
+        console_read_thread.start()
+
         while True and console_read_thread.is_alive():
             try:
                 chars = os.read(sys.stdin.fileno(), 4096).decode('utf-8')
@@ -1601,7 +1659,8 @@ def _cmdline_console_write(args):
                 [args.console].get('crlf', "\n")
         if args.interactive:
             _cmdline_console_write_interactive(target, args.console,
-                                               args.crlf, args.offset)
+                                               args.crlf, args.offset,
+                                               args.max_backoff_wait)
         elif args.data == []:	# no data given, so get from stdin
             while True:
                 line = getpass.getpass("")
@@ -1626,27 +1685,15 @@ def _cmdline_console_read(args):
         else:
             fd = open(args.output, "wb")
         try:
-            generation = 0
-            generation_prev = None
-            backoff_wait = 0.1
-            while True:
-                generation, offset, data_len = \
-                    target.console.read_full(console, offset,
-                                             max_size, fd, newline = '')
-                if generation_prev != None and generation_prev != generation:
-                    sys.stderr.write(
-                        "\n\r\r\nWARNING: console reinitialized or target power cycled\r\r\n\n")
-                generation_prev = generation
-                if not args.follow:
-                    break
-                if data_len == 0:
-                    backoff_wait *= 2
-                else:
-                    backoff_wait = 0.1
-                if backoff_wait >= args.max_backoff_wait:
-                    backoff_wait = args.max_backoff_wait
-
-                time.sleep(backoff_wait)	# no need to bombard the server..
+            # limit how much time we keep retrying due to server connection errors
+            if args.follow:
+                _console_read_thread_fn(target, console, fd, offset,
+                                        args.max_backoff_wait, False)
+            else:
+                console_reader = _console_reader_c(
+                    target, console, fd, offset,
+                    args.max_backoff_wait, 10)
+                console_reader.read()
         finally:
             if fd != sys.stdout.buffer:
                 fd.close()
@@ -1937,6 +1984,11 @@ def _cmdline_setup(arg_subparser):
                     help = "read the console from the given offset, "
                     " negative to start from the end, -1 for last"
                     " (defaults to 0 or -1 if -i is active)")
+    ap.add_argument(
+        "--max-backoff-wait",
+        action = "store", type = float, metavar = "SECONDS", default = 2,
+        help = "Maximum number of seconds to backoff wait for"
+        " data (%(default)ss)")
     ap.set_defaults(func = _cmdline_console_write, crlf = None)
 
 
