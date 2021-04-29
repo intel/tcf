@@ -683,9 +683,12 @@ class reporter_c(object):
         #: we assign it to a target group to run.
         if testcase:
             self.ts_start = testcase.ts_start
+            assert isinstance(testcase, tc_c)
+            self.testcase = testcase	# record who our testcase is
         else:
             self.ts_start = time.time()
-        self.testcase = testcase
+            assert isinstance(self, tc_c)
+            self.testcase = self
 
 
     #: Ignore messages with verbosity about this level
