@@ -496,7 +496,7 @@ if __name__ == "__main__":
     global args
     args = arg_parser.parse_args()
     log_format = "%(levelname)s %(module)s.%(funcName)s():%(lineno)d: %(message)s"
-    log_format = commonl.log_format_compose(log_format, False, False)
+    log_format = commonl.log_format_compose(log_format, args.log_pid_tid, args.log_time)
     logging.basicConfig(format = log_format, level = args.level)
 
     if args.debug:
