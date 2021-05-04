@@ -130,12 +130,24 @@ class ssh(tc.target_extension_c):
         self._ssh_host = None
 
         self._ssh_cmdline_options = [
+            # use a private known host directory -- even with disabled
+            # strict host key checking it will disable password auth
+            # if there is one and it changes; we'll remove everytime
+            # we do a connection to avoid the problem
+            "-o", f"UserKnownHostsFile {self._known_hosts_path()}",
             # Most of the machines used for testing get provisioned
             # and re-provisioned over and over again, with no stable
             # SSH key, so mo point on checking it
             "-o", "StrictHostKeyChecking no",
             "-o", "CheckHostIP no",
         ]
+
+    def _known_hosts_path(self):
+        return os.path.join(self.target.tmpdir, 'ssh_known_hosts')
+
+    def _known_hosts_wipe(self):
+        # wipe known_hosts, to avoid key issues
+        commonl.rm_f(self._known_hosts_path())
 
     def _tunnel(self):
         # Ensure the IP tunnel is up, overriding whatever was there
@@ -220,6 +232,7 @@ class ssh(tc.target_extension_c):
             + [ self.login + "@" + self._ssh_host, "-t", _cmd ]
         self.target.report_info("running SSH command: %s"
                                 % " ".join(cmdline), dlevel = 2)
+        self._known_hosts_wipe()
         returncode = subprocess.call(cmdline, stdin = None,
                                      shell = False,
                                      stdout = log_stdout,
@@ -328,6 +341,7 @@ class ssh(tc.target_extension_c):
                 + [ src, self.login + "@" + self._ssh_host + ":" + dst ]
             self.target.report_info("running SCP command: %s"
                                     % " ".join(cmdline), dlevel = 2)
+            self._known_hosts_wipe()
             s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT,
                                         shell = False)
         except subprocess.CalledProcessError as e:
@@ -390,6 +404,7 @@ class ssh(tc.target_extension_c):
                 + [ self.login + "@" + self._ssh_host + ":" + src, dst ]
             self.target.report_info("running SCP command: %s"
                                     % " ".join(cmdline), dlevel = 2)
+            self._known_hosts_wipe()
             s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT,
                                         shell = False, env = env)
         except subprocess.CalledProcessError as e:
