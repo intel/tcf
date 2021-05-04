@@ -80,7 +80,7 @@ class extension(tc.target_extension_c):
                                         files = { 'file': inf })
 
 
-    def dnload(self, remote, local):
+    def dnload(self, remote, local, offset = None):
         """
         Download a remote file from the store to the local system
 
@@ -91,7 +91,7 @@ class extension(tc.target_extension_c):
         with io.open(local, "wb+") as of, \
              contextlib.closing(self.target.ttbd_iface_call(
                  "store", "file", method = "GET", stream = True, raw = True,
-                 file_path = remote)) as r:
+                 file_path = remote, offset = offset)) as r:
             # http://docs.python-requests.org/en/master/user/quickstart/#response-content
             chunk_size = 4096
             total = 0
