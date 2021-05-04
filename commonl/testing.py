@@ -596,6 +596,7 @@ host = '127.0.0.1'
         self.srcdir = os.path.realpath(
             os.path.join(os.path.dirname(__file__), ".."))
         self.cmdline = [
+            "stdbuf", "-o0", "-e0",
             # This allows us to default to the source location,when
             # running from source, or the installed when running from
             # the system
@@ -639,7 +640,8 @@ host = '127.0.0.1'
         logging.info("Launching: %s", " ".join(self.cmdline))
         self.p = subprocess.Popen(
             self.cmdline, shell = False, cwd = self.tmpdir,
-            close_fds = True, preexec_fn = _preexec_fn)
+            close_fds = True, preexec_fn = _preexec_fn,
+            bufsize = 0)
         try:
             self._check_if_alive()
         finally:
@@ -812,7 +814,7 @@ host = '127.0.0.1'
             # Use negative, so we also kill child processes of a setsid
             try:
                 os.kill(-self.p.pid, signal.SIGTERM)
-                time.sleep(0.25)
+                time.sleep(1)	# give it time to flush
                 os.kill(-self.p.pid, signal.SIGKILL)
             except OSError:	# Most cases, already dead
                 pass
