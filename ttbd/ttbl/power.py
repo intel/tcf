@@ -1238,6 +1238,7 @@ class daemon_c(impl_c):
         assert isinstance(mkpidfile, bool)
         self.mkpidfile = mkpidfile
         self.close_fds = close_fds
+        self.stdin = None
 
 
     def verify(self, target, component, cmdline_expanded):
@@ -1326,7 +1327,9 @@ class daemon_c(impl_c):
         try:
             p = subprocess.Popen(_cmdline, env = env, cwd = target.state_dir,
                                  stdout = stderrf, close_fds = self.close_fds,
-                                 stderr = subprocess.STDOUT, bufsize = 0, shell = False,
+                                 stdin = self.stdin,
+                                 stderr = subprocess.STDOUT, bufsize = 0,
+                                 shell = False,
                                  universal_newlines = False)
             if self.mkpidfile:
                 with open(pidfile, "w+") as pidf:
