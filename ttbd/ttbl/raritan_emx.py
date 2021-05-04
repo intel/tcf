@@ -8,14 +8,16 @@
 #
 # pylint: disable = missing-docstring
 
-import logging
 import datetime
+import logging
+import os
 import subprocess
 import urllib.parse
 
 import commonl
 
 import ttbl
+import ttbl._install
 import ttbl.power
 import ttbl.capture
 import raritan
@@ -145,9 +147,11 @@ class pci(ttbl.power.impl_c, ttbl.capture.impl_c): # pylint: disable = abstract-
 
         ttbl.power.impl_c.__init__(self, **kwargs)
         self.capture_program = commonl.ttbd_locate_helper(
-            "raritan-power-capture.py", log = logging, relsrcpath = ".")
+            "raritan-power-capture.py",
+            ttbl._install.share_path,
+            log = logging, relsrcpath = ".")
         ttbl.capture.impl_c.__init__(
-            self, stream = True, mimetype = "application/json")
+            self, snapshot = False, mimetype = "application/json")
         self.url = urllib.parse.urlparse(url)
         if password:
             self.password = commonl.password_get(
@@ -215,33 +219,43 @@ class pci(ttbl.power.impl_c, ttbl.capture.impl_c): # pylint: disable = abstract-
     #
     # ttbl.capture.impl_c: power capture stats
     #
-    def start(self, target, capturer):
-        ttbl.capture.impl_c.start(self, target, capturer)
-        # no need for a timestamp because we can only capture one at the time
-        file_name = f"{self.user_path}/{target.id}-{capturer}.capture"
-        pidfile = f"{target.state_dir}/capture-{capturer}.pid"
-        logging.error("DEBUG starting pid@{pidfile}")
+    def start(self, target, capturer, path):
+        stream_filename = capturer + ".data.json"
+        log_filename = capturer + ".capture.log"
+        pidfile = "%s/capture-%s.pid" % (target.state_dir, capturer)
+
+        logf = open(os.path.join(path, log_filename), "w+")
         p = subprocess.Popen(
             [
+                "stdbuf", "-e0", "-o0",
                 self.capture_program,
-                f"{self.url.scheme}://{self.url.username}@{self.url.hostname}",
+                "%s://%s@%s" % (self.url.scheme, self.url.username,
+                                self.url.hostname),
                 "environment",
                 # the indexes the command line tool expects are
                 # 1-based, whereas we stored zero based (what the API likes)
                 str(self.outlet_number + 1),
-                file_name,
-            ], close_fds = True, shell = False, stderr = subprocess.STDOUT,
-            env = { 'RARITAN_PASSWORD': self.password })
+                os.path.join(path, stream_filename),
+            ],
+            env = { 'RARITAN_PASSWORD': self.password },
+            bufsize = -1,
+            close_fds = True,
+            shell = False,
+            stderr = subprocess.STDOUT, stdout = logf.buffer,
+        )
+
         with open(pidfile, "w+") as pidf:
             pidf.write("%s" % p.pid)
         ttbl.daemon_pid_add(p.pid)
-        return {}
 
-    def stop_and_get(self, target, capturer):
-        ttbl.capture.impl_c.stop_and_get(self, target, capturer)
-        pidfile = f"{target.state_dir}/capture-{capturer}.pid"
+        return True, {
+            "default": stream_filename,
+            "log": log_filename
+        }
+
+
+    def stop(self, target, capturer, path):
+        pidfile = "%s/capture-%s.pid" % (target.state_dir, capturer)
         commonl.process_terminate(pidfile, tag = "capture:" + capturer,
                                   wait_to_kill = 2)
-        return dict(stream_file =
-                    f"{self.user_path}/{target.id}-{capturer}.capture")
 
