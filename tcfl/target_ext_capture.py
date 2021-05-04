@@ -511,11 +511,16 @@ class extension(tc.target_extension_c):
         if not 'capture' in target.rt.get('interfaces', []):
             raise self.unneeded
 
+    def _capturers_data_get(self, capturer = None):
+        if capturer == None:
+            capturers = self.target.properties_get("interfaces.capture.*")
+            return capturers.get('interfaces', {}).get('capture', {})
+        capturers = self.target.properties_get(f"interfaces.capture.{capturer}.*")
+        return capturers.get('interfaces', {}).get('capture', {}).get(capturer, {})
+
     def start(self, capturer):
         """
-        Start capturing the stream with capturer *capturer*
-
-        (if this is not an streaming capturer, nothing happens)
+        Take a snapshot or start capturing
 
         >>> target.capture.start("screen_stream")
 
@@ -526,85 +531,65 @@ class extension(tc.target_extension_c):
         self.target.report_info("%s: starting capture" % capturer, dlevel = 3)
         r = self.target.ttbd_iface_call("capture", "start", method = "PUT",
                                         capturer = capturer)
-        self.target.report_info("%s: started capture" % capturer, dlevel = 2)
+        self.target.report_info("%s: started capture: %s" % (capturer, r),
+                                dlevel = 2)
         return r
 
-    def stop_and_get(self, capturer, local_filename = None):
-        """
-        If this is a streaming capturer, stop streaming and return the
-        captured data or if no streaming, take a snapshot and return it.
-
-        >>> target.capture.stop_and_get("screen_stream", "file.avi")
-        >>> target.capture.get("screen", "file.png")
-        >>> network.capture.get("tcpdump", "file.pcap")
-
-        :param str capturer: capturer to use, as listed in the
-          target's *capture*
-
-        :param str local_filename: (optional; default *None*) file to
-          which to write the capture. If *None*, the data is not
-          captured (nor transmitted).
-
-          If *False*, it is not written to a file, but returned as
-          JSON.
-
-          .. warning: **DO NOT** use for large amounts of data
-
-        :returns: dictionary of values passed by the server
-        """
-        assert isinstance(local_filename, (bool, type(None), str))
-        self.target.report_info("%s: stopping capture" % capturer, dlevel = 3)
-
-        if local_filename == False:
-            # stop and get, return the capture as json
-            r = self.target.ttbd_iface_call(
-                "capture", "stop_and_get", method = "PUT",
-                capturer = capturer)
-            self.target.report_info(
-                f"{capturer}: stopped capture, read RAW {len(r)}B",
-                dlevel = 2)
-            return r
-
-        if local_filename != None:
-            with open(local_filename, "wb") as of, \
-                 contextlib.closing(
-                     self.target.ttbd_iface_call(
-                         "capture", "stop_and_get", method = "PUT",
-                         capturer = capturer,
-                         stream = True, raw = True)) as r:
-                # http://docs.python-requests.org/en/master/user/quickstart/#response-content
-                chunk_size = 4096
-                read_bytes = 0
-                for chunk in r.iter_content(chunk_size):
-                    of.write(chunk)
-                    read_bytes += len(chunk)
-                of.flush()
-                self.target.report_info("%s: stopped capture, read %dB"
-                                        % (capturer, read_bytes), dlevel = 2)
-        else:
-            self.target.ttbd_iface_call(
-                "capture", "stop_and_get", method = "PUT",
-                capturer = capturer, stream = True, raw = True)
-            self.target.report_info("%s: stopped capture" % capturer,
-                                    dlevel = 2)
 
     def stop(self, capturer):
-        """
-        If this is a streaming capturer, stop streaming and discard
-        the captured content.
+        self.target.report_info("%s: stopping capture" % capturer, dlevel = 3)
+        r = self.target.ttbd_iface_call("capture", "stop", method = "PUT",
+                                        capturer = capturer)
+        self.target.report_info("%s: stopped capture: %s" % (capturer, r),
+                                dlevel = 2)
+        return r
 
-        >>> target.capture.stop("screen_stream")
 
-        :param str capturer: capturer to use, as listed in the
-          target's *capture*
-        """
-        self.stop_and_get(capturer, None)
+    def get(self, capturer, stream = None, file_name = None, offset = None,
+            prefix = None,
+            **streams):
+        assert isinstance(capturer, str)
+        assert stream == None or isinstance(stream, str)
+        assert prefix == None or isinstance(prefix, str)
+        assert file_name == None or isinstance(file_name, str)
+        assert offset == None or isinstance(offset, int)
 
-    def get(self, capturer, local_filename):
-        """
-        This is the same :meth:`stop_and_get`.
-        """
-        return self.stop_and_get(capturer, local_filename)
+        if prefix == None:
+            prefix = self.target.testcase.report_file_prefix
+        if stream:
+            streams[stream] = { 'file_name': file_name, 'offset': offset }
+        capturers_data = self._capturers_data_get()
+        capturer_data = capturers_data.get(capturer, {})
+        if capturer_data == {}:
+            raise tc.blocked_e(f"capturer '{capturer}': unknown"
+                               f" (available: {' '.join(capturers_data.keys())})")
+        streams_data = capturer_data.get('stream', {})
+
+        # verify the streams are valid
+        for stream_name in streams:
+            if stream_name not in streams_data:
+                raise tc.blocked_e(
+                    f"capturer '{capturer}': unknown stream '{stream_name}'"
+                    f" (available: {' '.join(streams_data.keys())}")
+        r = {}
+        for stream_name, stream_data in streams_data.items():
+            if streams and stream_name not in streams:
+                continue
+            src_file_name = stream_data.get('file', None)
+            dst_file_name = streams.get(stream_name, {}).get('file_name', None)
+            offset = streams.get('offset', None)
+            if dst_file_name == None:
+                _root, extension = os.path.splitext(src_file_name)
+                dst_file_name = prefix + f"{capturer}.{stream_name}{extension}"
+
+            try:
+                self.target.store.dnload("capture/" + src_file_name, dst_file_name, offset)
+                r[stream_name] = dst_file_name
+            except tc.exception as e:
+                tc.result_c.report_from_exception(self.target.testcase, e)
+                print(f"DEBUG error {type(e)}: {e}")
+        return r
+
 
     def list(self):
         """
@@ -620,9 +605,18 @@ class extension(tc.target_extension_c):
           - *True*: streaming capturer, currently capturing
           - *False*: streaming capturer, currently not-capturing
         """
-        r = self.target.ttbd_iface_call(
-            "capture", "list", method = "GET")
-        return r.get('components', {})
+        # pure target get w/o going through the cache
+
+        r = {}
+        capturers_data = self._capturers_data_get()
+        for capturer_name, data in capturers_data.items():
+            snapshot = data.get('snapshot', False)
+            if snapshot == True:
+                r[capturer_name] = None
+            else:
+                r[capturer_name] = data.get('streaming', False)
+        return r
+
 
     def _healthcheck(self):
         # not much we can do here without knowing what the interfaces
@@ -843,20 +837,63 @@ class extension(tc.target_extension_c):
             name = name)
 
 
+def _cmdline_capture(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
+        capturer = args.capturer
+        capturers = target.capture.list()
+        if capturer not in capturers:
+            raise RuntimeError(f"{capturer}: unknown capturer: {capturers}")
+        streaming = capturers[capturer]
+        if args.prefix:
+            prefix = args.prefix
+        else:
+            prefix = target.id + "."
+        if streaming == None:
+            # snapshot
+            print(f"{capturer}: taking snapshot")
+            target.capture.start(capturer)
+            print(f"{capturer}: downloading capture")
+            r = target.capture.get(capturer, prefix = prefix)
+        elif streaming == False:
+            # not snapshot, start, wait, stop, get
+            print(f"{capturer}: non-snapshot capturer was stopped, starting")
+            target.capture.start(args.capturer)
+            print(f"{capturer}: capturing for {args.wait} seconds")
+            time.sleep(args.wait)
+            print(f"{capturer}: stopping capture")
+            target.capture.stop(args.capturer)
+            print(f"{capturer}: downloading capture")
+            r = target.capture.get(capturer, prefix = prefix)
+        for stream_name, file_name in r.items():
+            print(f"{capturer}: downloaded stream {stream_name} -> {file_name}")
+
+
 def _cmdline_capture_start(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
-        target.capture.start(args.capturer)
+        r = target.capture.start(args.capturer)
+        for stream_name, file_name in r.items():
+            print(f"{stream_name}: {file_name}")
 
-def _cmdline_capture_stop_and_get(args):
+def _cmdline_capture_get(args):
+    # FIXME: add --continue to use offset to get from the same files
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
-        target.capture.stop_and_get(args.capturer, args.filename)
+        if args.prefix:
+            prefix = args.prefix
+        else:
+            prefix = target.id + "."
+        r = target.capture.get(args.capturer, prefix = prefix)
+        for stream_name, file_name in r.items():
+            print(f"{stream_name}: {file_name}")
 
 def _cmdline_capture_stop(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
-        target.capture.stop_and_get(args.capturer, None)
+        r = target.capture.stop(args.capturer)
+        for stream_name, file_name in r.items():
+            print(f"{stream_name}: {file_name}")
 
 def _cmdline_capture_list(args):
     state_to_str = {
@@ -866,22 +903,34 @@ def _cmdline_capture_list(args):
     }
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
+        capturers_data = target.capture._capturers_data_get()
         capturers = target.capture.list()
-        capture_spec = {}
-        for capturer, data \
-            in target.rt.get('interfaces', {}).get('capture', {}).items():
-            capture_spec[capturer] = (data['type'], data['mimetype'])
         for name, state in capturers.items():
-            print(
-                "%s:%s:%s:%s" % (
-                    name, capture_spec[name][0], capture_spec[name][1],
-                    state_to_str.get(state,
-                                     f"BUG: unknown state type {type(state)}")
-                )
-            )
+            streams = capturers_data[name]['stream']
+            l = [
+                name + ":" + data['mimetype']
+                for name, data in streams.items()
+            ]
+            print(f"{name} ({state_to_str[state]}): {' '.join(l)}")
 
 
 def cmdline_setup(argsp):
+    ap = argsp.add_parser("capture", help = "Generic capture; takes a"
+                          " snapshot or captures for given SECONDS"
+                          " and downloads captured data")
+    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
+                    default = None, help = "Target's name")
+    ap.add_argument("capturer", metavar = "CAPTURER-NAME", action = "store",
+                    type = str, help = "Name of capturer")
+    ap.add_argument("--prefix", action = "store", type = str, default = None,
+                    help = "Prefix for downloaded files")
+    ap.add_argument("--wait", action = "store", metavar = 'SECONDS', type = float, default = 5,
+                    help = "How long to wait between starting and stopping")
+    ap.add_argument("--stream", action = "append", metavar = 'STREAM-NAME',
+                    type = str, default = [], nargs = "*",
+                    help = "Specify stream(s) to download (default all)")
+    ap.set_defaults(func = _cmdline_capture)
+
     ap = argsp.add_parser("capture-start", help = "start capturing")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
@@ -895,19 +944,9 @@ def cmdline_setup(argsp):
                     default = None, help = "Target's name or URL")
     ap.add_argument("capturer", metavar = "CAPTURER-NAME", action = "store",
                     type = str, help = "Name of capturer that should stop")
-    ap.add_argument("filename", action = "store", type = str,
-                    help = "File to which to dump the captured content")
-    ap.set_defaults(func = _cmdline_capture_stop_and_get)
-
-    ap = argsp.add_parser("capture-stop-and-get",
-                          help = "stop capturing and get the result to a file")
-    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("capturer", metavar = "CAPTURER-NAME", action = "store",
-                    type = str, help = "Name of capturer that should stop")
-    ap.add_argument("filename", action = "store", type = str,
-                    help = "File to which to dump the captured content")
-    ap.set_defaults(func = _cmdline_capture_stop_and_get)
+    ap.add_argument("--prefix", action = "store", type = str, default = None,
+                    help = "Prefix for downloaded files")
+    ap.set_defaults(func = _cmdline_capture_get)
 
     ap = argsp.add_parser("capture-stop", help = "stop capturing, discarding "
                           "the capture")
