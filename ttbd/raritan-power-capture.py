@@ -39,6 +39,8 @@ import raritan.rpc
 import raritan.rpc.sensors
 import raritan.rpc.pdumodel
 
+import ttbl.capture_cli
+
 # Map unit codes to unit names
 #
 # There is no good way to do it because the unit codes reported below
@@ -114,7 +116,20 @@ def raritan_sensor_get(agent, outlet_numbers):
         unit_name = unit_id_to_name[reading_unit.unit]
         outlet_data[element_name + " (" + unit_name + ")"] = reading_value.value
 
-    return data, errors
+    # Note this function was designed to pick multiple outlets, but
+    # here we use it only for one, so we return outlet_data
+    return outlet_data, errors
+
+
+def xlat(d, data):
+    # these are known fields -- we convert them from whatever raritan provides to our "convention"
+    power = data.get("activePower (WATT)", None)
+    if power != None:
+        d['power (watt)'] = power
+    voltage = data.get('voltage (VOLT)', None)
+    if voltage != None:
+        d['voltage (volt)'] = voltage
+
 
 #
 # Main
@@ -128,7 +143,6 @@ if password == "environment":
 # note the indexes for the SW are 0-based, while in the labels
 # in the HW for humans, they are 1 based.
 outlet_number = int(sys.argv[3]) - 1
-outputfilename = sys.argv[4]
 
 # Fire up an agent and get a PDU model for the PDU data
 agent = raritan.rpc.Agent(url.scheme, url.hostname, url.username, password,
@@ -139,61 +153,8 @@ pdu = raritan.rpc.pdumodel.Pdu("/model/pdu/0", agent)
 # validate they are good; otherwise we'll list them all
 outlets = pdu.getOutlets()
 assert outlet_number < len(outlets), \
-    "outlet %d not valid (max %d)" % (outlet_number, len(outlets))
+    f"outlet {outlet_number} not valid (max len{(outlets)})"
 
-# SIGTERM will just exit and we'll print proper JSON
-def _sigterm(_a, _b):
-    raise SystemExit
-
-signal.signal(signal.SIGTERM, _sigterm)
-
-# Main loop, keep reading power until we stop
-first = True
-period_s = 1	# wait at least one sec between reads
-with open(outputfilename, "w") as of:
-    try:
-        print("[", file = of)
-        ts0 = time.time()
-        sequence = 0
-        while True:
-            ts = time.time()
-            if ts - ts0 < period_s:
-                time.sleep(period_s)
-            ts0 = ts
-            data, errors = raritan_sensor_get(agent, [ outlet_number ])
-            # this returns like
-            # OUTLETNUMBER: {
-            #     "voltage (VOLT)": VALUE
-            #     ...
-            # }
-            d = data[outlet_number]
-            # This output follows the convention dictated in ttbl.capture
-            _d = dict(
-                sequence = sequence,
-                timestamp = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"),
-                raw = d,
-            )
-            # these are known fields -- we convert them from whatever raritan provides to our "convention"
-            power = d.get("activePower (WATT)", None)
-            if power != None:
-                _d['power (watt)'] = power
-            voltage = d.get('voltage (VOLT)', None)
-            if voltage != None:
-                _d['voltage (volt)'] = voltage
-
-            if first:
-                first = False
-            else:
-                print(",", file = of)
-            print(json.dumps(_d, indent = 4), file = of)
-            # flush now, to make sure this gets synced to disk
-            of.flush()
-            sequence += 1
-    except ( SystemExit, KeyboardInterrupt )  as e:
-        # ugly hack so we print the "]" to terminate the JSON array when
-        # we Ctrl-C or we send SIGTERM -- If I don't catch this then the
-        # finally ...won't work -- some detail I am missing.
-        pass
-    finally:
-        print("]", file = of)
-        of.flush()
+ttbl.capture_cli.main(sys.argv[4], raritan_sensor_get, xlat,
+                      agent, [ outlet_number ],
+                      period_s = 0.5)
