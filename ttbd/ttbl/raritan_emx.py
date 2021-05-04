@@ -17,11 +17,12 @@ import commonl
 
 import ttbl
 import ttbl.power
+import ttbl.capture
 import raritan
 import raritan.rpc
 import raritan.rpc.pdumodel
 
-class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
+class pci(ttbl.power.impl_c, ttbl.capture.impl_c): # pylint: disable = abstract-method
     """
     Power control interface for the Raritan EMX family of PDUs (eg: PX3-\*)
 
@@ -219,7 +220,7 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
             bufsize = -1,
             close_fds = True,
             shell = False,
-            stderr = subprocess.STDOUT, stdout = logf.buffer,
+            stderr = subprocess.STDOUT, stdout = logf.fileno(),
         )
 
         with open(pidfile, "w+") as pidf:
