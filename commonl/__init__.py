@@ -795,6 +795,7 @@ def process_alive(pidfile, path = None):
         return None
 
 def process_terminate(pid, pidfile = None, tag = None,
+                      use_signal = signal.SIGTERM,
                       path = None, wait_to_kill = 0.25):
     """Terminate a process (TERM and KILL after 0.25s)
 
@@ -807,6 +808,9 @@ def process_terminate(pid, pidfile = None, tag = None,
     :param str path: (optional) path to the binary
 
     :param str tag: (optional) prefix to error messages
+
+    :param int use_signal: (optional; default SIGTERM) signal to send
+      to stop the process (see signal.SIG*).
     """
     if tag == None:
         if path:
@@ -829,8 +833,8 @@ def process_terminate(pid, pidfile = None, tag = None,
         if os.path.abspath(_path) != os.path.abspath(path):
             return None	            # Not our binary
     try:
-        signal_name = "SIGTERM"
-        os.kill(_pid, signal.SIGTERM)
+        signal_name = str(use_signal)
+        os.kill(_pid, use_signal)
         time.sleep(wait_to_kill)
         signal_name = "SIGKILL"
         os.kill(_pid, signal.SIGKILL)
