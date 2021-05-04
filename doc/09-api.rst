@@ -576,6 +576,7 @@ Other interfaces
 ----------------
 
 .. automodule:: ttbl.capture
+.. automodule:: ttbl.noyito
 .. automodule:: ttbl.debug
 .. automodule:: ttbl.fastboot
 .. automodule:: ttbl.images
