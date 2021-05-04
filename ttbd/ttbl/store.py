@@ -62,13 +62,19 @@ class interface(ttbl.tt_interface):
 
     _bad_path = re.compile(r"(^\.\.$|^\.\./|/\.\./|/\.\.$)")
 
-    def _validate_file_path(self, file_path, user_path):
+    def _validate_file_path(self, target, file_path, user_path):
         matches = self._bad_path.findall(file_path)
-        if matches:
+        if matches \
+           or os.path.pardir in file_path:
             raise ValueError("%s: file path cannot contains components: "
                              "%s" % (file_path, " ".join(matches)))
 
-        if not os.path.isabs(file_path):
+        if target and file_path.startswith("capture/"):
+            # file comes from the targt's capture space
+            # remove any possible nastiness
+            file_name = os.path.basename(file_path)
+            file_path_final = os.path.join(target.state_dir, "capture", file_name)
+        elif not os.path.isabs(file_path):
             # file comes from the user's storage
             file_path_normalized = os.path.normpath(file_path)
             file_path_final = os.path.join(user_path, file_path_normalized)
@@ -102,7 +108,7 @@ class interface(ttbl.tt_interface):
         "zero": "no signature"
     }
 
-    def get_list(self, _target, _who, args, _files, user_path):
+    def get_list(self, target, _who, args, _files, user_path):
         filenames = self.arg_get(args, 'filenames', list,
                                  allow_missing = True, default = [ ])
         path = self.arg_get(args, 'path', basestring,
@@ -145,7 +151,7 @@ class interface(ttbl.tt_interface):
             for filename in filenames:
                 if not isinstance(filename, basestring):
                     continue
-                file_path = self._validate_file_path(filename, path)
+                file_path = self._validate_file_path(None, filename, path)
                 if os.path.isdir(file_path):
                     file_data[filename] = 'directory'
                 else:
@@ -175,30 +181,30 @@ class interface(ttbl.tt_interface):
                 "%s: trying to upload a file to an area that is not allowed"
                 % file_path)
         file_object = files['file']
-        file_path_final = self._validate_file_path(file_path, user_path)
+        file_path_final = self._validate_file_path(None, file_path, user_path)
         commonl.makedirs_p(user_path)
         file_object.save(file_path_final)
         target.log.debug("%s: saved" % file_path_final)
         return dict()
 
-    def get_file(self, _target, _who, args, _files, user_path):
+    def get_file(self, target, _who, args, _files, user_path):
         # we can get files from the user's path or from paths_allowed;
         # an absolute path is assumed to come from paths_allowed,
         # otherwise from the user's storage area.
         file_path = self.arg_get(args, 'file_path', basestring)
-        file_path_final = self._validate_file_path(file_path, user_path)
+        file_path_final = self._validate_file_path(target, file_path, user_path)
         # interface core has file streaming support builtin
         # already, it will take care of streaming the file to the
         # client
         return dict(stream_file = file_path_final)
 
-    def delete_file(self, _target, _who, args, _files, user_path):
-        file_path = self.arg_get(args, 'file_path', basestring)
+    def delete_file(self, target, _who, args, _files, user_path):
+        file_path = self.arg_get(args, 'file_path', str)
         if os.path.isabs(file_path):
             raise RuntimeError(
                 "%s: trying to delete a file from an area that is not allowed"
                 % file_path)
 
-        file_path_final = self._validate_file_path(file_path, user_path)
+        file_path_final = self._validate_file_path(target, file_path, user_path)
         commonl.rm_f(file_path_final)
         return dict()
