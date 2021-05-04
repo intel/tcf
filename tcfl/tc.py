@@ -725,7 +725,8 @@ class reporter_c(object):
     
     @staticmethod
     def _argcheck(message, attachments, level, dlevel, alevel):
-        assert isinstance(message, str)
+        assert isinstance(message, str), \
+            f"message: expected str, got {type(message)}"
         if attachments:
             assert isinstance(attachments, dict)
             # FIXME: valid values?
@@ -758,16 +759,7 @@ class reporter_c(object):
         subcase = "##".join(subl)
 
         if subcase:
-            if subcase in testcase.subtc:
-                subtc = testcase.subtc[subcase]
-            else:
-                # messed up we don't keep tc_file_path as is
-                # Convention is we separate subcase names with ##
-                subtc = subtc_c(testcase.name + "##" + subcase,
-                                testcase.kws['thisfile'],
-                                testcase.origin, testcase)
-                subtc._execute = False
-                testcase.subtc[subcase] = subtc
+            subtc = testcase._subcase_get(subcase)
             if tag == "PASS":
                 subtc.result.passed += 1
             elif tag == "FAIL":
@@ -2827,7 +2819,7 @@ class result_c:
                 # expression is a tupple (str, dict), we convert
                 # that to a blocke_d(str, attachments = dict)
                 if isinstance(e.args[0][1], dict):
-                    newe = tcfl.tc.blocked_e(e.args[0][0], e.args[0][1])
+                    newe = blocked_e(e.args[0][0], e.args[0][1])
                     return result_c.report_from_exception(_tc, newe)
             return result_c.report_from_exception(_tc, e)
         except subprocess.CalledProcessError as e:
@@ -3008,8 +3000,13 @@ def subcase(subcase = None, break_on_non_pass = False):
         @functools.wraps(method)
         def wrapped(*args, **kwargs):
             with msgid_c(subcase = _subcase, depth_relative = 0):
-                return result_c.call_fn_handle_exception(method, *args, **kwargs)
-                #return method(self, *args, **kwargs)
+                testcase = args[0] # The `self`  argument to the test case
+                r = result_c.call_fn_handle_exception(method, *args, **kwargs)
+                # ensure we register the result of this testcase,
+                # otherwise we'll miss reporting about it
+                subtc = testcase._subcase_get(_subcase)
+                subtc.result = r
+                return r
         return wrapped
     return wrapper
 
@@ -4269,6 +4266,64 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             # this is a hack
             self.tls.expect_timeout = 60
 
+    def _subcase_get(self, subcase):
+        if subcase in self.subtc:
+            return self.subtc[subcase]
+        # messed up we don't keep tc_file_path as is
+        # Convention is we separate subcase names with ##
+        subtc = subtc_c(self.name + "##" + subcase,
+                        self.kws['thisfile'],
+                        self.origin, self)
+        # normally this subcases do not need to be executed, the are
+        # just used for accounting
+        subtc._execute = False
+        self.subtc[subcase] = subtc
+        return subtc
+
+    @classmethod
+    def testcase_name_validate(cls, name):
+        """
+        Validate *name* is a valid testcase name
+
+        :param str name: name of the testcase; this must be:
+
+          - a simple string (shortish if possible)
+          - contain no *##*
+
+        """
+        assert isinstance(name, str), \
+            f"name: expected str, got {type(name)}"
+        assert '##' not in name, \
+            f"test case names cannot contain '##', got '{name}'"
+
+
+    def subcase(self, subcase):
+        """
+        Start a new subcase context
+
+        This can be called in any method of any phase to start
+        reporting as a new subcase of this testcase
+        (NAME##SUBCASENAME). Note this can be nested as much as
+        wanted, eg:
+
+        >>> class _test(tcfl.tc.tc_c):
+        >>>     ...
+        >>>     def eval_10_something(self):
+        >>>        ....
+        >>>        with self.subcase("NAME1"):
+        >>>            with self.subcase("NAME2"):
+        >>>                self.report_pass("Done")
+
+        Will report a pass on testcase *_test##NAME1##NAME2* which is
+        a subcase of *_test##NAME1* which is itself a subcase of
+        *_test*.
+
+        :param str subcase: a subcase name
+        """
+        self.testcase_name_validate(subcase)
+        return msgid_c(subcase = subcase)
+
+
     def is_static(self):
         """
         Returns *True* if the testcase is *static* (needs to targets to
@@ -5092,8 +5147,6 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                                       self._start_serial, None)
             elif fname.startswith("eval"):
                 self.__method_prepare(fname, fn, True, self._eval_serial, None)
-            elif fname.startswith("test"):
-                self.__method_prepare(fname, fn, True, self._test_serial, None)
             elif fname.startswith("teardown"):
                 self.__method_prepare(fname, fn, True,
                                       self._teardown_serial, None)
@@ -7402,7 +7455,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             self.report_file_prefix = os.path.join(log_dir, f"report-{file_prefix}.")
             self.kws['report_file_prefix'] = self.report_file_prefix
 
-            with msgid_c(depth = 1) as msgid:
+            with msgid_c(depth = 1, testcase = self) as msgid:
                 try:
                     self.report_info(
                         # report this for the reports to databases and
@@ -7449,7 +7502,16 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                             # be less verbose for subcases,
                             # since we know this info already
                             dlevel = 2 if self.parent else 0 )
-                        result = self.result
+                        r = self.result.normalized()
+                        self.report_tweet(
+                            # hardcode eval phase here
+                            "subcase", r, ignore_nothing = False,
+                            extra_report = self._extra_report(self.kws),
+                            # report first level on non-pass
+                            level = 0,
+                            dlevel_passed = 1,
+                            dlevel_skipped = 2)
+                        result += r
                 except Exception as e:
                     self.log.error(
                         "exception: %s %s\n%s" %

@@ -57,7 +57,7 @@ class msgid_c(object):
     def __init__(self, s = None,
                  phase = None, depth = None, parent = None,
                  depth_relative = None,
-                 subcase = None):
+                 testcase = None, subcase = None):
         cls = type(self)
         if not hasattr(cls.tls, "msgid_lifo"):
             cls.cls_init()
@@ -110,10 +110,19 @@ class msgid_c(object):
             f = cls.tls.msgid_lifo[-1]
             if f._subcase:
                 subl.append(f._subcase)
+            if testcase == None:	# get testcase from the stack
+                testcase = f.testcase
+        self.testcase = testcase
         if subcase:
             subl.append(subcase)
-        self._subcase = "##".join(subl)
-
+        self.subcase = subcase		# this subcase name
+        self._subcase = "##".join(subl)	# current subcase chain
+        if self.testcase and self.subcase:
+	    # we need to create a new subcase, so get to it, so we
+            # account for it properly
+            self.subtc = testcase._subcase_get(self._subcase)
+        else:
+            self.subtc = None
 
     def __enter__(self):
         cls = type(self)
@@ -127,6 +136,17 @@ class msgid_c(object):
             # raise any exception from inside a msgid_c context, we
             # want it to be reported with the right subcase
             setattr(exce_value, "_subcase_base", cls.subcase())
+        else:
+            # if we were in a subcase--if no result is filled up with
+            # reporting, we'll assume it is a pass--in line with how
+            # tc_c.__method_trampoline_call() does when a function
+            # returns nothing.
+            #
+            # Note we only do this if no exception, we let exceptin
+            # handling do its own accounting -- urg mess
+            if self.subtc:
+                if self.subtc.result.total() == 0:
+                    self.subtc.result.passed = 1
         cls.tls.msgid_lifo.pop()
 
     @classmethod
