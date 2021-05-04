@@ -131,7 +131,7 @@ capture_screenshot_ffmpeg_v4l = ttbl.capture.generic_snapshot(
 #: :class:`ttbl.capture.generic_snapshot` and
 #: :class:`ttbl.capture.generic_stream`.
 #:
-#: Deprecated in favour of :func:`mc_capture_screenshot_vnc`
+#: Deprecated in favour of :func:`mk_capture_screenshot_vnc`
 capture_screenshot_vnc = ttbl.capture.generic_snapshot(
     # dont set the port for the name, otherwise the UPID keeps
     # changing
@@ -145,22 +145,23 @@ capture_screenshot_vnc = ttbl.capture.generic_snapshot(
     extension = ".png"
 )
 
-#: Create a VNC screenshot capturer that captures off a VNC source
-#: declared in inventory entry *vnc.NAME*
-#:
-#: Note the fields are target's tags and others specified in
-#: :class:`ttbl.capture.generic_snapshot` and
-#: :class:`ttbl.capture.generic_stream`.
-#:
-#: to use, add in a :ref:`server configuration file
-#: <ttbd_configuration>` to any target that offers a VNC source:
-#:
-#: >>> target.interface_add("capture", ttbl.capture.interface(
-#: >>>     vnc0_screenshot = mk_capture_screenshot_vnc("vnc0"),
-#: >>>     screen = "vnc0_screenshot",
-#: >>> ))
-
 def mk_capture_screenshot_vnc(name):
+    """
+    Create a VNC screenshot capturer that captures off a VNC source
+    declared in inventory entry *vnc.NAME*
+
+    Note the fields are target's tags and others specified in
+    :class:`ttbl.capture.generic_snapshot` and
+    :class:`ttbl.capture.generic_stream`.
+
+    to use, add in a :ref:`server configuration file
+    <ttbd_configuration>` to any target that offers a VNC source:
+
+    >>> target.interface_add("capture", ttbl.capture.interface(
+    >>>     vnc0_screenshot = mk_capture_screenshot_vnc("vnc0"),
+    >>>     screen = "vnc0_screenshot",
+    >>> ))
+    """
     assert isinstance(name, str)
     # note the %(FIELD)s will be mapped to entries in the target's
     # inventory when the capture is going to be done, so if name is
