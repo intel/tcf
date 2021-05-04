@@ -8617,8 +8617,9 @@ target_c.extension_register(target_ext_ioc_flash_server_app.extension,
                             "ioc_flash_server_app")
 import target_ext_buttons
 target_c.extension_register(target_ext_buttons.extension, "button")
-import target_ext_capture
-target_c.extension_register(target_ext_capture.extension, "capture")
+# Not suported on v0.14 -- use >= v0.15 for client with capture support
+#import target_ext_capture
+#target_c.extension_register(target_ext_capture.extension, "capture")
 import target_ext_fastboot
 target_c.extension_register(target_ext_fastboot.extension, "fastboot")
 import pos

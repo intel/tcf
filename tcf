@@ -412,7 +412,8 @@ if __name__ == "__main__":
     tcfl.tc.pos.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_alloc._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
+    # not supported on v0.14 client, use >= v0.15
+    #tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_console._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_debug._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_images._cmdline_setup(arg_subparsers)
