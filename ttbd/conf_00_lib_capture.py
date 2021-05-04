@@ -46,6 +46,8 @@ expose different audio controls that have to be set or queried.
 
 """
 
+import signal
+
 import ttbl.capture
 
 
@@ -189,9 +191,11 @@ capture_screenshot_vnc0 = mk_capture_screenshot_vnc("vnc0")
 #: are common.
 capture_vstream_ffmpeg_v4l = ttbl.capture.generic_stream(
     "video:/dev/video-%(id)s-0",
-    "ffmpeg -i /dev/video-%(id)s-0"
-    " -f avi -qscale:v 10 -y %(output_file_name)s",
-    mimetype = "video/avi"
+    "ffmpeg -y -nostdin -i /dev/video-%(id)s-0"
+    " -flush_packets"    # disable some buffering
+    " -f avi -qscale:v 10 -y %(stream_filename)s",
+    mimetype = "video/avi", wait_to_kill = 4,
+    use_signal = signal.SIGINT	# flushes ffmpeg
 )
 
 

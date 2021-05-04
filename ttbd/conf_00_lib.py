@@ -20,7 +20,6 @@ import netifaces
 
 import commonl
 import ttbl
-import ttbl.capture
 import ttbl.dhcp
 import ttbl.pc
 import ttbl.pc_ykush
