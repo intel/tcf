@@ -13,7 +13,7 @@ import random
 import sys
 import time
 
-import ttbl.capture_cli
+import capture_cli
 
 def _f(rng):
     # note testcase test/test-capture-streams.py relies in this
@@ -34,7 +34,7 @@ def _xlat(d, data):
     d['r3'] = data['r3']/1000000
 
 
-ttbl.capture_cli.main(
+capture_cli.main(
     sys.argv[1], _f, _xlat,
     # define a random number generator we'll pass to _f via
     # ttbl.capture_cli.main

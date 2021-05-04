@@ -39,7 +39,7 @@ import raritan.rpc
 import raritan.rpc.sensors
 import raritan.rpc.pdumodel
 
-import ttbl.capture_cli
+import capture_cli
 
 # Map unit codes to unit names
 #
@@ -155,6 +155,6 @@ outlets = pdu.getOutlets()
 assert outlet_number < len(outlets), \
     f"outlet {outlet_number} not valid (max len{(outlets)})"
 
-ttbl.capture_cli.main(sys.argv[4], raritan_sensor_get, xlat,
-                      agent, [ outlet_number ],
-                      period_s = 0.5)
+capture_cli.main(sys.argv[4], raritan_sensor_get, xlat,
+                 agent, [ outlet_number ],
+                 period_s = 0.5)

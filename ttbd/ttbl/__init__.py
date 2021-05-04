@@ -2032,9 +2032,9 @@ class test_target(object):
                 if prop.match(name):
                     return True
                 continue
-            raise AssertionError, \
-                "user property %s: not a string or regex, but %s" \
-                % (prop, type(prop).__name__)
+            raise AssertionError(
+                "user property %s: not a string or regex, but %s"
+                % (prop, type(prop).__name__))
         return False
 
     def property_keep_value(self, name):
@@ -2050,9 +2050,9 @@ class test_target(object):
                 if prop.match(name):
                     return True
                 continue
-            raise AssertionError, \
-                "user property %s: not a string or regex, but %s" \
-                % (prop, type(prop).__name__)
+            raise AssertionError(
+                "user property %s: not a string or regex, but %s"
+                % (prop, type(prop).__name__))
         return False
 
 

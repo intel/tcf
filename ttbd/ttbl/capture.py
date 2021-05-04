@@ -1,11 +1,12 @@
-#! /usr/bin/python2
+#! /usr/bin/python3
 #
 # Copyright (c) 2017 Intel Corporation
-#
+#f'
 # SPDX-License-Identifier: Apache-2.0
+#
 """
-Stream and snapshot capture interace
-------------------------------------
+Stream and snapshot capture interface
+*************************************
 
 This module implements an interface to capture things in the server
 and then return them to the client.
@@ -20,27 +21,145 @@ This can be used to, for example:
 
    - `LKV373A <https://www.lenkeng.net/Index/detail/id/149>`_
 
+   - VNC providers
+
    ...
 
    and then running somethig such as ffmpeg on its output
 
-- capture a video stream (with audio) when the controller can say when
-  to start and when to end
+- capture a video stream (with or without audio) when the controller
+  can say when to start and when to end (same above)
 
 - capture network traffic with tcpdump
 
+- sample power consumption data from PDUs that support it (eg:
+  :class:`ttbl.raritan_emx.pci`)
 
+A capturer is a driver, instance of :class:`ttbl.capture.impl_c` that
+provides methods to start capturing and stop capturing. When a capture
+is started, the driver returns a list of files where streams of data
+are captured or being captured.
+
+A snapshot providing only implements the start capture.
+
+A driver captures one or more streams of data (most commonly the data
+itself and a log of the capture process). In most cases, the capture
+is done forking a process that does the work, forwarding all the
+output to the log and the captured data to a file. If multiple files
+are captured, each is mapped a *stream*.
+
+Eg: if using ffmpeg to capture video from a screen:
+
+ - *default* stream would have an AVI file with the video/audio
+   capture
+
+ - *log* stream would have the stdout and stderr of the ffmpeg
+   program.
+
+
+Capture Inventory
+-----------------
+
+.. _inventory_capture:
+
+.. list-table:: Capture Inventory
+   :header-rows: 1
+   :widths: 20 10 10 60
+   :width: 50%
+
+   * - Field name
+
+     - Type
+       (str, bool, integer,
+       float, dictionary)
+     - Disposition
+       (mandatory, recommended,
+       optional[default])
+     - Description
+
+   * - interfaces.capture
+     - Dictionary
+     - Optional
+     - Information about the different capturers available in the
+       target; presence of this dictionary indicates the target
+       supports data capture
+
+   * - interfaces.capture
+     - Dictionary
+     - Optional
+     - Information about the different capturers available in the
+       target; presence of this dictionary indicates the target
+       supports data capture
+
+   * - interfaces.capture.NAME
+     - Dictionary
+     - mandatory
+     - Descriptor for a capturer called *NAME*
+
+   * - interfaces.capture.NAME.instrument
+     - str
+     - mandatory
+     - Instrument that implements the capturer. This is described in
+       the inventory entry *instrumentation.VALUE*
+
+   * - interfaces.capture.NAME.snapshot
+     - bool
+     - mandatory
+     - Indicates if this capturer is a snapshot or non-snapshot
+       capturer. A snapshot capturer takes a single capture and
+       returns the capture as set of streams. A non-snapshot capturer
+       starts capturing and captures data until stopped and then
+       returns the streams captured.
+
+   * - interfaces.capture.NAME.capturing
+     - bool
+     - optional
+     - Indicates if this capturer is currently capturing (applies only
+       to non-snapshot capturers). If not present, it can be assumed
+       to be *False*.
+
+   * - interfaces.capture.NAME.stream.STREAMNAME
+     - Dictionary
+     - mandatory
+     - Descriptor for each stream captured by *NAME*. The convention
+       calls for the default stream to be called *default*, any
+       diagnostics or logs to be called *logANYTHING*, others can be
+       called anything that is a valid field name.
+
+   * - interfaces.capture.NAME.stream.STREAMNAME.mimetype
+     - Dictionary
+     - mandatory
+     - Indicates the MIME type of the data captured by a stream (eg:
+       application/json, text/plain, video/avi...)
+
+   * - interfaces.capture.NAME.stream.STREAMNAME.file
+     - Dictionary
+     - mandatory
+     - When capturing or when having captured, this points to the name
+       of a file containing the captured data. The user can download
+       this data using the store interface from the location
+       *capture/FILENAME*.
 """
 
+import collections
+import datetime
 import errno
 import json
 import os
 import re
+import signal
+import shutil
 import subprocess
 import time
+import sys
 
 import commonl
 import ttbl
+
+if sys.version_info.major > 2:
+    str_type = str
+else:
+    str_type = basestring
 
 mime_type_regex = re.compile(
     "^([_a-zA-Z0-9]+/[_a-zA-Z0-9]+)"
@@ -50,63 +169,119 @@ class impl_c(ttbl.tt_interface_impl_c):
     """
     Implementation interface for a capture driver
 
-    The target will list the available capturers in the *capture* tag.
+    The target will list the available capturers in the
+       *interfaces.capture* inventory structure.
 
-    :param bool stream: if this capturer is capable of streaming; an
-      streaming capturer has to be told to start and then stop and
-      return the capture as a file.
-    :param str mimetype: MIME type of the capture output, eg image/png
+    :param bool snapshot: if this capturer can only take snapshots (vs
+      starting a capture and then ending it)
+
+    :param str mimetype: MIME type of the capture output for a stream
+      called *data* (by default)
+
+    :param kwargs: dict keyed by string of other stream names and
+       their mimetypes. Stream naming convention:
+
+        - *default*: default
+        - *log\**: logs about the capture process [optional]
+        - *\**: any other data streams
+
     """
-    def __init__(self, stream, mimetype):
-        # can be False (just gets), True (start/stop+get)
-        self.stream = stream
-        # Path to the user directory, updated on every request_process
-        # call
-        self.user_path = None
-        assert mime_type_regex.search(mimetype), \
-            "%s: MIME type specification not valid (only" \
-            "multiple [_a-zA-Z0-9]+/[_a-zA-Z0-9]+ separated by commas" \
-            % mimetype
-        self.mimetype = mimetype
+    def __init__(self, snapshot, mimetype = None,
+                 **kwargs):
+        assert isinstance(snapshot, bool), \
+            "snapshot: expected bool, got %s" % type(snapshot)
+        assert mimetype == None or isinstance(mimetype, str_type), \
+            "mimetype: default mimetype expected to be a string" \
+            "; got %s" % type(mimetype)
+        if mimetype:
+            assert isinstance(mimetype, str_type), \
+                "mimetype: default mimetype expected to be a string" \
+                "; got %s" % type(mimetype)
+            if 'data' in kwargs:
+                assert isinstance(mimetype, str_type), \
+                    "mimetype: specifying mimetype overrides a stream" \
+                    " source called 'data' which has been specified" \
+                    " with mimetype '%s'" % kwargs['data']
+            kwargs['default'] = mimetype
+        self.stream = collections.OrderedDict()
+        for k in kwargs:
+            v = kwargs[k]
+            assert isinstance(v, str_type), \
+                "mimetype for data %s: expected to be a string" \
+                "; got %s" % (k, type(v))
+            assert mime_type_regex.search(v), \
+                "%s: MIME type specification not valid (only" \
+                "multiple [_a-zA-Z0-9]+/[_a-zA-Z0-9]+ separated by commas" \
+                % mimetype
+            self.stream[k] = v
+        self.snapshot = snapshot
         ttbl.tt_interface_impl_c.__init__(self)
 
-    def start(self, target, capturer):
+
+    def start(self, target, capturer, path):
         """
-        If this is a streaming capturer, start capturing the stream
+        Start capturing
 
         Usually starts a program that is active, capturing to a file
-        until the :meth:`stop_and_get` method is called.
+        until the :meth:`stop` method is called.
 
         :param ttbl.test_target target: target on which we are capturing
         :param str capturer: name of this capturer
-        :returns: dictionary of values to pass to the client, usually
-          nothing
+        :param str path: path where to store capture files
+
+        :returns (state, dict): state is a bool *True* if the capturer
+          is capturing, *False* if it is not
+
+          A snapshot capturer will capture and return *False*
+
+          A non-snapshot capturer will start capturing and return *True*
+
+          The dictionary is keyed by stream name (as in self.stream) and
+          the value is the name of the file RELATIVE to *path* where
+          the data is captured or being captured.
 
         """
         assert isinstance(target, ttbl.test_target)
-        assert isinstance(capturer, basestring)
-        # must return a dict
+        assert isinstance(capturer, str_type)
+        assert isinstance(path, str_type)
+        # if this just took an snapshot of two stream files relative to path/
+        # return False, { STREAM1: FILE1, STREAM2: FILE2... }
+        # if this started streaming two stream files relative to path/
+        # return True, { STREAM1: FILE1, STREAM2: FILE2... }
 
-    def stop_and_get(self, target, capturer):
+    def stop(self, target, capturer, path):
         """
-        If this is a streaming capturer, stop streaming and return the
-        captured data or take a snapshot and return it.
+        If this is a non-snapshot capturer and it is streaming, stop
+        streaming.
 
-        This stops the capture of the stream and return the file
-        or take a snapshot capture and return.
+        If it is a snapshot capturer, do nothing; the upper
+        layer won't call it.
+
+        The driver is responsible of properly terminating the captured
+        data when the capture process is interrupted.
 
         :param ttbl.test_target target: target on which we are capturing
-        :param str capturer: name of this capturer
-        :returns: dictionary of values to pass to the client,
-          including the data; to stream a large file, include a member
-          in this dictionary called *stream_file* pointing to the
-          file's path; eg:
 
-          >>> return dict(stream_file = CAPTURE_FILE)
+        :param str capturer: name of this capturer
+
+        :param str path: path where the capture files are to be located
+
+        :returns dict: If an empty dictionary, the capture information
+          as returned by :meth:`start` if still valid.
+
+          On error, a dictionary with "_error" and a description on
+          it; all the fields in the dictionary will be reported.
+
+          If a dictionary keyed by stream name (as in self.stream), the
+          values are names of the file RELATIVE to *path* where
+          the data is captured or being captured, overriding the
+          values reported upon start by :meth:`start`.
+
         """
         assert isinstance(target, ttbl.test_target)
-        assert isinstance(capturer, basestring)
+        assert isinstance(capturer, str_type)
         # must return a dict
+        raise NotImplementedError
 
 
 class interface(ttbl.tt_interface):
@@ -137,155 +312,203 @@ class interface(ttbl.tt_interface):
 
       Names have to be valid python symbol names.
 
-    """
-    def __init__(self, **impls):
-        assert isinstance(impls, dict), \
-            "impls must be a dictionary keyed by capture name, got %s" \
-            % type(impls).__name__
-        ttbl.tt_interface.__init__(self)
-        # Verify arguments
-        self.impls = {}
-        for capturer, impl in impls.iteritems():
-            if isinstance(impl, impl_c):
-                if capturer in self.impls:
-                    raise AssertionError("capturer '%s' is repeated "
-                                         % capturer)
-                self.impls[capturer] = impl
-            elif isinstance(impl, basestring):
-                # synonym
-                if not impl in impls:
-                    raise AssertionError(
-                        "capturer synonym '%s' refers to a capturer "
-                        "'%s' that does not exist " % (capturer, impl))
-                self.impls[capturer] = impls[impl]
-            else:
-                raise AssertionError(
-                    "capturer '%s' implementation is type %s, " \
-                    "expected ttbl.capture.impl_c or str"
-                    % (capturer, type(impl).__name__))
 
-        # Path to the user directory, updated on every request_process
-        # call
-        self.user_path = None
+    **Lifecycle**
+
+    When starting a capture, if the capturer is already capturing, it
+    is stopped first and the previous capture is wiped. If trying to
+    stop an snapshot capturer or a non-capturing capturer, nothing
+    happens.
+
+    Once capturing starts, inventory fields are set with the names of
+    the files where the data is being downloaded (see :ref:`inventory
+    <inventory_capture>`). The data can be downloaded at any time,
+    even when the system is still capturing, and in this case it might
+    be incomplete or partial. Only when stopped the data is guaranteed
+    to be complete and properly terminated.
+
+    When the targets are released, any captured data is wiped.
+
+    Only allocation owner, creator or guests can access the captured
+    data (FIXME: pending).
+
+    """
+    def __init__(self, *impls, **kwimpls):
+        ttbl.tt_interface.__init__(self)
+        self.impls_set(impls, kwimpls, impl_c)
+
 
     def _target_setup(self, target, iface_name):
         """
         Called when the interface is added to a target to initialize
         the needed target aspect (such as adding tags/metadata)
         """
-        capturers = []
         publish_dict = target.tags['interfaces'][iface_name]
-        for capturer, impl in self.impls.iteritems():
-            ctype = "stream" if impl.stream else "snapshot"
-            publish_dict[capturer]['type'] = ctype
-            descr = capturer + ":" + ctype
-            if impl.mimetype:
-                descr += ":" + impl.mimetype
-                publish_dict[capturer]['mimetype'] = impl.mimetype
-
-    def start(self, who, target, capturer):
-        """
-        If this is a streaming capturer, start capturing the stream
-
-        :param str who: user who owns the target
-        :param ttbl.test_target target: target on which we are capturing
-        :param str capturer: capturer to use, as registered in
-          :class:`ttbl.capture.interface`.
-        :returns: dictionary of values to pass to the client
-        """
-        assert capturer in self.impls.keys(), "capturer %s unknown" % capturer
-        with target.target_owned_and_locked(who):
+        for capturer in self.impls:
             impl = self.impls[capturer]
-            if impl.stream == False:
-                # doesn't need starting
-                return { 'result' : 'capture start not needed'}
-            capturing = target.property_get("capturer-%s-started" % capturer)
-            impl.user_path = self.user_path
-            if not capturing:
-                target.property_set("capturer-%s-started" % capturer, "True")
-                return { 'result' : 'capture started'}
-            else:
-                # if we were already capturing, restart it--maybe
-                # someone left it capturing by mistake or who
-                # knows--but what matters is what the current user wants.
-                target.property_set("capturer-%s-started" % capturer, None)
-                impl.stop_and_get(target, capturer)
-                impl.start(target, capturer)
-                target.property_set("capturer-%s-started" % capturer, "True")
-                return { 'result' : 'capture started'}
+            assert capturer != "capturing", \
+                "capturer name 'capturing' is reserved; cannot use"
+            # Clean any existing state
+            target.property_set("interfaces.capture." + capturer, None)
+            publish_dict[capturer]['snapshot'] = impl.snapshot
+            publish_dict[capturer]['stream'] = {}
+            for stream_name in impl.stream:
+                publish_dict[capturer]['stream'][stream_name] = {}
+                publish_dict[capturer]['stream'][stream_name]['mimetype'] = \
+                    impl.stream[stream_name]
 
 
-    def stop_and_get(self, who, target, capturer):
-        """
-        If this is a streaming capturer, stop streaming and return the
-        captured data or if no streaming, take a snapshot and return it.
-
-        :param str who: user who owns the target
-        :param ttbl.test_target target: target on which we are capturing
-        :param str capturer: capturer to use, as registered in
-          :class:`ttbl.capture.interface`.
-        :returns: dictionary of values to pass to the client
-        """
-        assert capturer in self.impls.keys(), "capturer %s unknown" % capturer
-        with target.target_owned_and_locked(who):
-            impl = self.impls[capturer]
-            if impl.stream == False:
-                impl.user_path = self.user_path
-                return impl.stop_and_get(target, capturer)
-            capturing = target.property_get("capturer-%s-started" % capturer)
-            if capturing:
-                impl.user_path = self.user_path
-                target.property_set("capturer-%s-started" % capturer, None)
-                return impl.stop_and_get(target, capturer)
-            else:
-                return { 'result' : 'it is not capturing, can not stop'}
-
-
-    def list(self, target):
-        """
-        List capturers available on a target
-
-        :param ttbl.test_target target: target on which we are capturing
-        """
-        res = {}
-        for name, impl in self.impls.iteritems():
-            if impl.stream:
-                capturing = target.property_get("capturer-%s-started"
-                                                % name)
-                if capturing:
-                    res[name] = "capturing"
-                else:
-                    res[name] = "not-capturing"
-            else:
-                res[name] = "ready"
-        return dict(capturers = res)
+    @staticmethod
+    def _capture_path(target):
+        # FIXME: Ideally we'd include teh ALLOCID here, so we could
+        # keep data after release for future reference?
+        capture_path = os.path.join(target.state_dir, "capture")
+        # just make sure it always exist
+        commonl.makedirs_p(capture_path)
+        return capture_path
 
 
     def _release_hook(self, target, _force):
-        for name, impl in self.impls.iteritems():
-            if impl.stream == True:
-                impl.stop_and_get(target, name)
+        # nothing to do on target release
+        # we don't power off on release so we can pass the target to
+        # someone else in the same state it was
+        capture_path = self._capture_path(target)
+        for capturer in self.impls:
+            impl = self.impls[capturer]
+            if impl.snapshot:
+                continue
+            capturing = target.property_get(
+                "interfaces.capture.%s.capturing" % capturer, False)
+            if not capturing:
+                continue
+            capturing = target.property_set(
+                "interfaces.capture.%s.capturing" % capturer, None)
+            try:
+                target.log.info(
+                    "capture: %s: stopping active capturer on release",
+                    capturer)
+                impl.stop(target, capturer, capture_path)
+            except Exception as e:
+                target.log.warning(
+                    "capture: %s:"
+                    " ignoring exception when stopping upon release: %s",
+                    capturer, e)
+        # WIPE all the captures: FIXME: fix to per ALLOCID
+        shutil.rmtree(capture_path, ignore_errors = True)
 
 
-    def request_process(self, target, who, method, call, args, _files,
-                        _user_path):
-        # called by the daemon when a METHOD request comes to the HTTP path
-        # /ttb-vVERSION/targets/TARGET/interface/capture/CALL
-        self.user_path = _user_path
-        ticket = args.get('ticket', "")
-        if call == "start" and method == "POST":
-            capturer = self.arg_get(args, "capturer", basestring)
-            self.start(who, target, capturer)
-            r = {}
-        elif call == "stop_and_get" and method == "POST":
-            capturer = self.arg_get(args, "capturer", basestring)
-            r = self.stop_and_get(who, target, capturer)
-        elif method == "GET" and call == "list":
-            r = self.list(target)
-        else:
-            raise RuntimeError("%s|%s: unsuported" % (method, call))
-        target.timestamp()	# If this works, it is acquired and locked
-        return r
+    def put_start(self, target, who, args, _files, user_path):
+        """
+        Take a snapshot or start capturing
+
+        :param str who: user who owns the target
+        :param ttbl.test_target target: target on which we are capturing
+        :param str capturer: capturer to use, as registered in
+          :class:`ttbl.capture.interface`.
+        :returns: dictionary of values to pass to the client
+        """
+        impl, capturer = self.arg_impl_get(args, "capturer")
+        assert capturer in list(self.impls.keys()), \
+            "capturer '%s' unknown" % capturer
+
+        capture_path = self._capture_path(target)
+        with target.target_owned_and_locked(who):
+            if not impl.snapshot:
+                capturing = target.property_get(
+                    "interfaces.capture.%s.capturing" % capturer, False)
+                # if we were already capturing, restart it--maybe
+                # someone left it capturing by mistake or who
+                # knows--but what matters is what the current user wants.
+                try:
+                    target.log.info(
+                        "capture/start: %s: stopping to clear state",
+                        capturer)
+                    impl.stop(target, capturer, capture_path)
+                except:
+                    pass	# not care about errors here, resetting state
+            capturing, streams = impl.start(target, capturer, capture_path)
+            assert isinstance(capturing, bool) and isinstance(streams, dict), \
+                "%s: capture driver BUG (%s): start()'s return value " \
+                " expected (bool, dict); got (%s, %s)" % (
+                    capturer, type(impl), type(capturing), type(streams))
+            # Clean state
+            target.property_set("interfaces.capture.%s" % capturer, None)
+            target.property_set(
+                "interfaces.capture.%s.capturing" % capturer, True)
+            r = dict(capturing = capturing)
+            for stream_name in streams:
+                file_name = streams[stream_name]
+                if os.path.isabs(file_name):
+                    raise RuntimeError(
+                        "%s: capture driver BUG (%s): start() returned "
+                        " absolute stream capture file: %s" % (
+                        capturer, type(impl), file_name))
+                target.property_set(
+                    "interfaces.capture.%s.stream.%s.file"
+                    % (capturer, stream_name), file_name)
+                r[stream_name] = file_name
+
+            target.log.info("capture/start: %s: started", capturer)
+            return r
+
+
+    def put_stop(self, target, who, args, _files, _user_path):
+        impl, capturer = self.arg_impl_get(args, "capturer")
+        with target.target_owned_and_locked(who):
+            if impl.snapshot:
+                return {}
+            capturing = target.property_get(
+                "interfaces.capture.%s.capturing" % capturer, False)
+            if not capturing:
+                # pass on this, maybe it was an streaming capture that
+                # stopped on its own after a number of cycles -- the
+                # capture info is in the inventory, the use can use
+                # that to get the capture
+                return {}
+            target.log.info("capture/stop: %s: stopping", capturer)
+            target.property_set("interfaces.capture.%s.capturing" % capturer, False)
+            capture_path = self._capture_path(target)
+            r = impl.stop(target, capturer, capture_path)
+            assert r == None or isinstance(r, dict), \
+                "%s: capture driver BUG (%s): stop()'s return value " \
+                " expected dict; got %s" % (capturer, type(impl), type(r))
+            target.log.info("capture/stop: %s: stopped", capturer)
+
+            if not r:
+                r = {}
+                # no new streams, we are good -- let's see what we got
+                # and return it to the user for convenience
+                streams = target.fsdb.keys("interfaces.capture.%s.stream.*.file"
+                                           % capturer)
+                prefix = "interfaces.capture.%s.stream." % capturer
+                for stream in streams:
+                    file_name = target.fsdb.get(stream)
+                    # remove prefix and trailing .file
+                    stream_name = stream[len(prefix):-len(".file")]
+                    r[stream_name] = file_name
+                return r
+
+            if '_error' in r:
+                raise RuntimeError(r['_error'], r)
+
+            # if the driver reports new streams, let's update them
+            # this cleans the state, but leaves the default, which
+            # comes from the tags and contains the mimetypes
+            target.property_set("interfaces.capture.%s.stream" % capturer,
+                                None)
+            for stream in r:
+                file_name = r[stream]
+                if os.path.isabs(file_name):
+                    raise RuntimeError(
+                        "%s: capture driver BUG (%s): returned "
+                        " absolute stream capture file: %s,"
+                        " expected relative" % (
+                        capturer, type(impl), file_name))
+                target.property_set(
+                    "interfaces.capture.%s.stream.%s"
+                    % (capturer, stream), file_name)
+                r[stream] = file_name
+            return r
 
 
 class generic_snapshot(impl_c):
@@ -312,9 +535,11 @@ class generic_snapshot(impl_c):
     >>>     )
     >>> )
 
+    (for a full VNC capturer see :func:`mk_capture_screenshot_vnc`)
+
     Now the command::
 
-      $ tcf capture-get TARGETNAME vnc0 file.png
+      $ tcf capture TARGETNAME vnc0
 
     will download to ``file.png`` a capture of the target's screen via
     VNC.
@@ -333,7 +558,7 @@ class generic_snapshot(impl_c):
 
     :param str mimetype: MIME type of the capture output, eg image/png
 
-    :param list pre_commands: (optional) list of commands (str) to
+    :param list pre_commands: (optional) list of commands (str_type) to
       execute before the command line, to for example, set parameters
       eg:
 
@@ -345,21 +570,13 @@ class generic_snapshot(impl_c):
     Note all string parameters are `%(keyword)s` expanded from the
     target's tags (as reported by `tcf list -vv TARGETNAME`), such as:
 
-    - output_file_name: name of the file where to dump the capture
-      output; file shall be overwritten.
+    - stream_filename: name of the file where to dump the capture
+      output in the capture/ subdirectory; file shall be overwritten.
+    - log_filename: name of the file where we are capturing execution
+      log in the capture/ subdirectory; file shall be overwritten.
     - id: target's name
     - type: target's type
     - ... (more with `tcf list -vv TARGETNAME`)
-
-    :param str extension: (optional) string to append to the filename,
-      like for example, an extension. This is needed because some
-      capture programs *insist* on guessing the file type from the
-      file name and balk of there is no proper extension; eg:
-
-      >>> extension = ".png"
-
-      avoid adding the extension to the command name you are asking to
-      execute, as the system needs to know the full file name.
 
     **System configuration**
 
@@ -382,56 +599,78 @@ class generic_snapshot(impl_c):
     """
     def __init__(self, name, cmdline, mimetype, pre_commands = None,
                  extension = ""):
-        assert isinstance(name, basestring)
-        assert isinstance(cmdline, basestring)
-        assert isinstance(extension, basestring)
+        assert isinstance(name, str_type)
+        assert isinstance(cmdline, str_type)
+        assert isinstance(extension, str_type)
         self.name = name
         self.cmdline = cmdline.split()
         if pre_commands:
             self.pre_commands = pre_commands
-            assert all([ isinstance(command, basestring)
+            assert all([ isinstance(command, str_type)
                          for command in pre_commands ]), \
                              "list of pre_commands have to be strings"
         else:
             self.pre_commands = []
-        self.extension = extension
-        impl_c.__init__(self, False, mimetype)
+        impl_c.__init__(self, True, mimetype, log = "text/plain")
         # we make the cmdline be the unique physical identifier, since
         # it is like a different implementation each
         self.upid_set(name, serial_number = commonl.mkid(cmdline))
 
-    def start(self, target, capturer):
-        impl_c.start(self, target, capturer)
-        # we don't do anything here, only upon stop
 
-    def stop_and_get(self, target, capturer):
-        impl_c.stop_and_get(self, target, capturer)
-        file_name = "%s/%s-%s-%s%s" % (
-            self.user_path, target.id, capturer,
-            time.strftime("%Y%m%d-%H%M%S"), self.extension)
-        kws = dict(output_file_name = file_name)
+    def start(self, target, capturer, path):
+        stream_filename = "%s.png" % capturer
+        log_filename = "%s.log" % capturer
+        kws = dict(
+            output_file_name = os.path.join(path, stream_filename),# LEGACY
+            stream_filename = os.path.join(path, stream_filename),
+            log_filename = os.path.join(path, log_filename),
+            capturer = capturer,
+            timestamp = str(datetime.datetime.utcnow())
+        )
         kws.update(target.kws)
         kws.update(target.fsdb.get_as_dict())
-        cmdline = []
-        try:
-            for command in self.pre_commands:
-                # yup, run with shell -- this is not a user level
-                # command, the configurator has full control
-                subprocess.check_call(command % kws, shell = True)
-            for i in self.cmdline:
-                cmdline.append(i % kws)
-            target.log.info("snapshot command: %s" % " ".join(cmdline))
-            subprocess.check_call(cmdline, cwd = "/tmp", shell = False,
-                                  close_fds = True,
-                                  stderr = subprocess.STDOUT)
-        except subprocess.CalledProcessError as e:
-            target.log.error(
-                "%s: capturing of '%s' with '%s' failed: (%d) %s"
-                % (target.id, self.name % kws, " ".join(e.cmd), e.returncode,
-                   e.output))
-            raise
-        # tell the caller to stream this file to the client
-        return dict(stream_file = file_name)
+        with open(kws['log_filename'], "w+") as logf:
+            logf.write("""\
+INFO: ttbd running generic_snaphost capture for '%(capturer)s' at %(timestamp)s
+INFO: log_file (this file): %(log_filename)s
+INFO: stream_file: %(stream_filename)s
+""" % kws)
+            try:
+                for command in self.pre_commands:
+                    # yup, run with shell -- this is not a user level
+                    # command, the configurator has full control
+                    logf.write("INFO: calling pre-command: %s\n"
+                               % (command % kws))
+                    logf.flush()
+                    subprocess.check_call(
+                        command % kws,
+                        shell = True, close_fds = True, cwd = "/tmp",
+                        stdout = logf, stderr = subprocess.STDOUT)
+                cmdline = []
+                for i in self.cmdline:
+                    cmdline.append(i % kws)
+                target.log.info("%s: snapshot command: %s" % (
+                    capturer, " ".join(cmdline)))
+                logf.write("INFO: calling commandline: %s\n"
+                           % " ".join(cmdline))
+                logf.flush()
+                subprocess.check_call(
+                    cmdline, cwd = "/tmp", shell = False, close_fds = True,
+                    stdout = logf, stderr = subprocess.STDOUT)
+                target.log.info("%s: generic snapshot taken" % capturer)
+            except subprocess.CalledProcessError as e:
+                target.log.error(
+                    "%s: capturing of '%s' with '%s' failed: (%d) %s" % (
+                        capturer, self.name % kws, " ".join(e.cmd),
+                        e.returncode, e.output))
+                logf.write("ERROR: capture failed\n")
+                raise
+        # report we rare no streaming (snapshot!) and the streams
+        # provided in the capture/ directory
+        return False, { "default": stream_filename, "log": log_filename }
+
+    # no stop() because is a snapshot capturer
+
 
 
 class generic_stream(impl_c):
@@ -487,7 +726,7 @@ class generic_stream(impl_c):
     :param str cmdline: commandline to invoke the capturing of the
       stream
     :param str mimetype: MIME type of the capture output, eg video/avi
-    :param list pre_commands: (optional) list of commands (str) to
+    :param list pre_commands: (optional) list of commands (str_type) to
       execute before the command line, to for example, set
       volumes.
     :param int wait_to_kill: (optional) time to wait since we send a
@@ -506,75 +745,93 @@ class generic_stream(impl_c):
     For more information, look at :class:`ttbl.capture.generic_snapshot`.
     """
     def __init__(self, name, cmdline, mimetype,
-                 pre_commands = None, wait_to_kill = 1):
-        assert isinstance(name, basestring)
-        assert isinstance(cmdline, basestring)
+                 extension = "",
+                 pre_commands = None,
+                 wait_to_kill = 2,
+                 use_signal = signal.SIGINT):
+        assert isinstance(name, str_type)
+        assert isinstance(cmdline, str_type)
         assert wait_to_kill > 0
         self.name = name
         self.cmdline = cmdline.split()
         self.wait_to_kill = wait_to_kill
+        self.extension = "." + extension
+        self.use_signal = use_signal
         if pre_commands:
             self.pre_commands = pre_commands
-            assert all([ isinstance(command, basestring)
+            assert all([ isinstance(command, str_type)
                          for command in pre_commands ]), \
                              "list of pre_commands have to be strings"
         else:
             self.pre_commands = []
-        impl_c.__init__(self, True, mimetype)
+        impl_c.__init__(self, False, mimetype, log = 'text/plain')
         # we make the cmdline be the unique physical identifier, since
         # it is like a different implementation each
         self.upid_set(name, serial_number = commonl.mkid(cmdline))
 
-    def start(self, target, capturer):
-        impl_c.start(self, target, capturer)
-        pidfile = os.path.join(target.state_dir,
-                               "capturer-" + capturer + ".pid")
-        file_name = "%s/%s-%s-%s" % (self.user_path, target.id, capturer,
-                                     time.strftime("%Y%m%d-%H%M%S"))
-        kws = dict(output_file_name = file_name)
+    def start(self, target, capturer, path):
+        stream_filename = "%s%s" % (capturer, self.extension)
+        log_filename = "%s.log" % capturer
+        pidfile = "%s/capture-%s.pid" % (target.state_dir, capturer)
+        kws = dict(
+            output_file_name = os.path.join(path, stream_filename),# LEGACY
+            stream_filename = os.path.join(path, stream_filename),
+            log_filename = os.path.join(path, log_filename),
+            capturer = capturer,
+            timestamp = str(datetime.datetime.utcnow())
+        )
         kws.update(target.kws)
         kws.update(target.fsdb.get_as_dict())
-        target.property_set("capturer-%s-output" % capturer, file_name)
-        try:
-            for command in self.pre_commands:
-                target.log.info("streaming pre-command: %s" % command)
-                # yup, run with shell -- this is not a user level
-                # command, the configurator has full control
-                subprocess.check_call(command % kws, shell = True)
-            # replace $OUTPUTFILENAME$ with the name of the output file
-            cmdline = []
-            for i in self.cmdline:
-                if '$OUTPUTFILENAME$' in i:
-                    i = i.replace("$OUTPUTFILENAME$", file_name)
-                cmdline.append(i % kws)
-            target.log.info("streaming command: %s" % " ".join(cmdline))
-            p = subprocess.Popen(cmdline, cwd = "/tmp", shell = False,
-                                 close_fds = True,
-                                 stderr = subprocess.STDOUT)
-            with open(pidfile, "w+") as pidf:
-                pidf.write("%s" % p.pid)
-        except subprocess.CalledProcessError as e:
-            target.log.error(
-                "%s: starting capture of '%s' output with '%s' failed: (%d) %s"
-                % (target.id, self.name % kws, e.cmd, e.returncode,
-                   e.output))
-            raise
-
-    def stop_and_get(self, target, capturer):
-        impl_c.stop_and_get(self, target, capturer)
-        pidfile = os.path.join(target.state_dir,
-                               "capturer-" + capturer + ".pid")
-        file_name = target.property_get("capturer-%s-output" % capturer)
-        kws = dict(output_file_name = file_name)
-        kws.update(target.kws)
-        kws.update(target.fsdb.get_as_dict())
-        try:
-            target.property_set("capturer-%s-output" % capturer, None)
-            commonl.process_terminate(
-                pidfile, tag = "capture:" + self.name % kws,
-                wait_to_kill = self.wait_to_kill)
-            return dict(stream_file = file_name)
-        except OSError as e:
-            # adb might have died already
-            if e != errno.ESRCH:
+        with open(kws['log_filename'], "w+") as logf:
+            logf.write("""\
+INFO: ttbd running generic_stream capture for '%(capturer)s' at %(timestamp)s
+INFO: log_file (this file): %(log_filename)s
+INFO: stream_file: %(stream_filename)s
+""" % kws)
+            try:
+                for command in self.pre_commands:
+                    # yup, run with shell -- this is not a user level
+                    # command, the configurator has full control
+                    logf.write("INFO: calling pre-command: %s\n"
+                               % (command % kws))
+                    logf.flush()
+                    subprocess.check_call(
+                        command % kws,
+                        shell = True, close_fds = True, cwd = "/tmp",
+                        stdout = logf, stderr = subprocess.STDOUT)
+                cmdline = []
+                for i in self.cmdline:
+                    cmdline.append(i % kws)
+                target.log.info("%s: stream command: %s" % (
+                    capturer, " ".join(cmdline)))
+                logf.write("INFO: calling commandline: %s\n"
+                           % " ".join(cmdline))
+                logf.flush()
+                p = subprocess.Popen(
+                    cmdline, cwd = "/tmp", shell = False, close_fds = True,
+                    stdout = logf, stderr = subprocess.STDOUT)
+                target.log.info("%s: generic streaming started" % capturer)
+            except subprocess.CalledProcessError as e:
+                target.log.error(
+                    "%s: capturing of '%s' with '%s' failed: (%d) %s" % (
+                        capturer, self.name % kws, " ".join(e.cmd),
+                        e.returncode, e.output))
+                logf.write("ERROR: capture failed\n")
                 raise
+
+        with open(pidfile, "w+") as pidf:
+            pidf.write("%s" % p.pid)
+        ttbl.daemon_pid_add(p.pid)
+
+        # report we rare no streaming (snapshot!) and the streams
+        # provided in the capture/ directory
+        return False, { "default": stream_filename, "log": log_filename }
+
+
+    def stop(self, target, capturer, path):
+        pidfile = "%s/capture-%s.pid" % (target.state_dir, capturer)
+        target.log.info("%s: stopping generic streaming", capturer)
+        commonl.process_terminate(pidfile, tag = "capture:" + capturer,
+                                  wait_to_kill = self.wait_to_kill,
+                                  use_signal = self.use_signal)
+        target.log.info("%s: generic streaming stopped", capturer)

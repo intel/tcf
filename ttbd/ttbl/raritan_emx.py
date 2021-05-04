@@ -8,6 +8,9 @@
 #
 # pylint: disable = missing-docstring
 
+import logging
+import os
+import subprocess
 import urlparse
 
 import commonl
@@ -122,6 +125,11 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
         assert password == None or isinstance(password, basestring)
 
         ttbl.power.impl_c.__init__(self, **kwargs)
+        self.capture_program = commonl.ttbd_locate_helper(
+            "raritan-power-capture.py",
+            log = logging, relsrcpath = ".")
+        ttbl.capture.impl_c.__init__(
+            self, snapshot = False, mimetype = "application/json")
         self.url = urlparse.urlparse(url)
         if password:
             self.password = commonl.password_get(
@@ -185,3 +193,46 @@ class pci(ttbl.power.impl_c): # pylint: disable = abstract-method
         if state == 0:
             return False
         return True
+
+    #
+    # ttbl.capture.impl_c: power capture stats
+    #
+    def start(self, target, capturer, path):
+        stream_filename = capturer + ".data.json"
+        log_filename = capturer + ".capture.log"
+        pidfile = "%s/capture-%s.pid" % (target.state_dir, capturer)
+
+        logf = open(os.path.join(path, log_filename), "w+")
+        p = subprocess.Popen(
+            [
+                "stdbuf", "-e0", "-o0",
+                self.capture_program,
+                "%s://%s@%s" % (self.url.scheme, self.url.username,
+                                self.url.hostname),
+                "environment",
+                # the indexes the command line tool expects are
+                # 1-based, whereas we stored zero based (what the API likes)
+                str(self.outlet_number + 1),
+                os.path.join(path, stream_filename),
+            ],
+            env = { 'RARITAN_PASSWORD': self.password },
+            bufsize = -1,
+            close_fds = True,
+            shell = False,
+            stderr = subprocess.STDOUT, stdout = logf.buffer,
+        )
+
+        with open(pidfile, "w+") as pidf:
+            pidf.write("%s" % p.pid)
+        ttbl.daemon_pid_add(p.pid)
+
+        return True, {
+            "default": stream_filename,
+            "log": log_filename
+        }
+
+
+    def stop(self, target, capturer, path):
+        pidfile = "%s/capture-%s.pid" % (target.state_dir, capturer)
+        commonl.process_terminate(pidfile, tag = "capture:" + capturer,
+                                  wait_to_kill = 2)
