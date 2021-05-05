@@ -690,7 +690,7 @@ class interface(ttbl.tt_interface):
         # full power cycle might be needed
         if self.power_sequence_post:
             target.power.sequence(target, self.power_sequence_post)
-        target.log.info("flashed images" + " ".join(parallel.values()))
+        target.log.info("flashed images: %s", parallel)
 
 
     def put_flash(self, target, who, args, _files, user_path):
