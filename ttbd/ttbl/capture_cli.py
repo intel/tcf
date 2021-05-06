@@ -12,8 +12,7 @@ import sys
 import time
 
 
-def main(outputfilename, sample_function, xlat, *args,
-         period_s = 1, **kwargs):
+def main(outputfilename, sample_function, xlat, *args,**kwargs):
     r"""
     Shell to call sampling functions and report as JSON
 
@@ -69,6 +68,7 @@ def main(outputfilename, sample_function, xlat, *args,
     :param float period_s: (optional; default 1s) sampling period (in
       seconds)
     """
+    period_s = kwargs.get("period_s", 1)
     assert isinstance(outputfilename, str)
     assert callable(xlat)
     assert callable(sample_function)
@@ -98,15 +98,16 @@ def main(outputfilename, sample_function, xlat, *args,
                     time.sleep(period_s)
                     ts = time.time()
                 ts0 = ts
-                print(f"INFO: calling sample function @{ts}", file = sys.stderr)
+                sys.stderr.write("INFO: calling sample function @%s" % ts)
                 data, errors = sample_function(*args, **kwargs)
                 assert isinstance(data, dict), \
-                    f"BUG in sampling function {sample_function}:" \
-                    f" data returned is not a dict; got {type(data)}"
+                    "BUG in sampling function %s:" \
+                    " data returned is not a dict; got %s" \
+                    % (sample_function, type(data))
                 assert errors == None or isinstance(errors, dict), \
-                    f"BUG in sampling function {sample_function}:" \
-                    f" errors returned is not a dict or None;" \
-                    f" got {type(errors)}"
+                    "BUG in sampling function %s:"\
+                    " errors returned is not a dict or None;" \
+                    " got %s" % (sample_function, type(errors))
                 # This output follows the convention dictated in ttbl.capture
 
                 if period_s < 1:
@@ -139,6 +140,6 @@ def main(outputfilename, sample_function, xlat, *args,
         finally:
             # Note testcases rely on this message to see we terminated
             # properly or not (tests/test_capture_*)
-            print("INFO: terminating JSON!", file = sys.stderr)
+            sys.stderr.write("INFO: terminating JSON!")
             of.write("\n]")
             of.flush()
