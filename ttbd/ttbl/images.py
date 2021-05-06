@@ -332,7 +332,6 @@ class impl2_c(impl_c):
       power sequences will be run, only the global ones specifed as
       arguments to the :class:ttbl.images.interface.
 
-
     :param int retries (optional; defaults to 3) how many times to
       retry before giving up, on failure.
 
@@ -422,29 +421,6 @@ class impl2_c(impl_c):
         raise NotImplementedError
         return None	# if all ok
         return {}	# diagnostics info
-
-    def flash(self, target, images):
-        """
-        Flashes in serial mode a parallel-capable flasher
-        """
-        context = dict()		# setup as interface._flash_parallel()
-        context['ts0'] = time.time()
-        self.flash_start(target, images, context)
-        ts = ts0 = time.time()
-        while ts - ts0 < self.estimated_duration:
-            time.sleep(self.check_period)
-            target.timestamp()	# timestamp so we don't idle...
-            if self.flash_check_done(target, images, context) == True:
-                break
-            ts = time.time()
-        else:
-            msg = "%s: flashing failed: timedout after %ds" \
-                % (" ".join(images.keys()), self.estimated_duration)
-            self.flash_kill(target, images, context, msg)
-            raise RuntimeError(msg)
-
-        self.flash_post_check(target, images, context)
-        target.log.info("flashed image")
 
 
 class interface(ttbl.tt_interface):
@@ -551,49 +527,9 @@ class interface(ttbl.tt_interface):
                 name
             )
 
-    def _impl_flash(self, impl, target, subimages):
-        if impl.power_sequence_pre:
-            target.power.sequence(target, impl.power_sequence_pre)
-        try:
-            # in some flashers, the flashing occurs over a
-            # serial console we might be using, so we can
-            # disable it -- we'll renable on exit--or not.
-            # This has to be done after the power-cycle, as it might
-            # be enabling consoles
-            # FIXME: move this for parallel too?
-            for console_name in impl.consoles_disable:
-                target.log.info(
-                    "flasher %s: disabling console %s to allow flasher to work"
-                    % (img_type, console_name))
-                target.console.put_disable(
-                    target, ttbl.who_daemon(),
-                    dict(component = console_name),
-                    None, None)
-            impl.flash(target, subimages)
-            self._hash_record(target, subimages)
-
-            # note in case of flashing failure we don't
-            # necessarily power on the components, since
-            # things might be a in a bad state--we let the
-            # user figure it out.
-        finally:
-            # FIXME: move this for parallel too?
-            for console_name in impl.consoles_disable:
-                target.log.info(
-                    "flasher %s: enabling console %s after flashing"
-                    % (img_type, console_name))
-                target.console.put_enable(
-                    target, ttbl.who_daemon(),
-                    dict(component = console_name),
-                    None, None)
-        # note this might seem counterintuitive; the
-        # configuration might specify some components are
-        # switched off while others are power cycled, or none
-        if impl.power_sequence_post:
-            target.power.sequence(target, impl.power_sequence_post)
-
-    def _flash_parallel_once(self, target, parallel, failed):
-        # flash a parallel-capable flasher in a serial fashion
+    def _flash_parallel_do(self, target, parallel, image_names):
+        # flash a parallel-capable flasher in a serial fashion; when
+        # something fails, repeat it right away if it has retries
         contexts = {}
         estimated_duration = 0
         check_period = 4
@@ -601,26 +537,58 @@ class interface(ttbl.tt_interface):
         for impl, images in parallel.items():
             context = dict()
             context['ts0'] = time.time()
+            context['retry_count'] = 1	# 1 based, nicer for human display
             contexts[impl] = context
             estimated_duration = max(impl.estimated_duration, estimated_duration)
             check_period = min(impl.check_period, check_period)
-            impl.flash_start(target, images, context)
             all_images += images.keys()
+            target.log.info("%s: flashing %s", target.id, image_names[impl])
+            impl.flash_start(target, images, context)
 
         ts = ts0 = time.time()
         done = set()
+        done_impls = set()
         while ts - ts0 < estimated_duration:
             target.timestamp()	# timestamp so we don't idle...
             time.sleep(check_period)
             for impl, images in parallel.items():
+                if impl in done_impls:	# already completed? skip
+                    continue
                 context = contexts[impl]
+                retry_count = context['retry_count']
                 ts = time.time()
                 if ts - ts0 > impl.check_period \
                    and impl.flash_check_done(target, images, context) == True:
-                    done.update(images.keys())
+                    # says it is done, let's verify it
+                    r = impl.flash_post_check(target, images, context)
+                    if r == None:
+	                # success! we are done in this one
+                        self._hash_record(target, images)
+                        done.update(images.keys())
+                        done_impls.add(impl)
+                        target.log.warning(
+                            "%s/%s: flashing completed; done_impls: %s",
+                            target.id, image_names[impl], done_impls)
+                    elif retry_count <= impl.retries:
+	                # failed, retry?
+                        context['retry_count'] += 1
+                        target.log.warning(
+                            "%s/%s: flashing failed, retrying %d/%d: %s",
+                            target.id, image_names[impl],
+                            context['retry_count'], impl.retries, r)
+                        impl.flash_start(target, images, context)
+                    else:
+                        # failed, out of retries, error as soon as possible
+                        msg = "%s/%s: flashing failed %d times, aborting: %s" % (
+                            target.id, image_names[impl], retry_count, r)
+                        target.log.error(msg)
+                        for _impl, _images in parallel.items():
+                            _impl.flash_kill(target, _images, contexts[_impl], msg)
+                        raise RuntimeError(msg)
             ts = time.time()
-            if len(done) == len(contexts):
-                break
+            if len(done_impls) == len(parallel):
+                target.log.info("flashed images" + " ".join(image_names.values()))
+                return
         else:
             msg = "%s/%s: flashing failed: timedout after %ds" \
                 % (target.id, " ".join(all_images), estimated_duration)
@@ -628,69 +596,59 @@ class interface(ttbl.tt_interface):
                 impl.flash_kill(target, images, contexts[impl], msg)
             raise RuntimeError(msg)
 
+
+    def _flash_consoles_disable(self, target, parallel, image_names):
+        # in some flashers, the flashing occurs over a
+        # serial console we might be using, so we can
+        # disable it -- we'll renable on exit--or not.
+        # This has to be done after the power-cycle, as it might
+        # be enabling consoles
+        # FIXME: move this for parallel too?
+        for impl in parallel:
+            for console_name in impl.consoles_disable:
+                target.log.info(
+                    "flasher %s/%s: disabling console %s to allow flasher to work",
+                    target.id, image_names[impl], console_name)
+                target.console.put_disable(
+                    target, ttbl.who_daemon(),
+                    dict(component = console_name),
+                    None, None)
+
+    def _flash_consoles_enable(self, target, parallel, image_names):
+        for impl in parallel:
+            for console_name in impl.consoles_disable:
+                target.log.info(
+                    "flasher %s/%s: enabling console %s after flashing",
+                    target.id, image_names[impl], console_name)
+                target.console.put_enable(
+                    target, ttbl.who_daemon(),
+                    dict(component = console_name),
+                    None, None)
+
+
+    def _flash_parallel(self, target, parallel, power_sequence_pre, power_sequence_post):
+        if power_sequence_pre:
+            target.power.sequence(target, power_sequence_pre)
+
+        image_names = { }
         for impl, images in parallel.items():
-            context = contexts[impl]
-            r = impl.flash_post_check(target, images, context)
-            if r == None:
-                self._hash_record(target, images)
-            else:
-                image_names = ",".join(images.keys())
-                failed.append(( impl, image_names, r))
+            image_names[impl] = ",".join([ i + ":" + images[i] for i in images ])
 
+        try:
+            target.log.info("flasher %s/%s: starting",
+                            target.id, image_names[impl])
+            self._flash_consoles_disable(target, parallel, image_names)
+            self._flash_parallel_do(target, parallel, image_names)
+        finally:
+            target.log.info("flasher %s/%s: done",
+                            target.id, image_names[impl])
+            self._flash_consoles_enable(target, parallel, image_names)
 
-    def _flash_parallel(self, target, parallel):
-        if self.power_sequence_pre:
-            target.power.sequence(target, self.power_sequence_pre)
-
-        total_estimated_duration = 0
-        retry_counters = collections.defaultdict(int)
-        for impl in parallel.keys():
-            total_estimated_duration = max(
-                total_estimated_duration,
-                impl.retries * impl.estimated_duration)
-        total_estimated_duration /= 2
-
-        # run flashings as long as their retry counters are up
-        ts0 = time.time()
-        results = {}
-        while True:
-            failed = []
-            _parallel = {}
-            tasks = []
-            for impl in parallel:
-                if retry_counters[impl] >= 0:
-                    _parallel[impl] = parallel[impl]
-                    tasks.append("%s (%d/%d tries)" % (
-                        parallel[impl], retry_counters[impl], impl.retries))
-            target.log.info("%s: flashing %s", target.id, " ".join(tasks))
-            self._flash_parallel_once(target, _parallel, failed)
-            if not failed:
-                break			# we are good here
-            ts = time.time()
-            if ts - ts0 > total_estimated_duration:
-                raise RuntimeError(
-                    "%s: flashing failed: timedout after %fs"
-                    % (target.id, total_estimated_duration))
-
-            for impl, image_names, r in failed:
-                retry_counters[impl] += 1
-                current_count = retry_counters[impl]
-                if current_count >= impl.retries:
-                    raise RuntimeError(
-                        "%s/%s: flashing failed after %d retries: %s" % (
-                            target.id, image_names, impl.retries, r))
-                target.log.warning(
-                    "%s/%s: flashing retrying %d/%d because of result: %s",
-                    target.id, image_names,
-                    retry_counters[impl],
-                    impl.retries, r)
-
-        # note the post sequence is not run in case of flashing error,
-        # this is intended, things might be a in a weird state, so a
-        # full power cycle might be needed
-        if self.power_sequence_post:
-            target.power.sequence(target, self.power_sequence_post)
-        target.log.info("flashed images: %s", parallel)
+            # note the post sequence is not run in case of flashing error,
+            # this is intended, things might be a in a weird state, so a
+            # full power cycle might be needed
+            if power_sequence_post:
+                target.power.sequence(target, power_sequence_post)
 
 
     def put_flash(self, target, who, args, _files, user_path):
@@ -765,11 +723,18 @@ class interface(ttbl.tt_interface):
             target.timestamp()
             # iterate over the real implementations only
             for impl, subimages in serial.iteritems():
-                self._impl_flash(impl, target, subimages)
+                # Serial implementation we just fake like it is
+                # parallel, but with a single implementation at the
+                # same time
+                self._flash_parallel(target, { impl: subimages },
+                                     impl.power_sequence_pre,
+                                     impl.power_sequence_post)
             # FIXME: collect diagnostics here of what failed only if
             # 'admin' or some other role?
             if parallel:
-                self._flash_parallel(target, parallel)
+                self._flash_parallel(target, parallel,
+                                     self.power_sequence_pre,
+                                     self.power_sequence_post)
             return {}
 
     # FIXME: save the names of the last flashed in fsdb so we can
@@ -1553,7 +1518,6 @@ class flash_shell_cmd_c(impl2_c):
             target.log.error(message)
             raise RuntimeError(message)
         cmdline_s = " ".join(cmdline)
-        target.log.info("%s: command line: %s" % (image_types, cmdline_s))
         context['cmdline'] = cmdline
         context['cmdline_s'] = cmdline_s
 
@@ -1566,7 +1530,8 @@ class flash_shell_cmd_c(impl2_c):
         ts0 = time.time()
         context['ts0'] = ts0
         try:
-            target.log.info("flashing image with: %s" % " ".join(cmdline))
+            target.log.info("flashing %s image with: %s",
+                            image_types, " ".join(cmdline))
             with open(logfile_name, "w+") as logf:
                 self.p = subprocess.Popen(
                     cmdline, env = env, stdin = None, cwd = cwd,
@@ -1653,18 +1618,17 @@ class flash_shell_cmd_c(impl2_c):
                 context['cmdline_s'], self.p.returncode,
                 self._log_file_read(context))
             target.log.error(msg)
-            raise RuntimeError(msg)
+            return { "message": msg }
         return
         # example, look at errors in the logfile
         try:
             with codecs.open(context['logfile_name'], errors = 'ignore') as logf:
                 for line in logf:
                     if 'Fail' in line:
-                        logf.seek(0)
-                        msg = "flashing with %s failed, issues in logfile: %s" % (
-                            context['cmdline_s'], logf.read())
+                        msg = "flashing with %s failed, issues in logfile" % (
+                            context['cmdline_s'])
                         target.log.error(msg)
-                        raise RuntimeError(msg)
+                        return { "message": msg }
         except IOError as e:
             if e.errno != errno.ENOENT:
                 raise
@@ -1842,6 +1806,7 @@ class quartus_pgm_c(flash_shell_cmd_c):
             self.args = {}
 
         cmdline = [
+            "stdbuf", "-o0", "-e0", "-i0",
             self.path,
             # FIXME: move this to args, enable value-less args (None)
             "--bgp",		# Real time background programming
@@ -1860,7 +1825,8 @@ class quartus_pgm_c(flash_shell_cmd_c):
         ]
         if args:
             for arg, value in args.items():
-                cmdline += [ arg, value ]
+                if value != None:
+                    cmdline += [ arg, value ]
         # we do this because in flash_start() we need to add
         # --operation as we find images we are supposed to flash
         self.cmdline_orig = cmdline
@@ -2133,4 +2099,4 @@ class sf100linux_c(flash_shell_cmd_c):
                 " but it has been called to flash %d images (%s)" % (
                     target.id, type(self),
                     len(images), ", ".join(images.keys())))
-        flash_shell_cmd_c.flash_post_check(self, target, images, context)
+        return flash_shell_cmd_c.flash_post_check(self, target, images, context)
