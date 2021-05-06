@@ -432,6 +432,7 @@ def ipmitool_superuser_setup(target, uid, username, password,
 
 
 def ipmitool_ipv4_static_setup(target, channel, ipaddr, netmask, gateway,
+                               mac_addr = None,
                                bmc_id = 0):
     """
     Configure an IPMI network channel with static IPv4 with *ipmitool*
@@ -479,6 +480,8 @@ def ipmitool_ipv4_static_setup(target, channel, ipaddr, netmask, gateway,
     target.report_info(f"bmc{bmc_id}: configuring network channel {channel}")
     target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} access off")
     target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} ipsrc static")
+    if mac_addr:
+        target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} macaddr {mac_addr}")
     target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} ipaddr {ipaddr}")
     target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} netmask {netmask}")
     # need to set this after the netmask, in some platforms it might
@@ -499,6 +502,9 @@ def ipmitool_ipv4_static_setup(target, channel, ipaddr, netmask, gateway,
         f'Subnet Mask             : {netmask}',
         f'Default Gateway IP      : {gateway}'
     ]
+    if mac_addr:
+        musthave.append(
+            f'MAC Address             : {mac_addr.lower()}')
     for s in musthave:
         if s not in output:
             raise tcfl.tc.failed_e(
@@ -686,6 +692,7 @@ def setup_ipmitool(target, bmc_id, bmc_name, bmc_data):
         ipmitool_ipv4_static_setup(
             target, data['channel'],
             data['ipv4_addr'], data['ipv4_netmask'], data['ipv4_gateway'],
+            mac_addr = data.get('mac_addr', None),
             bmc_id = bmc_id)
 
 
