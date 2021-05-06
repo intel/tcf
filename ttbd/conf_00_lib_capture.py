@@ -121,7 +121,7 @@ capture_screenshot_ffmpeg_v4l = ttbl.capture.generic_snapshot(
     # black frame always
     " -ss 0.5 -frames 1 -c:v png -f image2pipe "
     "-y %(output_file_name)s",
-    mimetype = "image/png"
+    mimetype = "image/png", extension = ".png"
 )
 
 
@@ -152,7 +152,7 @@ capture_vstream_ffmpeg_v4l = ttbl.capture.generic_stream(
     "video:/dev/video-%(id)s-0",
     "ffmpeg -i /dev/video-%(id)s-0"
     " -f avi -qscale:v 10 -y %(output_file_name)s",
-    mimetype = "video/avi"
+    mimetype = "video/avi", extension = ".avi"
 )
 
 

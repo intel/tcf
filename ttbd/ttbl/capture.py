@@ -611,6 +611,7 @@ class generic_snapshot(impl_c):
                              "list of pre_commands have to be strings"
         else:
             self.pre_commands = []
+        self.extension = extension
         impl_c.__init__(self, True, mimetype, log = "text/plain")
         # we make the cmdline be the unique physical identifier, since
         # it is like a different implementation each
@@ -618,8 +619,8 @@ class generic_snapshot(impl_c):
 
 
     def start(self, target, capturer, path):
-        stream_filename = "%s.png" % capturer
-        log_filename = "%s.log" % capturer
+        stream_filename = capturer + self.extension
+        log_filename = capturer + ".log"
         kws = dict(
             output_file_name = os.path.join(path, stream_filename),# LEGACY
             stream_filename = os.path.join(path, stream_filename),
@@ -755,7 +756,7 @@ class generic_stream(impl_c):
         self.name = name
         self.cmdline = cmdline.split()
         self.wait_to_kill = wait_to_kill
-        self.extension = "." + extension
+        self.extension = extension
         self.use_signal = use_signal
         if pre_commands:
             self.pre_commands = pre_commands
