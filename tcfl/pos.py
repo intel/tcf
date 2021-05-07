@@ -612,7 +612,7 @@ def _metadata_schema_yaml_load():
     if _metadata_schema_yaml:	# already loaded
         return
     schema_path = commonl.ttbd_locate_helper("img-metadata.schema.yaml",
-                                             tcfl._install,
+                                             tcfl._install.share_path,
                                              logging, "tcfl")
     _metadata_schema_yaml = commonl.yamll.load(schema_path)
     logging.info("POS: loaded image YAML schema from %s", schema_path)
