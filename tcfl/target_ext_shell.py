@@ -451,6 +451,14 @@ class shell(tc.target_extension_c):
         # Set the original shell prompt
         self.prompt_regex = self.prompt_regex_default
 
+        login_error_exp = target.console.text(
+            "Login incorrect",
+            name = f"{target.want_name}/{console}: login error",
+            console = console, timeout = 0, poll_period = 1,
+            raise_on_found = tc.error_e("login error",
+                                        # ensure this is considered a hard fail
+                                        dict(recoverable = False)))
+
         def _login(target):
             # If we have login info, login to get a shell prompt
             if login_regex != None:
@@ -466,8 +474,10 @@ class shell(tc.target_extension_c):
                 target.expect(password_regex, name = "password prompt",
                               console = console)
                 target.send(password, console = console)
+            # FIXME: catch Login incorrect
 
         original_timeout = testcase.tls.expect_timeout
+        testcase.expect_tls_append(login_error_exp)
         try:
             if console == None:		# reset the default console
                 target.console.default = None
@@ -522,6 +532,8 @@ class shell(tc.target_extension_c):
                                       timeout = inner_timeout)
                     break
                 except ( tc.error_e, tc.failed_e ) as e:
+                    if e.attachments_get().get('recoverable', True) == False:
+                        raise
                     ts = time.time()
                     target.report_info(
                         "shell-up: action '%s' failed at +%.1fs; retrying: %s"
@@ -554,6 +566,7 @@ class shell(tc.target_extension_c):
                         3 * timeout, console,
                         self.prompt_regex.pattern), dict(target = target))
         finally:
+            testcase.expect_tls_remove(login_error_exp)
             testcase.tls.expect_timeout = original_timeout
 
         # same as target.console.select_preferred()
