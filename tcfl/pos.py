@@ -2771,7 +2771,7 @@ def edkii_pxe_ipxe_target_power_cycle_to_pos(target):
                     f" failed network boot / iPXE", dict(recoverable = False))
             target.report_fail(
                 f"boot failure: retry {retry}/{retries_max}:"
-                f" due to failed network boot / iPXE'", dict(exception = e))
+                f" due to failed network boot / iPXE", dict(exception = e), alevel = 1)
             retry_data["boot: retries due to network boot / iPXE failure"] += 1
             target.report_data(
                 "Recovered conditions [%(type)s]",
