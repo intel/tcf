@@ -192,11 +192,21 @@ class interface(ttbl.tt_interface):
         # an absolute path is assumed to come from paths_allowed,
         # otherwise from the user's storage area.
         file_path = self.arg_get(args, 'file_path', str)
+        offset = self.arg_get(args, 'offset', int,
+                              allow_missing = True, default = 0)
         file_path_final = self._validate_file_path(target, file_path, user_path)
         # interface core has file streaming support builtin
         # already, it will take care of streaming the file to the
         # client
-        return dict(stream_file = file_path_final)
+        try:
+            generation = os.readlink(file_path_final + ".generation")
+        except OSError:
+            generation = 0
+        return dict(
+            stream_file = file_path_final,
+            stream_generation = generation,
+            stream_offset = offset,
+        )
 
     def delete_file(self, target, _who, args, _files, user_path):
         file_path = self.arg_get(args, 'file_path', str)

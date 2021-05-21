@@ -2095,6 +2095,9 @@ their own storage area.
 
 - *file_path*: name of the file to read from the storage area
 
+- *offset*: (integer; default 0) offset into the file to which to read
+  from. If negative, offset from the end.
+
 **Returns:**
 
 - On success, 200 HTTP code and the file contents on the response
@@ -3043,7 +3046,7 @@ that came out of it. This call allows the user to query that data. See
 - *component*: name of the console to read data from.
 
 - *offset*: (integer; default 0) offset into the data already read to
-  read from.
+  read from. If negative, offset from the end.
 
 **Returns:**
 
