@@ -2082,6 +2082,9 @@ their own storage area.
 
 - *file_path*: name of the file to read from the storage area
 
+- *offset*: (integer; default 0) offset into the file to which to read
+  from. If negative, offset from the end.
+
 **Returns:**
 
 - On success, 200 HTTP code and the file contents on the response
@@ -2721,6 +2724,472 @@ In this example, the target offer four destinations (one for the BIOS,
 another one for a BMC and two microcontrollers). No aliases are
 specified.
 
+.. _http_target_console:
+
+Instrumentation interface: serial consoles
+------------------------------------------
+
+This interface provides means to read and write to and from a
+platform's serial console (and other serial like interfaces).
+
+Multiple serial consoles, each with a unique name can be handled,
+representing:
+
+- a traditional UART serial console over RS-232C, encapsulated over
+  USB or over a network redirection over a KVM
+
+- the output of server-side processes, like the output of a process
+  flashing an SPI chip.
+
+- SSH or telnet connections to the platform
+
+Consoles can be enabled or disabled. When a console is enabled, the
+server will record all the traffic received from it to provide it to
+the client/s that request it and avoid missing when a client is not
+reading. Disabling the console stops such recording. Enabling discards
+previously recorded data.
+
+Each time the target is enabled, a generation counter is monotonically
+increased--this allows the client to reset its internal state
+regarding the offset it needs to read from. As well, when a target is
+power cycled, its consoles' generations change; a client can use them
+to detect a power cycle.
+
+Console naming follows the following convention:
+
+- *serialN*: physical UART consoles over RS-232C, USB [normally these
+  consoles are pre-configured for an specific baud rate and line
+  configuration by the administrator to match the target's needs].
+
+- *solN*: UART over IPMI Serial-Over-Lan
+
+- *sshN*: consoles over an SSH connection
+
+- *telnetN*: consoles over a telnet connection
+
+- *netconsoleN*: Linux kernel consoles over network (read-only)
+
+- *log-NAME*: output of different processes executed in the server on
+  behalf of the target (read-only)
+
+Aliases are supported. The following aliases have a pre-defined
+meaning:
+
+- *default*: console that shall be used if no other is specified. This
+  is a configuration setting that can then be altered by setting the
+  inventory variable *interfaces.console.default* to the console name.
+
+  When the platform is powered on, console shall be enabled and
+  depending on the OS, provide output, login or means to interact with
+  the platform.
+
+- *preferred*: console that shall be used preferably, because it might
+  be faster or more reliable than the *default* one. This is a
+  configuration setting.
+
+  This console might need extra setup and then be enabled for it to
+  work, versus the *default* one that shall be always operational (for
+  example, if it is a console based on SSH).
+
+
+.. _http_target_console_reading_workflow::
+
+Console reading workflow
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+The goal of this workflow is to show how multiple reading clients can
+be reading from the same data stream without interferring on each
+other and of course, without loosing any data, while at the same time
+being able to detect (and potentially act) on the target power-cycling.
+
+The server will capture the data reported by the serial console and
+save it for the clients. Every time the console is disabled and then
+re-enabled, the previous data is discarded and the stream generation
+number monotonically increases. This also happens (generally) when the
+target power cycles.
+
+This also allows multiple readers in parallel to read, since the data
+is only removed when disabling and re-enabling.
+
+The process is:
+
+1. client initializes *GENERATION* to zero, *OFFSET* to zero.
+
+2. client requests to read from console *CONSOLE* at offset *OFFSET*
+
+3. client receives data from the server, along with a *READ-GENERATION* and
+   *READ-OFFSET* (see the :ref:`GET /targets/TARGETID/console/read
+   <http_target_console_read>`).
+
+   *READ-OFFSET* reports at what offset the server actually read.
+
+4. client compares *READ-GENERATION* to *GENERATION*
+
+   - if different, the console has gone through a disable/re-enable
+     cycle; the target possibly has power-cycled.
+
+     Client sets *GENERATION* to *READ-GENERATION*
+
+     Client sets *OFFSET* to *READ-OFFSET*
+
+     Client does any local state adjustments or notifications as
+     deemed necessary when the console has changed / power-cycled
+     (client specific).
+
+5. client compares *OFFSET* to *READ-OFFSET*
+
+   - if same, the *OFFSET* is valid,
+
+   - if lower, the client has tried to read past the end of the
+     recorded data; client can choose to adjust *OFFSET* to
+     *READ-OFFSET*.
+
+6. process the data
+
+   - if *Content-Length* is zero, there is no new data to report
+
+   - report the data as needed
+
+   - increase *OFFSET* by *Content-Length*
+
+7. pause for a client-chosen time period
+
+   The client might choose to increase the time period if the content
+   received was zero and reduce it to a base setting (eg: 0.25s) once
+   data starts being received, implementing something akin of an
+   increasing backoff when no data is received.
+
+8. read again, go to step #2
+
+
+GET /targets/TARGETID/console/list -> DICT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+List available consoles
+
+**Access control:** any logged in user
+
+**Arguments:**
+
+None
+
+**Returns:**
+
+- On success, 200 HTTP code and a JSON dictionary with values:
+
+  - *aliases*: dictionary mapping currently active aliases (keys) to
+    console names (values)
+
+  - *result*: list of all console names available in the system
+    (including aliases)
+
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
+
+Note this information overlaps and can be complemented with other
+information available on the inventory in the *interfaces.console*
+section (which gets updated by the server during operation):
+
+- *interfaces.console.CONSOLENAME*: dictionary containing the
+  following keys
+
+  - *instrument=VALUE*: (string) name of the instrument implementing this console
+    (information available in the inventory *instrumentation.VALUE*.
+
+  - *crlf=VALUE*: (string) Carriage Return / Line Feed convention (common
+    values *\\r*, *\\r\\n*, *\\n* (single backslashes) or if missing,
+    none (empty string).
+
+  - *generation=VALUE* (integer) monotonically increasing integer that
+    is incremented whenever the console gets disabled and enabled, or
+    when the target is power cycled.
+
+    This enables the client to know when the recording has been
+    flushed and current recorded offsets need to be reset to zero. See
+    :ref:`console reading workflows <console_reading_workflows>` above.
+
+  - *state=VALUE*: (boolean) *true* for enabled, *false* for disabled.
+
+  - *parameter_NAME=VALUE*: parameters to the console (driver
+    specific) and their current values. See :ref:`console setup
+    <http_target_console_setup>`.
+
+  Different console drivers might store other values here.
+
+**Example**
+
+::
+
+  $ curl -sk cookies.txt -k -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/console/list \
+    | python -m json.tool
+  {
+      "aliases": {
+          "default": "serial0",
+          "preferred": "ssh0"
+      },
+      "result": [
+          "default",
+          "preferred",
+          "serial0",
+          "ssh0",
+      ],
+      "_diagnostics": ""
+  }
+
+more information about the real consoles (excluding the aliases) can
+be obtained from from the inventory with (note we have asked to get
+only a partial piece of the inventory contaning the console
+information)::
+
+  $ curl -sk cookies.txt -k -X GET https://localhost:5000/ttb-v2/targets/s04 -d projections='["interfaces.console"]' \
+     | python -m json.tool
+  {
+      "interfaces": {
+          "console": {
+              "serial0": {
+                  "instrument": "t4qb",
+                  "crlf": "\r",
+                  "generation": "1614752550",
+                  "state": false
+              },
+              "serial1": {
+                  "instrument": "dpmd",
+                  "crlf": "\r",
+                  "generation": "1614752550",
+                  "state": false
+              },
+              "ssh0": {
+                  "instrument": "w7cl",
+                  "crlf": "\r",
+                  "generation": "1614752539",
+                  "parameter_user": "root",
+                  "state": false
+              },
+              ...
+          }
+      }
+  }
+
+
+With the TCF client, use the following commands:
+
+ - *tcf console-ls [-v] TARGETNAME*
+ - *tcf get TARGETNAME -p interfaces.console*
+
+
+GET /targets/TARGETID/console/size component=CONSOLE -> DICT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Return the amount of bytes that have been read so far for a console
+
+**Access control:** any logged in user
+
+**Arguments:**
+
+- *component*: name of the console to query size for
+
+**Returns:**
+
+- On success, 200 HTTP code and a JSON dictionary with values:
+
+  - *result*: (int or *null*); number of bytes read by the server from
+    the serial console or *null* if the console is disabled.
+
+    Note the number if bytes will drop to zero when the console is
+    cycled from disabled to enabled; see :ref:`console reading
+    workflow <http_target_console_reading_workflow>`
+
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
+
+**Example**
+
+::
+
+  $ curl -sk cookies.txt -k -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/console/state \
+        -d component=ssh0 \
+    | python -m json.tool
+  {
+        "result": false,
+        "_diagnostics": ""
+  }
+
+.. _http_target_console_read:
+
+GET /targets/TARGETID/console/read component=CONSOLE -> DICT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Return bytes read from the serial console by the server, optionally
+specifying the offset into the data already read.
+
+When the console was enabled, the server started recording anything
+that came out of it. This call allows the user to query that data. See
+:ref:`console reading workflow
+<http_target_console_reading_workflow>`.
+
+**Access control:** any logged in user
+
+**Arguments:**
+
+- *component*: name of the console to read data from.
+
+- *offset*: (integer; default 0) offset into the data already read to
+  read from. If negative, offset from the end.
+
+**Returns:**
+
+- On success, 200 HTTP code and the data read from the console in the
+  body of the response as a raw stream of bytes.
+
+  A header is also returned::
+
+    X-Stream-Gen-Offset: <READ-GENERATION> <READ-OFFSET>
+
+  Example::
+
+    X-Stream-Gen-Offset: 1614797628 10
+
+  This provides:
+
+  - the current generation of the stream of data (which
+    monotonically increases when the console is enabled after a
+    disable)
+
+  - the offset of the data that is returned; this allows the client to
+    calculate how big the stream is at precisely the time the last
+    byte was sent by the server, but adding *READ-OFFSET* to the
+    *Content-Length* reported by the HTTP response.
+
+    If the offset requested is longer than the amount of data
+    available, no data will be returned and the *X-Stream-Gen-Offset*
+    header will return the maximum offset allowed (which matches the
+    current size).
+
+    See :ref:`console reading workflows <console_reading_workflows>`
+    above for how these values are used for the client to read through
+    power cycles of the platform.
+
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
+
+**Example**
+
+::
+
+  $ curl -sk cookies.txt -k -X GET https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/console/read \
+        -d component=ssh0 -d offset=10
+  ...
+  Ubuntu 18.04.4 LTS nuc-81o ttyUSB0
+
+  nuc-81o login: root
+
+
+
+PUT /targets/TARGETID/console/write component=CONSOLENAME data=DATA -> DICT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Write data to a console
+
+Data is JSON encoded (to be able to send binary). In practice, any
+size is allowed, but it is recommended to chunk the data in requests
+no larger than 1KiB to improve latency response.
+
+**Access control:** the user, creator or guests of an allocation that
+has this target allocated.
+
+**Arguments**
+
+- *component*: name of the console to setup
+
+- *data*: JSON encoded bytes to write to the console
+
+**Returns:**
+
+- On success, 200 HTTP code and a JSON dictionary with optional
+  diagnostics
+
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
+
+**Example:**
+
+Send Ctrl-C (the interrupt character, hex 0x03) followed by a pressing
+the carriage return (\\r\\n)::
+
+   $ curl -sk cookies.txt -k -X PUT https://localhost:5000/ttb-v2/targets/TARGETNAME/console/write \
+         -d component=CONSOLENAME -d data="\\u0003\\r\\n" \
+     | python -m json.tool
+   {
+       "_diagnostics": ""
+   }
+
+with the TCF client, use the following command:
+
+- *tcf console-write TARGETNAME [-c CONSOLENAME]  $(echo -e \\x03\\r\\n)*
+
+- An interactive console can be executed by reading in one thread and
+  dumping to the terminal while another sends to the target anything
+  the user types. The TCF client does this when feeding *-i* to
+  *console-write*::
+
+    $ tcf console-write -i TARGETNAME [-c console]
+
+
+PUT /targets/TARGETID/console/enable component=CONSOLENAME -> DICT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Enable a console.
+
+If the console is already enabled, nothing is done.
+
+When a console is enabled, the server starts recording anything coming
+out of it, so it can be read later by the client at will.
+
+**Access control:** the user, creator or guests of an allocation that
+has this target allocated.
+
+**Arguments**
+
+- *component*: name of the console to setup
+
+**Returns:**
+
+- On success, 200 HTTP code and a JSON dictionary with optional
+  diagnostics
+
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
+
+**Example:**
+
+::
+
+   $ curl -sk cookies.txt -k -X PUT https://localhost:5000/ttb-v2/targets/TARGETNAME/console/enable \
+         -d component=CONSOLENAME \
+     | python -m json.tool
+   {
+       "_diagnostics": ""
+   }
+
+with the TCF client, use the following command:
+
+- *tcf console-enable TARGETNAME -c CONSOLENAME*
+
+
+PUT /targets/TARGETID/console/disable component=CONSOLENAME -> DICT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Disable a console.
+
+If the console is already disabled, nothing is done.
+
+When a console is disabled, the server stops recording anything coming
+out of it; however, the data read until then is still available (until
+the next time the console is enabled).
+
+**Access control:** the user, creator or guests of an allocation that
+has this target allocated.
+
+**Arguments**
+
+- *component*: name of the console to disable
+
+**Returns:**
 
 Old documentation, pending rewrite/update
 -----------------------------------------
