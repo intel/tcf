@@ -16,7 +16,7 @@ import serial.tools.list_ports
 import ttbl
 import ttbl.things
 
-class rly08b(object):
+class rly08b(ttbl.tt_interface_impl_c):
     """
     A power control implementation for the USB-RLY08B relay controller
     https://www.robot-electronics.co.uk/htm/usb_rly08btech.htm.
@@ -72,7 +72,9 @@ class rly08b(object):
 
     def __init__(self, serial_number):
         assert isinstance(serial_number, str)
+        ttbl.tt_interface_impl_c.__init__("USBRLY08b")
         self.serial_number = serial_number
+        self.upid_set("USBRLY08b", serial_number = serial_number)
 
     def _command(self, cmd, states = None, get_state = False):
         """
