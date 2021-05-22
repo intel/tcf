@@ -546,13 +546,14 @@ class extension(tc.target_extension_c):
 
 
     def get(self, capturer, stream = None, file_name = None, offset = None,
-            prefix = None,
+            prefix = None, follow = False,
             **streams):
         assert isinstance(capturer, str)
         assert stream == None or isinstance(stream, str)
         assert prefix == None or isinstance(prefix, str)
         assert file_name == None or isinstance(file_name, str)
         assert offset == None or isinstance(offset, int)
+        assert isinstance(follow, bool)
 
         if prefix == None:
             prefix = self.target.testcase.report_file_prefix
@@ -583,11 +584,16 @@ class extension(tc.target_extension_c):
                 dst_file_name = prefix + f"{capturer}.{stream_name}{extension}"
 
             try:
-                self.target.store.dnload("capture/" + src_file_name, dst_file_name, offset)
+                if follow:
+                    try:
+                        offset = os.stat(dst_file_name).st_size
+                    except FileNotFoundError:
+                        offset = None	# still not existing, so start from scratch
+                self.target.store.dnload("capture/" + src_file_name, dst_file_name,
+                                         offset = offset, append = follow)
                 r[stream_name] = dst_file_name
             except tc.exception as e:
                 tc.result_c.report_from_exception(self.target.testcase, e)
-                print(f"DEBUG error {type(e)}: {e}")
         return r
 
 
@@ -884,9 +890,14 @@ def _cmdline_capture_get(args):
             prefix = args.prefix
         else:
             prefix = target.id + "."
-        r = target.capture.get(args.capturer, prefix = prefix)
-        for stream_name, file_name in r.items():
-            print(f"{stream_name}: {file_name}")
+        while True:
+            r = target.capture.get(args.capturer, prefix = prefix,
+                                   follow = args.follow)
+            for stream_name, file_name in r.items():
+                print(f"{stream_name}: {file_name}")
+            if not args.follow:
+                break
+            time.sleep(args.wait)
 
 def _cmdline_capture_stop(args):
     with msgid_c("cmdline"):
@@ -946,6 +957,13 @@ def cmdline_setup(argsp):
                     type = str, help = "Name of capturer that should stop")
     ap.add_argument("--prefix", action = "store", type = str, default = None,
                     help = "Prefix for downloaded files")
+    ap.add_argument("--wait", action = "store", metavar = 'SECONDS',
+                    type = float, default = 2,
+                    help = "When --follow, time to wait between downloads"
+                    " [%(default).1f seconds]")
+    ap.add_argument("--follow",
+                    action = "store_true", default = False,
+                    help = "Read any changes from the last download")
     ap.set_defaults(func = _cmdline_capture_get)
 
     ap = argsp.add_parser("capture-stop", help = "stop capturing, discarding "
