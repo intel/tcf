@@ -80,15 +80,24 @@ class extension(tc.target_extension_c):
                                         files = { 'file': inf })
 
 
-    def dnload(self, remote, local, offset = None):
+    def dnload(self, remote, local, offset = None, append = False):
         """
         Download a remote file from the store to the local system
 
         :param str remote: name of the file to download in the server
         :param str local: local file name
+        :param int offset: (optional; default *None*) offset of data
+          to read (if negative, offset from the end).
+        :param bool append: (optional; default *False*) append to
+          existing file--normally used with offset matching its
+          length.
         :returns int: the amount of bytes downloaded
         """
-        with io.open(local, "wb+") as of, \
+        if append:
+            mode = "ab+"
+        else:
+            mode = "wb+"
+        with io.open(local, mode) as of, \
              contextlib.closing(self.target.ttbd_iface_call(
                  "store", "file", method = "GET", stream = True, raw = True,
                  file_path = remote, offset = offset)) as r:
