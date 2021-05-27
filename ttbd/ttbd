@@ -1430,7 +1430,7 @@ if __name__ == "__main__":
         from tornado.ioloop import IOLoop
 
         http_server = HTTPServer(WSGIContainer(app), ssl_options = ssl_context)
-        http_server.listen(port, address = host)
+        http_server.bind(port, address = host)
         # This might not be the real good way to do this, but our APIs
         # might block for a long time, so we start a crapload of
         # servers to be able to service more requests in paralell.
