@@ -291,10 +291,13 @@ class extension(tc.target_extension_c):
           the default is set in
           :meth:`tcfl.tc.target_c.ttbd_iface_call`.
         """
+        kwargs = {}
+        if timeout != None:
+            kwargs['timeout'] = timeout
         # FIXME: compute length for timeout
         self.target.report_info("running sequence: %s" % (sequence, ), dlevel = 1)
         self.target.ttbd_iface_call("power", "sequence", method = "PUT",
-                                    sequence = sequence, timeout = timeout)
+                                    sequence = sequence, **kwargs)
         self.target.report_info("ran sequence: %s" % (sequence, ))
 
 
