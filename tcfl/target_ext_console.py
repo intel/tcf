@@ -68,6 +68,7 @@ would need a different context:
 import argparse
 import collections
 import contextlib
+import datetime
 import errno
 import getpass
 import io
@@ -1466,7 +1467,8 @@ _flags_old = None
 
 class _console_reader_c:
     def __init__(self, target, console, fd, offset,
-                 backoff_wait_max, server_connection_errors_max):
+                 backoff_wait_max, server_connection_errors_max,
+                 timestamp = None):
         self.target = target
         self.console = console
         self.fd = fd
@@ -1476,8 +1478,12 @@ class _console_reader_c:
         self.backoff_wait = 0.1
         self.backoff_wait_max = backoff_wait_max
         self.generation_prev = None
+        self.timestamp = timestamp
 
-    def read(self, flags_restore = None):
+    def read(self, flags_restore = None, timestamp = None):
+        """
+        :param bool timestamp:
+        """
         data_len = 0
         try:
             # Instead of reading and sending directy to the
@@ -1501,6 +1507,9 @@ class _console_reader_c:
                 for line in data.splitlines(True):
                     # note line is strings, UTF-8 encode, which is
                     # what we get from the protocol
+                    if self.timestamp:
+                        timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S ")
+                        self.fd.write(timestamp.encode('utf-8'))
                     f_write_retry_eagain(self.fd, line.encode('utf-8'))
                     if '\n' in line:
                         f_write_retry_eagain(self.fd, b"\r")
@@ -1540,14 +1549,15 @@ class _console_reader_c:
 
 
 def _console_read_thread_fn(target, console, fd, offset, backoff_wait_max,
-                            _flags_restore):
+                            _flags_restore, timestamp = False):
     # read in the background the target's console output and print it
     # to stdout
     offset = target.console.offset_calc(target, console, int(offset))
     with msgid_c("cmdline"):
         # limit how much time we keep retrying due to server connection errors
         console_reader = _console_reader_c(target, console, fd, offset,
-                                           backoff_wait_max, 10)
+                                           backoff_wait_max, 10,
+                                           timestamp = timestamp)
         while True:
             try:
                 console_reader.read(flags_restore = _flags_restore)
@@ -1688,11 +1698,12 @@ def _cmdline_console_read(args):
             # limit how much time we keep retrying due to server connection errors
             if args.follow:
                 _console_read_thread_fn(target, console, fd, offset,
-                                        args.max_backoff_wait, False)
+                                        args.max_backoff_wait, False,
+                                        timestamp = args.timestamp)
             else:
                 console_reader = _console_reader_c(
                     target, console, fd, offset,
-                    args.max_backoff_wait, 10)
+                    args.max_backoff_wait, 10, timestamp = args.timestamp)
                 console_reader.read()
         finally:
             if fd != sys.stdout.buffer:
@@ -1930,6 +1941,11 @@ def _cmdline_setup(arg_subparser):
                     action = "store_true", default = False,
                     help = "Continue reading in a loop until Ctrl-C is "
                     "pressed")
+    ap.add_argument("--timestamp",
+                    action = "store_true", default = False,
+                    help = "Add a client-side UTC timestamp to the"
+                    " beginning of each line (this timestamp reflects"
+                    " when the data was read)")
     ap.add_argument(
         "--max-backoff-wait",
         action = "store", type = float, metavar = "SECONDS", default = 2,

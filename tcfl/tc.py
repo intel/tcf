@@ -8855,7 +8855,7 @@ def _run(args):
                 for rtb in _allocids:
                     # FIXME: this has to be done so we can submit a list
                     #        of allocids to remove
-                    for allocid in _allocids[rtb]:
+                    for allocid in list(_allocids[rtb]):
                         logging.error("removing allocation %s on %s",
                                       allocid, rtb)
                         target_ext_alloc._delete(rtb, allocid)
