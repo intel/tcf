@@ -473,13 +473,19 @@ class expect_text_on_console_c(tc.expectation_c):
         if stat_info.st_size == 0:	# Nothing to read
             return None
 
+        # if no detect context is given, we default to something
+        # called as the console where we are looking
+        if not self.detect_context:
+            detect_context = self.console
+        else:
+            detect_context = self.detect_context
         # last time we looked and found, we updated the search_offset,
         # so search from there on -- note this offset is on the
         # capture file we save in the client, not from the server's
         # capture POV.
-        if self.detect_context + 'search_offset' not in buffers_poll:
-            buffers_poll[self.detect_context + 'search_offset'] = 0
-        search_offset = buffers_poll[self.detect_context + 'search_offset']
+        if detect_context + 'search_offset' not in buffers_poll:
+            buffers_poll[detect_context + 'search_offset'] = 0
+        search_offset = buffers_poll[detect_context + 'search_offset']
 
         # we mmap because we don't want to (a) read a lot of a huger
         # file line by line and (b) share file pointers -- we'll look
@@ -501,9 +507,9 @@ class expect_text_on_console_c(tc.expectation_c):
             if match:
                 # this allows us later to pick up stuff in report
                 # handlers without having to have context knowledge
-                buffers_poll[self.detect_context + 'search_offset_prev'] = \
+                buffers_poll[detect_context + 'search_offset_prev'] = \
                     search_offset
-                buffers_poll[self.detect_context + 'search_offset'] = \
+                buffers_poll[detect_context + 'search_offset'] = \
                     search_offset + match.end()
                 # take care of printing a meaningful message here, as
                 # this is one that many people rely on when doing
@@ -561,10 +567,16 @@ class expect_text_on_console_c(tc.expectation_c):
                    ellapsed, timeout):
         testcase = self.target.testcase
         # If no previous search, that'd be the beginning...
+        # if no detect context is given, we default to something
+        # called as the console where we are looking
+        if not self.detect_context:
+            detect_context = self.console
+        else:
+            detect_context = self.detect_context
         search_offset_prev = \
-            buffers_poll.get(self.detect_context + 'search_offset_prev', 0)
+            buffers_poll.get(detect_context + 'search_offset_prev', 0)
         search_offset = \
-            buffers_poll.get(self.detect_context + 'search_offset', 0)
+            buffers_poll.get(detect_context + 'search_offset', 0)
         raise self.raise_on_timeout(
             "%s/%s: timed out finding text '%s' in "
             "console '%s:%s' @%.1f/%.1fs/%.1fs)"
@@ -1321,6 +1333,7 @@ class extension(tc.target_extension_c):
           <console_expectation_detect_context>`
 
         """
+        console = self._console_get(console)
         # If we are sending something, the next expect we want to
         # start searching from the output of that something. So we set
         # the output to the current size of the capture file so we
@@ -1331,6 +1344,10 @@ class extension(tc.target_extension_c):
             if context not in testcase._poll_state:
                 testcase._poll_state[context] = testcase._poll_state_c()
             poll_state = testcase._poll_state[context]
+        # if no detect context is given, we default to something
+        # called as the console where we are looking
+        if detect_context == "":
+            detect_context = console
         with poll_state.lock:
             of = poll_state.buffers.get('of', None)
             if of:
