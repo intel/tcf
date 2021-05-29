@@ -72,7 +72,7 @@ class rly08b(ttbl.tt_interface_impl_c):
 
     def __init__(self, serial_number):
         assert isinstance(serial_number, str)
-        ttbl.tt_interface_impl_c.__init__("USBRLY08b")
+        ttbl.tt_interface_impl_c.__init__(self, "USBRLY08b")
         self.serial_number = serial_number
         self.upid_set("USBRLY08b", serial_number = serial_number)
 
