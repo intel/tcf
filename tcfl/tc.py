@@ -1852,9 +1852,9 @@ class target_c(reporter_c):
         """
         assert isinstance(data, (str, bytes))
 
+        if console == None:
+            console = self.console.default
         if crlf == None:
-            if console == None:
-                console = self.console.default
             # note that target_ext_console.extension.__init__ might
             # have initialized this from server info
             crlf = self.console.crlf.get(console, None)
