@@ -58,7 +58,7 @@ class _stream_c(ttbl.capture.impl_c):
             close_fds = True,
             shell = False,
             stderr = subprocess.STDOUT,
-            stdout = logf.buffer)
+            stdout = logf.fileno())
 
         with open(pidfile, "w+") as pidf:
             pidf.write("%s" % p.pid)
