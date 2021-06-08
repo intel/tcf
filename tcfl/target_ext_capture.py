@@ -620,7 +620,7 @@ class extension(tc.target_extension_c):
             if snapshot == True:
                 r[capturer_name] = None
             else:
-                r[capturer_name] = data.get('streaming', False)
+                r[capturer_name] = data.get('capturing', False)
         return r
 
 
@@ -632,7 +632,7 @@ class extension(tc.target_extension_c):
 
         capture_spec = {}
         for name, data in target.rt['interfaces'].get('capture', {}).items():
-            capture_spec[name] = ( data['type'], data['mimetype'] )
+            capture_spec[name] = data.get('snapshot', True)
         capturers = target.capture.list()		# gather states
 
         target.report_info("capturers: listed %s" \
@@ -653,7 +653,8 @@ class extension(tc.target_extension_c):
                 target.report_fail("capturer %s: can't start" % capturer,
                                    dict(exception = e))
 
-            if capture_spec[capturer][0] == "stream":
+            # If the capturer is not a snapshot capturer check streaming state
+            if capture_spec[capturer] == False:
                 states = target.capture.list()
                 state = states[capturer]
                 if state == True:
@@ -666,36 +667,17 @@ class extension(tc.target_extension_c):
 
         for capturer, state in capturers.items():
 
-            if state == None:
-                # snapshot type, just snapshot it
-                target.capture.stop_and_get(capturer, "/dev/null")
-                target.report_pass("capturer %s: stops and gets to /dev/null"
-                                   % capturer)
-                target.capture.get(capturer, "/dev/null")
-                target.report_pass("capturer %s: gets to /dev/null"
-                                   % capturer)
-                continue
-
-            # streaming type, try start and stopping
             _start_and_check(capturer)
-            time.sleep(3)		# give it some time to record sth
+            time.sleep(10)		# give it some time to record sth
             try:
-                target.capture.stop_and_get(capturer, "/dev/null")
-                target.report_pass("capturer %s: stops and gets to /dev/null"
-                                   % capturer)
+                r = target.capture.get(capturer)
+                for item in r.items():
+                    target.report_pass(
+                        "capturer %s: gets %s \"%s\""
+                         % (capturer, item[0], item[1]))
             except RuntimeError as e:
                 target.report_fail(
-                    "capturer %s: can't stop and get to /dev/null" % capturer,
-                    dict(exception = e))
-
-            _start_and_check(capturer)
-            time.sleep(3)		# give it some time to record sth
-            try:
-                target.capture.get(capturer, "/dev/null")
-                target.report_pass("capturer %s: gets to /dev/null" % capturer)
-            except RuntimeError as e:
-                target.report_fail(
-                    "capturer %s: can't get to /dev/null" % capturer,
+                    "capturer %s: can't get" % capturer,
                     dict(exception = e))
 
             _start_and_check(capturer)
