@@ -19,6 +19,7 @@ import ttbl.things
 class rly08b(ttbl.tt_interface_impl_c):
     """
     A power control implementation for the USB-RLY08B relay controller
+
     https://www.robot-electronics.co.uk/htm/usb_rly08btech.htm.
 
     This serves as base for other drivers to implement :class:`per
@@ -83,8 +84,38 @@ class rly08b(ttbl.tt_interface_impl_c):
         Opens the serial port and sends the command; depending on the
         command, read expected response and if we need to get state,
         get it, appending it to the response.
+
         :param byte cmd: byte command to send; if a list of bytes, a
           list of commands to send in sequence.
+
+        Known commands are (from
+        https://www.robot-electronics.co.uk/htm/usb_rly08tech.htm
+        Commands section):
+
+        - 0x38: get serial number
+
+          returns: 8 bytes
+
+        - 0x5a: get SW version
+
+          returns: 2 bytes
+
+        - 0x5b: get relay states
+
+          returns: 1 byte
+
+        - 0x5c: set multiple relay states
+
+          send 1 byte: binary map of states (0 NC-C, 1 NO-C). Bit 0
+            corresponds to relay 1, bit 2, relay 2, etc.
+
+        - 0x64: turn on all relays
+
+        - 0x65 - 0x6c: turn on relay #1, #2 ... #8
+
+        - 0x6e: turn off all relays
+
+        - 0x6f - 0x76: turn off relay #1, #2 ... #8
         """
         if not isinstance(cmd, list):
             cmds = [ cmd ]
@@ -166,14 +197,22 @@ class pc(rly08b, ttbl.power.impl_c):
     Power control implementation that uses a relay to close/open a
     circuit on on/off
 
+    :param int relay: relay number to work on (1-8), maching the
+       numbers printed in the PCB.
+
     Other parameters as to :class:ttbl.power.impl_c.
     """
     def __init__(self, serial_number, relay, **kwargs):
+        assert isinstance(relay, int) and relay >= 1 or relay <= 8, \
+            "relay: relay number is a number 1 - 8, " \
+            f"matching the relay number in the PCB; got {type(relay)}"
         self.relay = relay
         rly08b.__init__(self, serial_number)
         ttbl.power.impl_c.__init__(self, **kwargs)
 
     def on(self, target, _component):
+        # 0x64 is all relays on (see _command()); thus first relay
+        # (#1) + 0x64 -> 0x65 turn relay #1 on
         cmd = 0x64 + self.relay
         rs = self._command(cmd, get_state = True)[-1]
         rl = struct.unpack('<' + 'B' *len(rs), rs)
