@@ -570,7 +570,7 @@ tcf-jobserver-run:
             _url = url
             url = _url[0]
             ssl_ignore = _url[1]
-        tcfl.config.urls.append((url, ssl_ignore,))
+        tcfl.config.url_add(url, ssl_ignore)
 
     tcfl.config.load(config_path = args.config_path,
                      config_files = args.config_files,
