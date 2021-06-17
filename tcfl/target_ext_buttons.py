@@ -25,10 +25,10 @@ class extension(tc.target_extension_c):
     button1, release button2, wait 0.25s, press button 2, wait 1s
     release button1).
 
-    >>> target.buttons.list()
-    >>> target.tunnel.press('button1')
-    >>> target.tunnel.release('button2')
-    >>> target.tunnel.sequence([
+    >>> target.button.list()
+    >>> target.button.press('button1')
+    >>> target.button.release('button2')
+    >>> target.button.sequence([
     >>>     ( 'on', 'button1' ),	# press
     >>>     ( 'off', 'button2' ),	# release
     >>>     ( 'wait', 0.25 ),
