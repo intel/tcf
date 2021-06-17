@@ -10,8 +10,8 @@
 # settings; attach most to it
 """.. _bios_menus:
 
-Utilities for manipulating BIOS menus
--------------------------------------
+Utilities for manipulating BIOS menus and UEFI
+----------------------------------------------
 
 When a BIOS menu can be accessed from the serial console (eg:
 Tianocore's EDKII), it usually uses an ANSI Text UI that is quite
@@ -1403,3 +1403,72 @@ def main_level_entries_get(target):
     #
     # note the order matters and it is given by sorting the keys
     return [ entry[1] for entry in sorted(entries.items(), key = lambda x: x[0]) ]
+
+
+def uefi_ifconfig_l_parse(target, output):
+    """
+    Parse the output of UEFI's *ifconfig -l* into a dictionary
+
+    :param tcfl.tc.target_c target: target we parsed this from (for
+      reporting)
+
+    :param str output: output of execution *ifconfig -l* which we are
+      to parse
+
+    :returns dict: dictionary keyed by interface name with the name of
+      each field and its value (with all the ANSI stripped).
+
+    The output of the ifconfig -l command resembles someting like::
+
+      -----------------------------------------------------------------
+      name         : eth0
+      Media State  : Media disconnected
+      policy       : dhcp
+      mac addr     : 98:4F:EE:00:3E:7F
+      -----------------------------------------------------------------
+      name         : eth1
+      Media State  : Media disconnected
+      policy       : dhcp
+      mac addr     : 98:4F:EE:00:3E:80
+      ...
+
+    with the following caveats:
+
+      - some fields are multiline (PENDING: parse those properly)
+
+      - a lot of ANSI characters are in the middle (we try to purge
+        those)
+
+    """
+    ifaces = {}
+    recordl = output.split("-----------------------------------------------------------------")
+    for record in recordl:
+        # cleanup empty lines and stuff, there is a lot of cruft
+        # after parsing that the human eye doesn't see
+        record = record.strip()
+        if not record:
+            continue
+        lines = record.split("\n")
+        data = {}
+        for line in lines:
+            # very primitive field parsin, won't catch routes and dns
+            # servers properly
+            line = line.strip()
+            if not line:
+                continue
+            if ':' in line:
+                field, value = line.split(":", 1)
+                field = ansi_strip(field.strip())
+                value = ansi_strip(value.strip())
+            else:
+                field = ansi_strip(line)
+                value = True
+            data[field] = value
+        iface_name = data.get("name", None)
+        if not iface_name:
+            target.report_error(
+                "WARNING: ignoring entry which has no interface name",
+                dict(output = output, data = data))
+            continue
+        ifaces[iface_name] = data
+    return ifaces
