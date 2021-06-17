@@ -1330,7 +1330,7 @@ def boot_network_pxe(target, entry = "UEFI PXEv4.*",
         raise tcfl.tc.error_e("BIOS: PXE network boot failed %s/%s; giving up"
                               % (cnt, top))
 
-def boot_efi_shell(target):
+def boot_efi_shell(target, in_main_menu = False):
     """
     From the main menu, select the EFI Shell boot entry.
 
@@ -1338,7 +1338,8 @@ def boot_efi_shell(target):
       the default console)
     """
     assert isinstance(target, tcfl.tc.target_c)
-    main_menu_expect(target)
+    if not in_main_menu:
+        main_menu_expect(target)
 
     entry_efi_shell = target.kws.get(
         "boot.boot_entry_EFI_shell", "EFI .* Shell")
