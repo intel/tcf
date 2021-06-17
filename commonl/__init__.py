@@ -1333,8 +1333,16 @@ def raise_from(what, cause):
 #:
 #: >>> data = commonl.ansi_regex.sub('', source_data)
 #:
-# FIXME: this is deleting more stuff than it should
-ansi_regex = re.compile(r'\x1b(\[[0-9]*J|\[[0-9;]*H|\[[0-9=]*h|\[[0-9]*m|\[B)')
+ansi_regex = re.compile(r'\x1b\[\d+(;\d+){0,2}m')
+
+def ansi_strip(s):
+    """
+    Strip ANSI sequences from a string
+
+    :param str s: string to strip ANSI sequences from
+    :returns s: ANSI-stripped string
+    """
+    return ansi_regex.sub('', s)
 
 
 class dict_missing_c(dict):
