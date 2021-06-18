@@ -228,13 +228,13 @@ def inventory_keys_fix(d):
         count = 0
         while safe in seen or (safe != key and safe in current_keys):
             count += 1
-            safe = f"{safe}.{count}"
+            safe = f"{safe}_{count}"
         seen.add(safe)
         value = d[key]
+        if isinstance(value, dict):
+            d[safe] = inventory_keys_fix(value)
+        else:
+            d[safe] = value
         if safe != key:
-            if isinstance(value, dict):
-                d[safe] = inventory_keys_fix(value)
-            else:
-                d[safe] = value
             del d[key]
     return d
