@@ -776,7 +776,7 @@ def discover_ipmitool(target, bmc_id, selector, update_inventory = False):
     # clean whatever is there now, re-populate it
     target.property_set(f"bmcs.{bmc_name}.mc", None)
     target.property_set(f"bmcs.{bmc_name}.fru", None)
-    target.properties_set(d)
+    target.properties_set(tcfl.inventory_keys_fix(d))
     target.report_pass(f"bmc{bmc_id}: updated inventory with MC and FRU information")
     return dict(mc = mc_data, fru = fru_data)
 
