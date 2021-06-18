@@ -1458,10 +1458,10 @@ def uefi_ifconfig_l_parse(target, output):
                 continue
             if ':' in line:
                 field, value = line.split(":", 1)
-                field = ansi_strip(field.strip())
-                value = ansi_strip(value.strip())
+                field = commonl.ansi_strip(field.strip())
+                value = commonl.ansi_strip(value.strip())
             else:
-                field = ansi_strip(line)
+                field = commonl.ansi_strip(line)
                 value = True
             data[field] = value
         iface_name = data.get("name", None)
