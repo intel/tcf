@@ -232,7 +232,7 @@ class extension(tc.target_extension_c):
     _image_flash_regex = re.compile(
         r"((no-)?(soft|upload)\s+)*((\S+:)?\S+\s*)+")
 
-    def flash_spec_parse(self, flash_image_s = None):
+    def flash_spec_parse(self, flash_image_s = None, env_prefix = "IMAGE_FLASH"):
         """Parse a images to flash specification in a string (that might be
         taken from the environment
 
@@ -325,10 +325,14 @@ class extension(tc.target_extension_c):
             source = None	# keep pylint happy
             sourcel = [
                 # go from most specifcy to most generic
-                "IMAGE_FLASH_%s" % target_fullid_safe,
-                "IMAGE_FLASH_%s" % target_id_safe,
-                "IMAGE_FLASH_%s" % target_type_safe,
-                "IMAGE_FLASH",
+                # IMAGE_FLASH_SERVER_NAME
+                # IMAGE_FLASH_NAME
+                # IMAGE_FLASH_TYPE
+                # IMAGE_FLASH
+                f"{env_prefix}_{target_fullid_safe}",
+                f"{env_prefix}_{target_id_safe}",
+                f"{env_prefix}_{target_type_safe}",
+                env_prefix,
             ]
             for source in sourcel:
                 flash_image_s = os.environ.get(source, None)
