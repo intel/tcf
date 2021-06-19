@@ -1899,6 +1899,7 @@ class quartus_pgm_c(flash_shell_cmd_c):
         # object creation because the USB path might change when we power
         # it on/off (rare, but could happen).
         usb_path, _vendor, product = ttbl.usb_serial_to_path(self.device_id)
+        port = target.fsdb.get("jtagd.tcp_port")
         context['kws'] = {
             # HACK: we assume all images are in the same directory, so
             # we are going to cwd there (see in __init__ how we set
@@ -1906,7 +1907,7 @@ class quartus_pgm_c(flash_shell_cmd_c):
             # include @, which the tool considers illegal as it uses
             # it to separate arguments--see below --operation
             'file_path': os.path.dirname(list(images.values())[0]),
-            'device_path': "%s [%s]" % (product, usb_path)
+            'device_path': "%s on localhost:%s [%s]" % (product, port, usb_path)
             # flash_shell_cmd_c.flash_start() will add others
         }
 
