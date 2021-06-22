@@ -100,6 +100,7 @@ targets over HTTP to be controlled by the TCF client.
     # This is needed so when data is to be installed, our
     # _install_data class is used.
     cmdclass = dict(
+        build_py = _build_py,
         sdist = _sdist,
         install_data = _install_data,
         install_lib = setupl._install_ttbd_lib,
