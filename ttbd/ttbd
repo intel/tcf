@@ -31,6 +31,7 @@ import pickle
 import datetime
 import errno
 import fnmatch
+import gzip
 import json
 import numbers
 import signal
@@ -466,7 +467,15 @@ def _targets_gets():
             # set of data
             d['id'] = target.id
             result[target.id] = d
-    return flask.jsonify(result)
+    # Compress if gzip is accepted encoding
+    if flask.request.accept_encodings['gzip']:
+        content = gzip.compress(json.dumps(result).encode('utf-8'))
+        response = flask.make_response(content)
+        response.headers['Content-length'] = len(content)
+        response.headers['Content-Encoding'] = 'gzip'
+        return response
+    else:
+        return flask.jsonify(result)
 
 @app.route(API_PREFIX + 'targets/<string:target_id>', methods = ['GET'])
 @flask_login.login_required
@@ -481,7 +490,15 @@ def _target_get(target_id):
     if target == None:
         flask.abort(404, "%s: unknown target" % target_id)
     d = target.to_dict(projections)
-    return flask.jsonify(d)
+    # Compress if gzip is accepted encoding
+    if flask.request.accept_encodings['gzip']:
+        content = gzip.compress(json.dumps(d).encode('utf-8'))
+        response = flask.make_response(content)
+        response.headers['Content-length'] = len(content)
+        response.headers['Content-Encoding'] = 'gzip'
+        return response
+    else:
+        return flask.jsonify(d)
 
 _admin_required = [
     'disabled',
