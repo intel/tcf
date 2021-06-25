@@ -258,7 +258,8 @@ class quartus_pgm_c(ttbl.images.flash_shell_cmd_c):
             for option, value in self.jtagconfig.items():
                 cmdline = [
                     self.path_jtagconfig,
-                    "--setparam", "%s [%s]" % (product, usb_path),
+                    "--setparam", 
+                    "%s on localhost:%s [%s]" % (product, port, usb_path),
                     option, value
                 ]
                 target.log.info("running per-config: %s" % " ".join(cmdline))
