@@ -2458,3 +2458,116 @@ class late_resolve_usb_path_by_serial(str):
                 return devpath
 
         return None
+
+
+def rpyc_connection(hostname = None, port = None,
+                    username = None, password = None,
+                    spec = None,
+                    mode: str = None, tag = None):
+    """
+    :param str mode: (optional, default *ssh*) connection mode:
+
+      - zerodeploy
+      - ssh
+      - direct
+
+      if *None*, defaults to what the environment variables
+      RPYC_<TAG>_MODE or RPYC_MODE say, otherwise defaults to *ssh*.
+
+    System Setup
+    ^^^^^^^^^^^^
+
+    Python packages needed:
+
+    - rpyc
+    - plumbum
+    - paramiko
+
+    Tips
+    ^^^^
+
+    https://rpyc.readthedocs.io/en/latest/docs/howto.html
+
+    Redirecting remote's stdout and stderr locally
+
+    >>> import sys
+    >>> c.modules.sys.stdout = sys.stdout
+    >>> c.execute("print('Hello World')")
+
+    TODO/FIXME
+    ^^^^^^^^^^
+
+    - use ttbd as a tunnel provider and the TCF cookie
+
+    - implement USERNAME:PASSWORD@HOSTNAME:PORT
+
+      how to spec the SSH port vs the RPYC port?
+    """
+    # fake lazy import
+    try:
+        import rpyc
+        import rpyc.utils.zerodeploy
+        import rpyc.core.stream
+        import plumbum.machines.paramiko_machine
+        import plumbum
+    except ImportError:
+        tcfl.tc.tc_global.report_blck(
+            "MISSING MODULES: install them with:"
+            " pip install --user plumbum rpyc")
+        raise
+
+    assert hostname == None or isinstance(hostname, str)
+    if mode == None:
+        mode = os.environ.get("RPYC_MODE", "ssh")
+    assert mode in ( "zerodeploy", "ssh", "direct" )
+
+    spec = ""
+    if not hostname:
+        hostname = "localhost"
+    if not username:
+        username = os.environ.get('RPYC_USERNAME', None)
+    if username:
+        spec += username + "@"
+    spec += hostname
+    if port:
+        spec += ":" + str(port)
+    if not password:
+        password = os.environ['RPYC_SSHPASS']
+
+    if mode == "zerodeploy":
+        machine = plumbum.machines.paramiko_machine.ParamikoMachine(
+            hostname, user = username, password = password)
+        server = rpyc.utils.zerodeploy.DeployedServer(machine)
+        connection = server.classic_connect()
+    elif mode == "ssh":
+        machine = plumbum.machines.paramiko_machine.ParamikoMachine(
+            hostname, user = username, password = password)
+        # ParamikoMachine has no tunnel, so use a stram -- copied
+        # from rpyc.utils.zerodeploy
+        connection = rpyc.utils.classic.connect_stream(
+            rpyc.core.stream.SocketStream(machine.connect_sock(port)))
+    elif mode == "connect":
+        # passwordless
+        connection = rpyc.classic.connect(hostname, port = port)
+    else:
+        assert()
+    return connection
+
+
+def rpyc_compress_dnload_file(remote_name, local_name = None):
+    try:
+        # fake lazy import
+        import rpyc.utils.classic
+    except ImportError:
+        tcfl.tc.tc_global.report_blck(
+            "MISSING MODULES: install them with:"
+            " pip install --user plumbum rpyc")
+        raise
+    if local_name == None:
+        local_name = remote_name + ".xz"
+    # Compress the file to download it (way faster!)
+    remote_subprocess = remote.modules['subprocess']
+    remote_subprocess.run([ "xz", "-9f", remote_name ])
+    rpyc.utils.classic.download(remote,
+                                remote_name + ".xz",
+                                local_name)
