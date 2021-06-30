@@ -179,7 +179,7 @@ class interface(ttbl.tt_interface):
         self.impls_set(impls, kwimpls, impl_c)
 
     def _target_setup(self, target, iface_name):
-        target.fsdb.set("debug", None)
+        pass
 
     def _release_hook(self, target, _force):
         self._stop(target, list(self.impls.keys()))
