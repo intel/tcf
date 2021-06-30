@@ -1060,7 +1060,11 @@ class tt_interface(object):
 
         :returns: the value
         """
-        assert isinstance(args, dict)
+        if args == None:
+            args = dict()
+        else:
+            assert isinstance(args, dict), \
+                f"args: expected dict, got {type(args)}"
         assert isinstance(arg_name, str)
         assert arg_type == None or isinstance(arg_type, type)\
             or isinstance(arg_type, tuple) and all(isinstance(i, type)
