@@ -132,6 +132,7 @@ def load(config_path = None, config_files = None,
 
 def setup(*args,
           report_drivers = None, verbosity = 2, logfile_name = "run.log",
+          ident = "standalone",
           **kwargs):
     """
     Setup and Load the TCF Library configuration for standalone execution
@@ -157,6 +158,8 @@ def setup(*args,
     # Do a partial initialzation of the testcase management system
     tcfl.tc.tc_c.tmpdir = "tmp"
     tcfl.tc.tc_c.ticket = "TICKET"
+    # clean this one up, so that we have minimal hash printing
+    tcfl.tc.tc_global.runid_hashid = ""
     if not report_drivers:
         tcfl.tc.report_driver_c.add(
             tcfl.tc.report_jinja2.driver("."),
@@ -173,4 +176,5 @@ def setup(*args,
         for report_driver in report_drivers:
             tcfl.tc.report_driver_c.add(report_driver)
     load(*args, **kwargs)
-    tcfl.msgid_c.tls.msgid_lifo.append(tcfl.msgid_c("standalone"))
+    tcfl.msgid_c.tls.msgid_lifo.append(tcfl.msgid_c(""))
+    tcfl.msgid_c.tls.msgid_lifo[-1]._ident = ident
