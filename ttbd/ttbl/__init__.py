@@ -885,7 +885,8 @@ class tt_interface(object):
         """
         Called when the target is released
         """
-        raise NotImplementedError
+        pass
+
 
     def _init_by_name(self, name, impl, aliases):
         if isinstance(impl, self.cls):
