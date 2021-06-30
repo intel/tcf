@@ -47,6 +47,9 @@ This drivers support:
 . For each capture that wants to be
   done, a class:`channel_c` caputer
 
+
+  This device packs an stm32 MPU, can be reprogrammed, firmware at http://files.banggood.com/2018/06/SKU836210.zip
+
 """
 
 import logging
