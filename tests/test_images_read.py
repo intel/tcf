@@ -30,7 +30,7 @@ Far, A long long way to runnnnnnnnnnnnnnnnnn!
 And etc.
 """
 
-@tcfl.tc.target("t0")
+@tcfl.tc.target(ttbd.url_spec + ' and t0')
 class flashes(tcfl.tc.tc_c):
     """
     Test the estimated_duration field from the imaging flasing
