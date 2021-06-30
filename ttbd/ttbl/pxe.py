@@ -117,6 +117,16 @@ def template_rexpand(text, kws):
 #: >>>     '/usr/local/share/syslinux/lpxelinux1.0`)
 #: >>> ttbl.pxe.architectures['x86']['boot_file'] = 'lpxelinux1.0`
 #:
+#:
+#: For example, to boot iPXE, one could do
+#:
+#: >>> ttbl.pxe.architectures['efi-bc']['copy_files'].append("/usr/share/ipxe/")
+#: >>> ttbl.pxe.architectures['efi-bc']['boot_filename'] = 'ipxe-x86_64.efi'
+#: >>> ttbl.pxe.architectures['efi-x86_64']['copy_files'].append("/usr/share/ipxe/")
+#: >>> ttbl.pxe.architectures['efi-x86_64']['boot_filename'] = 'ipxe-x86_64.efi'
+#:
+#: .. warning:: this is incomplete and would still require means to
+#:              tell iPXE what to do
 architectures = {
     'x86': dict(
         rfc_code = "00:00",
