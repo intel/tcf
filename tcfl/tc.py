@@ -9156,6 +9156,9 @@ target_c.extension_register(target_ext_buttons.extension, "button")
 from . import target_ext_capture
 target_c.extension_register(target_ext_capture.extension, "capture")
 
+from . import target_ext_certs
+target_c.extension_register(target_ext_certs.extension, "certs")
+
 from . import target_ext_console
 target_c.extension_register(target_ext_console.extension, "console")
 

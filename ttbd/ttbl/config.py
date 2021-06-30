@@ -13,8 +13,9 @@ import collections
 import re
 
 import ttbl
-import ttbl.tunnel
+import ttbl.certs
 import ttbl.store
+import ttbl.tunnel
 
 urls = []
 targets = {}
@@ -103,6 +104,7 @@ def _nested_list_flatten(l):
 # state, only one instance is needed that all target can share
 _iface_tunnel = ttbl.tunnel.interface()
 _iface_store = ttbl.store.interface()
+_iface_certs = ttbl.certs.interface()
 
 def target_add(target, _id = None, tags = None, target_type = None,
                acquirer = None):
@@ -170,6 +172,8 @@ def target_add(target, _id = None, tags = None, target_type = None,
     target.interface_add("tunnel", _iface_tunnel)
     global _iface_store
     target.interface_add("store", _iface_store)
+    global _certs_store
+    target.interface_add("certs", _iface_certs)
 
 
 def interconnect_add(ic, _id = None, tags = None, ic_type = None,

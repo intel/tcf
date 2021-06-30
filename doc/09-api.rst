@@ -26,6 +26,7 @@ Other target interfaces
 
 .. automodule:: tcfl.target_ext_buttons
 .. automodule:: tcfl.target_ext_capture
+.. automodule:: tcfl.target_ext_certs
 .. automodule:: tcfl.target_ext_console
 .. automodule:: tcfl.target_ext_debug
 .. automodule:: tcfl.target_ext_fastboot
@@ -576,6 +577,7 @@ Other interfaces
 ----------------
 
 .. automodule:: ttbl.capture
+.. automodule:: ttbl.certs
 .. automodule:: ttbl.noyito
 .. automodule:: ttbl.debug
 .. automodule:: ttbl.fastboot
