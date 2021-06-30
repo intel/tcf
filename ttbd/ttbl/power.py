@@ -1177,7 +1177,8 @@ class daemon_c(impl_c):
     def __init__(self, cmdline,
                  precheck_wait = 0, env_add = None, kws = None,
                  path = None, check_path = None, name = None,
-                 pidfile = None, mkpidfile = True, paranoid = False,
+                 pidfile = "%(path)s/%(component)s-%(name)s.pid",
+                 mkpidfile = True, paranoid = False,
                  close_fds = True,
                  **kwargs):
         assert isinstance(cmdline, list), \
@@ -1185,6 +1186,7 @@ class daemon_c(impl_c):
             % type(cmdline).__name__
         assert precheck_wait >= 0
         assert isinstance(close_fds, bool)
+        assert pidfile == None or isinstance(pidfile, str)
 
         impl_c.__init__(self, paranoid = paranoid, **kwargs)
         self.cmdline = cmdline
@@ -1222,7 +1224,8 @@ class daemon_c(impl_c):
         if check_path == None:
             self.check_path = self.path
         else:
-            assert isinstance(check_path, str) and os.path.isfile(check_path)
+            assert isinstance(check_path, str) and os.path.isfile(check_path), \
+                f"{check_path}: invalid file or non existing"
             self.check_path = check_path
         if name == None:
             self.name = os.path.basename(self.path)
@@ -1230,11 +1233,7 @@ class daemon_c(impl_c):
             assert isinstance(name, str)
             self.name = name
         self.kws.setdefault('name', self.name)
-        if pidfile:
-            assert isinstance(pidfile, str)
-            self.pidfile = pidfile
-        else:
-            self.pidfile = "%(path)s/%(component)s-%(name)s.pid"
+        self.pidfile = pidfile
         assert isinstance(mkpidfile, bool)
         self.mkpidfile = mkpidfile
         self.close_fds = close_fds
@@ -1321,8 +1320,11 @@ class daemon_c(impl_c):
             env.update(self.env_add)
         else:
             env = os.environ
-        pidfile = self.pidfile % kws
-        commonl.rm_f(pidfile)
+        if self.pidfile:
+            pidfile = self.pidfile % kws
+            commonl.rm_f(pidfile)
+        else:
+            pidfile = None
         stderrf = open(stderrf_name, "w+")
         try:
             p = subprocess.Popen(_cmdline, env = env, cwd = target.state_dir,
@@ -1331,7 +1333,7 @@ class daemon_c(impl_c):
                                  stderr = subprocess.STDOUT, bufsize = 0,
                                  shell = False,
                                  universal_newlines = False)
-            if self.mkpidfile:
+            if pidfile and self.mkpidfile:
                 with open(pidfile, "w+") as pidf:
                     pidf.write("%s" % p.pid)
         except TypeError as e:
@@ -1366,7 +1368,8 @@ class daemon_c(impl_c):
             self.log_stderr(target, component, stderrf)
             raise self.power_on_e("%s: %s failed to start"
                                   % (component, self.name))
-        ttbl.daemon_pid_add(pid)
+        if pid != None and pid > 0:
+            ttbl.daemon_pid_add(pid)
 
 
     def off(self, target, component):
