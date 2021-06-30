@@ -152,9 +152,9 @@ class _test(tcfl.tc.tc_c):
         try:
             target.store.delete("/path1/non_existing_file")
         except tcfl.tc.error_e as e:
-            if "area that is not" not in str(e):
+            if "is a read only location" not in str(e):
                 raise tcfl.tc.failed_e(
-                    "expected error with 'area that is not'",
+                    "expected error with 'is a read only location'",
                     dict(e = e))
         target.report_pass("deleting from invalid path fails")
 
@@ -168,6 +168,63 @@ class _test(tcfl.tc.tc_c):
             raise tcfl.tc.failed_e("uploaded and downloaded file differ")
         target.store.delete("test_file")
         target.report_pass("can upload, download and delete")
+
+    @tcfl.tc.subcase(break_on_non_pass = True)
+    def eval_00_target_sub_path_ro(self, target):
+        with self.subcase("delete"):
+            try:
+                target.store.delete("ro/file")
+            except tcfl.tc.error_e as e:
+                if "is a read only location" not in str(e):
+                    raise tcfl.tc.failed_e(
+                        "deleting from read-only path did not fail",
+                        dict(e = e))
+            target.report_pass("deleting from read-only path fails")
+
+        with self.subcase("upload"):
+            try:
+                target.store.upload("ro/upload_test_file", __file__)
+            except tcfl.tc.error_e as e:
+                if "is a read only location" not in str(e):
+                    raise tcfl.tc.failed_e(
+                        "uploading to a read-only path did not fail",
+                        dict(e = e))
+            target.report_pass("uploading to a read-only path fails")
+
+
+    @tcfl.tc.subcase(break_on_non_pass = True)
+    def eval_00_target_sub_path_rw(self, target):
+
+        with self.subcase("upload"):
+            try:
+                target.store.upload("rw/upload_test_file", __file__)
+            except tcfl.tc.error_e as e:
+                raise tcfl.tc.failed_e(
+                    "uploading to a rw path didn't work",
+                    dict(e = e))
+            target.report_pass("uploading to a rw path worked")
+
+        with self.subcase("dnload"):
+            try:
+                local_filename = self.report_file_prefix + "upload_test_file"
+                target.store.dnload("rw/upload_test_file", local_filename)
+                if not filecmp.cmp(local_filename, __file__):
+                    raise tcfl.tc.failed_e("uploaded and downloaded file differ")
+            except tcfl.tc.error_e as e:
+                raise tcfl.tc.failed_e(
+                    "uploading to a rw path didn't work",
+                    dict(e = e))
+            target.report_pass("uploading to a rw path worked")
+
+        with self.subcase("delete"):
+            try:
+                target.store.delete("rw/upload_test_file")
+            except tcfl.tc.error_e as e:
+                raise tcfl.tc.failed_e(
+                    "deleting from rw path didn't work",
+                    dict(e = e))
+            target.report_pass("deleting from rw path worked")
+
 
     def eval_healcheck(self, target):
         target.store._healthcheck()

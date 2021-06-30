@@ -62,6 +62,14 @@ class interface(ttbl.tt_interface):
 
     _bad_path = re.compile(r"(^\.\.$|^\.\./|/\.\./|/\.\.$)")
 
+    # Paths allowed to access in TARGETSTATEDIR/PATH
+    target_sub_paths = {
+        # PATH1: False,          # read-only
+        # PATH2: True,           # read-write
+        # For the capture interface FIXME move to ttbl/capture.py
+        "capture": False,
+    }
+
     def _validate_file_path(self, target, file_path, user_path):
         matches = self._bad_path.findall(file_path)
         if matches \
@@ -69,33 +77,45 @@ class interface(ttbl.tt_interface):
             raise ValueError("%s: file path cannot contains components: "
                              "%s" % (file_path, " ".join(matches)))
 
-        if target and file_path.startswith("capture/"):
-            # file comes from the targt's capture space
-            # remove any possible nastiness
-            file_name = os.path.basename(file_path)
-            file_path_final = os.path.join(target.state_dir, "capture", file_name)
-        elif not os.path.isabs(file_path):
+        if target:
+            for subpath, rw in self.target_sub_paths.items():
+                if file_path.startswith(subpath + "/"):
+                    # file comes from the targt's designated state
+                    # directory (capture, certificates) remove any
+                    # possible nastiness
+                    file_name = os.path.basename(file_path)
+                    file_path_final = os.path.join(target.state_dir, subpath, file_name)
+                    return file_path_final, rw
+
+        # fall through
+        if not os.path.isabs(file_path):
             # file comes from the user's storage
             file_path_normalized = os.path.normpath(file_path)
             file_path_final = os.path.join(user_path, file_path_normalized)
-        else:
-            # file from the system (mounted FS or similar);
-            # double check it is allowed
-            for path, path_translated in paths_allowed.items():
-                if file_path.startswith(path):
-                    file_path = file_path.replace(path, path_translated, 1)
-                    file_path_final = os.path.normpath(file_path)
-                    break
-            else:
-                # FIXME: use PermissionError in Python3
-                raise RuntimeError(
-                    "%s: tries to read from a location that is not allowed"
-                    % file_path)
+            return file_path_final, True
 
-        return file_path_final
+        # file from the system (mounted FS or similar);
+        # double check it is allowed
+        for path, path_translated in paths_allowed.items():
+            if file_path.startswith(path):
+                file_path = file_path.replace(path, path_translated, 1)
+                file_path_final = os.path.normpath(file_path)
+                return file_path_final, False	# FIXME: always read-only?
 
-    @staticmethod
-    def _validate_path(path):
+        # FIXME: use PermissionError in Python3
+        raise RuntimeError(
+            "%s: tries to read from a location that is not allowed"
+            % file_path)
+
+    def _validate_path(self, target, path):
+        if target:
+            for subpath, _rw in self.target_sub_paths.items():
+                if path.startswith(subpath + "/") or path == subpath:
+                    # file comes from the targt's designated state
+                    # directory (capture, certificates) remove any
+                    # possible nastiness
+                    return os.path.join(target.state_dir, subpath)
+
         for valid_path, translated_path in paths_allowed.items():
             if path.startswith(valid_path):
                 return path.replace(valid_path, translated_path, 1)
@@ -118,7 +138,7 @@ class interface(ttbl.tt_interface):
         elif path == "/":
             pass	# special handling
         else:
-            path = self._validate_path(path)
+            path = self._validate_path(target, path)
         digest = self.arg_get(args, 'digest', str,
                               allow_missing = True, default = "sha256")
         if digest not in self.valid_digests:
@@ -151,7 +171,7 @@ class interface(ttbl.tt_interface):
             for filename in filenames:
                 if not isinstance(filename, str):
                     continue
-                file_path = self._validate_file_path(None, filename, path)
+                file_path, _rw = self._validate_file_path(target, filename, path)
                 if os.path.isdir(file_path):
                     file_data[filename] = 'directory'
                 else:
@@ -172,18 +192,17 @@ class interface(ttbl.tt_interface):
         file_data['result'] = dict(file_data)	# COMPAT
         return file_data
 
+
     def post_file(self, target, _who, args, files, user_path):
         # we can only upload to the user's storage path, never to
         # paths_allowed -> hence why we alway prefix it.
         file_path = self.arg_get(args, 'file_path', str)
-        if os.path.isabs(file_path):
-            raise RuntimeError(
-                "%s: trying to upload a file to an area that is not allowed"
-                % file_path)
+        file_path_final, rw = self._validate_file_path(target, file_path, user_path)
+        if not rw:
+            raise PermissionError(f"{file_path}: is a read only location")
         file_object = files['file']
-        file_path_final = self._validate_file_path(None, file_path, user_path)
-        commonl.makedirs_p(user_path)
         file_object.save(file_path_final)
+        commonl.makedirs_p(user_path)
         target.log.debug("%s: saved" % file_path_final)
         return dict()
 
@@ -194,7 +213,7 @@ class interface(ttbl.tt_interface):
         file_path = self.arg_get(args, 'file_path', str)
         offset = self.arg_get(args, 'offset', int,
                               allow_missing = True, default = 0)
-        file_path_final = self._validate_file_path(target, file_path, user_path)
+        file_path_final, _ = self._validate_file_path(target, file_path, user_path)
         # interface core has file streaming support builtin
         # already, it will take care of streaming the file to the
         # client
@@ -210,11 +229,8 @@ class interface(ttbl.tt_interface):
 
     def delete_file(self, target, _who, args, _files, user_path):
         file_path = self.arg_get(args, 'file_path', str)
-        if os.path.isabs(file_path):
-            raise RuntimeError(
-                "%s: trying to delete a file from an area that is not allowed"
-                % file_path)
-
-        file_path_final = self._validate_file_path(target, file_path, user_path)
+        file_path_final, rw = self._validate_file_path(target, file_path, user_path)
+        if not rw:
+            raise PermissionError(f"{file_path}: is a read only location")
         commonl.rm_f(file_path_final)
         return dict()
