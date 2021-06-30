@@ -742,6 +742,17 @@ class tt_interface_impl_c(object):
         self.upid = kwargs
 
 
+    def target_setup(self, target, iface_name, component):
+        """
+        Called when the interface is added to a target to initialize
+        anything specific to the target, such as data in the inventory.
+
+        Remember *self* should not be used to store runtime data,
+        since this is a multiprocess server
+        """
+        pass
+
+
 class tt_interface(object):
     """A target specific interface
 
