@@ -876,7 +876,14 @@ class tt_interface(object):
         Called when the interface is added to a target to initialize
         the needed target aspect (such as adding tags/metadata)
         """
-        raise NotImplementedError
+        pass
+
+
+    def _allocate_hook(self, target, iface_name, allocdb):
+        """
+        Called when the target is allocated
+        """
+        pass
 
 
     def _release_hook(self, target, force):
@@ -903,6 +910,7 @@ class tt_interface(object):
                     name, type(impl).__name__,
                     self.cls
                 ))
+
 
     def _aliases_update(self, aliases):
         for alias, component in aliases.items():
@@ -1418,6 +1426,9 @@ class test_target(object):
         #: here. :func:`ttbl.config.target_add` will update this with
         #: the final list of tags.
         self.kws = {}
+
+        #: Functions to call when the target is allocated
+        self.allocate_hooks = dict()
 
         #: Functions to call when the target is released (things like
         #: removing tunnels the user created, resetting debug state,
@@ -2262,6 +2273,7 @@ class test_target(object):
         self.interface_origin[name] = commonl.origin_get(2)
         setattr(self, name, obj)
         self.release_hooks.add(obj._release_hook)
+        self.allocate_hooks[name] = obj._allocate_hook
 
 
     def fsdb_cleanup(self):

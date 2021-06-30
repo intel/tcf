@@ -627,6 +627,8 @@ def _target_allocate_locked(target, current_allocdb, waiters, preempt):
     # ** This waiter is the owner now **
     #logging.error("DEBUG: %s: target allocated to %s",
     #              target.id, allocdb.allocid)
+    for iface_name, allocate_hook in target.allocate_hooks.items():
+        allocate_hook(target, iface_name, allocdb)
     return allocdb
 
 
