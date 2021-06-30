@@ -8,6 +8,8 @@
 import ttbl
 import ttbl.config
 
+raise ImportError("bitrotten")
+
 class example_target(ttbl.test_target):
     pass
 

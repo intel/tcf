@@ -15,6 +15,7 @@ to a power rail, will start *OpenOCD* and then allow to use it to
 perform debug operations and flashing on the target's board.
 
 """
+raise ImportError("openocd driver is bitrotten and cannot be used")
 #
 # FIXME: clarify the whole target vs target_id in the addrmap, it is
 # currently a mess

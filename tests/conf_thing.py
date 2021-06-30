@@ -6,6 +6,7 @@
 #
 # pylint: disable = missing-docstring
 
+raise ImportError("bitrotten")
 import ttbl.pc
 import ttbl.tt
 
