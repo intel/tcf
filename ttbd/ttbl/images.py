@@ -283,6 +283,20 @@ class impl_c(ttbl.tt_interface_impl_c):
         self.log_name = log_name
         ttbl.tt_interface_impl_c.__init__(self)
 
+    def target_setup(self, target, iface_name, component):
+        target.fsdb.set(
+            "interfaces.images." + component + ".estimated_duration",
+            self.estimated_duration)
+        if self.power_sequence_pre:
+            target.power.sequence_verify(
+                target, self.power_sequence_pre,
+                f"flash {component} pre power sequence")
+        if self.power_sequence_post:
+            target.power.sequence_verify(
+                target, self.power_sequence_post,
+                f"flash {component} post power sequence")
+
+
     def flash(self, target, images):
         """
         Flash *images* onto *target*
@@ -513,19 +527,6 @@ class interface(ttbl.tt_interface):
         if self.power_sequence_post:
             target.power.sequence_verify(target, self.power_sequence_post,
                                          "flash post power sequence")
-        for name, impl in self.impls.items():
-            commonl.verify_str_safe(name)
-            target.fsdb.set(
-                "interfaces.images." + name + ".estimated_duration",
-                impl.estimated_duration)
-            if impl.power_sequence_pre:
-                target.power.sequence_verify(
-                    target, impl.power_sequence_pre,
-                    "flash %s pre power sequence" % name)
-            if impl.power_sequence_post:
-                target.power.sequence_verify(
-                    target, impl.power_sequence_post,
-                    "flash %s post power sequence" % name)
 
     def _release_hook(self, target, _force):
         pass
@@ -2042,8 +2043,8 @@ class sf100linux_c(flash_shell_cmd_c):
 
     A console can be added to watch progress with::
 
-      target.console.impl_add("log-flash-IMAGENAME",
-                              ttbl.console.logfile_c("flash-IMAGENAME.log"))
+      target.interface_impl_add("console", "log-flash-IMAGENAME",
+                                ttbl.console.logfile_c("flash-IMAGENAME.log"))
 
     """
     def __init__(self, dediprog_id, args = None, name = None, timeout = 60,

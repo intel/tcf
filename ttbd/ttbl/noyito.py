@@ -86,7 +86,8 @@ class reader_pc(ttbl.power.daemon_c):
     This has to be added to the targets's power rail as an explicit
     off component:
 
-    >>> target.power.impl_add(
+    >>> target.interface_impl_add(
+    >>>     "power",
     >>>     "data_acquisition_1",
     >>>     ttbl.noyito.reader_pc(
     >>>         "/dev/serial/by-path/pci-0000:00:14.0-usb-0:3.1.6:1.0-port0",

@@ -161,6 +161,18 @@ class impl_c(ttbl.tt_interface_impl_c):
         self.re_enable_if_dead = False
         self.crlf = crlf
 
+    def target_setup(self, target, iface_name, component):
+        # if it declares a CRLF string, publish it
+        if self.crlf:
+            assert isinstance(self.crlf, str), \
+                f"{target.id}: target declares CRLF for console '{component}' with" \
+                f" type '{type(self.crlf)}; expected string"
+            target.fsdb.set("interfaces.console." + component + ".crlf",
+                            self.crlf)
+        else:
+            target.fsdb.set("interfaces.console." + component + ".crlf", None)
+
+
     class exception(Exception):
         """
         General console driver exception
@@ -444,16 +456,8 @@ class interface(ttbl.tt_interface):
         # because things like consoles over SSH will stop working, no
         # matter what, and we want it to fail early and not seem there
         # is something odd.
+        # FIXME: don't do this for log consoles?
         target.power_off_pre_fns.append(self._pre_off_disable_all)
-        for console, impl in self.impls.items():
-            if impl.crlf:
-                # if it declares a CRLF string, publish it
-                assert isinstance(impl.crlf, str), \
-                    "%s: target declares CRLF for console %s with" \
-                    " a type %s; expected string" % (
-                        target.id, console, type(impl.crlf))
-                target.fsdb.set("interfaces.console." + console + ".crlf",
-                                impl.crlf)
 
 
     def _release_hook(self, target, _force):
@@ -1280,7 +1284,10 @@ class netconsole_pc(ttbl.power.socat_pc, generic_c):
     driver and insert it into the power rail and the console of a
     target:
 
-    target.console.impl_add("netconsole0", netconsole_pc())
+    >>> target.interface.impl_add("console", "netconsole0", netconsole_pc())
+
+    or
+
     >>> netconsole_pc = ttbl.console.netconsole_c("192.168.98.2")
     >>>
     >>> ttbl.test_target.get(name).interface_add(
@@ -1472,7 +1479,8 @@ class logfile_c(impl_c):
     present, enabled otherwise. Attempts to enable it at will be
     ignored; disabling it removes the logfile.
 
-    >>> target.console.impl_add(
+    >>> target.interface_impl_add(
+    >>>     "console",
     >>>     "debugger_log",
     >>>     ttbl.console.logfile_c("debugger.log")
     >>> )

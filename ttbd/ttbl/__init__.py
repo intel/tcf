@@ -941,6 +941,10 @@ class tt_interface(object):
         aliases = {}
         self._init_by_name(name, impl, aliases)
         self._aliases_update(aliases)
+        warnings.warn(
+            "impl_add() is deprecated in favour of target.interface_impl_add()",
+            DeprecationWarning, stack_level = 4)
+
 
     def impls_set(self, impls, kwimpls, cls):
         """
@@ -1005,7 +1009,7 @@ class tt_interface(object):
             % type(impls).__name__
         assert issubclass(cls, object)
 
-        # initialize for impl_add()
+        # initialize for interface_impl_add()
         self.cls = cls
         aliases = {}
 
@@ -2258,6 +2262,7 @@ class test_target(object):
           :meth:`ttbl.tt_interface.request_process` to handle calls
           from proxy/brokerage layers.
         """
+        # FIXME: rename obj -> iface
         assert isinstance(obj, tt_interface), \
             "obj: expected ttbl.tt_interface; got %s" \
             % type(obj).__name__
@@ -2270,10 +2275,38 @@ class test_target(object):
         # called by _target_setup() can store stuff
         obj.instrumentation_publish(self, name)
         obj._target_setup(self, name)
+        for component, impl in obj.impls.items():
+            # initialize implementations, if any
+            # self is target, obj is iface
+            impl.target_setup(self, name, component)
         self.interface_origin[name] = commonl.origin_get(2)
         setattr(self, name, obj)
         self.release_hooks.add(obj._release_hook)
         self.allocate_hooks[name] = obj._allocate_hook
+
+
+    def interface_impl_add(self, iface_name, component, impl):
+        """
+        Append a new implementation to the list of implementations
+        this interface supports.
+
+        This can be used after an interface has been declared, such
+        as:
+
+        >>> target = ttbl.test_target('somename')
+        >>> target.interface_add('power', ttbl.power.interface(*power_rail))
+        >>> target.interface_impl_add("power", 'newcomponent', impl_object)
+
+        :param str component: implementation's name
+        :param impl: object that defines the implementation; this must
+          be an instance of the class :data:`cls` (this gets set by the
+          first call to :meth:`impls_set`.
+        """
+        iface = getattr(self, iface_name)
+        aliases = {}
+        iface._init_by_name(component, impl, aliases)
+        iface._aliases_update(aliases)
+        impl.target_setup(self, iface_name, component)
 
 
     def fsdb_cleanup(self):

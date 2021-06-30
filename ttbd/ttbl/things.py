@@ -36,6 +36,18 @@ class impl_c(ttbl.tt_interface_impl_c):
     - this might be controlling a mechanical device which
       plugs/unplugs a cable
     """
+    def target_setup(self, target, iface_name, component):
+        # for each thing we added, we are going to tell them they
+        # are a thing to this target, so they can unplug
+        # themselves when they are released
+        thing = ttbl.test_target.get(component)
+        assert thing != None, \
+            "%s: thing '%s' for target '%s' has to be an" \
+            " existing target" % (target.id, name, target.id)
+        thing.thing_to.add(target)
+        publish_dict = target.tags['interfaces'][iface_name][component]['type'] = thing.type
+
+
     def plug(self, target, thing):
         """
         Plug *thing* into *target*
@@ -88,19 +100,7 @@ class interface(ttbl.tt_interface):
         self.impls_set(impls, kwimpls, impl_c)
 
     def _target_setup(self, target, iface_name):
-        # Called when the interface is added to a target to initialize
-        # the needed target aspect (such as adding tags/metadata)
-        publish_dict = target.tags['interfaces'][iface_name]
-        for name, _impl in self.impls.items():
-            # for each thing we added, we are going to tell them they
-            # are a thing to this target, so they can unplug
-            # themselves when they are released
-            thing = ttbl.test_target.get(name)
-            assert thing != None, \
-                "%s: thing '%s' for target '%s' has to be an" \
-                " existing target" % (target.id, name, target.id)
-            thing.thing_to.add(target)
-            publish_dict[name] = thing.type
+        pass
 
 
     def _release_hook(self, target, _force):

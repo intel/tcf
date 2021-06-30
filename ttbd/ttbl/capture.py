@@ -217,6 +217,22 @@ class impl_c(ttbl.tt_interface_impl_c):
         self.snapshot = snapshot
         ttbl.tt_interface_impl_c.__init__(self)
 
+    def target_setup(self, target, iface_name, component):
+        assert component != "capturing", \
+            "capturer name 'capturing' is reserved; cannot use"
+        # wipe previous state
+        target.property_set(f"interfaces.{iface_name}.{component}", None)
+        # set the tags as reference
+        publish_dict = target.tags['interfaces'][iface_name]
+        publish_dict[component]['snapshot'] = self.snapshot
+        publish_dict[component]['stream'] = {}
+        for stream_name in self.stream:
+            publish_dict[component]['stream'][stream_name] = {}
+            publish_dict[component]['stream'][stream_name]['mimetype'] = \
+                self.stream[stream_name]
+        # register the path TARGETSTATEDIR/capture, where we allow the
+        # user to download captured data from.
+        target.store.target_sub_paths['capture'] = False
 
     def start(self, target, capturer, path):
         """
@@ -339,24 +355,7 @@ class interface(ttbl.tt_interface):
 
 
     def _target_setup(self, target, iface_name):
-        """
-        Called when the interface is added to a target to initialize
-        the needed target aspect (such as adding tags/metadata)
-        """
-        publish_dict = target.tags['interfaces'][iface_name]
-        for capturer in self.impls:
-            impl = self.impls[capturer]
-            assert capturer != "capturing", \
-                "capturer name 'capturing' is reserved; cannot use"
-            # Clean any existing state
-            target.property_set("interfaces.capture." + capturer, None)
-            publish_dict[capturer]['snapshot'] = impl.snapshot
-            publish_dict[capturer]['stream'] = {}
-            for stream_name in impl.stream:
-                publish_dict[capturer]['stream'][stream_name] = {}
-                publish_dict[capturer]['stream'][stream_name]['mimetype'] = \
-                    impl.stream[stream_name]
-
+        pass
 
     @staticmethod
     def _capture_path(target):

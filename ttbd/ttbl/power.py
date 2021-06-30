@@ -299,6 +299,15 @@ class impl_c(ttbl.tt_interface_impl_c):
         self.paranoid_get_samples = 6
         ttbl.tt_interface_impl_c.__init__(self)
 
+
+    def target_setup(self, target, iface_name, component):
+        assert component not in ( 'all', 'full' ), \
+            f"{component}: invalid power component name, reserved"
+        assert self.explicit in ( None, 'on', 'off', 'both' ), \
+            f"{component}: invalid 'explicit' value '{self.explicit}';" \
+            " expected None, 'on', 'off' or 'both'"
+
+
     class retry_all_e(Exception):
         """
         Exception raised when a power control implementation operation

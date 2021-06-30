@@ -237,7 +237,8 @@ class screenshot_spider_c(ttbl.capture.generic_snapshot):
 
     or extending it
 
-    >>> target.capture.impl_add(
+    >>> target.interface_impl_add(
+    >>>     "capture",
     >>>     "kvm_screenshot",
     >>>     ttbl.lantronix.screenshot_spider_c(hostname)
     >>> )

@@ -317,8 +317,8 @@ class pc(ttbl.power.daemon_c,
     be registered as in the console interface later on with:
 
     >>> console_pc = ttbl.console.general_pc()
-    >>> ttbl.console.impl_add(NAME, console_pc)
-    >>> ttbl.power.impl_add(NAME, console_pc)   # to auto-start on power-on
+    >>> ttbl.interface_impl_add("console", NAME, console_pc)
+    >>> ttbl.interface_impl_add("power", NAME, console_pc)   # to auto-start on power-on
 
     which makes QEMU create a PTY for each serial console we want to
     define; on power on, *ttbl.qemy.pc._qemu_console_on()* will find

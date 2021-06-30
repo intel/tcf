@@ -91,8 +91,8 @@ class pc(ttbl.power.daemon_c):
 
     .. code-block:: python
 
-       target.console.impl_add(
-           "log-dnsmasq",
+       target.interface_impl_add(
+           "console", "log-dnsmasq",
            ttbl.console.logfile_c("dnsmasq.log")
        )
 
