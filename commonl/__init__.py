@@ -868,8 +868,8 @@ def process_started(pidfile, path,
         time.sleep(poll_period)		# Give it .1s to come up
         pid = process_alive(pidfile, path)
         if pid == None:
-            log.debug("%s: no PID yet (+%.2f/%ss), re-checking", tag,
-                      t - t0, timeout)
+            log.debug("%s: no %s PID yet (+%.2f/%ss), re-checking",
+                      tag, path, t - t0, timeout)
             continue
         # PID found, if there is a verification function, let's run it
         break
