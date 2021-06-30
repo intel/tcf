@@ -46,7 +46,6 @@ class interface(ttbl.tt_interface):
             target.fsdb.set(prefix + ".ip_addr", None)
             target.fsdb.set(prefix + ".protocol", None)
             target.fsdb.set(prefix + ".port", None)
-        pass
 
 
     def _release_hook(self, target, _force):
