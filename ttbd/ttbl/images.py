@@ -342,7 +342,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         NotImplementedError (maybe we need a better exception).
         """
         assert isinstance(target, ttbl.test_target)
-        assert isinstance(image, basestring)
+        assert isinstance(image, str)
         raise NotImplementedError("reading not implemented")
 
 
@@ -765,7 +765,7 @@ class interface(ttbl.tt_interface):
 
 
     def get_flash(self, target, who, args, _files, user_path):
-        image = self.arg_get(args, 'image', basestring)
+        image = self.arg_get(args, 'image', str)
         image_offset = self.arg_get(args, 'image_offset', int,
                                     allow_missing = True, default = 0)
         read_bytes = self.arg_get(args, 'read_bytes', int,
@@ -1284,7 +1284,7 @@ class dfu_c(impl_c):
         target.log.info("flashed image")
 
 
-class fake_c(impl_c):
+class fake_c(impl2_c):
     """
     Fake flashing driver (mainly for testing the interfaces)
 
