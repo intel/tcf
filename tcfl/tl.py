@@ -13,6 +13,7 @@ import collections
 import datetime
 import os
 import re
+import ssl
 import time
 
 import tcfl.tc
@@ -331,7 +332,7 @@ def linux_ssh_root_nopwd(target, prefix = ""):
     target.shell.run(
         f'grep -qe "^PermitEmptyPasswords yes" {prefix}/etc/ssh/sshd_config'
         f' || echo "PermitEmptyPasswords yes" >> {prefix}/etc/ssh/sshd_config')
-    
+
 
 def deploy_linux_ssh_root_nopwd(_ic, target, _kws):
     linux_ssh_root_nopwd(target, "/mnt")
@@ -1021,7 +1022,7 @@ def linux_package_add(ic, target, *packages,
         target.shell.run("date -us '%s'; hwclock -wu"
                          % str(datetime.datetime.utcnow()))
 
-        
+
     packages = list(packages)
     if distro.startswith('clear'):
         _packages = packages + kws.get("any", []) + kws.get("clear", [])
@@ -1087,3 +1088,91 @@ def linux_network_ssh_setup(ic, target):
 
     tcfl.tl.linux_ssh_root_nopwd(target)	# allow remote access
     tcfl.tl.linux_sshd_restart(ic, target)
+
+
+# FIXME: this should declare target is tcfl.tc.target_c but it can't
+# yet because we have an import hell that will be fixed in v0.16
+# - add to target: tcfl.tc.target_c, component: str
+def rpyc_connect(target, component: str,
+                 cert_name: str = "default",
+                 iface_name = "power"):
+    """Connect to an RPYC component exposed by the target
+
+    :param tcfl.tc.target_c target: target which exposes the RPYC
+      component.
+
+      An RPYC component exposes in the inventory for the (power)
+      interface two fields:
+
+        - *interfaces.power.COMPONENT.rpyc_port*: (int) TCP port in
+          the server where the RPYC listens
+
+        - *interfaces.power.COMPONENT.ssl_enabled*: (bool) *True* if
+          SSL enabled; SSL is considered disabled otherwise.
+
+    :param str component: name of the component that exposes the RPYC
+      interface.
+
+    :param str cert_name: (optional, defaults to *default*) name of
+      the client certificate to use to connect to the RPYC
+      interface it requests SSL.
+
+      See :mod:`ttbl.certs` for more info; the server can issue SSL
+      client certificates to use as One-Time-Passwords for the
+      duration of the target allocation.
+
+    :param str iface_name: (optional; default *power*) name of the
+      interface which exposes the component. In most cases it is the
+      power interface, but it could be associated to any.
+
+    """
+    # FIXME: assert isinstance(target, tcfl.tc.target_c)
+    assert isinstance(component, str)
+    assert isinstance(cert_name, str)
+
+    try:
+        import rpyc	# pylint: disable=import-outside-toplevel
+    except ImportError:
+        tcfl.tc.tc_global.report_blck(
+            "MISSING MODULES: install them with: pip install --user rpyc")
+        raise
+
+    rpyc_port = target.kws[f"interfaces.{iface_name}.{component}.rpyc_port"]
+    ssl_enabled = target.kws[f"interfaces.{iface_name}.{component}.ssl_enabled"]
+    if ssl_enabled:
+        # get the certificate files from the server, unless they are already created
+        client_key_path = os.path.join(target.tmpdir, "client." + cert_name + ".key")
+        client_cert_path = os.path.join(target.tmpdir, "client." + cert_name + ".cert")
+
+        if not os.path.isfile(client_key_path) or not os.path.isfile(client_cert_path):
+            r = target.certs.get(cert_name)
+            with open(client_key_path, "w") as keyf:
+                keyf.write(r['key'])
+            with open(client_cert_path, "w") as certf:
+                certf.write(r['cert'])
+
+        target.report_info(
+            f"rpyc: SSL-connecting (cert '{cert_name}') to '{component}' on"
+            f" {target.rtb.parsed_url.hostname}:{rpyc_port}", dlevel = 3)
+        remote = rpyc.utils.classic.ssl_connect(
+            target.rtb.parsed_url.hostname,
+            port = rpyc_port,
+            keyfile = client_key_path,
+            certfile =  client_cert_path,
+            ssl_version = ssl.PROTOCOL_TLS
+        )
+        target.report_info(
+            f"rpyc: SSL-connected (cert '{cert_name}') to '{component}' on"
+            f" {target.rtb.parsed_url.hostname}:{rpyc_port}", dlevel = 2)
+    else:
+        target.report_info(
+            f"rpyc: connecting to '{component}' on"
+            f" {target.rtb.parsed_url.hostname}:{rpyc_port}", dlevel = 3)
+        remote = rpyc.utils.classic.ssl_connect(
+            target.rtb.parsed_url.hostname,
+            port = rpyc_port)
+        target.report_info(
+            f"rpyc: connected to '{component}' on"
+            f" {target.rtb.parsed_url.hostname}:{rpyc_port}", dlevel = 2)
+
+    return remote

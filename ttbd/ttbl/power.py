@@ -2042,6 +2042,136 @@ class delay_til_shell_cmd_c(impl_c):
         return self._test(target, component, cmdline)
 
 
+class rpyc_c(daemon_podman_container_c):
+    """Expose a containeraized Python environment in the server to client via RPYC
+
+    This driver is used to expose RPYC servers that that allows us to
+    execute Python code in the server environment
+    (https://rpyc.readthedocs.io/en/latest/).
+
+    When started, it starts a server in the server that listens on a
+    TCP port (by default wrapped over SSL). The client then can
+    connect to it and instantiate Python objects in the environment
+    and call them / use them as if it was local. For example:
+
+    >>> import rpyc
+    >>> remote = rpyc.ssl_connect(HOSTNAME, PORTNUMBER)
+    >>> with remote.builtins.open("somefile", "w") as f:
+    >>>    f.write("hello")
+
+    Creates a file *somefile* in the target environment.
+
+    .. note: this can open security issues and to avoid such, this
+             environment is by default run inside a rootless container
+             using podman.
+
+    The function :func:`tcfl.tl.rpyc_connect` returns a ready to use
+    remote connection object given a target and the component name for the
+    target (which is assumed in the *power* interface):
+
+    >>> remote = tcfl.tl.rpyc_connect(target, "COMPONENTNAME")
+    >>> remote_sys = remote.modules['sys']
+
+
+    :param int port: TCP port in which to listen
+
+    :param str host: (optional, default *0*--attach to all interfaces)
+
+    :param bool ssl_enabled: (optional, default *True*) run all
+      communication between RPYC client and server SSL encrypted.
+
+      Uses the target-defined SSL Certificate Authority, certificates
+      can be downloaded from the target with
+      target.certs.get("CERTNAME")
+
+    :param dict env_add: environment variables to add to the container
+      (will be passed with *-e* to *podman run*).
+
+    The rest of the parameters are as to :class:`ttbl.power.daemon_podman_container_c`.
+
+
+    **System Setup**
+
+    1. Ensure there is an image name with RPYC support
+
+       See :class:`daemon_podman_container_c` for image setup; the base
+       image called *ttbd* is already defined to be able to run *rpyc*
+       containers.
+    """
+    def __init__(self, image_name: str, rpyc_port: int,
+                 cmdline = None,
+                 env_add: dict = None,
+                 ssl_enabled = True, **kwargs):
+        assert isinstance(image_name, str)
+        assert isinstance(rpyc_port, int) and rpyc_port > 0 and rpyc_port < 65546
+        assert isinstance(ssl_enabled, bool)
+
+        self.rpyc_port = rpyc_port
+        if cmdline == None:
+            cmdline = []
+        else:
+            commonl.assert_list_of_strings(cmdline,
+                                           "command line options", "argument")
+        cmdline += [
+            # Port where RPYC serves
+            "--publish", f"{rpyc_port}:{rpyc_port}",
+            # FIXME: why this fials?
+            #"--publish", "%(rpyc_port)d:%(rpyc_port)d",
+            "--volume", "%(path)s/certificates:/etc/ttbd/certificates:ro",
+            image_name,
+            "rpyc_classic",	# for PIP: "rpyc_classic.py",
+            # listen on all interfaces of the container, we'll map it later
+            "--port", str(rpyc_port), "--host", "0",
+            "--mode", "forking",
+        ]
+        if ssl_enabled:
+            cmdline += [
+                # note the /etc/ttbd/certificates path is mapped by
+                # the container from the certificates in the target's
+                # directory TARGETSTATEDIR/certificates -- these are
+                # always re-created new upon target's allocation.
+                "--ssl-cafile", "/etc/ttbd/certificates/ca.cert",
+                "--ssl-certfile", "/etc/ttbd/certificates/server.cert",
+                "--ssl-keyfile", "/etc/ttbd/certificates/server.key",
+            ]
+
+        daemon_podman_container_c.__init__(
+            self, "rpyc", cmdline,
+            rm_container = True, env_add = env_add, **kwargs
+        )
+        self.name = "rpyc"
+        self.upid_set(f"RPYC Server @TCP:{rpyc_port}",
+                      image_name = image_name,
+                      rpyc_port = rpyc_port,
+                      ssl_enabled = ssl_enabled)
+
+
+
+    #: Minimum container speficification
+    #:
+    #: This can be fed to commonl.buildah_image_create() to generate
+    #: the image upon server configuration.
+    dockerfile = """
+FROM fedora-minimal
+RUN dnf install -y usbutils strace python3-rpyc
+RUN dnf clean all
+"""
+
+    def target_setup(self, target, iface_name, component):
+        target.fsdb.set(f"interfaces.{iface_name}.{component}.rpyc_port",
+                        self.upid['rpyc_port'])
+        target.fsdb.set(f"interfaces.{iface_name}.{component}.ssl_enabled",
+                        self.upid['ssl_enabled'])
+        daemon_podman_container_c.target_setup(
+            self, target, iface_name, component)
+
+
+    def verify(self, target, component, cmdline_expanded):
+        time.sleep(1)	# force delay
+        return commonl.tcp_port_busy(self.rpyc_port)
+
+
+
 class socat_pc(daemon_c):
     """
     Generic power component that starts/stops socat as daemon

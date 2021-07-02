@@ -2620,3 +2620,12 @@ def usb_device_by_serial(arg_serial, sibling_port = None, *fields):
             ]
 
     return None if not fields else [ None ] + [ None for field in fields ]
+
+
+def console_generation_set(target, console):
+    # internal to the ttbl.console interface, but needed here since
+    # also other drivers call it to reset the generation of consoles
+    # they expose.
+    target.fsdb.set("interfaces.console." + console + ".generation",
+                    # trunc the time and make it a string
+                    str(int(time.time())))

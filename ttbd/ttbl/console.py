@@ -635,6 +635,7 @@ def generation_set(target, console):
                     # trunc the time and make it a string
                     str(int(time.time())))
 
+
 class generic_c(impl_c):
     """General base console implementation
 
