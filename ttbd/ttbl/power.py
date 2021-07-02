@@ -2172,6 +2172,148 @@ RUN dnf clean all
 
 
 
+class rpyc_aardvark_c(rpyc_c):
+    """Driver to expose an Aardvark device using Totalphase's Python
+    Aardvark library over the Python RPYC Remote system.
+
+    When powered on, it starts a podman container which has access to
+    an specific Aardvark device and that exports an RPYC service
+    https://rpyc.readthedocs.io/en/latest/ in the given TCP port to
+    use the `aarvark_py
+    <https://aardvark-py.readthedocs.io/en/master/`_ library.
+
+    A client then can establish an RPYC connection and instantiate an
+    aardvark object:
+
+    >>> remote = tcfl.tl.rpyc_connect(target, "COMPONENTNAME")
+    >>> raardvark_py = remote.modules['aardvark_py']
+
+    >>> r, handles, ids = raardvark_py.aa_find_devices_ext(1, 1)
+    >>> assert r > 0
+    >>> handle = raardvark_py.aa_open(0)
+    >>> features = raardvark_py.aa_features(handle)
+    >>> assert features == 27
+    >>> target.report_pass("Aardvark: features is 27")
+    >>> raardvark_py.aa_close(handle)
+
+
+    :param str usb_serial_number: USB serial number for the Aaardvark
+      device to use.
+
+    :param int rpyc_port: TCP port number to use for the RPYC
+      connection. This port will be opened on the server and expect an
+      a client connecting using SSL with certificates from the
+      target's cert interface.
+
+    System Setup
+    ^^^^^^^^^^^^
+
+    **Server**
+
+    Create a container image with the Aardvark PY library, RPYC and
+    other utilities for debugging; generate a file called
+    *aardvark_py.Dockefile* with the contents::
+
+        FROM fedora-minimal
+        RUN dnf install -y usbutils strace python3-rpyc
+        RUN dnf clean all
+        RUN pip3 install --no-deps rpyc
+
+    And setup the container image for Aardvark::
+
+        $ buildah bud -f aardvark_py.Dockerfile -t aardvark_py
+
+    You can also use, from the in a :ref:`server configuration file
+    <ttbd_configuration>`, the helper to auto-generate a local image
+    upon server initialization:
+
+    >>> commonl.buildah_image_create("aardvark_py", ttbl.aardvark.dockerfile)
+
+    Which will create the image if non-existant.
+
+    Client:
+
+      $ sudo dnf install -y python3-rpyc
+      $ pip3 install --user rpyc		# if not available
+
+    """
+    def __init__(self, usb_serial_number: str, rpyc_port: int,
+                 image_name: str = "aardvark_py",
+                 **kwargs):
+        assert isinstance(usb_serial_number, str)
+        assert isinstance(rpyc_port, int) \
+            and rpyc_port > 1024 and rpyc_port <= 65536, \
+            "rpyc_port: expected integer from 1024 to 65536; " \
+            "got {type(rpyc_port)}"
+
+        self.usb_serial_number = usb_serial_number
+
+        rpyc_c.__init__(
+            self,
+            image_name,		# FIXME: build instructions
+            rpyc_port,
+            cmdline = [
+                #
+                # Map the device
+                #
+                "--device=%(device_path)s:%(device_path)s:rwm",
+                "--volume=%(device_syspath)s:%(device_syspath)s",
+
+                # "always" conflicts with --rm; this is enough to
+                # restart when running in forking --mode (see below)
+                # even adding :COUNT conflicts with --rm...hmm
+                "--restart", "on-failure",
+            ],
+            ssl_enabled = True,
+            **kwargs
+        )
+        self.upid_set(
+            f"Aardvark I2C/SPI #{usb_serial_number}",
+            usb_serial_number = usb_serial_number,
+        )
+        self.name = "aardvark"
+
+
+    #: Minimum container speficification
+    #:
+    #: This can be fed to commonl.buildah_image_create() to generate
+    #: the image upon server configuration. We assume the basic *ttbd*
+    #: image is available
+    dockerfile = """
+FROM ttbd
+RUN pip3 install --no-deps aardvark_py
+"""
+
+    # rpyc_c.target_setup() -> will be called
+
+    def on(self, target, component):
+        # Find /dev/bus/usb/BUSNUM/DEVNUM for the Aardvark associated
+        # to this component given the serial number
+        syspath, busnum, devnum = ttbl.usb_device_by_serial(
+            self.usb_serial_number, None, "busnum", "devnum"
+        )
+        if syspath == None or busnum == None or devnum == None:
+            raise RuntimeError(
+                f"Cannot find USB device with serial {self.usb_serial_number}")
+        # Create the /dev/bus/usb/NNN/ZZZ path using the bus and dev numbers
+        devpath = f"/dev/bus/usb/{int(busnum):03d}/{int(devnum):03d}"
+
+        # create a dictionary of keywords with that information which
+        # the command line defined in __init__ will use to start the
+        # podman contained daemon.
+        self.kws = {
+            "device_path": devpath,
+            "device_syspath": syspath,
+            "rpyc_port": self.rpyc_port,
+        }
+        rpyc_c.on(self, target, component)
+
+
+    def verify(self, target, component, _cmdline):
+        return commonl.tcp_port_busy(self.rpyc_port)
+
+
+
 class socat_pc(daemon_c):
     """
     Generic power component that starts/stops socat as daemon
