@@ -1247,7 +1247,14 @@ class tt_interface(object):
                 # there might be empty values, as defaults, so we ignore them
                 if isinstance(val, str):
                     # if it is a string, it is a template
-                    target.property_set(prefix + "." + key, val % kws)
+                    try:
+                        target.property_set(prefix + "." + key, val % kws)
+                    except TypeError as e:
+                        # don't use target.log --> not fully
+                        # initialized yet
+                        logging.error(
+                            f"{target.id}: possible formatting error for val '{val}': {e}")
+                        raise
                 else:
                     target.property_set(prefix + "." + key, val)
         if components:
