@@ -739,7 +739,8 @@ class tt_interface_impl_c(object):
         if not self.name:
             self.name = name_long
         kwargs['name_long'] = name_long
-        self.upid = kwargs
+        # use update so we can accumulate values from inherited classes
+        self.upid.update(kwargs)
 
 
     def target_setup(self, target, iface_name, component):
