@@ -11,6 +11,7 @@
 # package: fedora,ubuntu=openocd
 # package: centos,fedora=openssh-clients
 # package: parted
+# package: podman
 # package: python3-devel ubuntu=python3-dev
 # package: qemu centos=qemu-kvm
 # package: socat
@@ -32,6 +33,7 @@ pysnmp          # package: centos,fedora=python3-pysnmp ubuntu=python3-pysnmp4
 python_ldap     # package: centos,fedora=python3-ldap
 pyusb           # package: centos,fedora=python3-pyusb ubuntu=python3-usb
 requests        # package: python3-requests
+rpyc            # package: python3-rpyc
 setuptools      # package: python3-setuptools
 systemd-python  # package: python3-systemd
 tornado         # package: python3-tornado

@@ -1122,7 +1122,10 @@ class inverter_c(impl_c):
             return state
         return not state
 
-
+# FIXME: daemon_c and daemon_podman_container_c need to be split into
+# a third base class containing all the basic functionality shared by
+# both (_kws_expand and friends, verify prototypes, verify_timeout,
+# etc)
 class daemon_c(impl_c):
     """Generic power controller to start daemons in the server machine
 
@@ -1274,6 +1277,34 @@ class daemon_c(impl_c):
         """
         raise NotImplementedError
 
+
+    def _kws_expand(self, s, kws):
+        try:
+            # some older Linux distros complain if this string is unicode
+            if '%(' in s:
+                return str(s % kws)
+            return s
+        except KeyError as e:
+            raise ValueError(
+                f"configuration error? missing field '{str(e)}' from "
+                f"template string '{s}'") from e
+
+
+    def _cmdline_expand(self, target, kws, cmdline):
+        _cmdline = []
+        count = 0
+        try:
+            for i in cmdline:
+                _cmdline.append(self._kws_expand(i, kws))
+                count += 1
+        except KeyError as e:
+            message = "configuration error? can't template command line #%d," \
+                " missing field or target property: %s" % (count, e)
+            target.log.error(message)
+            raise self.power_on_e(message)
+        return _cmdline
+
+
     def _stderr_stream(self, target, component, stderrf):
         count = 0
         for line in stderrf:
@@ -1306,6 +1337,7 @@ class daemon_c(impl_c):
 
         kws = dict(target.kws)
         kws.update(self.kws)
+        kws.update(self.upid)
         # bring in runtime properties (override the rest)
         kws.update(target.fsdb.get_as_dict())
         kws['component'] = component
@@ -1403,6 +1435,468 @@ class daemon_c(impl_c):
         kws.update(target.fsdb.get_as_dict())
         kws['component'] = component
         return commonl.process_alive(self.pidfile % kws, self.check_path) != None
+
+
+# derive daemon_c so we get verify() _kws_expand() and
+# _cmdline_expand(), but we re-do most
+class daemon_podman_container_c(daemon_c):
+    """Run a daemon inside a Podman container
+
+    A container is spun to execute a command (usually a long standing
+    service provider) isolated from the main system
+
+    >>> pc = ttbl.power.daemon_podman_container_c(
+    >>>     "SOMENAME",
+    >>>     cmdline = [
+    >>>         "fedora:34",
+    >>>         "/bin/ls", "-l",
+    >>>     ]
+    >>> )
+
+    :param str name: name given to the container, will be
+      passed to *podman run*
+
+    :param list(str) cmdline: command line to add to *podman run* (see
+      below); example:
+
+    :param dict env_add: environment variables to add to the container
+      (will be passed with *-e* to *podman run*).
+
+    Other parameters as to :class:`ttbl.power.impl_c`.
+
+    The container:
+
+    - is run a child of the daemon process if not using *-d*, thus if
+      the process is killed, the container is killed too.
+
+    - a container name is composed by adding the target name and
+      component to the *name* parameter to generate
+      *TARGETNAME_COMPONENT_NAME*
+
+    **Debugging**
+
+    To find running containers, as *root* or user running the
+    daemon, issue::
+
+      $ podman ps
+      CONTAINER ID  IMAGE   COMMAND               CREATED             STATUS                 PORTS                   NAMES
+      c379aedfed4b          rpyc_classic --ho...  About a minute ago  Up About a minute ago  0.0.0.0:3003->3003/tcp  t0_aa0_SOMENAME
+
+    To run a shell inside the container, run either::
+
+      $ podman exec -ti c379aedfed4b /bin/bash
+      $ podman exec -ti tt_aa0_SOMENAME /bin/bash
+
+    **Configuration tips**
+
+    In general, except for very basic configurations, you might need
+    to subclass the container class to set container configurations.
+
+    >>> class my_class(ttbl.power.daemon_container_c):
+    >>>
+    >>>     def __init__(self, myparams, **kwargs):
+    >>>         ...verify and set myparams...
+    >>>         ttbl.power.daemon_container_c.__init__(self, **kwargs)
+    >>>         self.upid_set("LONG NAME", data1=val1, data2 = val2
+    >>>
+    >>>     def on(self, target, component):
+    >>>         ...determine runtime info, set self.kws
+
+    - *Add an image*: if you don't want to use / can use an image
+      available on a registry (summary of
+      https://www.redhat.com/sysadmin/building-buildah) create a file
+      called *image.Dockerfile* with::
+
+        FROM centos:8
+        RUN dnf install -y python36 usbutils strace
+        RUN dnf clean all
+
+      and run to create an image named *centos8python36*::
+
+        $ buildah bud -f image.Dockerfile -t centos8python36
+        $ podman run localhost/centos8python36 echo "I work"
+
+      This then can be fed to the podman command line as
+      *localhost/centos8python36*
+
+      >>> cmdline = [
+      >>>     ...,
+      >>>     # these two have to be the last arguments
+      >>>     "localhost/centos8python36",
+      >>>     COMMANDTOEXECUTEINTHECONTAINER,
+      >>>     ARG1, ARG2,...
+      >>> ]
+
+    - *Capturing output to consoles*: the output of the container is
+      captured to a file called *COMPONENTNAME.stderr* in the target's
+      state directory.
+
+      It can be exposed as a console via the console interface by
+      adding to the target object:
+
+      >>> target.interface_impl_add(
+      >>>     "console", "log_COMPONENTNAME",
+      >>>     ttbl.console.logfile_c("COMPONENTNAME-CONTAINERNAME.stderr"))
+
+    - *Exposing network ports*: the default container configuration
+      allows the container to access the host network. To expose ports
+      from inside the container in the host, specify the *--publish*
+      command line option:
+
+      >>> cmdline = [
+      >>>     ...,
+      >>>     "--publish", "PORT_HOST:PORT_CONTAINER",
+      >>>     ...,
+      >>> ]
+
+    - *Exposing other host directories to the container*: using the
+      container's *-v|--volume* option:
+
+      >>> cmdline = [
+      >>>     ...,
+      >>>     # expose /opt/somedir as readonly from
+      >>>     # /opt/somedir/*someversion* take *someversion* from self.kws
+      >>>     "--volume=/opt/somedir/%(someversion)s:/opt/somedir:ro",
+      >>>     # expose as readonly, take *someversion* from self.kws
+      >>>     "--volume=/opt/somedir/%(someversion)s:/opt/somedir:ro",
+      >>>     ...,
+      >>> ]
+
+      Some of the options to be added:
+
+      - *rw* / *ro*: give read/write or read/only access
+
+      - *O*: give overlay access (host is read only, container is
+        read-write and changes get discarded when the container is
+        destroyed)
+
+      See *podman-run*'s man page for more information and other
+      settings
+
+    - *Exposing hardware devices*
+
+      The container can access hardware devices, as long as:
+
+      1. the user the daemon runs under has permission to access the
+         device
+
+      2. the container has to be given the right command lines to
+         acces it (*--device*, *--volume*); for example, for passing
+         access to a device, given its serial number, we need to find
+         its */dev/usb/bus/BUSNUMBER/DEVICENUMBER* path and its
+         */sys/bus/usb* path
+
+         >>> cmdline = [
+         >>>     ...,
+         >>>
+         >>>     "--device=%(device_path)s:%(device_path)s:rwm",
+         >>>     "--volume=%(device_syspath)s:%(device_syspath)s",
+         >>>     ...,
+         >>> ]
+
+         Those paths (*device_path* and *device_syspath*) are
+         published in the *self.kws* in the *on* method, since they
+         have to be found upon runtime:
+
+         >>>     def on(self, target, component):
+         >>>         ...
+         >>>         syspath, busnum, devnum = ttbl.usb_device_by_serial(
+         >>>             self.usb_serial_number, None, "busnum", "devnum"
+         >>>         )
+         >>>         if syspath == None or busnum == None or devnum == None:
+         >>>             raise RuntimeError(
+         >>>                 f"Cannot find USB device with serial {self.usb_serial_number}")
+         >>>        ...
+         >>>        self.kws = {
+         >>>            # Keywords for mapping a USB device
+         >>>            "device_path": f"/dev/bus/usb/{int(busnum):03d}/{int(devnum):03d}",
+         >>>            "device_syspath": syspath,
+         >>>            ...,
+         >>>        }
+         >>>        ttbl.power.daemon_podman_container_c.on(self, target, component)
+
+         See example implementation at FIXME.
+
+    3. Other command line additions:
+
+       - *--restart*: restart on failure, note it might conflict with *--rm*
+
+         >>>         cmdline = [
+         >>>             ...,
+         >>>             # "always" conflicts with --rm; this is enough to
+         >>>             # restart when running in forking --mode (see below)
+         >>>             # even adding :COUNT conflicts with --rm...hmm
+         >>>             "--restart", "on-failure",
+         >>>             ...,
+         >>>        ]
+
+       - *--cap-add*: if you need to debug
+
+         >>>         cmdline = [
+         >>>             ...,
+         >>>             # allow strace for debugging and others etc
+         >>>             "--cap-add=SYS_PTRACE",
+         >>>             ...,
+         >>>        ]
+
+
+
+    **System Setup**
+
+    This driver requires the podman package being installed in the
+    server::
+
+      $ sudo dnf install -y podman
+
+    Ensure the user that runs the daemon has SUBUIDs::
+
+      $ sudo usermod --add-subuids 10000-65536 --add-subgids 10000-65536 ttbd
+
+      $ sudo -u ttbd podman system migrate
+      $ sudo -u podman unshare cat /proc/self/uid_map
+      0        991          1
+      1      70000     100001
+      $ FIXME
+
+    **Troubleshooting**
+
+    - If the container system for the user is all messed up, the
+      username can be wiped up::
+
+        $ sudo su - DAEMONUSER    # become the user that runs the daemon
+        $ rm -rf ~DAEMONUSER/.{config,local/share}/containers
+        $ rm -rf /run/user/DAEMONUSER/{libpod,runc,vfs-*}
+        $ podman unshare rm -rf .{config,local/share}/containers
+
+    **FIXME/PENDING**
+
+    - use podman python library instead of shell
+
+    - expose the container ID in
+      interfaces.INFACENAME.COMPONENT.container_id when started
+
+    """
+
+    def __init__(self,
+                 name: str, cmdline: list,
+                 precheck_wait: float = 0,
+                 env_add: dict = None,
+                 rm_container: bool = True,
+                 **kwargs):
+        commonl.verify_str_safe(name, do_raise = False, name = "name")
+        commonl.assert_list_of_strings(cmdline, "command line", "command")
+        assert isinstance(precheck_wait, numbers.Real) and precheck_wait >= 0
+        assert isinstance(rm_container, bool)
+
+        if env_add != None:
+            assert isinstance(env_add, dict), \
+                f"env_add: expected a dictionary of string; got {type(env_add)}"
+            commonl.assert_dict_of_strings(env_add, "environment variables")
+            self.env_add = env_add
+        else:
+            self.env_add = dict()
+        self.precheck_wait = precheck_wait
+        self.rm_container = rm_container
+
+        # we don't really use this except for the verify definition
+        daemon_c.__init__(self, cmdline, **kwargs)
+        self.cmdline = cmdline
+
+        self.name = name
+        self.kws = None			# on() defines as a dict
+        self.upid_set(
+            f"Podman container #{name}",
+            name = name,
+            cmdline = ' '.join(cmdline),
+        )
+
+
+    #: Path to use to call podman
+    path_podman = "/usr/bin/podman"
+
+    #: Minimum container speficification
+    #:
+    #: This tries to have all the dependencies that we'd use on most
+    #: drivers that run containers, to have a common image.
+    #:
+    #: This can be fed to commonl.buildah_image_create() to generate
+    #: the image upon server configuration.
+    dockerfile = """
+FROM fedora-minimal
+RUN microdnf install -y usbutils strace python3-rpyc
+RUN microdnf clean all
+"""
+
+    def _cmdline_run(self, target, component, cmdline, env = None):
+        # call it only after the component, so it is easier to
+        # reference then when using the logfile_c driver to expose
+        # it as a console
+        stderrf_name = os.path.join(target.state_dir,
+                                    f"{component}-{self.name}.stderr")
+
+        stderrf = open(stderrf_name, "w+")	# passed to subprocess
+        try:
+            p = subprocess.Popen(cmdline, env = env, cwd = target.state_dir,
+                                 close_fds = True,
+                                 stdin = None,
+                                 stdout = stderrf, stderr = subprocess.STDOUT,
+                                 bufsize = 0,
+                                 shell = False, universal_newlines = False)
+            del stderrf
+            return p
+        except TypeError as e:
+            # This happens on misconfiguration
+            ## TypeError: execve() arg 3 contains a non-string value
+            if 'execve() arg 3' in str(e):
+                target.log.exception(
+                    "Ensure environment settings are not set to None", e)
+            if 'execve()' in str(e):
+                target.log.exception(
+                    "Possible target misconfiguration: %s", e)
+                count = 0
+                for i in cmdline:
+                    target.log.error(
+                        "cmdline #%d: [%s] %s", count, type(i).__name__, i)
+                    count += 1
+                for key, val in env.items():
+                    target.log.error(
+                        "env %s: [%s] %s", key, type(val).__name__, val)
+            raise
+        except OSError as e:
+            raise self.power_on_e("%s: %s failed to start [cmdline %s]: %s" % (
+                component, self.name, " ".join(cmdline), e))
+
+
+    def _verify_timeout(self, target, component, timeout,
+                        verify_f,
+                        *verify_args,
+                        poll_period = 0.25,
+                        **verify_kwargs):
+        # Well, not verify if it is running
+        t0 = t = time.time()
+        while True:
+            if t - t0 > timeout:
+                target.log.error(
+                    "%s: verifying with %s timed out at +%.1f/%.1d",
+                    self.name, verify_f, t - t0, timeout)
+                self.log_stderr(target, component)
+                raise self.power_on_e("%s: %s failed to start"
+                                      % (component, self.name))
+            if verify_f(*verify_args, **verify_kwargs):
+                target.log.info(
+                    "%s: verified at +%.1f/%.1fs",
+                    self.name, t - t0, timeout)
+                break
+            time.sleep(poll_period)		# Give it .1s to come up
+            t = time.time()
+
+
+    def on(self, target, component):
+        # Deck of fields to replace in the command line and env vars
+        #
+        # FIXME: this kws setting shall match daemon_c.on's prefix
+        kws = dict(target.kws)
+        if self.kws != None:
+            kws.update(self.kws)
+        kws.update(self.upid)
+        # bring in runtime properties (override the rest)
+        kws.update(target.fsdb.get_as_dict())
+        kws['component'] = component
+
+        # Start the command line with 'podman run'
+        cmdline = [
+            self.path_podman,
+            # FIXME: runc gives a unix socket too long error
+            "--runtime", "crun",
+            "run",
+            "--name", f"{target.id}_{component}",
+            "--annotation", "run.oci.keep_original_groups=1",
+        ]
+        if self.rm_container:
+            cmdline.append("--rm")
+
+        # Add environment
+        for name, val in self.env_add.items():
+            cmdline.append("-e")
+            cmdline.append(f"{name}={self._kws_expand(val, kws)}")
+
+        # append the stuff from the user after "podman run [-e
+        # KEY=VAL [...]]", expanding the fields
+        cmdline += self._cmdline_expand(target, kws, self.cmdline)
+        target.log.info("%s: command line: %s"
+                        % (component, " ".join(cmdline)))
+
+        console_name = "log-" + component
+        if hasattr(target, "console"):
+            try:
+                target.console.impl_get_by_name(console_name, "console")
+                # console for the log file has been registered
+                ttbl.console_generation_set(target, console_name)
+            except IndexError:
+                # console is not registered, skip
+                pass
+
+        # remove leftovers--the power subsystem will only call this if
+        # we really have to power on, so if there is something half
+        # way there, *we want it dead first*.
+        subprocess.run([ "podman", "kill", "--signal", "KILL",
+                         f"{target.id}_{component}" ],
+                       timeout = 5, check = False,
+                       capture_output = True)
+        subprocess.run([ "podman", "rm", "--ignore", "--force",
+                         f"{target.id}_{component}" ],
+                       timeout = 5, check = False)
+        self._cmdline_run(target, component, cmdline)
+
+        if self.precheck_wait:
+            time.sleep(self.precheck_wait)
+
+        # Verify the container started
+        self._verify_timeout(target, component, 3,
+                             self.get, target, component, )
+
+        # Verify the container is functional
+        self._verify_timeout(target, component, 3,
+                             self.verify, target, component, cmdline)
+
+
+    def off(self, target, component):
+        subprocess.run([ "podman", "kill", "--signal", "KILL",
+                         f"{target.id}_{component}" ],
+                       # don't chec -- if it fails, prolly off already
+                       timeout = 5, check = False)
+
+
+    def get(self, target, component):
+        # check if the container is running by just listing the
+        # container we the name we gave it -- if it shows in the
+        # command output, then we are good.
+        #
+        # note we filter only running containers and JUST the one
+        # we named -- if someone else creates a container with the
+        # same name this would fail but we are not doing that.
+        output = subprocess.check_output(
+            [
+                "podman", "ps",
+                "--filter", f"name={target.id}_{component}",
+                "--filter", "status=running",
+                # yup, Names...not Name, because they might have many
+                "--format", "{{.Names}}",
+            ],
+            timeout = 5)
+        return f"{target.id}_{component}".encode("ascii") in output
+
+
+    def verify(self, target, component, cmdline_expanded):
+        """
+        Verify the container is running
+
+        Can be overriden to do any other checks
+
+        :returns bool: *True* if the service is working as expected
+          (eg: a port is open)
+        """
+        return True
 
 
 class delay_til_shell_cmd_c(impl_c):

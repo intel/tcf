@@ -2571,3 +2571,34 @@ def rpyc_compress_dnload_file(remote_name, local_name = None):
     rpyc.utils.classic.download(remote,
                                 remote_name + ".xz",
                                 local_name)
+
+def buildah_image_create(image_name, dockerfile_s, maybe = True,
+                         timeout = 20, capture_output = True):
+    """
+    Build a container image using buildah
+
+    :returns bool: *True* if the image was built, *False* if not
+      because it already existed
+
+    FIXME: add --annotation cfg_hash so we can always refresh them
+    based on the config file -> if it changes
+    """
+    if maybe:
+        # since this can take a while, if we see it already exists, we
+        # don't redo it
+        p = subprocess.run([ "buildah", "images", "--format", "{{.Name}}" ],
+                           capture_output = True, check = True, timeout = 5,
+                           text = 'utf-8')
+        if image_name in p.stdout:
+            return False
+
+    with tempfile.NamedTemporaryFile() as f:
+        # see ttbl.power.daemon_c
+        f.write(dockerfile_s.encode('utf-8'))
+        f.flush()
+        subprocess.run(
+            [
+                "buildah", "bud", "-f", f.name, "-t", image_name,
+            ], check = True, capture_output = capture_output, text = 'utf-8',
+            timeout = timeout)
+        return True
