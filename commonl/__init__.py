@@ -304,7 +304,7 @@ def trim_trailing(s, trailer):
     else:
         return s
 
-def verify_str_safe(s, safe_chars = None):
+def verify_str_safe(s, safe_chars = None, do_raise = True, name = "string"):
     """
     Raise an exception if string contains unsafe chars
 
@@ -312,13 +312,19 @@ def verify_str_safe(s, safe_chars = None):
     :param str safe_chars: (optional) list/set of valid chars
       (defaults to ASCII letters, digits, - and _)
     """
+    assert isinstance(s, str), \
+        f"{name}: got a {type(s)}; expected a string"
+
     if safe_chars == None:
         safe_chars = set('-_' + string.ascii_letters + string.digits)
     s_set = set(s)
     s_unsafe = s_set - s_set.intersection(safe_chars)
+    if not do_raise:
+        return not s_unsafe
     assert not s_unsafe, \
-        "%s: contains invalid characters: %s (valid are: %s)" % (
-            s, "".join(s_unsafe), "".join(safe_chars))
+        f"{name}: contains invalid characters: {''.join(s_unsafe)}" \
+        f" (valid are: {''.join(safe_chars)})"
+    return None		# keep pylint happy
 
 
 def name_make_safe(name, safe_chars = None):
