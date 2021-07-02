@@ -735,7 +735,7 @@ class interface(ttbl.tt_interface):
                 if retries >= retries_max:
                     raise RuntimeError(
                         "power on%s: failed too many retries (%d)"
-                        % (why, retries))
+                        % (why, retries)) from e
                 target.log.error("%s: power-on%s failed: retrying (%d/%d) "
                                  "the whole power rail: %s",
                                  component, why, retries, retries_max, e)
