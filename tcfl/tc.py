@@ -2299,6 +2299,65 @@ class target_c(reporter_c):
             instrument = "instrument:" + instrument_hash
         return instrument
 
+
+    def instrument_data_get(self, iface_name, component = None, do_raise = True):
+        """
+        Return the name of data for an instrument associated to a component
+
+        :param tcfl.tc.target_c: target from which to get the instrument data
+
+        :param str iface_name: name of the interface where the component
+          is located
+
+        :param str component: name of the component
+
+        :param do_raise: (optional, default *True*) if not found, raise an
+          exception
+
+        :returns tuple(str,dict): if no instrument found
+        """
+        if component:
+            entry = self.rt['interfaces'][iface_name].get(component, None)
+        else:
+            entry = self.rt['interfaces'][iface_name]
+            instrument_hash = self.kws.get(
+                f'interfaces.{iface_name}.instrument',
+                None)
+        if not isinstance(entry, dict):
+            # some interfaces drop entries in the top level that are
+            # not components and can be skipped
+            return None, None
+        instrument_hash = entry.get('instrument', None)
+
+        if instrument_hash == None:
+            if do_raise:
+                raise tcfl.tc.error_e(
+                    f"{iface_name}/{component}: declares no instrument;"
+                    f" configuration bug?",
+                    dict(entry = entry))
+            else:
+                self.report_fail(
+                    f"{iface_name}/{component}: declares no instrument;"
+                    f" configuration bug?")
+                return None, None
+            return None, None
+
+        instrument_data = self.rt['instrumentation'].get(instrument_hash, None)
+        if instrument_data == None:
+            if do_raise:
+                raise tcfl.tc.error_e(
+                    f"{iface_name}/{component}: missing instrument data '{instrument_hash}';"
+                    f" configuration bug?",
+                    dict(entry = entry))
+            else:
+                self.report_fail(
+                    f"{iface_name}/{component}: missing instrument data '{instrument_hash}';"
+                    f" configuration bug?")
+                return None, None
+        return instrument_hash, instrument_data
+
+
+
     #
     # Private API
     #
