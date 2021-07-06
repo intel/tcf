@@ -5394,15 +5394,15 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                 result += retval
                 break_on_non_pass = getattr(fn, "break_on_non_pass", True)
                 if break_on_non_pass and ( retval.errors or retval.failed
-                   or retval.blocked or retval.skipped ):
+                                           or retval.blocked ):
                     return result
         else:
             for fname, fn, _type, args in serial_list:
                 retval = self._method_run(fname, fn, _type, args)
                 result += retval
                 break_on_non_pass = getattr(fn, "break_on_non_pass", True)
-                if break_on_non_pass and ( retval.errors or retval.failed \
-                   or retval.blocked or retval.skipped ):
+                if break_on_non_pass and ( retval.errors or retval.failed
+                                           or retval.blocked ):
                     return result
             # FIXME: set from from config
             # All these are supposedly I/O bound jobs as either they
