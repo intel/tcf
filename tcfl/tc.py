@@ -5428,7 +5428,16 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             for thread in list(threads.values()):
                 r = thread.get()
                 if r[1] != None:	# re-raise thrown exceptions
-                    raise r[1][0](r[1][1]).with_traceback(r[1][2])
+                    # Re raise the exception, but with the right traceback
+                    # (
+                    #     None,
+                    #     (
+                    #         <class 'subprocess.CalledProcessError'>,
+                    #         CalledProcessError(125, ['buildah', 'bud', '-f', '/home/inaky/t/py3-tcf.git/tests/report-hkkcfu.Dockerfile', 'rpyc-test']),
+                    #         <traceback object at 0x7f1e0002c080>
+                    #     ),
+                    # )
+                    raise r[1][1].with_traceback(r[1][2])
                 result += r[0]
             del thread_pool
         return result
