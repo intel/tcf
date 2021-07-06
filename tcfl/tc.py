@@ -2279,24 +2279,27 @@ class target_c(reporter_c):
 
         """
         if component:
-            instrument_hash = self.kws[
-                'interfaces.' + interface_name + '.' + component + '.instrument']
+            instrument_hash = self.kws.get(
+                'interfaces.' + interface_name + '.' + component + '.instrument',
+                None)
         else:
-            instrument_hash = self.kws[
-                'interfaces.' + interface_name + '.instrument']
-        # get the long name (more human friendly, otherwise the short one)
-        instrument = self.kws.get(
-            "instrumentation." + instrument_hash + ".name_long",
-            self.kws.get(
-                "instrumentation." + instrument_hash + ".name",
-                None))
-        if instrument == None:
+            instrument_hash = self.kws.get(
+                'interfaces.' + interface_name + '.instrument',
+                None)
+        if instrument_hash == None:
             self.report_info(
                 "WARNING! cannot find instrument name for instrument %s" % (
                     instrument_hash),
                 dict(target = self, interface_name = interface_name,
                      component = component))
             instrument = "instrument:" + instrument_hash
+        else:
+            # get the long name (more human friendly, otherwise the short one)
+            instrument = self.kws.get(
+                "instrumentation." + instrument_hash + ".name_long",
+                self.kws.get(
+                    "instrumentation." + instrument_hash + ".name",
+                None))
         return instrument
 
 
