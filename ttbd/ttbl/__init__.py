@@ -40,6 +40,7 @@ import time
 import traceback
 import types
 import urllib.parse
+import warnings
 
 import __main__
 import requests
@@ -944,7 +945,7 @@ class tt_interface(object):
         self._aliases_update(aliases)
         warnings.warn(
             "impl_add() is deprecated in favour of target.interface_impl_add()",
-            DeprecationWarning, stack_level = 4)
+            DeprecationWarning, stacklevel = 4)
 
 
     def impls_set(self, impls, kwimpls, cls):
