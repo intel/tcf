@@ -35,6 +35,10 @@ class console_spider_duo_pc(ttbl.console.ssh_pc):
     :param str crlf: (optional, default *\\r*) character to use for
       line ending; see :class:ttbl.console.impl_c.
 
+    :param str power_controller: (optional) name of a power rail
+      component that powers on this device. Otherwise, it is
+      considered always on
+
     If the serial console is set to no flow control, it is advisable
     to chunk the input to avoid dropping characters, adding
 
@@ -116,7 +120,12 @@ class console_spider_duo_pc(ttbl.console.ssh_pc):
         flip the configuration from RTS/CTS to None or viceversa
 
     """
-    def __init__(self, kvm_hostname, crlf = '\r', **kwargs):
+    def __init__(self, kvm_hostname, crlf = '\r',
+                 power_controller = None,
+                 **kwargs):
+        assert power_controller == None or isinstance(power_controller, str), \
+            "power_controller: expected string naming power rail component;" \
+            f" got {type(power_controller)}"
         ttbl.console.ssh_pc.__init__(
             self,
             kvm_hostname,
@@ -179,7 +188,10 @@ class console_spider_duo_pc(ttbl.console.ssh_pc):
         self.chunk_size = 5
         self.interchunk_wait = 0.2
         _, _, hostname = commonl.split_user_pwd_hostname(kvm_hostname)
-        self.upid_set("Spider KVM %s" % hostname, hostname = hostname)
+        self.upid_set(f"Lantronix Spider KVM @{hostname}",
+                      power_controller = power_controller,
+                      hostname = hostname)
+        self.name = "lantronix_spider"
 
 
 class screenshot_spider_c(ttbl.capture.generic_snapshot):
@@ -193,6 +205,10 @@ class screenshot_spider_c(ttbl.capture.generic_snapshot):
 
     :param str kvm_hostname: hostname for the KVM; no user/password is
       needed, and if provided, it will be ignored.
+
+    :param str power_controller: (optional) name of a power rail
+      component that powers on this device. Otherwise, it is
+      considered always on
 
     Other parameters as per :class:ttbl.capture.generic_snapshot
 
@@ -254,7 +270,12 @@ class screenshot_spider_c(ttbl.capture.generic_snapshot):
     Enable capturing high definition data via websocket / HTML5
     """
 
-    def __init__(self, kvm_hostname, **kwargs):
+    def __init__(self, kvm_hostname,
+                 power_controller = None,
+                 **kwargs):
+        assert power_controller == None or isinstance(power_controller, str), \
+            "power_controller: expected string naming power rail component;" \
+            f" got {type(power_controller)}"
         _, _, hostname = commonl.split_user_pwd_hostname(kvm_hostname)
         ttbl.capture.generic_snapshot.__init__(
             self,
@@ -271,4 +292,7 @@ class screenshot_spider_c(ttbl.capture.generic_snapshot):
             extension = ".jpg",
             **kwargs
         )
-        self.upid_set("Spider KVM %s" % hostname, hostname = hostname)
+        self.upid_set(f"Lantronix Spider KVM @{hostname}",
+                      power_controller = power_controller,
+                      hostname = hostname)
+        self.name = "lantronix_spider"
