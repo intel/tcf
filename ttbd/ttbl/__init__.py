@@ -2710,6 +2710,28 @@ def tty_by_usb_serial_number(usb_serial_number):
         raise RuntimeError(
             f"Cannot find TTY with USB Serial #{usb_serial_number}")
 
+class late_resolve_tty_by_usb_serial_number(str):
+    """
+    Given a USB serial number, resolve it to a TTY device only when we
+    are trying to use it.
+
+    :param str serial_number: USB Serial Number
+
+    When converting to a string (and only when doing that) it will be
+    resolved to a USB path. If no such USB device is present, an
+    exception will be raised. Otherwise, something like::
+
+      */dev/ttyUSB0*
+
+    will be returned
+    """
+    def __init__(self, usb_serial_number):
+        assert isinstance(usb_serial_number, str)
+        self.usb_serial_number = usb_serial_number
+
+    def __str__(self):
+        return ttbl.tty_by_usb_serial_number(self.usb_serial_number)
+
 
 def console_generation_set(target, console):
     # internal to the ttbl.console interface, but needed here since
