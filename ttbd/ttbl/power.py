@@ -1278,24 +1278,12 @@ class daemon_c(impl_c):
         raise NotImplementedError
 
 
-    def _kws_expand(self, s, kws):
-        try:
-            # some older Linux distros complain if this string is unicode
-            if '%(' in s:
-                return str(s % kws)
-            return s
-        except KeyError as e:
-            raise ValueError(
-                f"configuration error? missing field '{str(e)}' from "
-                f"template string '{s}'") from e
-
-
     def _cmdline_expand(self, target, kws, cmdline):
         _cmdline = []
         count = 0
         try:
             for i in cmdline:
-                _cmdline.append(self._kws_expand(i, kws))
+                _cmdline.append(commonl.kws_expand(i, kws))
                 count += 1
         except KeyError as e:
             message = "configuration error? can't template command line #%d," \
@@ -1437,7 +1425,7 @@ class daemon_c(impl_c):
         return commonl.process_alive(self.pidfile % kws, self.check_path) != None
 
 
-# derive daemon_c so we get verify() _kws_expand() and
+# derive daemon_c so we get verify()  and
 # _cmdline_expand(), but we re-do most
 class daemon_podman_container_c(daemon_c):
     """Run a daemon inside a Podman container
@@ -1818,7 +1806,7 @@ RUN microdnf clean all
         # Add environment
         for name, val in self.env_add.items():
             cmdline.append("-e")
-            cmdline.append(f"{name}={self._kws_expand(val, kws)}")
+            cmdline.append(f"{name}={commonl.kws_expand(val, kws)}")
 
         # append the stuff from the user after "podman run [-e
         # KEY=VAL [...]]", expanding the fields
