@@ -277,6 +277,21 @@ def cmdline_log_options(parser):
                         help = "Print Date and time in the logs")
 
 
+def kws_expand(s: str, kws: dict):
+    assert isinstance(s, str), \
+        f"s: expected str; got {type(s)}"
+    assert kws == None or isinstance(kws, dict), \
+        f"kws: expected dict/None; got {type(kws)}"
+    try:
+        if '%(' in s and kws != None:
+            return s % kws
+        return s
+    except KeyError as e:
+        raise ValueError(
+            f"configuration error? missing field '{str(e)}' from "
+            f"template string '{s}'") from e
+
+
 def mkid(something, l = 10):
     """
     Generate a 10 character base32 ID out of an iterable object
