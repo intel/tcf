@@ -18,7 +18,18 @@ target = ttbl.test_target("t0")
 target.interface_add(
     "power",
     ttbl.power.interface(
-        c0 = ttbl.power.rpyc_c("ttbd", port_base),
+        c0 = ttbl.power.rpyc_c(
+            "ttbd",
+            port_base,
+            run_files = {
+                "runthis.sh": """
+#! /bin/sh -xe
+ls -l /etc/ttbd
+ls -l /etc/ttbd/run
+echo "ein belegtes Brot mit Schinken" > /tmp/runthisexecuted
+"""
+            },
+        ),
     )
 )
 ttbl.config.target_add(target)
