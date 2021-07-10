@@ -212,6 +212,7 @@ import os
 import time
 import traceback
 import types
+import shutil
 import subprocess
 import logging
 
@@ -1710,7 +1711,7 @@ class daemon_podman_container_c(daemon_c):
     #: the image upon server configuration.
     dockerfile = """
 FROM fedora-minimal
-RUN microdnf install -y usbutils strace python3-rpyc
+RUN microdnf install -y usbutils strace python3-rpyc findutils
 RUN microdnf clean all
 """
 
@@ -2071,11 +2072,59 @@ class rpyc_c(daemon_podman_container_c):
       can be downloaded from the target with
       target.certs.get("CERTNAME")
 
+    :param str venv_path: (optional, default *None*) Python Virtual
+      Environment (venv) inside the container where to execute the
+      RPYC server.
+
+      Note that if the venv uses a diffferent python version than that
+      of the container (eg: Python 3.6 vs Python 3.9), the RPYC server
+      must be available inside said virtual environment and the path
+      to it overriden in the *env_add* variable, e.g.:
+
+      >>> ttbl.power.rpy_c(
+      >>>     ...
+      >>>     venv_path = "/some/venv",
+      >>>     env_add = { 'RPYC_CLASSIC': "/some/venv/bin/rpyc_classic.py" },
+      >>>     ...
+
     :param dict env_add: environment variables to add to the container
       (will be passed with *-e* to *podman run*).
 
-    The rest of the parameters are as to :class:`ttbl.power.daemon_podman_container_c`.
+      Note the path to the RPYC server will default to *rpyc_classic*
+      but can be overriden by setting here the *RPYC_CLASSIC*
+      environment variable:
 
+      >>> ttbl.power.rpy_c(
+      >>>     ...
+      >>>     env_add = { 'RPYC_CLASSIC': "/some/venv/bin/rpyc_classic.py" },
+      >>>     ...
+
+    :param dict(str) data_files: (optional) files that will be created
+      in the configuration directory mapped to the container's
+      */etc/ttbd/data*.
+
+      When this is powered on, :meth:`on` is executed; the files are
+      then created and available inside the container at
+      */etc/ttbd/data*.
+
+      This is a dictionary keyed by file name (no subdirectories); the
+      value is a string that will be written to the file; the string
+      will be *%(FIELD)s* substituted against the :data:`kws` member
+      which includes the target's inventory data and anything added to
+      it.
+
+    :param dict(str) run_files: (optional) files that will be created
+      in the configuration directory mapped to the container's
+      */etc/ttbd/run*.
+
+      When this is powered on, :meth:`on` is executed; the files are
+      then created and executed before running the RPYC server.
+
+      This is meant for scripting. Note the *run_files* are created
+      and executed after the data files, thus the run files can access
+      them.
+
+    The rest of the parameters are as to :class:`ttbl.power.daemon_podman_container_c`.
 
     **System Setup**
 
@@ -2084,11 +2133,16 @@ class rpyc_c(daemon_podman_container_c):
        See :class:`daemon_podman_container_c` for image setup; the base
        image called *ttbd* is already defined to be able to run *rpyc*
        containers.
+
     """
     def __init__(self, image_name: str, rpyc_port: int,
                  cmdline = None,
+                 venv_path: str = None,
                  env_add: dict = None,
-                 ssl_enabled = True, **kwargs):
+                 run_files: dict = None,
+                 data_files: dict = None,
+                 ssl_enabled = True,
+                 **kwargs):
         assert isinstance(image_name, str)
         assert isinstance(rpyc_port, int) and rpyc_port > 0 and rpyc_port < 65546
         assert isinstance(ssl_enabled, bool)
@@ -2099,28 +2153,51 @@ class rpyc_c(daemon_podman_container_c):
         else:
             commonl.assert_list_of_strings(cmdline,
                                            "command line options", "argument")
+
+        if env_add == None:
+            env_add = {}
+        else:
+            commonl.assert_dict_of_strings(env_add, "env_add")
+
+        if run_files == None:
+            run_files = {}
+        else:
+            commonl.assert_dict_of_strings(run_files, "run_files")
+        self.run_files = run_files
+
+        if data_files == None:
+            data_files = {}
+        else:
+            commonl.assert_dict_of_strings(data_files, "data_files")
+        self.data_files = data_files
+
+        if venv_path:
+            # run RPYC inside a Python virtual environment that is
+            # inside the container
+            env_add['VENVPYTHON'] = venv_path + "/bin/python"
+        # no env runs directly the rpyc_classic server
+
         cmdline += [
             # Port where RPYC serves
             "--publish", f"{rpyc_port}:{rpyc_port}",
-            # FIXME: why this fials?
-            #"--publish", "%(rpyc_port)d:%(rpyc_port)d",
-            "--volume", "%(path)s/certificates:/etc/ttbd/certificates:ro",
+            "--volume", "%(path)s/%(component)s.etc:/etc/ttbd:ro",
             image_name,
-            "rpyc_classic",	# for PIP: "rpyc_classic.py",
+            "/bin/bash", "-xeuc",
+            # for PIP: "rpyc_classic.py",
+            "for v in /etc/ttbd/run/*; do $v; done; "
+            "cd $HOME; exec ${VENVPYTHON:-} ${RPYC_CLASSIC:-rpyc_classic}"
             # listen on all interfaces of the container, we'll map it later
-            "--port", str(rpyc_port), "--host", "0",
-            "--mode", "forking",
+            f" --port {str(rpyc_port)} --host 0 --mode forking"
         ]
         if ssl_enabled:
-            cmdline += [
-                # note the /etc/ttbd/certificates path is mapped by
-                # the container from the certificates in the target's
-                # directory TARGETSTATEDIR/certificates -- these are
-                # always re-created new upon target's allocation.
-                "--ssl-cafile", "/etc/ttbd/certificates/ca.cert",
-                "--ssl-certfile", "/etc/ttbd/certificates/server.cert",
-                "--ssl-keyfile", "/etc/ttbd/certificates/server.key",
-            ]
+            # note the /etc/ttbd/certificates path is mapped by
+            # the container from the certificates in the target's
+            # directory TARGETSTATEDIR/certificates -- these are
+            # always re-created new upon target's allocation.
+            cmdline[-1] += \
+                " --ssl-cafile /etc/ttbd/ca.cert" \
+                " --ssl-certfile /etc/ttbd/server.cert" \
+                " --ssl-keyfile /etc/ttbd/server.key"
 
         daemon_podman_container_c.__init__(
             self, "rpyc", cmdline,
@@ -2140,8 +2217,8 @@ class rpyc_c(daemon_podman_container_c):
     #: the image upon server configuration.
     dockerfile = """
 FROM fedora-minimal
-RUN dnf install -y usbutils strace python3-rpyc
-RUN dnf clean all
+RUN microdnf install -y usbutils strace python3-rpyc
+RUN microdnf clean all
 """
 
     def target_setup(self, target, iface_name, component):
@@ -2151,6 +2228,39 @@ RUN dnf clean all
                         self.upid['ssl_enabled'])
         daemon_podman_container_c.target_setup(
             self, target, iface_name, component)
+
+    def config_dir_setup(self, target, component):
+        pass
+
+    def on(self, target, component):
+        # Container configuration dir
+        cfg_dir = os.path.join(target.state_dir, component + ".etc")
+        run_dir = os.path.join(cfg_dir, "run")
+        data_dir = os.path.join(cfg_dir, "data")
+        shutil.rmtree(cfg_dir, ignore_errors = True)
+        commonl.makedirs_p(cfg_dir)
+        commonl.makedirs_p(run_dir)
+        commonl.makedirs_p(data_dir)
+
+        # copy the certificates to the config dir
+        shutil.copy(target.state_dir + "/certificates/ca.cert", cfg_dir)
+        shutil.copy(target.state_dir + "/certificates/server.key", cfg_dir)
+        shutil.copy(target.state_dir + "/certificates/server.cert", cfg_dir)
+
+        # Get the data and run files; data first, since run files
+        # might need them
+        for file_name, file_data in self.data_files.items():
+            with open(os.path.join(data_dir, file_name), "w") as f:
+                f.write(commonl.kws_expand(file_data, self.kws))
+        for file_name, file_data in self.run_files.items():
+            with open(os.path.join(run_dir, file_name), "w") as f:
+                f.write(commonl.kws_expand(file_data, self.kws))
+                os.fchmod(f.fileno(), 0o755)
+
+        # hook for subclasses to re-define
+        self.config_dir_setup(target, component)
+
+        daemon_podman_container_c.on(self, target, component)
 
 
     def verify(self, target, component, cmdline_expanded):
@@ -2202,9 +2312,9 @@ class rpyc_aardvark_c(rpyc_c):
     *aardvark_py.Dockefile* with the contents::
 
         FROM fedora-minimal
-        RUN dnf install -y usbutils strace python3-rpyc
-        RUN dnf clean all
-        RUN pip3 install --no-deps rpyc
+        RUN microdnf install -y usbutils strace python3-rpyc python3-rpyc
+        RUN microdnf clean all
+        RUN pip3 install --no-deps aardvark_py
 
     And setup the container image for Aardvark::
 
