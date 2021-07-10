@@ -2488,6 +2488,71 @@ def daemon_pid_rm(pid):
 
 # util
 
+def sys_device_fields(bus, *fields, **filters):
+    """
+    Find a device in the sysfs tree based on filters and report the
+    value of the given fields
+
+    :param str bus: bus name (from */sys/bus/BUSNAME*)
+
+    :param fields: strings describing the fields to report; these are
+      files in the sysfs path for the device
+
+      eg:
+
+      >>> sys_device_fields('usb', 'busnum', 'devnum')
+
+      would return the values of the *busnum* and *devnum* files on
+      each device in the USB tree.
+
+    :param filters: things to filter for; file is the name of a file
+      in the device path and the value needs to match that provided
+
+      eg:
+
+      >>> sys_device_fields('usb', 'busnum', 'devnum',
+      >>>                   'idProduct' = "1138")
+
+      would file for devices which have a *idProduct* file with *1138*
+      as content.
+
+    :returns dict: dictionary keyed by the device's sysfs path (eg:
+      */sys/bus/usb/XYZ*); value is a dictionary keyed by field name
+      and their values. If a field was not present, it'll be *None*.
+    """
+    r = {}
+
+    def _sysfs_read(filename):
+        try:
+            with open(filename) as fr:
+                return fr.read().strip()
+        except IOError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            return None
+
+    def _check_fields():
+        for filter_name, filter_value in filters.items():
+
+            if not os.path.isdir(dev_path):
+                return False
+
+            value = _sysfs_read(os.path.join(dev_path, filter_name))
+            if filter_value != value:
+                return False
+
+        return True
+
+    for dev_path in glob.glob(f"/sys/bus/{bus}/devices/*"):
+
+        if _check_fields():
+            r[dev_path] = {}
+            for field in fields:
+                r[dev_path][field] = _sysfs_read(os.path.join(dev_path, field))
+
+    return r
+
+
 def usb_serial_number(d):
     #depending on the library version, get the USB string one way or another
     if hasattr(d, 'serial_number'):
