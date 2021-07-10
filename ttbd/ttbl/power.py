@@ -1676,18 +1676,17 @@ class daemon_podman_container_c(daemon_c):
         assert isinstance(precheck_wait, numbers.Real) and precheck_wait >= 0
         assert isinstance(rm_container, bool)
 
+        # we don't really use this except for the verify definition
+        daemon_c.__init__(self, cmdline, env_add = env_add, **kwargs)
+
         if env_add != None:
-            assert isinstance(env_add, dict), \
-                f"env_add: expected a dictionary of string; got {type(env_add)}"
             commonl.assert_dict_of_strings(env_add, "environment variables")
-            self.env_add = env_add
+            self.env_add = dict(env_add)	# copy so we avoid manipulation
         else:
             self.env_add = dict()
         self.precheck_wait = precheck_wait
         self.rm_container = rm_container
 
-        # we don't really use this except for the verify definition
-        daemon_c.__init__(self, cmdline, **kwargs)
         self.cmdline = cmdline
 
         self.name = name
