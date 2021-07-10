@@ -870,29 +870,38 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
     >>> )
 
     """
-    def __init__(self, serial_file_name = None):
+    def __init__(self, serial_file_name = None, usb_serial_number = None):
         generic_c.__init__(self)
-        if serial_file_name == None:
-            serial_file_name = "/dev/tty-%(id)s"
-        else:
-            serial_file_name = serial_file_name
         ttbl.power.socat_pc.__init__(
             self,
             # note it is important to do the rawer first thing, then
             # do the settings; rawer resets to raw state
             "PTY,link=console-%(component)s.write,rawer"
             "!!CREATE:console-%(component)s.read",
-            "%s,creat=0,rawer,b115200,parenb=0,cs8,bs1" % serial_file_name)
-        self.upid_set("RS-232C serial port @%s" % serial_file_name,
-                      name = "RS-232C serial port",
-                      baud_rate = 115200,
-                      data_bits = 8,
-                      stop_bits = 1,
-                      serial_port = serial_file_name,
-        )
+            "%(device)s,creat=0,rawer,b115200,parenb=0,cs8,bs1")
+        # pass the device name like this so we can resolve LATE
+        if usb_serial_number != None:
+            assert serial_file_name == None, \
+                "can't specify serial_file_name and usb_serial_number at the same time"
+            self.upid_set("RS-232C over USB serial port @%s" % serial_file_name,
+                          name = "RS-232CoUSB",
+                          usb_serial_number = usb_serial_number,
+            )
+        else:
+            # default to a file called /dev/tty-TARGETNAME (udev rules)
+            if serial_file_name == None:
+                serial_file_name = "/dev/tty-%(id)s"
+            self.upid_set("RS-232C serial port @%s" % serial_file_name,
+                          name = "RS-232C",
+                          serial_port = serial_file_name,
+            )
+        self.usb_serial_number = usb_serial_number
+        self.serial_file_name = serial_file_name
 
     # console interface; state() is implemented by generic_c
     def on(self, target, component):
+        if self.usb_serial_number:
+            self.kws['device'] = ttbl.tty_by_usb_serial_number(self.usb_serial_number)
         ttbl.power.socat_pc.on(self, target, component)
         generation_set(target, component)
         generic_c.enable(self, target, component)
