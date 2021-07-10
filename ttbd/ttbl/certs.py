@@ -123,43 +123,17 @@ class interface(ttbl.tt_interface):
 
     def __init__(self, key_size = 2048):
         ttbl.tt_interface.__init__(self)
-        self.cert_path = None
-        self.cert_client_path = None
         self.key_size = key_size
 
 
-    def _target_setup(self, target, iface_name):
-        # initialize and ensure no certificate is left over from
-        # previous execution
-        self.cert_path = os.path.join(target.state_dir, "certificates")
-        self.cert_client_path = os.path.join(target.state_dir, "certificates_client")
-        # the certificate storage access is read only
-        target.store.target_sub_paths['certificates_client'] = False
-        self._release_hook(target, True)
-
-
-    def _allocate_hook(self, target, iface_name, allocdb):
-        # initalize certificates once allocated, so they are available
-        # to all the components that might need them
-        self._setup_maybe(target)
-
-
-    def _release_hook(self, target, force):
-        # wipe all the certificates for this target, the allocation is
-        # cancelled
-        shutil.rmtree(self.cert_path, ignore_errors = True)
-        shutil.rmtree(self.cert_client_path, ignore_errors = True)
-        target.log.debug(f"wiped target's certificates in {self.cert_path}")
-
-
-    def _setup_maybe(self, target):
-        if os.path.isdir(self.cert_path) and os.path.isdir(self.cert_client_path):
+    def _setup_maybe(self, target, cert_path, cert_client_path):
+        if os.path.isdir(cert_path) and os.path.isdir(cert_client_path):
             return
         # not initialized or inconsistent state, just wipe it all
         self._release_hook(target, True)
         try:
-            commonl.makedirs_p(self.cert_path)
-            commonl.makedirs_p(self.cert_client_path)
+            commonl.makedirs_p(cert_path)
+            commonl.makedirs_p(cert_client_path)
             # FIXME: do from python-openssl?
 
             # Create a Certificate authority for signing
@@ -173,21 +147,21 @@ class interface(ttbl.tt_interface):
                 f" -keyform PEM -keyout ca.key"
                 f" -subj /C=LC/ST=Local/L=Local/O=TCF-Signing-Authority-{target.id}-{allocid}/CN=TTBD"
                 f" -x509 -days 1000 -outform PEM -out ca.cert".split(),
-                check = True, cwd = self.cert_path,
+                check = True, cwd = cert_path,
                 stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
-            target.log.debug(f"created target's certificate authority in {self.cert_path}")
+            target.log.debug(f"created target's certificate authority in {cert_path}")
 
             # Now create a server key
             subprocess.run(
                 f"openssl genrsa -out server.key {self.key_size}".split(),
                 stdin = None, timeout = 5,
-                capture_output = True, cwd = self.cert_path, check = True)
+                capture_output = True, cwd = cert_path, check = True)
             target.log.debug("created target's server key")
 
             subprocess.run(
                 f"openssl req -new -key server.key -out server.req -sha256"
                 f" -subj /C=LC/ST=Local/L=Local/O=TCF-Signing-Authority-{target.id}-{allocid}/CN=TTBD".split(),
-                check = True, cwd = self.cert_path,
+                check = True, cwd = cert_path,
                 stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
             target.log.debug("created target's server req")
 
@@ -195,7 +169,7 @@ class interface(ttbl.tt_interface):
                 f"openssl x509 -req -in server.req -CA ca.cert -CAkey ca.key"
                 f" -set_serial 100 -extensions server -days 1460 -outform PEM"
                 f" -out server.cert -sha256".split(),
-                check = True, cwd = self.cert_path,
+                check = True, cwd = cert_path,
                 stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
             target.log.debug("created target's server cert")
         except subprocess.CalledProcessError as e:
@@ -209,11 +183,38 @@ class interface(ttbl.tt_interface):
 
     client_extensions = [ "key", "req", "cert" ]
 
-    def _client_wipe(self, name):
+    def _client_wipe(self, name, cert_client_path):
         # wipe without complaining if not there
         for extension in self.client_extensions:
-            commonl.rm_f(os.path.join(self.cert_client_path,
+            commonl.rm_f(os.path.join(cert_client_path,
                                       name + "." + extension))
+
+
+    def _target_setup(self, target, iface_name):
+        # initialize and ensure no certificate is left over from
+        # previous execution
+        # the certificate storage access is read only
+        target.store.target_sub_paths['certificates_client'] = False
+        self._release_hook(target, True)
+
+
+    def _allocate_hook(self, target, iface_name, allocdb):
+        # initalize certificates once allocated, so they are available
+        # to all the components that might need them
+        cert_path = os.path.join(target.state_dir, "certificates")
+        cert_client_path = os.path.join(target.state_dir, "certificates_client")
+        self._setup_maybe(target, cert_path, cert_client_path)
+
+
+    def _release_hook(self, target, force):
+        # wipe all the certificates for this target, the allocation is
+        # cancelled
+        cert_path = os.path.join(target.state_dir, "certificates")
+        cert_client_path = os.path.join(target.state_dir, "certificates_client")
+        shutil.rmtree(cert_path, ignore_errors = True)
+        shutil.rmtree(cert_client_path, ignore_errors = True)
+        target.log.debug(f"wiped target's certificates in {cert_path}")
+
 
     def put_certificate(self, target, who, args, _files, _user_path):
         """
@@ -232,11 +233,13 @@ class interface(ttbl.tt_interface):
 
         with target.target_owned_and_locked(who):
 
-            self._setup_maybe(target)
+            cert_path = os.path.join(target.state_dir, "certificates")
+            cert_client_path = os.path.join(target.state_dir, "certificates_client")
+            self._setup_maybe(target, cert_path, cert_client_path)
 
-            client_key_path = os.path.join(self.cert_client_path, name + ".key")
-            client_req_path = os.path.join(self.cert_client_path, name + ".req")
-            client_cert_path = os.path.join(self.cert_client_path, name + ".cert")
+            client_key_path = os.path.join(cert_client_path, name + ".key")
+            client_req_path = os.path.join(cert_client_path, name + ".req")
+            client_cert_path = os.path.join(cert_client_path, name + ".cert")
 
             if os.path.isfile(client_key_path) \
                and os.path.isfile(client_cert_path):	# already made?
@@ -253,27 +256,27 @@ class interface(ttbl.tt_interface):
                 subprocess.run(
                     f"openssl genrsa -out {client_key_path} {self.key_size}".split(),
                     stdin = None, timeout = 5,
-                    capture_output = True, cwd = self.cert_path, check = True)
+                    capture_output = True, cwd = cert_path, check = True)
                 allocid = target.fsdb.get("_alloc.id", "UNKNOWN")
                 subprocess.run(
                     f"openssl req -new -key {client_key_path} -out {client_req_path}"
                     f" -subj /C=LC/ST=Local/L=Local/O=TCF-Signing-Authority-{target.id}-{allocid}/CN=TCF-{name}".split(),
-                    check = True, cwd = self.cert_path,
+                    check = True, cwd = cert_path,
                     stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
                 target.log.debug(f"{name}: created client's certificate")
 
                 # Issue the client certificate using the cert request and the CA cert/key.
-                # note we run in the self.cert_path directory, so the ca.*
+                # note we run in the cert_path directory, so the ca.*
                 # files are there
                 subprocess.run(
                     f"openssl x509 -req -in {client_req_path} -CA ca.cert"
                     " -CAkey ca.key -set_serial 101 -extensions client"
                     f" -days 365 -outform PEM -out {client_cert_path}".split(),
                     stdin = None, timeout = 5,
-                    capture_output = True, cwd = self.cert_path, check = True)
+                    capture_output = True, cwd = cert_path, check = True)
             except subprocess.CalledProcessError as e:
                 target.log.error(f"command {' '.join(e.cmd)} failed: {e.output}")
-                self._client_wipe(name)	# don't leave things half there
+                self._client_wipe(name, cert_client_path)	# don't leave things half there
                 raise
 
             with open(client_key_path) as keyf, \
@@ -287,20 +290,22 @@ class interface(ttbl.tt_interface):
 
 
     def delete_certificate(self, target, who, args, _files, _user_path):
-        name = self.arg_get(args, 'name', str)
-        if not commonl.verify_str_safe(name, do_raise = False):
-            raise ValueError(
-                "invalid certificate name, only [-_a-zA-Z0-9] allowed")
         with target.target_owned_and_locked(who):
-            self._client_wipe(name)
+            name = self.arg_get(args, 'name', str)
+            if not commonl.verify_str_safe(name, do_raise = False):
+                raise ValueError(
+                    "invalid certificate name, only [-_a-zA-Z0-9] allowed")
+            cert_client_path = os.path.join(target.state_dir, "certificates_client")
+            self._client_wipe(name, cert_client_path)
             return dict({ })
 
 
     def get_certificate(self, target, who, _args, _files, _user_path):
         with target.target_owned_and_locked(who):
             client_certificates = set()
-            if os.path.isdir(self.cert_client_path):
-                for filename in os.listdir(self.cert_client_path):
+            cert_client_path = os.path.join(target.state_dir, "certificates_client")
+            if os.path.isdir(cert_client_path):
+                for filename in os.listdir(cert_client_path):
                     name, extension = os.path.splitext(filename)
                     if extension[1:] not in self.client_extensions:
                         target.log.error(
