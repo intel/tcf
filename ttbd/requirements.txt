@@ -1,5 +1,6 @@
 # Non-Python Requirements
 # package: alsa-utils
+# package: buildah
 # package: fedora=android-tools ubuntu=android-tools-adb,android-tools-fastboot
 # package: dnsmasq
 # package: dosfstools
