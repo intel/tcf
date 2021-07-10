@@ -1124,7 +1124,7 @@ class inverter_c(impl_c):
 
 # FIXME: daemon_c and daemon_podman_container_c need to be split into
 # a third base class containing all the basic functionality shared by
-# both (_kws_expand and friends, verify prototypes, verify_timeout,
+# both (commonl.kws_expand and friends, verify prototypes, verify_timeout,
 # etc)
 class daemon_c(impl_c):
     """Generic power controller to start daemons in the server machine
@@ -1217,8 +1217,8 @@ class daemon_c(impl_c):
 
         self.cmdline_extra = []
         self.precheck_wait = precheck_wait
-        if env_add:
-            assert isinstance(env_add, dict)
+        if env_add != None:
+            commonl.assert_dict_of_strings(env_add, "env_add")
             self.env_add = env_add
         else:
             self.env_add = {}
