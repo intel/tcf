@@ -738,11 +738,14 @@ class tt_interface_impl_c(object):
                                                    float, bool)), \
                 "UPID field '%s' must be string|number|bool; got %s" \
                 % (key, type(val))
+            # None values we don't place'm
+            if val == None:
+                continue
+            # use update so we can accumulate values from inherited classes
+            self.upid[key] = val
         if not self.name:
             self.name = name_long
         kwargs['name_long'] = name_long
-        # use update so we can accumulate values from inherited classes
-        self.upid.update(kwargs)
 
 
     def target_setup(self, target, iface_name, component):
@@ -1251,7 +1254,7 @@ class tt_interface(object):
                     # if it is a string, it is a template
                     try:
                         target.property_set(prefix + "." + key, val % kws)
-                    except TypeError as e:
+                    except ( ValueError, TypeError ) as e:
                         # don't use target.log --> not fully
                         # initialized yet
                         logging.error(
