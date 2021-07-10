@@ -44,6 +44,7 @@ import warnings
 
 import __main__
 import requests
+import serial
 import usb.util
 
 import commonl
@@ -2629,6 +2630,17 @@ def usb_device_by_serial(arg_serial, sibling_port = None, *fields):
             ]
 
     return None if not fields else [ None ] + [ None for field in fields ]
+
+
+def tty_by_usb_serial_number(usb_serial_number):
+    ports = serial.tools.list_ports.comports()
+    f = filter(lambda port: port.serial_number == usb_serial_number, ports)
+    try:
+        port = next(f)
+        return port.device
+    except StopIteration:
+        raise RuntimeError(
+            f"Cannot find TTY with USB Serial #{usb_serial_number}")
 
 
 def console_generation_set(target, console):
