@@ -1393,6 +1393,41 @@ class dict_missing_c(dict):
 def ipv4_len_to_netmask_ascii(length):
     return socket.inet_ntoa(struct.pack('>I', 0xffffffff ^ ((1 << (32 - length) ) - 1)))
 
+#: Simple general keyring redirectory
+#:
+#: Any configuration file can add entries to this dictionary, that
+#: then can be used by password_lookup() to find passwords when not
+#: specified and needed.
+#:
+#: This is mainly used when passwords will be shared in different
+#: parts of the infrastructure and it is easier to refer to them from
+#: central location.
+passwords = {
+    # Simple match username/hostname to password
+    #"billy@thismachine.com": "badS3cre7",
+
+    # Match a regular expression for account/hostname to a password
+    # located in a file that password_get() will reead
+    #re.compile("admin@r[0-9]+p[0-9]+..*.deacluster.intel.com"): \
+    #    "FILE:/etc/ttbd-production/pwd.pdu.admin",
+
+}
+
+def password_lookup(entry):
+    for entry_r, value in passwords.items():
+        if isinstance(entry_r, str) and entry_r == entry:
+            return value
+        elif isinstance(entry_r, re.Pattern):
+            m = entry_r.search(entry)
+            if not m:
+                continue
+            if '%(' in value:
+                value = value % m.groupdict()
+            return value
+        raise RuntimeError(f"can't find a password for entry '{entry}'")
+
+
+
 def password_get(domain, user, password):
     """Get the password for a domain and user
 
