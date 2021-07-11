@@ -26,38 +26,38 @@ ttbd = commonl.testing.test_ttbd(
 @tcfl.tc.target(ttbd.url_spec + " and t0")
 class _test(tcfl.tc.tc_c):
     """
-    Test the ttbl.power.daemon_c class
+    Test the ttbl.power.daemon_c class and other daemons based on it
     """
 
     @tcfl.tc.subcase()
     def eval_10_power_on(self, target):
         target.power.on()
-        state, _, _ = target.power.list()
-        assert state == True
+        state, _, components = target.power.list()
+        assert state == True, ( "target doesn't report on", components )
         target.report_pass("target reports on")
 
 
     @tcfl.tc.subcase()
     def eval_20_power_off(self, target):
         target.power.off()
-        state, _, _ = target.power.list()
-        assert state == False
+        state, _, components = target.power.list()
+        assert state == False, ( "target doesn't report off", components )
         target.report_pass("target reports off")
 
 
     @tcfl.tc.subcase()
     def eval_30_power_on(self, target):
         target.power.on()
-        state, _, _ = target.power.list()
-        assert state == True
+        state, _, components = target.power.list()
+        assert state == True, ( "target doesn't report on", components )
         target.report_pass("target reports on")
 
 
     @tcfl.tc.subcase()
     def eval_40_power_off(self, target):
         target.power.off()
-        state, _, _ = target.power.list()
-        assert state == False
+        state, _, components = target.power.list()
+        assert state == False, ( "target doesn't report off", components )
         target.report_pass("target reports off")
 
 
