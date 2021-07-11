@@ -1245,7 +1245,6 @@ class daemon_c(impl_c):
         else:
             assert isinstance(name, str)
             self.name = name
-        self.kws.setdefault('name', self.name)
         self.pidfile = pidfile
         assert isinstance(mkpidfile, bool)
         self.mkpidfile = mkpidfile
@@ -1327,6 +1326,7 @@ class daemon_c(impl_c):
         kws = dict(target.kws)
         kws.update(self.kws)
         kws.update(self.upid)
+        kws.setdefault('name', self.name)
         # bring in runtime properties (override the rest)
         kws.update(target.fsdb.get_as_dict())
         kws['component'] = component
@@ -1405,6 +1405,8 @@ class daemon_c(impl_c):
     def off(self, target, component):
         kws = dict(target.kws)
         kws.update(self.kws)
+        kws.update(self.upid)
+        kws.setdefault('name', self.name)
         # bring in runtime properties (override the rest)
         kws.update(target.fsdb.get_as_dict())
         kws['component'] = component
@@ -1420,6 +1422,8 @@ class daemon_c(impl_c):
     def get(self, target, component):		# power interface
         kws = dict(target.kws)
         kws.update(self.kws)
+        kws.update(self.upid)
+        kws.setdefault('name', self.name)
         # bring in runtime properties (override the rest)
         kws.update(target.fsdb.get_as_dict())
         kws['component'] = component
@@ -2521,6 +2525,15 @@ class socat_pc(daemon_c):
             precheck_wait = precheck_wait,
             env_add = env_add,
             **kwargs)
+
+
+    def on(self, target, component):
+        # this is what we use to tell if the thing has turned on in
+        # the verify() method, so wipe it first to make sure we have a
+        # clean state
+        commonl.rm_f(f"{target.state_dir}/{component}-{self.name}.log")
+        daemon_c.on(self, target, component)
+
 
     def verify(self, target, component, cmdline_expanded):
         # this is the log file name, that has been expanded already by
