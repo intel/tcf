@@ -14,7 +14,7 @@ import ttbl
 import ttbl.images
 import ttbl.power
 
-class quartus_pgm_c(ttbl.images.flash_shell_cmd_c):
+class pgm_c(ttbl.images.flash_shell_cmd_c):
     """
     Flash using Intel's Quartus PGM tool
 
@@ -35,7 +35,7 @@ class quartus_pgm_c(ttbl.images.flash_shell_cmd_c):
     cable is plugged to another port or might be enumerated in a
     different number).
 
-    :param str device_id: USB serial number of the USB device to use
+    :param str usb_serial_number: USB serial number of the USB device to use
       (USB-BlasterII or similar)
 
     :param dict image_map:
@@ -158,25 +158,25 @@ class quartus_pgm_c(ttbl.images.flash_shell_cmd_c):
     #: Change by setting, in a :ref:`server configuration file
     #: <ttbd_configuration>`:
     #:
-    #: >>> ttbl.images.quartus_pgm_c.path = "/opt/quartus/qprogrammer/bin/quartus_pgm"
+    #: >>> ttbl.quartus.pgm_c.path = "/opt/quartus/qprogrammer/bin/quartus_pgm"
     #:
     #: or for a single instance that then will be added to config:
     #:
-    #: >>> imager = ttbl.images.quartus_pgm_c(...)
+    #: >>> imager = ttbl.quartus.pgm_c(...)
     #: >>> imager.path =  "/opt/quartus/qprogrammer/bin/quartus_pgm"
     path = "/opt/quartus/qprogrammer/bin/quartus_pgm"
     path_jtagconfig = "/opt/quartus/qprogrammer/bin/jtagconfig"
 
 
-    def __init__(self, device_id, image_map, args = None, name = None,
+    def __init__(self, usb_serial_number, image_map, args = None, name = None,
                  jtagconfig = None,
                  **kwargs):
-        assert isinstance(device_id, str)
+        assert isinstance(usb_serial_number, str)
         commonl.assert_dict_of_ints(image_map, "image_map")
         commonl.assert_none_or_dict_of_strings(jtagconfig, "jtagconfig")
         assert name == None or isinstance(name, str)
 
-        self.device_id = device_id
+        self.usb_serial_number = usb_serial_number
         self.image_map = image_map
         self.jtagconfig = jtagconfig
         if args:
@@ -213,10 +213,11 @@ class quartus_pgm_c(ttbl.images.flash_shell_cmd_c):
 
         ttbl.images.flash_shell_cmd_c.__init__(self, cmdline, cwd = '%(file_path)s',
                                    **kwargs)
-
         if name == None:
-            name = "Intel Quartus PGM %s" % device_id
-        self.upid_set(name, device_id = device_id)
+            self.name = "quartus"
+        self.upid_set(
+            f"Intel Quartus PGM @ USB#{usb_serial_number}",
+            usb_serial_number = usb_serial_number)
 
 
     def flash_start(self, target, images, context):
@@ -227,7 +228,7 @@ class quartus_pgm_c(ttbl.images.flash_shell_cmd_c):
         # [PATH]', like 'USB BlasterII [1-3.3]'; we can't do this on
         # object creation because the USB path might change when we power
         # it on/off (rare, but could happen).
-        usb_path, _vendor, product = ttbl.usb_serial_to_path(self.device_id)
+        usb_path, _vendor, product = ttbl.usb_serial_to_path(self.usb_serial_number)
         port = target.fsdb.get("jtagd.tcp_port")
         context['kws'] = {
             # HACK: we assume all images are in the same directory, so
@@ -278,7 +279,7 @@ class jtagd_c(ttbl.power.daemon_c):
 
     **Arugments**
 
-    :param str serial_number: serial number of the USB Blaster II
+    :param str usb_serial_number: serial number of the USB Blaster II
 
     :param int tcp_port: (1024 - 65536) Number of the TCP port on 
       localhost where the daemon will listen
@@ -310,25 +311,25 @@ class jtagd_c(ttbl.power.daemon_c):
 
     jtagd_path = "/opt/quartus/qprogrammer/bin/jtagd"
 
-    def __init__(self, serial_number, tcp_port, jtagd_path = None,
+    def __init__(self, usb_serial_number, tcp_port, jtagd_path = None,
                  check_path = None, explicit = "off", **kwargs):
-        assert isinstance(serial_number, str), \
-            "serial_number: expected a string, got %s" % type(serial_number)
+        assert isinstance(usb_serial_number, str), \
+            "usb_serial_number: expected a string, got %s" % type(usb_serial_number)
         assert isinstance(tcp_port, int), \
             "tcp_port: expected an integer between 1024 and 65536, got %s" \
-            % type(serial_number)
+            % type(usb_serial_number)
 
         if jtagd_path:
             self.jtagd_path = jtagd_path
         assert isinstance(self.jtagd_path, str), \
             "openipc_path: expected a string, got %s" % type(jtagd_path)
-        self.serial_number = serial_number
+        self.usb_serial_number = usb_serial_number
         self.tcp_port = tcp_port
 
         cmdline = [
             self.jtagd_path,
             "--no-config",
-            "--auto-detect-filter", serial_number,
+            "--auto-detect-filter", usb_serial_number,
             "--port", str(tcp_port),
             "--debug",
             "--foreground",
@@ -340,12 +341,15 @@ class jtagd_c(ttbl.power.daemon_c):
             check_path = "/opt/quartus/qprogrammer/linux64/jtagd",
             **kwargs)
 
+        # Register the instrument like this, so it matches pgm_c and
+        # others and they all point to the same instrument
         self.upid_set(
-            "jtag daemon for %s @TCP:%d" % (
-                serial_number, tcp_port),
-            tcp_port = tcp_port,
-            serial_number = serial_number,
-        )
+            f"Intel Quartus PGM @ USB#{usb_serial_number}",
+            usb_serial_number = usb_serial_number)
+
+    def target_setup(self, target, iface_name, component):
+        target.fsdb.set(f"interfaces.{iface_name}.{component}.tcp_port",
+                        self.tcp_port)
 
     def verify(self, target, component, cmdline_expanded):
         pidfile = os.path.join(target.state_dir, component + "-jtagd.pid")
