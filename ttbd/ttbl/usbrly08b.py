@@ -197,18 +197,25 @@ class pc(rly08b, ttbl.power.impl_c):
     Power control implementation that uses a relay to close/open a
     circuit on on/off
 
+    :param str usb_serial_number: USB serial number of the USBRLY08b
+      board to use
     :param int relay: relay number to work on (1-8), maching the
        numbers printed in the PCB.
 
     Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, serial_number, relay, **kwargs):
+    def __init__(self, usb_serial_number, relay, **kwargs):
         assert isinstance(relay, int) and relay >= 1 or relay <= 8, \
             "relay: relay number is a number 1 - 8, " \
             f"matching the relay number in the PCB; got {type(relay)}"
         self.relay = relay
-        rly08b.__init__(self, serial_number)
+        rly08b.__init__(self, usb_serial_number)
         ttbl.power.impl_c.__init__(self, **kwargs)
+        self.upid_set(
+            f"USBRLY08b at USB#{usb_serial_number}",
+            name = "USBRLY08b",
+            usb_serial_number = usb_serial_number)
+
 
     def on(self, target, _component):
         # 0x64 is all relays on (see _command()); thus first relay
