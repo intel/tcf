@@ -120,13 +120,12 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
             r.update(result)
         # COMPAT: end        
         commonl.progress(
-            "allocation ID %s: [+%.1fs] keeping alive during state '%s': %s"
+            "allocation ID %s: [+%.1fs] alloc/keeping alive during state '%s': %s"
             % (allocid, ts - ts0, state, r))
 
         if allocid not in r:
             continue # no news
-        alloc = r[allocid]
-        new_state = alloc['state']
+        new_state = r[allocid]
         if new_state == 'active':
             r = rtb.send_request("GET", "allocation/%s" % allocid)
             group_allocated = r['group_allocated'].split(',')
