@@ -59,6 +59,10 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
 
         jtagconfig --setparam CABLENAME KEY VALUE
 
+    :param int tcp_port: (optional, default *None*) if a TCP port
+      number is given, it is a assumed the flashing server is in
+      localhost in the given TCP port.
+
     Other parameters described in :class:ttbl.images.impl_c.
 
 
@@ -169,14 +173,16 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
 
 
     def __init__(self, usb_serial_number, image_map, args = None, name = None,
-                 jtagconfig = None,
+                 jtagconfig = None, tcp_port = None,
                  **kwargs):
         assert isinstance(usb_serial_number, str)
         commonl.assert_dict_of_ints(image_map, "image_map")
         commonl.assert_none_or_dict_of_strings(jtagconfig, "jtagconfig")
         assert name == None or isinstance(name, str)
+        assert tcp_port == None or isinstance(tcp_port, int)
 
         self.usb_serial_number = usb_serial_number
+        self.tcp_port = tcp_port
         self.image_map = image_map
         self.jtagconfig = jtagconfig
         if args:
@@ -191,6 +197,9 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
             # FIXME: move this to args, enable value-less args (None)
             "--bgp",		# Real time background programming
             "--mode=JTAG",	# this is a JTAG
+            # when using a server, if the target is called
+            # SOMETHING in SERVERNAME:PORT CABLENAME, it seems PGM
+            # goes straight there. Weird
             "-c", "%(device_path)s",	# will resolve in flash_start()
             # in flash_start() call we'll map the image names to targets
             # to add these
@@ -229,7 +238,23 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
         # object creation because the USB path might change when we power
         # it on/off (rare, but could happen).
         usb_path, _vendor, product = ttbl.usb_serial_to_path(self.usb_serial_number)
-        port = target.fsdb.get("jtagd.tcp_port")
+
+        if self.tcp_port:
+            # server based cable name
+            device_path = f"{product} on localhost:{self.tcp_port} [{usb_path}]"
+            jtag_config_filename = f"{target.state_dir}/jtag-{'_'.join(images.keys())}.conf"
+            # Create the jtag client config file to ensure that
+            # the correct jtag daemon is connected to, then use the
+            # environment variable QUARTUS_JTAG_CLIENT_CONFIG to have
+            # the quartus software find it
+            with open(jtag_config_filename, "w+") as jtag_config:
+                jtag_config.write(
+                    f'ReplaceLocalJtagServer = "localhost:{self.tcp_port}";')
+            self.env_add["QUARTUS_JTAG_CLIENT_CONFIG"] = jtag_config_filename
+        else:
+            # local cable name, starts sever on its own
+            device_path = f"{product} [{usb_path}]"
+
         context['kws'] = {
             # HACK: we assume all images are in the same directory, so
             # we are going to cwd there (see in __init__ how we set
@@ -237,7 +262,7 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
             # include @, which the tool considers illegal as it uses
             # it to separate arguments--see below --operation
             'file_path': os.path.dirname(list(images.values())[0]),
-            'device_path': "%s on localhost:%s [%s]" % (product, port, usb_path)
+            'device_path': device_path,
             # flash_shell_cmd_c.flash_start() will add others
         }
 
@@ -259,8 +284,9 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
             for option, value in self.jtagconfig.items():
                 cmdline = [
                     self.path_jtagconfig,
-                    "--setparam", 
-                    "%s on localhost:%s [%s]" % (product, port, usb_path),
+                    "--addserver", f"localhost:{self.tcp_port}", "",  # empty password
+                    "--setparam",
+                    device_path,
                     option, value
                 ]
                 target.log.info("running per-config: %s" % " ".join(cmdline))
@@ -357,5 +383,4 @@ class jtagd_c(ttbl.power.daemon_c):
             and commonl.tcp_port_busy(self.tcp_port)
     
     def on(self, target, component):
-        target.fsdb.set("jtagd.tcp_port", self.tcp_port)
         return ttbl.power.daemon_c.on(self, target, component)
