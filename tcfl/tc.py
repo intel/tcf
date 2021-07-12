@@ -1148,7 +1148,8 @@ class target_c(reporter_c):
         #: Temporary directory where to store files -- this is the same
         #: as the testcase's -- it is needed for the report driver to
         #: find where to put stuff.
-        self.tmpdir = testcase.tmpdir
+        self.tmpdir = os.path.join(testcase.tmpdir, "targets", target_want_name)
+        commonl.makedirs_p(self.tmpdir)
 
         #: Keywords for ``%(KEY)[sd]`` substitution specific to the
         #: testcase or target and its current active :term:`BSP model`
@@ -7971,6 +7972,20 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                     # this just updates the core keys, but later calls
                     # to kw_set() and company will refresh the main
                     # target.kws dict.
+
+                #
+                # Set the new tmpdir
+                #
+                # FIXME: this is bad to make these two here
+                tc_for_tg.mkticket()
+                tc_for_tg.tmpdir = os.path.join(tc_c.tmpdir, tc_for_tg.ticket)
+                commonl.makedirs_p(tc_for_tg.tmpdir)
+
+                for target_want_name, target in tc_for_tg.targets.items():
+                    target.tmpdir = os.path.join(
+                        tc_for_tg.tmpdir, "targets", target_want_name)
+                    commonl.makedirs_p(target.tmpdir)
+
                 tc_for_tg.report_info("queuing for execution", dlevel = 3)
                 thread = tp.apply_async(
                     tc_for_tg._run,
