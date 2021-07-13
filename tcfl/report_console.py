@@ -84,6 +84,7 @@ import io
 import os
 import subprocess
 import sys
+import termcolor
 import threading
 
 import commonl
@@ -204,16 +205,42 @@ class driver(tc.report_driver_c):
             raise AssertionError(
                 "reporter is not tcfl.tc.{tc,target}_c but %s" % type(reporter))
 
-        _prefix = \
-            f"{tag}{level}/{testcase.runid_hashid}{testcase.ident()}" \
-            f" {reporter._report_prefix} [+{delta:0.1f}s]: "
-        with commonl.tls_prefix_c(self.tls, _prefix):
-            console_p, logfile_p = self._shall_do(level)
-            message += "\n"
-            if console_p:
+        tag_to_color = {
+            "PASS": ( "green", ),
+            "ERRR": ( "magenta", ),
+            "FAIL": ( "red", ),
+            "BLCK": ( "yellow", ),
+            "SKIP": ( 'cyan', ),	# no orange available...
+            'DATA': ( "blue", ),
+        }
+        console_p, logfile_p = self._shall_do(level)
+        if console_p:
+            # if this is a terminal, colorlize the TAG in the main
+            # message so we can easily locate issues; note we don't
+            # colorize the tag for attachments, just for the main
+            # message.
+            # We don't colorize INFO nor DATA
+            if self.consolef.isatty() and tag in tag_to_color:
+                args = tag_to_color[tag]
+                _taglevel = termcolor.colored(f"{tag}{level}", *args, attrs = [ 'bold' ])
+                _prefix = _taglevel + \
+                    f"/{testcase.runid_hashid}{testcase.ident()}" \
+                    f" {reporter._report_prefix} [+{delta:0.1f}s]: "
+            else:
+                _prefix = \
+                    f"{tag}{level}/{testcase.runid_hashid}{testcase.ident()}" \
+                    f" {reporter._report_prefix} [+{delta:0.1f}s]: "
+            with commonl.tls_prefix_c(self.tls, _prefix):
+                message += "\n"
                 self.consolef.write(message)
-            if self.logf and logfile_p:
-                self.logf.write(message)
+        if logfile_p:
+            _prefix = \
+                f"{tag}{level}/{testcase.runid_hashid}{testcase.ident()}" \
+                f" {reporter._report_prefix} [+{delta:0.1f}s]: "
+            with commonl.tls_prefix_c(self.tls, _prefix):
+                message += "\n"
+                if self.logf and logfile_p:
+                    self.logf.write(message)
 
         if attachments != None:
             assert isinstance(attachments, dict)
