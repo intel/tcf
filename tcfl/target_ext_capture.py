@@ -109,7 +109,6 @@ def _template_find(image_filename, image_rgb,
             image_gray, width = int(image_gray.shape[1] * scale))
 
         w, h = image_gray_resized.shape[::-1]
-        #print "DEBUG scaling image to %d %d" % (w, h)
 
         # stop if the image is smaller than the template
         if w < template_width or h < template_height:
@@ -577,6 +576,8 @@ class extension(tc.target_extension_c):
             if streams and stream_name not in streams:
                 continue
             src_file_name = stream_data.get('file', None)
+            if src_file_name == None:
+                continue
             dst_file_name = streams.get(stream_name, {}).get('file_name', None)
             offset = streams.get('offset', None)
             if dst_file_name == None:
@@ -901,7 +902,7 @@ def _cmdline_capture_list(args):
         for name, state in capturers.items():
             streams = capturers_data[name]['stream']
             l = [
-                name + ":" + data['mimetype']
+                name + ":" + data.get('mimetype', "mimetype-n/a")
                 for name, data in streams.items()
             ]
             print(f"{name} ({state_to_str[state]}): {' '.join(l)}")
