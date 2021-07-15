@@ -151,7 +151,7 @@ class pci(ttbl.power.impl_c, ttbl.capture.impl_c): # pylint: disable = abstract-
             ttbl._install.share_path,
             log = logging, relsrcpath = ".")
         ttbl.capture.impl_c.__init__(
-            self, snapshot = False, mimetype = "application/json")
+            self, False, "application/json", log = "text/plain")
         self.url = urllib.parse.urlparse(url)
         if password:
             self.password = commonl.password_get(
