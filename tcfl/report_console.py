@@ -224,8 +224,9 @@ class driver(tc.report_driver_c):
                 args = tag_to_color[tag]
                 _taglevel = termcolor.colored(f"{tag}{level}", *args, attrs = [ 'bold' ])
                 _prefix = _taglevel + \
-                    f"/{testcase.runid_hashid}{testcase.ident()}" \
-                    f" {reporter._report_prefix} [+{delta:0.1f}s]: "
+                    f"/{termcolor.colored(testcase.runid_hashid, attrs = [ 'bold' ])}{testcase.ident()}" \
+                    f" {termcolor.colored(reporter._report_prefix, *args)}" \
+                    f" [+{delta:0.1f}s]: "
             else:
                 _prefix = \
                     f"{tag}{level}/{testcase.runid_hashid}{testcase.ident()}" \
