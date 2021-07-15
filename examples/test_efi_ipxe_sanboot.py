@@ -36,7 +36,7 @@ more information).
 Execute :download:`the testcase <../examples/test_efi_ipxe_sanboot.py>`
 with::
 
-  $ IMAGE=clear tcf run -v /usr/share/tcf/examples/test_efi_ipxe_sanboot.py
+  $ SANBOOR_URL=http://someserver.com/Fedora-Workstation-Live-x86_64-31-1.9.iso tcf run -v /usr/share/tcf/examples/test_efi_ipxe_sanboot.py
   INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+438.5s]: power cycled
   INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+438.9s]: BIOS: waiting for main menu after power on
   ...
@@ -69,8 +69,12 @@ with::
   PASS1/x74ds3  .../test_efi_ipxe_sanboot.py @huty-ehnc [+644.0s]: evaluation passed 
   PASS0/	toplevel @local [+648.6s]: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:10:44.397730) - passed 
 
+If SANBOOT_URL is "skip*, then no sanboot is executed and the iPXE
+command line is left available for use.
+
 (depending on your installation method, location might be
 *~/.local/share/tcf/examples*)
+
 """
 import os
 import re
@@ -203,8 +207,11 @@ class _test(tcfl.pos.tc_pos_base):
             target.shell.run("set %s/netmask %s" % (ifname, kws['ipv4_netmask']))
             target.shell.run("ifopen " + ifname)
 
-            target.send("sanboot %s" % SANBOOT_URL)
-            # can't use shell.run...it will timeout, since we'll print no more prompt
-            target.expect("Booting from SAN device")
+            if SANBOOT_URL == "skip":
+                target.report_info("not booting", level = 0)
+            else:
+                target.send("sanboot %s" % SANBOOT_URL)
+                # can't use shell.run...it will timeout, since we'll print no more prompt
+                target.expect("Booting from SAN device")
         finally:
             target.shell.shell_prompt_regex = prompt_orig
