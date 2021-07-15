@@ -18,3 +18,4 @@ requests            # package: python3-requests
 rpyc	            # package: python3-rpyc
 setuptools          # package: python3-setuptools
 tabulate            # package: python3-tabulate
+termcolor           # package: python3-termcolor
