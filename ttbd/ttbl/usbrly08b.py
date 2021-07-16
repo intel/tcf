@@ -202,9 +202,16 @@ class pc(rly08b, ttbl.power.impl_c):
     :param int relay: relay number to work on (1-8), maching the
        numbers printed in the PCB.
 
+    :param bool resilient: (optional; default *False*) if the
+      controller cannot be found, assume the relay is off (or in
+      default state) when trying to get state. If *True*, :meth:`get`
+      will return *None* if the controller cannot be found. In any
+      case, it will raise an exception on :meth:`on` or :meth:`off` if
+      the controller is not found.
+
     Other parameters as to :class:ttbl.power.impl_c.
     """
-    def __init__(self, usb_serial_number, relay, **kwargs):
+    def __init__(self, usb_serial_number, relay, resilient = False, **kwargs):
         assert isinstance(relay, int) and relay >= 1 or relay <= 8, \
             "relay: relay number is a number 1 - 8, " \
             f"matching the relay number in the PCB; got {type(relay)}"
@@ -215,7 +222,7 @@ class pc(rly08b, ttbl.power.impl_c):
             f"USBRLY08b at USB#{usb_serial_number}",
             name = "USBRLY08b",
             usb_serial_number = usb_serial_number)
-
+        self.resilient = resilient
 
     def on(self, target, _component):
         # 0x64 is all relays on (see _command()); thus first relay
@@ -264,11 +271,16 @@ class pc(rly08b, ttbl.power.impl_c):
             else:
                 return False
         except self.not_found_e:
-            # If it is not connected, it is off
-            target.log.log(8, "USB-RLY08B[%s] not found, assuming relay "
-                           "#%d powered off"
-                           % (self.serial_number, self.relay))
-            return False
+            if self.resilient:
+                # If it is not connected, it is off
+                target.log.warning("USB-RLY08B[%s] not found, assuming"
+                                   " relay #%d powered off"
+                                   % (self.serial_number, self.relay))
+                return False
+            target.log.warning("USB-RLY08B[%s] not found, no status for"
+                               " relay #%d"
+                               % (self.serial_number, self.relay))
+            return None
 
 
 class plugger(rly08b,		 # pylint: disable = abstract-method
