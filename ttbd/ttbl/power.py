@@ -279,12 +279,19 @@ class impl_c(ttbl.tt_interface_impl_c):
       - *off*: explicit for powering off: only power-off/stop if explicity
         powered off by name, power on normally
 
+    :param bool off_on_release: (optional; default *False*) turn off
+      when the target is released; this is normally use for components
+      that implement some kind of access control that should not be
+      used once a machine is released.
+
     """
     def __init__(self, paranoid = False, explicit = None,
-                 ignore_get = False, ignore_get_errors = False):
+                 ignore_get = False, ignore_get_errors = False,
+                 off_on_release = False):
         assert isinstance(paranoid, bool)
         assert isinstance(ignore_get, bool)
         assert isinstance(ignore_get_errors, bool)
+        assert isinstance(off_on_release, bool)
         assert explicit in ( None, 'on', 'off', 'both' )
         #: If the power on fails, automatically retry it by powering
         #: first off, then on again
@@ -295,6 +302,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         self.explicit = explicit
         self.ignore_get = ignore_get
         self.ignore_get_errors = ignore_get_errors
+        self.off_on_release = off_on_release
         #: for paranoid power getting, now many samples we need to get
         #: that are the same for the value to be considered stable
         self.paranoid_get_samples = 6
@@ -399,7 +407,12 @@ class interface(ttbl.tt_interface):
         # nothing to do on target release
         # we don't power off on release so we can pass the target to
         # someone else in the same state it was
-        pass
+        for component, impl in self.impls.items():
+            if impl.off_on_release:
+                target.log.info(f"{component}: powering off upon release")
+                impl.off(target, component)
+                target.log.info(f"{component}: powered off upon release")
+
 
     def _impl_on(self, impl, target, component):
         # calls the implementation function to do the ON operation,
@@ -1713,9 +1726,11 @@ class daemon_podman_container_c(daemon_c):
     #:
     #: This can be fed to commonl.buildah_image_create() to generate
     #: the image upon server configuration.
+    #:
+    #: crontabs -> run-parts
     dockerfile = """
 FROM fedora-minimal
-RUN microdnf install -y usbutils strace python3-rpyc findutils
+RUN microdnf install -y crontabs usbutils strace python3-rpyc findutils
 RUN microdnf clean all
 """
 
@@ -2188,8 +2203,10 @@ class rpyc_c(daemon_podman_container_c):
             image_name,
             "/bin/bash", "-xeuc",
             # for PIP: "rpyc_classic.py",
-            "for v in /etc/ttbd/run/*; do $v; done; "
-            "cd $HOME; exec ${VENVPYTHON:-} ${RPYC_CLASSIC:-rpyc_classic}"
+            "run-parts /etc/ttbd/run; "
+            "cd $HOME;"
+            # unbuffer so we get output in the console---might slow down
+            " PYTHONUNBUFFERED=1 exec ${VENVPYTHON:-} ${RPYC_CLASSIC:-rpyc_classic}"
             # listen on all interfaces of the container, we'll map it later
             f" --port {str(rpyc_port)} --host 0 --mode forking"
         ]
@@ -2219,9 +2236,11 @@ class rpyc_c(daemon_podman_container_c):
     #:
     #: This can be fed to commonl.buildah_image_create() to generate
     #: the image upon server configuration.
+    #:
+    #: crontabs -> run-parts
     dockerfile = """
 FROM fedora-minimal
-RUN microdnf install -y usbutils strace python3-rpyc
+RUN microdnf install -y crontabs usbutils strace python3-rpyc
 RUN microdnf clean all
 """
 
@@ -2316,7 +2335,7 @@ class rpyc_aardvark_c(rpyc_c):
     *aardvark_py.Dockefile* with the contents::
 
         FROM fedora-minimal
-        RUN microdnf install -y usbutils strace python3-rpyc python3-rpyc
+        RUN microdnf install -y crontabs usbutils strace python3-rpyc python3-rpyc
         RUN microdnf clean all
         RUN pip3 install --no-deps aardvark_py
 
@@ -2340,6 +2359,7 @@ class rpyc_aardvark_c(rpyc_c):
     """
     def __init__(self, usb_serial_number: str, rpyc_port: int,
                  image_name: str = "aardvark_py",
+                 off_on_release: bool = True,
                  **kwargs):
         assert isinstance(usb_serial_number, str)
         assert isinstance(rpyc_port, int) \
@@ -2366,6 +2386,7 @@ class rpyc_aardvark_c(rpyc_c):
                 "--restart", "on-failure",
             ],
             ssl_enabled = True,
+            off_on_release = off_on_release,
             **kwargs
         )
         self.upid_set(
