@@ -7330,6 +7330,10 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
         Note that for deployment and evolution we need the targets assigned.
         """
+        # FIXME: this needs to differentiate skipping a whole TC
+        #        if we raise from the main TC, skip and stop executing
+        #        if we skip from a subtc, keep going
+        
         # Note dlevel_passed; we don't want the PASS messages for
         # level-0 verbosity, only when things FAIL or are BLOCKed
         result = result_c(0, 0, 0, 0, 0)
@@ -7362,8 +7366,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                         "configure", retval, ignore_nothing = True,
                         extra_report = self._extra_report(self.kws),
                         dlevel = -1, dlevel_skipped = 2, dlevel_passed = 2) \
-                        == False \
-                        or retval.skipped > 0:
+                        == False:
                     break
             # We don't want to count build success as a separate
             # test-case when we have evaluation--hence why we reassign
@@ -7377,8 +7380,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                         "build", result, ignore_nothing = True,
                         extra_report = self._extra_report(self.kws),
                         dlevel = -1, dlevel_skipped = 2, dlevel_passed = 1) \
-                        == False \
-                        or result.skipped > 0:
+                        == False:
                     break
 
             # are the test target or testcase declaring as build only?
@@ -7411,8 +7413,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                         if self.report_tweet(
                                 "deploy", retval, ignore_nothing = True,
                                 extra_report = self._extra_report(self.kws),
-                                dlevel_passed = 1) \
-                                == False or retval.skipped > 0:
+                                dlevel_passed = 1) == False:
                             break
                     if not eval_skip:
                         retval = self._do_the_eval()
