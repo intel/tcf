@@ -207,7 +207,7 @@ class extension(tc.target_extension_c):
             target.console._set_default()
 
 
-    def cycle(self, wait = None, component = None, explicit = False):
+    def cycle(self, component = None, wait = None, explicit = False):
         """
         Power cycle a target or one of its components
 
