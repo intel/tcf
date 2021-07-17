@@ -2205,142 +2205,165 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
     """
     ipxe_seize(target)
     prompt_orig = target.shell.prompt_regex
+
+    expecter_ipxe_error = target.console.text(
+        # When iPXE prints an error, it looks like:
+        ## http://10.219.169.112/ttbd-pos/x86_64/vmlinuz-tcf-live..................
+        ## Connection timed out (http://ipxe.org/4c0a6092)
+        #
+        # So, if we find that URL, raise an error
+        re.compile("\(http://ipxe\.org/[0-9a-f]+\)"),
+        name = f"{target.want_name}: iPXE error",
+        timeout = 0, poll_period = 1,
+        raise_on_found = tc.error_e("iPXE error detected")
+    )
+
     with target.shell.context("iPXE boot"):
-        # FIXME: install context - level handler which errors out on
-        # - command not found
-        #
-        # When matching end of line, match against \r, since depends
-        # on the console it will send one or two \r (SoL vs SSH-SoL)
-        # before \n -- we removed that in the kernel driver by using
-        # crnl in the socat config
-        #
-        # FIXME: block on anything here? consider infra issues
-        # on "Connection timed out", http://ipxe.org...
-        # exiting the context restores this to what it was before
-        target.shell.prompt_regex = "iPXE>"
-        kws = dict(target.kws)
-        boot_ic = target.kws['pos_boot_interconnect']
-        mac_addr = target.kws['interconnects'][boot_ic]['mac_addr']
-        ipv4_addr = target.kws['interconnects'][boot_ic]['ipv4_addr']
-        ipv4_prefix_len = target.kws['interconnects'][boot_ic]['ipv4_prefix_len']
-        kws['mac_addr'] = mac_addr
-        kws['ipv4_addr'] = ipv4_addr
-        kws['ipv4_netmask'] = commonl.ipv4_len_to_netmask_ascii(ipv4_prefix_len)
+        try:
+            # FIXME: install context - level handler which errors out on
+            # - command not found
+            #
+            # When matching end of line, match against \r, since depends
+            # on the console it will send one or two \r (SoL vs SSH-SoL)
+            # before \n -- we removed that in the kernel driver by using
+            # crnl in the socat config
+            #
+            # FIXME: block on anything here? consider infra issues
+            # on "Connection timed out", http://ipxe.org...
+            # exiting the context restores this to what it was before
+            target.shell.prompt_regex = "iPXE>"
+            kws = dict(target.kws)
+            boot_ic = target.kws['pos_boot_interconnect']
+            mac_addr = target.kws['interconnects'][boot_ic]['mac_addr']
+            ipv4_addr = target.kws['interconnects'][boot_ic]['ipv4_addr']
+            ipv4_prefix_len = target.kws['interconnects'][boot_ic]['ipv4_prefix_len']
+            kws['mac_addr'] = mac_addr
+            kws['ipv4_addr'] = ipv4_addr
+            kws['ipv4_netmask'] = commonl.ipv4_len_to_netmask_ascii(ipv4_prefix_len)
 
-        # Find what network interface our MAC address is; the
-        # output of ifstat looks like:
-        #
-        ## net0: 00:26:55:dd:4a:9d using 82571eb on 0000:6d:00.0 (open)
-        ##   [Link:up, TX:8 TXE:1 RX:44218 RXE:44205]
-        ##   [TXE: 1 x "Network unreachable (http://ipxe.org/28086090)"]
-        ##   [RXE: 43137 x "Operation not supported (http://ipxe.org/3c086083)"]
-        ##   [RXE: 341 x "The socket is not connected (http://ipxe.org/380f6093)"]
-        ##   [RXE: 18 x "Invalid argument (http://ipxe.org/1c056082)"]
-        ##   [RXE: 709 x "Error 0x2a654089 (http://ipxe.org/2a654089)"]
-        ## net1: 00:26:55:dd:4a:9c using 82571eb on 0000:6d:00.1 (open)
-        ##   [Link:down, TX:0 TXE:0 RX:0 RXE:0]
-        ##   [Link status: Down (http://ipxe.org/38086193)]
-        ## net2: 00:26:55:dd:4a:9f using 82571eb on 0000:6e:00.0 (open)
-        ##   [Link:down, TX:0 TXE:0 RX:0 RXE:0]
-        ##   [Link status: Down (http://ipxe.org/38086193)]
-        ## net3: 00:26:55:dd:4a:9e using 82571eb on 0000:6e:00.1 (open)
-        ##   [Link:down, TX:0 TXE:0 RX:0 RXE:0]
-        ##   [Link status: Down (http://ipxe.org/38086193)]
-        ## net4: 98:4f:ee:00:05:04 using NII on NII-0000:01:00.0 (open)
-        ##   [Link:up, TX:10 TXE:0 RX:8894 RXE:8441]
-        ##   [RXE: 8173 x "Operation not supported (http://ipxe.org/3c086083)"]
-        ##   [RXE: 268 x "The socket is not connected (http://ipxe.org/380f6093)"]
-        #
-        # thus we need to match the one that fits our mac address
-        ifstat = target.shell.run("ifstat", output = True, trim = True)
-        regex = re.compile(
-            "(?P<ifname>net[0-9]+): %s using" % mac_addr.lower(),
-            re.MULTILINE)
-        m = regex.search(ifstat)
-        if not m:
-            raise tc.error_e(
-                "iPXE: cannot find interface name for MAC address %s;"
-                " is the MAC address in the configuration correct?"
-                % mac_addr.lower(),
-                dict(target = target, ifstat = ifstat,
-                     mac_addr = mac_addr.lower())
-            )
-        ifname = m.groupdict()['ifname']
+            # Find what network interface our MAC address is; the
+            # output of ifstat looks like:
+            #
+            ## net0: 00:26:55:dd:4a:9d using 82571eb on 0000:6d:00.0 (open)
+            ##   [Link:up, TX:8 TXE:1 RX:44218 RXE:44205]
+            ##   [TXE: 1 x "Network unreachable (http://ipxe.org/28086090)"]
+            ##   [RXE: 43137 x "Operation not supported (http://ipxe.org/3c086083)"]
+            ##   [RXE: 341 x "The socket is not connected (http://ipxe.org/380f6093)"]
+            ##   [RXE: 18 x "Invalid argument (http://ipxe.org/1c056082)"]
+            ##   [RXE: 709 x "Error 0x2a654089 (http://ipxe.org/2a654089)"]
+            ## net1: 00:26:55:dd:4a:9c using 82571eb on 0000:6d:00.1 (open)
+            ##   [Link:down, TX:0 TXE:0 RX:0 RXE:0]
+            ##   [Link status: Down (http://ipxe.org/38086193)]
+            ## net2: 00:26:55:dd:4a:9f using 82571eb on 0000:6e:00.0 (open)
+            ##   [Link:down, TX:0 TXE:0 RX:0 RXE:0]
+            ##   [Link status: Down (http://ipxe.org/38086193)]
+            ## net3: 00:26:55:dd:4a:9e using 82571eb on 0000:6e:00.1 (open)
+            ##   [Link:down, TX:0 TXE:0 RX:0 RXE:0]
+            ##   [Link status: Down (http://ipxe.org/38086193)]
+            ## net4: 98:4f:ee:00:05:04 using NII on NII-0000:01:00.0 (open)
+            ##   [Link:up, TX:10 TXE:0 RX:8894 RXE:8441]
+            ##   [RXE: 8173 x "Operation not supported (http://ipxe.org/3c086083)"]
+            ##   [RXE: 268 x "The socket is not connected (http://ipxe.org/380f6093)"]
+            #
+            # thus we need to match the one that fits our mac address
+            ifstat = target.shell.run("ifstat", output = True, trim = True)
+            regex = re.compile(
+                "(?P<ifname>net[0-9]+): %s using" % mac_addr.lower(),
+                re.MULTILINE)
+            m = regex.search(ifstat)
+            if not m:
+                raise tc.error_e(
+                    "iPXE: cannot find interface name for MAC address %s;"
+                    " is the MAC address in the configuration correct?"
+                    % mac_addr.lower(),
+                    dict(target = target, ifstat = ifstat,
+                         mac_addr = mac_addr.lower())
+                )
+            ifname = m.groupdict()['ifname']
 
-        if dhcp:
-            target.shell.run("dhcp " + ifname, re.compile("Configuring.*ok"))
-            target.shell.run("show %s/ip" % ifname, "ipv4 = %s" % ipv4_addr)
-        else:
-            # static is much faster and we know the IP address already
-            # anyway; but then we don't have DNS as it is way more
-            # complicated to get it
-            target.shell.run("set %s/ip %s" % (ifname, ipv4_addr))
-            target.shell.run("set %s/netmask %s" % (ifname, kws['ipv4_netmask']))
-            target.shell.run("ifopen " + ifname)
+            # wait until we scan to install this
+            target.testcase.expect_global_append(expecter_ipxe_error)
 
-        if pos_image == None:
-            pos_image = target.kws.get('pos_image', None)
-        if pos_image == None:
-            raise tc.blocked_e(
-                "POS: cannot determine what provisioning image is to be used"
-                "; (no pos_image provided and target doesn't provide"
-                " *pos_image* to indicate it")
-        pos_kernel_image = target.kws.get('pos.kernel_image', pos_image)
-        if 'pos_kernel_image' not in kws:
-            kws['pos_kernel_image'] = pos_kernel_image
-        # split cmdline in two chunks, sometimes it is too long
-        cmdline = pos_cmdline_opts[pos_image]
-        cmdline_len = len(cmdline)
-        cmdline1 = cmdline[ 0 : int(cmdline_len/2) ]
-        cmdline2 = cmdline[ int(cmdline_len/2) : ]
-        kws['pos_cmdline_opts1'] = " ".join(cmdline1) % kws
-        kws['pos_cmdline_opts2'] = " ".join(cmdline2) % kws
-        if url == None:
-            url = target.kws.get('pos.http_url_prefix',
-                                 target.kws.get('pos_http_url_prefix', None))
+            if dhcp:
+                target.shell.run("dhcp " + ifname, re.compile("Configuring.*ok"))
+                target.shell.run("show %s/ip" % ifname, "ipv4 = %s" % ipv4_addr)
+            else:
+                # static is much faster and we know the IP address already
+                # anyway; but then we don't have DNS as it is way more
+                # complicated to get it
+                target.shell.run("set %s/ip %s" % (ifname, ipv4_addr))
+                target.shell.run("set %s/netmask %s" % (ifname, kws['ipv4_netmask']))
+                target.shell.run("ifopen " + ifname)
 
-        target.shell.run("set base %s" % url)
-        # command line options in a variable so later the command line
-        # doesn't get too long and maybe overfill some buffer (has
-        # happened before)
-        # FIXME: all these command line generation stuff needs to be
-        # shared with dhcp.py / dnsmasq.py
-        target.shell.run(
-            "set cmdline1 %(pos_cmdline_opts1)s" % kws)
-        target.shell.run(
-            "set cmdline2 %(pos_cmdline_opts2)s" % kws)
-        pos_kernel_cmdline_extra = target.kws.get('pos.kernel_cmdline_extra', "")
-        chunk_size = 80
-        # FIXME FIXME: this eaither has to use quotes or break at
-        # spaces, otherwise if it falls in a space it munge them
-        pos_kernel_cmdline_extra_chunked =  [
-            pos_kernel_cmdline_extra[i : i + chunk_size]
-            for i in range(0, len(pos_kernel_cmdline_extra), chunk_size)
-        ]
-        count = 0
-        chunk_str = ""
-        for chunk in pos_kernel_cmdline_extra_chunked:
-            target.shell.run("set e%d " % count + chunk)
-            chunk_str += "${e%d}" % count
-            count += 1
-        kws['pos_cmdline_extra_chunked'] = chunk_str
-        target.shell.run(
-            "kernel"
-            " ${base}vmlinuz-%(pos_kernel_image)s"
-            " initrd=initramfs-%(pos_kernel_image)s"
-            " console=tty0 console=%(linux_serial_console_default)s,115200"
-            " ${cmdline1} ${cmdline2} %(pos_cmdline_extra_chunked)s"
-            % kws,
-            # .*because there are a lot of ANSIs that can come
-            re.compile(r"\.\.\..* ok"))
-        target.shell.run(
-            "initrd ${base}initramfs-%(pos_kernel_image)s"
-            % kws,
-            # .*because there are a lot of ANSIs that can come
-            re.compile(r"\.\.\..* ok"))
-        target.send("boot")
-        # now the kernel boots
+            if pos_image == None:
+                pos_image = target.kws.get('pos_image', None)
+            if pos_image == None:
+                raise tc.blocked_e(
+                    "POS: cannot determine what provisioning image is to be used"
+                    "; (no pos_image provided and target doesn't provide"
+                    " *pos_image* to indicate it")
+            pos_kernel_image = target.kws.get('pos.kernel_image', pos_image)
+            if 'pos_kernel_image' not in kws:
+                kws['pos_kernel_image'] = pos_kernel_image
+            # split cmdline in two chunks, sometimes it is too long
+            cmdline = pos_cmdline_opts[pos_image]
+            cmdline_len = len(cmdline)
+            cmdline1 = cmdline[ 0 : int(cmdline_len/2) ]
+            cmdline2 = cmdline[ int(cmdline_len/2) : ]
+            kws['pos_cmdline_opts1'] = " ".join(cmdline1) % kws
+            kws['pos_cmdline_opts2'] = " ".join(cmdline2) % kws
+            if url == None:
+                url = target.kws.get('pos.http_url_prefix',
+                                     target.kws.get('pos_http_url_prefix', None))
 
+            target.shell.run("set base %s" % url)
+            # command line options in a variable so later the command line
+            # doesn't get too long and maybe overfill some buffer (has
+            # happened before)
+            # FIXME: all these command line generation stuff needs to be
+            # shared with dhcp.py / dnsmasq.py
+            target.shell.run(
+                "set cmdline1 %(pos_cmdline_opts1)s" % kws)
+            target.shell.run(
+                "set cmdline2 %(pos_cmdline_opts2)s" % kws)
+            pos_kernel_cmdline_extra = target.kws.get('pos.kernel_cmdline_extra', "")
+            chunk_size = 80
+            # FIXME FIXME: this eaither has to use quotes or break at
+            # spaces, otherwise if it falls in a space it munge them
+            pos_kernel_cmdline_extra_chunked =  [
+                pos_kernel_cmdline_extra[i : i + chunk_size]
+                for i in range(0, len(pos_kernel_cmdline_extra), chunk_size)
+            ]
+            count = 0
+            chunk_str = ""
+            for chunk in pos_kernel_cmdline_extra_chunked:
+                target.shell.run("set e%d " % count + chunk)
+                chunk_str += "${e%d}" % count
+                count += 1
+            kws['pos_cmdline_extra_chunked'] = chunk_str
+            target.shell.run(
+                "kernel"
+                " ${base}vmlinuz-%(pos_kernel_image)s"
+                " initrd=initramfs-%(pos_kernel_image)s"
+                " console=tty0 console=%(linux_serial_console_default)s,115200"
+                " ${cmdline1} ${cmdline2} %(pos_cmdline_extra_chunked)s"
+                % kws,
+                # .*because there are a lot of ANSIs that can come
+                re.compile(r"\.\.\..* ok"))
+            target.shell.run(
+                "initrd ${base}initramfs-%(pos_kernel_image)s"
+                % kws,
+                # .*because there are a lot of ANSIs that can come
+                re.compile(r"\.\.\..* ok"))
+            target.send("boot")
+            # now the kernel boots
+        finally:
+            try:
+                target.testcase.expect_global_remove(expecter_ipxe_error)
+            except KeyError:
+                # in case we excepted before installing the handler,
+                # we are ok with it
+                pass
 
 # FIXME: when tc.py's import hell is fixed, this shall move to tl.py?
 
@@ -2722,9 +2745,21 @@ def edkii_pxe_ipxe_target_power_cycle_to_pos(target):
         raise tc.blocked_e(
             "can't find MAC address for interconnect %s" % boot_ic)
 
+    # add a detector for a shell error, make sure to name it
+    # after the target and console it will monitor so it
+    # doesn't override other targets/consoles we might be
+    # touching in parallel
+    error_pxe_N = target.console.text(
+        re.compile("PXE-E[0-9]+:[ \w]+"),
+        name = f"{target.want_name}: UEFI PXE boot error",
+        timeout = 0, poll_period = 1,
+        raise_on_found = tc.error_e("UEFI PXE boot error detected")
+    )
+
     target.report_info("POS: setting target to boot Provisioning OS")
     retries_max = 6
     for retry in range(1, retries_max):
+        target.testcase.expect_tls_append(error_pxe_N)
         try:
             target.power.cycle()
             biosl.boot_network_pxe(
@@ -2754,7 +2789,10 @@ def edkii_pxe_ipxe_target_power_cycle_to_pos(target):
                 retry_data['failed EFI PXE boot']
             )
             continue
+        finally:
+            target.testcase.expect_tls_remove(error_pxe_N)
 
+        target.testcase.expect_tls_append(error_pxe_N)
         try:
             # this will make it boot the iPXE bootloader and then we seize it
             # and direct it to our POS provide
@@ -2779,6 +2817,8 @@ def edkii_pxe_ipxe_target_power_cycle_to_pos(target):
                 retry_data["boot: retries due to network boot / iPXE failure"]
             )
             continue
+        finally:
+            target.testcase.expect_tls_remove(error_pxe_N)
 
 capability_register('boot_to_pos', 'edkii+pxe+ipxe',
                     edkii_pxe_ipxe_target_power_cycle_to_pos)
