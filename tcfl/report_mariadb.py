@@ -728,9 +728,10 @@ class driver_summary(tcfl.tc.report_driver_c):
             try:
                 self.table_row_inc("Summary", "RunID", runid, **data)
             except mariadb.Error as e:
-                logging.error(f"Summary: {tc_name}:{hashid}: MariaDB error: {str(e)}")
+                logging.error(f"Summary: {tc_name}:{hashid}: MariaDB error: %s" % e)
 
             # Record a mapping of runid-testcasename -> hashid; this
+
             # is needed so we can refer to various things that use the
             # hashid, like for example reports
             # (report-RUNID:HASHID.ANYTHING)
@@ -740,7 +741,7 @@ class driver_summary(tcfl.tc.report_driver_c):
                     "HashIDs", "RunID-TestcaseName", runid + "##" + tc_name,
                     **{ 'HashID': hashid })
             except mariadb.Error as e:
-                logging.error(f"HashIDs: {tc_name}:{hashid}: MariaDB error: {e}")
+                logging.error(f"HashIDs: {tc_name}:{hashid}: MariaDB error: {str(e)}")
 
             # Update --id-extra KEY=VALUE
             if reporter.runid_extra:
@@ -751,7 +752,7 @@ class driver_summary(tcfl.tc.report_driver_c):
                     self.table_row_update("Summary", "RunID", runid,
                                           **reporter.runid_extra)
                 except mariadb.Error as e:
-                    logging.error(f"HashIDs: {tc_name}:{hashid}: MariaDB error: {e}")
+                    logging.error(f"HashIDs: {tc_name}:{hashid}: MariaDB error: {str(e)}")
 
             # Any field name over 64 chars will make SQL (at least
             # MariaDB) complain sooo..encoding time; we have a table
@@ -770,7 +771,7 @@ class driver_summary(tcfl.tc.report_driver_c):
                     self.table_row_update(domain, "RunID", runid,
                                           prefix_bare = "DATA ", **data_flat)
                 except mariadb.Error as e:
-                    logging.error(f"domain: {tc_name}:{hashid}: MariaDB error: {e}")
+                    logging.error(f"domain: {tc_name}:{hashid}: MariaDB error: {str(e)}")
 
             # Add to the table of executed testcases/results
             # We need to index by test case and column by RunID. Why?
@@ -786,4 +787,4 @@ class driver_summary(tcfl.tc.report_driver_c):
                         "History", "Testcase name", tc_name,
                         **{ self._id_maybe_encode(runid, max_len = 63): result })
                 except mariadb.Error as e:
-                    logging.error(f"History: {tc_name}:{hashid}: MariaDB error: {e}")
+                    logging.error(f"History: {tc_name}:{hashid}: MariaDB error: {str(e)}")
