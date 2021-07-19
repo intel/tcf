@@ -277,19 +277,87 @@ def cmdline_log_options(parser):
                         help = "Print Date and time in the logs")
 
 
-def kws_expand(s: str, kws: dict):
+def kws_expand(s: str, kws: dict, nest_limit: int = 5):
+    """
+    Expand a template string with a dictionary
+
+    This is a version of *s % kws* that works recursively and supports
+    templates in the keys too.
+
+    Eg:
+
+    >>> kws_expand('a simple %(field)s substitution', dict(field = "field"))
+    'a simple field substitution'
+
+    >>> kws_expand('a nested %(nested_field)s substitution',
+    ...            dict(nested_field = "field", field = 'nested field'))
+    'a nested field substitution'
+
+    >>> kws_expand('a key %(nested_%(key)s_field)s substitution',
+    ...            dict(nested_key_field = "%(field)s", field = 'nested field', key = "key"))
+    'a key nested field substitution'
+
+    :param str s: templated string to expand; if it contains no
+      *%(FIELD)* templates, it won't be templated.
+
+      To include a *%(* chacter sequence that is not expanded, you
+      need to double the percentage sign as in *%%(*, understanding
+      that for every level of nested templating done you will need to
+      double them.
+
+    :param dict kws: Dictionary keyed by strings of values to
+      template.
+
+    :param int nest_limit: (optional; default 5) how many iterations
+      are done when trying to expand all templates before giving up.
+
+    :raises KeyError: if a template field is not available
+
+      To have missing fields expanded with a default value, pass a
+      argument to *kws* a :class:`commonl.dict_missing_c`, a
+      dictionary that returns pre-defined strings for missing keys.
+
+    :raises RecursionError: if the nest limit is exceeded
+
+    :return str: string with the template fields expanded
+    """
     assert isinstance(s, str), \
         f"s: expected str; got {type(s)}"
-    assert kws == None or isinstance(kws, dict), \
-        f"kws: expected dict/None; got {type(kws)}"
-    try:
-        if '%(' in s and kws != None:
-            return s % kws
+    if kws != None:
+        assert_dict_key_strings(kws, 'kws')
+    assert isinstance(nest_limit, int) and nest_limit >= 1, \
+        f"nest_limit: expected int <= 1; got {type(nest_limit)} {nest_limit}"
+
+    if not kws:		# nothing to template
         return s
-    except KeyError as e:
-        raise ValueError(
-            f"configuration error? missing field '{str(e)}' from "
-            f"template string '{s}'") from e
+
+    # template until there are no %( or we are 86ed
+    _s = s
+    for _count in range(nest_limit+1):
+        try:
+            if '%(' not in _s:
+                break
+            _s = _s % kws
+        except KeyError as e:
+            # missing key?
+            key = e.args[0]
+            if '%(' in key:
+                # this is a templated key, eg someone did:
+                #
+                # >>> "this string %(field1.%(field2)s.whatever)s ..."
+                #
+                # so first make "this string %(field1.VALUE2.whatever)s"
+                # and then "this string VALUE3"
+                _s = _s.replace(key, key % kws)
+                continue
+            raise KeyError(
+                f"configuration error? missing field '{key}' in "
+                f"template string '{s}'") from e
+    else:
+        raise RecursionError(
+            f"configuration error? nest limit is {nest_limit} and"
+            f" templates not all resolved for template '{s}'")
+    return _s
 
 
 def mkid(something, l = 10):
