@@ -756,10 +756,15 @@ class generic_stream(impl_c):
                  wait_to_kill = 2,
                  use_signal = signal.SIGINT, kws = None):
         assert isinstance(name, str_type)
-        assert isinstance(cmdline, str_type)
         assert wait_to_kill > 0
         self.name = name
-        self.cmdline = cmdline.split()
+        if isinstance(cmdline, str):
+            self.cmdline = cmdline.split()
+            cmdline_s = cmdline
+        else:
+            commonl.assert_list_of_strings(cmdline, "commandline", "commands")
+            self.cmdline = cmdline
+            cmdline_s = ''.join(cmdline)
         self.wait_to_kill = wait_to_kill
         self.extension = extension
         self.use_signal = use_signal
