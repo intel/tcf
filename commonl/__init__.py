@@ -2732,7 +2732,7 @@ def rpyc_connection(hostname = None, port = None,
     return connection
 
 
-def rpyc_compress_dnload_file(remote_name, local_name = None):
+def rpyc_compress_dnload_file(remote, remote_name, local_name = None):
     try:
         # fake lazy import
         import rpyc.utils.classic
