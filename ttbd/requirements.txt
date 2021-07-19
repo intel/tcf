@@ -17,6 +17,7 @@
 # package: qemu centos=qemu-kvm
 # package: socat
 # package: sshpass
+# package: tcpdump
 # package: fedora,ubuntu=v4l-utils
 
 blinker         # package: python3-blinker
@@ -29,6 +30,7 @@ pexpect         # package: python3-pexpect
 ply             # package: python3-ply
 pyOpenSSL       # package: centos,fedora=python3-pyOpenSSL ubuntu=python3-openssl
 python-prctl    # package: ubuntu=python3-prctl
+pyroute2        # package: python3-pyroute2
 pyserial        # package: centos,fedora=python3-pyserial ubuntu=python3-serial
 pysnmp          # package: centos,fedora=python3-pysnmp ubuntu=python3-pysnmp4
 python_ldap     # package: centos,fedora=python3-ldap

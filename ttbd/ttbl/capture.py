@@ -857,3 +857,183 @@ INFO: stream_file: %(_impl.stream_filename)s
                                   wait_to_kill = self.wait_to_kill,
                                   use_signal = self.use_signal)
         target.log.info("%s: generic streaming stopped", capturer)
+
+
+class tcpdump_c(generic_stream):
+    """
+    Capture network traffic
+
+    Examples:
+
+    >>> target.interface_add(
+    >>>     "capture", ttbl.capture.interface(
+    >>>        c0 = ttbl.capture.tcpdump_c(netif, macaddr = "01:02:03:04:05:06"),
+    >>>     )
+    >>> )
+
+    or for all traffic a SUT generates on a network *nut0* it is
+    connected to
+
+    >>> target.interface_impl_add("capture", "nw-nut0",
+    >>>      ttbl.capture.tcpdump_c("eno1", ic_name = "nut0"))
+
+    all broadcast traffic
+
+    >>> target.interface_impl_add("capture", "nw-all",
+    >>>      ttbl.capture.tcpdump_c("any", macaddr = "ff:ff:ff:ff:ff:ff"))
+
+
+    :params str netif: network interface in the server where to
+      capture from (will only be resolved when it starts capturing)
+
+      The network interface name can be found with the following code:
+
+      >>> local_ifaces = pyroute2.IPDB()
+      >>> this_host = socket.getfqdn()
+      >>> this_host_ip_addr = socket.gethostbyname(this_host)
+      >>> netif = None
+      >>> for _, data in local_ifaces.interfaces.items():
+      >>>     for ipaddr, netmask in data['ipaddr']:
+      >>>         if ipaddr == this_host_ip_addr:
+      >>>             netif = data['ifname']
+      >>>             break
+      >>>     if netif != None:
+      >>>         break
+      >>> else:
+      >>>     raise ValueError("can't find this hosts' interface")
+
+      In general, this works as is, but it might tweaking if the hosts
+      has multiple interfaces.
+
+      Note that for this driver to be able to capture data, the
+      network interface has to be connected to a network which has
+      visibilit over the SUT's traffic.
+
+    :param str macaddr: (optional) SUT's MAC address.
+
+      If not specified, *ic_name* has to be specified, so the system
+      can find which is the MAC to listen from.
+
+      the MAC address can be templated, for example:
+
+      >>> macaddr = "%(interconnects.%(id)s-nw.mac_addr)s"
+
+      would be interpreted as a template that expands to first:
+
+      - interconnects.TARGETID-nw.mac_addr
+      - the actual macaddress
+
+      This method uses :func:`commonl.kws_expand` and
+      :meth:`ttbl.test.target.kws_collect` allows to extract the
+      information directly from the inventory even during runtime and
+      avoid duplications.
+
+    :param str ic_name: (optional) name of the interconnect to which
+      the target is connected that.
+
+      This can be left unspecified if there is only one interconnect
+
+      *%(FIELD)s* are substituted agains the target's keywords. Eg:
+
+      >>> ic_name = "%(id)s-nw"
+
+      would be replaced for a target called *NAME* to *NAME-nw*.
+
+    :param bool flush: (optional; default *True*) flush packets to
+      disk as they arrive; this might be too hard when capturing high
+      bandwidth, thus it can be disabled. However, before stopping
+      capture
+
+    :param list(str) extra_tcpdump_args: (optional; default *None*)
+      list of extra command line options to send to TCPDUMP; these can
+      be templated with all the target keywords. EG:
+
+      >>> extra_tcpdump_args = [ "--immediate-mode" ]
+
+    Other arguments as to :class:`generic_capture`, most notably:
+
+    - *wait_to_kill* which is made to default to *3* with *flush*
+      enabled, *6* otherwise.
+    """
+    def __init__(self, netif: str, ic_name: str = None,
+                 macaddr: str = None, flush: bool = True,
+                 extra_tcpdump_args = None,
+                 **kwargs):
+        assert isinstance(netif, str)
+        assert ic_name == None or isinstance(ic_name, str)
+        assert macaddr == None or isinstance(macaddr, str)
+        assert isinstance(flush, bool)
+        commonl.assert_none_or_list_of_strings(
+            extra_tcpdump_args, "extra_tcpdump_args", "tcpdump args")
+
+        cmdline = [ "stdbuf", "-e0", "-o0", "tcpdump",  "-i", netif ]
+        if flush:
+            # normally, we flush each packet
+            cmdline.append("-U")
+        if macaddr != "":
+            cmdline.append("ether host %(_impl.macaddr)s")
+        cmdline += [ "-w", "%(_impl.stream_filename)s" ]
+        if extra_tcpdump_args:
+            cmdline += extra_tcpdump_args
+        if flush:
+            kwargs.setdefault('wait_to_kill', 3)
+        else:
+            kwargs.setdefault('wait_to_kill', 6)
+        generic_stream.__init__(
+            self,
+            "tcpdump:{netif}",
+            cmdline,
+            mimetype = "application/vnd.tcpdump.pcap",
+            extension = ".pcap",
+            # give plenty of time to flush
+            use_signal = signal.SIGTERM,
+            wait_to_kill = 5,
+        )
+        self.ic_name = ic_name
+        self.macaddr = macaddr
+        self.upid_set(
+            f"Network traffic capture @{netif}",
+            ic_name = ic_name,
+            macaddr = macaddr,
+            netif = netif)
+
+
+    def start(self, target, capturer, path):
+        if self.macaddr != None:	# got a MAC address! use it
+            macaddr = self.macaddr
+        else:				# got to extract the MAC address
+            # no interconnect given, let's take the ONLY one there should be
+            interconnects = target.tags['interconnects']
+            if self.ic_name == None:
+                if len(interconnects) > 1:
+                    raise RuntimeError(
+                        f"CONFIG BUG: {target.id} declares {len(interconnects)}"
+                        f" interconnects but tcpdump capturer wasn't configured "
+                        f" to select which one to capture from")
+                ic_name = list(interconnects.keys())[0]
+                macaddr = target.tags['interconnects'][ic_name]['mac_addr']
+            elif '%(' in self.ic_name:
+                # we have a templated interconnect name
+                # this will be expanded by generic_stream.start()
+                # might be sth like interconnects.%(FIELD)s-%(FIELD2)s.mac_addr
+                macaddr = f'interconnects.{self.ic_name}.mac_addr'
+            else:
+                # we have a fixed interconnect name
+                if self.ic_name not in interconnects:
+                    raise RuntimeError(
+                        f"capture/{capturer}: CONFIG BUG: tcpdump_c"
+                        f" configured to use interconnect "
+                        f" '{self.ic_name}';"
+                        f" target {target.id} is not connected to it")
+                macaddr = target.tags['interconnects'][self.ic_name]['mac_addr']
+
+        # set this for generic_stream.start() -> note this will be
+        # available in templates as _impl.macaddr
+        self.kws['macaddr'] = macaddr
+        # this matches what generic_stream.start() will do
+        stream_filename = os.path.join(path, f"{capturer}{self.extension}")
+        commonl.rm_f(stream_filename)
+        r = generic_stream.start(self, target, capturer, path)
+        commonl.verify_timeout(f"{target.id}/capture/{capturer}:tcpdump", 5,
+                               os.path.isfile, stream_filename)
+        return r
