@@ -827,8 +827,14 @@ INFO: stream_file: %(_impl.stream_filename)s
                 logf.flush()
                 p = subprocess.Popen(
                     cmdline, cwd = "/tmp", shell = False, close_fds = True,
-                    stdout = logf, stderr = subprocess.STDOUT)
+                    stdout = logf, stderr = subprocess.STDOUT
+                )
                 target.log.info("%s: generic streaming started" % capturer)
+                time.sleep(1)    # let it settle or fail
+                if p.poll() != None:
+                    logf.close()
+                    return False, { "log": log_filename }
+
             except subprocess.CalledProcessError as e:
                 target.log.error(
                     "%s: capturing of '%s' with '%s' failed: (%d) %s" % (
@@ -841,9 +847,7 @@ INFO: stream_file: %(_impl.stream_filename)s
             pidf.write("%s" % p.pid)
         ttbl.daemon_pid_add(p.pid)
 
-        # report we rare no streaming (snapshot!) and the streams
-        # provided in the capture/ directory
-        return False, { "default": stream_filename, "log": log_filename }
+        return True, { "default": stream_filename, "log": log_filename }
 
 
     def stop(self, target, capturer, path):
