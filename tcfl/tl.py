@@ -1095,7 +1095,7 @@ def linux_network_ssh_setup(ic, target):
 # - add to target: tcfl.tc.target_c, component: str
 def rpyc_connect(target, component: str,
                  cert_name: str = "default",
-                 iface_name = "power"):
+                 iface_name = "power", sync_timeout = 60):
     """Connect to an RPYC component exposed by the target
 
     :param tcfl.tc.target_c target: target which exposes the RPYC
@@ -1125,6 +1125,22 @@ def rpyc_connect(target, component: str,
       interface which exposes the component. In most cases it is the
       power interface, but it could be associated to any.
 
+
+    :param int sync_timeout: (optional; default *60* seconds) timeout
+      for calls to remote functions to return. Increase when running
+      longer functions, although this will incur a longter time to
+      detect network drops.
+
+      As well, it can be done temporarily as:
+
+      >>> remote = tcfl.tl.rpyc_connect(...)
+      >>> ...
+      >>> timeout_orig = remote._config['sync_request_timeout']
+      >>> try:
+      >>>     remote._config['sync_request_timeout'] = 30 * 60 # 30min
+      >>>     ... run long remote operation...
+      >>> finally:
+      >>>     remote._config['sync_request_timeout'] = timeout_orig
     """
     # FIXME: assert isinstance(target, tcfl.tc.target_c)
     assert isinstance(component, str)
@@ -1144,7 +1160,11 @@ def rpyc_connect(target, component: str,
         client_key_path = os.path.join(target.tmpdir, "client." + cert_name + ".key")
         client_cert_path = os.path.join(target.tmpdir, "client." + cert_name + ".cert")
 
-        if not os.path.isfile(client_key_path) or not os.path.isfile(client_cert_path):
+        # FIXME: this needs to be smarter -- it needs to re-download
+        # if the allocid is different; now it is causing way too many
+        # issues when there are files left around (eg: reusing tmp).
+        if True or not os.path.isfile(client_key_path) or not os.path.isfile(client_cert_path):
+            # if we have the certificates int
             r = target.certs.get(cert_name)
             with open(client_key_path, "w") as keyf:
                 keyf.write(r['key'])
@@ -1154,6 +1174,8 @@ def rpyc_connect(target, component: str,
         target.report_info(
             f"rpyc: SSL-connecting (cert '{cert_name}') to '{component}' on"
             f" {target.rtb.parsed_url.hostname}:{rpyc_port}", dlevel = 3)
+        target.report_info(
+            f"rpyc: using key/cert path {client_key_path}'", dlevel = 4)
         remote = rpyc.utils.classic.ssl_connect(
             target.rtb.parsed_url.hostname,
             port = rpyc_port,
@@ -1175,4 +1197,8 @@ def rpyc_connect(target, component: str,
             f"rpyc: connected to '{component}' on"
             f" {target.rtb.parsed_url.hostname}:{rpyc_port}", dlevel = 2)
 
+    if sync_timeout:
+        assert isinstance(sync_timeout, int) and sync_timeout > 0, \
+            "sync_timeout: expected positive number of seconds; got {sync_timeout}"
+        remote._config['sync_request_timeout'] = sync_timeout
     return remote
