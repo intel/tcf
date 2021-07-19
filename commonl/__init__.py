@@ -840,6 +840,60 @@ def _pid_grok(pid):
     else:
         assert True, "don't know how to convert %s to a PID" % pid
 
+
+def verify_timeout(what:str, timeout: float,
+                   verify_f: callable, *verify_args,
+                   poll_period: float = 0.25, log = logging,
+                   **verify_kwargs):
+    """
+    Verify a condition is met before a certain timeout
+
+    :param str what: short description of what is being verified
+
+    :param float timeout: how long to wait for; has to be at least
+      twice the poll period.
+
+    :param callable verify_f: function to call to verify; must return
+      something that evaluates to boolean *True* when ok, otherwise it
+      is considered not ok.
+
+    :param float poll_period: (optional, default 0.25s) period on
+      which to call the verification function
+
+    :param log: logger to use to report messages with INFO level.
+
+    Any other arguments (*\*args* and *\*\*kwargs*) are passed to the
+    verification function.
+    """
+    assert isinstance(what, str), \
+        f"what: expected a description string; got {type(what)}"
+    assert isinstance(timeout, numbers.Real) and timeout > 0, \
+        f"timeout: expected a positive number; got {type(timeout)}"
+    assert callable(verify_f), \
+        f"verify_f: expected a callable; got {type(verify_f)}"
+    assert isinstance(poll_period, numbers.Real) and poll_period > 0, \
+        f"poll_period: expected a positive number; got {type(poll_period)}"
+    assert poll_period < timeout/2, \
+        f"poll_period: expected a lower than half the timeout"
+    assert hasattr(log, "info"), \
+        f"log: expected logging object; got {type(log)}"
+
+    t0 = t = time.time()
+    while True:
+        if t - t0 > timeout:
+            log.info(
+                f"{what}: verifying with {verify_f} timed out at"
+                f" +{t-t0:.1f}/{timeout}s")
+            raise TimeoutError(f"{what}: timedout at +{t-t0:.1f}/{timeout}s")
+        if verify_f(*verify_args, **verify_kwargs):
+            log.info(
+                f"{what}: verified with {verify_f} at +{t-t0:.1f}/{timeout}s")
+            return
+        time.sleep(poll_period)		# Give it .1s to come up
+        t = time.time()
+    assert()
+
+
 def process_alive(pidfile, path = None):
     """
     Return if a process path/PID combination is alive from the
