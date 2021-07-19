@@ -626,35 +626,35 @@ class generic_snapshot(impl_c):
     def start(self, target, capturer, path):
         stream_filename = capturer + self.extension
         log_filename = capturer + ".log"
-        kws = dict(
-            output_file_name = os.path.join(path, stream_filename),# LEGACY
-            stream_filename = os.path.join(path, stream_filename),
-            log_filename = os.path.join(path, log_filename),
-            capturer = capturer,
-            timestamp = str(datetime.datetime.utcnow())
-        )
-        kws.update(target.kws)
-        kws.update(target.fsdb.get_as_dict())
-        with open(kws['log_filename'], "w+") as logf:
-            logf.write("""\
-INFO: ttbd running generic_snaphost capture for '%(capturer)s' at %(timestamp)s
-INFO: log_file (this file): %(log_filename)s
-INFO: stream_file: %(stream_filename)s
-""" % kws)
+
+        kws = target.kws_collect(self)
+        kws['output_file_name'] = os.path.join(path, stream_filename)	# LEGACY
+        kws['stream_filename'] = os.path.join(path, stream_filename)	# LEGACY
+        kws['_impl.stream_filename'] = os.path.join(path, stream_filename)
+        kws['_impl.log_filename'] = os.path.join(path, log_filename)
+        kws['_impl.capturer'] = capturer
+        kws['_impl.timestamp'] = str(datetime.datetime.utcnow())
+
+        with open(kws['_impl.log_filename'], "w+") as logf:
+            logf.write(commonl.kws_expand("""\
+INFO: ttbd running generic_snaphost capture for '%(_impl.capturer)s' at %(_impl.timestamp)s
+INFO: log_file (this file): %(_impl.log_filename)s
+INFO: stream_file: %(_impl.stream_filename)s
+""", kws))
             try:
                 for command in self.pre_commands:
                     # yup, run with shell -- this is not a user level
                     # command, the configurator has full control
-                    logf.write("INFO: calling pre-command: %s\n"
-                               % (command % kws))
+                    pre_command = commonl.kws_expand(command, kws)
+                    logf.write("INFO: calling pre-command: %s\n" % pre_command)
                     logf.flush()
                     subprocess.check_call(
-                        command % kws,
+                        pre_command,
                         shell = True, close_fds = True, cwd = "/tmp",
                         stdout = logf, stderr = subprocess.STDOUT)
                 cmdline = []
                 for i in self.cmdline:
-                    cmdline.append(i % kws)
+                    cmdline.append(commonl.kws_expand(i, kws))
                 target.log.info("%s: snapshot command: %s" % (
                     capturer, " ".join(cmdline)))
                 logf.write("INFO: calling commandline: %s\n"
@@ -667,7 +667,7 @@ INFO: stream_file: %(stream_filename)s
             except subprocess.CalledProcessError as e:
                 target.log.error(
                     "%s: capturing of '%s' with '%s' failed: (%d) %s" % (
-                        capturer, self.name % kws, " ".join(e.cmd),
+                        capturer, self.name, " ".join(e.cmd),
                         e.returncode, e.output))
                 logf.write("ERROR: capture failed\n")
                 raise
@@ -754,7 +754,7 @@ class generic_stream(impl_c):
                  extension = "",
                  pre_commands = None,
                  wait_to_kill = 2,
-                 use_signal = signal.SIGINT):
+                 use_signal = signal.SIGINT, kws = None):
         assert isinstance(name, str_type)
         assert isinstance(cmdline, str_type)
         assert wait_to_kill > 0
@@ -773,41 +773,48 @@ class generic_stream(impl_c):
         impl_c.__init__(self, False, mimetype, log = 'text/plain')
         # we make the cmdline be the unique physical identifier, since
         # it is like a different implementation each
-        self.upid_set(name, serial_number = commonl.mkid(cmdline))
+        self.upid_set(name, serial_number = commonl.mkid(cmdline_s))
+        if kws == None:
+            self.kws = {}
+        else:
+            commonl.assert_dict_key_strings(kws, "key")
+            self.kws = dict(kws)
+
 
     def start(self, target, capturer, path):
+        commonl.makedirs_p(path)
         stream_filename = "%s%s" % (capturer, self.extension)
         log_filename = "%s.log" % capturer
         pidfile = "%s/capture-%s.pid" % (target.state_dir, capturer)
-        kws = dict(
-            output_file_name = os.path.join(path, stream_filename),# LEGACY
-            stream_filename = os.path.join(path, stream_filename),
-            log_filename = os.path.join(path, log_filename),
-            capturer = capturer,
-            timestamp = str(datetime.datetime.utcnow())
-        )
-        kws.update(target.kws)
-        kws.update(target.fsdb.get_as_dict())
-        with open(kws['log_filename'], "w+") as logf:
-            logf.write("""\
-INFO: ttbd running generic_stream capture for '%(capturer)s' at %(timestamp)s
-INFO: log_file (this file): %(log_filename)s
-INFO: stream_file: %(stream_filename)s
-""" % kws)
+
+        kws = target.kws_collect(self)
+        kws['output_file_name'] = os.path.join(path, stream_filename)	# LEGACY
+        kws['stream_filename'] = os.path.join(path, stream_filename)	# LEGACY
+        kws['_impl.stream_filename'] = os.path.join(path, stream_filename)
+        kws['_impl.log_filename'] = os.path.join(path, log_filename)
+        kws['_impl.capturer'] = capturer
+        kws['_impl.timestamp'] = str(datetime.datetime.utcnow())
+
+        with open(kws['_impl.log_filename'], "w+") as logf:
+            logf.write(commonl.kws_expand("""\
+INFO: ttbd running generic_stream capture for '%(_impl.capturer)s' at %(_impl.timestamp)s
+INFO: log_file (this file): %(_impl.log_filename)s
+INFO: stream_file: %(_impl.stream_filename)s
+""", kws))
             try:
                 for command in self.pre_commands:
                     # yup, run with shell -- this is not a user level
                     # command, the configurator has full control
-                    logf.write("INFO: calling pre-command: %s\n"
-                               % (command % kws))
+                    pre_command = commonl.kws_expand(command, kws)
+                    logf.write("INFO: calling pre-command: %s\n" % pre_command)
                     logf.flush()
                     subprocess.check_call(
-                        command % kws,
+                        pre_command,
                         shell = True, close_fds = True, cwd = "/tmp",
                         stdout = logf, stderr = subprocess.STDOUT)
                 cmdline = []
                 for i in self.cmdline:
-                    cmdline.append(i % kws)
+                    cmdline.append(commonl.kws_expand(i, kws))
                 target.log.info("%s: stream command: %s" % (
                     capturer, " ".join(cmdline)))
                 logf.write("INFO: calling commandline: %s\n"
@@ -820,7 +827,7 @@ INFO: stream_file: %(stream_filename)s
             except subprocess.CalledProcessError as e:
                 target.log.error(
                     "%s: capturing of '%s' with '%s' failed: (%d) %s" % (
-                        capturer, self.name % kws, " ".join(e.cmd),
+                        capturer, self.name, " ".join(e.cmd),
                         e.returncode, e.output))
                 logf.write("ERROR: capture failed\n")
                 raise
