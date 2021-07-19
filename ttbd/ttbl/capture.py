@@ -416,6 +416,7 @@ class interface(ttbl.tt_interface):
 
         capture_path = self._capture_path(target)
         with target.target_owned_and_locked(who):
+            target.timestamp()
             if not impl.snapshot:
                 capturing = target.property_get(
                     "interfaces.capture.%s.capturing" % capturer, False)
@@ -458,6 +459,7 @@ class interface(ttbl.tt_interface):
     def put_stop(self, target, who, args, _files, _user_path):
         impl, capturer = self.arg_impl_get(args, "capturer")
         with target.target_owned_and_locked(who):
+            target.timestamp()
             if impl.snapshot:
                 return {}
             capturing = target.property_get(
