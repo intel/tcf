@@ -161,9 +161,13 @@ if sys.version_info.major > 2:
 else:
     str_type = basestring
 
+# mimetypes are NAME/NAME
+# NAME can be alphanumeric, dots and underscore
+# Multiple mimetypes are thus NAME/NAME,NAME/NAME...
+
 mime_type_regex = re.compile(
-    "^([_a-zA-Z0-9]+/[_a-zA-Z0-9]+)"
-    "(,[_a-zA-Z0-9]+/[_a-zA-Z0-9]+)*$")
+    r"^([_\.a-zA-Z0-9]+/[_\.a-zA-Z0-9]+)"
+    r"(,[_\.a-zA-Z0-9]+/[_\.a-zA-Z0-9]+)*$")
 
 class impl_c(ttbl.tt_interface_impl_c):
     """
