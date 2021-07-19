@@ -702,6 +702,13 @@ class tt_interface_impl_c(object):
         #: Unique ID for this instrument/device -- this gets filled in
         #: by the daemon upon initialization
         self.upid_index = None
+        #: base keywords for templaing for this implementation; see
+        #: :meth:`ttbl.test_target.kws_figure`
+        #:
+        #: Each of this NAME keys will be available in fields called
+        #: _impl.NAME for templating.
+        self.kws = None
+
 
     def upid_set(self, name_long, **kwargs):
         """
@@ -1220,17 +1227,16 @@ class tt_interface(object):
 
 
     @staticmethod
-    def instrument_mkindex(name, upid, kws):
-        if name:
-            name = name % kws
-            index = commonl.mkid(name + pprint.pformat(upid), l = 4)
-        else:
-            index = commonl.mkid(pprint.pformat(upid), l = 4)
+    def instrument_mkindex(name, upid):
+        # we don't use the name to make the UPID, since we might have
+        # multiple components with different name using the same HW
+        # instrument
+        index = commonl.mkid(pprint.pformat(upid), l = 4)
         return name, index
 
     def instrumentation_publish_component(
             self, target, iface_name,
-            index, instrument_name, upid, components = None, kws = None):
+            index, instrument_name, upid, components = None):
         """
         Publish in the target's inventory information about the
         instrumentations that implements the functionalities of the
@@ -1238,13 +1244,9 @@ class tt_interface(object):
         """
 
         assert components == None or isinstance(components, list)
-        if kws == None:
-            kws = commonl.dict_missing_c({}, "n/a")
-            kws.update(target.kws)
-            kws.update(target.fsdb.get_as_dict())
         if index == None:
             instrument_name, index = \
-                self.instrument_mkindex(instrument_name, upid, kws)
+                self.instrument_mkindex(instrument_name, upid)
         prefix = "instrumentation." + index
         target.property_set(prefix + ".name", instrument_name)
         for key, val in upid.items():
@@ -1253,7 +1255,7 @@ class tt_interface(object):
                 if isinstance(val, str):
                     # if it is a string, it is a template
                     try:
-                        target.property_set(prefix + "." + key, val % kws)
+                        target.property_set(prefix + "." + key, val)
                     except ( ValueError, TypeError ) as e:
                         # don't use target.log --> not fully
                         # initialized yet
@@ -1282,15 +1284,12 @@ class tt_interface(object):
         components_by_index = collections.defaultdict(list)
         name_by_index = {}
         upid_by_index = {}
-        kws = commonl.dict_missing_c({}, "n/a")
-        kws.update(target.kws)
-        kws.update(target.fsdb.get_as_dict())
         for component in list(self.impls.keys()):
             # validate image types (from the keys) are valid from
             # the components and aliases
             impl, _ = self.impl_get_by_name(component, "component")
             instrument_name, index = \
-                self.instrument_mkindex(impl.name, impl.upid, kws)
+                self.instrument_mkindex(impl.name, impl.upid)
             tags_interface[component] = {
                 "instrument": index
             }
@@ -1305,8 +1304,7 @@ class tt_interface(object):
             self.instrumentation_publish_component(
                 target, iface_name, index,
                 name_by_index.get(index, None), upid_by_index[index],
-                components,
-                kws = kws)
+                components)
         target.tags['interfaces'][iface_name] = tags_interface
 
 
@@ -1446,6 +1444,11 @@ class test_target(object):
         #: messages. Target's tags are translated to keywords
         #: here. :func:`ttbl.config.target_add` will update this with
         #: the final list of tags.
+        #:
+        #: See :meth:`ttbl.test_target.kws_collect` for a unified
+        #: function to make this into a dictionary of keywords that
+        #: can be used in different environments (mostly drivers) to
+        #: expand configuration templates.
         self.kws = {}
 
         #: Functions to call when the target is allocated
@@ -1623,6 +1626,42 @@ class test_target(object):
         if commonl.field_needed('_alloc.timestamp', projections):
             r.setdefault('_alloc', {})['timestamp'] = self.timestamp_get()
         return r
+
+
+    def kws_collect(self, impl = None, kws = None):
+        """
+        Create/update a key/value dictionary with the target's
+        tags/inventory and optionally information from the
+        implementations UPID and keywords.
+
+        This dictionary can be used for templating with
+        :func:`commonl.kws_expand`
+
+        :param dict kws: (optional; default created)
+          commonl.dict_missing_c({}, "n/a")
+
+        :returns dict: flat key dictionary
+        """
+        assert impl == None or isinstance(impl, tt_interface_impl_c)
+        assert kws == None or isinstance(kws, dict)
+
+        if kws == None:
+            kws = dict()
+        # see to_dict(), very similar
+        l = commonl.dict_to_flat(self.tags,
+                                 sort = False, empty_dict = True)
+        # fstb can overwrite tags, per policy
+        l += self.fsdb.get_as_slist()
+        kws.update(self.kws)
+        kws.update(l)
+        # now expand implementation's keywords with _upid. and _impl. prefixes
+        if impl:
+            for key, value in impl.upid.items():
+                kws["_upid." + key] = value
+        if impl and impl.kws:
+            for key, value in impl.kws.items():
+                kws["_impl." + key] = value
+        return kws
 
 
     @property
@@ -2324,6 +2363,15 @@ class test_target(object):
         iface._init_by_name(component, impl, aliases)
         iface._aliases_update(aliases)
         impl.target_setup(self, iface_name, component)
+
+        instrument_name, instrument_index = \
+            iface.instrument_mkindex(impl.name, impl.upid)
+
+        iface.instrumentation_publish_component(
+            self, iface_name,
+            instrument_index,
+            instrument_name,
+            impl.upid, [ component ])
 
 
     def fsdb_cleanup(self):
