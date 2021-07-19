@@ -1510,7 +1510,7 @@ class dict_missing_c(dict):
             return dict.__getitem__(self, key)
         if self.missing:
             return self.missing
-        return "%s_UNDEFINED_SYMBOL.%s" % (key, origin_fn_get(2, "."))
+        return "%s_UNDEFINED_TEMPLATE.%s" % (key, origin_fn_get(2, "."))
 
 def ipv4_len_to_netmask_ascii(length):
     return socket.inet_ntoa(struct.pack('>I', 0xffffffff ^ ((1 << (32 - length) ) - 1)))
