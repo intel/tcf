@@ -143,6 +143,17 @@ def _error_handler(error):
     r.status_code = error.code
     return r
 
+@app.errorhandler(413)
+def _file_larger_than_max_allowed(error):
+    message = {'_message': f'File larger than max size '
+               f'{ttbl.config.upload_max_size} allowed by server. Contact '
+               f'{ttbl.test_target.get("local").tags["support"]["owner"]} '
+               f'if a limit increase is needed'
+               }
+    r = flask.make_response(flask.jsonify(message))
+    r.status_code = error.code
+    return r
+
 @contextlib.contextmanager
 def log_to_str_too(logger, io):
     """
@@ -911,6 +922,7 @@ def _target_interface(target_id, interface, call):
                              exc_info = True)
     else:
         return flask.jsonify(result)
+
 
 def cleanup_files():
     for f in glob.iglob(ttbl.test_target.files_path + "/*/*"):
