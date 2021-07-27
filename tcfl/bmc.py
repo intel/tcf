@@ -431,9 +431,8 @@ def ipmitool_superuser_setup(target, uid, username, password,
                        " channels {','.join(channels}")
 
 
-def ipmitool_ipv4_static_setup(target, channel, ipaddr, netmask, gateway,
-                               mac_addr = None,
-                               bmc_id = 0):
+def ipmitool_ipv4_setup(target, channel, ipaddr, netmask, gateway,
+                        mac_addr = None, bmc_id = 0, dhcp = False):
     """
     Configure an IPMI network channel with static IPv4 with *ipmitool*
     via local access.
@@ -473,35 +472,50 @@ def ipmitool_ipv4_static_setup(target, channel, ipaddr, netmask, gateway,
     """
     assert isinstance(target, tcfl.tc.target_c)
     assert isinstance(channel, int) and channel >= 0
-    assert isinstance(ipaddr, str)
-    assert isinstance(netmask, str)
-    assert isinstance(gateway, str)
+    assert dhcp == None or isinstance(dhcp, bool)
+    if dhcp:
+        assert isinstance(ipaddr, str)
+        assert isinstance(netmask, str)
+        assert isinstance(gateway, str)
     assert isinstance(bmc_id, int) and bmc_id >= 0
     target.report_info(f"bmc{bmc_id}: configuring network channel {channel}")
-    target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} access off")
-    target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} ipsrc static")
-    if mac_addr:
-        target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} macaddr {mac_addr}")
-    target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} ipaddr {ipaddr}")
-    target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} netmask {netmask}")
-    # need to set this after the netmask, in some platforms it might
-    # get wiped
-    target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} defgw ipaddr {gateway}")
-    target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} access on")
-    target.report_pass(
-        f"bmc{bmc_id}: configured network channel {channel}"
-        f" to {ipaddr}/{netmask} via {gateway}"
-    )
+    if dhcp == None:
+        target.report_pass(
+            f"bmc{bmc_id}: not touching network config")
+    elif dhcp:
+        target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} access off")
+        target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} ipsrc dhcp")
+        target.report_pass(
+            f"bmc{bmc_id}: configured network channel {channel} to DHCP")
+        target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} access on")
+    else:
+        target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} access off")
+        target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} ipsrc static")
+        if mac_addr:
+            target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} macaddr {mac_addr}")
+        target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} ipaddr {ipaddr}")
+        target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} netmask {netmask}")
+        # need to set this after the netmask, in some platforms it might
+        # get wiped
+        target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} defgw ipaddr {gateway}")
+        target.report_pass(
+            f"bmc{bmc_id}: configured network channel {channel}"
+            f" to {ipaddr}/{netmask} via {gateway}"
+        )
+        target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} access on")
 
     # verify network settings
     output = target.shell.run(f"ipmitool lan print {channel}",
                               output = True, trim = True)
-    musthave = [
-        f'IP Address Source       : Static Address',
-        f'IP Address              : {ipaddr}',
-        f'Subnet Mask             : {netmask}',
-        f'Default Gateway IP      : {gateway}'
-    ]
+    if dhcp == False:
+        musthave = [
+            f'IP Address Source       : Static Address',
+            f'IP Address              : {ipaddr}',
+            f'Subnet Mask             : {netmask}',
+            f'Default Gateway IP      : {gateway}'
+        ]
+    else:
+        musthave = []
     if mac_addr:
         musthave.append(
             f'MAC Address             : {mac_addr.lower()}')
@@ -515,8 +529,14 @@ def ipmitool_ipv4_static_setup(target, channel, ipaddr, netmask, gateway,
         f"bmc{bmc_id}: configuration of network channel {channel} verified")
 
 
+def ipmitool_ipv4_static_setup(target, channel, ipaddr, netmask, gateway,
+                               mac_addr = None, bmc_id = 0):
+    return ipmitool_ipv4_setup(target, channel, ipaddr, netmask, gateway,
+                               mac_addr = mac_addr, bmc_id = 0, dhcp = False):
+
+
 def ipmitool_mc_reset(target, bmc_id = 0, reset_type = "cold",
-                      selector = None):
+                      reset_command = None, selector = None):
     """
     Rest an MC via *ipmitool* and wait for it to come back
 
@@ -546,6 +566,10 @@ def ipmitool_mc_reset(target, bmc_id = 0, reset_type = "cold",
           ipmitool -C 17 -H 192.168.1.2 -U username -P password -I lanplus mc reset cold
 
       allowing us to reset a remote BMC.
+
+    :param str reset_command: (optional) use this command to
+      *ipmitool* to reset the MC (instead of the default *mc reset
+      RESET_TYPE*
     """
     assert isinstance(target, tcfl.tc.target_c)
     assert isinstance(bmc_id, int) and bmc_id >= 0
@@ -555,7 +579,10 @@ def ipmitool_mc_reset(target, bmc_id = 0, reset_type = "cold",
     if selector == None:
         selector = f"-d {bmc_id}"
 
-    target.shell.run(f"ipmitool {selector} mc reset {reset_type}")
+    if reset_command:
+        target.shell.run(f"ipmitool {selector} {reset_command}")
+    else:
+        target.shell.run(f"ipmitool {selector} mc reset {reset_type}")
     wait_period = 20
     target.report_info(f"bmc{bmc_id}: waiting {wait_period}s for controller to reset")
     time.sleep(wait_period)
@@ -591,7 +618,7 @@ def ipmitool_mc_reset(target, bmc_id = 0, reset_type = "cold",
                               f" cold reset after {wait_period * count}s")
 
 
-def setup_ipmitool(target, bmc_id, bmc_name, bmc_data):
+def setup_ipmitool(target, bmc_id, bmc_name, bmc_data, dhcp = False):
     """
     Setup a **local** BMC using *ipmitool* with information from the
     inventory.
@@ -689,11 +716,18 @@ def setup_ipmitool(target, bmc_id, bmc_name, bmc_data):
                                  data['password'], channels, bmc_id = bmc_id)
 
     for network, data in networks.items():
-        ipmitool_ipv4_static_setup(
-            target, data['channel'],
-            data['ipv4_addr'], data['ipv4_netmask'], data['ipv4_gateway'],
-            mac_addr = data.get('mac_addr', None),
-            bmc_id = bmc_id)
+        if dhcp == True or dhcp == None:
+            ipmitool_ipv4_setup(
+                target, data['channel'],
+                None, None, None,
+                mac_addr = data.get('mac_addr', None),
+                bmc_id = bmc_id, dhcp = dhcp)
+        else:
+            ipmitool_ipv4_setup(
+                target, data['channel'],
+                data['ipv4_addr'], data['ipv4_netmask'], data['ipv4_gateway'],
+                mac_addr = data.get('mac_addr', None),
+                bmc_id = bmc_id,  dhcp = False)
 
 
 def discover_ipmitool(target, bmc_id, selector, update_inventory = False):
@@ -760,7 +794,7 @@ def discover_ipmitool(target, bmc_id, selector, update_inventory = False):
     target.property_set(f"bmcs.{bmc_name}.id", bmc_id)
     # this dictionary is just single level
     d = {}
-    for key, value in mc_data.items():
+    for key, value in tcfl.inventory_keys_fix(mc_data).items():
         # inventory supports only escalars or dicts, so lists are
         # dicts of bools
         if isinstance(value, list):
@@ -768,7 +802,8 @@ def discover_ipmitool(target, bmc_id, selector, update_inventory = False):
                 d[f"bmcs.{bmc_name}.mc.{key}.{i}"] = True
         else:
             d[f"bmcs.{bmc_name}.mc.{key}"] = value
-    for key, value in commonl.dict_to_flat(fru_data["FRU Device Description"]):
+    for key, value in commonl.dict_to_flat(
+            tcfl.inventory_keys_fix(fru_data["FRU Device Description"])):
         if isinstance(value, list):
             d[f"bmcs.{bmc_name}.fru." + key] = ":".join(value)
         else:
@@ -776,7 +811,7 @@ def discover_ipmitool(target, bmc_id, selector, update_inventory = False):
     # clean whatever is there now, re-populate it
     target.property_set(f"bmcs.{bmc_name}.mc", None)
     target.property_set(f"bmcs.{bmc_name}.fru", None)
-    target.properties_set(tcfl.inventory_keys_fix(d))
+    target.properties_set(d)
     target.report_pass(f"bmc{bmc_id}: updated inventory with MC and FRU information")
     return dict(mc = mc_data, fru = fru_data)
 
