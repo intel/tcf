@@ -728,6 +728,9 @@ class shell(tc.target_extension_c):
                     continue
             finally:
                 testcase.tls.echo_cmd = None
+
+        console_name = console if console else "default"
+        self.target.report_info(f"shell/{console_name}: sent command: {cmd}")
         if expect:
             if isinstance(expect, list):
                 for expectation in expect:
