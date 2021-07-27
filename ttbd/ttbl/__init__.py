@@ -681,6 +681,9 @@ class symlink_acquirer_c(acquirer_c):
 
 class tt_interface_impl_c(object):
     def __init__(self, name = None, **kwargs):
+        assert name == None or isinstance(name, str)
+        assert name == None or "%(" not in name, \
+            f"name: admits no templating; got '{name}'"
         self.name = name
         #: Unique Physical IDentification
         #:
