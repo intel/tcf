@@ -95,7 +95,12 @@ def _cmdline_logout(args):
     Logout user from all the servers
     """
     for rtb in ttb_client.rest_target_brokers.values():
-        rtb.logout(args.username)
+        try:
+            rtb.logout(args.username)
+        except ttb_client.requests.exceptions.HTTPError as e:
+            logging.warning("%s: can't logout: %s", str(rtb), str(e))
+            # in general, just ignore errors, server might be down, etc
+
 
 def _user_role(rtb, username, action, role):
     return rtb.send_request(
@@ -103,11 +108,26 @@ def _user_role(rtb, username, action, role):
 
 def _cmdline_role_gain(args):
     for rtb in ttb_client.rest_target_brokers.values():
-        _user_role(rtb, args.username, "gain", args.role)
+        try:
+            _user_role(rtb, args.username, "gain", args.role)
+        except ttb_client.requests.exceptions.HTTPError as e:
+            if e.status_code == 403:
+                # this means this role is not present in this server, which might be ok
+                logging.warning(
+                    "%s: not present in server %s", args.role, str(rtb))
+            # in general, just ignore errors, server might be down, etc
+
 
 def _cmdline_role_drop(args):
     for rtb in ttb_client.rest_target_brokers.values():
-        _user_role(rtb, args.username, "drop", args.role)
+        try:
+            _user_role(rtb, args.username, "drop", args.role)
+        except ttb_client.requests.exceptions.HTTPError as e:
+            if e.status_code == 403:
+                # this means this role is not present in this server, which might be ok
+                logging.warning(
+                    "%s: not present in server %s", args.role, str(rtb))
+            # in general, just ignore errors, server might be down, etc
 
 
 def _cmdline_servers(args):
