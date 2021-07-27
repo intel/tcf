@@ -1233,7 +1233,8 @@ class extension(tc.target_extension_c):
                 if interchunk_wait:
                     time.sleep(interchunk_wait)
         self.target.report_info("%s: wrote %dB (%s) to console"
-                                % (console, len(data), data_report))
+                                % (console, len(data), data_report),
+                                dlevel = 1)
 
     def capture_filename(self, console = None):
         """
