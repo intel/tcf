@@ -812,12 +812,6 @@ class reporter_c(object):
 
         :param str subcase: (optional, default *None*) report this
           message as coming from a subcase
-          the attachments to this message relative to level (normally
-          to the default level).
-
-          The attachments might contain a lot of extra data that in
-          some cases is not necessary unless more verbosity is
-          declared.
 
         :param int level: (optional, default set by
           :class:`tcfl.msgid_c` context depth) verbosity level of this
@@ -1635,7 +1629,7 @@ class target_c(reporter_c):
         else:
             val = r
         self.report_info("read property '%s': '%s' [%s]"
-                         % (property_name, val, default), dlevel = 2)
+                         % (property_name, val, default), dlevel = 4)
         if val == None and default != None:
             return default
         return val
@@ -1650,7 +1644,7 @@ class target_c(reporter_c):
         if value:
             assert isinstance(value, (str, numbers.Integral, numbers.Real, bool))
         self.report_info("setting property '%s' to '%s'"
-                         % (property_name, value), dlevel = 3)
+                         % (property_name, value), dlevel = 4)
         data = { property_name: value }
         if self.ticket:
             data['ticket'] = self.ticket
