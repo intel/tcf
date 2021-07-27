@@ -2386,6 +2386,23 @@ def assert_dict_of_ints(d, d_name):
             "'%s' needs to be a dict of ints keyed by string;" \
             " for key '%s' got a value type '%s'" % (d_name, k, type(v))
 
+macaddr_regex = re.compile(
+    "(?P<n0>[0-9a-fA-F][0-9a-fA-F])"
+    ":(?P<n1>[0-9a-fA-F][0-9a-fA-F])"
+    ":(?P<n2>[0-9a-fA-F][0-9a-fA-F])"
+    ":(?P<n3>[0-9a-fA-F][0-9a-fA-F])"
+    ":(?P<n4>[0-9a-fA-F][0-9a-fA-F])"
+    ":(?P<n5>[0-9a-fA-F][0-9a-fA-F])",
+    re.IGNORECASE
+)
+
+
+def assert_macaddr(macaddr):
+    assert macaddr_regex.match(macaddr) != None, \
+        "invalid MAC address, has to match HH:HH:HH:HH:HH:HH," \
+        " H being a hex digit"
+
+
 def assert_none_or_dict_of_strings(d, d_name):
     if d == None:
         return
