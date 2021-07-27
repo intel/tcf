@@ -166,10 +166,14 @@ class extension(tc.target_extension_c):
         :param str component: (optional) name of component to
           power off, defaults to whole target's power rail
         """
-        assert component == None or isinstance(component, str)
+        if component != None:
+            assert isinstance(component, str)
+            component_s = f" component {component}"
+        else:
+            component_s = ""
         assert isinstance(explicit, bool)
         target = self.target
-        target.report_info("powering off", dlevel = 1)
+        target.report_info("powering off" + component_s, dlevel = 1)
         timeout = 60 + self._compute_duration(target, component, "off")
         if timeout > 120:            
             target.report_info(
@@ -178,7 +182,7 @@ class extension(tc.target_extension_c):
         target.ttbd_iface_call(
             "power", "off", component = component, explicit = explicit,
             timeout = timeout)
-        target.report_info("powered off")
+        target.report_info("powered off" + component_s)
 
 
     def on(self, component = None, explicit = False):
@@ -188,10 +192,14 @@ class extension(tc.target_extension_c):
         :param str component: (optional) name of component to
           power on, defaults to whole target's power rail
         """
-        assert component == None or isinstance(component, str)
+        if component != None:
+            assert isinstance(component, str)
+            component_s = f" component {component}"
+        else:
+            component_s = ""
         assert isinstance(explicit, bool)
         target = self.target
-        target.report_info("powering on", dlevel = 1)
+        target.report_info("powering on" + component_s, dlevel = 1)
         timeout = 60 + self._compute_duration(target, component, "on")
         if timeout > 120:            
             target.report_info(
@@ -202,7 +210,7 @@ class extension(tc.target_extension_c):
             "power", "on", component = component, explicit = explicit,
             # extra time, since power ops can take long
             timeout = timeout)
-        target.report_info("powered on")
+        target.report_info("powered on" + component_s)
         if hasattr(target, "console"):
             target.console._set_default()
 
@@ -216,10 +224,14 @@ class extension(tc.target_extension_c):
           power-cycle, defaults to whole target's power rail
         """
         assert wait == None or wait >= 0
-        assert component == None or isinstance(component, str)
+        if component != None:
+            assert isinstance(component, str)
+            component_s = f" component {component}"
+        else:
+            component_s = ""
         assert isinstance(explicit, bool)
         target = self.target
-        target.report_info("power cycling", dlevel = 1)
+        target.report_info("power cycling" + component_s, dlevel = 1)
         timeout = 60 \
             + self._compute_duration(target, component, "on") \
             + self._compute_duration(target, component, "off")
@@ -231,7 +243,7 @@ class extension(tc.target_extension_c):
             "power", "cycle",
             component = component, wait = wait, explicit = explicit,
             timeout = timeout)
-        target.report_info("power cycled")
+        target.report_info("power cycled" + component_s)
         if hasattr(target, "console"):
             target.console._set_default()
 
