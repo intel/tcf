@@ -895,6 +895,9 @@ def dialog_changes_not_saved_expect(target, action):
     submenu_header_expect(
         target, "Changes have not saved. Save Changes and exit",
         canary_end_menu_redrawn = None)
+    # if we send the action too soon, sometimes it gets hung...so
+    # let's be patient
+    time.sleep(0.5)
     target.console_tx(action)
 
 
