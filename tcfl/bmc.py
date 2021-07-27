@@ -532,7 +532,7 @@ def ipmitool_ipv4_setup(target, channel, ipaddr, netmask, gateway,
 def ipmitool_ipv4_static_setup(target, channel, ipaddr, netmask, gateway,
                                mac_addr = None, bmc_id = 0):
     return ipmitool_ipv4_setup(target, channel, ipaddr, netmask, gateway,
-                               mac_addr = mac_addr, bmc_id = 0, dhcp = False):
+                               mac_addr = mac_addr, bmc_id = 0, dhcp = False)
 
 
 def ipmitool_mc_reset(target, bmc_id = 0, reset_type = "cold",
