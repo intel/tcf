@@ -905,8 +905,10 @@ def _target_interface(target_id, interface, call):
             s = os.fstat(fd.fileno())
             if offset >= s.st_size:	# cap offset to max size so when...
                 offset = s.st_size	# ...we report it it goes right
-            if offset > 0:
+            if offset >= 0:
                 fd.seek(offset)
+            else:
+                fd.seek(offset, os.SEEK_END)
             response = flask.Response(fd, direct_passthrough = True)
             # attach a header indicating the offset; this allows the
             # client to calculate how big the stream is at precisely

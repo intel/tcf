@@ -44,12 +44,12 @@ class _test(tcfl.tc.tc_c):
             elif offset > 0:
                 of.seek(offset)
             elif offset < 0:
-                of.seek(-offset, 2)
+                of.seek(offset, os.SEEK_END)
             # we don't seek the read-file, since that has the offset already :)
             read_data = rf.read()
             original_data = of.read()
             if read_data != original_data:
-                raise tcfl.tc.failed_e(
+                target.report_fail(
                     f"{offset}: read data and original data mismatch",
                     dict(read_data = read_data, original_data = original_data,
                          offset = offset)

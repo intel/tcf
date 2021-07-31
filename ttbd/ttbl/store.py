@@ -221,6 +221,8 @@ class interface(ttbl.tt_interface):
             generation = os.readlink(file_path_final + ".generation")
         except OSError:
             generation = 0
+        # ttbd will parse this response in _target_interface() to
+        # return a raw file according to these parameters.
         return dict(
             stream_file = file_path_final,
             stream_generation = generation,
