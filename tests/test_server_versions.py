@@ -26,28 +26,31 @@ class _test(commonl.testing.shell_client_base):
         CURRENT_API_VERSION = tcfl.ttb_client.rest_target_broker.API_VERSION
 
         # Note: *none* gets JSON-xlated to None...
-        self.run_local(
-            "curl -sk -X PUT %s/ttb-v%s/login -d password=badpassword -d username=local"
-            % (ttbd.url, CURRENT_API_VERSION),
-            "user local: not allowed")
-        self.report_pass(
-            "accessing login via v%s yields expected message for current version"
-            % CURRENT_API_VERSION)
+        with self.subcase("badpasswd"):
+            self.run_local(
+                "curl -sk -X PUT %s/ttb-v%s/login -d password=badpassword -d username=local"
+                % (ttbd.url, CURRENT_API_VERSION),
+                "user local: not allowed")
+            self.report_pass(
+                "accessing login via v%s yields expected message for current version"
+                % CURRENT_API_VERSION)
 
         for old_version in range(0, CURRENT_API_VERSION):
-            self.run_local(
-                "curl -sk -X PUT %s/ttb-v%s/login -d password=badpassword -d username=local"
-                % (ttbd.url, old_version),
-                "please upgrade")
-            self.report_pass(
-                "accessing login via old version v%s gives expected error message"
-                % old_version)
+            with self.subcase(f"old-version-{old_version}"):
+                self.run_local(
+                    "curl -sk -X PUT %s/ttb-v%s/login -d password=badpassword -d username=local"
+                    % (ttbd.url, old_version),
+                    "please upgrade")
+                self.report_pass(
+                    "accessing login via old version v%s gives expected error message"
+                    % old_version)
 
         for new_version in range(CURRENT_API_VERSION + 1, CURRENT_API_VERSION + 10):
-            self.run_local(
-                "curl -sk -X PUT %s/ttb-v%s/login -d password=badpassword -d username=local"
-                % (ttbd.url, new_version),
-                "please downgrade")
-            self.report_pass(
-                "accessing login via newer version v%s gives expected error message"
-                % new_version)
+            with self.subcase(f"new-version-{new_version}"):
+                self.run_local(
+                    "curl -sk -X PUT %s/ttb-v%s/login -d password=badpassword -d username=local"
+                    % (ttbd.url, new_version),
+                    "please downgrade")
+                self.report_pass(
+                    "accessing login via newer version v%s gives expected error message"
+                    % new_version)
