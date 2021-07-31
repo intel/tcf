@@ -41,8 +41,6 @@ Failing
     
 - test_tcfl_tc_run_method_return_values.py - not working ok
 
-- test_server_version
-
 - test_properties
 
 - gets stuck allocation/queued

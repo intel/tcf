@@ -25,8 +25,9 @@ class _test(commonl.testing.shell_client_base):
 
         CURRENT_API_VERSION = tcfl.ttb_client.rest_target_broker.API_VERSION
 
+        # Note: *none* gets JSON-xlated to None...
         self.run_local(
-            "curl -sk -X PUT %s/ttb-v%s/login -d password=none -d username=local"
+            "curl -sk -X PUT %s/ttb-v%s/login -d password=badpassword -d username=local"
             % (ttbd.url, CURRENT_API_VERSION),
             "user local: not allowed")
         self.report_pass(
@@ -35,7 +36,7 @@ class _test(commonl.testing.shell_client_base):
 
         for old_version in range(0, CURRENT_API_VERSION):
             self.run_local(
-                "curl -sk -X PUT %s/ttb-v%s/login -d password=none -d username=local"
+                "curl -sk -X PUT %s/ttb-v%s/login -d password=badpassword -d username=local"
                 % (ttbd.url, old_version),
                 "please upgrade")
             self.report_pass(
@@ -44,7 +45,7 @@ class _test(commonl.testing.shell_client_base):
 
         for new_version in range(CURRENT_API_VERSION + 1, CURRENT_API_VERSION + 10):
             self.run_local(
-                "curl -sk -X PUT %s/ttb-v%s/login -d password=none -d username=local"
+                "curl -sk -X PUT %s/ttb-v%s/login -d password=badpassword -d username=local"
                 % (ttbd.url, new_version),
                 "please downgrade")
             self.report_pass(
