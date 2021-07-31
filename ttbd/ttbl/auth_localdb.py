@@ -92,7 +92,7 @@ class authenticator_localdb_c(ttbl.authenticator_c):
         if email not in self.passwords:
             raise self.unknown_user_e(
                 "%s: unknown user in  %s" % (email, self))
-        hashed_password = hashlib.sha256(password).hexdigest()
+        hashed_password = hashlib.sha256(password.encode('utf-8')).hexdigest()
 
         _password = self.passwords[email]
         while True:

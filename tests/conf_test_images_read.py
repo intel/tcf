@@ -7,7 +7,7 @@
 import ttbl.images
 
 
-maria = """
+maria = b"""
 Doe, A Deer, A female Deer
 Ray, A drop of golden sun
 Me, a name, I call myself.

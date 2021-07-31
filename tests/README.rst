@@ -39,10 +39,6 @@ Failing
   - test_alloc_release_on_rm
   - test_alloc_timesout.py
     
-- sth broken bytes/str
-  - test_images_read
-  - test_curl_args
-
 - test_tcfl_tc_run_method_return_values.py - not working ok
 
 - test_store_dnload_offset

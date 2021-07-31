@@ -4485,6 +4485,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             cwd = self.tmpdir
 
         output = subprocess.check_output(command, cwd = cwd, shell = True,
+                                         text = "utf-8",
                                          stderr = subprocess.STDOUT)
         if expect:
             if isinstance(expect, str):
