@@ -41,43 +41,44 @@ class _test(tcfl.tc.tc_c):
         target.properties_set(d)
 
         def _property_check(name, original):
-            val = target.property_get(name)
-            if val != original:
-                raise tcfl.tc.failed_e(
-                    "%s mismatch" % name,
-                    dict(original = original, obtained = val))
-            self.report_pass("%s matches" % name)
+            with self.subcase(name):
+                val = target.property_get(name)
+                if val != original:
+                    self.report_fail("%s mismatch" % name,
+                                     dict(original = original, obtained = val))
+                else:
+                    self.report_pass("%s matches" % name)
 
-        _property_check('a', d['a'])
-        _property_check('b', d['b'])
-        _property_check('c', d['c'])
-        # get nested attributes
-        _property_check('a.d', d['a']['d'])
-        _property_check('a.d.i', d['a']['d']['i'])
+        with self.subcase("property_check"):
+            _property_check('a', d['a'])
+            _property_check('b', d['b'])
+            _property_check('c', d['c'])
+            # get nested attributes
+            _property_check('a.d', d['a']['d'])
+            _property_check('a.d.i', d['a']['d']['i'])
 
-        prop = "a.d.this doesnt exist"
-        val = target.property_get(prop)
-        if val != None:
-            raise tcfl.tc.failed_e(
-                "unexistant property '%s' returns value: %s" % (prop, val))
-        self.report_pass("unexistant property '%s' returns None" % prop)
+        def _unexistant_property_check(prop_name):
+            val = target.property_get(prop_name)
+            if val != None:
+                self.report_fail(
+                    f"unexistant property '{prop_name}':"
+                    f" expected None; got {val}")
+            else:
+                self.report_pass(
+                    f"unexistant property '{prop_name}': returns None")
 
-        prop = "this doesnt exist"
-        val = target.property_get(prop)
-        if val != None:
-            raise tcfl.tc.failed_e(
-                "unexistant property '%s' returns value: %s" % (prop, val))
-        self.report_pass("unexistant property '%s' returns None" % prop)
+        with self.subcase("unexistant_property"):
+            for prop_name in [
+                    "a.d.this doesnt exist",
+                    "this doesnt exist",
+                    "this.doesnt.exist" ]:
+                with self.subcase(prop_name):
+                    _unexistant_property_check(prop_name)
 
-        prop = "this.doesnt.exist"
-        val = target.property_get(prop)
-        if val != None:
-            raise tcfl.tc.failed_e(
-                "unexistant property '%s' returns value: %s" % (prop, val))
-        self.report_pass("unexistant property '%s' returns None" % prop)
 
     def teardown_90_scb(self):
         ttbd.check_log_for_issues(self)
+
 
 def field_get_verify(r, property_name, do_raise = False):
     # unfold a.b.c.d which returns { a: { b: { c: { d: value } } } }
