@@ -123,10 +123,11 @@ class _test_sorted(tcfl.tc.tc_c):
         # provides the resposnes in the right order
         rt = json.loads(r.text, object_pairs_hook = collections.OrderedDict)
         power_impls = field_get_verify(rt, "interfaces.power")
-        if power_impls.keys() != self.power_rail:
+        power_impl_list = list(power_impls.keys())
+        if power_impl_list != self.power_rail:
             raise tcfl.tc.failed_e("server didn't keep the power-rail order",
                                    dict(
-                                       reported_rail = power_impls.keys(),
+                                       reported_rail = power_impl_list,
                                        sorted_rail = self.power_rail,
                                    ))
         self.report_pass("server kept power-rail order",

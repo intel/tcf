@@ -41,8 +41,6 @@ Failing
     
 - test_tcfl_tc_run_method_return_values.py - not working ok
 
-- test_properties
-
 - gets stuck allocation/queued
   - test_images_parallel_retry.py
   - test_images_parallel.py
