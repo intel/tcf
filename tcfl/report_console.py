@@ -175,11 +175,25 @@ class driver(tc.report_driver_c):
     }
 
 
-    def _shall_do(self, level):
+    def _shall_do(self, level, message = None):
         console = level <= self.verbosity
+        if console and message:
+            # HACK: filter out some output for the console that is not that
+            # useful--it's repetitive and not conveying any new
+            # information, so we just up its verbosity level.
+            # We still want this in other report drivers or
+            # the log files--this relies on the actual message, which
+            # is not a good idea...buttttttt
+            if 'client version' in message \
+               or 'will run on target group' in message \
+               or 'ran on target group' in message \
+               or ( 'queing for pairing' in message and self.parent ) :
+                console = False
+
         # level >= 1000 is for control messages
         logfile = level <= self.verbosity_logf or level >= 1000
         return console, logfile
+
 
     def report(self, reporter, tag, ts, delta,
                level, message,
@@ -213,9 +227,9 @@ class driver(tc.report_driver_c):
             "SKIP": ( 'cyan', ),	# no orange available...
             'DATA': ( "blue", ),
         }
-        console_p, logfile_p = self._shall_do(level)
+        console_p, logfile_p = self._shall_do(level, message)
         if console_p:
-            # if this is a terminal, colorlize the TAG in the main
+            # if this is a terminal, colorize the TAG in the main
             # message so we can easily locate issues; note we don't
             # colorize the tag for attachments, just for the main
             # message.
