@@ -50,7 +50,6 @@ Failing
 
 - test_images_estimated_duration.py
 - test_images_flash_shell.py 
-- test_fsdb_symlink.py 
 - test_debug_loopback: needs readjustment on how it tests debug state
   is cleared on release
 - test_alloc_basic.py 

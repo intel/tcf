@@ -206,9 +206,6 @@ class fsdb_c(object):
         """
         raise NotImplementedError
 
-    #: Regular expresion that determines the valid characters in a field
-    key_valid_regex = re.compile(r"^[-\.a-zA-Z0-9_]+$")
-
     def set(self, key, value, force = True):
         """
         Set a value for a key in the database unless *key* already exists
@@ -224,12 +221,9 @@ class fsdb_c(object):
         :return bool: *True* if the new value was set correctly;
           *False* if *key* already exists and *force* is *False*.
         """
-        if not self.key_valid_regex.match(key):
-            raise ValueError("%s: invalid key name (valid: %s)" \
-                             % (key, self.key_valid_regex.pattern))
-        if value != None:
-            assert isinstance(value, (str, int, float, bool))
-        raise NotImplementedError
+        assert isinstance(value, (NoneType, str, int, float, bool)), \
+            f"value must be None, str, int, float, bool; got {type(value)}"
+
 
     def get(self, key, default = None):
         """
@@ -335,9 +329,6 @@ class fsdb_symlink_c(fsdb_c):
         key = urllib.parse.quote(
             key, safe = '-_ ' + string.ascii_letters + string.digits)
         location = os.path.join(self.location, key)
-        if not self.key_valid_regex.match(key):
-            raise ValueError("%s: invalid key name (valid: %s)" \
-                             % (key, self.key_valid_regex.pattern))
         if value != None:
             # the storage is always a string, so encode what is not as
             # string as T:REPR, where T is type (b boolean, n number,
