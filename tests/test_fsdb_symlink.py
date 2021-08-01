@@ -58,7 +58,7 @@ class _test(tcfl.tc.tc_c):
         expected_len = 0
         for name, value in db.items():
             fsdb.set(name, value)
-            self.report_pass("key name %s set" % name)
+            self.report_pass("key name '%s' set" % name)
             expected_len += 1
             l = os.listdir(fsdb_dir)
             if len(l) != expected_len:
@@ -77,7 +77,7 @@ class _test(tcfl.tc.tc_c):
         # and the lsit of keys FSDB reports.
         # Make it all a set() so they are ordered the same.
         l_raw = set(os.listdir(fsdb_dir))
-        l_unquoted = set([ urllib.unquote(i) for i in l_raw ])
+        l_unquoted = set([ urllib.parse.unquote(i) for i in l_raw ])
         keys_db = set(db.keys())
         keys_fsdb = set(fsdb.keys())
         if l_unquoted != keys_db:
