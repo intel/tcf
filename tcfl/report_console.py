@@ -175,20 +175,26 @@ class driver(tc.report_driver_c):
     }
 
 
-    def _shall_do(self, level, message = None):
-        console = level <= self.verbosity
-        if console and message:
-            # HACK: filter out some output for the console that is not that
-            # useful--it's repetitive and not conveying any new
-            # information, so we just up its verbosity level.
-            # We still want this in other report drivers or
-            # the log files--this relies on the actual message, which
-            # is not a good idea...buttttttt
-            if 'client version' in message \
-               or 'will run on target group' in message \
-               or 'ran on target group' in message \
-               or ( 'queing for pairing' in message and self.parent ) :
-                console = False
+    def _shall_do(self, testcase, level, message = None):
+        # HACK: filter out some output for the console that is not
+        # that useful--it's repetitive and not conveying any new
+        # information, so we just up its verbosity level -- this way
+        # if we reallly reallly want to see it, we can.  We still want
+        # this in other report drivers or the log files--this relies
+        # on the actual message, which is not a good idea...buttttttt
+        if message and (
+                # we don't need to know the client version in the
+                # console output, we an do tcf --version for that
+                'client version' in message
+                or testcase.parent and (
+                    # if a subcase, the parent testcase has already
+                    # printed a lot of this info, not useful
+                    'will run on target group' in message
+                    or 'ran on target group' in message
+                    or 'queing for pairing' in message )):
+            console = level + 4 <= self.verbosity
+        else:
+            console = level <= self.verbosity
 
         # level >= 1000 is for control messages
         logfile = level <= self.verbosity_logf or level >= 1000
@@ -227,7 +233,7 @@ class driver(tc.report_driver_c):
             "SKIP": ( 'cyan', ),	# no orange available...
             'DATA': ( "blue", ),
         }
-        console_p, logfile_p = self._shall_do(level, message)
+        console_p, logfile_p = self._shall_do(testcase, level, message)
         if console_p:
             # if this is a terminal, colorize the TAG in the main
             # message so we can easily locate issues; note we don't
@@ -259,7 +265,7 @@ class driver(tc.report_driver_c):
 
         if attachments != None:
             assert isinstance(attachments, dict)
-            console_p, logfile_p = self._shall_do(alevel)
+            console_p, logfile_p = self._shall_do(testcase, alevel)
             if console_p or logfile_p:
                 # note the extra two spaces at the end, those are so
                 # the attachments are printed indented; it's much
