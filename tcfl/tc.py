@@ -2624,9 +2624,9 @@ class result_c:
                         self.skipped + b.skipped)
 
     def __repr__(self):
-        return "%d (%d %d %d %d %d)" % (self.total(), self.passed,
-                                        self.errors, self.failed,
-                                        self.blocked, self.skipped)
+        return "%d (passed=%d errors=%d failed=%d blocked=%d skipped=%d)" % (
+            self.total(), self.passed, self.errors, self.failed,
+            self.blocked, self.skipped)
 
     def total(self):
         return self.passed + self.errors + self.failed \
@@ -2680,16 +2680,22 @@ class result_c:
 
     @staticmethod
     def from_retval(retval):
-        if retval == True:
-            return result_c(1, 0, 0, 0)
-        elif retval == False:
-            return result_c(0, 1, 0, 0)
-        elif retval == None:
-            return result_c(0, 0, 1, 0)
-        elif retval == "SKIP":
-            return result_c(0, 0, 0, 1)
-        else:
-            return result_c(0, 0, 0, 0)
+        if isinstance(retval, result_c):
+            return retval
+        # things that mean pass -- return nothing or True
+        if retval == True or retval == None:
+            return result_c(passed = 1)
+        # but returning Flase, something failed
+        if retval == False:
+            return result_c(failed = 1)
+        if retval == "SKIP":
+            # FIXME: undocumented
+            return result_c(skipped = 1)
+        raise blocked_e(
+            f"don't know how to interpret return value of type '{type(retval)}';"
+            " return None/True (PASS), False (FAIL), raise an"
+            " exception (FAIL/ERRR/BLCK); see FIXME:documentation")
+
 
     @staticmethod
     def _e_maybe_info(e, attachments):
@@ -2863,10 +2869,7 @@ class result_c:
 
         _tc = args[0] # The `self`  argument to the test case
         try:
-            r = fn(*args, **kwargs)
-            if r == None:
-                return result_c(1, 0, 0, 0, 0)
-            return r
+            return fn(*args, **kwargs)
         # Some exceptions that are common and we know about, so we
         # can print some more info that will be helpful
         except AssertionError as e:
@@ -3062,7 +3065,7 @@ def subcase(subcase = None, break_on_non_pass = False):
                 # ensure we register the result of this testcase,
                 # otherwise we'll miss reporting about it
                 subtc = testcase._subcase_get(_subcase)
-                subtc.result = r
+                subtc.result = result_c.from_retval(r)
                 return r
         return wrapped
     return wrapper
@@ -5295,6 +5298,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                        ])))
         return _args
 
+
     def __method_trampoline_call(self, fname, fn, _type, targets):
         # runs a class function and return a return_c
         #
@@ -5326,23 +5330,11 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                 r = getattr(self, fname)(*targets)
         else:	# static/classmethod
             r = fn(*targets)
-
         # Now, let's see what did it return
         if isinstance(r, result_c):
             return r
-        elif r == None or r == True:
-            return result_c(1, 0, 0, 0, 0)
-        elif r == False:
-            return result_c(0, 1, 0, 0, 0)
-        else:
-            raise blocked_e(
-                "%s.%s(): don't know what to do with "
-                "return value of type %s; return nothing or "
-                "True for success, False for failure, raise "
-                "any exception for blockage, or "
-                "tcfl.{passed|blocked|error|failed|skip}_e "
-                % (type(self).__name__, fn.__name__,
-                   type(r).__name))
+        return result_c.from_retval(r)
+
 
     def __method_trampoline_thread(self, msgid, fname, fn, _type, targets,
                                    tls_parent):
