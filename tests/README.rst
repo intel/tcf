@@ -14,6 +14,7 @@ Bitrotten tests
 Features
 --------
 
+- extend release hooks -> tt_interface_impl_c
 - current testcase set in msgid/context
 - report_*() add to the counts of the current testcase
   
@@ -47,6 +48,5 @@ Failing
   - test_images_parallel.py
   - test_capture_tcpdump
 
-- test_images_estimated_duration.py
 - test_images_flash_shell.py 
 - test_alloc_basic.py 
