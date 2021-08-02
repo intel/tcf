@@ -523,7 +523,9 @@ def _target_queue_load(target):
     return waiters, preempt
 
 def _target_starvation_recalculate(allocdb, target, score):
-    logging.info("FIXME: %s: %s: %s", allocdb, target.id, score)
+    # FIXME: don't print FIXME bc then it drives nuts all the unit
+    # tests and it is not necessarily a problem
+    logging.info("Not Implemented Yet: %s: %s: %s", allocdb, target.id, score)
 
 def _target_allocate_locked(target, current_allocdb, waiters, preempt):
     # return: allocdb from waiter that succesfully took it
