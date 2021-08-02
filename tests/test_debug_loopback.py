@@ -49,6 +49,7 @@ class _test(tcfl.tc.tc_c):
     def teardown_90_scb(self):
         ttbd.check_log_for_issues(self)
 
+
 @tcfl.tc.target(ttbd.url_spec)
 class release_hooks(tcfl.tc.tc_c):
     """
@@ -61,13 +62,18 @@ class release_hooks(tcfl.tc.tc_c):
         target.debug.start()
         i = target.debug.list()['debug0'].get('state', None)
         assert i == 'started', "info reports %s" % i
+        state = target.property_get("debug_state")
+        if state != "started":
+            raise tcfl.tc.error_e(
+                f"debug_state '{state}', expected 'started'")
         target.release()
-        target.acquire()
-        state = target.debug.list()['debug0']
-        assert state == None, \
-            "after releasing and re-acquiring, debug state is %s;" \
-            " expected None" % state
-        self.report_pass("release hooks were called on target release")
+        state = target.property_get("debug_state")
+        if state != "stopped":
+            raise tcfl.tc.failed_e(
+                f"release hook was not called; state '{state}',"
+                " expected 'stopped'")
+        self.report_pass("release hook was called")
+
 
     def teardown_90_scb(self):
         ttbd.check_log_for_issues(self)

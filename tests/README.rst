@@ -14,6 +14,9 @@ Bitrotten tests
 Features
 --------
 
+- current testcase set in msgid/context
+- report_*() add to the counts of the current testcase
+  
 - remove tests/symlinks, hardcode paths
   
 - FIXME: hack no arguments to @tcfl.tc.target so no () are needed http://stackoverflow.com/a/3932122
@@ -46,6 +49,4 @@ Failing
 
 - test_images_estimated_duration.py
 - test_images_flash_shell.py 
-- test_debug_loopback: needs readjustment on how it tests debug state
-  is cleared on release
 - test_alloc_basic.py 
