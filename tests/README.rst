@@ -22,7 +22,7 @@ Features
 
 - mix report_c with exception types: XYZ_e / report_c
 
-
+- deprecate/remove test_*
 
   
 Failing
@@ -39,8 +39,6 @@ Failing
   - test_alloc_release_on_rm
   - test_alloc_timesout.py
     
-- test_tcfl_tc_run_method_return_values.py - not working ok
-
 - gets stuck allocation/queued
   - test_images_parallel_retry.py
   - test_images_parallel.py

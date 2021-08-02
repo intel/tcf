@@ -5,132 +5,208 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
+"""
+Test translation of return values from methods into result_c
+------------------------------------------------------------
+
+:meth:`tcfl.tc.result_c.from_retval` takes any return value from a
+method and tries to convert it into a result_c, mapping into
+PASS/ERRR/FAIL/BLCK/SKIP.
+
+This tries to exercise all possible scenarios.
+
+Because some test cases will trigger a failure and we still don't
+support tagging an expected failure, we use the *teardown* method to
+check the evaluation result--if it is what is expected, we override it
+to signal a pass.
+"""
 
 import os
-
 import tcfl.tc
 
-srcdir = os.path.dirname(__file__)
 
-#
-# Metaclass for tc_c, to initialize class specific fields
-#
 class _mc(tcfl.tc._tc_mc):
+    # Metaclass for tc_c, to initialize class specific fields
     def __init__(cls, name, bases, d):
         tcfl.tc._tc_mc.__init__(cls, name, bases, d)
         cls.exception_to_result[AssertionError] = tcfl.tc.failed_e
 
-class _01_pass(tcfl.tc.tc_c, metaclass=_mc):
-    """
-    Return different things that mean "pass"
-    """
 
+class pass_base(tcfl.tc.tc_c):
+    def teardown(self):
+        if self.result_eval.passed == 0:
+            raise tcfl.tc.fail_e(
+                f"expected pass, but result_eval is {self.result_eval}")
+        self.report_pass(f"got expected pass")
+
+
+class pass_empty(pass_base):
     @staticmethod
-    def test_00_nothing():
+    def eval():
         pass
 
+
+class pass_return_nothing(pass_base):
     @staticmethod
-    def test_01_None():
+    def eval():
+        return
+
+
+class pass_return_none(pass_base):
+    @staticmethod
+    def eval():
         return None
 
+
+class pass_return_true(pass_base):
     @staticmethod
-    def test_02_True():
+    def eval():
         return True
 
-    @staticmethod
-    def test_03():
-        return tcfl.tc.result_c(1, 0, 0, 0, 0)
 
+class pass_return_result_c_1(pass_base):
     @staticmethod
-    def test_04():
-        return tcfl.tc.result_c(12, 0, 0, 0, 0)
+    def eval():
+        return tcfl.tc.result_c(passed = 1)
 
+
+class pass_return_result_c_2(pass_base):
     @staticmethod
-    def test_05():
+    def eval():
+        return tcfl.tc.result_c(passed = 2)
+
+
+class pass_raise_pass_e(pass_base):
+    @staticmethod
+    def eval():
         raise tcfl.tc.pass_e("pass via pass exception")
 
+
+
+class fail_base(tcfl.tc.tc_c):
     def teardown(self):
-        assert self.result_eval.summary() == tcfl.tc.result_c(1, 0, 0, 0, 0)
+        if self.result_eval.failed == 0:
+            raise tcfl.tc.fail_e(
+                f"expected failure, but result_eval is {self.result_eval}")
+        self.report_pass(f"got expected failure")
+        self.result_eval.failed = 0
+        self.result_eval.passed = 1
 
 
-class _02_fail(tcfl.tc.tc_c, metaclass=_mc):
-    """
-    Return different things that mean "fail"
-    """
-
+class fail_return_false(fail_base):
     @staticmethod
-    def test_02():
+    def eval():
         return False
 
-    @staticmethod
-    def test_03():
-        return tcfl.tc.result_c(0, 0, 1, 0, 0)
 
+class fail_return_result_c_failed_1(fail_base):
     @staticmethod
-    def test_04():
-        return tcfl.tc.result_c(0, 0, 2, 0, 0)
+    def eval():
+        return tcfl.tc.result_c(failed = 1)
 
+
+class fail_return_result_c_failed_2(fail_base):
     @staticmethod
-    def test_05():
+    def eval():
+        return tcfl.tc.result_c(failed = 2)
+
+
+class fail_raise_failed_e(fail_base):
+    @staticmethod
+    def eval():
         raise tcfl.tc.failed_e("fail via exception")
 
+
+class fail_assertion(fail_base, metaclass = _mc):
     @staticmethod
-    def test_06():
+    def eval():
         # We configured in the metaclass _mc that AssertionError means fail
         assert False, "fail via assertion exception"
 
+
+
+class block_base(tcfl.tc.tc_c):
     def teardown(self):
-        assert self.result_eval.summary() == tcfl.tc.result_c(0, 0, 1, 0, 0)
-        # that it fails means that it passed, so we override that
-        # result with a pass
-        self.result_eval = tcfl.tc.result_c(1, 0, 0, 0, 0)
+        if self.result_eval.blocked == 0:
+            raise tcfl.tc.fail_e(
+                f"expected blockage, but result_eval is {self.result_eval}")
+        self.report_pass(f"got expected blockage")
+        self.result_eval.blocked = 0
+        self.result_eval.passed = 1
 
-class _03_block(tcfl.tc.tc_c, metaclass=_mc):
-    """
-    Return different things that mean "block"
-    """
 
+class blocked_return_int(block_base):
     @staticmethod
-    def test_02():
-        return False
+    def eval():
+        return 3
 
-    @staticmethod
-    def test_03():
-        return tcfl.tc.result_c(0, 0, 0, 1, 0)
 
+class blocked_return_dict(block_base):
     @staticmethod
-    def test_04():
-        return tcfl.tc.result_c(0, 0, 0, 2, 0)
+    def eval():
+        return dict()
 
+
+class blocked_return_list(block_base):
     @staticmethod
-    def test_05():
+    def eval():
+        return list()
+
+
+class blocked_return_set(block_base):
+    @staticmethod
+    def eval():
+        return set()
+
+
+class blocked_return_str(block_base):
+    @staticmethod
+    def eval():
+        return "somestring"
+
+
+class fail_return_result_c_blocked_1(block_base):
+    @staticmethod
+    def eval():
+        return tcfl.tc.result_c(blocked = 1)
+
+
+class fail_return_result_c_blocked_2(block_base):
+    @staticmethod
+    def eval():
+        return tcfl.tc.result_c(blocked = 2)
+
+
+class fail_raise_blocked_e(block_base):
+    @staticmethod
+    def eval():
         raise tcfl.tc.blocked_e("block via exception")
 
+
+
+class skip_base(tcfl.tc.tc_c):
     def teardown(self):
-        assert self.result_eval.summary() == tcfl.tc.result_c(0, 0, 0, 1, 0)
-        # that it fails means that it passed, so we override that
-        # result with a pass
-        self.result_eval = tcfl.tc.result_c(1, 0, 0, 0, 0)
+        if self.result_eval.skipped == 0:
+            raise tcfl.tc.failed_e(
+                f"expected skip, but result_eval is {self.result_eval}")
+        self.report_pass(f"got expected skip")
+        self.result_eval.skipped = 0
+        self.result_eval.passed = 1
 
-class _04_skip(tcfl.tc.tc_c, metaclass=_mc):
-    """
-    Return different things that mean "skip"
-    """
 
+class skip_return_result_c_1(skip_base):
     @staticmethod
-    def test_03():
-        return tcfl.tc.result_c(0, 0, 0, 0, 1)
+    def eval():
+        return tcfl.tc.result_c(skipped = 1)
 
-    @staticmethod
-    def test_04():
-        return tcfl.tc.result_c(0, 0, 0, 0, 2)
 
+class skip_return_result_c_2(skip_base):
     @staticmethod
-    def test_05():
+    def eval():
+        return tcfl.tc.result_c(skipped = 2)
+
+
+class skip_raise_skip_e(skip_base):
+    @staticmethod
+    def eval():
         raise tcfl.tc.skip_e("skip via exception")
-
-    def teardown(self):
-        assert self.result_eval.summary() == tcfl.tc.result_c(0, 0, 0, 0, 1)
-        # that it fails means that it passed, so we override that
-        # result with a pass
-        self.result_eval = tcfl.tc.result_c(1, 0, 0, 0, 0)
