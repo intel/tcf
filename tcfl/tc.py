@@ -4784,7 +4784,6 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     _setup_serial = []
     _start_serial = []
     _eval_serial = []
-    _test_serial = []
     _teardown_serial = []
     _class_teardown_serial = []
 
@@ -5174,7 +5173,6 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         self._setup_serial = copy.deepcopy(super(cls, cls)._setup_serial)
         self._start_serial = copy.deepcopy(super(cls, cls)._start_serial)
         self._eval_serial = copy.deepcopy(super(cls, cls)._eval_serial)
-        self._test_serial = copy.deepcopy(super(cls, cls)._test_serial)
         self._teardown_serial = copy.deepcopy(super(cls, cls)._teardown_serial)
         # Class teardown inherits the class we inherit from too
         self._class_teardown_serial = copy.deepcopy(
@@ -5471,8 +5469,6 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             return self._methods_run(True, self._start_serial, [])
         elif base == "eval":
             return self._methods_run(True, self._eval_serial, [])
-        elif base == "test":
-            return self._methods_run(True, self._test_serial, [])
         elif base == "teardown":
             return self._methods_run(True, self._teardown_serial, [])
         elif base == "class_teardown":
@@ -7285,21 +7281,6 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                             self._methods_call("teardown")
                             continue
                         self.result_eval += self._methods_call("eval")
-                        self._methods_call("teardown")
-                    for fname, fn, _type, args in self._test_serial:
-                        self.result_eval = result_c(0, 0, 0, 0, 0)
-                        retval = self._methods_call("setup")
-                        self.result_eval += retval
-                        if retval.errors or retval.failed or retval.blocked:
-                            self._methods_call("teardown")
-                            continue
-                        retval = self._methods_call("start")
-                        self.result_eval += retval
-                        if retval.errors or retval.failed or retval.blocked:
-                            self._methods_call("teardown")
-                            continue
-                        self.result_eval += self._method_run(fname, fn,
-                                                             _type, args)
                         self._methods_call("teardown")
             finally:
                 result_all_evals += self.result_eval
