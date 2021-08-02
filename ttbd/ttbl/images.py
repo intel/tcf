@@ -1301,8 +1301,22 @@ class fake_c(impl2_c):
     Parameters like :class:ttbl.images.impl_c.
     """
     def __init__(self, **kwargs):
-        impl_c.__init__(self, **kwargs)
+        impl2_c.__init__(self, **kwargs)
         self.upid_set("Fake test flasher", _id = str(id(self)))
+
+    def flash_start(self, target, images, context):
+        target.fsdb.set(f"fake-{'.'.join(images.keys())}-{context}.ts0", time.time())
+
+    def flash_check_done(self, target, images, context):
+        ts0 = target.fsdb.get(f"fake-{'.'.join(images.keys())}-{context}.ts0", None)
+        ts = time.time()
+        return ts - ts0 > self.estimated_duration - self.check_period
+
+    def flash_kill(self, target, images, context, msg):
+        target.fsdb.set(f"fake-{'.'.join(images.keys())}-{context}.state", "started", None)
+
+    def flash_post_check(self, target, images, context):
+        return None
 
     def flash(self, target, images):
         for image_type, image in images.items():
