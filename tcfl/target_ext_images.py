@@ -63,6 +63,13 @@ class extension(tc.target_extension_c):
         """
         Reads data from the SPI
         """
+        assert isinstance(image, str)
+        assert isinstance(file_name, str)
+        assert isinstance(image_offset, int)
+        assert read_bytes == None or isinstance(read_bytes, int)
+
+        target = self.target
+        target.report_info(f"reading {image} image", dlevel = 1)
 
         with io.open(file_name, "wb+") as of, \
              contextlib.closing(self.target.ttbd_iface_call("images",
@@ -79,6 +86,8 @@ class extension(tc.target_extension_c):
             for chunk in r.iter_content(chunk_size):
                 of.write(chunk)
                 total += len(chunk)	# not chunk_size, it might be less
+            target.report_info(f"read {image} image")
+            target.report_info(f"image saved to {file_name}")
             return total
 
         return r['result']
@@ -396,6 +405,9 @@ class extension(tc.target_extension_c):
         return image_flash, upload, soft
 
 def _cmdline_images_read(args):
+    tc.tc_global = tc.tc_c("cmdline", "", "builtin")
+    tc.report_driver_c.add(		# FIXME: hack console driver
+        tc.report_console.driver(1, None))
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "images")
         target.images.read(args.image, args.filename, args.offset, args.bytes)
