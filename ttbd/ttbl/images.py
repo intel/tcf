@@ -783,8 +783,14 @@ class interface(ttbl.tt_interface):
             # we write the content to the user's storage area, that
             # gets cleaned up regularly
 
+            if self.power_sequence_pre:
+                target.power.sequence(target, self.power_sequence_pre)
+
             impl.flash_read(target, img_type_real, real_file_name,
                             image_offset, read_bytes)
+
+            if self.power_sequence_post:
+                target.power.sequence(target, self.power_sequence_post)
 
             return dict(stream_file = real_file_name)
 
