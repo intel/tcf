@@ -83,113 +83,6 @@ import tcfl.tl
 
 logger = logging.getLogger("tcfl.tc_clear_bbt")
 
-def tap_parse_output(output):
-    """
-    Parse `TAP
-    <https://testanything.org/tap-version-13-specification.html>`_
-    into a dictionary
-
-    :param str output: TAP formatted output
-    :returns: dictionary keyed by test subject containing a dictionary
-       of key/values:
-       - lines: list of line numbers in the output where data was found
-       - plan_count: test case number according to the TAP plan
-       - result: result of the testcase (ok or not ok)
-       - directive: if any directive was found, the text for it
-       - output: output specific to this testcase
-    """
-    tap_version = re.compile("^TAP version (?P<tap_version>[0-9]+)$")
-    tc_plan = re.compile(r"^(?P<plan_min>[0-9]+)\.\.(?P<plan_max>[0-9]+)$")
-    tc_line = re.compile(r"^(?P<result>(ok |not ok ))(?P<plan_count>[0-9]+ )?"
-                         r"(?P<subject>[^#]*)(#(?P<directive>.*))?$")
-    tc_output = re.compile(r"^#(?P<data>.*)$")
-    skip_regex = re.compile(r"skip(ped)?:?", re.IGNORECASE)
-    todo_regex = re.compile(r"todo:?", re.IGNORECASE)
-
-    # state
-    _plan_min = None
-    _plan_top = None
-    plan_set_at = None
-    tcs = {}
-    tc_current = None
-
-    linecnt = 0
-    _plan_count = 1
-    plan_max = 0
-    tc = None
-    for line in output.split("\n"):
-        linecnt += 1
-        m = tc_plan.search(line)
-        if m:
-            if plan_set_at and _plan_count > plan_max:
-                # only complain if we have not completed it, otherwise
-                # consider it spurious and ignore
-                continue
-            if plan_set_at:
-                raise tcfl.tc.blocked_e(
-                    "%d: setting range, but was already set at %d"
-                    % (linecnt, plan_set_at),
-                    dict(output = output, line = line))
-            plan_set_at = linecnt
-            plan_min = int(m.groupdict()['plan_min'])
-            plan_max = int(m.groupdict()['plan_max'])
-            continue
-        m = tc_line.search(line)
-        if m:
-            d = m.groupdict()
-            result = d['result']
-            count = d['plan_count']
-            if not count or count == "":
-                count = _plan_count	# if no count, use our internal one
-            subject = d['subject']
-            if not subject or subject == "":
-                subject = str(count)	# if no subject, use count
-            subject = subject.strip()
-            directive_s = d.get('directive', '')
-            if directive_s == None:
-                directive_s = ''
-                # directive is "TODO [text]", "skip: [text]"
-            directive_s = directive_s.strip()
-            directive_sl = directive_s.split()
-            if directive_sl:
-                directive = directive_sl[0]
-                if skip_regex.match(directive):
-                    result = "skip"
-                elif todo_regex.match(directive):
-                    result = "todo"
-            else:
-                directive = ''
-            tc_current = subject
-            tcs[subject] = dict(
-                lines = [ linecnt ],
-                plan_count = count,
-                result = result.strip(),
-                directive = directive_s,
-                output = "",
-            )
-            tc = tcs[subject]
-            # oficially a new testcase in the plan
-            _plan_count += 1
-            continue
-        m = tap_version.search(line)
-        if m:
-            d = m.groupdict()
-            tap_version = int(d['tap_version'])
-            if tap_version < 12:
-                raise RuntimeError("%d: Can't process versions < 12", linecnt)
-            continue
-        m = tc_output.search(line)
-        if m:
-            d = m.groupdict()
-            if tc:
-                tc['output'] += d['data'] + "\n"
-                tc['lines'].append(linecnt)
-            else:
-                raise tcfl.tc.blocked_e(
-                    "Can't parse output; corrupted? didn't find a header",
-                    dict(output = output, line = linecnt))
-            continue
-    return tcs
 
 #: Ignore t files
 #:
@@ -745,7 +638,7 @@ EOF
             # report_from_exception() will report exceptio data so we
             # can debug if it is an infra or TC problem.
             try:
-                tcs = tap_parse_output(output)
+                tcs = tcfl.tl.tap_parse_output(output.splitlines())
             except Exception as e:
                 tcs = dict()
                 result += tcfl.tc.result_c.report_from_exception(self, e)
@@ -771,7 +664,7 @@ EOF
                     log = data['output']
                 else:
                     # translate the taps result to a TCF result, record it
-                    _result = self.mapping[data['result']]
+                    _result = tcfl.tl.tap_mapping_result_c[data['result']]
                     log = data['output']
                     summary = log.split('\n', 1)[0]
                 subtc.update(_result, summary, log, )
