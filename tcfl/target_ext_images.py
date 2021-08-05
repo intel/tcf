@@ -18,6 +18,7 @@ import re
 import time
 import io
 import contextlib
+from pathlib import Path
 
 import requests
 
@@ -68,8 +69,12 @@ class extension(tc.target_extension_c):
         assert isinstance(image_offset, int)
         assert read_bytes == None or isinstance(read_bytes, int)
 
+        assert image_offset >= 0, 'offset value should be positive'
+        if read_bytes != None:
+            assert read_bytes >= 0, 'bytes value should be positive'
+
         target = self.target
-        target.report_info(f"reading {image} image", dlevel = 1)
+        target.report_info(f"{image}: reading image", dlevel = 1)
 
         with io.open(file_name, "wb+") as of, \
              contextlib.closing(self.target.ttbd_iface_call("images",
@@ -86,8 +91,8 @@ class extension(tc.target_extension_c):
             for chunk in r.iter_content(chunk_size):
                 of.write(chunk)
                 total += len(chunk)	# not chunk_size, it might be less
-            target.report_info(f"read {image} image")
-            target.report_info(f"image saved to {file_name}")
+            target.report_info(f"{image}: read image")
+            target.report_info(f"{image}: image saved to {Path(file_name).resolve()}")
             return total
 
         return r['result']
