@@ -543,23 +543,32 @@ EOF
         ;;
 esac
 
-case $image_type in
-    raspbian)
-        # allow root passwordless login--raspberry Pi defaults to ssh0
-        # console, not serial
-        sudo mkdir -p $destdir/etc/ssh
-        sudo tee -a $destdir/etc/ssh/sshd_config > /dev/null <<EOF
+if test -d $destdir/etc/ssh; then
+    info $image_type: SSH: enabling root and passwordless login
+    # allow root passwordless login--raspberry Pi defaults to ssh0
+    # console, not serial
+    sudo mkdir -p $destdir/etc/ssh
+    sudo tee -a $destdir/etc/ssh/sshd_config > /dev/null <<EOF
 PermitRootLogin yes
 PermitEmptyPasswords yes
 EOF
-        for v in rsa ecdsa ed25519; do
-            sudo rm -f $destdir/etc/ssh/ssh_host_${v}_key
-            sudo ssh-keygen -q -f $destdir/etc/ssh/ssh_host_${v}_key -t $v -C '' -N ''
-        done
-        sudo ln -sf /lib/systemd/system/ssh.service $destdir/etc/systemd/system/multi-user.target.wants
-        :
-        ;;
-esac
+    info $image_type: SSH: creating host keys
+    for v in rsa ecdsa ed25519; do
+        sudo rm -f $destdir/etc/ssh/ssh_host_${v}_key
+        sudo ssh-keygen -q -f $destdir/etc/ssh/ssh_host_${v}_key -t $v -C '' -N ''
+    done
+    # there is no good way to list units available in a chrooted environment, so just try blindly
+    if sudo systemctl --root=$destdir enable sshd; then
+        # most common
+        info $image_type: SSH: enabled sshd service
+    elif sudo systemctl --root=$destdir enable ssh; then
+        info $image_type: SSH: enabled ssh service
+    elif sudo systemctl --root=$destdir enable openssh-server; then
+        info $image_type: SSH: enabled openssh-server service
+    else:
+        warning "$image_type: SSH: did not enable (unknown service name, tried sshd ssh openssh-server)"
+    fi
+fi
 
 
 #
