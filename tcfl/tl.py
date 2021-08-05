@@ -17,7 +17,6 @@ import ssl
 import time
 
 import tcfl.tc
-from tcfl import target_ext_shell
 
 #! Place where the Zephyr tree is located
 # Note we default to empty string so it can be pased
@@ -953,6 +952,16 @@ def swupd_bundle_add(ic, target, bundle_list,
                            bundle, int(count))
         target.report_data("swupd bundle-add duration (seconds)",
                            bundle, float(m.groupdict()['seconds']))
+
+def linux_time_set(target):
+    """
+    Set the time in the target using the controller's date as a reference
+
+    :param tcfl.tc.target_c target: target whose time is to be set
+
+    """
+    target.shell.run("date -us '%s'; hwclock -wu --noadjfile"
+                     % str(datetime.datetime.utcnow()))
 
 
 def linux_package_add(ic, target, *packages,
