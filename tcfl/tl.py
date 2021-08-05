@@ -54,7 +54,7 @@ def zephyr_tags():
     return tags
 
 
-def console_dump_on_failure(testcase):
+def console_dump_on_failure(testcase, alevel = 0):
     """
     If a testcase has errored, failed or blocked, dump the consoles of
     all the targets.
@@ -91,13 +91,13 @@ def console_dump_on_failure(testcase):
                     target.console.generator_factory(console)
         if testcase.result_eval.failed:
             target.report_fail("console dump due to failure",
-                               attachments, alevel = 0)
+                               attachments, alevel = alevel)
         elif testcase.result_eval.errors:
             target.report_error("console dump due to errors",
-                                attachments, alevel = 0)
+                                attachments, alevel = alevel)
         else:
             target.report_blck("console dump due to blockage",
-                               attachments, alevel = 0)
+                               attachments, alevel = alevel)
 
 def setup_verify_slip_feature(zephyr_client, zephyr_server, _ZEPHYR_BASE):
     """

@@ -2591,7 +2591,7 @@ class tc_pos0_base(tc.tc_c):
                 continue
 
     def teardown_50(self):
-        tl.console_dump_on_failure(self)
+        tl.console_dump_on_failure(self, alevel = 1)
 
 
 @tc.interconnect("ipv4_addr")
