@@ -735,8 +735,7 @@ class tt_interface_impl_c(object):
         assert isinstance(name_long, str), \
             "name_long: expected a string; got %s" % type(name_long)
         for key, val in kwargs.items():
-            assert val == None or isinstance(val, (str, int,
-                                                   float, bool)), \
+            assert val == None or isinstance(val, (str, int, float, bool)), \
                 "UPID field '%s' must be string|number|bool; got %s" \
                 % (key, type(val))
             # None values we don't place'm
@@ -746,7 +745,7 @@ class tt_interface_impl_c(object):
             self.upid[key] = val
         if not self.name:
             self.name = name_long
-        kwargs['name_long'] = name_long
+        self.upid['name_long'] = name_long
 
 
     def target_setup(self, target, iface_name, component):
