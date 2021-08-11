@@ -2,7 +2,7 @@
 #
 # Copyright (c) 2019 Intel Corporation
 #
-# SPDX-License-Identifier: Proprietary
+# SPDX-License-Identifier: Apache-2.0
 #
 # pylint: disable = missing-docstring
 """.. _example_ptest_runner:
