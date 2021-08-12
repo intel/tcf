@@ -138,7 +138,14 @@ class driver(tc.report_driver_c):
                 self.tls, logf.detach())
         else:
             self.logf = None
-        consolef = io.open(sys.stdout.fileno(), "wb")
+        try:
+            fd = sys.stdout.fileno()
+        except AttributeError:
+            # purposedly work around #@#@#DR those libraries who wrap around
+            # sys.stdout to do whatever. Too bad
+            fd = 1	# 1 is always stdout
+
+        consolef = io.open(fd, "wb")
         self.consolef = commonl.io_tls_prefix_lines_c(
             self.tls, consolef.detach())
         self.verbosity = verbosity
