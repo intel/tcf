@@ -3,7 +3,7 @@
 #
 # Build as:
 #
-#  $ buildah bud -t IMAGENAME -v /path/to/tcf.git:/home/tcf -f client.Dockerfile
+#  $ buildah bud -t IMAGENAME -v /path/to/tcf.git:/home/tcf:O -f client.Dockerfile
 #
 # Run under the container without registry::
 #
@@ -15,15 +15,17 @@
 #
 # Run under the the container::
 #
-#  $ podman run -e HOME=$HOME -v $HOME:$HOME localhost:50000/tcf-f33 tcf ls
+#  $ podman run -e HOME=$HOME -v $HOME:$HOME:O localhost:50000/tcf-f33 tcf ls
 #
-FROM fedora:33
+FROM registry.fedoraproject.org/fedora:34
 LABEL maintainer https://github.com/intel/tcf
 
 # For CentOS
 #RUN dnf install -y python3 epel-release git python3-pip
 RUN dnf install -y python3 git python3-pip python3-wheel
-RUN /home/tcf/setup-requirements.py /home/tcf/requirements.txt > /tmp/dependencies.list
+RUN python3 /home/tcf/setup-requirements.py /home/tcf/requirements.txt > /tmp/dependencies.list
 RUN bash -c 'dnf install -y $(< /tmp/dependencies.list)'
 # our setup is a wee messed up at this point
 RUN cd /home/tcf && pip3 install . --root=/ --prefix=/
+# FIXME: quick hack because it's late and I am done with this
+RUN sed -i 's|#!python|#! /usr/bin/env python3|' /usr/bin/tcf
