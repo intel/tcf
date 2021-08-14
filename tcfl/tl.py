@@ -254,7 +254,8 @@ def linux_os_release_get(target, prefix = ""):
     return os_release
 
 
-def linux_mount_scratchfs(target):
+def linux_mount_scratchfs(target,
+                          reformat: bool = True, path: str = "/scratch"):
     """
     Mount in the target the TCF-scratch filesystem in */scratch*
 
@@ -264,13 +265,22 @@ def linux_mount_scratchfs(target):
 
     This function creates an ext4 filesystem on it and mounts it in
     */scratch* if not already mounted.
+
+    :param tcfl.tc.target_c target: target on which to mount
+
+    :param bool reformat: (optional; default *True*) re-format the
+      scratch file system before mounting it
+
+    :param str path: (optional; default */scratch*) path where to
+      mount the scratch file system.
     """
     output = target.shell.run("cat /proc/mounts", output = True, trim = True)
     if ' /scratch ' not in output:
         # not mounted already
-        target.shell.run("mkfs.ext4 -F /dev/disk/by-partlabel/TCF-scratch")
-        target.shell.run("mkdir -p /scratch" % target.kws)
-        target.shell.run("mount /dev/disk/by-partlabel/TCF-scratch /scratch")
+        if reformat:
+            target.shell.run("mkfs.ext4 -F /dev/disk/by-partlabel/TCF-scratch")
+        target.shell.run(f"mkdir -p {path}")
+        target.shell.run(f"mount /dev/disk/by-partlabel/TCF-scratch {path}")
 
 
 def linux_ssh_root_nopwd(target, prefix = ""):
