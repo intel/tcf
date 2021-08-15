@@ -187,7 +187,6 @@ from . import app
 import commonl
 import commonl.expr_parser
 from . import ttb_client
-from . import __init__ as tcfl
 from . import msgid_c
 
 # discovered by the importer
