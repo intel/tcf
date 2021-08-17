@@ -30,8 +30,8 @@ import traceback
 import commonl
 import tcfl
 import tcfl.ttb_client as ttb_client
-import tcfl.config
 import tcfl.tc
+import tcfl.config
 import tcfl._install
 
 # I bet there is a better way to do this...but we need the symbol to
