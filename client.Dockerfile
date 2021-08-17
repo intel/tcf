@@ -3,29 +3,30 @@
 #
 # Build as:
 #
-#  $ buildah bud -t IMAGENAME -v /path/to/tcf.git:/home/tcf:O -f client.Dockerfile
+#  # cd .../tcf.git
+#  $ buildah bud -t tcf -v $PWD:/home/tcf:O --label version="$(git describe --always)" -f client.Dockerfile
 #
 # Run under the container without registry::
 #
-#  $ podman run -e HOME=$HOME -v $HOME:$HOME IMAGENAME tcf ls
+#  $ podman run -v $HOME/.tcf:/home/work/.tcf:O tcf ls
 #
 # Push to a registry::
 #
-#  $ buildah push CONTAINERID REGISTRY/IMAGENAME
+#  $ buildah push localhost/tcf REGISTRY/IMAGENAME/tcf:latest
 #
 # Run under the the container::
 #
-#  $ podman run -e HOME=$HOME -v $HOME:$HOME:O localhost:50000/tcf-f33 tcf ls
+#  $ podman run -v $HOME/.tcf:/home/work/.tcf:O tcf tcf ls
 #
-FROM registry.fedoraproject.org/fedora:34
+FROM registry.fedoraproject.org/fedora-minimal:34
 LABEL maintainer https://github.com/intel/tcf
 
-# For CentOS
-#RUN dnf install -y python3 epel-release git python3-pip
-RUN dnf install -y python3 git python3-pip python3-wheel
-RUN python3 /home/tcf/setup-requirements.py /home/tcf/requirements.txt > /tmp/dependencies.list
-RUN bash -c 'dnf install -y $(< /tmp/dependencies.list)'
+RUN microdnf install -y python3 git python3-pip python3-wheel
+RUN microdnf install -y `python3 /home/tcf/setup-requirements.py /home/tcf/requirements.txt`
 # our setup is a wee messed up at this point
-RUN cd /home/tcf && pip3 install . --root=/ --prefix=/
-# FIXME: quick hack because it's late and I am done with this
-RUN sed -i 's|#!python|#! /usr/bin/env python3|' /usr/bin/tcf
+# FIXME: sed -> quick hack because it's late and I am done with this
+RUN cd /home/tcf && pip3 install . --root=/ --prefix=/ &&  sed -i 's|#!python|#! /usr/bin/env python3|' /usr/bin/tcf
+
+ENV HOME=/home/work
+WORKDIR /home/work
+ENTRYPOINT [ "tcf" ]
