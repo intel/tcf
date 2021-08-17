@@ -465,7 +465,7 @@ class fail_e(exception):
     The test case failed
     """
     tag = 'FAIL'	# see valid_results and exception.descr*
-faileded_e = fail_e
+failed_e = fail_e
 
 class timeout_fail_e(fail_e):
     """
