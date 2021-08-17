@@ -75,6 +75,12 @@ class pci(ttbl.power.impl_c):
         self.timeout = 30
         self.wait = 2
 
+        # We don't use the username because it doesn't uniquely
+        # identify the physical instrument
+        self.upid_set(f"console over IPMI SoL to {hostname}",
+                      name = f"IPMI@{hostname}",
+                      hostname = hostname)
+
     def _run(self, target, command):
         try:
             result = subprocess.check_output(
@@ -194,6 +200,13 @@ class pos_mode_c(ttbl.power.impl_c):
         self.wait = 0.1
         self.paranoid_get_samples = 1
 
+        # We don't use the username because it doesn't uniquely
+        # identify the physical instrument
+        self.upid_set(f"console over IPMI SoL to {hostname}",
+                      name = f"IPMI@{hostname}",
+                      hostname = hostname)
+
+
     def _run(self, target, command):
         try:
             result = subprocess.check_output(
@@ -293,13 +306,14 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
     def __init__(self, hostname,
                  precheck_wait = 0.5,
                  chunk_size = 5, interchunk_wait = 0.1,
-                 ipmi_timeout = 10, ipmi_retries = 3):
+                 ipmi_timeout = 10, ipmi_retries = 3,
+                 **kwargs):
         assert isinstance(hostname, str)
         assert isinstance(ipmi_timeout, numbers.Real)
         assert isinstance(ipmi_retries, int)
         ttbl.console.generic_c.__init__(self, chunk_size = chunk_size,
                                         interchunk_wait = interchunk_wait,
-                                        crlf = "\n")
+                                        **kwargs)
         ttbl.power.socat_pc.__init__(
             self,
             "PTY,link=console-%(component)s.write,rawer"
@@ -394,12 +408,14 @@ class sol_ssh_console_pc(ttbl.console.ssh_pc):
     """
     def __init__(self, hostname, ssh_port = 22,
                  chunk_size = 5, interchunk_wait = 0.1,
-                 ipmi_timeout = 10, ipmi_retries = 3):
+                 ipmi_timeout = 10, ipmi_retries = 3,
+                 **kwargs):
         assert isinstance(ipmi_timeout, numbers.Real)
         assert isinstance(ipmi_retries, int)
         ttbl.console.ssh_pc.__init__(
             self, hostname, port = ssh_port,
-            chunk_size = chunk_size, interchunk_wait = interchunk_wait)
+            chunk_size = chunk_size, interchunk_wait = interchunk_wait,
+            **kwargs)
         _user, password, _hostname = commonl.split_user_pwd_hostname(hostname)
         self.ipmi_timeout = ipmi_timeout
         self.ipmi_retries = ipmi_retries
@@ -407,6 +423,12 @@ class sol_ssh_console_pc(ttbl.console.ssh_pc):
             self.env_add['IPMITOOL_PASSWORD'] = password
         self.paranoid_get_samples = 1
         self.re_enable = True
+
+        # We don't use the username because it doesn't uniquely
+        # identify the physical instrument
+        self.upid_set(f"console over IPMI SoL to {_hostname}",
+                      name = f"IPMI@{_hostname}",
+                      hostname = _hostname)
 
     def on(self, target, component):
         # if there is someone leftover reading, kick them out, there can
