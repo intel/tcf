@@ -212,9 +212,11 @@ logging.addLevelName(6, "D5")
 exception = tcfl.exception
 pass_e = tcfl.pass_e
 error_e = tcfl.error_e
-blocked_e = tcfl.blocked_e
+blocked_e = tcfl.blocked_e	# deprecate
+block_e = tcfl.blocked_e
 timeout_error_e = tcfl.timeout_error_e
-failed_e = tcfl.failed_e
+failed_e = tcfl.fail_e	# deprecate
+fail_e = tcfl.fail_e
 timeout_failed_e = tcfl.timeout_failed_e
 skip_e = tcfl.skip_e
 

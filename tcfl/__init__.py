@@ -440,12 +440,13 @@ class pass_e(exception):
     """
     tag = 'PASS'	# see valid_results and exception.descr*
 
-class blocked_e(exception):
+class block_e(exception):
     """
     The test case could not be completed because something failed and
     disallowed testing if it woud pass or fail
     """
     tag = 'BLCK'	# see valid_results and exception.descr*
+blocked_e = block_e
 
 class error_e(exception):
     """
@@ -459,17 +460,19 @@ class timeout_error_e(error_e):
     """
     pass
 
-class failed_e(exception):
+class fail_e(exception):
     """
     The test case failed
     """
     tag = 'FAIL'	# see valid_results and exception.descr*
+faileded_e = fail_e
 
-class timeout_failed_e(failed_e):
+class timeout_fail_e(fail_e):
     """
     The test case timedout and we consider it a failure
     """
     pass
+timeout_failed_e = timeout_fail_e
 
 class skip_e(exception):
     """
