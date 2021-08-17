@@ -303,8 +303,9 @@ class shell(tc.target_extension_c):
         # it floating because then it will get confused if we switch
         # default consoles.
         console = target.console._console_get(console)
-        self.run('export PS1="TCF-%s:$PS1"' % self.target.kws['tc_hash'],
-                 console = console)
+        self.run(
+            'echo $PS1 | grep -q ^TCF- || export PS1="TCF-%s:$PS1"' % self.target.kws['tc_hash'],
+            console = console)
         # disable line editing for proper recording of command line
         # when running bash; otherwise the scrolling readline does
         # messes up the output
