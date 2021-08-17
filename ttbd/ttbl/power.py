@@ -396,12 +396,15 @@ class interface(ttbl.tt_interface):
         # Called when the interface is added to a target to initialize
         # the needed target aspect (such as adding tags/metadata)
         for name, impl in self.impls.items():
+            # check this here so if the impl doesn't inherit
+            # ttbl.power.impl_c, it is still checked
             assert name not in ( 'all', 'full' ), \
                 "power component '%s': cannot be called '%s'; name reserved" \
                 % (name, name)
             assert impl.explicit in ( None, 'on', 'off', 'both' ), \
                 "power component '%s': impls' explicit value is %s;" \
                 " expected None, 'on', 'off' or 'both'" % (name, impl.implicit)
+            impl.target_setup(target, iface_name, name)
 
     def _release_hook(self, target, _force):
         # nothing to do on target release
@@ -1774,6 +1777,7 @@ RUN microdnf clean all
                 component, self.name, " ".join(cmdline), e))
 
 
+    # FIXME: replace with commonl.verify_timeout()
     def _verify_timeout(self, target, component, timeout,
                         verify_f,
                         *verify_args,
