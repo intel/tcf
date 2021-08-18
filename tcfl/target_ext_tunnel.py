@@ -220,17 +220,13 @@ class tunnel(tc.target_extension_c):
             return
         target = self.target
         tunnels = target.tunnel.list()
-        for protocol, ip_address, target_port, server_port in tunnels:
-            target.report_info(
-                "removing existing tunnel %s %s -> %s:%s"
-                % (protocol, server_port, ip_address, target_port))
-            target.tunnel.remove(target_port, ip_address, protocol)
+        n_existing_tunnels = len(tunnels)
 
         server_port_22 = target.tunnel.add(22)
         target.report_pass("added tunnel to port 22")
 
         tunnels = target.tunnel.list()
-        if len(tunnels) != 1:
+        if len(tunnels) != n_existing_tunnels + 1:
             raise tc.failed_e(
                 "list() lists %d tunnels; expected 1" % len(tunnels),
                 dict(tunnels = tunnels))
@@ -247,7 +243,7 @@ class tunnel(tc.target_extension_c):
 
         tunnels = target.tunnel.list()
 
-        if len(tunnels) != 2:
+        if len(tunnels) != n_existing_tunnels + 2:
             raise tc.failed_e(
                 "list() lists %d tunnels; expected 2" % len(tunnels),
                 dict(tunnels = tunnels))
@@ -267,7 +263,7 @@ class tunnel(tc.target_extension_c):
         target.tunnel.remove(22)
         target.report_pass("removed tunnel to port 22")
         tunnels = target.tunnel.list()
-        if len(tunnels) != 1:
+        if len(tunnels) != n_existing_tunnels + 1:
             raise tc.failed_e(
                 "list() lists %d tunnels; expected 1" % len(tunnels),
                 dict(tunnels = tunnels))
@@ -282,7 +278,7 @@ class tunnel(tc.target_extension_c):
         target.tunnel.remove(23)
         target.report_pass("removed tunnel to port 23")
         tunnels = target.tunnel.list()
-        if len(tunnels) != 0:
+        if len(tunnels) != n_existing_tunnels + 0:
             raise tc.failed_e(
                 "list() reports %d tunnels; expected none" % len(tunnels),
                 dict(tunnels = tunnels))
