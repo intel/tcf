@@ -122,7 +122,7 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
                         f"alloc/keepalive giving up after {retry_timeout}s"
                         f" retrying connection errors") from e
             logging.warning(
-                f"retrying {retry_timeout - (ts - retry_ts):.0f}s"
+                f"retrying for {retry_timeout - (ts - retry_ts):.0f}s"
                 f" alloc/keepalive after connection error {type(e)}: {e}")
             continue
 
@@ -167,9 +167,6 @@ def _alloc_hold(rtb, allocid, state, ts0, max_hold_time, keep_alive_period):
             #print(f"DEBUG: holding/keepalive ", file = sys.stderr)
             r = rtb.send_request("PUT", "keepalive", json = data)
         except requests.exceptions.RequestException as e:
-            logging.warning(
-                f"retrying {retry_timeout - (ts - retry_ts):.0f}s"
-                f" hold/keepalive after connection error {type(e)} {e}")
             ts = time.time()
             if retry_ts == None:
                 retry_ts = ts
@@ -178,6 +175,9 @@ def _alloc_hold(rtb, allocid, state, ts0, max_hold_time, keep_alive_period):
                     raise RuntimeError(
                         f"alloc/keepalive giving up after {retry_timeout}s"
                         f" retrying connection errors") from e
+            logging.warning(
+                f"retrying for {retry_timeout - (ts - retry_ts):.0f}s"
+                f" hold/keepalive after connection error {type(e)} {e}")
             continue
 
         # COMPAT: old version packed the info in the 'result' field,
