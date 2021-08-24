@@ -233,10 +233,9 @@ class ssh(tc.target_extension_c):
         self.target.report_info("running SSH command: %s"
                                 % " ".join(cmdline), dlevel = 2)
         self._known_hosts_wipe()
-        returncode = subprocess.call(cmdline, stdin = None,
-                                     shell = False,
-                                     stdout = log_stdout,
-                                     stderr = log_stderr)
+        returncode = subprocess.call(cmdline, stdin = None, shell = False,
+                                     stdout = log_stdout, stderr = log_stderr,
+                                     encoding = 'utf-8')
         log_stdout.seek(0, 0)
         log_stderr.seek(0, 0)
         if returncode != 0:
@@ -343,7 +342,7 @@ class ssh(tc.target_extension_c):
                                     % " ".join(cmdline), dlevel = 2)
             self._known_hosts_wipe()
             s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT,
-                                        shell = False)
+                                        shell = False, encoding = 'utf-8')
         except subprocess.CalledProcessError as e:
             self._returncode_eval(e.returncode)
             self.target.report_error(
@@ -406,7 +405,8 @@ class ssh(tc.target_extension_c):
                                     % " ".join(cmdline), dlevel = 2)
             self._known_hosts_wipe()
             s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT,
-                                        shell = False, env = env)
+                                        shell = False, env = env,
+                                        encoding = 'utf-8')
         except subprocess.CalledProcessError as e:
             self._returncode_eval(e.returncode)
             commonl.raise_from(nonzero_e(
