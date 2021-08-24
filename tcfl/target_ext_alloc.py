@@ -99,6 +99,8 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
         "allocation ID %s: [+%.1fs] keeping alive during state '%s'" % (
             allocid, ts - ts0, state))
     new_state = state		# in case we don't wait
+    retry_ts = None
+    retry_timeout = 40
     while wait_in_queue:
         if queue_timeout and ts - ts0 > queue_timeout:
             raise tcfl.tc.blocked_e(
@@ -108,10 +110,21 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
         ts = time.time()
         state = data[allocid]
         try:
+            #print(f"DEBUG: alloc/keepalive", file = sys.stderr)
             r = rtb.send_request("PUT", "keepalive", json = data)
-        except requests.exceptions.RequestException:
-            # FIXME: tolerate N failures before giving up
-            pass
+        except requests.exceptions.RequestException as e:
+            ts = time.time()
+            if retry_ts == None:
+                retry_ts = ts
+            else:
+                if ts - retry_ts > retry_timeout:
+                    raise RuntimeError(
+                        f"alloc/keepalive giving up after {retry_timeout}s"
+                        f" retrying connection errors") from e
+            logging.warning(
+                f"retrying {retry_timeout - (ts - retry_ts):.0f}s"
+                f" alloc/keepalive after connection error {type(e)}: {e}")
+            continue
 
         # COMPAT: old version packed the info in the 'result' field,
         # newer have it in the first level dictionary
@@ -125,7 +138,7 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
 
         if allocid not in r:
             continue # no news
-        new_state = r[allocid]
+        new_state = r[allocid]['state']
         if new_state == 'active':
             r = rtb.send_request("GET", "allocation/%s" % allocid)
             group_allocated = r['group_allocated'].split(',')
@@ -141,6 +154,8 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
 
 
 def _alloc_hold(rtb, allocid, state, ts0, max_hold_time, keep_alive_period):
+    retry_ts = None
+    retry_timeout = 40
     while True:
         time.sleep(keep_alive_period)
         ts = time.time()
@@ -148,7 +163,22 @@ def _alloc_hold(rtb, allocid, state, ts0, max_hold_time, keep_alive_period):
             # maximum hold time reached, release it
             break
         data = { allocid: state }
-        r = rtb.send_request("PUT", "keepalive", json = data)
+        try:
+            #print(f"DEBUG: holding/keepalive ", file = sys.stderr)
+            r = rtb.send_request("PUT", "keepalive", json = data)
+        except requests.exceptions.RequestException as e:
+            logging.warning(
+                f"retrying {retry_timeout - (ts - retry_ts):.0f}s"
+                f" hold/keepalive after connection error {type(e)} {e}")
+            ts = time.time()
+            if retry_ts == None:
+                retry_ts = ts
+            else:
+                if ts - retry_ts > retry_timeout:
+                    raise RuntimeError(
+                        f"alloc/keepalive giving up after {retry_timeout}s"
+                        f" retrying connection errors") from e
+            continue
 
         # COMPAT: old version packed the info in the 'result' field,
         # newer have it in the first level dictionary
@@ -157,7 +187,7 @@ def _alloc_hold(rtb, allocid, state, ts0, max_hold_time, keep_alive_period):
             r.update(result)
         # COMPAT: end        
         commonl.progress(
-            "allocation ID %s: [+%.1fs] keeping alive during state '%s': %s"
+            "allocation ID %s: [+%.1fs] hold/keeping alive during state '%s': %s"
             % (allocid, ts - ts0, state, r))
         # r is a dict, allocids that changed state of the ones
         # we told it in 'data'
