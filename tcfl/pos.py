@@ -2147,7 +2147,7 @@ def ipxe_seize(target):
     ts_init = time.time()
     target.report_data("Boot statistics %(type)s",
                        "iPXE initialization time (s)", ts_init - ts0)
-    
+
     # if the connection is slow, we have to start sending Ctrl-B's
     # ASAP
     #target.expect(re.compile("iPXE .* -- Open Source Network Boot Firmware"))
@@ -2383,6 +2383,12 @@ class tc_pos0_base(tc.tc_c):
     >>>                          "Hello World")
 
     Please refer to :class:`tc_pos_base` for more information.
+
+    Environment:
+
+    - *REBOOT_DISABLED* if defined in the environment, this will skip
+      power cycling in the start subphase of eval
+
     """
 
 
@@ -2555,6 +2561,14 @@ class tc_pos0_base(tc.tc_c):
         target.report_pass("deployed %s" % self.image)
 
     def start_50(self, ic, target):
+        if 'REBOOT_DISABLED' in os.environ:
+            target.report_info(
+                "not rebooting (REBOOT_DISABLED defined in environment)")
+            # used for debugging or tight development cycles
+            target.console.select_preferred()
+            target.console.enable()
+            return
+
         ic.power.on()
         # fire up the target, wait for a login prompt
 
