@@ -2037,7 +2037,7 @@ def _cmdline_setup(arg_subparser):
                     action = "store_true", default = False,
                     help = "reset to default values")
     ap.add_argument("parameters", metavar = "KEY:VALUE", #action = "append",
-                    nargs = "*",
+                    nargs = "+",
                     help = "Parameters to set (KEY:VALUE)")
     ap.set_defaults(func = _cmdline_console_setup)
 
