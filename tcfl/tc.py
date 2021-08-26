@@ -8390,7 +8390,7 @@ def _run(args):
     tc_c._phases_skip['clean'] = set(['builtin-config'])
     if 'configure' in args.phases:
         tc_c._phases["configure"].add('command line')
-        tc_c._phases_skip.pop('configure')
+        tc_c._phases_skip.pop('configure', None)
     if 'build' in args.phases:
         tc_c._phases['build'].add('command line')
     if 'deploy' in args.phases:
@@ -8402,7 +8402,7 @@ def _run(args):
         tc_c._phases['eval'].add('command line')
     if 'clean' in args.phases:
         tc_c._phases['clean'].add('command line')
-        tc_c._phases_skip.pop('clean')
+        tc_c._phases_skip.pop('clean', None)
 
     if 'configure' in args.phases_skip:
         tc_c._phases.pop('configure', None)
