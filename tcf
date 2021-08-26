@@ -295,6 +295,10 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "-i", "--ignore-ssl", action='store_true', default = False,
         help = "Ignore server SSL certificate")
+    arg_parser.add_argument(
+        "-e", "--environment", metavar = "KEY=VALUE", action='append',
+        default = [],
+        help = "add an environment variable to execution")
     # This is made a global argument, even if only 'run' uses it
     # because it makes it easier to generate the sub-command without
     # having to muck with 'run's sub-arguments
@@ -499,6 +503,14 @@ if __name__ == "__main__":
     log_format = "%(levelname)s %(module)s.%(funcName)s():%(lineno)d: %(message)s"
     log_format = commonl.log_format_compose(log_format, args.log_pid_tid, args.log_time)
     logging.basicConfig(format = log_format, level = args.level)
+
+    for environment in args.environment:
+        if '=' in environment:
+            key, val = environment.split("=", 1)
+        else:
+            key = environment
+            val = True
+        os.environ[key] = val
 
     if args.debug:
         import http.client
