@@ -9,6 +9,7 @@ PyYAML              # package: centos,fedora=python3-pyyaml
 imutils
 ply                 # package: python3-ply
 pykwalify           # package: python3-pykwalify
+pyte	            # pacakge: python3-pyte
 pyserial            # package: python3-pyserial ubuntu=python3-serial
 # This has to build, so in windows take one that is built, otherwise
 # we need a lot of extra deps

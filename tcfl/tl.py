@@ -12,11 +12,71 @@ Common utilities for test cases
 import collections
 import datetime
 import os
+import pyte
 import re
 import ssl
 import time
 
 import tcfl.tc
+
+def ansi_render_approx(s, width = 80, height = 2000):
+    """
+    Does an approximated render of how a string would look on a vt100
+    terminal
+
+    The string can contain ANSI escape sequences, which the
+    :module:`pyte` engine can render so a string such as
+
+    >>> s = '\x1b[23;08Hi\x1b[23;09H\x1b[23;09Hf\x1b[23;10H\x1b[23;10Hc\x1b[23;11H\x1b[23;11Ho\x1b[23;12H\x1b[23;12Hn\x1b[23;13H\x1b[23;13Hf\x1b[23;14H\x1b[23;14Hi\x1b[23;15H\x1b[23;15Hg\x1b[23;16H\x1b[23;16H \x1b[23;17H\x1b[23;17H-\x1b[23;18H\x1b[23;18Hl\x1b[23;19H\x1b[23;19H \x1b[23;20H\x1b[23;20He\x1b[23;21H\x1b[23;21Ht\x1b[23;22H\x1b[23;22Hh\x1b[23;23H\x1b[23;23H0\x1b[23;24H\x1b[23;24H\r\n\r\n'
+
+    renders to::
+
+      <RENDERER: skipped 23 empty lines>
+             ifconfig -l eth0
+
+      Shell> ping -n 5 10.219.169.119
+
+    (loosing attributes such as boldface, colors, etc) Note also that
+    the sequences might move the cursor, override things, etc --
+    sometimes you need to render different parts of the string and
+    feed parts to it and see how it updates it.
+
+    :param str s: string to render, possibly containing ANSI escape
+      sequences
+
+    :param int width: (optional) with of the screen where to render
+      (usually 80, the original vt100 terminal size)
+
+    :param int height: (optional) height of the screen where to render
+      (usually 24, the original vt100 terminal size, however made to
+      default to 2000 so it catches history for sequential command
+      executions; this might not work on all cases if the sequentials
+      clear the screen or move the cursor.
+    """
+    assert isinstance(s, str)
+    assert isinstance(width, int) and width > 20
+    assert isinstance(height, int) and height > 20
+    r = ""
+    screen = pyte.Screen(width, height)
+    stream = pyte.Stream(screen)
+    stream.feed(s)
+
+    empty_line = width * " "
+    last = empty_line
+    skips = 1
+    for line in screen.display:
+        # skip over repeated empty lines
+        if line == empty_line and line == last:
+            skips += 1
+            continue
+        else:
+            if skips > 1:
+                r += f"<RENDERER: skipped {skips} empty lines>\n"
+            skips = 1
+            last = line
+        r += line.rstrip() + "\n"
+    return r
+
 
 #! Place where the Zephyr tree is located
 # Note we default to empty string so it can be pased
