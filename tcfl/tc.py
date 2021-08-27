@@ -3585,10 +3585,11 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             assert callable(hook_pre), \
                 "tcfl.tc.tc_c.hook_pre contains %s, defined as type '%s', " \
                 "which  is not callable" % type(hook_pre).__name__
-        # see also __init_shallow__()
 
-        self.__init_shallow__(None)
-        self.name = name
+        #: Lock to access :attr:`buffers` safely from multiple threads
+        #: at the same time for the same testcase.
+        self.lock = None	# initialized by __init_shallow__()
+        # see also __init_shallow__()
 
         #: Keywords for *%(KEY)[sd]* substitution specific to this
         #: testcase.
@@ -3623,6 +3624,10 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         #:
         #: (this will actually be fully initialzied in *__init_shallow__()*)
         self.kws = {}
+        self.kws_origin = {}
+
+        self.__init_shallow__(None)
+        self.name = name
 
         self.kw_set('pid', str(os.getpid()))
         self.kw_set('tid', "%x" % threading.current_thread().ident)
@@ -3798,9 +3803,6 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         # later on, we don't actually need to execute those subtcs,
         # just report on them.
         self._execute = True
-        #: Lock to access :attr:`buffers` safely from multiple threads
-        #: at the same time for the same testcase.
-        self.lock = None	# initialized by __init_shallow__()
 
 
     def __init_shallow__(self, other):
@@ -3816,14 +3818,16 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         self.buffers = {}
         if other:
             self.kws = dict(other.kws)
-        else:
+        elif self.kws == None:
+            # respect settings from __init__
             self.kws = dict()
 
         #: Origin of the keyword in self.kws; the values for these are
         #: lists of places where the setting was set, or re-set
         if other:
             self.kws_origin = dict(other.kws_origin)
-        else:
+        elif self.kws_origin == None:
+            # respect settings from __init__
             self.kws_origin = dict()
 
         #: list of files kept as collateral in logdir (to decide if we
