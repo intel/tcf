@@ -2049,6 +2049,7 @@ class target_c(reporter_c):
     def ttbd_iface_call(self, interface, call, method = "PUT",
                         component = None, stream = False, raw = False,
                         files = None, timeout = 160,
+                        retry_timeout = 0, retry_backoff = 0.5,
                         **kwargs):
         """
         Execute a general interface call to TTBD, the TCF remoting server
@@ -2074,6 +2075,20 @@ class target_c(reporter_c):
           descriptors (or iterables). FIXME: needs more clarification
           on how this works.
 
+        :param float retry_timeout: (optional, default 0--disabled)
+          how long (in seconds) to retry connections in case of failure
+          (:class:`requests.exceptions.ConnectionError`,
+          :class:`requests.exceptions.ReadTimeout`)
+
+          Note a retry can have side effects if the request is not
+          idempotent (eg: writing to a console); retries shall only be
+          enabled for GET calls. Support for non-idempotent calls has
+          to be added to the protocol.
+
+        :param float retry_backofff: (optional) how long to wait in
+          between retries. This number is increased each time by 20%
+          until it is at most *retry_timeout / 10*.
+
         Rest of the arguments are a dictionary keyed by string with
         values that will be serialized to pass the remote call
         as arguments, and thus are interface specific.
@@ -2089,7 +2104,13 @@ class target_c(reporter_c):
         assert isinstance(raw, bool)
         assert method.upper() in ( "PUT", "GET", "DELETE", "POST" ), \
             "method must be PUT|GET|DELETE|POST; got %s" % method
-
+        assert isinstance(retry_timeout, (int, float)) and retry_timeout >= 0, \
+            f"retry_timeout: {retry_timeout} has to be an int/float >= 0"
+        assert isinstance(retry_backoff, (int, float)) and retry_backoff > 0
+        if retry_timeout > 0:
+            assert retry_backoff < retry_timeout, \
+                f"retry_backoff {retry_backoff} has to be" \
+                f" smaller than retry_timeout {retry_timeout}"
         if self.rtb.server_json_capable:
             all_json = True
         else:
@@ -2117,22 +2138,68 @@ class target_c(reporter_c):
 
         if self.ticket:		# almost deprecated
             kwargs['ticket'] = self.ticket
-        try:
-            return self.rtb.send_request(
-                method,
-                "targets/%s/%s/%s" % (self.id, interface, call),
-                stream = stream, raw = raw, files = files, timeout = timeout,
-                data = kwargs if kwargs else None)
-        except requests.HTTPError as e:
-            commonl.raise_from(
-                error_e("%s: %s/%s: remote call failed: %s"
-                        % (self.id, interface, call, e),
-                        dict(
-                            target = self,
-                            server = str(self.rtb),
-                            error = str(e)
-                        )),
-                e)
+
+        # This looks really complex, but it is just the
+        # rtb.send_request() below call
+        #
+        # the rest is just a retry loop that keeps trying if
+        # retry_timeout > 0 until the timeout expires, backing off an
+        # incremental amount of time.
+        retry_count = -1
+        retry_ts = None
+        while True:
+            retry_count += 1
+            try:
+                return self.rtb.send_request(
+                    method,
+                    f"targets/{self.id}/{interface}/{call}",
+                    stream = stream, raw = raw, files = files, timeout = timeout,
+                    data = kwargs if kwargs else None)
+
+            except (
+                    requests.exceptions.ConnectionError,
+                    requests.exceptions.ReadTimeout,
+            ) as e:
+                # Failure, shall we retry?
+                # Report how many retries we have done, wait a backoff
+                # and then loop it.
+                if retry_timeout == 0:
+                    raise
+                name = f"HTTP {method} {interface}/{call}"
+                testcase = self.testcase
+                ts = time.time()
+                if retry_ts == None:
+                    retry_ts = ts	# first one
+                else:
+                    if ts - retry_ts > retry_timeout:
+                        raise RuntimeError(
+                            f"{name}: giving up after {retry_timeout}s"
+                            f" retrying {retry_count} connection errors") from e
+                with testcase.lock:
+                    testcase.buffers.setdefault(name, 0)
+                    testcase.buffers[name] += 1
+                    count = testcase.buffers[name]
+                self.report_data("Warnings [%(type)s]", name, count)
+                self.testcase.log.warning(
+                    f"{name}: retrying for {retry_timeout - (ts - retry_ts):.0f}s"
+                    f" more after connection error {type(e)}: {e}")
+                time.sleep(retry_backoff)
+                # increase the backoff to avoid pestering too much,
+                # but make sure it doesn't get too big so we at least
+                # get 10 tries in the timeout period
+                if retry_backoff < retry_timeout / 10:
+                    retry_backoff *= 1.2
+                continue
+
+            except requests.HTTPError as e:
+                raise error_e("%s: %s/%s: remote call failed: %s"
+                              % (self.id, interface, call, e),
+                              dict(
+                                  target = self,
+                                  server = str(self.rtb),
+                                  error = str(e)
+                              )) from e
+
 
     def instrument_name_get(self, interface_name, component = None):
         """
