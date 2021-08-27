@@ -1985,8 +1985,8 @@ class target_c(reporter_c):
             self.bsps_stub[bsp] = (_app, app_src, app_src_options)
 
 
-    @staticmethod
-    def create_from_cmdline_args(args, target_name = None, iface = None,
+    @classmethod
+    def create_from_cmdline_args(cls, args, target_name = None, iface = None,
                                  extensions_only = None):
         """
         Create a :class:`tcfl.tc.target_c` object from command line
@@ -2008,28 +2008,36 @@ class target_c(reporter_c):
             if not hasattr(args, 'target'):
                 raise RuntimeError("missing 'target' argument")
             target_name = getattr(args, 'target', None)
-        _rtb, rt = ttb_client._rest_target_find_by_id(target_name)
-        target = target_c(rt, tc_global, None, "cmdline",
-                          extensions_only = extensions_only)
-        if iface != None and not iface in target.rt.get('interfaces', []):
-            raise RuntimeError("%s: target does not support the %s interface"
-                               % (target_name, iface))
+        target = cls.create(target_name,
+                            iface = iface, extensions_only = extensions_only)
         if args.ticket:
             target.ticket = args.ticket
-        else:
-            target.ticket = None	# target_c.__init__ inits this
+            target.testcase.ticket = args.ticket
         return target
 
+
     @staticmethod
-    def create(target_name):
+    def create(target_name, iface = None, extensions_only = None):
         """
         Create a :class:`tcfl.tc.target_c` object for a direct test
 
         :param str target_name: name of the target; this can be just
           an ID or a fullid (SERVER/ID).
+        :param str iface: (optional) target must support the given
+          interface, otherwise an exception is raised.
+        :param list extensions_only: (optional) list of extensions to
+          load; if *[]*, load no extensions, if *None* load all
+          extensions available/needed; otherwise, load only the
+          extensions listed by name.
+        :returns: instance of :class:`tcfl.tc.target_c` representing
+          said target, if it is available.
         """
         _rtb, rt = ttb_client._rest_target_find_by_id(target_name)
-        target = target_c(rt, tc_global, None, "target")
+        target = target_c(rt, tc_global, None, "target",
+                          extensions_only = extensions_only)
+        if iface != None and not iface in target.rt.get('interfaces', []):
+            raise RuntimeError("%s: target does not support the %s interface"
+                               % (target_name, iface))
         target.testcase.ticket = "TICKET"
         target.ticket = target.testcase.ticket
         target.testcase.__init_shallow__(target.testcase)
