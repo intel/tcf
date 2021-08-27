@@ -321,26 +321,9 @@ class expect_text_on_console_c(tc.expectation_c):
             # the capture must be raw, no translations -- otherwise it
             # is going to be a mess to keep offsets right
             newline = ''
-            retry_count = -1
-            last_e = None
-            while retry_count < 3:
-                retry_count += 1
-                try:
-                    generation, new_offset, total_bytes = \
-                        target.console.read_full(self.console, read_offset,
-                                                 self.max_size, of, newline = newline)
-                    break
-                except requests.exceptions.ReadTimeout as e:
-                    last_e = e
-                    name = f"HTTP read timeouts from console {self.console}"
-                    testcase = target.testcase
-                    with testcase.lock:
-                        testcase.buffers.setdefault(name, 0)
-                        testcase.buffers[name] += 1
-                        count = testcase.buffers[name]
-                    target.report_data("Warnings [%(type)s]", name, count)
-            else:
-                raise last_e
+            generation, new_offset, total_bytes = \
+                target.console.read_full(self.console, read_offset,
+                                         self.max_size, of, newline = newline)
             generation_prev = buffers_poll.get('generation', None)
             if generation_prev == None:
                 buffers_poll['generation'] = generation
@@ -947,8 +930,10 @@ class extension(tc.target_extension_c):
             f" expected none, empty string, regex, bytes or string"
             f" (data_type {data_type})")
 
+
     def _read(self, console = None, offset = 0, max_size = 0, fd = None,
-              newline = None):
+              newline = None,
+              **ttbd_iface_call_kwargs):
         """
         Read data received on the target's console
 
@@ -980,7 +965,8 @@ class extension(tc.target_extension_c):
                     target.ttbd_iface_call(
                         "console", "read", method = "GET",
                         component = console, offset = offset,
-                        stream = True, raw = True)) as r:
+                        stream = True, raw = True,
+                        **ttbd_iface_call_kwargs)) as r:
                 # http://docs.python-requests.org/en/master/user/quickstart/#response-content
                 # when doing raw streaming, the call returns
                 # bytes--it's up to the customer to pass the right
@@ -1017,7 +1003,8 @@ class extension(tc.target_extension_c):
             # read from the stream, to a stream, return it
             r = target.ttbd_iface_call("console", "read", method = "GET",
                                        component = console, offset = offset,
-                                       raw = True)
+                                       raw = True,
+                                       **ttbd_iface_call_kwargs)
             ret = self._newline_convert(r.text, newline)
             l = len(ret)
         target.report_info("%s: read %dB from console @%d"
@@ -1030,8 +1017,13 @@ class extension(tc.target_extension_c):
             + int(r.headers.get('Content-Length', 0))
         return generation, new_offset, ret
 
+
     def read(self, console = None, offset = 0, max_size = 0, fd = None,
-             newline = None):
+             newline = None,
+             # when reading, we are ok with retrying a lot, since
+             # this is an idempotent operation
+             retry_timeout = 60, retry_backoff = 0.1,
+             **ttbd_iface_call_kwargs):
         """
         Read data received on the target's console
 
@@ -1063,14 +1055,24 @@ class extension(tc.target_extension_c):
           - a regular expresion: whatever matches the regular
             expression is replaced with a *\\n*.
 
+        Retry parameters as to :meth:`tcfl.tc.target_c.ttbd_iface_call`.
+
         :returns: data read (or if written to a file descriptor,
           amount of bytes read)
         """
         return self._read(console = console, offset = offset,
-                          max_size = max_size, fd = fd, newline = newline)[2]
+                          max_size = max_size, fd = fd, newline = newline,
+                          retry_timeout = retry_timeout,
+                          retry_backoff = retry_backoff,
+                          **ttbd_iface_call_kwargs)[2]
+
 
     def read_full(self, console = None, offset = 0, max_size = 0, fd = None,
-                  newline = None):
+                  newline = None,
+                  # when reading, we are ok with retrying a lot, since
+                  # this is an idempotent operation
+                  retry_timeout = 60, retry_backoff = 0.1,
+                  **ttbd_iface_call_kwargs):
         """
         Like :meth:`read`, reads data received on the target's console
         returning also the stream generation and offset at which to
@@ -1107,6 +1109,8 @@ class extension(tc.target_extension_c):
           - a regular expresion: whatever matches the regular
             expression is replaced with a *\\n*.
 
+        Retry parameters as to :meth:`tcfl.tc.target_c.ttbd_iface_call`.
+
         :returns: tuple consisting of:
 
           - stream generation
@@ -1118,7 +1122,10 @@ class extension(tc.target_extension_c):
 
         """
         return self._read(console = console, offset = offset,
-                          max_size = max_size, fd = fd, newline = newline)
+                          max_size = max_size, fd = fd, newline = newline,
+                          retry_timeout = retry_timeout,
+                          retry_backoff = retry_backoff,
+                          **ttbd_iface_call_kwargs)
 
     def size(self, console = None):
         """
@@ -1503,65 +1510,53 @@ class _console_reader_c:
         :param bool timestamp:
         """
         data_len = 0
-        try:
-            # Instead of reading and sending directy to the
-            # stdout, we need to break it up in chunks; the
-            # console is in non-blocking mode (for reading
-            # keystrokes) and also in raw mode, so it doesn't do
-            # \n to \r\n xlation for us.
-            # So we chunk it and add the \r ourselves; there might
-            # be a better method to do this.
-            generation, self.offset, data = \
-                self.target.console.read_full(
-                    self.console, self.offset, 4096)
-            if self.generation_prev != None and self.generation_prev != generation:
-                sys.stderr.write(
-                    "\n\r\r\nWARNING: console was restarted\r\r\n\n")
-                self.offset = len(data)
-            self.generation_prev = generation
 
-            if data:
-                # add CR, because the console is in raw mode
-                for line in data.splitlines(True):
-                    # note line is strings, UTF-8 encode, which is
-                    # what we get from the protocol
-                    if self.timestamp:
-                        timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S ")
-                        self.fd.write(timestamp.encode('utf-8'))
-                    f_write_retry_eagain(self.fd, line.encode('utf-8'))
-                    if '\n' in line:
-                        f_write_retry_eagain(self.fd, b"\r")
-                self.fd.flush()
-                data_len = len(data)
+        # Instead of reading and sending directy to the
+        # stdout, we need to break it up in chunks; the
+        # console is in non-blocking mode (for reading
+        # keystrokes) and also in raw mode, so it doesn't do
+        # \n to \r\n xlation for us.
+        # So we chunk it and add the \r ourselves; there might
+        # be a better method to do this.
+        generation, self.offset, data = \
+            self.target.console.read_full(
+                self.console, self.offset, 4096,
+                # when reading, we are ok with retrying a lot, since
+                # this is an idempotent operation
+                retry_backoff = self.backoff_wait,
+                retry_timeout = 60)
+        if self.generation_prev != None and self.generation_prev != generation:
+            sys.stderr.write(
+                "\n\r\r\nWARNING: console was restarted\r\r\n\n")
+            self.offset = len(data)
+        self.generation_prev = generation
 
-            if data_len == 0:
-                self.backoff_wait *= 2
-            else:
-                self.backoff_wait = 0.1
-            # in interactive mode we want to limit the backoff to
-            # one second so we have time to react
-            if self.backoff_wait >= self.backoff_wait_max:
-                self.backoff_wait = self.backoff_wait_max
-            time.sleep(self.backoff_wait)	# no need to bombard the server..
-            if self.server_connection_errors > 0:
-                self.server_connection_errors = 0	# successful, restart the count
-                self.backoff_wait = 0.1
-        except requests.exceptions.ConnectionError:
-            self.server_connection_errors += 1
-            if self.server_connection_errors >= self.server_connection_errors_max:
-                if flags_restore:		# need to do this before printing
-                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN,
-                                      flags_restore)
-                raise
-            # connection error, server might be down, retry
-            print(f"\n\r\r\nWARNING: server connection timedout,"
-                  f" retry #{self.server_connection_errors+1}/{self.server_connection_errors_max}"
-                  f" after {self.backoff_wait:.1f}s\r\r\n\n",
-                  file = sys.stderr)
-            time.sleep(self.backoff_wait)	# no need to bombard the server..
+        if data:
+            # add CR, because the console is in raw mode
+            for line in data.splitlines(True):
+                # note line is strings, UTF-8 encode, which is
+                # what we get from the protocol
+                if self.timestamp:
+                    timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S ")
+                    self.fd.write(timestamp.encode('utf-8'))
+                f_write_retry_eagain(self.fd, line.encode('utf-8'))
+                if '\n' in line:
+                    f_write_retry_eagain(self.fd, b"\r")
+            self.fd.flush()
+            data_len = len(data)
+
+        if data_len == 0:
             self.backoff_wait *= 2
-            if self.backoff_wait >= self.backoff_wait_max:
-                self.backoff_wait = self.backoff_wait_max
+        else:
+            self.backoff_wait = 0.1
+        # in interactive mode we want to limit the backoff to
+        # one second so we have time to react
+        if self.backoff_wait >= self.backoff_wait_max:
+            self.backoff_wait = self.backoff_wait_max
+        time.sleep(self.backoff_wait)	# no need to bombard the server..
+        if self.server_connection_errors > 0:
+            self.server_connection_errors = 0	# successful, restart the count
+            self.backoff_wait = 0.1
 
         return data_len
 
