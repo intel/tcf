@@ -27,7 +27,7 @@ path = []
 #: The list of config files we have imported
 loaded_files = []
 #: Path where shared files are stored
-share_path = None
+share_path = os.path.expanduser(_install.share_path)
 #: Path where state files are stored
 state_path = None
 #: List of URLs to servers we are working with
@@ -85,9 +85,6 @@ def load(config_path = None, config_files = None,
         state_path = state_dir
     else:
         state_path = os.path.join(os.path.expanduser("~"), ".tcf")
-
-    global share_path
-    share_path = os.path.expanduser(_install.share_path)
 
     if not config_files:
         config_files = []
