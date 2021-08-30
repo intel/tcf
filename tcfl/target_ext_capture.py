@@ -652,7 +652,7 @@ class extension(tc.target_extension_c):
                 target.report_pass("capturer %s: starts" % capturer)
             except RuntimeError as e:
                 target.report_fail("capturer %s: can't start" % capturer,
-                                   dict(exception = e))
+                                   dict(exception = e), subcase = "start")
 
             # If the capturer is not a snapshot capturer check streaming state
             if capture_spec[capturer] == False:
@@ -666,28 +666,30 @@ class extension(tc.target_extension_c):
                         "capturer %s is not in expected streaming mode, but %s"
                         % (capturer, state))
 
+        testcase = target.testcase
         for capturer, state in capturers.items():
 
-            _start_and_check(capturer)
-            time.sleep(10)		# give it some time to record sth
-            try:
-                r = target.capture.get(capturer)
-                for item in r.items():
-                    target.report_pass(
-                        "capturer %s: gets %s \"%s\""
-                         % (capturer, item[0], item[1]))
-            except RuntimeError as e:
-                target.report_fail(
-                    "capturer %s: can't get" % capturer,
-                    dict(exception = e))
+            with testcase.subcase(capturer):
+                _start_and_check(capturer)
+                time.sleep(10)		# give it some time to record sth
+                try:
+                    r = target.capture.get(capturer)
+                    for item in r.items():
+                        target.report_pass(
+                            "capturer %s: gets %s \"%s\""
+                             % (capturer, item[0], item[1]))
+                except RuntimeError as e:
+                    target.report_fail(
+                        "capturer %s: can't get" % capturer,
+                        dict(exception = e), subcase = "get")
 
-            _start_and_check(capturer)
-            try:
-                target.capture.stop(capturer)
-                target.report_pass("capturer %s: stops" % capturer)
-            except RuntimeError as e:
-                target.report_fail("capturer %s: can't stop" % capturer,
-                                   dict(exception = e))
+                _start_and_check(capturer)
+                try:
+                    target.capture.stop(capturer)
+                    target.report_pass("capturer %s: stops" % capturer)
+                except RuntimeError as e:
+                    target.report_fail("capturer %s: can't stop" % capturer,
+                                       dict(exception = e), subcase = "stop")
 
 
     def image_on_screenshot(
