@@ -386,16 +386,20 @@ class exception(Exception, result_c):
             assert isinstance(attachments, dict)
         Exception.__init__(self, description, attachments)
         result_c.__init__(self,  **result_c_kwargs)
+        self.attachments = attachments
 
     def attachments_get(self):
-        return self.args[1]
+        return self.attachments
+
+    def attachment_get(self, name, default = None):
+        return self.attachments.get(name, default)
 
     def attachments_update(self, d):
         """
         Update an exception's attachments
         """
         assert isinstance(d, dict)
-        self.args[1].update(d)
+        self.attachments.update(d)
 
     def __repr__(self):
         return self.args[0]
