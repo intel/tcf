@@ -8111,8 +8111,14 @@ def testcases_discover(tcs_filtered, args):
             result.blocked += 1
 
     for tc_path in args.testcase:
-        if '#' in tc_path:
-            parts = tc_path.split("#")
+        if ',' in tc_path:
+            parts = tc_path.split(',')
+            tc_path = parts[0]
+            subcases_cmdline = parts[1:]
+            logger.info("commandline '%s' requests subcases: %s",
+                        tc_path, " ".join(subcases_cmdline))
+        elif '#' in tc_path:
+            parts = tc_path.split('#')
             tc_path = parts[0]
             subcases_cmdline = parts[1:]
             logger.info("commandline '%s' requests subcases: %s",
