@@ -2551,6 +2551,8 @@ class tc_pos0_base(tc.tc_c):
 
     def deploy_50(self, ic, target):
         # ensure network, DHCP, TFTP, etc are up and deploy
+        if self.image_requested == None:
+            self.image_requested = os.environ.get('IMAGE', None)
         ic.power.on()
         if not self.image_requested:
             raise tc.blocked_e(
