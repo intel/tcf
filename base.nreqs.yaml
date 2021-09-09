@@ -1,0 +1,48 @@
+#
+# Install with::
+#
+#   $ tcf.git/nreqs.py install base.nreqs.yaml
+#
+make:
+gvnc-tools:
+dosfstools:
+
+Jinja2: python3-jinja2
+
+imutils:
+  
+ply:
+  dnf: python3-ply
+
+pykwalify: python3-pykwalify
+  
+pyte: python3-pyte
+
+pyserial:
+  dnf:
+    name: python3-pyserial
+  apt:
+    name: python3-serial
+
+# This has to build, so in windows take one that is built, otherwise
+# we need a lot of extra deps
+python-Levenshtein-wheels:
+  require_platform: win32
+
+python-Levenshtein:
+  skip_platform: win32
+  
+PyYAML: python3-pyyaml 
+
+requests: python3-requests
+
+rpyc: python3-rpyc
+
+tabulate: python3-tabulate
+  
+setuptools:
+  distro: python3-setuptools
+  
+termcolor:
+  distro:
+    name: python3-termcolor
