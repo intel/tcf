@@ -198,7 +198,8 @@ class method_dnf_c(method_abc):
         method_abc.__init__(self, "dnf", [ 'fedora', 'centos', 'rhel' ])
 
     def install(self, package, package_alternate, package_data, method_details):
-        cmdline = f"dnf install -y".split()
+        dnf_command = os.environ.get("DNF_COMMAND", "dnf")
+        cmdline = f"{dnf_command} install -y".split()
         # Force default locale, so we can parse messages
         os.environ["LC_ALL"] = "C"
         os.environ["LC_LANG"] = "C"
@@ -219,7 +220,9 @@ class method_dnf_c(method_abc):
                 logging.error(
                     f"{package} [dnf/{package_alternate}]: no permission to install (need superuser)")
                 return False
-            if "Error: Unable to find a match" in output:
+            # DNF prints one message, microdnf another
+            if "Error: Unable to find a match" in output \
+               or "error: No package matches" in output:
                 # package does not exist, try something else
                 logging.error(
                     f"{package} [dnf/{package_alternate}]: not available from DNF (missing repo?)")
@@ -755,6 +758,8 @@ def _command_json(args):
 
 
 def _command_install(args):
+    logging.warning(f"installing for: {distro} v{distro_version},"
+                    f" default install with {distro_method}")
     packages, method_details = _parse_files(args)
     methods = [ method_abc.methods_by_name[distro_method] ] \
         + list(method_abc.generic_methods.values())
@@ -776,7 +781,7 @@ def _command_install(args):
                 if method.install(
                         package, package_alternate, package_data,
                         _method_details):
-                    logging.info(f"{package}: installed with {method.name}")
+                    logging.warning(f"{package}: installed with {method.name}")
                     break
                 logging.warning(
                     f"{package} [{method.name}/{package_alternate}]:"
@@ -798,7 +803,7 @@ def _command_install(args):
             sys.exit(1)
         # if keep_going is True, we ignore errors
     logging.error("Success")
-    sys.exit(1)
+    sys.exit(0)
 
 
 def logging_verbosity_inc(level):
@@ -923,8 +928,6 @@ if args.distro_method:
     distro_method = args.distro_method
 else:
     distro_method = method_abc.get_method_for_distro()
-logging.warning(f"installing for: {distro} v{distro_version},"
-                f" default install with {distro_method}")
 
 
 try:
