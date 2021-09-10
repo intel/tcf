@@ -736,6 +736,7 @@ def _parse_files(args):
             logging.warning(f"{path}: invalid input file")
     return packages, method_details
 
+
 def _command_hash(args):
     packages, method_details = _parse_files(args)
     # FIXME: preprocess packages and method_details and remove fields
@@ -745,6 +746,11 @@ def _command_hash(args):
     s = json.dumps(packages, indent = 4, skipkeys = True) \
         + json.dumps(method_details, indent = 4, skipkeys = True)
     m = hashlib.sha512(s.encode('utf-8'))
+    # add any files passed with -e
+    for filename in args.extra_file:
+        with open(filename, 'rb') as f:
+            logging.warning(f"hash: adding contents of {filename}")
+            m.update(f.read())
     print(m.hexdigest()[:16])
 
 
@@ -881,6 +887,10 @@ ap = command_subparser.add_parser(
 ap.add_argument(
     "filenames", metavar = "PATH|FILE.nreqs.yaml", type = str, nargs = "+",
     help = "requirements file(s) or paths contianing them [*.nreqs.yaml]")
+ap.add_argument(
+    "-e", "--extra-file", metavar = "FILE",
+    type = str, action = "append", default = [],
+    help = "add other files to use for generating the hash")
 ap.set_defaults(func = _command_hash)
 
 ap = command_subparser.add_parser(
