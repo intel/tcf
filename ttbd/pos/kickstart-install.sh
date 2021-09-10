@@ -12,12 +12,8 @@
 
 progname=$(basename $0)
 tmpdir=${TMPDIR:-`mktemp -d $progname-XXXXXX`}
-mntdir=""
 
 function cleanup() {
-    if ! [ -z "${mntdir:-}" ]; then
-        sudo umount $mntdir
-    fi
     if [ "$tmpdir" != "${TMPDIR:-}" ]; then
         # wipe it only if we made it
         rm -rf $tmpdir
@@ -88,11 +84,9 @@ mcopy -i $tmpdir/ks.drive $ksfile ::ks.cfg
 
 # Create the destination image file
 qemu-img create -f qcow2 -q $qcowfile 20G
-# mount the iso to get the kernel/initird to boot -- note the EXIT
-# trap above will unmount on exit
-mntdir=$tmpdir/mnt
-mkdir -p $mntdir
-sudo mount -o loop $isofile $mntdir
+# extract the kernel and initrd
+iso-read -i $isofile -e isolinux/vmlinuz -o $tmpdir/vmlinuz
+iso-read -i $isofile -e isolinux/initrd.img -o $tmpdir/initrd.img
 
 # Now QEMU launch the thing
 # - -no-reboot: exit when done instead of rebooting
@@ -107,8 +101,8 @@ sudo mount -o loop $isofile $mntdir
 # - pass the ISO as hdd, the dest qcow as hda, the Kickstart drive as hdb
 qemu-system-x86_64 -no-reboot \
                    -enable-kvm -cpu host -m 3072 \
-                   -kernel $mntdir/isolinux/vmlinuz \
-                   -initrd $mntdir/isolinux/initrd.img \
+                   -kernel $tmpdir/vmlinuz \
+                   -initrd $tmpdir/initrd.img \
                    -append "console=ttyS0,115200n81 text ks=hd:LABEL=KS:/ks.cfg" \
                    -bios /usr/share/edk2/ovmf/OVMF_CODE.fd \
                    -cdrom $isofile \
