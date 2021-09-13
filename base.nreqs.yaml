@@ -3,9 +3,12 @@
 #
 #   $ tcf.git/nreqs.py install base.nreqs.yaml
 #
-make:
-gvnc-tools:
 dosfstools:
+git:
+gvnc-tools:
+  pip:
+    skip: true
+make:
 
 Jinja2: python3-jinja2
 
