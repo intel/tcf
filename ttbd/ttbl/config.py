@@ -170,7 +170,8 @@ def target_add(target, _id = None, tags = None, target_type = None,
     # determination with the limited information we have here if the
     # target has an IP or not...and it is very cheap.
     global _iface_tunnel
-    target.interface_add("tunnel", _iface_tunnel)
+    if not hasattr(target, "tunnel"):
+        target.interface_add("tunnel", _iface_tunnel)
     if not hasattr(target, "store"):
         # dirty trick--some interfaces (eg: capture interfce needs the
         # store defined before adding it, so they might add it
@@ -179,7 +180,8 @@ def target_add(target, _id = None, tags = None, target_type = None,
         global _iface_store
         target.interface_add("store", _iface_store)
     global _certs_store
-    target.interface_add("certs", _iface_certs)
+    if not hasattr(target, "certs"):
+        target.interface_add("certs", _iface_certs)
 
 
 def interconnect_add(ic, _id = None, tags = None, ic_type = None,
