@@ -65,7 +65,7 @@ This is the client and meta-testcase runner for the TCF test case framework.
     author_email = "inaky.perez-gonzalez@intel.com",
     license = "Apache-2.0",
     packages = find_packages(exclude=['build','examples','ttbd']),
-    scripts = [ "tcf" ],
+    scripts = [ "tcf", "nreqs.py" ],
     # This is needed so when data is to be installed, our
     # _install_data class is used.
     cmdclass = dict(
