@@ -46,6 +46,7 @@ evertything:
 .. automodule:: examples.test_pos_deploy_2
 .. automodule:: examples.test_pos_deploy_N
 .. automodule:: examples.test_pos_boot
+.. automodule:: examples.test_container_runner.py
 .. automodule:: examples.test_qemu_bios
 .. automodule:: examples.test_qemu_bios_N
 .. automodule:: examples.test_deploy_files
