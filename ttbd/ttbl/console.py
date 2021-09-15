@@ -1123,10 +1123,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
             "extra_opts: expected dict of string:string; got %s" \
             % type(extra_opts)
 
-        generic_c.__init__(self,
-                           chunk_size = chunk_size,
-                           interchunk_wait = interchunk_wait,
-                           **kwargs)
+        generic_c.__init__(self, **kwargs)
         ttbl.power.socat_pc.__init__(
             self,
             "PTY,link=console-%(component)s.write,rawer"
