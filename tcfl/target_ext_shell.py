@@ -737,40 +737,46 @@ class shell(tc.target_extension_c):
                 for expectation in expect:
                     assert isinstance(expectation, str) \
                         or isinstance(expectation, typing.Pattern)
-                    target.expect(expectation, name = "command output",
-                                  console = console, origin = origin)
+                    r = target.expect(expectation, name = "command output",
+                                      console = console, origin = origin)
             else:
-                target.expect(expect, name = "command output",
-                              console = console, origin = origin)
+                r = target.expect(expect, name = "command output",
+                                  console = console, origin = origin)
+        else:
+            r = None
+
         if prompt_regex == None:
             self.target.expect(self.prompt_regex, name = "shell prompt",
                                console = console, origin = origin)
         else:
             self.target.expect(prompt_regex, name = "shell prompt",
                                console = console, origin = origin)
-        if output:
-            if console == None:
-                console = target.console.default
-            if output_filter_crlf:
-                newline = None
-            else:
-                newline = ''
-            output = self.target.console.read(
-                offset = offset, console = console, newline = newline)
-            if trim:
-                # When we can run(), it usually prints in the console:
-                ## <command-echo from our typing>
-                ## <command output>
-                ## <prompt>
-                #
-                # So to trim we just remove the first and last
-                # lines--won't work well without output_filter_crlf
-                # and it is quite a hack.
-                first_nl = output.find("\n")
-                last_nl = output.rfind("\n")
-                output = output[first_nl+1:last_nl+1]
-            return output
-        return None
+        if not output:
+            return r
+
+        # we need to return output, postprocess it
+        if console == None:
+            console = target.console.default
+        if output_filter_crlf:
+            newline = None
+        else:
+            newline = ''
+        output = self.target.console.read(
+            offset = offset, console = console, newline = newline)
+        if trim:
+            # When we can run(), it usually prints in the console:
+            ## <command-echo from our typing>
+            ## <command output>
+            ## <prompt>
+            #
+            # So to trim we just remove the first and last
+            # lines--won't work well without output_filter_crlf
+            # and it is quite a hack.
+            first_nl = output.find("\n")
+            last_nl = output.rfind("\n")
+            output = output[first_nl+1:last_nl+1]
+        return output
+
 
     def run(self, cmd = None, expect = None, prompt_regex = None,
             output = False, output_filter_crlf = True, timeout = None,
@@ -831,8 +837,41 @@ class shell(tc.target_extension_c):
           or something as:
 
           >>> "somefilename:43"
-        :returns str: if ``output`` is true, a string with the output
-          of the command.
+
+        :returns str:
+
+          - if ``output`` is false, and *expectation* was not set,
+            then returns *None*
+
+            if an *expectation* was set, then the return value is that
+            of matching the expectation; for example, if the
+            expectation was  *re.compile(
+
+            >>> r = target.shell.run(
+            >>>     f"ping -n 5 192.168.1.1",
+            >>>     re.compile("(?P<packet_loss>[\.0-9]+)% packet loss"))
+
+            the return value will be the result of matching the
+            regular expression, something like::
+
+              {
+                  'command output': {
+                      'console output': ...,
+                      'target': <tcfl.tc.target_c object at 0x7f92ea1c7250>,
+                      'console': 'serial0',
+                      'pattern': b'(?P<packet_loss>[\.0-9]+)% packet loss',
+                      'groupdict': {'packet_loss': b'0'},
+                      'offset': 4096,
+                      'offset_match_start': 4870,
+                      'offset_match_end': 4880
+                  }
+              }
+
+             the matched values will be in the *groupdict* dictionary;
+             this is what is returned by the *re* matching engine for
+             the regular expressions passed in the expectation/s.
+
+          - if ``output`` is true, a string with the output of the command.
 
           .. warning:: if ``output_filter_crlf`` is False, this output
              will be ``\\r\\n`` terminated and it will be confusing because
