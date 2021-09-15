@@ -684,6 +684,7 @@ class generic_c(impl_c):
 
     """
     def __init__(self, chunk_size = 0, interchunk_wait = 0.2,
+                 escape_chars = None,
                  **kwargs):
         assert chunk_size >= 0
         assert interchunk_wait > 0
