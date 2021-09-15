@@ -898,6 +898,12 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
         self.usb_serial_number = usb_serial_number
         self.serial_file_name = serial_file_name
 
+
+    def target_setup(self, target, iface_name, component):
+        generic_c.target_setup(self, target, iface_name, component)
+        ttbl.power.socat_pc.target_setup(self, target, iface_name, component)
+
+
     # console interface; state() is implemented by generic_c
     def on(self, target, component):
         if self.usb_serial_number:
@@ -1018,6 +1024,12 @@ class general_pc(ttbl.power.socat_pc, generic_c):
         else:
             self.upid_set("General console",
                           name = "general-console")
+
+
+    def target_setup(self, target, iface_name, component):
+        generic_c.target_setup(self, target, iface_name, component)
+        ttbl.power.socat_pc.target_setup(self, target, iface_name, component)
+
 
     # console interface; state() is implemented by generic_c
     def on(self, target, component):
@@ -1153,6 +1165,14 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
         self.env_add['SSHPASS'] = password if password else ""
         self.extra_opts = extra_opts
         self.paranoid_get_samples = 1
+        self.upid_set(f"console over SSH to {hostname}:{port}",
+                      name = f"ssh:{hostname}:{port}",
+                      hostname = hostname, port = port)
+
+    def target_setup(self, target, iface_name, component):
+        generic_c.target_setup(self, target, iface_name, component)
+        ttbl.power.socat_pc.target_setup(self, target, iface_name, component)
+
 
     def on(self, target, component):
         # generate configuration file from parameters
@@ -1321,6 +1341,12 @@ class netconsole_pc(ttbl.power.socat_pc, generic_c):
             "CREATE:console-%(component)s.read",
             extra_cmdline = [ "-u" ])	# unidirectional, UDP:6666 -> file
 
+
+    def target_setup(self, target, iface_name, component):
+        generic_c.target_setup(self, target, iface_name, component)
+        ttbl.power.socat_pc.target_setup(self, target, iface_name, component)
+
+
     def on(self, target, component):
         ttbl.power.socat_pc.on(self, target, component)
         generation_set(target, component)
@@ -1422,6 +1448,12 @@ class telnet_pc(ttbl.power.socat_pc, generic_c):
                       username = username,
                       hostname = _hostname,
                       port = port)
+
+
+    def target_setup(self, target, iface_name, component):
+        generic_c.target_setup(self, target, iface_name, component)
+        ttbl.power.socat_pc.target_setup(self, target, iface_name, component)
+
 
     def on(self, target, component):
         telnet_user = target.fsdb.get(

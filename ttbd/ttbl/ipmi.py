@@ -336,6 +336,12 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
             self.env_add['IPMITOOL_PASSWORD'] = password
         self.re_enable = True
 
+
+    def target_setup(self, target, iface_name, component):
+        ttbl.console.generic_c.target_setup(self, target, iface_name, component)
+        ttbl.power.socat_pc.target_setup(self, target, iface_name, component)
+
+
     def on(self, target, component):
         # if there is someone leftover reading, kick them out, there can
         # be only one
