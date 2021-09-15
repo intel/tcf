@@ -1260,6 +1260,10 @@ class tt_interface(object):
         if components:
             target.property_set(prefix + ".functions." + iface_name,
                                 ":".join(components))
+            # declare the index for the component
+            for component in components:
+                target.property_set(f"interfaces.{iface_name}.{component}.instrument",
+                                    index)
         else:
             target.property_set(prefix + ".functions." + iface_name,
                                 "true")
@@ -1284,6 +1288,9 @@ class tt_interface(object):
             instrument_name, index = \
                 self.instrument_mkindex(impl.name, impl.upid)
             tags_interface[component] = {
+                # this is also in instrumentation_publish_component so
+                # it can work also when adding components after the
+                # fact
                 "instrument": index
             }
             impl.upid_index = index
@@ -2360,6 +2367,7 @@ class test_target(object):
         instrument_name, instrument_index = \
             iface.instrument_mkindex(impl.name, impl.upid)
 
+        impl.upid_index = instrument_index
         iface.instrumentation_publish_component(
             self, iface_name,
             instrument_index,
