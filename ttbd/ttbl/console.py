@@ -684,16 +684,14 @@ class generic_c(impl_c):
 
     """
     def __init__(self, chunk_size = 0, interchunk_wait = 0.2,
-                 command_sequence = None, escape_chars = None,
-                 crlf = '\r'):
+                 **kwargs):
         assert chunk_size >= 0
         assert interchunk_wait > 0
         assert escape_chars == None or isinstance(escape_chars, dict)
 
         self.chunk_size = chunk_size
         self.interchunk_wait = interchunk_wait
-        impl_c.__init__(self, command_sequence = command_sequence,
-                        crlf = crlf)
+        impl_c.__init__(self, **kwargs)
         if escape_chars == None:
             self.escape_chars = {}
         else:
@@ -870,8 +868,9 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
     >>> )
 
     """
-    def __init__(self, serial_file_name = None, usb_serial_number = None):
-        generic_c.__init__(self)
+    def __init__(self, serial_file_name = None, usb_serial_number = None,
+                 **kwargs):
+        generic_c.__init__(self, **kwargs)
         ttbl.power.socat_pc.__init__(
             self,
             # note it is important to do the rawer first thing, then
@@ -1112,9 +1111,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
      - pass password via agent? file descriptor?
 
     """
-    def __init__(self, hostname, port = 22, crlf = '\r',
-                 chunk_size = 0, interchunk_wait = 0.1,
-                 extra_opts = None, command_sequence = None,
+    def __init__(self, hostname, port = 22, extra_opts = None,
                  **kwargs):
         assert isinstance(hostname, str)
         assert port > 0
@@ -1128,8 +1125,7 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
         generic_c.__init__(self,
                            chunk_size = chunk_size,
                            interchunk_wait = interchunk_wait,
-                           command_sequence = command_sequence,
-                           crlf = crlf, **kwargs)
+                           **kwargs)
         ttbl.power.socat_pc.__init__(
             self,
             "PTY,link=console-%(component)s.write,rawer"
@@ -1317,9 +1313,9 @@ class netconsole_pc(ttbl.power.socat_pc, generic_c):
     >>> )
 
     """
-    def __init__(self, ip_addr, port = 6666):
+    def __init__(self, ip_addr, port = 6666, **kwargs):
         assert isinstance(port, numbers.Integer)
-        generic_c.__init__(self)
+        generic_c.__init__(self, **kwargs)
         ttbl.power.socat_pc.__init__(
             self,
             # fork?
@@ -1394,11 +1390,11 @@ class telnet_pc(ttbl.power.socat_pc, generic_c):
 
     FIXME: passwords are still not supported
     """
-    def __init__(self, hostname, port = 23, crlf = '\r',
+    def __init__(self, hostname, port = 23,
                  socat_pc_kwargs = None,
                  **kwargs):
         assert isinstance(port, int)
-        generic_c.__init__(self)
+        generic_c.__init__(self, **kwargs)
         username, password, _hostname = commonl.split_user_pwd_hostname(hostname)
         self.hostname = _hostname
         ttbl.power.socat_pc.__init__(
