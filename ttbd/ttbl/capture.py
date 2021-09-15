@@ -981,7 +981,7 @@ class tcpdump_c(generic_stream):
             kwargs.setdefault('wait_to_kill', 6)
         generic_stream.__init__(
             self,
-            "tcpdump:{netif}",
+            "tcpdump:" + netif,
             cmdline,
             mimetype = "application/vnd.tcpdump.pcap",
             extension = ".pcap",
