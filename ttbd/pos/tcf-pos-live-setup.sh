@@ -71,10 +71,10 @@ EOF
 # Pre-generate SSH keys so we don't get in trouble with the init
 # sequence; at some point FIXME, we need to have the proper ordering
 for v in rsa ecdsa ed25519; do
-    sudo rm -f $destdir/etc/ssh/ssh_host_${v}_key
-    sudo ssh-keygen -q -f $destdir/etc/ssh/ssh_host_${v}_key -t $v -C '' -N ''
+    sudo rm -f $IMAGEDIR/etc/ssh/ssh_host_${v}_key
+    sudo ssh-keygen -q -f $IMAGEDIR/etc/ssh/ssh_host_${v}_key -t $v -C '' -N ''
 done
-sudo ln -sf /lib/systemd/system/ssh.service $destdir/etc/systemd/system/multi-user.target.wants
+sudo ln -sf /lib/systemd/system/ssh.service $IMAGEDIR/etc/systemd/system/multi-user.target.wants
 
 
 info "ensuring SSHD is enabled"
