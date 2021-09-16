@@ -1662,7 +1662,7 @@ class flash_shell_cmd_c(impl2_c):
 
     def _log_file_read(self, context, max_bytes = 2000):
         try:
-            with codecs.open(context['logfile_name'], errors = 'ignore') as logf:
+            with open(context['logfile_name'], 'rb') as logf:
                 try:
                     # SEEK to -MAX_BYTES or if EINVAL (too big), leave it
                     # at beginning of file
@@ -1670,7 +1670,7 @@ class flash_shell_cmd_c(impl2_c):
                 except IOError as e:
                     if e.errno != errno.EINVAL:
                         raise
-                return logf.read()
+                return logf.read().decode('utf-8')
         except IOError as e:
             if e.errno != errno.ENOENT:
                 raise
