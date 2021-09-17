@@ -88,6 +88,8 @@ import tcfl.tl
 
 class _test(tcfl.pos.tc_pos_base):
 
+    sanboot_url = None
+
     # tcfl.pos.tc_pos_base.deploy_10_flash(self, target) does the BIOS
     # flashing for us
 
@@ -101,9 +103,13 @@ class _test(tcfl.pos.tc_pos_base):
 
     def eval(self, target):
 
-        SANBOOT_URL = os.environ.get("SANBOOT_URL", None)
-        if SANBOOT_URL == None:
-            raise tcfl.tc.blocked_e("No SANBOOT_URL environment given")
+        if self.sanboot_url == None:
+            SANBOOT_URL = os.environ.get("SANBOOT_URL", None)
+            if SANBOOT_URL == None:
+                raise tcfl.tc.blocked_e(
+                    "No default sanboot_url programmed or"
+                    " SANBOOT_URL environment given")
+            self.sanboot_url = SANBOOT_URL
 
         target.power.cycle()
 
@@ -207,11 +213,12 @@ class _test(tcfl.pos.tc_pos_base):
             target.shell.run("set %s/netmask %s" % (ifname, kws['ipv4_netmask']))
             target.shell.run("ifopen " + ifname)
 
-            if SANBOOT_URL == "skip":
+            if self.sanboot_url == "skip":
                 target.report_info("not booting", level = 0)
             else:
-                target.send("sanboot %s" % SANBOOT_URL)
+                target.send("sanboot %s" % self.sanboot_url)
                 # can't use shell.run...it will timeout, since we'll print no more prompt
-                target.expect("Booting from SAN device")
+                # ESXi would print now...
+                #target.expect("Booting from SAN device")
         finally:
             target.shell.shell_prompt_regex = prompt_orig
