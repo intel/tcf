@@ -17,6 +17,7 @@ import re
 import ssl
 import time
 
+import commonl
 import tcfl.tc
 
 def ansi_render_approx(s, width = 80, height = 2000):
@@ -77,6 +78,137 @@ def ansi_render_approx(s, width = 80, height = 2000):
         r += line.rstrip() + "\n"
     return r
 
+
+def ipxe_sanboot_url(target, sanboot_url):
+    """
+    Use iPXE to sanboot a given URL
+
+    Given a target than can boot iPXE via a PXE boot entry (normally
+    in EFI), drive it to boot iPXE and iPXE to load a sanboot URL so
+    any ISO image can be loaded and booted as a local one.
+
+    This is also used in :ref:`the iPXE Sanboot<example_efi_pxe_sanboot>`.
+
+    Requirements: 
+
+    - iPXE: must have Ctrl-B configured to allow breaking into the
+      console
+
+    :param tcfl.tc.target_c target: target where to perform the
+      operation
+    :param str sanboot_url: URL to download and map into a drive to
+      boot into. If *skip* nothing is done and you are left with an
+      iPXE console connected to the network.
+    """
+    target.power.cycle()
+
+    boot_ic = target.kws['pos_boot_interconnect']
+    mac_addr = target.kws['interconnects'][boot_ic]['mac_addr']
+    tcfl.biosl.boot_network_pxe(
+        target,
+        # Eg: UEFI PXEv4 (MAC:4AB0155F98A1)
+        r"UEFI PXEv4 \(MAC:%s\)" % mac_addr.replace(":", "").upper().strip())
+
+    # can't wait also for the "ok" -- debugging info might pop in th emiddle
+    target.expect("iPXE initialising devices...")
+    # if the connection is slow, we have to start sending Ctrl-B's
+    # ASAP
+    #target.expect(re.compile("iPXE .* -- Open Source Network Boot Firmware"))
+
+    # send Ctrl-B to go to the PXE shell, to get manual control of iPXE
+    #
+    # do this as soon as we see the boot message from iPXE because
+    # otherwise by the time we see the other message, it might already
+    # be trying to boot pre-programmed instructions--we'll see the
+    # Ctrl-B message anyway, so we expect for it.
+    #
+    # before sending these "Ctrl-B" keystrokes in ANSI, but we've seen
+    # sometimes the timing window being too tight, so we just blast
+    # the escape sequence to the console.
+    target.console.write("\x02\x02")	# use this iface so expecter
+    time.sleep(0.3)
+    target.console.write("\x02\x02")	# use this iface so expecter
+    time.sleep(0.3)
+    target.console.write("\x02\x02")	# use this iface so expecter
+    time.sleep(0.3)
+    target.expect("Ctrl-B", timeout = 250)
+    target.console.write("\x02\x02")	# use this iface so expecter
+    time.sleep(0.3)
+    target.console.write("\x02\x02")	# use this iface so expecter
+    time.sleep(0.3)
+    target.expect("iPXE>")
+    prompt_orig = target.shell.shell_prompt_regex
+    try:
+        #
+        # When matching end of line, match against \r, since depends
+        # on the console it will send one or two \r (SoL vs SSH-SoL)
+        # before \n -- we removed that in the kernel driver by using
+        # crnl in the socat config
+        #
+        # FIXME: block on anything here? consider infra issues
+        # on "Connection timed out", http://ipxe.org...
+        target.shell.shell_prompt_regex = "iPXE>"
+        kws = dict(target.kws)
+        boot_ic = target.kws['pos_boot_interconnect']
+        mac_addr = target.kws['interconnects'][boot_ic]['mac_addr']
+        ipv4_addr = target.kws['interconnects'][boot_ic]['ipv4_addr']
+        ipv4_prefix_len = target.kws['interconnects'][boot_ic]['ipv4_prefix_len']
+        kws['ipv4_netmask'] = commonl.ipv4_len_to_netmask_ascii(ipv4_prefix_len)
+
+        # Find what network interface our MAC address is; the
+        # output of ifstat looks like:
+        #
+        ## net0: 00:26:55:dd:4a:9d using 82571eb on 0000:6d:00.0 (open)
+        ##   [Link:up, TX:8 TXE:1 RX:44218 RXE:44205]
+        ##   [TXE: 1 x "Network unreachable (http://ipxe.org/28086090)"]
+        ##   [RXE: 43137 x "Operation not supported (http://ipxe.org/3c086083)"]
+        ##   [RXE: 341 x "The socket is not connected (http://ipxe.org/380f6093)"]
+        ##   [RXE: 18 x "Invalid argument (http://ipxe.org/1c056082)"]
+        ##   [RXE: 709 x "Error 0x2a654089 (http://ipxe.org/2a654089)"]
+        ## net1: 00:26:55:dd:4a:9c using 82571eb on 0000:6d:00.1 (open)
+        ##   [Link:down, TX:0 TXE:0 RX:0 RXE:0]
+        ##   [Link status: Down (http://ipxe.org/38086193)]
+        ## net2: 00:26:55:dd:4a:9f using 82571eb on 0000:6e:00.0 (open)
+        ##   [Link:down, TX:0 TXE:0 RX:0 RXE:0]
+        ##   [Link status: Down (http://ipxe.org/38086193)]
+        ## net3: 00:26:55:dd:4a:9e using 82571eb on 0000:6e:00.1 (open)
+        ##   [Link:down, TX:0 TXE:0 RX:0 RXE:0]
+        ##   [Link status: Down (http://ipxe.org/38086193)]
+        ## net4: 98:4f:ee:00:05:04 using NII on NII-0000:01:00.0 (open)
+        ##   [Link:up, TX:10 TXE:0 RX:8894 RXE:8441]
+        ##   [RXE: 8173 x "Operation not supported (http://ipxe.org/3c086083)"]
+        ##   [RXE: 268 x "The socket is not connected (http://ipxe.org/380f6093)"]
+        #
+        # thus we need to match the one that fits our mac address
+        ifstat = target.shell.run("ifstat", output = True, trim = True)
+        regex = re.compile(
+            "(?P<ifname>net[0-9]+): %s using" % mac_addr.lower(),
+            re.MULTILINE)
+        m = regex.search(ifstat)
+        if not m:
+            raise tcfl.tc.error_e(
+                "iPXE: cannot find interface name for MAC address %s;"
+                " is the MAC address in the configuration correct?"
+                % mac_addr.lower(),
+                dict(target = target, ifstat = ifstat,
+                     mac_addr = mac_addr.lower())
+            )
+        ifname = m.groupdict()['ifname']
+
+        # static is much faster and we know the IP address already
+        # anyway; but then we don't have DNS as it is way more
+        # complicated to get it
+        target.shell.run("set %s/ip %s" % (ifname, ipv4_addr))
+        target.shell.run("set %s/netmask %s" % (ifname, kws['ipv4_netmask']))
+        target.shell.run("ifopen " + ifname)
+
+        if sanboot_url == "skip":
+            target.report_info("not booting", level = 0)
+        else:
+            target.send("sanboot %s" % sanboot_url)
+    finally:
+        target.shell.shell_prompt_regex = prompt_orig
+    
 
 #! Place where the Zephyr tree is located
 # Note we default to empty string so it can be pased

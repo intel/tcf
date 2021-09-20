@@ -15,6 +15,9 @@ machine and using the serial console, break into the BIOS menu to
 direct the machine to boot the PXE boot entry associated to the MAC
 address declared in the inventory.
 
+Note this functionality can be accessed by using
+:func:`tcfl.tl.ipxe_sanboot_url`.
+
 Assumptions:
 
  - The DHCP service in the network to which this machine is connected
