@@ -465,6 +465,7 @@ def _reqs_grok(packages, req_method_details, filename, y):
 
         req_alternate = None
         # need at least a basic definition
+        method_name = None
         method_data = {}
         description = None
         spdx_license = None
@@ -681,6 +682,9 @@ def _reqs_grok(packages, req_method_details, filename, y):
             packages[req]['description'] = description
         if spdx_license:
             packages[req]['license'] = spdx_license
+        if method_name == None:
+            # no method? default to the distro's default
+            method_name = method_abc.distro_to_method[distro].name
         # do we have to install exclusively with any method? if so,
         # mark it -- this applies mostly to 'data' methods, where we
         # just download some file
@@ -712,7 +716,7 @@ def _parse_file(filename, packages, method_details):
             # FIXME: validate YAML
             _reqs_grok(packages, method_details, filename, y)
     except Exception as e:
-        logging.error(f"{filename}: can't process: {e}")
+        logging.exception(f"{filename}: can't process: {e}")
         # FIXME: ack -k?
 
 def _parse_files(args):
