@@ -84,7 +84,8 @@ import io
 import os
 import subprocess
 import sys
-import termcolor
+if sys.platform != "win32":
+    import termcolor
 import threading
 
 import commonl
@@ -247,7 +248,8 @@ class driver(tc.report_driver_c):
             # colorize the tag for attachments, just for the main
             # message.
             # We don't colorize INFO nor DATA
-            if self.consolef.isatty() and tag in tag_to_color:
+            # we don't do windows yet
+            if sys.platform != "win32" and self.consolef.isatty() and tag in tag_to_color:
                 args = tag_to_color[tag]
                 _taglevel = termcolor.colored(f"{tag}{level}", *args, attrs = [ 'bold' ])
                 _prefix = _taglevel + \

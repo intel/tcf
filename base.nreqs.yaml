@@ -49,3 +49,4 @@ setuptools:
 termcolor:
   distro:
     name: python3-termcolor
+  skip_platform: win32
