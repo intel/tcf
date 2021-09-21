@@ -649,7 +649,7 @@ class extension(tc.target_extension_c):
         self.fsinfo = {}
         self.metadata = {}	# FIXME: ren to image_metadata
 
-    def _boot_dev_guess(self, boot_dev):
+    def _boot_dev_guess(self, boot_dev = None):
         target = self.target
         # What is our boot device?
         if boot_dev:
