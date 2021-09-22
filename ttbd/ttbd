@@ -511,6 +511,14 @@ def _target_get(target_id):
     else:
         return flask.jsonify(d)
 
+@app.route('/ttb', methods = ['GET'])
+def _ttb_get():
+    return {
+        'protocol.major': API_VERSION,
+        'protocol.minor': 0, # TODO currently no value in source
+        'server.version': commonl.version_get(ttbl, 'ttbd')
+    }
+
 _admin_required = [
     'disabled',
     'instrumentation',
