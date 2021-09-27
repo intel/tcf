@@ -712,7 +712,7 @@ def _parse_file(filename, packages, method_details):
     logging.warning(f"{filename}: parsing")
     try:
         with open(filename) as f:
-            y = yaml.load(f)
+            y = yaml.safe_load(f)
             # FIXME: validate YAML
             _reqs_grok(packages, method_details, filename, y)
     except Exception as e:
