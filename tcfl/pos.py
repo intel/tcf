@@ -2486,8 +2486,8 @@ class tc_pos0_base(tc.tc_c):
 
          [[no-]soft] [[no-]upload] IMAGE:NAME[ IMAGE:NAME[..]]]
 
-        Flash anything specified in :data:image_flash or IMAGE_FLASH*
-        environment variables
+        Flash anything specified in :data:`image_flash` or
+        *IMAGE_FLASH* environment variables
 
         The *IMAGE_FLASH* environment variable is a string containing
         a space separated list of tokens:
@@ -2627,7 +2627,7 @@ class tc_pos_base(tc_pos0_base):
     - a target that supports Provisioning OS
 
     if you want more control over said conditions, use
-    class:`tc_pos0_base`, for which the targets have to be
+    :class:`tc_pos0_base`, for which the targets have to be
     declared. Also, more knobs are available there.
 
     To use:
