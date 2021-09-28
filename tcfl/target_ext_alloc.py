@@ -730,6 +730,15 @@ def _cmdline_guest_remove(args):
         else:
             _guests_remove(rtb, allocid, args.guests)
 
+
+try:
+    username = getpass.getuser() + "@"
+except KeyError:
+    # inside containers with a user with no name to the ID it'll raise
+    ## KeyError: 'getpwuid(): uid not found: 121'
+    username = ""
+
+
 def _cmdline_setup(arg_subparsers):
     ap = arg_subparsers.add_parser(
         "alloc-targets",
@@ -743,7 +752,7 @@ def _cmdline_setup(arg_subparsers):
         # use instead of getfqdn(), since it does a DNS lookup and can
         # slow things a lot
         default = "cmdline %s@%s:%d" % (
-            getpass.getuser(), socket.gethostname(), os.getppid()),
+            username, socket.gethostname(), os.getppid()),
         help = "Reason to pass to the server (default: %(default)s)"
         " [LOGNAME:HOSTNAME:PARENTPID]")
     ap.add_argument(
