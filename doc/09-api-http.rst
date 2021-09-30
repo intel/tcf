@@ -86,6 +86,26 @@ optionally the output of *curl* will be piped through *python -m
 json.tool* to pretty-format the JSON output for clarity.
 
 
+API information
+---------------
+
+GET /ttb
+^^^^^^^^
+
+Any user can check the API's version, even if he is not logged in. Making
+this http request will return the major and minor API's protocol. It will
+also return the server version.
+
+**Example**::
+
+  $ curl -k https://SERVERNAME:5000/ttb | jq
+  {
+      "protocol.major": 2,
+      "protocol.minor": 0,
+      "server.version": "v0.15.358.gd8a4b4f.dirty"
+  }
+
+
 User management (login, logout, roles)
 --------------------------------------
 
