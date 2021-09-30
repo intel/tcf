@@ -213,8 +213,14 @@ class shell(tc.target_extension_c):
         """
         return _context_c(self, context_name)
 
+    #: The shell prompt regex is searched for after running a command in the
+    #: target shell. The prompt is set to TCF- concatenated with a random
+    #: string of length tcfl.tc.tc_c.hashid_len. Our below regex search's for
+    #: TCF- and the number of random 0-9, a-z, A-Z defined by hashid_len. When
+    #: found we know our previous command completed execution.
     prompt_regex_default = \
-        re.compile('(TCF-[0-9a-zA-Z]{4})?(' + "|".join(shell_prompts) + ')')
+        re.compile('(TCF-[0-9a-zA-Z]{' + str(tc.tc_c.hashid_len) + '})?(' +
+                   "|".join(shell_prompts) + ')')
 
     #: What do we look for into a shell prompt
     #:
