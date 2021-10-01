@@ -371,7 +371,10 @@ def _distro_version_get(distro, version):
     if sys.platform == "linux":
         with open("/etc/os-release") as f:
             for line in f:
-                key, val = line.strip().split('=', 1)
+                line = line.strip()
+                if not '=' in line:
+                    continue
+                key, val = line.split('=', 1)
                 # FIXME: unquote val
                 data.setdefault(key, val)
                 logging.log(8, f"/etc/os-release: sets {key}={val}")
@@ -780,6 +783,8 @@ def _command_install(args):
 
         for method in methods:
             try:
+                # FIXME: acknowledge exclusive -> if
+                # package_data['method'] != method, skip
                 _method_details = method_details.get(method.name, {}).get(package, {})
                 package_alternate = _method_details.get('name', package)
                 logging.warning(
