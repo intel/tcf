@@ -375,7 +375,9 @@ def _distro_version_get(distro, version):
                 if not '=' in line:
                     continue
                 key, val = line.split('=', 1)
-                # FIXME: unquote val
+                # some distros put values with quotes at beg/end...some don't,
+                # in anycase, we don't need'em
+                val = val.strip('"')
                 data.setdefault(key, val)
                 logging.log(8, f"/etc/os-release: sets {key}={val}")
     else:
