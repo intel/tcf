@@ -1510,6 +1510,10 @@ EOF""")
     #: respect the space where content has been previousloy downloaded, so
     #: future executions don't have to download it again. This can heavily
     #: cut test setup time.
+    #:
+    #: Note these paths are rsync regular expressions which will be
+    #: passed to rsync when we are refreshing the root filesystem as
+    #: paths to ignore, so they are not cleared.
     cache_locations_per_distro = {
         'clear': [
             # we try to keep the downloaded content across
@@ -1519,15 +1523,15 @@ EOF""")
 
         ],
         'fedora': [
-            "/var/lib/rpm",
+            "/var/cache/PackageKit/*/metadata",
             '/var/lib/containers',
         ],
         'rhel': [
-            "/var/lib/rpm",
+            "/var/cache/PackageKit/*/metadata",
             '/var/lib/containers',
         ],
         'centos': [
-            "/var/lib/rpm",
+            "/var/cache/PackageKit/*/metadata",
             '/var/lib/containers',
         ],
         'ubuntu': [
