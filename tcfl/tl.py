@@ -443,6 +443,9 @@ def linux_os_release_get(target, prefix = ""):
         field, value = line.strip().split("=", 1)
         # remove leading and ending quotes
         os_release[field] = value.strip('"')
+
+    target.kw_set("linux.distro", os_release['ID'].strip('"'))
+    target.kw_set("linux.distro_version", os_release['VERSION_ID'].strip('"'))
     return os_release
 
 
