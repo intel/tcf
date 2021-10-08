@@ -51,6 +51,7 @@ evertything:
 .. automodule:: examples.test_qemu_bios_N
 .. automodule:: examples.test_deploy_files
 .. automodule:: examples.test_linux_kernel
+.. automodule:: examples.test_sysbench
 
 Booting off images on the network
 ---------------------------------
