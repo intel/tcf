@@ -136,9 +136,9 @@ class result_c:
             return e.args[0]
         return e
 
-    def report(self, tc, message, attachments = None,
+    def report(self, _reporter, message, attachments = None,
                level = None, dlevel = 0, alevel = 2):
-        assert isinstance(tc, tc_c)
+        assert isinstance(_reporter, (tc.tc_c, tc.target_c))
         assert isinstance(message, str)
         if attachments:
             assert isinstance(attachments, dict)
@@ -159,7 +159,7 @@ class result_c:
                 "attachment 'target' does not point to a " \
                 "tcfl.tc.target_c but to a type %s" % type(reporter).__name__
         else:
-            reporter = tc
+            reporter = _reporter
 
         if self.blocked:
             report_fn = reporter.report_blck
