@@ -7,7 +7,7 @@ mariadb                 # package: fedora,centos=mariadb
 numpy                   # package: python3-numpy
 # CentOS7's pip3 is quite old, barfs at newer; but then 3.1.0.4 can't
 # be found on Ubuntu20...
-opencv-python==3.4.8.29 # package: fedora,ubuntu=python3-opencv
+opencv-python==4.2.0.32 # package: fedora,ubuntu=python3-opencv
 pylint                  # package: python3-pylint ubuntu=pylint
 pymongo                 # package: python3-pymongo
 sphinx                  # package: python3-sphinx
