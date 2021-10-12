@@ -1895,10 +1895,14 @@ def _cmdline_console_wall(args):
                     except StopIteration:
                         done = True
                     descr = consolel[item]
+                    if args.interactive:
+                        subcommand = "console-write -i"
+                    else:
+                        subcommand = "console-read --follow"
                     cf.write(
-                        'screen -c %s console-read %s --max-backoff-wait %f -c %s --follow\n'
+                        'screen -c %s %s %s --max-backoff-wait %f -c %s\n'
                         'title %s\n\n' % (
-                            sys.argv[0],
+                            sys.argv[0], subcommand,
                             descr.target.fullid, args.max_backoff_wait, descr.console, item
                         ))
                     if done or item == console_names[-1]:
@@ -2089,6 +2093,9 @@ def _cmdline_setup(arg_subparser):
     ap.add_argument("--console", "-c", metavar = "CONSOLE",
                     action = "append", default = None,
                     help = "Read only from the named consoles (default: all)")
+    ap.add_argument("--interactive", "-i",
+                    action = "store_true", default = False,
+                    help = "Start interactive console instead of just reading")
     ap.add_argument(
         "--max-backoff-wait",
         action = "store", type = float, metavar = "SECONDS", default = 2,
