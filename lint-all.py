@@ -1068,7 +1068,11 @@ else:
 
 cfs_all = {}
 for _filename in git_repo.filenames:
-    cfs_all[_filename] = changedfile_c(git_repo, _filename)
+    try:
+        cfs_all[_filename] = changedfile_c(git_repo, _filename)
+    except IsADirectoryError:
+        logging.warning(f"{_filename}: ignored, it is a directory (submodule?)")
+        # happens when we have submodules
 
 for _name, (lint_function, lint_filter, _shortname, _config) \
     in lint_functions_sorted:
@@ -1079,6 +1083,8 @@ for _name, (lint_function, lint_filter, _shortname, _config) \
 
         cfs = []
         for _filename in git_repo.filenames:
+            if _filename not in cfs_all:
+                continue	# means we skipped it because of multiple reasons
             cf = cfs_all[_filename]
             # get a logger with more context
             cf.log = logging.getLogger(git_repo.context.shortname
