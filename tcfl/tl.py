@@ -672,7 +672,7 @@ def sh_export_proxy(ic, target):
         target.shell.run("export " + proxy_cmd % ic.kws)
         target.shell.run("export NO_PROXY=$no_proxy")
 
-def sh_proxy_environment(ic, target):
+def sh_proxy_environment(ic, target, prefix = "/"):
     """
     If the interconnect *ic* defines a proxy environment, issue
     commands to write the proxy configuration to the target's
@@ -685,34 +685,57 @@ def sh_proxy_environment(ic, target):
     See :func:`tcfl.tl.sh_export_proxy`
     """
     apt_proxy_conf = []
+    dnf_proxy = None
+
+    # FIXME: we need to change proxies in targets to be homed in the
+    # proxy hierarchy as a backup? they are always network specific anyway?
+
     if 'ftp_proxy' in ic.kws:
         target.shell.run(
             "echo -e 'ftp_proxy=%(ftp_proxy)s\nFTP_PROXY=%(ftp_proxy)s'"
             " >> /etc/environment"
             % ic.kws)
         apt_proxy_conf.append('FTP::proxy "%(ftp_proxy)s";' % ic.kws)
+
     if 'http_proxy' in ic.kws:
         target.shell.run(
             "echo -e 'http_proxy=%(http_proxy)s\nHTTP_PROXY=%(http_proxy)s'"
             " >> /etc/environment"
             % ic.kws)
         apt_proxy_conf.append('HTTP::proxy "%(http_proxy)s";' % ic.kws)
+        dnf_proxy = f"{ic.kws['http_proxy']}"	# default to HTTP proxy
+
     if 'https_proxy' in ic.kws:
         target.shell.run(
             "echo -e 'https_proxy=%(https_proxy)s\nHTTPS_PROXY=%(https_proxy)s'"
             " >> /etc/environment"
             % ic.kws)
         apt_proxy_conf.append('HTTPS::proxy "%(https_proxy)s";' % ic.kws)
+        dnf_proxy = f"{ic.kws['https_proxy']}"	# override https if available
+
     if 'no_proxy' in ic.kws:
         target.shell.run("echo 'export NO_PROXY=%(no_proxy)s"
                          " no_proxy=%(no_proxy)s' >> ~/.bashrc" % ic.kws)
-    target.shell.run(
-        "test -d /etc/apt/apt.conf.d"
-        " && cat > /etc/apt/apt.conf.d/tcf-proxy.conf <<EOF\n"
-        "Acquire {\n"
-        + "\n".join(apt_proxy_conf) +
-        "}\n"
-        "EOF")
+    if apt_proxy_conf:
+        target.shell.run(
+            "test -d /etc/apt/apt.conf.d"
+            " && cat > /etc/apt/apt.conf.d/tcf-proxy.conf <<EOF\n"
+            "Acquire {\n"
+            + "\n".join(apt_proxy_conf) +
+            "}\n"
+            "EOF")
+
+    # there is no way to distinguis https vs http so we need to make a
+    # wild guess by overriding
+    if dnf_proxy:
+        target.shell.run(
+            "test -r /etc/dnf/dnf.conf"
+            # sed's -n and -i don't play well, so copy it to post-process
+            f" && cp /etc/dnf/dnf.conf /tmp/dnf.conf"
+            # sed: wipe existing proxy (if any) add new setting
+            # hack: assumes [main] section is the only one
+            f" && sed -n -e '/^proxy=/!p' -e '$aproxy={dnf_proxy}' /tmp/dnf.conf > /etc/dnf/dnf.conf")
+
 
 def linux_wait_online(ic, target, loops = 20, wait_s = 0.5):
     """
