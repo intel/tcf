@@ -63,6 +63,15 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
       number is given, it is a assumed the flashing server is in
       localhost in the given TCP port.
 
+    :param str sibling_serial_number (optional, default *None*) USB serial
+      number of the USB device that is a sibling to the one defined by
+      usb_serial_number
+
+    :param int usb_port (optional, default *None*) port that the USB device is
+      connected to, used in combination with sibling_serial_number to find
+      the USB path for devices that do not have unique serial numbers (USB
+      Blaster I)
+
     Other parameters described in :class:ttbl.images.impl_c.
 
 
@@ -174,6 +183,7 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
 
     def __init__(self, usb_serial_number, image_map, args = None, name = None,
                  jtagconfig = None, tcp_port = None,
+                 sibling_serial_number = None, usb_port = None,
                  **kwargs):
         assert isinstance(usb_serial_number, str)
         commonl.assert_dict_of_ints(image_map, "image_map")
@@ -185,6 +195,8 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
         self.tcp_port = tcp_port
         self.image_map = image_map
         self.jtagconfig = jtagconfig
+        self.sibling_serial_number = sibling_serial_number
+        self.usb_port = usb_port
         if args:
             commonl.assert_dict_of_strings(args, "args")
             self.args = args
@@ -236,8 +248,15 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
         # address by serial and expects a cable name as 'PRODUCT NAME
         # [PATH]', like 'USB BlasterII [1-3.3]'; we can't do this on
         # object creation because the USB path might change when we power
-        # it on/off (rare, but could happen).
-        usb_path, _vendor, product = ttbl.usb_serial_to_path(self.usb_serial_number)
+        # it on/off (rare, but could happen). Since USB Blaster I do not
+        # have unique serial numbers we use a combination of usb_port
+        # and sibling_serial_number to find the correct usb_path
+        if self.usb_port != None:
+            usb_path, _vendor, product = ttbl.usb_serial_to_path(
+                self.sibling_serial_number, self.usb_port)
+        else:
+            usb_path, _vendor, product = ttbl.usb_serial_to_path(
+                self.usb_serial_number)
 
         if self.tcp_port:
             # server based cable name
