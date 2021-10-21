@@ -2620,7 +2620,7 @@ def _sysfs_read(filename):
         if e.errno != errno.ENOENT:
             raise
 
-def usb_serial_to_path(arg_serial):
+def usb_serial_to_path(arg_serial, sibling_port = None):
     """
     Given a USB serial number, return it's USB path
 
@@ -2637,6 +2637,9 @@ def usb_serial_to_path(arg_serial):
       ....
 
     :param str arg_serial: USB serial number
+    :param int sibling_port: (optional) work instead on the device
+      that is in the same hub as the given device, but in this port
+      number.
     :return: tuple with USB path, vendor product name for the given serial
       number, *None, None, None* if not found
 
@@ -2653,6 +2656,13 @@ def usb_serial_to_path(arg_serial):
         serial = _sysfs_read(fn_serial)
         if serial == arg_serial:
             devpath = os.path.dirname(fn_serial)
+            if sibling_port != None:
+                if '.' in devpath:
+                    separator = "."
+                else:
+                    separator = "-"
+                head, _sep, _tail = devpath.rpartition(separator)
+                devpath = head + separator + str(sibling_port)
             return os.path.basename(devpath), \
                 _sysfs_read(os.path.join(devpath, "vendor")), \
                 _sysfs_read(os.path.join(devpath, "product"))
