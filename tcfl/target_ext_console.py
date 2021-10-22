@@ -2029,21 +2029,21 @@ def _cmdline_setup(arg_subparser):
                                   help = "Setup a console")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target name")
-    ap.add_argument("--console", "-c", metavar = "CONSOLE",
+    ap.add_argument("-c", "--console", metavar = "CONSOLE",
                     action = "store", default = None,
                     help = "name of console to setup, or default")
     ap.add_argument("--reset", "-r",
                     action = "store_true", default = False,
                     help = "reset to default values")
     ap.add_argument("parameters", metavar = "KEY:VALUE", #action = "append",
-                    nargs = "+",
+                    nargs = "*",
                     help = "Parameters to set (KEY:VALUE)")
     ap.set_defaults(func = _cmdline_console_setup)
 
 
     ap = arg_subparser.add_parser("console-disable",
                                   help = "Disable a console")
-    ap.add_argument("--console", "-c", metavar = "CONSOLE",
+    ap.add_argument("-c", "--console", metavar = "CONSOLE",
                     action = "store", default = None,
                     help = "name of console to disable")
     ap.add_argument("target", metavar = "TARGET", action = "store",
@@ -2052,7 +2052,7 @@ def _cmdline_setup(arg_subparser):
 
     ap = arg_subparser.add_parser("console-enable",
                                   help = "Enable a console")
-    ap.add_argument("--console", "-c", metavar = "CONSOLE",
+    ap.add_argument("-c", "--console", metavar = "CONSOLE",
                     action = "store", default = None,
                     help = "name of console to enable")
     ap.add_argument("target", metavar = "TARGET", action = "store",
@@ -2090,7 +2090,7 @@ def _cmdline_setup(arg_subparser):
                     action = "store", type = int, default = None,
                     help = "fix rows to COLUMNS (default auto)"
                     ";  incompatible with -r|--rows")
-    ap.add_argument("--console", "-c", metavar = "CONSOLE",
+    ap.add_argument("-c", "--console", metavar = "CONSOLE",
                     action = "append", default = None,
                     help = "Read only from the named consoles (default: all)")
     ap.add_argument("--interactive", "-i",
