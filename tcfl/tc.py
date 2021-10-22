@@ -857,7 +857,7 @@ class reporter_c(object):
 
         self._report(
             level, 1000, "DATA",
-            domain + "::" + name + "::%s" % value, subcase = subcase,
+            domain + "::" + name + "::" + str(value), subcase = subcase,
             attachments = dict(domain = domain, name = name, value = value))
 
     def report_tweet(self, what, result, extra_report = "",
