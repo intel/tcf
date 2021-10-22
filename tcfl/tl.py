@@ -291,23 +291,11 @@ def console_dump_on_failure(testcase, alevel = 0):
                                attachments, alevel = alevel)
 
 def target_ic_kws_get(target, ic, keyword, default = None):
-    """
-    Obtain a keyword from the targets' keywords, if not found, from
-    the interconnect (ic) or default.
-
-    :param tcfl.tc.target_c target: target where to retrieve from
-
-    :param tcfl.tc.interconnect_c ic: interconnect where to retrieve from
-
-    :param str keyword: keyword to retrieve
-
-    :param default: (optional, default *None*) value to return if
-      *keyword* is not found in *target* or *ic*.
-
-    :returns: the value of *keyword* in the target's keyword
-      definition, if not found, in the interconnect's, ortherwise default.
-    """
-    return target.kws.get(keyword, ic.kws.get(keyword, default))
+    target.report_info(
+        "DEPRECATED: tcfl.tl.target_ic_kws_get() deprecated in"
+        " favour of target.ic_key_get()",
+        dict(trace = traceback.format_stack()))
+    return target.ic_key_get(ic, keyword, default)
 
 
 def setup_verify_slip_feature(zephyr_client, zephyr_server, _ZEPHYR_BASE):

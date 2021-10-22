@@ -397,9 +397,6 @@ def target_power_cycle_to_normal_pxe(target):
     )
     target_power_cycle_to_normal(target)
 
-def _target_ic_kws_get(target, ic, kw, default = None):
-    return target.kws.get(kw, ic.kws.get(kw, default))
-
 
 #: Name of the directory created in the target's root filesystem to
 #: cache test content
@@ -1734,9 +1731,9 @@ EOF""")
 
                 testcase.targets_active()
                 kws = dict(
-                    rsync_server = _target_ic_kws_get(
-                        target, ic, 'pos.rsync_server',
-                        _target_ic_kws_get(target, ic, 'pos_rsync_server', None)),
+                    rsync_server = target.ic_key_get(
+                        ic, 'pos.rsync_server',
+                        target.ic_key_get(ic, 'pos_rsync_server', None)),
                     image = image,
                     boot_dev = boot_dev,
                 )
@@ -1811,10 +1808,10 @@ cat > /tmp/deploy.ex
                 size_gib = int(self.metadata.get('size_gib', 0))
                 # Well, base it at 500 and add one minute per GiB to
                 # be very genereous, but we'd need tweaks per target
-                timeout_base = int(_target_ic_kws_get(
-                    target, ic, "pos.deploy_timeout_base", 500))
-                timeout_per_gib = int(_target_ic_kws_get(
-                    target, ic, "pos.deploy_timeout_per_gib", 30))
+                timeout_base = int(target.ic_key_get(
+                    ic, "pos.deploy_timeout_base", 500))
+                timeout_per_gib = int(target.ic_key_get(
+                    ic, "pos.deploy_timeout_per_gib", 30))
                 timeout = timeout_base + timeout_per_gib * size_gib
                 target.report_info(
                     "POS: image deployment timeout %s seconds"
@@ -2039,9 +2036,9 @@ def deploy_path(ic, target, _kws, cache = True):
                     "# trying to seed %s from the server's cache"
                     % (cache_name, cache_name))
 
-        rsync_server = _target_ic_kws_get(
-            target, ic, 'pos.rsync_server',
-            _target_ic_kws_get(target, ic, 'pos_rsync_server', None))
+        rsync_server = target.ic_key_get(
+            ic, 'pos.rsync_server',
+            target.ic_key_get(ic, 'pos_rsync_server', None))
         target.report_info("POS: rsyncing %s from %s "
                            "to /mnt/persistent.tcf.git/%s"
                            % (cache_name, rsync_server, cache_name),

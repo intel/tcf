@@ -1325,6 +1325,73 @@ class target_c(reporter_c):
                 'target does not export needed keywords: %s'
                 % ', '.join(missing))
 
+
+    def ic_key_get(self, ic, key, default = None):
+        """
+        Obtain the value of an interconnect key
+
+        An *interconnect key* is a key that is specific to the
+        interconnect we are talking about; for example, for a network
+        X, the proxy might be address A1 but for network Y the proxy
+        might be A2.
+
+        A target might be a member of one or more interconnects, as
+        described by its tags (*interconnects* section).
+
+        These keys live in the *interconnects.INTERCONNECTNAME*
+        hiearchy of the target's inventory. If they are not there,
+        they are seeked in the interconnect's inventory (top level),
+        thus the resolution order for key *KEY* is:
+
+         - TARGET.interconnects.INTERCONNECTNAME.KEY
+         - INTERCONNECTNAME.KEY
+         - <default>
+
+        :param tcfl.tc.target_c ic: target describing the interconnect
+          of which this target is a member
+
+        :param str key: name of the inventory key we need
+
+        :param default: (optional, default *None*) value to return if
+          not found
+
+        :returns: value of key or the default.
+
+        Note this is different to :meth:`ic_field_get` in that:
+
+        - :meth:`ic_field_get` only gets fields from
+          *interconnects.INTERCONNECTNAME*
+
+        - :meth:`ic_field_get` raises exceptions when the key is not
+          found
+
+
+        Notable keys which are accessed with this mechanism:
+
+        - *server.url*: URL of the server when seen inside the
+          interconnect (if the network is isolated, so that the target
+          can access the server)
+
+        - *http_proxy* / *https_proxy* / *ftp_proxy*: URLs of the
+          HTTP/S/FTP proxy
+        """
+        assert isinstance(ic, target_c)
+        assert isinstance(key, str)
+
+        interconnect_data = self.kws.get('interconnects', {})
+        if not ic.id in interconnect_data:
+            raise tcfl.error_e(
+                f"tried to request interconnect key '{key}'"
+                f" from interconnect '{ic.id}';"
+                f" but target is not connected to it",
+                dict(target = target))
+        if key in interconnect_data[ic.id]:
+            return interconnect_data[ic.id][key]
+        if key in ic.kws:
+            return ic.kws[key]
+        return default
+
+
     def ic_field_get(self, ic, field, field_description = ""):
         """Obtain the value of a field for a target in an interconnect
 
