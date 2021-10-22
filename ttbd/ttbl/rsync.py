@@ -48,7 +48,8 @@ class pci(ttbl.power.impl_c):
     def __init__(self, address,
                  share_name, share_path,
                  port = 873,
-                 uid = None, gid = None, read_only = True, **kwargs):
+                 uid = None, gid = None, read_only = True, sections = None,
+                 **kwargs):
         ttbl.power.impl_c.__init__(self, **kwargs)
         self.address = address
         self.port = port
@@ -57,6 +58,25 @@ class pci(ttbl.power.impl_c):
         self.read_only = str(read_only)
         self.uid = uid
         self.gid = gid
+        if sections:
+            self._sections_verify(sections, "sections")
+
+        self.sections = sections
+
+    #: Sections to add to the rsync configurations for all instances;
+    #: same format as the constructor's :class:`ttbl.rsync.pci`
+    #: *section*
+    sections_global = None
+
+    @staticmethod
+    def _sections_verify(sections, kind):
+        assert isinstance(sections, dict), \
+            f"{kind}: expected a dictionary expressing rsync sections"
+        for name, data in sections.items():
+            commonl.verify_str_safe(name)
+            assert 'path' in data, \
+                f"{kind}/{name}: no 'path' specified"
+
 
     def on(self, target, _component):
         """
@@ -79,6 +99,29 @@ timeout = 300
                 conff.write("uid = %s" % self.uid)
             if self.gid:
                 conff.write("gid = %s" % self.gid)
+
+            def _section_add(name, data):
+                conff.write(f"""
+[{name}]
+path = {data['path']}
+read only = true
+timeout = 300
+""")
+                if 'uid' in data:
+                    conff.write(f"uid = {data['uid']}")
+                if 'gid' in data:
+                    conff.write(f"uid = {data['gid']}")
+
+            if self.sections:
+                for name, data in self.sections.items():
+                    _section_add(name, data)
+            if self.sections_global:
+                # check this now, since it might have been modified
+                # after constructors were ran
+                self._sections_verify(self.sections_global, "sections_global")
+                for name, data in self.sections_global.items():
+                    _section_add(name, data)
+
 
         def _preexec_fn():
             # We need this to access image files to serve that are
