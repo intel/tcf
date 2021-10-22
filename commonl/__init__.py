@@ -473,33 +473,10 @@ def hash_file(hash_object, filepath, blk_size = 8192):
             hash_object.update(chunk)
     return hash_object
 
+
 _hash_sha512 = hashlib.sha512()
 
-def hash_file_cached(filepath, digest,
-                     cache_path = None, cache_entries = 1024):
-    """
-    hash file contents and keep them in a cache in
-    *~/.cache/file-hashes*.
-
-    Next time the same file is being cached, use the cache entries (as
-    long as the filepath is the same and the os.stat() signature
-    doesn't change).
-
-    :param str filepath: path to the file to hash
-
-    :param str digest: digest to use; anything :mod:`python.hashlib` supports
-
-    :param str cache_path: (optional; default
-      *~/.cache/file-hashes*) path where
-      to store the cached hashes.
-
-    :param int cache_entries: (optional; default *1024*) how many
-      entries to keep in the cache; old entries are removed to give way
-      to frequently used entries or new ones (LRU).
-
-    :returns str: hex digest
-
-    """
+def _hash_file_cached(filepath, digest, cache_path, cache_entries):
     # stat info happens to be iterable, ain't that nice
     filepath_stat_hash = mkid(
         digest + filepath + "".join([ str(i) for i in os.stat(filepath) ]),
@@ -530,6 +507,47 @@ def hash_file_cached(filepath, digest,
     value = hoc.hexdigest()
     os.symlink(hoc.hexdigest(), cached_filename)
     return value
+
+def hash_file_cached(filepath, digest,
+                     cache_path = None, cache_entries = 1024):
+    """
+    Hash file contents and keep them in a cache in
+    *~/.cache/file-hashes*.
+
+    Next time the same file is being cached, use the cache entries (as
+    long as the filepath is the same and the os.stat() signature
+    doesn't change).
+
+    :param str filepath: path to the file to hash
+
+    :param str digest: digest to use; anything :mod:`python.hashlib` supports
+
+    :param str cache_path: (optional; default
+      *~/.cache/file-hashes*) path where
+      to store the cached hashes.
+
+    :param int cache_entries: (optional; default *1024*) how many
+      entries to keep in the cache; old entries are removed to give way
+      to frequently used entries or new ones (LRU).
+
+    :returns str: hex digest
+
+    """
+    # If we have a cache
+    tries_max = 10
+    tries = 0
+    while tries < tries_max:
+        try:
+            return _hash_file_cached(filepath, digest,
+                                     cache_path, cache_entries)
+        except FileExistsError as e:
+            # ops? tried to create a cache entry and found it already
+            # is there? ok, retry in case *our* version is better
+            # because the file has been updated...but if we had tried
+            # 10 times, bail
+            if tries >= tries_max:
+                raise
+            tries += 1
 
 
 def symlink_lru_cleanup(dirname, max_entries):
