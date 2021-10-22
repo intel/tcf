@@ -3,6 +3,10 @@
 #
 #   $ tcf.git/nreqs.py install base.nreqs.yaml
 #
+
+bzip2:
+  reason: for de/compressing logfiles and others
+
 dosfstools:
 git:
 gvnc-tools:
@@ -18,7 +22,11 @@ ply:
   dnf: python3-ply
 
 pykwalify: python3-pykwalify
-  
+
+pymongo:
+  reason: used to report execution data to MongoDB databases
+  distro: python3-pymongo
+
 pyte: python3-pyte
 
 pyserial:
@@ -50,3 +58,6 @@ termcolor:
   distro:
     name: python3-termcolor
   skip_platform: win32
+
+xz:
+  reason: for de/compressing logfiles and others
