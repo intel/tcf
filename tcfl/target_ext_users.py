@@ -13,6 +13,8 @@ from __future__ import print_function
 import json
 import logging
 import pprint
+import requests
+import urllib3
 
 import tabulate
 
@@ -157,7 +159,13 @@ def _cmdline_servers(args):
                 # we don't need this if verbosity < 0 and it takes time
                 username = rtb.logged_in_username()
         # FIXME: we need a base exception for errors from the API
-        except ( ttb_client.requests.HTTPError, RuntimeError):
+        except (
+                requests.exceptions.ConnectionError,
+                ttb_client.requests.HTTPError,
+                urllib3.exceptions.MaxRetryError,
+                RuntimeError
+        ) as e:
+            logging.warning("%s: can't reach server: %s", name, e)
             username = "n/a"
         r.append(( rtb.aka, str(rtb), username ))
         d[rtb.aka] = dict(url = str(rtb), username = username)
