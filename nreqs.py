@@ -760,6 +760,8 @@ def _command_hash(args):
         with open(filename, 'rb') as f:
             logging.warning(f"hash: adding contents of {filename}")
             m.update(f.read())
+    for salt in args.salt:
+        m.update(salt.encode('utf-8'))
     print(m.hexdigest()[:16])
 
 
@@ -902,6 +904,10 @@ ap.add_argument(
     "-e", "--extra-file", metavar = "FILE",
     type = str, action = "append", default = [],
     help = "add other files to use for generating the hash")
+ap.add_argument(
+    "-s", "--salt", metavar = "VALUE",
+    type = str, action = "append", default = [],
+    help = "add extra values for salting the hash")
 ap.set_defaults(func = _command_hash)
 
 ap = command_subparser.add_parser(
