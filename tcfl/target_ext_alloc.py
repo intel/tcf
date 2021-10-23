@@ -468,7 +468,7 @@ def _alloc_ls(verbosity, username = None):
     tp.close()
     tp.join()
     for rtb, thread in threads.items():
-        allocs[rtb.aka] = thread.get()
+        allocs[rtb] = thread.get()
 
     if verbosity < 0:
         # just print the list of alloc ids for each server, one per line
@@ -516,7 +516,7 @@ def _alloc_ls(verbosity, username = None):
                     tgs.append( name + ": " + ",".join(group))
                 table.append([
                     allocid,
-                    rtb,
+                    rtb.aka,
                     data['state'],
                     prio,
                     data.get('timestamp', 'n/a'),
