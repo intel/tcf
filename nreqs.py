@@ -121,6 +121,7 @@ password/usernames)
 
 import argparse
 import collections
+import ctypes
 import hashlib
 import json
 import logging
@@ -245,9 +246,39 @@ class method_pip_c(method_abc):
         method_abc.__init__(self, "pip")	# empty means "generic"
 
     def install(self, package, package_alternate, package_data, method_details):
-        # do not remove --user if you do, add --no-deps FIXME:expl
-        # FIXME: support -i --index-url --extra-index-url
-        cmdline = f"pip install --user".split()
+        cmdline = [ "pip", "install" ]
+        admin = False
+        if hasattr(os, "geteuid"):	# most Unix platforms
+            admin = os.geteuid() == 0
+        elif hasattr(ctypes, "windll"):	# windowsy
+            admin = ctypes.windll.shell32.IsUserAnAdmin()
+        else:
+            logging.warning("non-Unix platform? can't tell if sysadmin"
+                            "--running with --user")
+        # To deps or --no-deps, this is the question.
+        # We can't tell ahead of time if we are able to install
+        # dependencies as distro packages (which we prefer), and we
+        # can't force the installation order (since the info could
+        # come from multiple files). If we did --no-deps, it'd be
+        # clustermess on packages we know are only available on
+        # pip/whichever, which would require the user to unravel the
+        # depednenciy rathole.
+        #
+        # FIXME: an approach might be to do some sort of ordering in
+        # which we install in this order:
+        #
+        # - general packages
+        # - packages which are exclusive to some method (without
+        #   --no-deps)
+        #
+        # this balances the need, since the user can ensure the main
+        # distro packages are installed before doing a pip something
+        # that has distro-dependencies. Might not solve all, but gets
+        # close.
+
+        if not admin:
+            cmdline.append("--user")
+
         _indexes = []
         _index = method_details.get('index', None)
         if _index != None:
