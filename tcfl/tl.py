@@ -12,11 +12,13 @@ Common utilities for test cases
 import collections
 import datetime
 import os
-import pyte
 import re
 import ssl
 import time
 import traceback
+import urllib.parse
+
+import pyte
 
 import commonl
 import tcfl.tc
@@ -643,13 +645,16 @@ def sh_export_proxy(ic, target):
 
     """
     proxy_cmd = ""
+    proxy_hosts = {}
     if 'http_proxy' in ic.kws:
         target.shell.run("export http_proxy=%(http_proxy)s; "
-                         "export HTTP_PROXY=$http_proxy" % ic.kws)
+                          "export HTTP_PROXY=$http_proxy" % ic.kws)
+        proxy_hosts['http_proxy'] = ic.kws['http_proxy']
     if 'https_proxy' in ic.kws:
         target.shell.run("export https_proxy=%(https_proxy)s; "
                          "export HTTPS_PROXY=$https_proxy" % ic.kws)
-    if 'https_proxy' in ic.kws or 'http_proxy' in ic.kws:
+        proxy_hosts['https_proxy'] = ic.kws['https_proxy']
+    if proxy_hosts:
         # if we are setting a proxy, make sure it doesn't do the
         # local networks
         no_proxyl = [ "127.0.0.1", "localhost" ]
@@ -660,6 +665,7 @@ def sh_export_proxy(ic, target):
         proxy_cmd += " no_proxy=" + ",".join(no_proxyl)
         target.shell.run("export " + proxy_cmd % ic.kws)
         target.shell.run("export NO_PROXY=$no_proxy")
+    return proxy_hosts
 
 def sh_proxy_environment(ic, target, prefix = "/"):
     """
@@ -678,6 +684,7 @@ def sh_proxy_environment(ic, target, prefix = "/"):
 
     # FIXME: we need to change proxies in targets to be homed in the
     # proxy hierarchy as a backup? they are always network specific anyway?
+    proxy_hosts = {}
 
     if 'ftp_proxy' in ic.kws:
         target.shell.run(
@@ -685,6 +692,7 @@ def sh_proxy_environment(ic, target, prefix = "/"):
             " >> /etc/environment"
             % ic.kws)
         apt_proxy_conf.append('FTP::proxy "%(ftp_proxy)s";' % ic.kws)
+        proxy_hosts['ftp_proxy'] = ic.kws['ftp_proxy']
 
     if 'http_proxy' in ic.kws:
         target.shell.run(
@@ -693,6 +701,7 @@ def sh_proxy_environment(ic, target, prefix = "/"):
             % ic.kws)
         apt_proxy_conf.append('HTTP::proxy "%(http_proxy)s";' % ic.kws)
         dnf_proxy = f"{ic.kws['http_proxy']}"	# default to HTTP proxy
+        proxy_hosts['http_proxy'] = ic.kws['http_proxy']
 
     if 'https_proxy' in ic.kws:
         target.shell.run(
@@ -701,6 +710,7 @@ def sh_proxy_environment(ic, target, prefix = "/"):
             % ic.kws)
         apt_proxy_conf.append('HTTPS::proxy "%(https_proxy)s";' % ic.kws)
         dnf_proxy = f"{ic.kws['https_proxy']}"	# override https if available
+        proxy_hosts['https_proxy'] = ic.kws['https_proxy']
 
     if 'no_proxy' in ic.kws:
         target.shell.run("echo 'export NO_PROXY=%(no_proxy)s"
@@ -718,12 +728,14 @@ def sh_proxy_environment(ic, target, prefix = "/"):
     # wild guess by overriding
     if dnf_proxy:
         target.shell.run(
-            "test -r /etc/dnf/dnf.conf"
+            "rm -f /tmp/dnf.conf; test -r /etc/dnf/dnf.conf"
             # sed's -n and -i don't play well, so copy it to post-process
             f" && cp /etc/dnf/dnf.conf /tmp/dnf.conf"
             # sed: wipe existing proxy (if any) add new setting
             # hack: assumes [main] section is the only one
             f" && sed -n -e '/^proxy=/!p' -e '$aproxy={dnf_proxy}' /tmp/dnf.conf > /etc/dnf/dnf.conf")
+
+    return proxy_hosts
 
 
 def linux_wait_online(ic, target, loops = 20, wait_s = 0.5):
@@ -1202,7 +1214,9 @@ def linux_time_set(target):
 
 
 def linux_package_add(ic, target, *packages,
-                      timeout = 120, fix_time = True, **kws):
+                      timeout = 120, fix_time = True,
+                      proxy_wait_online = True,
+                      **kws):
     """Ask target to install Linux packages in distro-generic way
 
     This function checks the target to see what it has installed and
@@ -1230,6 +1244,9 @@ def linux_package_add(ic, target, *packages,
        - RHEL: use *rhel*
        - Ubuntu: use *ubuntu*
 
+    :param bool proxy_wait_online: (optional, default *True*) if there
+      are proxies defined, wait for them to be pingable before
+      accessing the network.
 
     FIXME:
 
@@ -1268,6 +1285,19 @@ def linux_package_add(ic, target, *packages,
         target.shell.run("date -us '%s'; hwclock -wu"
                          % str(datetime.datetime.utcnow()))
 
+    if proxy_wait_online:
+        proxy_hosts = set()
+        if 'ftp_proxy' in ic.kws:
+            proxy_hosts.add(urllib.parse.urlparse(ic.kws['ftp_proxy']).hostname)
+        if 'http_proxy' in ic.kws:
+            proxy_hosts.add(urllib.parse.urlparse(ic.kws['http_proxy']).hostname)
+        if 'https_proxy' in ic.kws:
+            proxy_hosts.add(urllib.parse.urlparse(ic.kws['https_proxy']).hostname)
+        if proxy_hosts:
+            target.report_info(
+                f"waiting for proxies to be online (ping): {', '.join(proxy_hosts)}")
+            for hostname in proxy_hosts:
+                linux_wait_host_online(target, hostname)
 
     packages = list(packages)
     if distro.startswith('clear'):
@@ -1310,13 +1340,17 @@ def linux_package_add(ic, target, *packages,
                               % (distro, distro_version))
     return distro, distro_version
 
-def linux_network_ssh_setup(ic, target):
+def linux_network_ssh_setup(ic, target, proxy_wait_online = True):
     """
     Ensure the target has network and SSH setup and running
 
     :param tcfl.tc.target_c ic: interconnect where the target is connected
 
     :param tcfl.tc.target_c target: target on which to operate
+
+    :param bool proxy_wait_online: (optional, default *True*) if there
+      are proxies defined, wait for them to be pingable before
+      accessing the network.
     """
     tcfl.tl.linux_wait_online(ic, target)
     tcfl.tl.sh_export_proxy(ic, target)
@@ -1329,7 +1363,8 @@ def linux_network_ssh_setup(ic, target):
         clear = [ 'sudo', 'openssh-server', 'openssh-client' ],
         fedora = [ 'openssh-server' ],
         rhel = [ 'openssh-server' ],
-        ubuntu = [ 'openssh-server' ]
+        ubuntu = [ 'openssh-server' ],
+        proxy_wait_online = proxy_wait_online
     )
 
     tcfl.tl.linux_ssh_root_nopwd(target)	# allow remote access
