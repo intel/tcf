@@ -2569,7 +2569,7 @@ class tc_pos0_base(tc.tc_c):
                 "not rebooting (REBOOT_DISABLED defined in environment)")
             # used for debugging or tight development cycles
             target.console.select_preferred()
-            target.console.enable()
+            # select_preferred enables and calls shell.setup()
             return
 
         ic.power.on()
