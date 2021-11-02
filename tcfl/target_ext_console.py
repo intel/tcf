@@ -776,6 +776,9 @@ class extension(tc.target_extension_c):
           will be called. No arguments are passed, the function needs
           to operate on the default console.
 
+        :returns bool: *True* if the default console changed, *False*
+          otherwise
+
         The rest of the arguments are passed verbatim to
         :func:`target.console.setup
         <tcfl.target_ext_console.extension.setup>` to setup the
@@ -787,14 +790,14 @@ class extension(tc.target_extension_c):
             if 'preferred' not in self.aliases:
                 # nothing? well, this means keep as default whatever is
                 # the default now
-                return
+                return False
             # get the name of the preferred console
             parameters = target.console.setup_get('preferred')
             console = parameters['real_name']
         if console == None:
             # nothing? well, this means keep as default whatever is
             # the default now
-            return
+            return False		# we didn't change
         else:
             assert console in target.console.console_list, \
                 "%s: unknown console (valid: %s)" \
@@ -809,7 +812,7 @@ class extension(tc.target_extension_c):
         elif callable(shell_setup):
             shell_setup(console)
         # False, so we don't call shell setup
-
+        return True			# we changed
 
     def enable(self, console = None):
         """
