@@ -296,9 +296,10 @@ if __name__ == "__main__":
         "-i", "--ignore-ssl", action='store_true', default = False,
         help = "Ignore server SSL certificate")
     arg_parser.add_argument(
-        "-e", "--environment", metavar = "KEY=VALUE", action='append',
+        "-e", "--environment", metavar = "KEY[=VALUE]", action='append',
         default = [],
-        help = "add an environment variable to execution")
+        help = "add an environment variable to execution;"
+        " if VALUE is omitted, it defaults to 'true'")
     # This is made a global argument, even if only 'run' uses it
     # because it makes it easier to generate the sub-command without
     # having to muck with 'run's sub-arguments
@@ -509,7 +510,7 @@ if __name__ == "__main__":
             key, val = environment.split("=", 1)
         else:
             key = environment
-            val = True
+            val = "true"
         os.environ[key] = val
 
     if args.debug:
