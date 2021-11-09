@@ -23,7 +23,11 @@ LABEL maintainer https://github.com/intel/tcf
 
 COPY . /home/work/tcf.git
 # We also add multiple tools for diagnosing that at the end we always need
-RUN microdnf install -y python3-pip python3-yaml; \
+# chmod: when we run inside Jenkins, it'll use which ever UID it uses
+#        (can't control it), so we need /home/work world accesible
+RUN \
+    chmod a+rwX -R /home/work; \
+    microdnf install -y python3-pip python3-yaml; \
     DNF_COMMAND=microdnf /home/work/tcf.git/nreqs.py install /home/work/tcf.git; \
     microdnf install -y \
         bind-utils \
