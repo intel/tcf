@@ -31,8 +31,8 @@ RUN \
     DNF_COMMAND=microdnf /home/work/tcf.git/nreqs.py install /home/work/tcf.git; \
     microdnf install -y \
         bind-utils \
-        iputils; \
-        ssh; \
+        iputils \
+        ssh \
         strace; \
     microdnf clean all
 # our setup is a wee messed up at this point
