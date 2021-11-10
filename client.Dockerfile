@@ -32,7 +32,6 @@ RUN \
     microdnf install -y \
         bind-utils \
         iputils \
-        ssh \
         strace; \
     microdnf clean all
 # our setup is a wee messed up at this point
