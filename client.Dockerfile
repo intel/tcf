@@ -25,6 +25,11 @@ COPY . /home/work/tcf.git
 # We also add multiple tools for diagnosing that at the end we always need
 # chmod: when we run inside Jenkins, it'll use which ever UID it uses
 #        (can't control it), so we need /home/work world accesible
+# pip3 install: our setup is a wee messed up at this point
+#               sed -> quick hack because it's late and I am done with this
+# rm -rf : leftover lib from pip3 removed
+# chmod: when we run inside Jenkins, it'll use which ever UID it uses
+#        (can't control it), so we need /home/work world accesible
 RUN \
     chmod a+rwX -R /home/work; \
     microdnf install -y python3-pip python3-yaml; \
@@ -33,10 +38,11 @@ RUN \
         bind-utils \
         iputils \
         strace; \
-    microdnf clean all
-# our setup is a wee messed up at this point
-# FIXME: sed -> quick hack because it's late and I am done with this
-RUN cd /home/work/tcf.git && pip3 install . --root=/ --prefix=/ &&  sed -i 's|#!python|#! /usr/bin/env python3|' /usr/bin/tcf
+    microdnf clean all; \
+    cd /home/work/tcf.git; \
+    pip3 install . --root=/ --prefix=/; \
+    sed -i 's|#!python|#! /usr/bin/env python3|' /usr/bin/tcf; \
+    rm -rf lib
 
 ENV HOME=/home/work
 WORKDIR /home/work
