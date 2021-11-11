@@ -10,6 +10,7 @@ Configuration API for *tcf*
 ---------------------------
 """
 
+import collections
 import inspect
 import logging
 import os
@@ -40,8 +41,14 @@ state_path = None
 #: - ca_path (str): path to certificates
 urls = []
 
+# FIXME: eventually this and urls  will be superseeded with a proper
+# list/dict of server objects; temporary workaround that allows us to
+# have origins for the time being. Hack. Horrible hack
+servers = collections.defaultdict(dict)
+
 # FIXME: need to figure out a way to tag this as configuration language
-def url_add(url, ssl_ignore = False, aka = None, ca_path = None):
+def url_add(url, ssl_ignore = False, aka = None, ca_path = None,
+            origin = None):
     """
     Add a TTBD server
 
@@ -50,13 +57,16 @@ def url_add(url, ssl_ignore = False, aka = None, ca_path = None):
     :param bool ssl_ignore: if True, skips verifying SSL certificates
     :param str aka: Short form for this server, to use in display messages
     """
+    # FIXME: move this to the object construction
     u = urllib.parse.urlparse(url)
     if u.scheme == "" or u.netloc == "":
         raise Exception("%s: malformed URL?" % url)
-    o = inspect.stack()[1]
-    origin = "%s:%s" % (o[1], o[2])
+    if not origin:
+        o = inspect.stack()[1]
+        origin = "%s:%s" % (o[1], o[2])
     logger.info("%s: Added server URL %s", origin, url)
     urls.append((url, ssl_ignore, aka, ca_path))
+    servers[url]['origin'] = origin
 
 
 def load(config_path = None, config_files = None,
