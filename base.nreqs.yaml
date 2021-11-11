@@ -53,6 +53,11 @@ tabulate: python3-tabulate
   
 setuptools:
   distro: python3-setuptools
+
+time:
+  reason: |
+    Some scripting commands prefix with time to measure
+    execution time
   
 termcolor:
   distro:
