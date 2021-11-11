@@ -513,11 +513,19 @@ def _target_get(target_id):
 
 @app.route('/ttb', methods = ['GET'])
 def _ttb_get():
-    return {
+    d = {
         'protocol.major': API_VERSION,
         'protocol.minor': 0, # TODO currently no value in source
-        'server.version': commonl.version_get(ttbl, 'ttbd')
+        'server.version': commonl.version_get(ttbl, 'ttbd'),
     }
+    target_local = ttbl.test_target.get("local")
+    if target_local:
+        # if the configuration did create a local target,
+        # publish extra information about herds/servers
+        herds = target_local.to_dict([ "herds" ])
+        if herds:
+            d.update(herds)
+    return d
 
 _admin_required = [
     'disabled',
@@ -751,9 +759,18 @@ def _delete_allocation(allocid):
     return flask.jsonify(result)
 
 
+# v2 changed the return format to be a dictionary per allocid (which
+# allows for easier future expansion if needed) containing the new
+# state and the allocated group (if any)
+@app.route(API_PREFIX + 'keepalive-v<int:version>', methods = [ 'PUT' ])
+# first versiont: returns a string w/ state per allocid that changed state
 @app.route(API_PREFIX + 'keepalive', methods = [ 'PUT' ])
 @flask_login.login_required
-def _put_keepalive():
+def _put_keepalive(version = 1):
+    if version > 2:
+        return flask.abort(
+            404, f"keepalive: unsupported method version v{version}")
+
     # {
     #     'pressure': N,
     #     'ALLOCID1': 'KNOWNSTATE1',
@@ -790,13 +807,23 @@ def _put_keepalive():
         else:
             pressure = 0
         result = dict()
+        # FIXME: parallelize
         for allocid, expected_state in data.items():
             r = ttbl.allocation.keepalive(
                 allocid, expected_state, pressure,
                 flask_login.current_user._get_current_object())
             if r['state'] == expected_state:
                 continue		# nothing to return
-            result[allocid] = r
+            if version == 2:
+                # for v2 we return data in a dictionary, so we
+                # can expand it more easily. We also add the group
+                # that was allocated
+                result[allocid] = dict(
+                    state = r['state'],
+                    group_allocated_name = r['group_allocated']
+                )
+            else:
+                result[allocid] = r['state']
     except Exception as e:
         flask_logi_abort(400, "%s" % e, exc_info = True)
     return flask.jsonify(dict(result))
@@ -1440,6 +1467,10 @@ if __name__ == "__main__":
         # Not a daemon, don't reap it, let other do it
         return
 
+    def sigquit_handler(signum, frame):
+        logging.shutdown()
+
+    signal.signal(signal.SIGQUIT, sigquit_handler)
     signal.signal(signal.SIGCHLD, sigchld_handler)
 
     # Ensure we are session leaders, so we can kill the whole group
