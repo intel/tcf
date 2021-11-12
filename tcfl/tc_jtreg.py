@@ -655,6 +655,14 @@ class driver(tcfl.pos.tc_pos0_base):
             output = True, timeout = timeout)
         self.targets_active()
 
+        # For example:
+        ## Error: cannot determine version for JDK: /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.272.b10-0.fc31.x86_64
+        general_error_regex = re.compile("^Error: (?P<message>.*)$", re.MULTILINE)
+        m = general_error_regex.search(output)
+        if m:
+            raise tcfl.tc.error_e(f"java errored? {m.groupdict()['message']}",
+                                  dict(output = output))
+
         # see above on time -p
         kpi_regex = re.compile(r"^real[ \t]+(?P<seconds>[\.0-9]+)$",
                                re.MULTILINE)
