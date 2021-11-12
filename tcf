@@ -288,10 +288,14 @@ if __name__ == "__main__":
         help = "URL to the test broker (multiple may be specified)")
     arg_parser.add_argument(
         "-d", "--debug", action = "store_true", default = False,
-        help = "Enable internal debug prints and checks")
+        help = "Enable internal debug prints and checks and"
+        " extra logging info")
     arg_parser.add_argument(
         "-x", "--traces", action='store_true', default = False,
         help = "Print exception traces")
+    arg_parser.add_argument(
+        "--log-functions", action='store_true', default = False,
+        help = "Log function names")
     arg_parser.add_argument(
         "-i", "--ignore-ssl", action='store_true', default = False,
         help = "Ignore server SSL certificate")
@@ -501,7 +505,10 @@ if __name__ == "__main__":
 
     global args
     args = arg_parser.parse_args()
-    log_format = "%(levelname)s %(module)s.%(funcName)s():%(lineno)d: %(message)s"
+    log_format = "%(levelname)s: %(name)s"
+    if args.debug or args.log_functions:
+        log_format += "::%(module)s.%(funcName)s():%(lineno)d"
+    log_format += ": %(message)s"
     log_format = commonl.log_format_compose(log_format, args.log_pid_tid, args.log_time)
     logging.basicConfig(format = log_format, level = args.level)
 
