@@ -577,14 +577,10 @@ tcf-jobserver-run:
             os.unlink(args.make_jobserver)
 
     for url in args.url:	# Expand the list of URLs
-        ssl_ignore = False
         if url == "":	# Cleanup list if there is an empty url
             tcfl.config.urls = []
-        if isinstance(url, tuple):
-            _url = url
-            url = _url[0]
-            ssl_ignore = _url[1]
-        tcfl.config.url_add(url, ssl_ignore)
+        else:
+            tcfl.config.url_add(url, args.ignore_ssl, origin = "command line")
 
     tcfl.config.load(config_path = args.config_path,
                      config_files = args.config_files,
