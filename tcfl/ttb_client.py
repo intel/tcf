@@ -166,8 +166,10 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
     API_VERSION = 2
     API_PREFIX = "/ttb-v" + str(API_VERSION) + "/"
 
+    port_default = 5000
+
     def __init__(self, state_path, url, ignore_ssl = False, aka = None,
-                 ca_path = None):
+                 ca_path = None, origin = None):
         """Create a proxy for a target broker, optionally loading state
         (like cookies) previously saved.
 
@@ -184,6 +186,7 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
         self._base_url = None
         self.cookies = {}
         self.valid_session = None
+        self.origin = origin
         if ignore_ssl == True:
             self.verify_ssl = False
         elif ca_path:
@@ -192,8 +195,15 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
             self.verify_ssl = True
         self.lock = threading.Lock()
         self.parsed_url = urllib.parse.urlparse(url)
+        if self.parsed_url.port == None:
+            port = self.port_default
+        else:
+            port = self.parsed_url.port
         if aka == None:
-            self.aka = self.parsed_url.hostname.split('.')[0]
+            # hostname is something.other.whatever, so get the
+            # hostname, append the port where this is probably
+            # listening to make a human-friendly unique ID
+            self.aka = self.parsed_url.hostname.split('.')[0] + f"_{port}"
         else:
             assert isinstance(aka, str)
             self.aka = aka
@@ -572,7 +582,9 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
             "PUT", "targets/%s/release" % rt['id'],
             data = { 'force': force, 'ticket': ticket })
 
-def rest_init(path, url, ignore_ssl = False, aka = None):
+
+
+def rest_init(path, url, ignore_ssl = False, aka = None, origin = None):
     """
     Initialize access to a remote target broker.
 
@@ -582,8 +594,10 @@ def rest_init(path, url, ignore_ssl = False, aka = None):
     :type url: str
     :returns: True if information was loaded for the URL, False otherwise
     """
-    rtb = rest_target_broker(path, url, ignore_ssl, aka)
-    rest_target_brokers[url] = rtb
+    rtb = rest_target_broker(path, url, ignore_ssl, aka, origin = origin)
+    # ensure the URL is normalized
+    # FIXME: move this to the constructor
+    rest_target_brokers[rtb.parsed_url.geturl()] = rtb
     return rtb
 
 def rest_shutdown(path):
