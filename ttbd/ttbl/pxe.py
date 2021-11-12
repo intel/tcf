@@ -143,6 +143,8 @@ architectures = {
         # https://www.syslinux.org/wiki/index.php?title=PXELINUX#UEFI
         rfc_code = "00:07",
         boot_filename = 'syslinux.efi',
+        # FIXME: needed for some emulators
+        #boot_filename = 'syslinux-6.03.efi',
         copy_files = [
             "/usr/share/syslinux/efi64/",
             "/home/ttbd/public_html/x86_64/vmlinuz-tcf-live",
@@ -152,6 +154,8 @@ architectures = {
     'efi-x86_64': dict(
         rfc_code = "00:09",
         boot_filename = 'syslinux.efi',
+        # FIXME: needed for some emulators
+        #boot_filename = 'syslinux-6.03.efi',
         copy_files = [
             "/usr/share/syslinux/efi64/",
             "/home/ttbd/public_html/x86_64/vmlinuz-tcf-live",
