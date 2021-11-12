@@ -2303,7 +2303,7 @@ class rpyc_aardvark_c(rpyc_c):
     When powered on, it starts a podman container which has access to
     an specific Aardvark device and that exports an RPYC service
     https://rpyc.readthedocs.io/en/latest/ in the given TCP port to
-    use the `aarvark_py
+    use the `aardvark_py
     <https://aardvark-py.readthedocs.io/en/master/`_ library.
 
     A client then can establish an RPYC connection and instantiate an
