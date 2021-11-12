@@ -80,8 +80,8 @@ python: {" ".join(sys.version.splitlines())}""")
     print(f"""\
 servers:""")
     count = 0
-    for url in tcfl.config.urls:
-        print(f"server {count}: {url[0]}")
+    for url, rtb in tcfl.ttb_client.rest_target_brokers.items():
+        print(f"server {rtb.aka}: {url} [{rtb.origin or 'n/a'}]")
         count += 1
 
 
