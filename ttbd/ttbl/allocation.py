@@ -147,7 +147,7 @@ class lru_aged_c(object):
         elif entry in self.cache:
             del self.cache[entry]
     
-class allocation_c(ttbl.fsdb_symlink_c):
+class allocation_c(commonl.fsdb_symlink_c):
     """
     Backed by state in disk
 
@@ -156,7 +156,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
     """
     def __init__(self, allocid):
         dirname = os.path.join(path, allocid)
-        ttbl.fsdb_symlink_c.__init__(self, dirname, concept = "allocid")
+        commonl.fsdb_symlink_c.__init__(self, dirname, concept = "allocid")
         self.allocid = allocid
         # protects writing to most fields
         # - group
@@ -222,7 +222,7 @@ class allocation_c(ttbl.fsdb_symlink_c):
             _run(targets.values(), False)
 
     def set(self, key, value, force = True):
-        return ttbl.fsdb_symlink_c.set(self, key, value, force = force)
+        return commonl.fsdb_symlink_c.set(self, key, value, force = force)
 
     def state_set(self, new_state):
         """

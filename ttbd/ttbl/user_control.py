@@ -26,7 +26,7 @@ def known_user_list():
     for path in glob.glob(user_path):
         try:
             # FIXME: ugly hack, fix when we have the cache
-            fsdb = ttbl.fsdb_symlink_c(path)
+            fsdb = commonl.fsdb_symlink_c(path)
             userid = fsdb.get('userid', None)
             if userid:
                 l.append(userid)
@@ -81,8 +81,8 @@ class User(object):
             commonl.rm_f(path)	# cleanup, just in case
             commonl.makedirs_p(path)
         try:
-            self.fsdb = ttbl.fsdb_symlink_c(path)
-        except ( AssertionError, ttbl.fsdb_c.exception ) as e:
+            self.fsdb = commonl.fsdb_symlink_c(path)
+        except ( AssertionError, commonl.fsdb_c.exception ) as e:
             if fail_if_new:
                 raise self.user_not_existant_e("%s: no such user" % userid)
         self.fsdb.set('userid', userid)
