@@ -10,6 +10,7 @@ Utilities to see user's information
 
 """
 from __future__ import print_function
+import concurrent.futures
 import json
 import logging
 import pprint
@@ -38,6 +39,7 @@ def _user_list(rtb, userids):
         except Exception as e:
             logging.error("error getting all user info: %s", e)
     return result
+
 
 def _cmdline_user_list(args):
     with msgid_c("cmdline"):
@@ -96,40 +98,36 @@ def _cmdline_logout(args):
     """
     Logout user from all the servers
     """
-    for rtb in ttb_client.rest_target_brokers.values():
-        try:
-            rtb.logout(args.username)
-        except ttb_client.requests.exceptions.HTTPError as e:
-            logging.warning("%s: can't logout: %s", str(rtb), str(e))
-            # in general, just ignore errors, server might be down, etc
+    rtbs = ttb_client.rest_target_brokers.values()
+    with concurrent.futures.ThreadPoolExecutor(len(rtbs)) as executor:
+        rs = executor.map(
+            lambda rtb: rtb.logout(args.username),
+            rtbs)
 
 
 def _user_role(rtb, username, action, role):
-    return rtb.send_request(
-        "PUT", "users/" + username + "/" + action + "/" + role)
+    try:
+        return rtb.send_request(
+            "PUT", "users/" + username + "/" + action + "/" + role)
+    except ttb_client.requests.exceptions.HTTPError as e:
+        logging.error(f"{rtb.aka}: {e} (ignored)")
+
 
 def _cmdline_role_gain(args):
-    for rtb in ttb_client.rest_target_brokers.values():
-        try:
-            _user_role(rtb, args.username, "gain", args.role)
-        except ttb_client.requests.exceptions.HTTPError as e:
-            if e.status_code == 403:
-                # this means this role is not present in this server, which might be ok
-                logging.warning(
-                    "%s: not present in server %s", args.role, str(rtb))
-            # in general, just ignore errors, server might be down, etc
+    rtbs = ttb_client.rest_target_brokers.values()
+    with concurrent.futures.ThreadPoolExecutor(len(rtbs)) as executor:
+        rs = executor.map(
+            lambda rtb: _user_role(rtb, args.username, "gain", args.role),
+            rtbs)
 
 
 def _cmdline_role_drop(args):
-    for rtb in ttb_client.rest_target_brokers.values():
-        try:
-            _user_role(rtb, args.username, "drop", args.role)
-        except ttb_client.requests.exceptions.HTTPError as e:
-            if e.status_code == 403:
-                # this means this role is not present in this server, which might be ok
-                logging.warning(
-                    "%s: not present in server %s", args.role, str(rtb))
-            # in general, just ignore errors, server might be down, etc
+    rtbs = ttb_client.rest_target_brokers.values()
+    with concurrent.futures.ThreadPoolExecutor(len(rtbs)) as executor:
+        rs = executor.map(
+            lambda rtb: _user_role(rtb, args.username, "drop", args.role),
+            rtbs)
+
 
 
 def _cmdline_servers(args):
