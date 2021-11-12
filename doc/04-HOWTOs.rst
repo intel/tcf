@@ -171,6 +171,47 @@ slightly more reliable to use:
 *\x04* is the ASCII end-of-transmission character, *Ctrl-D*. This is
 the equivalent of typing the file contents on the command line.
 
+Prompt related
+--------------
+
+Prompt handling is actually way harder than it seems (see also
+:ref:`general catchas <general_catchas>`).
+
+Every terminal/command prompt has its own preferences:
+
+- different Linux OSes use different variations (with user name,
+  hostname, without, with %, $ or #)
+
+- with or without ANSI characters / colors
+
+the :mod:`shell module <tcfl.target_ext_shell>` offers more details;
+in :meth:`target.shell.prompt_regex
+<tcfl.target_ext_shell.shell.prompt_regex` a regular expression to
+catch most prompts is defined.
+
+However, that can also have some false positives in rare cases, the
+symptom being the console is out of sync (there is a command running
+while the automation is trying to punch new ones because some output
+was confused with a prompt and thus automation thouth it was done).
+
+The simplest sollution is to define a VERY simple prompt with the
+following snippet:
+
+.. code-block:: python
+
+   # use PROMPT# vs PROMPT%, so that it also matches the
+   # general initial regex in target.shell.setup() and it
+   # servers in scenarios where we shortcut initialization
+   target.shell.prompt_regex = re.compile("TCF-%(tc_hash)s:PROMPT# " % self.kws)
+   target.shell.run(
+       "export PS1='TCF-%(tc_hash)s:''PROMPT# '  # a simple prompt is "
+       "harder to confuse with general output" % self.kws)
+
+this is much more deterministic--the prompt becomes
+``TCF-<HASHID>:PROMPT#``, where ``<HASHID>`` is a unique string (see
+:term:`hash`) with less chances of it matching on random output.
+
+
 Accessing the server API without the TCFL library
 =================================================
 
