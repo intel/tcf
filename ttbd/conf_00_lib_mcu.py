@@ -23,7 +23,7 @@ import commonl
 import ttbl
 import ttbl.debug
 import ttbl.images
-import ttbl.openocd
+# FIXME: bitrot -- import ttbl.openocd
 import ttbl.pc
 import ttbl.pc_ykush
 import ttbl.rsync
