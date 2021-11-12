@@ -946,6 +946,52 @@ def menu_config_network_enable(target):
     return True
 
 
+def menu_config_network_disable(target):
+    """
+    With the BIOS menu at the top level, disable the configuration option
+
+      *EDKII Menu > Platform Configuration > Network Configuration > EFI Network*
+
+    :param tcfl.tc.target_c target: target on which to operate (uses
+      the default console)
+
+    :returns: *True* if changed, *False* if it was already disabled.
+    """
+    assert isinstance(target, tcfl.tc.target_c)
+
+    r = menu_dig_to(
+        target,
+        [
+            "EDKII Menu",
+            "Platform Configuration",
+            "Network Configuration",
+            ( "EFI Network", None, True ),
+        ],
+        dig_last = False,
+        # FIXME: make this default
+        canary_end_menu_redrawn = "Esc=Exit")
+
+    entry = 'EFI Network'
+    value = r['EFI Network']['value']
+    # sic, different versions have differnt values, Disable vs Disabled vs ...
+    if b"Enable" not in value:
+        target.report_info("BIOS: %s: already disabled (%s)" % (entry, value))
+        target.console_tx("\x1b")	# ESC one menu up
+        return False
+    target.report_info("BIOS: %s: disabling (was: %s)" % (entry, value))
+    # it's enabled, let's disable
+    tcfl.biosl.entry_select(target)			# select it
+    # geee ... some do Disable, some Disabled (see the missing d) so
+    # use ? as a regex
+    tcfl.biosl.multiple_entry_select_one(target, "Disable?")
+    tcfl.biosl.entry_select(target)			# select it
+    # Need to hit ESC twice to get the "save" menu
+    target.console_tx("\x1b\x1b")
+    tcfl.biosl.dialog_changes_not_saved_expect(target, "Y")
+
+    return True
+
+
 def menu_reset(target):
     """
     With the BIOS menu at the top level, select the *Reset* option
