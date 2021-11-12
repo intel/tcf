@@ -78,7 +78,7 @@ version: {tcfl.tc.version}
 python: {" ".join(sys.version.splitlines())}""")
     commonl.data_dump_recursive(platform.uname()._asdict(), "uname")
     print(f"""\
-servers:""")
+servers: {len(tcfl.ttb_client.rest_target_brokers)}""")
     count = 0
     for url, rtb in tcfl.ttb_client.rest_target_brokers.items():
         print(f"server {rtb.aka}: {url} [{rtb.origin or 'n/a'}]")

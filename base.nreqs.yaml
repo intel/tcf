@@ -8,12 +8,19 @@ bzip2:
   reason: for de/compressing logfiles and others
 
 dosfstools:
+
+filelock:
+  reason: file-based multiprocess locking
+  distro: python3-filelock
+
 git:
+
 gvnc-tools:
   ubuntu: gvncviewer
   debian: gvncviewer
   pip:
     skip: true
+
 make:
 
 Jinja2: python3-jinja2

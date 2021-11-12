@@ -44,7 +44,7 @@ urls = []
 # FIXME: eventually this and urls  will be superseeded with a proper
 # list/dict of server objects; temporary workaround that allows us to
 # have origins for the time being. Hack. Horrible hack
-servers = collections.defaultdict(dict)
+urls_data = collections.defaultdict(dict)
 
 # FIXME: need to figure out a way to tag this as configuration language
 def url_add(url, ssl_ignore = False, aka = None, ca_path = None,
@@ -62,11 +62,10 @@ def url_add(url, ssl_ignore = False, aka = None, ca_path = None,
     if u.scheme == "" or u.netloc == "":
         raise Exception("%s: malformed URL?" % url)
     if not origin:
-        o = inspect.stack()[1]
-        origin = "%s:%s" % (o[1], o[2])
+        origin = "configured " + commonl.origin_get(2)
     logger.info("%s: Added server URL %s", origin, url)
-    urls.append((url, ssl_ignore, aka, ca_path))
-    servers[url]['origin'] = origin
+    urls.append((url, ssl_ignore, aka, ca_path))	# COMPAT
+    urls_data[url]['origin'] = origin
 
 
 def load(config_path = None, config_files = None,
@@ -116,23 +115,27 @@ def load(config_path = None, config_files = None,
         commonl.config_import_file(config_file, "__main__")
         loaded_files.append(config_file)
 
-    if urls == []:
+    # this takes stuff in added by config files to tcfl.config.urls to
+    # seed, stuff we saved on disk from previous runs or defaults to
+    # hostname "ttbd" that is resovled
+    tcfl.server_c.discover()
+
+    for _, server in tcfl.server_c.servers.items():		# create target server objects
+        # COMPAT: old style ttb_client.rest_target_broker -> being
+        # moved to tcfl.server_c
+        rtb = ttb_client.rest_target_broker(
+            os.path.expanduser(state_path), server.url,
+            ignore_ssl = not server.ssl_verify,
+            aka = server.aka, origin = server.origin)
+        ttb_client.rest_target_brokers[server.parsed_url.geturl()] = rtb
+
+    if not tcfl.ttb_client.rest_target_brokers:
         logger.warning(
-            "No server URLs available; please use --url or "
-            "add to a conf_*.py in any of %s with:\n"
+            "No servers available; please use --url or "
+            "add to a file called conf_ANYTHING.py in any of %s with:\n"
             "\n"
             "  tcfl.config.url_add('https://URL:PORT', ssl_ignore = True)\n"
             "\n" % ":".join(config_path))
-
-    for _url in urls:		# create target server objects
-        url = _url[0]
-        ssl_ignore = ignore_ssl or _url[1]
-        if len(_url) > 2:
-            aka = _url[2]
-        else:
-            aka = None
-        ttb_client.rest_init(os.path.expanduser(state_path),
-                             url, ssl_ignore, aka)
 
     tcfl.msgid_c.cls_init()
 

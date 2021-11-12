@@ -1,21 +1,37 @@
 #! /usr/bin/python3
 #
-# Copyright (c) 2017 Intel Corporation
+# Copyright (c) 2017-21 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
 #
 
+import collections
+import concurrent.futures
 import inspect
+import itertools
+import json
+import logging
+import os
+import shutil
+import socket
+import urllib
+
 import base64
 import hashlib
 import random
+import requests
 import subprocess
 import sys
 import traceback
 import threading
 
-import commonl
+import filelock
 
+import commonl
+import tcfl.ttb_client # ...ugh
+
+logger = logging.getLogger("tcfl")
+log_sd = logging.getLogger("server-discovery")
 
 class result_c:
     def __init__(self, passed = 0, errors = 0, failed = 0,
@@ -736,3 +752,813 @@ def inventory_keys_fix(d):
         if safe != key:
             del d[key]
     return d
+
+
+import tcfl.config		# FIXME: this is bad, will be removed
+
+
+class server_c:
+    """Describe a Remote Target Server.
+
+    Historically this was called *rtb*, meaning *Remote Target
+    Broker*-- in many areas of the client code you will see *rtb* and
+    *rt* for remote target.
+
+    - Constructor is very simple on purpose, so we can just use it to
+      store a pointer to a server without doing network access. All it
+      does is validate the URL
+
+    - :meth:`create` <- _url_servers_add(), creates one or more server
+      objects from a URL/hostname.
+
+    - :meth:`setup` has to be called before it's used to gather state
+
+    - :meth:`discover` is a high level process used to discover
+       servers (querying the network and servers for other servers)
+
+    .. _tcf_discovery_process:
+
+    Server discovery process
+    ========================
+
+    This process helps to discover all the servers available in an
+    infrastructure with minimum configuration on the client side (ideally
+    none).
+
+    This relies on the following assumptions:
+
+    - the servers describe other servers they know about (herd data)
+      without login in
+
+    - the servers can trust each other
+
+    - the number of servers might be very high >100s
+
+    - multiple clients and threads might be doing this in parallel;
+      the database for caching has to be low
+
+    The client starts the discovery process via a set of seed URLs, that
+    come from:
+
+    - the command line and environment
+
+    - entries provided in the :ref:`client configuration files
+      <tcf_client_configuration>`
+
+      >>> tcfl.server_c.seed_add("https://myserver.domain:1234")
+      >>> tcfl.server_c.seed_add("plainhostname")
+
+    - load cached entries from previous runs (~/.cache/tcf/servers)
+
+    - default seed URL *http://ttbd*; thus, the sysadmin of the local
+      network can create a DNS CNAME that points to one or more DNS
+      address records representing servers.
+
+    Upon start, the client:
+
+    1. (in parallel) queries each seed URL for their herd dara
+
+    2. parses the herd data for each seed URL, extract the URLs in there,
+       recording them all in a list of all URLs; return the new ones as a
+       new list of seed URLs
+
+    3. repeats process 1 and 2 with the new list of seed URLs until no more
+       new servers are returned for a couple of times.
+
+    Currently, :func:`tcfl.config.setup` calls
+    :func:`tcfl.server_discover` which is seeded from URLs added with
+    :meth:`tcfl.config.url_add`, command line
+
+
+    Herd data published by the servers
+    ----------------------------------
+
+    When a server has a target called *local*, it is meant to describe the
+    server itself and in its inventory it may have a :term:`herd` definition
+    section specified :ref:`below <inventory_server_herds>`, which in
+    summary looks like::
+
+      $ tcf ls -avv SERVER_AKA/local | grep herds
+      SERVER_AKA/local.herds...
+      SERVER_AKA/local.herds.HERDNAME1.ID1.url: http://somehost:4323
+      SERVER_AKA/local.herds.HERDNAME1.ID1.instance: INSTANCENAME
+      SERVER_AKA/local.herds.HERDNAME1.ID2.url: http://somehost.somedomain:5000
+      SERVER_AKA/local.herds.HERDNAME1.ID3.url: http://host34.domain.com:5000
+      ...
+      SERVER_AKA/local.herds.HERDNAME3.ID3.url: http://host34.sweet.com:5000
+
+    The sever also publishes this information in the http://HOSTNAME/ttb
+    endpoint with no login required.
+
+    How this information is provisioned into the different servers is left
+    to the user/admins, but it can be set from the command line with::
+
+      $ tcf property-set SERVER_AKA/local herds.HERDNAME1.ID1.url http://somehost:4323
+      $ tcf property-set SERVER_AKA/local herds.HERDNAME1.ID2.url http://somehost.somedomain:5000
+
+    or via scripting using the :meth:`target.property_set
+    <tcfl.tc.target_c.property_set>` call.
+
+
+    Server Inventory: Herds
+    -----------------------
+
+    .. _inventory_server_herds:
+
+    FIXME: this table has horrible formatting when rendered, figure out
+    how to make the columns narrower so it is readable
+
+    .. list-table:: Server Inventory
+       :header-rows: 1
+       :widths: 20 10 10 60
+       :width: 50%
+
+       * - Field name
+         - Type
+           (str, bool, integer,
+           float, dictionary)
+         - Disposition
+           (mandatory, recommended,
+           optional[default])
+         - Description
+
+       * - herds
+         - dictionary
+         - Optional
+         - Information about other servers this server knows about
+
+       * - herds.HERDNAME
+         - dictionary
+         - Optional
+         - Information about a herd called *HERDNAME*
+
+       * - herds.HERDNAME.HASH
+         - dictionary
+         - Optional
+         - Information about a host in herd called *HERDNAME*; *HASH* is
+           an alphanumeric identifier of four or more characters that is
+           unique to each server and meant to distinguish different
+           entries. The client shall not use it for anything.
+
+       * - herds.HERDNAME.HASH.url
+         - string
+         - Mandatory
+         - Base URL for the server in the form
+           *http[s]//HOSTNAME[:PORT]/*.
+
+       * - herds.HERDNAME.HASH.instance
+         - string
+         - Optional
+         - Name for this instance (currently ignored)
+
+
+    Pending/FIXME
+    -------------
+
+    - bad_servers -> register a count of failures to connect, stop
+      after three tries consider it unusable
+      other bad conditions (bad responses) refuse them
+
+    - fix reporting list tcfl.config.urls -> used in report to jinja2,
+      move to use tcfl.server_c.servers
+
+    - replace tcfl.ttb_client.rest_target_broker with tcfl.server_c
+
+    - as soon as we call a server good, start reading its inventory
+      in the background
+
+    - if cached, don't query from network until XYZ old?
+
+    """
+
+    def __init__(self, url, ssl_verify = False, aka = None, ca_path = None,
+                 herd = None, herds = None, origin = None):
+
+        self.parsed_url = urllib.parse.urlparse(url)
+        if self.parsed_url.scheme == "" or self.parsed_url.netloc == "":
+            raise ValueError(f"{url}: malformed URL? missing hostname/schema")
+        self.url = url
+        self.ssl_verify = ssl_verify
+        self.aka = aka
+        self.ca_path = ca_path
+        self.herds = set()
+        if herd:
+            self.herds.add(herd)
+        if herds:
+            self.herds.update(herds)
+        if origin:
+            self.origin = origin
+        else:
+            self.origin = commonl.origin_get()
+        self.reason = None
+        self.cache_lockfile = None
+        self.fsdb = None
+
+
+    def setup(self):
+        """
+        Sets up any other internal data structure that are no strictly
+        needed until operating seconday parts of the API (eg: file paths)
+        """
+        self.aka_make()
+        self._cache_setup()
+
+    #: only initialized once we start commiting to disk
+    cache_dir = None
+
+    def __repr__(self):
+        return self.url + f"@{id(self)}"
+
+
+    def aka_make(self):
+        aka = self.parsed_url.hostname.split('.')[0]
+        if self.parsed_url.port:
+            aka += f"_{self.parsed_url.port}"
+        if self.parsed_url.scheme.lower() != "https":
+            aka += "_unencrypted"
+        self.aka = aka
+        return aka
+
+    #: List of servers found indexed by AKA
+    servers = {}
+
+    @classmethod
+    def _servers_add_hostname_url(cls, servers, url, origin, seed_port,
+                                  aka = None,
+                                  ssl_verify = False, ca_path = None,
+                                  herd = None, herds = None):
+
+        parsed_url = urllib.parse.urlparse(url)
+        if parsed_url.netloc:
+            # this looks like a proper URL
+            server = cls(url, origin = origin, aka = aka,
+                         ssl_verify = ssl_verify, ca_path = ca_path,
+                         herd = herd, herds = herds)
+            servers[parsed_url.geturl()] = server
+            log_sd.info(f"seeded URL {server.url} [{server.origin}]")
+            return
+
+        # this looks like a hostname, not a url; let's resolve, in
+        # case it yields multiple A records, reverse resolve to
+        # names and use defaults on them (HTTPS)
+        hostname = url
+        try:
+            name, aliases, addresses = socket.gethostbyname_ex(hostname)
+            log_sd.info(f"seed hostname '{hostname}' [{origin}] -> {name}, {aliases}, {addresses}")
+        except OSError as e:
+            log_sd.warning(f"ignoring hostname '{hostname}' [{origin}]: {e}")
+            return
+
+        servers_from_addresses = set()
+        for address in addresses:
+            name, _aliases, _addresses = socket.gethostbyaddr(address)
+            server = cls(
+                f"https://{name}:{seed_port}",
+                origin = f"{origin} -> DNS address {address} for" \
+                f" '{hostname}' -> reverse DNS lookup ",
+                aka = aka,
+                ssl_verify = ssl_verify, ca_path = ca_path,
+                herd = herd, herds = herds)
+            servers[f"https://{name}:{seed_port}"] = server
+            servers_from_addresses.add(name)
+            log_sd.info(f"seeded reverse DNS lookup {server.url} [{server.origin}]")
+
+        # only add servers from aliases if we got none from addresses
+        # reverse lookup. Why? because if this record was, eg:
+        #
+        # ttbd -> ttbd.DOMAIN A1 A2 A3
+        #
+        # then we'd have three servers NAME(A1), NAME(A2) and NAME(A3)
+        # and a fourth ttbd.DOMAIN that would randomly map to A1 A2 or
+        # A3 and make things confusing.
+        #
+        # If it is just giving us an alias but no addresses, then at
+        # least it won't get confused--so that's the only case when we
+        # consider the alias.
+        if servers_from_addresses:
+            log_sd.info(
+                f"{hostname}: ignoring aliases ({' '.join(aliases)}) in"
+                f" favour of reverse-DNS addresses"
+                f" ({' '.join(servers_from_addresses)})")
+            return
+
+        for alias in aliases:
+            server = cls(
+                f"https://{alias}:{seed_port}",
+                origin =  f"{origin} -> DNS aliases for '{hostname}'",
+                aka = aka,
+                ssl_verify = ssl_verify, ca_path = ca_path,
+                herd = herd, herds = herds)
+            servers[f"https://{alias}:{seed_port}"] = server
+            log_sd.info(f"seeded alias {server.url} [{server.origin}]")
+
+
+    def _cache_set_unlocked(self, field, value):
+        self.fsdb.set(self.aka + "." + field, value)
+
+    def _cache_set(self, field, value):
+        with filelock.FileLock(self.cache_lockfile):
+            self.fsdb.set(self.aka + "." + field, value)
+
+    def _cache_get_unlocked(self, field, default = None):
+        return self.fsdb.get(self.aka + "." + field, default)
+
+    def _cache_get(self, field, default = None):
+        with filelock.FileLock(self.cache_lockfile):
+            return self.fsdb.get(self.aka + "." + field, default)
+
+    def _cache_setup(self):
+        # don't call from initialization, only once we start using it
+        # in earnest
+        self.cache_lockfile = os.path.join(
+            self.cache_dir, self.aka + ".lockfile")
+        self.fsdb = commonl.fsdb_c.create(self.cache_dir)
+        self.cache_lockfile = os.path.join(self.cache_dir, self.aka + ".lockfile")
+        with filelock.FileLock(self.cache_lockfile):
+            self._cache_set_unlocked("url", self.url)
+            self._cache_set_unlocked("ssl_verify", self.ssl_verify)
+            self._cache_set_unlocked("origin", self.origin)
+            self._cache_set_unlocked("ca_path", self.ca_path)
+
+
+    def _record_success(self, reason = "n/a"):
+        self._cache_set("last_success", reason)
+
+    def _record_failure(self):
+        with filelock.FileLock(self.cache_lockfile):
+            current_count = int(self._cache_get_unlocked("failure_count", 0))
+            current_count += 1
+            self._cache_set_unlocked("failure_count", str(current_count))
+
+
+    def _herds_get(self, count, loops_max):
+        """
+        Query for a given server the /ttb URL, which provides
+        information about the server and the herds of other servers it
+        knows about.
+
+        :returns: tuple of:
+
+         - server_c object where the discovery was done
+         - dictionary of new servers found (server_c) keyed by URL,
+           *None* in case of error
+         - *None* on sucess, else string with error description
+        """
+
+        log_sd.info(f"#{count}/{loops_max}: scanning {self.url}:"
+                    f" {self.origin}")
+        # this is always available with no login
+        try:
+            # FIXME: ttb_client.send_request, so it retries
+            r = requests.get(self.url + "/ttb",
+                             verify = self.ssl_verify,
+                             # want fast response, go quick or go
+                             # away--otherwise when discovering many we
+                             # could be here many times
+                             timeout = 2)
+        except requests.RequestException as e:
+            return self, None, \
+                f"{self.url}/ttb: got HTTP exception {e}"
+        if r.status_code != 200:
+            if r.status_code != 404:
+                return self, None, \
+                    f"{self.url}/ttb: got HTTP code {r.status_code}"
+            # 404 - maybe an old server, since it lacks the /ttb endpoint,
+            # so we'll still consider it
+            log_sd.info(
+                f"#{count}/{loops_max}: considering {self.url}/ttb:"
+                f" maybe an older server")
+        try:
+            j = r.json()
+        except json.decoder.JSONDecodeError as e:
+            return self, None, \
+                f"{self.url}/ttb: bad JSON {e}"
+        if not isinstance(j, dict):
+            return self.url, None, \
+                f"{self.url}/ttb: expected a dictionary, got {type(j)}"
+        # note it is legal for a server to report no herds if it
+        # working alone.
+        herds = r.json().get('herds', {})
+        if not isinstance(herds, dict):
+            return self, None, \
+                f"{self.url}/ttb: expected ['herds'] to be a dictionary," \
+                f" got {type(herds)}"
+
+        # This parses the herds data we got from the server, which
+        # looks like:
+        #
+        # "herds": {
+        #   "HERD1": {       << OUTER LOOP
+        #     "2ddd": {    << INNER LOOP
+        #       "instance": "production",
+        #       "url": "https://HOSTNAME1.DOMAIN1:5000"
+        #     },
+        #    "co4g": {
+        #      "instance": "production",
+        #       ...
+        #   ...
+        new_hosts = {}
+
+        self._record_success("got some herd info")
+        # If we get here, this means we got data from this host, so we'll
+        # add it as a possible one -- note we don't know if it has any
+        # herds, so we just add it
+        for herd_name, herd_data in herds.items():
+            if not isinstance(herd_data, dict):
+                log_sd.info(
+                    f"#{count}/{loops_max}: {self.url}/ttb:"
+                    f" ['herds.{herd_name}']: expected a dictionary,"
+                    f" got {type(herd_data)}; ignoring")
+                continue
+            # see INNER LOOP above
+            for host_hash, host_data in herd_data.items():
+                if not isinstance(host_data, dict):
+                    log_sd.info(
+                        f"#{count}/{loops_max}: ignoring {self.url}/ttb:"
+                        f" ['herds.{herd_name}.{host_hash}]:"
+                        f" expected a dictionary, got {type(host_data)}")
+                    continue
+                new_server_url = host_data.get('url', None)
+                if not new_server_url:
+                    log_sd.info(
+                        f"#{count}/{loops_max}: {self.url}/ttb:"
+                        f" ['herds.{herd_name}.{host_hash}]:"
+                        f" no 'url' field; ignoring")
+                    continue
+                try:
+                    # create a server_c object to return -- we create
+                    # it here so if in the future we increase the
+                    # amount of data returned, we don't have to pass
+                    # it back and forth, since the server_c object
+                    # will have it.
+                    # Note we do not access the global lists here
+                    server = new_hosts.get(new_server_url, None)
+                    if server == None:			# new
+                        server = type(self)(
+                            new_server_url,
+                            herd = herd_name,
+                            origin = f"discovered from {self.url}/ttb")
+                        new_hosts[server.url] = server
+                    else:				# new herd
+                        server.herds.add(herd_name)
+                except Exception as e:
+                    log_sd.info(f"#{count}/{loops_max}:"
+                                f" {new_server_url} from {self.url}:"
+                                f" ignoring due to bad URL: {e}")
+                    continue
+
+        return self, new_hosts, None
+
+    @classmethod
+    def _discover_once(cls, servers, bad_servers, count, loops_max):
+        """
+        Given a list of servers (good and bad), try to discover more
+        servers from them
+
+        Bad servers are retried since the could have had a
+        glitch--this needs a better retry/circuit-breaker pattern.
+
+        :param current_servers: dict keyed by URL of :class:`server_c`
+          representing a known host we have to discover on
+
+        :param bad_servers: dict keyed by URL of :class:`server_c`
+          representing a known host we have to discover on, but that
+          we know was bad for any reason before.
+        """
+
+        if not cls.servers and not bad_servers:
+            return {}, 0, 0
+
+        bad_server_count = 0
+        new_server_count = 0
+        new_servers = {}
+
+        # Parallelize discovery of each server FIXME: cap it?
+        with concurrent.futures.ThreadPoolExecutor(
+                len(servers) + len(bad_servers)) as executor:
+
+            rs = executor.map(
+                lambda i: i._herds_get(count, loops_max),
+                itertools.chain(
+                    servers.values(),
+                    bad_servers.values()
+                )
+            )
+            # now gather each the resposne from each server we queried
+            # and join them into the current list FIXME: pass a lock
+            # to _herds_get() and have it done straight to save an
+            # iteration? when we have multiple servers, it'll add to
+            # significant wasted computation
+            for server, new_hosts_on_this_server, reason in rs:
+                if new_hosts_on_this_server == None:
+                    # this means there was an error querying this
+                    # server and is bad (as in we can't contact it or
+                    # it returns junk meaning TTBD not spoken there)
+                    bad_servers[server.url] = server
+                    server.reason = reason
+                    server.setup()
+                    server._record_failure()
+                    bad_server_count += 1
+                    log_sd.info(f"#{count}/{loops_max}: skipping"
+                                f" {server.url}: bad server [{reason}]")
+                    continue
+                for new_url, new_server in new_hosts_on_this_server.items():
+                    # do this here, single threaded
+                    if new_url in cls.servers:
+                        log_sd.info(f"#{count}/{loops_max}:"
+                                    f" skipping {new_url}: already known")
+                        continue
+
+                    new_server_count += 1
+                    log_sd.info(f"#{count}/{loops_max}: adding {new_url}:"
+                                f" discovered from {server.url}")
+                    cls.servers[new_url] = new_server
+                    new_server.setup()
+                    new_servers[new_url] = new_server
+
+        return new_servers, new_server_count, bad_server_count
+
+    @classmethod
+    def flush(cls):
+        cls.servers = {}
+        log_sd.info(f"wiping cache directory {cls.cache_dir}")
+        shutil.rmtree(cls.cache_dir, ignore_errors = True)
+
+
+    _seed_default = {}
+
+    @classmethod
+    def seed_add(cls, url, aka = None, port = 5000,
+                 ssl_verify = False, ca_path = None,
+                 herd = None, herds = None, origin = None):
+        """
+        Add hosts and server info to the default list of seeds
+
+        All arguments are directly fed to the :class:`server_c`
+        constructor, if missing they are guessed.
+        """
+        # same arguments as _servers_add_hostname_url
+        cls._seed_default[url] = dict(
+            # lame, but clear
+            aka = aka, port = port,
+            ssl_verify = ssl_verify, ca_path = ca_path,
+            herd = herd, herds = herds,
+            origin = origin if origin else commonl.origin_get(1)
+        )
+
+
+    @classmethod
+    def discover(cls, ssl_ignore = True,
+                 # named as a host, so we do A/AAAA discovery
+                 seed_url = None,
+                 seed_port = 5000,
+                 herds_exclude = None, herds_include = None,
+                 zero_strikes_max = 2,
+                 loops_max = 4,
+                 origin = "source code defaults",
+                 ignore_cache = False):
+        """
+        Discover servers
+
+        Given a list of seed servers, use them to discover more servers
+        on the network.
+
+        The seed server list comes from:
+
+        - resolving a hardcoded list of hostnames/URLs (that defaults
+          to *ttbd*) and others added with
+          :func:`tcfl.server_c.seed_add()` in configuration files
+
+          >>> tcfl.server_c.seed_add("https://myserver.domain:1234")
+          >>> tcfl.server_c.seed_add("plainhostname")
+
+        - any server already initialized
+
+        - hosts for which we have cached information
+
+        This tries a few times (controlled by *loops_max*) to query
+        each known server for more servers and gives up if it can't
+        get more server twice. If a run provides more servers, on the
+        next run those new servers will be query for others not yet
+        known.
+
+        Any bad server is removed from the list so we don't waste time
+        on it.
+
+        This is normally called by the *TCFL* library initialization
+        sequence and the user does not need to worry about it.
+
+        :param str seed_url: (optional; default *ttbd*) URL
+          (or list of URLs) for a server (which to use for finding more
+          servers).
+
+          A good practice is to create a CNAME or a RECORD FOR
+          *ttbd.DEFAULTDOMAIN* that points to one or more servers in your
+          organization, so clients don't have to do any further server
+          configuration.
+
+
+        """
+
+        # FIXME: get default from tcfl.config -- this is always USER specific
+        cls.cache_dir = os.path.expanduser(
+            os.path.join("~", ".cache", "tcf", "servers"))
+        commonl.makedirs_p(cls.cache_dir, reason = "server cache")
+
+        bad_servers = collections.defaultdict(int)
+
+        log_sd.warning("finding servers")
+        count_start = len(cls.servers)
+        # Prep seed of servers from function arguments and anything the
+        # config files have already asked us to load or anything gthat
+        # already exists
+        if seed_url == None:
+            seed_url = cls._seed_default
+            origin = "default seed list in tcfl.server_c.seed_default"
+
+        if origin == None:
+            origin = "defaults " + commonl.origin_get(1)
+
+        if isinstance(seed_url, str):
+            cls._servers_add_hostname_url(cls.servers, seed_url,
+                                          origin, seed_port)
+        elif isinstance(seed_url, list):	# if we are given seed URLs, add them
+            commonl.assert_list_of_strings(
+                seed_url, "list of URL/hostnames", "URL/hostname")
+            for url in seed_url:
+                cls._servers_add_hostname_url(cls.servers, url,
+                                              origin, seed_port)
+        elif isinstance(seed_url, dict):	# if we are given seed URLs, add them
+            commonl.assert_dict_key_strings(
+                seed_url, "URL/hostnames and parameters")
+
+            for url, parameters in seed_url.items():
+                cls._servers_add_hostname_url(
+                    cls.servers, url, parameters['origin'], parameters['port'],
+                    parameters['aka'],
+                    parameters['ssl_verify'], parameters['ca_path'],
+                    parameters['herd'], parameters['herds'])
+        else:
+            raise ValueError(f"seed_url: expected string or list of strings;"
+                             f" got {type(seed_url)}")
+        count_seed = len(cls.servers)
+        log_sd.warning(
+            f"added {count_seed - count_start} new servers from"
+            " (configuration/cmdline) seeding")
+
+        # from tcfl.config.url_add()	# COMPAT
+        for url, _ssl_ignore, aka, ca_path in tcfl.config.urls:
+            origin = tcfl.config.urls_data[url].get(
+                'origin', 'probably tcfl.config.url_add() in a config file')
+            server = cls(url, aka = aka, ssl_verify = not _ssl_ignore,
+                         origin = origin, ca_path = ca_path)
+            if server.aka == None:
+                server.aka_make()
+            if server.url in cls.servers:
+                if origin == cls.servers[server.url].origin:
+                    # already there, log anyway so we know is there
+                    log_sd.info(f"seeded {server.url} [{server.origin}]")
+                    continue
+                log_sd.warning(f"{origin}: overriding server AKA {server.aka}"
+                               f" from {cls.servers[server.url].origin}")
+            log_sd.info(f"seeded {server.url} [{server.origin}]")
+            cls.servers[server.url] = server
+        count_config = len(cls.servers)
+        log_sd.warning(
+            f"added {count_config - count_seed} new servers from"
+            " configuration files")
+
+
+        # take known servers from the cache
+        fsdb = commonl.fsdb_c.create(cls.cache_dir)
+        for key in fsdb.keys("*.url") if ignore_cache == False else []:
+            # key is AKA.url
+            aka = key.rsplit(".", 1)[0]
+            url = fsdb.get(key)
+
+            try:
+                # get fields something wrong? wipe the whole entry
+                if not isinstance(url, str) or not url:
+                    log_sd.debug(
+                        f"{key}: wiping invalid cache entry (bad url)")
+                    fsdb.set(aka, None)
+                    continue
+
+                ssl_verify = fsdb.get(aka + ".ssl_verify", False)
+                if not isinstance(ssl_verify, bool):
+                    log_sd.debug(
+                        f"{key}: wiping invalid cache entry (bad ssl_verify)")
+                    fsdb.set(aka, None)
+                    continue
+
+                origin = fsdb.get(aka + ".origin", f"cached @{cls.cache_dir}")
+                if not isinstance(origin, str):
+                    log_sd.debug(
+                        f"{key}: wiping invalid cache entry (bad origin)")
+                    fsdb.set(aka, None)
+                    continue
+
+                ca_path = fsdb.get(aka + ".ca_path", None)
+                if ca_path and not type(ca_path, str):
+                    log_sd.debug(
+                        f"{key}: wiping invalid cache entry (bad ca_path)")
+                    fsdb.set(aka, None)
+                    continue
+
+                if 'cached @' not in origin:
+                    # we want to keep the true origin message, but also
+                    # append that then it was cached, so kinda like add that
+                    origin = f"cached @{cls.cache_dir}, " + origin
+
+                if url in cls.servers:
+                    log_sd.debug(
+                        f"ignoring already loaded cached server AKA {aka}"
+                        f" [{cls.servers[url].origin}]")
+                    continue
+                cls.servers[url] = cls(url, ssl_verify = ssl_verify,
+                                       origin = origin, ca_path = ca_path)
+            except ValueError as e:
+                log_sd.debug(f"{key}: wiping invalid cache entry ({e})")
+                fsdb.set(aka, None)
+
+        if ignore_cache == False:
+            count_cache = len(cls.servers)
+            log_sd.warning(
+                f"added {count_cache - count_config} new servers from"
+                f" the known server cache at {cls.cache_dir}")
+        else:
+            count_cache = count_seed
+
+        if not cls.servers:
+            # FIXME: unify this message with tcfl.config.load()
+            config_path = [
+                ".tcf", os.path.join(os.path.expanduser("~"), ".tcf"),
+            ] + _install.sysconfig_paths
+            log_sd.warning(
+                "No seed servers available; please use --url or "
+                "add to a file called conf_ANYTHING.py in any of %s with:\n"
+                "\n"
+                "  tcfl.config.url_add('https://URL:PORT', ssl_ignore = True)\n"
+                "\n" % ":".join(config_path))
+            return
+
+        # we'll need these properly setup in disk so we can record
+        # statistics
+        for aka, server in cls.servers.items():
+            server.setup()
+
+        zero_strikes = 0
+        cls.servers = dict(cls.servers)
+        new_servers = cls.servers
+        for count in range(1, loops_max + 1):
+            # start searching the seed servers, but then only search
+            # the new servers found in the previous run
+            new_servers, new_server_count, bad_server_count = \
+                cls._discover_once(new_servers, bad_servers, count, loops_max)
+
+            if new_server_count == 0:
+                zero_strikes += 1
+                if zero_strikes >= zero_strikes_max:
+                    log_sd.warning(
+                        f"#{count}/{loops_max}: done (got no new servers"
+                        f" {zero_strikes} times in a row even after retrying"
+                        " those that failed before)")
+                    break
+                log_sd.warning(
+                    f"#{count}/{loops_max}: no new servers"
+                    f" (retrying {bad_server_count} of those that failed)")
+                continue
+
+            # _discover() adds directlry to cls.servers
+            log_sd.warning(
+                f"#{count}/{loops_max}: found {new_server_count} new server/s")
+        else:
+            log_sd.info(f"done after #{count} iterations")
+
+        # prune bad servers that might have sneaked in
+        for bad_url, bad_server in bad_servers.items():
+            if bad_url not in cls.servers:
+                continue
+            # these 'command line' or 'configured' settings are
+            # done in set in the main tcf script or in
+            # tcfl.config.url_add() and are a bit of a wild guess.
+            # Allows us to be more explicit for what the
+            # user has explicitly configured
+            if bad_server.origin == "command line" \
+               or 'configured' in bad_server.origin:
+                log_sd.error(f"{bad_url}: skipping, listed as"
+                             f" bad [{bad_server.origin}]")
+            else:
+                log_sd.info(f"{bad_url}: skipping, listed as"
+                            f" bad [{bad_server.origin}]")
+            del cls.servers[bad_url]
+
+
+# we don't need too much logging level from this
+logging.getLogger("filelock").setLevel(logging.CRITICAL)
+
+# add a server "ttbd" which the admins can initialize by just aliasing
+# DNS and this triggers all servers auto-discovering.
+server_c.seed_add(
+    "ttbd", port = 5000, ssl_verify = False,
+    origin = f"defaults @{commonl.origin_get()}")
