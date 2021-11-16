@@ -639,7 +639,8 @@ class extension(tc.target_extension_c):
         # this won't change runtime, so it is ok to cache it
         self.console_list = self.list()
         # this becomes a ALIAS: REAL-NAME
-        r = self.target.ttbd_iface_call("console", "list", method = "GET")
+        r = self.target.ttbd_iface_call("console", "list", method = "GET",
+                                        retry_timeout = 10)
         self.aliases = r['aliases']
         self._set_default()
         #: Default end of line for the different consoles
@@ -846,7 +847,8 @@ class extension(tc.target_extension_c):
         """
         console = self._console_get(console)
         r = self.target.ttbd_iface_call("console", "state", method = "GET",
-                                        component = console)
+                                        component = console,
+                                        retry_timeout = 10)
         return r['result']
 
 
@@ -869,11 +871,13 @@ class extension(tc.target_extension_c):
         """
         console = self._console_get(console)
         r = self.target.ttbd_iface_call("console", "setup", method = "GET",
-                                        component = console)
+                                        component = console,
+                                        retry_timeout = 10)
         return r['result']
 
     def list(self):
-        r = self.target.ttbd_iface_call("console", "list", method = "GET")
+        r = self.target.ttbd_iface_call("console", "list", method = "GET",
+                                        retry_timeout = 10)
         return r['result']
 
     @staticmethod
