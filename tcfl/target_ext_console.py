@@ -1569,17 +1569,21 @@ class _console_reader_c:
 
 
 def _console_read_thread_fn(target, console, fd, offset, backoff_wait_max,
-                            _flags_restore, timestamp = False):
+                            _flags_restore, timestamp = False,
+                            stop = None):
     # read in the background the target's console output and print it
     # to stdout
+    # stop: if it is an iterable and is not empty, stop reading
     offset = target.console.offset_calc(target, console, int(offset))
     with msgid_c("cmdline"):
         # limit how much time we keep retrying due to server connection errors
         console_reader = _console_reader_c(target, console, fd, offset,
                                            backoff_wait_max, 10,
                                            timestamp = timestamp)
-        while True:
+        while stop == None or len(stop) == 0:
             try:
+                if stop and len(stop) > 0:
+                    break
                 console_reader.read(flags_restore = _flags_restore)
             except Exception as e:	# pylint: disable = broad-except
                 if _flags_restore:
