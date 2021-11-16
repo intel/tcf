@@ -49,6 +49,10 @@ requests: python3-requests
 
 rpyc: python3-rpyc
 
+rsync:
+  reason: |
+    Scripting uses it to efficiently provision SUTs
+
 tabulate: python3-tabulate
   
 setuptools:
