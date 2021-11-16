@@ -452,6 +452,8 @@ def _allocs_get(rtb, username):
         for allocid, allocdata in r.items():
             if _alloc_filter(allocdata, username):
                 _r[allocid] = allocdata
+            else:
+                logging.info(f"filtered out {rtb._url} {allocdata}")
 
         return _r
     else:
