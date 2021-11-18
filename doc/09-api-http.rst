@@ -2608,6 +2608,9 @@ The process for flashing anything is to first upload the data file to
 the server using the storage interface described above, and then
 commanding this interface to burn said file into a given location.
 
+
+.. _http_listing_possible_flashing_targets:
+
 Listing possible flashing targets
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -2729,6 +2732,59 @@ to 800::
 
 With the TCF client, use *tcf images-flash TARGETNAME bios:bios.bin.xz
 bmc:bmc.bin.xz*.
+
+
+
+GET /targets/TARGETID/images/flash IMAGE -> CONTENT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Read a flash image from one of the target's possible flashing 
+destinations
+
+**Access control:** the user, creator or guests of an
+allocation that has this target allocated.
+
+**Arguments:**
+
+- *image*: the name of the image to read. A list of valid images can
+  be found using the command in :ref:`Listing possible flashing
+  targets <http_listing_possible_flashing_targets>`
+
+  Type: string
+
+  Disposition: mandatory
+
+- *image_offset*: offset in bytes from which to start reading 
+  relative to the image's beginning
+
+  Type: integer
+
+  Disposition: optional, defaults to 0
+
+- *read_bytes*: number of bytes to read starting from image_offset
+
+  Type: integer
+
+  Disposition: optional, defaults to read the entire file starting 
+  at the offset
+
+**Returns:**
+
+- On success, 200 HTTP code and the image contents on the response
+  body
+
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
+
+**Example**
+
+::
+
+   $ curl -sk -b cookies.txt -X GET \
+     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/images/flash \
+     -d image="bios" > bios.bin
+
+With the TCF client, use the *tcf images-read TARGETNAME IMAGENAME
+LOCALFILENAME* command.
 
 
 
