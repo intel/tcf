@@ -252,8 +252,13 @@ class allocation_c(commonl.fsdb_symlink_c):
         # Check if it has been idle for too long
         ts_last_keepalive = datetime.datetime.strptime(self.timestamp_get(),
                                                        "%Y%m%d%H%M%S")
-        seconds_idle = (ts_now - ts_last_keepalive).seconds
-        if seconds_idle > ttbl.config.target_max_idle:
+        ts_idle = ts_now - ts_last_keepalive
+        seconds_idle = ts_idle.seconds
+        # days might be < 0 when the maintenance process has started
+        # and before we got here somebody timestamped the target, thus
+        # ts_last_keepalive > ts_now -> in this case, we are good, it
+        # is fresh
+        if ts_idle.days >= 0 and seconds_idle > ttbl.config.target_max_idle:
             logging.info(
                 "ALLOC: allocation %s timedout (idle %s/%s), deleting",
                 self.allocid, seconds_idle, ttbl.config.target_max_idle)
