@@ -2738,7 +2738,7 @@ bmc:bmc.bin.xz*.
 GET /targets/TARGETID/images/flash IMAGE -> CONTENT
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Read a flash image from one of the target's possible flashing 
+Read a flash image from one of the target's possible flashing
 destinations
 
 **Access control:** the user, creator or guests of an
@@ -2747,14 +2747,14 @@ allocation that has this target allocated.
 **Arguments:**
 
 - *image*: the name of the image to read. A list of valid images can
-  be found using the command in :ref:`Listing possible flashing
+  be found using the command in :ref:`listing possible flashing
   targets <http_listing_possible_flashing_targets>`
 
   Type: string
 
   Disposition: mandatory
 
-- *image_offset*: offset in bytes from which to start reading 
+- *image_offset*: offset in bytes from which to start reading
   relative to the image's beginning
 
   Type: integer
@@ -2765,7 +2765,7 @@ allocation that has this target allocated.
 
   Type: integer
 
-  Disposition: optional, defaults to read the entire file starting 
+  Disposition: optional, defaults to read the entire file starting
   at the offset
 
 **Returns:**
@@ -2882,7 +2882,7 @@ meaning:
   example, if it is a console based on SSH).
 
 
-.. _http_target_console_reading_workflow::
+.. _http_target_console_reading_workflow:
 
 Console reading workflow
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -2995,7 +2995,8 @@ section (which gets updated by the server during operation):
 
     This enables the client to know when the recording has been
     flushed and current recorded offsets need to be reset to zero. See
-    :ref:`console reading workflows <console_reading_workflows>` above.
+    :ref:`console reading workflows
+    <http_target_console_reading_workflow>` above.
 
   - *state=VALUE*: (boolean) *true* for enabled, *false* for disabled.
 
@@ -3153,9 +3154,10 @@ that came out of it. This call allows the user to query that data. See
     header will return the maximum offset allowed (which matches the
     current size).
 
-    See :ref:`console reading workflows <console_reading_workflows>`
-    above for how these values are used for the client to read through
-    power cycles of the platform.
+    See :ref:`console reading workflows 
+    <http_target_console_reading_workflow>` above for how these
+    values are used for the client to read through power cycles of
+    the platform.
 
 - On error, non-200 HTTP code and a JSON dictionary with diagnostics
 
