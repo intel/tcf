@@ -30,6 +30,7 @@ import imp
 import importlib
 import io
 import inspect
+import json
 import logging
 import numbers
 import os
@@ -48,6 +49,7 @@ import time
 import traceback
 import types
 
+import urllib.parse
 
 if False:
     # disabling all this until we have a proper fix for the import
@@ -2945,7 +2947,7 @@ class fsdb_symlink_c(fsdb_c):
                                  % (os.path.basename(dirname), concept))
 
         if use_uuid == None:
-            self.uuid = commonl.mkid(str(id(self)) + str(os.getpid()))
+            self.uuid = mkid(str(id(self)) + str(os.getpid()))
         else:
             self.uuid = use_uuid
 
@@ -2972,7 +2974,7 @@ class fsdb_symlink_c(fsdb_c):
             if patterns:	# that means no args given
                 use = {}
                 for filename, filename_raw in filenames.items():
-                    if commonl.field_needed(filename, patterns):
+                    if field_needed(filename, patterns):
                         use[filename] = filename_raw
             else:
                 use = filenames
@@ -2990,7 +2992,7 @@ class fsdb_symlink_c(fsdb_c):
             if patterns:	# that means no args given
                 use = {}
                 for filename, filename_raw in filenames.items():
-                    if commonl.field_needed(filename, patterns):
+                    if field_needed(filename, patterns):
                         use[filename] = filename_raw
             else:
                 use = filenames
@@ -3065,7 +3067,7 @@ class fsdb_symlink_c(fsdb_c):
         # at the same time; they can override each other, that's
         # ok--the last one wins.
         location_new = location + "-" + str(os.getpid())
-        commonl.rm_f(location_new)
+        rm_f(location_new)
         os.symlink(value, location_new)
         os.rename(location_new, location)
         return True
