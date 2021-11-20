@@ -102,6 +102,14 @@ class _test(tcfl.pos.tc_pos0_base):
 
     def eval(self, ic, target):
 
+        # use PROMPT# vs PROMPT%, so that it also matches the
+        # general initial regex in target.shell.setup() and it
+        # servers in scenarios where we shortcut initialization
+        target.shell.prompt_regex = re.compile("TCF-%(tc_hash)s:PROMPT# " % self.kws)
+        target.shell.run(
+            "export PS1='TCF-%(tc_hash)s:''PROMPT# '  # a simple prompt is "
+            "harder to confuse with general output" % self.kws)
+
         tcfl.tl.sh_export_proxy(ic, target)
         tcfl.tl.linux_wait_online(ic, target)
 
@@ -113,6 +121,13 @@ class _test(tcfl.pos.tc_pos0_base):
                 tcfl.tl.linux_network_ssh_setup(ic, target)
                 target.console.select_preferred(user = 'root')
                 tcfl.tl.sh_export_proxy(ic, target)
+                # use PROMPT# vs PROMPT%, so that it also matches the
+                # general initial regex in target.shell.setup() and it
+                # servers in scenarios where we shortcut initialization
+                target.shell.prompt_regex = re.compile("TCF-%(tc_hash)s:PROMPT# " % self.kws)
+                target.shell.run(
+                    "export PS1='TCF-%(tc_hash)s:''PROMPT# '  # a simple prompt is "
+                    "harder to confuse with general output" % self.kws)
 
         if target.kws['linux.distro'] == "ubuntu":
             # fix repositories -- there was a better way to do this
