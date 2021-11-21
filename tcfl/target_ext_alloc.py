@@ -139,9 +139,10 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
         if allocid not in r:
             continue # no news
         if 'state' not in r[allocid]:
-            raise tcfl.blocked_e(f"{allocid}: invalid server response? no 'state': {r}")
-            continue
-        new_state = r[allocid]['state']
+            logging.error(f"WARNING: {allocid}: CORRECTING: invalid server response? no 'state' in: {r}")
+            new_state = r[allocid]
+        else:
+            new_state = r[allocid]['state']
         if new_state == 'active':
             r = rtb.send_request("GET", "allocation/%s" % allocid)
             group_allocated = r['group_allocated'].split(',')
