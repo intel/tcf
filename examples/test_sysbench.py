@@ -120,7 +120,6 @@ class _test(tcfl.pos.tc_pos0_base):
             if real_name.startswith("ssh"):
                 tcfl.tl.linux_network_ssh_setup(ic, target)
                 target.console.select_preferred(user = 'root')
-                tcfl.tl.sh_export_proxy(ic, target)
                 # use PROMPT# vs PROMPT%, so that it also matches the
                 # general initial regex in target.shell.setup() and it
                 # servers in scenarios where we shortcut initialization
@@ -128,6 +127,7 @@ class _test(tcfl.pos.tc_pos0_base):
                 target.shell.run(
                     "export PS1='TCF-%(tc_hash)s:''PROMPT# '  # a simple prompt is "
                     "harder to confuse with general output" % self.kws)
+                tcfl.tl.sh_export_proxy(ic, target)
 
         if target.kws['linux.distro'] == "ubuntu":
             # fix repositories -- there was a better way to do this
@@ -139,6 +139,8 @@ class _test(tcfl.pos.tc_pos0_base):
         if 'REBOOT_DISABLED' not in os.environ:
             # this is a convention acknowloedged by
             # :class:`tcfl.pos.tc_pos0_base`).
+            tcfl.tl.linux_package_add(ic, target,
+                                      centos = [ 'epel-release' ])
             tcfl.tl.linux_package_add(ic, target, 'sysbench')
 
         self.sysbench_run(target)
