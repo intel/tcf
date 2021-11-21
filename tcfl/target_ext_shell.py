@@ -293,7 +293,7 @@ class shell(tc.target_extension_c):
         self.prompt_regex = val
 
 
-    def setup(self, console = None):
+    def setup(self, console = None, prompt_default = True):
         """
         Setup the shell for scripting operation
 
@@ -309,6 +309,15 @@ class shell(tc.target_extension_c):
         # it floating because then it will get confused if we switch
         # default consoles.
         console = target.console._console_get(console)
+        if prompt_default:
+            # FIXME: prompt regex should be a per-console dictionary
+            target.report_info("resetting prompt regex to"
+                               f" {self.prompt_regex_default.pattern}",
+                               dlevel = 1)
+            # in most cases, when we are setting up a new console it
+            # comes with a default prompt, so we need to reset so we
+            # can run commands.
+            self.prompt_regex = self.prompt_regex_default
         self.run(
             'echo $PS1 | grep -q ^TCF- || export PS1="TCF-%s:$PS1"' % self.target.kws['tc_hash'],
             console = console)
