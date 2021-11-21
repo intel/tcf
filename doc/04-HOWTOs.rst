@@ -211,6 +211,39 @@ this is much more deterministic--the prompt becomes
 ``TCF-<HASHID>:PROMPT#``, where ``<HASHID>`` is a unique string (see
 :term:`hash`) with less chances of it matching on random output.
 
+Note that if you are switching to a preferred console, the pattern
+needs some adaptation so that while the console is setup, the prompt
+is recognized:
+
+.. code-block:: python
+
+        # use PROMPT# vs PROMPT%, so that it also matches the
+        # general initial regex in target.shell.setup() and it
+        # servers in scenarios where we shortcut initialization
+        target.shell.prompt_regex = re.compile("TCF-%(tc_hash)s:PROMPT# " % self.kws)
+        target.shell.run(
+            "export PS1='TCF-%(tc_hash)s:''PROMPT# '  # a simple prompt is "
+            "harder to confuse with general output" % self.kws)
+
+        tcfl.tl.sh_export_proxy(ic, target)
+        tcfl.tl.linux_wait_online(ic, target)
+
+        tcfl.tl.linux_os_release_get(target, prefix = "")
+        # Switch to SSH console if available
+        if 'preferred' in target.console.list():
+            real_name = target.console.setup_get('preferred')['real_name']
+            if real_name.startswith("ssh"):
+                tcfl.tl.linux_network_ssh_setup(ic, target)
+                target.console.select_preferred(user = 'root')
+                # use PROMPT# vs PROMPT%, so that it also matches the
+                # general initial regex in target.shell.setup() and it
+                # servers in scenarios where we shortcut initialization
+                target.shell.prompt_regex = re.compile("TCF-%(tc_hash)s:PROMPT# " % self.kws)
+                target.shell.run(
+                    "export PS1='TCF-%(tc_hash)s:''PROMPT# '  # a simple prompt is "
+                    "harder to confuse with general output" % self.kws)
+                tcfl.tl.sh_export_proxy(ic, target)
+
 
 Accessing the server API without the TCFL library
 =================================================
