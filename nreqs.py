@@ -907,6 +907,11 @@ parser.add_argument(
     "-V", "--distro-version", required = False,
     help = "distro version to install on"
     " (default: guessed from /etc/os-release or equivalent")
+parser.add_argument(
+    "-i", "--ignore-method", metavar = "NAME",
+    type = str, action = "append", default = [],
+    help = "add drivers to ignore when loading")
+
 # ugh, can't self guess these because when arg parsing is done, the
 # drivers are not loaded yet -> FIXME: be a "list knonw
 # methods" option, so it can load all drivers and report'em
@@ -979,6 +984,11 @@ method_dnf_c()
 method_apt_c()
 method_pip_c()
 method_data_c()
+
+for method in list(method_abc.generic_methods):
+    if method in args.ignore_method:
+        logging.info(f"removing method {method}")
+        del method_abc.generic_methods[method]
 
 # determine in which distro we are running, except for overrides
 distro, distro_version = _distro_version_get(args.distro, args.distro_version)
