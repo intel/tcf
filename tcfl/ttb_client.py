@@ -584,7 +584,9 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
         else:
             data = None
         if target_id:
-            r = self.send_request("GET", "targets/" + target_id, data = data)
+            r = self.send_request("GET", "targets/" + target_id, data = data,
+                                  # retry a few times
+                                  retry_timeout = 2)
             # FIXME: imitate same output format until we unfold all
             # these calls--it was a bad idea
             if not 'targets' in r:
@@ -592,7 +594,9 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
         else:
             # force a short timeout to get rid of failing servers quick
             r = self.send_request("GET", "targets/",
-                                  data = data, timeout = 20)
+                                  data = data, timeout = 20,
+                                  # retry a few times
+                                  retry_timeout = 2)
             if 'targets' in r:		# old version, deprecated # COMPAT
                 target_list = r['targets']
             else:
