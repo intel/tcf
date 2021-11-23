@@ -383,7 +383,9 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
     # for the target to flash, which we know from the tags
     def send_request(self, method, url,
                      data = None, json = None, files = None,
-                     stream = False, raw = False, timeout = 160):
+                     stream = False, raw = False, timeout = 160,
+                     retry_timeout = 0, retry_backoff = 0.5,
+                     skip_prefix = False):
         """
         Send request to server using url and data, save the cookies
         generated from request, search for issues on connection and
@@ -395,45 +397,100 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
           PUT. Defaults to PUT.
         :param bool raise_error: if true, raise an error if something goes
            wrong in the request. default True
+
+        :param float retry_timeout: (optional, default 0--disabled)
+          how long (in seconds) to retry connections in case of failure
+          (:class:`requests.exceptions.ConnectionError`,
+          :class:`requests.exceptions.ReadTimeout`)
+
+          Note a retry can have side effects if the request is not
+          idempotent (eg: writing to a console); retries shall only be
+          enabled for GET calls. Support for non-idempotent calls has
+          to be added to the protocol.
+
+          See also :meth:`tcfl.tc.target_c.ttbd_iface_call`
+
         :returns requests.Response: response object
 
         """
         assert not (data and json), \
             "can't specify data and json at the same time"
+        assert isinstance(retry_timeout, (int, float)) and retry_timeout >= 0, \
+            f"retry_timeout: {retry_timeout} has to be an int/float >= 0"
+        assert isinstance(retry_backoff, (int, float)) and retry_backoff > 0
+        if retry_timeout > 0:
+            assert retry_backoff < retry_timeout, \
+                f"retry_backoff {retry_backoff} has to be" \
+                f" smaller than retry_timeout {retry_timeout}"
+
         # create the url to send request based on API version
+        if url.startswith("/"):
+            url = url[1:]
         if not self._base_url:
             self._base_url = urllib.parse.urljoin(
                 self._url, rest_target_broker.API_PREFIX)
-        if url.startswith("/"):
-            url = url[1:]
-        url_request = urllib.parse.urljoin(self._base_url, url)
+        if skip_prefix:
+            url_request = urllib.parse.urljoin(self.parsed_url.geturl(), url)
+        else:
+            url_request = urllib.parse.urljoin(self._base_url, url)
         logger.debug("send_request: %s %s", method, url_request)
         with self.lock:
             cookies = self.cookies
         session = tls_var("session", requests.Session)
-        if method == 'GET':
-            r = session.get(url_request, cookies = cookies, json = json,
-                            data = data, verify = self.verify_ssl,
-                            stream = stream, timeout = (timeout, timeout))
-        elif method == 'PATCH':
-            r = session.patch(url_request, cookies = cookies, json = json,
-                              data = data, verify = self.verify_ssl,
-                              stream = stream, timeout = ( timeout, timeout ))
-        elif method == 'POST':
-            r = session.post(url_request, cookies = cookies, json = json,
-                             data = data, files = files,
-                             verify = self.verify_ssl,
-                             stream = stream, timeout = ( timeout, timeout ))
-        elif method == 'PUT':
-            r = session.put(url_request, cookies = cookies, json = json,
-                            data = data, verify = self.verify_ssl,
-                            stream = stream, timeout = ( timeout, timeout ))
-        elif method == 'DELETE':
-            r = session.delete(url_request, cookies = cookies, json = json,
-                               data = data, verify = self.verify_ssl,
-                               stream = stream, timeout = ( timeout, timeout ))
-        else:
-            raise Exception("Unknown method '%s'" % method)
+        retry_count = -1
+        retry_ts = None
+        while True:
+            retry_count += 1
+            try:
+                if method == 'GET':
+                    r = session.get(url_request, cookies = cookies, json = json,
+                                    data = data, verify = self.verify_ssl,
+                                    stream = stream, timeout = (timeout, timeout))
+                elif method == 'PATCH':
+                    r = session.patch(url_request, cookies = cookies, json = json,
+                                      data = data, verify = self.verify_ssl,
+                                      stream = stream, timeout = ( timeout, timeout ))
+                elif method == 'POST':
+                    r = session.post(url_request, cookies = cookies, json = json,
+                                     data = data, files = files,
+                                     verify = self.verify_ssl,
+                                     stream = stream, timeout = ( timeout, timeout ))
+                elif method == 'PUT':
+                    r = session.put(url_request, cookies = cookies, json = json,
+                                    data = data, verify = self.verify_ssl,
+                                    stream = stream, timeout = ( timeout, timeout ))
+                elif method == 'DELETE':
+                    r = session.delete(url_request, cookies = cookies, json = json,
+                                       data = data, verify = self.verify_ssl,
+                                       stream = stream, timeout = ( timeout, timeout ))
+                else:
+                    raise AssertionError("{method}: unknown HTTP method" )
+                return r
+            except (
+                    requests.exceptions.ConnectionError,
+                    requests.exceptions.ReadTimeout,
+            ) as e:
+                # Retry only these; note these cannot report
+                # Report how many retries we have done, wait a backoff
+                # and then loop it.
+                if retry_timeout == 0:
+                    raise
+                ts = time.time()
+                if retry_ts == None:
+                    retry_ts = ts	# first one
+                else:
+                    if ts - retry_ts > retry_timeout:
+                        raise RuntimeError(
+                            f"{url_request}: giving up after {retry_timeout}s"
+                            f" retrying {retry_count} connection errors") from e
+                time.sleep(retry_backoff)
+                # increase the backoff to avoid pestering too much,
+                # but make sure it doesn't get too big so we at least
+                # get 10 tries in the timeout period
+                if retry_backoff < retry_timeout / 10:
+                    retry_backoff *= 1.2
+                continue
+
 
         #update cookies
         if len(r.cookies) > 0:
