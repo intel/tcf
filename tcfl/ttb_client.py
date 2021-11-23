@@ -439,6 +439,7 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
         session = tls_var("session", requests.Session)
         retry_count = -1
         retry_ts = None
+        r = None
         while True:
             retry_count += 1
             try:
@@ -465,7 +466,7 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
                                        stream = stream, timeout = ( timeout, timeout ))
                 else:
                     raise AssertionError("{method}: unknown HTTP method" )
-                return r
+                break
             except (
                     requests.exceptions.ConnectionError,
                     requests.exceptions.ReadTimeout,
