@@ -1140,8 +1140,8 @@ EOF""")
         # area to final destination
         if not skip_local and src != None:
             target.report_info(
-                "rsyncing %s to target's persistent area /mnt%s/%s"
-                % (src, persistent_dir, persistent_name))
+                "POS: rsyncing %s to target's persistent area /mnt%s/%s"
+                % (src, persistent_dir, _persistent_name), dlevel = -1)
             target.shcmd_local(
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
@@ -1149,7 +1149,7 @@ EOF""")
                 " --port %%(rsync_port)s "
                 " %s%s %%(rsync_server)s::rootfs/%s/%s"
                 % (rsync_extra, src, path_append, persistent_dir,
-                   persistent_name))
+                   _persistent_name))
         target.testcase._targets_active()
         if dst != None:
             # There is a final destination specified, so now, in the
@@ -1158,6 +1158,10 @@ EOF""")
             parent_dirs = os.path.dirname(dst)
             if parent_dirs != '':
                 target.shell.run("mkdir -p /mnt/%s" % parent_dirs)
+            target.report_info(
+                f"POS: rsyncing {src} from target's persistent area"
+                f" /mnt{persistent_dir}/{_persistent_name} to destination",
+                dlevel = -1)
             target.shell.run(
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
