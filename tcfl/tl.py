@@ -580,7 +580,25 @@ def linux_sshd_restart(ic, target):
         "while ! exec 3<>/dev/tcp/localhost/22; do"
         " sleep 1s; done", timeout = 15)
     time.sleep(2)	# SSH settle
-    target.ssh.check_call("echo Checking SSH tunnel is up")
+    # force the SSH tunnel on 22 being re-created -- since it might be
+    # toast...bit it will distirb ithir thrids? we just restarted
+    # sshd. They were disturbed
+    last_e = None
+    for _count in range(4):
+        try:
+            target.tunnel.remove(22)
+            target.ssh.check_call("echo Checking SSH tunnel is up")
+            break
+        except tcfl.error_e as e:
+            last_e = e
+            data = e.attachments
+            target.report_info(
+                f"SSH tunnel not up: SSH returned {data['returncode']}",
+                e.attachments)
+            continue
+    else:
+        raise last_e
+
 
 def linux_ipv4_addr_get_from_console(target, ifname):
     """
