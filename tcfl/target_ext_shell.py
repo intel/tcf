@@ -317,10 +317,23 @@ class shell(tc.target_extension_c):
             # in most cases, when we are setting up a new console it
             # comes with a default prompt, so we need to reset so we
             # can run commands.
-            self.prompt_regex = self.prompt_regex_default
-        self.run(
-            'echo $PS1 | grep -q ^TCF- || export PS1="TCF-%s:$PS1"' % self.target.kws['tc_hash'],
-            console = console)
+            #
+            # This defines a simple prompt, valid in all SH* Unix
+            # shells that is very hard to false positive with output
+            # (not we hardcode the TCF-HASHID string to ensure this
+            # only works with this particular testcase execution) and
+            # the ending %%%% (which becomes after python escaping %%)
+            # is meant to be able to catch it easily and avoid other
+            # false positives.
+            #
+            # Every distro has a different prompt with more creative
+            # stuff incl ANSI stuff and latching to it without false
+            # positives is close to impossible.
+            self.prompt_regex = re.compile(
+                "TCF-%(tc_hash)s:.+ %%%% [\$#] " % self.target.kws)
+            self.run(
+                'export PS1="TCF-%(tc_hash)s:\w %%%% \$ "' % self.target.kws,
+                console = console)
         # disable line editing for proper recording of command line
         # when running bash; otherwise the scrolling readline does
         # messes up the output
