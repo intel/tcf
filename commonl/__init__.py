@@ -2918,6 +2918,22 @@ class fsdb_c(object):
         """
         raise NotImplementedError
 
+    @staticmethod
+    def create(cache_dir):
+        """
+        Create with the right type for the host OS
+
+        Same params as :class:`fsdb_symlink_c`
+
+        Note there are catchas for atomicity; read the docs for:
+
+        - :class:`fsdb_symlink_c`
+        - :class:`fsdb_file_c`
+        """
+        if sys.platform in ( 'linux', 'macos' ):
+            return fsdb_symlink_c(cache_dir)
+        else:
+            return fsdb_file_c(cache_dir)
 
 
 class fsdb_symlink_c(fsdb_c):
@@ -2953,6 +2969,21 @@ class fsdb_symlink_c(fsdb_c):
 
         self.location = dirname
 
+    def _raw_valid(self, location):
+        return os.path.islink(location)
+
+    def _raw_read(self, location):
+        return os.readlink(location)
+
+    def _raw_write(self, location, value):
+        os.symlink(value, location)
+
+    def _raw_unlink(self, location):
+        os.unlink(location)
+
+    def _raw_rename(self, location_new, location):
+        os.rename(location_new, location)
+
     def keys(self, pattern = None):
         l = []
         for _rootname, _dirnames, filenames_raw in os.walk(self.location):
@@ -2961,7 +2992,7 @@ class fsdb_symlink_c(fsdb_c):
                 # need to filter with the unquoted name...
                 filename = urllib.parse.unquote(filename_raw)
                 if pattern == None or fnmatch.fnmatch(filename, pattern):
-                    if os.path.islink(os.path.join(self.location, filename_raw)):
+                    if self._raw_valid(os.path.join(self.location, filename_raw)):
                         l.append(filename)
         return l
 
@@ -2979,7 +3010,7 @@ class fsdb_symlink_c(fsdb_c):
             else:
                 use = filenames
             for filename, filename_raw in use.items():
-                if os.path.islink(os.path.join(self.location, filename_raw)):
+                if self._raw_valid(os.path.join(self.location, filename_raw)):
                     bisect.insort(fl, ( filename, self._get_raw(filename_raw) ))
         return fl
 
@@ -2997,7 +3028,7 @@ class fsdb_symlink_c(fsdb_c):
             else:
                 use = filenames
             for filename, filename_raw in use.items():
-                if os.path.islink(os.path.join(self.location, filename_raw)):
+                if self._raw_valid(os.path.join(self.location, filename_raw)):
                     d[filename] = self._get_raw(filename_raw)
         return d
 
@@ -3036,7 +3067,7 @@ class fsdb_symlink_c(fsdb_c):
             # note that we are setting None (aka: removing the value)
             # we also need to remove any "subfield" -- KEY.a, KEY.b
             try:
-                os.unlink(location)
+                self._raw_unlink(location)
             except OSError as e:
                 if e.errno != errno.ENOENT:
                     raise
@@ -3047,14 +3078,14 @@ class fsdb_symlink_c(fsdb_c):
                     key_itr, safe = '-_ ' + string.ascii_letters + string.digits)
                 location = os.path.join(self.location, key_itr_raw)
                 try:
-                    os.unlink(location)
+                    self._raw_unlink(location)
                 except OSError as e:
                     if e.errno != errno.ENOENT:
                         raise
             return True	# already wiped by someone else
         if force == False:
             try:
-                os.symlink(value, location)
+                self._raw_write(location, value)
             except OSError as e:
                 if e.errno != errno.EEXIST:
                     raise
@@ -3066,16 +3097,16 @@ class fsdb_symlink_c(fsdb_c):
         # collision if more than one process is trying to modify
         # at the same time; they can override each other, that's
         # ok--the last one wins.
-        location_new = location + "-" + str(os.getpid())
+        location_new = location + "-" + str(os.getpid()) + "-" + str(threading.get_ident())
         rm_f(location_new)
-        os.symlink(value, location_new)
-        os.rename(location_new, location)
+        self._raw_write(location_new, value)
+        self._raw_rename(location_new, location)
         return True
 
     def _get_raw(self, key, default = None):
         location = os.path.join(self.location, key)
         try:
-            value = os.readlink(location)
+            value = self._raw_read(location)
             # if the value was type encoded (see set()), decode it;
             # otherwise, it is a string
             if value.startswith("i:"):
@@ -3105,3 +3136,39 @@ class fsdb_symlink_c(fsdb_c):
         key = urllib.parse.quote(
             key, safe = '-_ ' + string.ascii_letters + string.digits)
         return self._get_raw(key, default = default)
+
+
+class fsdb_file_c(fsdb_symlink_c):
+    """
+    In filesystem quick database, but with files instead of symlinks
+
+    In Linux, with symlinks, this was a very good idea -- in
+    Windows...well, let's see it doesn't work so well. But this will
+    cut it until Windows1x? where apparently symlinks are saner.
+
+    Now, this is not fully atomic, but it tries to be at the name
+    level. It is not meant to be a bomb-proof atomic database--it cuts
+    it to have multiple processes/threads waiting to the same area of
+    disk and if you lock on top (using :mod:`lockfile`), then you
+    should achieve better atomicity.
+    """
+
+    # note the data is written as a string, since that's what we do
+    # with symlinks, so we can just open in default, text mode
+
+    def _raw_valid(self, location):
+        return os.path.isfile(location)
+
+    def _raw_read(self, location):
+        with open(location, "r") as f:
+            return f.read()
+
+    def _raw_write(self, location, value):
+        with open(location, "x") as f:
+            f.write(value)
+
+    def _raw_unlink(self, location):
+        os.unlink(location)
+
+    def _raw_rename(self, location_new, location):
+        os.rename(location_new, location)
