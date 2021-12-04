@@ -14,12 +14,13 @@ import concurrent.futures
 import json
 import logging
 import pprint
-import requests
 import urllib3
 
+import requests
 import tabulate
 
 import commonl
+import tcfl
 from . import tc
 from . import ttb_client
 from . import msgid_c
@@ -135,7 +136,8 @@ def _cmdline_servers(args):
     # different verbosity levels...yah, lazy
     r = []
     d = {}
-    rtbs = {}
+    rtbs = {}		# COMPAT
+    servers = {}	# new stuff
 
     if args.targets:
         rtb_list = {}
@@ -144,10 +146,13 @@ def _cmdline_servers(args):
                 target = tc.target_c.create_from_cmdline_args(
                     args, target_name, extensions_only = [])
                 rtb_list[target.rtb.aka] = target.rtb
+                server = tcfl.server_c.servers[target.rtb.parsed_url.geturl()]
+                servers[server.url] = server
             except IndexError as e:
                 logging.error("%s: invalid target" % target_name)
     else:
         rtb_list = ttb_client.rest_target_brokers
+        servers = tcfl.server_c.servers
 
     for name, rtb in rtb_list.items():
         username = "n/a"
@@ -165,8 +170,10 @@ def _cmdline_servers(args):
         ) as e:
             logging.warning("%s: can't reach server: %s", name, e)
             username = "n/a"
-        r.append(( rtb.aka, str(rtb), username ))
-        d[rtb.aka] = dict(url = str(rtb), username = username)
+        server = servers[rtb.parsed_url.geturl()]
+        r.append(( rtb.aka, str(rtb), username, server.origin ))
+        d[rtb.aka] = dict(url = str(rtb), username = username,
+                          origin = server.origin)
         rtbs[rtb.aka] = rtb
 
     verbosity = args.verbosity - args.quietosity
@@ -185,6 +192,7 @@ def _cmdline_servers(args):
             "Server",
             "URL",
             "UserID",
+            "Origin"
         ]
         print(tabulate.tabulate(r, headers = headers))
     elif verbosity == 3:
@@ -193,6 +201,51 @@ def _cmdline_servers(args):
         pprint.pprint(d)
     elif verbosity >= 5:
         print(json.dumps(d, skipkeys = True, indent = 4))
+
+
+def _cmdline_servers_flush(_args):
+    log_sd = logging.getLogger("server-discovery")
+    log_sd.setLevel(logging.INFO)
+    tcfl.server_c.flush()
+
+
+def _cmdline_servers_discover(args):
+    # adjust logging level of server-discovery
+    # -qqqq -vvvvvv -> -vvv
+    verbosity = args.verbosity - args.quietosity
+    levels = [ logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG ]
+    # now translate that to logging's module format
+    # server-discovery -> tcfl.log_sd
+    log_sd = logging.getLogger("server-discovery")
+    if verbosity >= len(levels):
+        verbosity = len(levels) - 1
+    log_sd.setLevel(levels[verbosity])
+
+    if args.flush:
+        log_sd.warning("flushing cached server list (--flush given)")
+        tcfl.server_c.flush()
+    else:
+        log_sd.warning("keeping cached server list (--flush not given)")
+    current_server_count = len(tcfl.server_c.servers)
+    log_sd.warning(f"starting with {current_server_count} server/s")
+    if log_sd.isEnabledFor(logging.DEBUG):
+        count = 0
+        for url, _server in tcfl.server_c.servers.items():
+            log_sd.debug(f"starting server[{count}]: {url}")
+            count += 1
+
+    tcfl.server_c.discover(
+        ssl_ignore = args.ssl_ignore,
+        seed_url = args.items,
+        seed_port = args.port,
+        herds_exclude = args.herd_exclude,
+        herds_include = args.herd_include,
+        loops_max = args.iterations,
+        ignore_cache = args.flush,
+        zero_strikes_max = args.zero_strikes_max,
+        origin = "command line",
+    )
+    log_sd.warning(f"found {len(tcfl.server_c.servers)} server/s")
 
 
 def _cmdline_setup(arg_subparsers):
@@ -241,7 +294,7 @@ def _cmdline_setup(arg_subparsers):
 
     ap = arg_subparsers.add_parser(
         "servers",
-        help = "List configured servers")
+        help = "List configured/discovered servers")
     commonl.argparser_add_aka(arg_subparsers, "servers", "server-ls")
     ap.add_argument(
         "-q", dest = "quietosity", action = "count", default = 0,
@@ -260,3 +313,51 @@ def _cmdline_setup(arg_subparsers):
         help = "List of targets for which we want to find server"
         " information (optional; defaults to all)")
     ap.set_defaults(func = _cmdline_servers)
+
+    ap = arg_subparsers.add_parser(
+        "servers-flush",
+        help = "Flush currently cached/known servers")
+    ap.set_defaults(func = _cmdline_servers_flush)
+
+    ap = arg_subparsers.add_parser(
+        "servers-discover",
+        help = "Discover servers")
+    ap.add_argument(
+        "-q", dest = "quietosity", action = "count", default = 0,
+        help = "Decrease verbosity of information to display "
+        "(none is a table, -q list of shortname, url and username, "
+        "-qq the hostnames, -qqq the shortnames"
+        "; all one per line")
+    ap.add_argument(
+        "-v", dest = "verbosity", action = "count", default = 1,
+        help = "Increase verbosity of progress info [%(default)d] ")
+    ap.add_argument(
+        "--iterations", "-e", type = int, metavar = "MAX_LOOPS",
+        action = "store", default = 10,
+        help = "Maximum number of iterations [%(default)d]")
+    ap.add_argument(
+        "--zero-strikes-max", "-z", type = int, metavar = "MAX",
+        action = "store", default = 4,
+        help = "Stop after this many iterations [%(default)d] finding"
+        " no new servers")
+    ap.add_argument(
+        "--flush", "-f", action = 'store_true', default = False,
+        help = "Flush existing cached entries before")
+    ap.add_argument(
+        "--ssl-ignore", "-s", action = 'store_false', default = True,
+        help = "Default to ignore SSL validation [False]")
+    ap.add_argument(
+        "--port", "-p", action = 'store', type = int, default = 5000,
+        help = "Default port when none specified %(default)s")
+    ap.add_argument(
+        "--herd-exclude", "-x", metavar = "HERDNAME", action = 'append',
+        default = [], help = "Exclude herd (can be given multiple times)")
+    ap.add_argument(
+        "--herd-include", "-i", metavar = "HERDNAME", action = 'append',
+        default = [], help = "Include herd (can be given multiple times)")
+    ap.add_argument(
+        "items", metavar = "HOSTNAME|URL", nargs = "*",
+        action = "store", default = [],
+        help = "List of URLs or hostnames to seed discovery"
+        f" [{' '.join(tcfl.server_c._seed_default.keys())}]")
+    ap.set_defaults(func = _cmdline_servers_discover)
