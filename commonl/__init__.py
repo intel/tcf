@@ -184,7 +184,7 @@ def config_import(path_list, file_regex, namespace = "__main__",
 
 def logging_verbosity_inc(level):
     if level == 0:
-        return
+        return 0
     if level > logging.DEBUG:
         delta = 10
     else:
