@@ -2608,6 +2608,9 @@ The process for flashing anything is to first upload the data file to
 the server using the storage interface described above, and then
 commanding this interface to burn said file into a given location.
 
+
+.. _http_listing_possible_flashing_targets:
+
 Listing possible flashing targets
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -2732,6 +2735,59 @@ bmc:bmc.bin.xz*.
 
 
 
+GET /targets/TARGETID/images/flash IMAGE -> CONTENT
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Read a flash image from one of the target's possible flashing
+destinations
+
+**Access control:** the user, creator or guests of an
+allocation that has this target allocated.
+
+**Arguments:**
+
+- *image*: the name of the image to read. A list of valid images can
+  be found using the command in :ref:`listing possible flashing
+  targets <http_listing_possible_flashing_targets>`
+
+  Type: string
+
+  Disposition: mandatory
+
+- *image_offset*: offset in bytes from which to start reading
+  relative to the image's beginning
+
+  Type: integer
+
+  Disposition: optional, defaults to 0
+
+- *read_bytes*: number of bytes to read starting from image_offset
+
+  Type: integer
+
+  Disposition: optional, defaults to read the entire file starting
+  at the offset
+
+**Returns:**
+
+- On success, 200 HTTP code and the image contents on the response
+  body
+
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
+
+**Example**
+
+::
+
+   $ curl -sk -b cookies.txt -X GET \
+     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/images/flash \
+     -d image="bios" > bios.bin
+
+With the TCF client, use the *tcf images-read TARGETNAME IMAGENAME
+LOCALFILENAME* command.
+
+
+
 GET /targets/TARGETID/images/list
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -2826,7 +2882,7 @@ meaning:
   example, if it is a console based on SSH).
 
 
-.. _http_target_console_reading_workflow::
+.. _http_target_console_reading_workflow:
 
 Console reading workflow
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -2939,7 +2995,8 @@ section (which gets updated by the server during operation):
 
     This enables the client to know when the recording has been
     flushed and current recorded offsets need to be reset to zero. See
-    :ref:`console reading workflows <console_reading_workflows>` above.
+    :ref:`console reading workflows
+    <http_target_console_reading_workflow>` above.
 
   - *state=VALUE*: (boolean) *true* for enabled, *false* for disabled.
 
@@ -3097,9 +3154,10 @@ that came out of it. This call allows the user to query that data. See
     header will return the maximum offset allowed (which matches the
     current size).
 
-    See :ref:`console reading workflows <console_reading_workflows>`
-    above for how these values are used for the client to read through
-    power cycles of the platform.
+    See :ref:`console reading workflows 
+    <http_target_console_reading_workflow>` above for how these
+    values are used for the client to read through power cycles of
+    the platform.
 
 - On error, non-200 HTTP code and a JSON dictionary with diagnostics
 
