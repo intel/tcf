@@ -174,10 +174,12 @@ class process_posix_file_lock_c(object):
                 break
             except IOError as e:
                 if e.errno != errno.EAGAIN:
+                    self.release()
                     raise
                 time.sleep(self.wait)
                 ts = time.time()
                 if ts - ts0 > self.timeout:
+                    self.release()
                     raise self.timeout_e
 
     def release(self):
