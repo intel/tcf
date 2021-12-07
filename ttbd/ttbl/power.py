@@ -1733,8 +1733,15 @@ class daemon_podman_container_c(daemon_c):
     #: crontabs -> run-parts
     dockerfile = """
 FROM fedora-minimal
-RUN microdnf install -y crontabs usbutils strace python3-rpyc findutils
-RUN microdnf clean all
+RUN \
+     microdnf install -y \
+         crontabs \
+         findutils \
+         procps \
+         python3-rpyc \
+         strace \
+         usbutils; \
+     microdnf clean all
 """
 
     def _cmdline_run(self, target, component, cmdline, env = None):
@@ -2244,8 +2251,14 @@ class rpyc_c(daemon_podman_container_c):
     #: crontabs -> run-parts
     dockerfile = """
 FROM fedora-minimal
-RUN microdnf install -y crontabs usbutils strace python3-rpyc
-RUN microdnf clean all
+RUN \
+    microdnf install -y \
+       crontabs \
+       procps \
+       python3-rpyc; \
+       strace \
+       usbutils \
+    microdnf clean all
 """
 
     def target_setup(self, target, iface_name, component):
