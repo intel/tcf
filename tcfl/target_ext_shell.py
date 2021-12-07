@@ -358,6 +358,22 @@ class shell(tc.target_extension_c):
             # fine, ignore them
             skip_duplicate = True
         )
+        testcase.expect_global_append(
+            # add a detector for a command not found shell error,
+            # which is different to what we get when we execute a
+            # command and fails.
+            #
+            # see note on previous on for the rest of the arguments
+            target.console.text(
+                re.compile(r"bash: .*: command not found\.\.\."),
+                name = f"{target.want_name}:{console}: command not available",
+                console = console, timeout = 0, poll_period = 1,
+                raise_on_found = tc.error_e("error detected in shell")),
+            # if we have already added detectors for this, that's
+            # fine, ignore them
+            skip_duplicate = True
+        )
+
 
     def setup_windows(self, console = None):
         """
