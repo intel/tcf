@@ -7093,8 +7093,6 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                             break
             # Catch stuff in _targets_assign()
             except Exception as e:
-                self.log.error("exception: %s %s\n%s" %
-                               (type(e).__name__, e, traceback.format_exc()))
                 self.report_blck("exception: %s %s" % (type(e).__name__, e),
                                  { 'exception info': traceback.format_exc() },
                                  alevel = 1)
