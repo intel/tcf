@@ -427,8 +427,9 @@ def ipmitool_superuser_setup(target, uid, username, password,
         target.shell.run(
             f"ipmitool -d {bmc_id} channel setaccess {channel} {uid}"
             " ipmi=on privilege=4")
-    target.report_info(f"bmc{bmc_id}: added {username} as UID {uid} in"
-                       " channels {','.join(channels}")
+    target.report_info(
+        f"bmc{bmc_id}: added {username} as UID {uid} in channels"
+        f" {','.join([ str(i) for i in channels ])}")
 
 
 def ipmitool_ipv4_setup(target, channel, ipaddr, netmask, gateway,
@@ -706,12 +707,14 @@ def setup_ipmitool(target, bmc_id, bmc_name, bmc_data, dhcp = False):
             # if we didn't specify user channels to set in the
             # inventory, just use the ones declared in the network
             # sections
-            target.report_info(f"BMC: user {username} configured in"
-                               f" general network channels {':'.join(channels)}")
             channels = network_channels
+            target.report_info(
+                f"BMC: user {username} configured in general network channels"
+                f" {':'.join([ str(i) for i in channels ])}")
         else:
-            target.report_info(f"BMC: user {username} configured in"
-                               f" user-specific channels {':'.join(channels)}")
+            target.report_info(
+                f"BMC: user {username} configured in user-specific channels"
+                f" {':'.join([ str(i) for i in channels ])}")
         ipmitool_superuser_setup(target, data['uid'], username,
                                  data['password'], channels, bmc_id = bmc_id)
 
