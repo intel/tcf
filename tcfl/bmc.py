@@ -506,8 +506,29 @@ def ipmitool_ipv4_setup(target, channel, ipaddr, netmask, gateway,
         target.shell.run(f"ipmitool -d {bmc_id} lan set {channel} access on")
 
     # verify network settings
-    output = target.shell.run(f"ipmitool lan print {channel}",
-                              output = True, trim = True)
+    count = 0
+    top = 3
+    retry_data = target.testcase.buffers.setdefault(
+        f"{target.fullid}-retries", collections.defaultdict(int))
+    last_e = None
+    for count in range(top):
+        try:
+            output = target.shell.run(f"ipmitool lan print {channel}",
+                                  output = True, trim = True)
+            break
+        except tcfl.error_e as e:
+            last_e = e
+            if 'error detected in shell' not in str(e):
+                raise
+            retry_data[f'ipmitool lan print {channel}'] += 1
+            target.report_data(
+                "Recovered conditions [%(type)s]",
+                f"IPMI: retries to print lan {channel}",
+                retry_data[f'ipmitool lan print {channel}']
+            )
+            time.sleep(1)
+    else:
+        raise last_e
     if dhcp == False:
         musthave = [
             f'IP Address Source       : Static Address',
