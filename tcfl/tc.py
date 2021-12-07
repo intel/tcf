@@ -2258,7 +2258,7 @@ class target_c(reporter_c):
                     retry_backoff *= 1.2
                 continue
 
-            except requests.HTTPError as e:
+            except requests.RequestException as e:
                 raise error_e("%s: %s/%s: remote call failed: %s"
                               % (self.id, interface, call, e),
                               dict(
