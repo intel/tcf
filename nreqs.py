@@ -893,7 +893,10 @@ def _command_json(args):
 def _command_install(args):
     logging.warning(f"installing for: {distro} v{distro_version},"
                     f" default install with {distro_method}")
-    if args.sudo:
+    if args.sudo and not method_abc.is_admin():
+        # only enable sudo if not running as root, makes no sense
+        # otherwise; it also allows this to run smoothly on machines
+        # (eg: containers) that don't install sudo
         method_abc.sudo = "sudo "
     else:
         method_abc.sudo = ""
