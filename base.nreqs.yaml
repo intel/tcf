@@ -10,6 +10,8 @@ bzip2:
 dosfstools:
 git:
 gvnc-tools:
+  ubuntu: gvncviewer
+  debian: gvncviewer
   pip:
     skip: true
 make:
@@ -18,8 +20,7 @@ Jinja2: python3-jinja2
 
 imutils:
   
-ply:
-  dnf: python3-ply
+ply: python3-ply
 
 pykwalify: python3-pykwalify
 
@@ -41,9 +42,10 @@ python-Levenshtein-wheels:
   require_platform: win32
 
 python-Levenshtein:
+  distro: python3-levenshtein
   skip_platform: win32
   
-PyYAML: python3-pyyaml 
+PyYAML: python3-yaml 
 
 requests: python3-requests
 
@@ -69,4 +71,5 @@ termcolor:
   skip_platform: win32
 
 xz:
+  apt: xz-utils
   reason: for de/compressing logfiles and others
