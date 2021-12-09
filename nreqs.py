@@ -189,6 +189,54 @@ class method_abc:
         raise NotImplementedError
 
 
+class method_apt_c(method_abc):
+
+    # FIXME: how to add extra repos?
+
+    description = "Install packages with APT"
+
+    def __init__(self):
+        method_abc.__init__(self, "apt", [ 'debian', 'ubuntu' ])
+
+    def install(self, package, package_alternate, package_data, method_details):
+        apt_command = os.environ.get("APT_COMMAND", "apt")
+        cmdline = f"{apt_command} install -y".split()
+        # Force default locale, so we can parse messages
+        os.environ["LC_ALL"] = "C"
+        os.environ["LC_LANG"] = "C"
+        try:
+            output = subprocess.check_output(
+                cmdline + [ package_alternate ],
+                stdin = subprocess.DEVNULL, stderr = subprocess.STDOUT)
+            output = output.decode('utf-8', errors = 'backslashreplace').replace('\n', '\n  ')
+            logging.info(
+                f"{package} [apt/{package_alternate}]: installed\n  {output}")
+            return True
+        except subprocess.CalledProcessError as e:
+            output = e.stdout.decode('utf-8', errors = 'backslashreplace')
+            if "are you root?" in output:
+                # can't install, try something else -- it is possible
+                # the user doesn't have privs, but can then fallback
+                # to pip --user, for example
+                logging.error(
+                    f"{package} [apt/{package_alternate}]: no permission to install (need superuser)")
+                return False
+            # APT prints one message, microapt another
+            if "Unable to locate package" in output:
+                # package does not exist, try something else
+                logging.error(
+                    f"{package} [apt/{package_alternate}]: not available from APT (missing repo?)")
+                return False
+            # welp, what's this? no idea
+            logging.error(
+                f"{package} [apt/{package_alternate}]: command failed '{cmdline}':"
+                f" {output}")
+            raise RuntimeError(
+                f"{package} [apt/{package_alternate}]: command failed '{cmdline}':"
+                f" {output}")
+
+
+
 class method_dnf_c(method_abc):
 
     # FIXME: how to add extra repos?
@@ -373,14 +421,6 @@ class method_data_c(method_abc):
             raise RuntimeError(
                 f"{package} [pip/{package_alternate}]: command failed '{cmdline}':"
                 f" {output}")
-
-
-class method_apt_c(method_abc):
-
-    description = "Install packages with apt"
-
-    def __init__(self):
-        method_abc.__init__(self, "apt", [ 'ubuntu', 'debian' ])
 
 
 class method_default_c(method_abc):
