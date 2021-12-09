@@ -146,6 +146,11 @@ class method_abc:
 
     # append space, so we compose a command...bleh
     sudo = "sudo "
+
+    # dictionary with a spec of things that need to be installed
+    # first--this is the same yaml format, but in dict. See
+    # method_pip_c for an example
+    prerequisites = None
     
     def __init__(self, name, distros = None, exclusive = False):
         """
@@ -296,6 +301,13 @@ class method_dnf_c(method_abc):
 class method_pip_c(method_abc):
 
     description = "Install packages with Python's PIP"
+
+    prerequisites = {
+        "pip": {
+            "distro": "python3-pip",
+            #"exclusive": True	# FIXME: broken
+        }
+    }
 
     def __init__(self):
         method_abc.__init__(self, "pip")	# empty means "generic"
@@ -631,7 +643,8 @@ def _reqs_grok(packages, req_method_details, filename, y):
             elif req_distro_data == None:
                 method_data = {}
             else:
-                assert isinstance(req_distro_data, dict)
+                assert isinstance(req_distro_data, dict), \
+                    f"req_distro_data expected dict, got {type(req_distro_data)}"
                 method_data = dict(req_distro_data)
             logging.debug(f"{req}/{req_distro_spec}: method_data {method_data}")
 
@@ -808,7 +821,20 @@ def _parse_files(args):
     #
     # reqs[METHOD] = [set of packages to install]
     method_details = collections.defaultdict(collections.defaultdict)
-    packages = dict()
+    packages = collections.OrderedDict()
+
+    # pre-install packages that might be needed by methods
+    #
+    # this has to happen first thing so they show up in the right
+    # order and are installed first.
+    #
+    # eg: pip defines python3-pip has to be dnf/apt installed
+    for method_name, method in method_abc.methods_by_name.items():
+        if method.prerequisites:
+            _reqs_grok(packages, method_details,
+                       f"prerequisites for {method_name}",
+                       method.prerequisites)
+
     for path in args.filenames:
         logging.debug(f"{path}: considering parsing")
         if os.path.isfile(path):
