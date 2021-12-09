@@ -13,11 +13,20 @@ class authenticator_party_c(ttbl.authenticator_c):
 
     To configure, create a config file that looks like:
 
-    >>> import timo.auth_party
+    >>> import ttbl
+    >>> import ttbl.auth_party
     >>>
-    >>> add_authenticator(timo.auth_party.authenticator_party_c(
+    >>> ttbl.config.add_authenticator(ttbl.auth_party.authenticator_party_c(
     >>>    [ 'admin', 'user', 'role3', ...],
     >>>    local_addresses = [  '127.0.0.1', '192.168.0.2' ] ))
+    >>>
+
+    Allow anyone as user and admin (dangerous!):
+
+    >>> import ttbl.auth_party
+    >>>
+    >>> ttbl.config.add_authenticator(ttbl.auth_party.authenticator_party_c(
+    >>>    [ 'user', 'admin' ])
     >>>
 
     Where you list the roles that everyone will get all the time.
