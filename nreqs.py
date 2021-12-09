@@ -199,6 +199,23 @@ class method_abc:
         raise NotImplementedError
 
 
+    # Handy methods for drivers
+    @staticmethod
+    def is_admin():
+        """
+        Return *True* if current users is a sysadmin, *False* otherwise
+        """
+        if hasattr(os, "geteuid"):	# most Unix platforms
+            return os.geteuid() == 0
+        if hasattr(ctypes, "windll"):	# windowsy
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        logging.warning(
+            "non-Unix nor windosy platform? [{sys.platform},"
+            " can't tell if running user is a root/admin;"
+            " assuming not")
+        return False
+
+
 class method_apt_c(method_abc):
 
     # FIXME: how to add extra repos?
@@ -316,14 +333,7 @@ class method_pip_c(method_abc):
 
     def install(self, package, package_alternate, package_data, method_details):
         cmdline = [ "pip", "install" ]
-        admin = False
-        if hasattr(os, "geteuid"):	# most Unix platforms
-            admin = os.geteuid() == 0
-        elif hasattr(ctypes, "windll"):	# windowsy
-            admin = ctypes.windll.shell32.IsUserAnAdmin()
-        else:
-            logging.warning("non-Unix platform? can't tell if sysadmin"
-                            "--running with --user")
+        admin = self.is_admin()
         # To deps or --no-deps, this is the question.
         # We can't tell ahead of time if we are able to install
         # dependencies as distro packages (which we prefer), and we
