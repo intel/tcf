@@ -28,6 +28,8 @@ Given a top level list of packages needed, this script tries to
 install them using a native OS framework first (eg: DNF, APT) and then
 falling back to other things like 'pip --user'.
 
+No need to call as superuser! Will try to sudo by default
+
 """
 __epilog__ = """\
 Allows covering cases such when a PIP package (eg: paramiko) in RHEL
@@ -142,6 +144,9 @@ class method_abc:
     generic_methods = dict()
     methods_by_name = collections.defaultdict(set)
 
+    # append space, so we compose a command...bleh
+    sudo = "sudo "
+    
     def __init__(self, name, distros = None, exclusive = False):
         """
         :param bool exclusive: (optional) fallback setting to decide
@@ -200,7 +205,7 @@ class method_apt_c(method_abc):
 
     def install(self, package, package_alternate, package_data, method_details):
         apt_command = os.environ.get("APT_COMMAND", "apt")
-        cmdline = f"{apt_command} install -y".split()
+        cmdline = f"{self.sudo}{apt_command} install -y".split()
         # Force default locale, so we can parse messages
         os.environ["LC_ALL"] = "C"
         os.environ["LC_LANG"] = "C"
@@ -219,7 +224,8 @@ class method_apt_c(method_abc):
                 # the user doesn't have privs, but can then fallback
                 # to pip --user, for example
                 logging.error(
-                    f"{package} [apt/{package_alternate}]: no permission to install (need superuser)")
+                    f"{package} [apt/{package_alternate}]: no permission to"
+                    f" install (need superuser, add --sudo?)")
                 return False
             # APT prints one message, microapt another
             if "Unable to locate package" in output:
@@ -248,7 +254,7 @@ class method_dnf_c(method_abc):
 
     def install(self, package, package_alternate, package_data, method_details):
         dnf_command = os.environ.get("DNF_COMMAND", "dnf")
-        cmdline = f"{dnf_command} install -y".split()
+        cmdline = f"{self.sudo}{dnf_command} install -y".split()
         # Force default locale, so we can parse messages
         os.environ["LC_ALL"] = "C"
         os.environ["LC_LANG"] = "C"
@@ -267,7 +273,8 @@ class method_dnf_c(method_abc):
                 # the user doesn't have privs, but can then fallback
                 # to pip --user, for example
                 logging.error(
-                    f"{package} [dnf/{package_alternate}]: no permission to install (need superuser)")
+                    f"{package} [dnf/{package_alternate}]: no permission to"
+                    f" install (need superuser, add --sudo?)")
                 return False
             # DNF prints one message, microdnf another
             if "Error: Unable to find a match" in output \
@@ -848,6 +855,10 @@ def _command_json(args):
 def _command_install(args):
     logging.warning(f"installing for: {distro} v{distro_version},"
                     f" default install with {distro_method}")
+    if args.sudo:
+        method_abc.sudo = "sudo "
+    else:
+        method_abc.sudo = ""
     packages, method_details = _parse_files(args)
     methods = [ method_abc.methods_by_name[distro_method] ] \
         + list(method_abc.generic_methods.values())
@@ -997,6 +1008,15 @@ ap.set_defaults(func = _command_json)
 ap = command_subparser.add_parser(
     "install",
     help = "Install packages")
+ap.add_argument(
+    "-s", "--sudo", 
+    action = "store_true", default = True, dest = "sudo",
+    help = "Run dnf/apt (system level package managers) under sudo [%(default)s]")
+ap.add_argument(
+    "-u", "--no-sudo", 
+    action = "store_false", default = True, dest = "sudo",
+    help = "Do not run dnf/apt (system level package managers)"
+    " under sudo [%(default)s]")
 ap.add_argument(
     "filenames", metavar = "PATH|FILE.nreqs.yaml", type = str, nargs = "+",
     help = "requirements file(s) or paths contianing them [*.nreqs.yaml]")
