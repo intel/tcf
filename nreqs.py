@@ -304,8 +304,10 @@ class method_pip_c(method_abc):
 
     prerequisites = {
         "pip": {
-            "distro": "python3-pip",
-            #"exclusive": True	# FIXME: broken
+            "distro": {
+                "name": "python3-pip",
+                "exclusive": True
+            }
         }
     }
 
