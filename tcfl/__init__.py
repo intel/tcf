@@ -1226,7 +1226,7 @@ class server_c:
           we know was bad for any reason before.
         """
 
-        if not cls.servers and not bad_servers:
+        if not servers and not bad_servers:
             return {}, 0, 0
 
         bad_server_count = 0
