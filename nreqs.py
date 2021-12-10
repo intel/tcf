@@ -398,6 +398,8 @@ class method_pip_c(method_abc):
                 # package does not exist, try something else
                 logging.error(
                     f"{package} [pip/{package_alternate}]: not available from PIP (missing repo?)")
+                logging.info(
+                    f"{package} [pip/{package_alternate}]: output: {output}")
                 return False
             # welp, what's this? no idea
             logging.error(
