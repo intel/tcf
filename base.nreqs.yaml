@@ -42,7 +42,8 @@ python-Levenshtein-wheels:
   require_platform: win32
 
 python-Levenshtein:
-  distro: python3-levenshtein
+  dnf: python3-Levenshtein
+  apt: python3-levenshtein
   skip_platform: win32
   
 PyYAML: python3-yaml 
