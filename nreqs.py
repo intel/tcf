@@ -352,7 +352,10 @@ class method_pip_c(method_abc):
         method_abc.__init__(self, "pip")	# empty means "generic"
 
     def install(self, package, package_alternate, package_data, method_details):
-        cmdline = [ "pip", "install" ]
+        # sys.executable is the current python interpreter; this way
+        # if we run with different versions we get it installed for
+        # that version
+        cmdline = [ sys.executable, "-m", "pip", "install" ]
         admin = self.is_admin()
         # To deps or --no-deps, this is the question.
         # We can't tell ahead of time if we are able to install
