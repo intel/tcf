@@ -128,6 +128,7 @@ import hashlib
 import json
 import logging
 import os
+import platform
 import pprint
 import re
 import subprocess
@@ -315,6 +316,25 @@ class method_dnf_c(method_abc):
 
 
 
+class method_windows_c(method_abc):
+
+    # FIXME: Windows doesn't have packages like Linux, so we just skip
+    # to fall back to pip
+
+    description = "(does not) install packages with Windows" \
+        " (non existing) package manager"
+
+    def __init__(self):
+        method_abc.__init__(self, "windows", [ 'windows' ])
+
+    def install(self, package, package_alternate, package_data, method_details):
+        logging.error(
+            f"{package} [windows/{package_alternate}]: not installing"
+            f" as windows package because Windows can't")
+        return False
+
+
+
 class method_pip_c(method_abc):
 
     description = "Install packages with Python's PIP"
@@ -484,6 +504,9 @@ def _distro_version_get(distro, version):
                 val = val.strip('"')
                 data.setdefault(key, val)
                 logging.log(8, f"/etc/os-release: sets {key}={val}")
+    elif sys.platform == 'win32':
+        data['ID'] = "windows"
+        data['VERSION_ID'] = platform.release()
     else:
         raise RuntimeError(
             f"Can't figure out distro or version for"
@@ -697,8 +720,8 @@ def _reqs_grok(packages, req_method_details, filename, y):
             else:
                 raise RuntimeError(
                     f"BUG? specification {req_distro_spec} not understood"
-                    f"as a distribution ({','.join(methods_abc.distro_to_method.keys())})"
-                    f" or install method ({','.join(methods_abc.methods_by_name.keys())})")
+                    f" as a distribution ({','.join(method_abc.distro_to_method.keys())})"
+                    f" or install method ({','.join(method_abc.methods_by_name.keys())})")
 
             # We have an installation method name, either specified as
             # a top level or derived from a distro specification or
@@ -1087,6 +1110,7 @@ method_dnf_c()
 method_apt_c()
 method_pip_c()
 method_data_c()
+method_windows_c()
 
 for method in list(method_abc.generic_methods):
     if method in args.ignore_method:
@@ -1099,7 +1123,6 @@ if args.distro_method:
     distro_method = args.distro_method
 else:
     distro_method = method_abc.get_method_for_distro()
-
 
 try:
     logging.debug(f"running {args.func}")
