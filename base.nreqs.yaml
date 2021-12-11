@@ -6,22 +6,27 @@
 
 bzip2:
   reason: for de/compressing logfiles and others
-
+  skip_platform: win32
+  
 dosfstools:
+  skip_platform: win32
 
 filelock:
   reason: file-based multiprocess locking
   distro: python3-filelock
 
 git:
+  skip_platform: win32
 
 gvnc-tools:
+  skip_platform: win32
   ubuntu: gvncviewer
   debian: gvncviewer
   pip:
     skip: true
 
 make:
+  skip_platform: win32
 
 Jinja2: python3-jinja2
 
@@ -60,6 +65,7 @@ requests: python3-requests
 rpyc: python3-rpyc
 
 rsync:
+  skip_platform: win32
   reason: |
     Scripting uses it to efficiently provision SUTs
 
@@ -69,6 +75,7 @@ setuptools:
   distro: python3-setuptools
 
 time:
+  skip_platform: win32
   reason: |
     Some scripting commands prefix with time to measure
     execution time
@@ -79,5 +86,6 @@ termcolor:
   skip_platform: win32
 
 xz:
+  skip_platform: win32
   apt: xz-utils
   reason: for de/compressing logfiles and others
