@@ -584,9 +584,9 @@ def linux_sshd_restart(ic, target):
     # toast...bit it will distirb ithir thrids? we just restarted
     # sshd. They were disturbed
     last_e = None
+    target.tunnel.remove(22)
     for _count in range(4):
         try:
-            target.tunnel.remove(22)
             target.ssh.check_call("echo Checking SSH tunnel is up")
             break
         except tcfl.error_e as e:
