@@ -110,7 +110,8 @@ def load(config_path = None, config_files = None,
     global loaded_files
     logger.info("configuration path %s", path)
     commonl.config_import(path, re.compile("^conf[-_].*.py$"),
-                          imported_files = loaded_files)
+                          imported_files = loaded_files,
+                          raise_on_fail = False)
     for config_file in config_files:
         commonl.config_import_file(config_file, "__main__")
         loaded_files.append(config_file)
