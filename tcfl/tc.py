@@ -2469,6 +2469,7 @@ class target_c(reporter_c):
         Update the prefix we use for the logging/reports when some
         parameter changes.
         """
+        # FIXME: this needs to be revamped to consider as inputs only: tcname hash_salt target-group AXES
         # Some considerations:
         # - if the target group we are running the testcase on has a
         #   single target, then we don't add anything else, as the target
@@ -3703,7 +3704,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     # (internally: setting this forces the testcase to use the given
     # allocation ID)
 
-    def __init__(self, name, tc_file_path, origin):
+    def __init__(self, name, tc_file_path, origin, hashid = None):
         #
         # need this before calling reporter_c.__init__
         #
@@ -3866,7 +3867,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
         # Initialize prefixes and a few keywords we need -- we might
         # override these later if/when we assign a target group.
-        self.mkticket()
+        self.mkticket(hashid)
         self.tmpdir = os.path.join(tc_c.tmpdir, self.ticket)
         try:
             os.makedirs(self.tmpdir)
@@ -7138,9 +7139,11 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         )
         self._cleanup()
 
-    def mkticket(self):
+    def mkticket(self, hashid = None):
         # FIXME: rename to internal API, _mkid
         #        rename ticket to hashid
+        #        change to consider also tc axes
+        #          (test running on same TC group with different axes)
         #        remove passing of ticket to server? we don't really
         #        use it anymore
         #
@@ -7148,11 +7151,14 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         # it is a unique name based on target name and BSP model, test
         # case name (which might be more than just the tescase path if
         # a single file yields multiple test cases).
-        target_group_name = self.target_group.name \
-                            if self.target_group else 'n/a'
-        self.ticket = msgid_c.encode(
-            self._hash_salt + self.runid_visible + self.name + target_group_name,
-            self.hashid_len).decode('UTF-8')
+        if hashid == None:
+            target_group_name = self.target_group.name \
+                                if self.target_group else 'n/a'
+            self.ticket = msgid_c.encode(
+                self._hash_salt + self.runid_visible + self.name + target_group_name,
+                self.hashid_len).decode('UTF-8')
+        else:
+            self.ticket = hashid
         self._kw_set("tc_hash", self.ticket)
         if self.runid == None:
             self.runid_hashid = self.ticket

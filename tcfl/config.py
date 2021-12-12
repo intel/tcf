@@ -142,7 +142,8 @@ def load(config_path = None, config_files = None,
 
 def setup(*args,
           report_drivers = None, verbosity = 2, logfile_name = "run.log",
-          ident = "standalone",
+          name = "toplevel",
+          runid = None, hashid = "standalone", skip_reports = False,
           **kwargs):
     """
     Setup and Load the TCF Library configuration for standalone execution
@@ -165,11 +166,24 @@ def setup(*args,
     Other arguments as :func:`load`.
 
     """
-    # Do a partial initialzation of the testcase management system
+    assert runid == None or isinstance(runid, str)
+    assert hashid == None or isinstance(hashid, str)
+    assert isinstance(skip_reports, bool)
+
+    tcfl.tc.tc_c.runid = runid
+    if runid == None:
+        tcfl.tc.tc_c.runid_visible = ""
+    else:
+        tcfl.tc.tc_c.runid_visible = runid
+    # Do a partial initialzation of the testcase management system so
+    # the only testcase object declared, tcfl.tc.tc_global reflects
+    # all the info
     tcfl.tc.tc_c.tmpdir = "tmp"
-    tcfl.tc.tc_c.ticket = "TICKET"
-    # clean this one up, so that we have minimal hash printing
-    tcfl.tc.tc_global.runid_hashid = ""
+    # reinitialize this one up, so that we have minimal hash printing
+    tcfl.tc.tc_global = tcfl.tc.tc_c(name, "", commonl.origin_get(1),
+                                     hashid = hashid)
+    tcfl.tc.tc_global.skip_reports = skip_reports
+
     if not report_drivers:
         tcfl.tc.report_driver_c.add(
             tcfl.tc.report_jinja2.driver("."),
@@ -187,4 +201,3 @@ def setup(*args,
             tcfl.tc.report_driver_c.add(report_driver)
     load(*args, **kwargs)
     tcfl.msgid_c.tls.msgid_lifo.append(tcfl.msgid_c(""))
-    tcfl.msgid_c.tls.msgid_lifo[-1]._ident = ident
