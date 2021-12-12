@@ -2982,7 +2982,7 @@ class fsdb_symlink_c(fsdb_c):
         os.unlink(location)
 
     def _raw_rename(self, location_new, location):
-        os.rename(location_new, location)
+        os.replace(location_new, location)
 
     def keys(self, pattern = None):
         l = []
@@ -3171,4 +3171,4 @@ class fsdb_file_c(fsdb_symlink_c):
         os.unlink(location)
 
     def _raw_rename(self, location_new, location):
-        os.rename(location_new, location)
+        os.replace(location_new, location)
