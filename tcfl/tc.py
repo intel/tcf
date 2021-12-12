@@ -1965,6 +1965,12 @@ class target_c(reporter_c):
           sanitized version of the regular expression to match and
           will be in the return value's key.
 
+        :param int report: (optional; default all) number of bytes to
+          report of console output found before the match; this allows
+          to cut reports when the previous output was very large and
+          gets in the way. The output still will be captured in the
+          report files.
+
         :returns: dictionary with the match information:
 
           >>> target.send("hello")
