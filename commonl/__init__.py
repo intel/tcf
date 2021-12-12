@@ -51,6 +51,8 @@ import types
 
 import urllib.parse
 
+debug_traces = False
+
 if False:
     # disabling all this until we have a proper fix for the import
     # mess they keyring package has
@@ -106,7 +108,10 @@ def config_import_file(filename, namespace = "__main__",
         logging.debug("%s: configuration file imported", filename)
     except Exception as e:	# pylint: disable = W0703
         # throw a wide net to catch any errors in filename
-        logging.exception("%s: can't load config file: %s", filename, e)
+        if debug_traces:
+            logging.exception("%s: can't load config file: %s", filename, e)
+        else:
+            logging.error("%s: can't load config file: %s", filename, e)
         if raise_on_fail:
             raise
 
@@ -169,7 +174,8 @@ def config_import(path_list, file_regex, namespace = "__main__",
                     logging.log(6, "%s/%s: ignored", path, filename)
                     continue
                 config_file_path = os.path.join(path, filename)
-                config_import_file(config_file_path, namespace)
+                config_import_file(config_file_path, namespace,
+                                   raise_on_fail = raise_on_fail)
                 if imported_files != None:
                     imported_files.append(config_file_path)
         except Exception:	# pylint: disable = W0703
