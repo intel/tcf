@@ -1104,6 +1104,22 @@ EOF""")
           to be copied to the target's persistent area. If not specified,
           nothing is copied to the persistent area.
 
+          Be quite careful when naming directories; trailing slashes
+          make a difference, meaning *copy the contents*:
+
+          - rsync the contents of *srcdir* into the contents of *dstdir*
+
+             >>> rsync("srcdir/", "/some/dstdir/")
+             >>> rsync("srcdir/.", "/some/dstdir/.")
+
+          - rsync the *srcdir* as a subdir of *dstdir*
+
+            >>> rsync("srcdir", "/some/dstdir/")
+
+          See the `rsync <https://linux.die.net/man/1/rsync>`_ man page
+          for more info on this [search for *trailing* to get to the
+          gist of it].
+
         :param str dst: (optional) destination tree/file in the target
           machine; if specified, the file is copied from the persistent
           area to the final destination. If not specified,
