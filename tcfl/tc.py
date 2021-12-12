@@ -3975,7 +3975,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         #: remove later or not)
         self.collateral = set()
         self.tls = threading.local()
-        self.log = tc_logadapter_c(logging, None)
+        self.log = tc_logadapter_c(logger, None)
         # instance specific list of files/paths to wipe at the end
         self._cleanup_files = set()
 
