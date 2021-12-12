@@ -84,6 +84,17 @@ servers: {len(tcfl.ttb_client.rest_target_brokers)}""")
         print(f"server {rtb.aka}: {url} [{rtb.origin or 'n/a'}]")
         count += 1
 
+    # Get resolver information to know default search domains
+    try:
+        with open("/etc/resolv.conf") as f:
+            for line in f:
+                print(f"resolvconf: {line.strip()}")
+    except OSError as e:
+        print(f"resolvconf: skipping [{e}]")
+    # FIXME: windows way to do this?
+    # https://stackoverflow.com/questions/21318427/get-dns-search-suffix-in-python
+
+
 
 def _target_get(args):
     # pure target get w/o going through the cache
@@ -485,6 +496,11 @@ if __name__ == "__main__":
     tcfl.tc.target_ext_tunnel.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_users._cmdline_setup(arg_subparsers)
 
+    # extra stuff that is not adding to the API, just to the command
+    # line interface
+    import tcfl.target_ext_alloc_ui
+    tcfl.target_ext_alloc_ui._cmdline_setup(arg_subparsers)
+
     ap = arg_subparsers.add_parser("healthcheck",
                                    help = "Do a very basic health check")
     ap.set_defaults(level = logging.ERROR)
@@ -528,6 +544,13 @@ if __name__ == "__main__":
         req_log = logging.getLogger('requests.packages.urllib3')
         req_log.setLevel(logging.DEBUG)
         req_log.propagate = True
+
+    if args.traces or args.debug:
+        # I mean, this is ugly, but simple
+        commonl.debug_traces = True
+    else:
+        commonl.debug_traces = False
+
 
     if args.chdir:
         os.chdir(args.chdir)
