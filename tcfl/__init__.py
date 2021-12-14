@@ -1676,6 +1676,1247 @@ class server_c:
             del cls.servers[bad_url]
 
 
+    def _targets_get(self, target_id = None, projections = None):
+        commonl.assert_none_or_list_of_strings(projections, "projections",
+                                               "field name")
+        log_server.error(f"DEBUG {self.url}: projecting {projections}")
+
+        # load the raw description from the server and then do some
+        # minimal manipulation for the cache:
+        #
+        # - add fullid, server, server_aka
+        # - add TARGETNAME=True
+        # - return both nested and flat dictionary
+        #
+        # if a given target is given, load only that one
+        try:
+            server_rts = dict()
+            server_rts_flat = dict()
+
+            def _rt_handle(target_id, rt):
+                rt[target_id] = True
+                fullid = self.aka + "/" + target_id
+                rt[fullid] = True
+                rt['fullid'] = fullid
+                # these are needed to later one be able to go from an
+                # rt straight to the server
+                rt['server'] = self.url
+                rt['server_aka'] = self.aka
+                # DO NOT publish rt['rtb'], it is an internal object
+                server_rts[fullid] = rt
+                server_rts_flat[fullid] = dict(rt)
+                # Note the empty_dict!! it's important; we want to
+                # keep empty nested dictionaries, because even if
+                # empty, the presence of the key might be used by
+                # clients to tell things about the remote target
+                server_rts_flat[fullid].update(
+                    commonl.dict_to_flat(rt, empty_dict = True))
+
+            if projections:
+                data = { 'projections': json.dumps(projections) }
+            else:
+                data = None
+            # we do a short timeout here, so dead servers don't hold
+            # us too long
+            if target_id:
+                r = self.send_request("GET", "targets/" + target_id,
+                                      data = data, raw = True, timeout = 10)
+                # Keep the order -- even if json spec doesn't contemplate it, we
+                # use it so the client can tell (if they want) the order in which
+                # for example, power rail components are defined in interfaces.power
+                rt = json.loads(r.text, object_pairs_hook = collections.OrderedDict)
+                _rt_handle(target_id, rt)
+            else:
+                r = self.send_request("GET", "targets/",
+                                      data = data, raw = True, timeout = 10)
+                # Keep the order -- even if json spec doesn't contemplate it, we
+                # use it so the client can tell (if they want) the order in which
+                # for example, power rail components are defined in interfaces.power
+                r = json.loads(r.text, object_pairs_hook = collections.OrderedDict)
+                for target_id, rt in r.items():
+                    _rt_handle(target_id, rt)
+            return server_rts, server_rts_flat
+        except requests.exceptions.RequestException as e:
+            log_server.error("%s: can't use: %s", self.url, e)
+            return {}, {}
+
+
+    # this accesses the global tcfl.rts* variables without locks, to
+    # be executed sequential only
+    @staticmethod
+    def _cache_rt_handle(fullid, rt):
+        pos = bisect.bisect_left(rts_fullid_sorted, fullid)
+        if not rts_fullid_sorted or rts_fullid_sorted[-1] != fullid:
+            rts_fullid_sorted.insert(pos, fullid)
+        if rt.get('disabled', None):
+            rts_fullid_disabled.add(fullid)
+            rts_fullid_enabled.discard(fullid)
+        else:
+            rts_fullid_disabled.discard(fullid)
+            rts_fullid_enabled.add(fullid)
+
+
+    def target_update(self, target_id):
+        """
+        Update information about a target
+
+        Pulls a fresh inventory off the server for the given target,
+        updates the cached copy and returns the updated data
+
+        :param str target_id: ID of the target to operate on
+
+        :returns: updated target tags
+        """
+        server_rts, server_rts_flat = self._targets_get(target_id)
+        if not server_rts:
+            raise ValueError(f"{self.aka}/{target_id}: unknown target")
+        global rts
+        global rts_flat
+        # we might get back more targets, so ignore all of those that
+        # are not the one we asked for
+        rt = None
+        rt_flat = None
+        for fullid, rt in server_rts.items():
+            if rt['id'] != target_id:
+                logging.warning("%s: asked for RT %s, also got info for %s",
+                                self.url, target_id, rt['id'])
+                continue
+            # this might be a new target, so handle it in the cache
+            self._cache_rt_handle(fullid, rt)
+            rts[fullid] = rt
+        # rts_flat are the same info as rt, but in flat form
+        for fullid, rt_flat in server_rts_flat.items():
+            rts_flat[fullid] = rt_flat
+        return rt, rt_flat
+
+
+    @classmethod
+    def targets_load(cls, projections = None):
+        """
+        Reload the remote target cache for all the servers
+
+        :param list(str) projections: (optional; default all) list of
+          fields to load
+
+          Depending on the operation that is to be performed, not all
+          fields might be needed and depending on network conditions
+          and how many remote targets are available and how much data
+          is in their inventory, this can considerably speed up
+          operation.
+
+          For example, to only list the target names:
+
+          >>> tcfl.server_c.targets_reload(projections = [ 'id' ])
+
+          Only targets that have the field defined will be fetched
+          (PENDING: prefix field name with a period `.` will gather
+          all targets irrespective of that field being defined or
+          not).
+
+        """
+        log_server.info("caching target information")
+        global rts
+        global rts_flat
+        global rts_fullid_sorted
+        rts.clear()
+        rts_flat.clear()
+        rts_fullid_sorted.clear()
+        # load all the servers at the same time using a thread pool
+        if not cls.servers:
+            return
+        log_server.info("reading all targets")
+        with concurrent.futures.ThreadPoolExecutor(len(cls.servers)) as e:
+            rs = e.map(lambda server: server._targets_get(projections = projections),
+                       cls.servers.values())
+        for server_rts, server_rts_flat in rs:
+            # do this here to avoid multithreading issues; only one
+            # thread updating the sorted list
+            for fullid, rt in server_rts.items():
+                cls._cache_rt_handle(fullid, rt)
+            rts.update(server_rts)
+            rts_flat.update(server_rts_flat)
+        log_server.info("read all targets")
+
+
+
+
+class target_c:
+
+    #: Length of the hash used to identify groups or lists of targets
+    #:
+    #: Used to create a unique string that represents a dictionary of
+    #: role/targetname assignments and others for caching.
+    #:
+    #: The underlying implementation takes a sha512 hash of a string
+    #: that represents the data, base32 encodes it and takes the as
+    #: many characters as this length for the ID (for humans base32 it
+    #: is easier than base64 as it does not mix upperand lower
+    #: case).
+    #:
+    #: If there are a lot of target roles and/or targets, it might be
+    #: wise to increase it to avoid collisions...but how much is a lot
+    #: is not clear. 10 gives us a key space of 32^10 (1024 Peta)
+    hash_length = 10
+
+    #: How many times to retry to generate a group before giving up
+    #:
+    #: If the generation ess yields an empty group more than this
+    #: many times, stop trying and return.
+    spin_max = 3000
+    keys_from_inventory = collections.defaultdict(set)
+    target_inventory = None
+
+    def __init__(self, role, origin,
+                 axes = None,
+                 spec = None,
+                 spec_args = None,
+                 ic_spec = None,
+                 ic_spec_args = None,
+                 interconnect = False):
+        """FIXME
+
+        **Internal API for testcase/target pairing**
+
+        :param bool interconnect: (optional; default *False*) this
+          role will serve as an interconnect, binding other target
+          roles together. Other target roles might request being
+          connected to this one.
+
+        """
+        assert spec == None or isinstance(spec, str) or callable(spec)
+        assert spec_args == None or isinstance(spec_args, dict)
+        assert ic_spec == None or callable(ic_spec)
+        assert ic_spec_args == None or isinstance(ic_spec_args, dict)
+        assert isinstance(interconnect, bool), \
+            f"interconnect: expected boolean, got {type(interconnect)}"
+
+        self.role = role
+        # FIXME: pre-compile if text
+        self.spec = spec
+        self.spec_args = spec_args
+        self.ic_spec = ic_spec
+        self.ic_spec_args = ic_spec_args
+        # make a copy of the axes (because it'll be modified
+        # later). Note that any axes with value None will be expanded
+        # later by target_ext_run.executor_c from values in the
+        # inventory, thus we'll be demanding it is present in the
+        # inventory
+        # See also the note in tc_c._axes_all.
+        self.axes = collections.OrderedDict(axes)
+        #FIXME: this is expanded by executor_c.axes_expand() once we
+        #have read the inventory of targets
+        self.axes_from_inventory = set()
+        self.interconnect = interconnect
+        self.origin = origin
+
+        # these are not defined until _bind() is called
+        self.rtb_aka = None	# filled by _bind
+        self.rtb = None		# FIXME: this is resolved later
+        self.fullid = None	# filled by _bind()
+        self.id = None		# filled by _bind()
+        self.rt = None		# filled by _bind()
+        self.allocid = None	# filled by _bind()
+
+    def __repr__(self):
+        #return f"role:{self.role} spec:'{self.spec}' axes:{self.axes}"
+        return self.role
+
+    @staticmethod
+    def get_rt_by_id(targetid):
+        """
+        Returns the (cached) dictionary of inventory data received from the
+        server for a given target
+
+        :param str target_id: name of the target; this can be
+          shortname (*TARGETNAME*) or full id (*SERVER/FULLID*)
+
+        :returns dict: inventory data for target
+
+        :raises KeyError: if target name not found
+        """
+        global rts
+        if '/' in targetid:		# targetid is a fullid (SERVER/TARGET)
+            return rts[targetid]
+        for rt_fullid, rt in rts.items():
+            if rt['id'] == targetid:
+                return rt
+        raise KeyError(f"unknown target {targetid}")
+
+    @classmethod
+    def _inventory_update(cls):
+        # Collects a list of all the keys available in the target's
+        # inventory and all their values, which we'll use when we need
+        # to use them as axes to spin their values.
+        #
+        #
+        # FIXME: this needs to be a hook in target_update(),
+        # targets_load() so it is always kept updated.
+        cls.keys_from_inventory.clear()
+        for fullid in rts_fullid_sorted:
+            # FIXME: this belongs somehwere else? might not be needed
+            # once we finalize axes_from_inventory
+            for key, value in rts_flat[fullid].items():
+                try:
+                    # FIXME: filter out _alloc.id, _alloc.queue.*
+                    #   bsps.x86_64.lcpu-N? .cpu-N?
+                    #   instrumentation.*.*?
+                    #   interconnects.XYZ. mhmmm
+                    #   *.instrument
+                    #   path
+                    if isinstance(value, dict):
+                        cls.keys_from_inventory[key].add(True)
+                    elif isinstance(value, list):
+                        cls.keys_from_inventory[key].update(value)
+                    else:
+                        cls.keys_from_inventory[key].add(value)
+                except Exception as e:
+                    print("ERRR key %s value %s %s" % (key, value, e))
+
+        #log_role.debug(
+        #    "keys from inventory: %s",
+        #    json.dumps(list(cls.keys_from_inventory.keys()), skipkeys = True, indent = 4))
+
+    def _bind(self, rtb_aka, target_id, target_fullid, allocid):
+        self.rtb_aka = rtb_aka
+        self.id = target_id
+        self.fullid = target_fullid
+        self.allocid = allocid
+
+
+class tc_c:
+
+    """FIXME:
+
+    A more detailed description of how tescases are paired for
+    execution with targets or group of targets is explained :ref:`here
+    <testcase_pairing>`.
+
+
+    FIXME: these parameters need to be moved to cls, along with axes
+    and that they can be set with a decorator and a method, since we
+    can't do constructor
+
+    :param int target_group_permutations_max: an interger greater than
+      zero that capping how many target group permutations to produce
+      per axes permutation.
+
+    :param bool target_group_randomize: (optional) override the
+      randomization deduced from *target_group_permutations_max*.
+
+    :param int replication_factor: (default: 1) how many different
+      target group permutations to execute. For example, 3 would mean
+      that the same testcase would be run three times, once in a
+      different target group.
+
+    """
+    def __init__(
+            self,
+            # FIXME: this needs to be controlled from somewhere
+            # else? not feasible here -- maybe max can be computed
+            # dynamically, but not really a good idea....
+            target_group_permutations_max = -100,
+            replication_factor = 1,
+    ):
+        assert isinstance(target_group_permutations_max, int), \
+            "target_group_permutations_max: expected integer (-N random N targets," \
+            " 0: all targets randomly, N targets alphabetically)"
+        assert replication_factor >= 1 and isinstance(replication_factor, int), \
+            "replication_factor: expected > 0 integer"
+
+        # we need an OrderedDict so we have move_to_end(), which we
+        # need in role_add(). Also, the order is
+        # important--we'll use it throughout.
+
+        # see _axes_all_update(); these are all the axes (from the
+        # testcase and the testcase roles) and they are always sorted
+        # the same so we can reproduce the pseudo-random sequences.
+        # FIXME: move all .axes to ._axes
+        self._axes_all = collections.OrderedDict()
+        self._axes_all_mr = None
+        # The initialization of the multiple-radix number representing
+        # the axes is done by called by executor_c.axes_expand(), who
+        # will call self._axes_all_update() once the axes expansion is
+        # done.
+
+        # These two are set by the pairing/execution engines
+
+        #: FIXME: only assigned once an Axes Permutation has been
+        #: assigned
+        #: dict
+        self.axes_permutation = None	# FIXME: dict
+        #: FIXME: only assigned once an Axes Permutation ID has been assigned
+        #: integer
+        self.axes_permutation_id = None	# FIXME: integer
+
+        self.id = "TESTID"
+
+        # Data used by the allocation phase; see
+        # __init__allocation__()
+        #
+        ## { GROUPNAME: { ( rtb.aka, allocid ) } }
+        #
+        # to make sure they # are fast and easy to pickle around
+        # betwween threads.
+        self._allocations_pending = None
+        #
+        # Allocations active: dict keyed by groupname, value is a set
+        # of tuples RTB.AKA and allocid in that server
+        #
+        ## { GROUPNAME: { ( rtb.aka, allocid ) } }
+        self._allocations_complete = None
+
+
+    def __init__allocation__(self):
+        # Used by target_ext_run.executor_c._alloc_create()
+        #
+        # Initializes the allocation state; it is not needed in any
+        # other phase, so we create it then and wipe it later to avoid
+        # having to pickle it around.
+        #
+        # these are both keyed by target-group-name and contain a set
+        # of the allocations *( RTB_AKA:str, ALLOCID:str )* that are
+        # trying to get that target group allocated
+        self._allocations_pending = collections.defaultdict(set)
+        self._allocations_complete = collections.defaultdict(set)
+        # keep track of how many copies of the testcase we have
+        # scheduled on target groups (up until
+        # testcase.target_group_permutations).
+        self._target_groups_launched = 0
+
+    def __init__shallow__(self, other):
+        pass
+
+
+    def _clone(self):
+        c = copy.deepcopy(self)
+        # since this might be defined at the class level, copy()
+        # doesn't seem to always pick it up.
+        c.target_roles = copy.deepcopy(self.target_roles)
+        c.__init__shallow__(self)
+        return c
+
+
+    def log(self, *args, **kwargs):
+        # LAME
+        print(self.id, *args, **kwargs)
+
+    _axes = collections.OrderedDict()
+    axes_origin = []
+
+    #: Dictionary of target roles
+    #:
+    #: Keyed by a string, the role name
+    #:
+    #: The values are :class:`target_c`, which describe the
+    #: target roles and during testcase execution, also provice
+    #: access to the actual :class:`target_c` object to manipulate
+    #: the target via :data:`target_c.target`.
+    target_roles = collections.OrderedDict()
+    # needs to be here so the decorator can set it
+
+    #
+    # See Execution Modes above
+    #
+    _axes_permutations = 0
+    _axes_randomizer_original = "random"
+    _axes_randomizer = random.Random()
+    _target_group_permutations = 1
+    _target_group_randomizer_original = "random"
+    _target_group_randomizer = random.Random()
+    # FIXME: add manipulators
+    _target_groups_overallocation_factor = 10
+
+
+    @property
+    def axes_permutations(self):
+        """
+        How many axes permutations are to be considered
+
+        See :ref:`execution modes <execution_modes>` for more information.
+
+        :getter: return the number of axes permutations
+        :setter: sets the number of axes permutations
+        :type: int
+        """
+        return self._axes_permutations
+
+    @axes_permutations.setter
+    def axes_permutations(self, n):
+        assert isinstance(n, int) and n >= 0, \
+            f"axes_permutations: expected >= integer, got {type(n)}"
+        self._axes_permutations = n
+        return self._axes_permutations
+
+
+    @property
+    def axes_randomizer(self):
+        """
+        Randomizer object for the targes group permutation iterator
+
+        See :ref:`execution modes <execution_modes>` for more information.
+
+        :getter: return the current randomizer
+          (:class:`random.Random` or *None* for sequential execution).
+
+        :setter: sets the randomizer:
+
+          - *None* or (str) *sequential* for sequential execution
+
+          - *random* (str) constructs a default random device
+            :class:`random.Random`.
+
+          - *SEED* (str) any random string which will used as seed to
+            construct a :class:`random.Random` object
+
+          - a :class:`random.Random` instance
+
+        :type: :class:`random.Random`
+        """
+        return self._axes_randomizer
+
+
+    @staticmethod
+    def _randomizer_make(r, what):
+        if isinstance(r, str):
+            if r == 'sequential':
+                return None
+            elif r == 'random':
+                return random.Random()
+            else:
+                return random.Random(r)
+        if isinstance(r, random.Random):
+            return r
+        raise AssertionError(
+            f"{what}: expecting a string"
+            f" ('sequential', 'random' or anything else to use"
+            f" as a SEED) or a random.Random instance; got {type(r)}")
+
+
+    @axes_randomizer.setter
+    def axes_randomizer(self, r):
+        self._axes_randomizer = self._randomizer_make(r, "axes_randomizer")
+        self._axes_randomizer_original = r
+        return self._axes_randomizer
+
+
+    @property
+    def target_group_permutations(self):
+        """
+        How many target group permutations on each axes permutations
+        are to be considered
+
+        See :ref:`execution modes <execution_modes>` for more information.
+
+        :getter: return the number of target group permutations
+        :setter: sets the number of target group permutations (n >= 0)
+        :type: int
+        """
+        return self._target_group_permutations
+
+    @target_group_permutations.setter
+    def target_group_permutations(self, n):
+        assert isinstance(n, int) and n >= 0, \
+            f"target_group_permutations: expected >= integer, got {type(n)}"
+        self._target_group_permutations = n
+        return self._target_group_permutations
+
+
+    @property
+    def target_group_randomizer(self):
+        """
+        Randomizer object for the targes group permutation iterator
+
+        See :ref:`execution modes <execution_modes>` for more information.
+
+        :getter: return the current randomizer
+          (:class:`random.Random` or *None* for sequential execution).
+
+        :setter: sets the randomizer:
+
+          - *None* or (str) *sequential* for sequential execution
+
+          - *random* (str) constructs a default random device
+            :class:`random.Random`.
+
+          - *SEED* (str) any random string which will used as seed to
+            construct a :class:`random.Random` object
+
+          - a :class:`random.Random` instance
+
+        :type: :class:`random.Random`
+        """
+        return self._target_group_permutations
+
+    @target_group_randomizer.setter
+    def target_group_randomizer(self, r):
+        self._target_group_randomizer = self._randomizer_make(r, "target_group_randomizer")
+        self._target_group_randomizer_original = r
+
+
+    @staticmethod
+    def _legacy_mode_set(where, mode):
+        assert isinstance(where, tc_c) or issubclass(where, tc_c)
+        # See Execution modes in the documentation on top of this file
+        if mode == "one-per-type":
+            where._axes_permutations = 0
+            where._target_group_permutations = 1
+        elif mode == "all":
+            where._axes_permutations = 0
+            print("WARNING: woah, trying to run everywhere"
+                  "--you might not be able to chew it all")
+            where._target_group_permutations = 0
+        elif mode == "any":
+            where._axes_permutations = 1
+            where._target_group_permutations = 1
+
+
+    def _axes_all_update(self):
+        #
+        # This will be called by executor_c.axes_expand() before doing
+        # the pairing run or iterating the axes.
+        #
+        # update the unified list of axes [testcase + target roles's]
+        #
+        # Note we always have keep this as an ordered dictionary and
+        # we sort the keys alphabetically and also the values.
+        #
+        # This is **important** because when we need to reproduce the
+        # permutations by issuing the same random seed, they need to
+        # start always from the same order.
+        #
+        # So ensure the order is always the same: sort everything,
+        # don't use sets :/ because we don't have the OrderedSet in
+        # the std. Anywhoo, these are short lists, so not a biggie
+        self._axes_all.clear()
+        if self._axes:
+            for k, v in sorted(self._axes.items(), key = lambda k: k[0]):
+                self._axes_all[k] = sorted(list(v))
+        for role_name, role in sorted(self.target_roles.items(), key = lambda k: k[0]):
+            if role.axes:
+                for axis_name, axis_data in role.axes.items():
+                    self._axes_all[( role, axis_name )] = sorted(list(axis_data))
+        self._axes_all_mr = mrn.mrn_c(*self._axes_all.values())
+
+
+    def axes_names(self):
+        """
+        Return the names of all the axes known for the testcase
+
+        **Internal API for testcase/target pairing**
+
+        :return list(str): list of axes for the testcase and each
+          target roles.
+        """
+        return list(self._axes_all.keys())
+
+    _axes_permutation_filter = None
+
+    @property
+    def axes_permutation_filter(self):
+        """
+        A callable to filter a particular axes permutation
+
+        A testcase can override this method (when subclassing or just
+        setting on an instance) to filter out invalid axis values.
+
+        >>> @tcfl.tc.axes(axisA = [ 'valA0', 'valA1', 'valA2' ],
+        >>>               axisB = [ 'valB0', 'valB1' ])
+        >>> class _test(tcfl.tc.tc_c):
+        >>>    pass
+        >>>
+        >>> def my_filter(axes_permutation):
+        >>>     if axes_permutation[0] == 'valA0':
+        >>>         return False
+        >>>
+        >>> testcase.axes_permutation_filter = my_filter
+
+        To have the permutation system ignore a particular
+        permutation, return a *False* value.
+
+        There are multiple ways this can be specified:
+
+        - create a method in your test class called
+          *axes_permutation_filter* that takes as arguments the group
+          id and the axes permutation (FIXME: implement classmethod)
+
+          >>> class _test(tcfl.tc.tc_c):
+          >>>
+          >>>     @staticmethod
+          >>>     def axes_permutation_filter(i, axes_permutation):
+          >>>         if axes_permutation[0] == 'valA0':
+          >>>             return False
+
+
+        - create a static method in your test class called
+          *SOMETHING* that takes as arguments the group
+          id and the axes permutation and then set it (FIXME: implement classmethod)
+
+          >>> class _test(tcfl.tc.tc_c):
+          >>>
+          >>>     @staticmethod
+          >>>     def SOMETHING(i, axes_permutation):
+          >>>         if axes_permutation[0] == 'valA0':
+          >>>             return False
+
+        - create a function to do the filtering
+
+        Setting mechanisms (needed except when creating the method
+        called *axes_permutation_filter*):
+
+        - :func:`tcfl.tc.execution_mode` decorator, argument *axes_permutation_filter*
+
+        - for an existing instance, direct assignment:
+
+          >>> testcase.axes_permutation_filter = MYFUNC
+
+        """
+        return self._axes_permutation_filter
+
+    @axes_permutation_filter.setter
+    def axes_permutation_filter(self, f):
+        assert callable(f)
+        self._axes_permutation_filter = f
+        return self._axes_permutation_filter
+
+
+    # Target group iteration
+    # ----------------------
+
+    #: A callable to filter a target group permutation
+    #:
+    #: A testcase can override this method (when subclassing or just
+    #: setting on an instance) to filter out invalid axis values.
+    #:
+    #: >>> def my_filter(groupid, groupid_ic, target_group):
+    #: >>>     if target_group['target'] == 'SOMETARGET':
+    #: >>>         return False
+    #: >>>
+    #: >>> testcase.target_group_filter = my_filter
+    #:
+    #: To have the permutation system ignore a particular
+    #: target group, return a *False* value.
+    #:
+    #: .. warning:: target group filtering can be VERY *computational*
+    #:              intensive if you have a lot of checks, it might
+    #:              make discovery very slow. It is more efficient to
+    #:              filter individual targets using *spec*, *ic_spec*
+    #:              and *axes* spinning.
+    target_group_filter = None
+
+
+    @staticmethod
+    def _axes_verify(axes):
+        if axes == None:
+            return
+        commonl.assert_dict_key_strings(axes, "axes")
+        for axis, values in axes.items():
+            if values != None:
+                commonl.assert_list_of_types(values, f"{axis} values", "value",
+                                             ( type(None), int, str, bool, float, bytes, dict ))
+            else:
+                # we'll fill this a list of the values in the
+                # inventory for this field
+                pass
+
+    def axes_update(self, origin = None, **kwargs):
+        """
+        Add axes to a testcase instance
+
+        See :func:`tcfl.tc.axes` for further information.
+        """
+        self._axes_verify(kwargs)
+        if origin == None:
+            origin = commonl.origin_get(2)
+        self._axes.update(kwargs)
+        self.axes_origin.append(origin)
+        self._axes_all_update()
+
+
+    @staticmethod
+    def _role_add_args_verify(role_name,
+                              axes, axes_extra,
+                              spec, spec_args,
+                              ic_spec, ic_spec_args,
+                              origin, interconnect, count):
+        assert isinstance(role_name, str) and role_name.isidentifier(), \
+            f"role_name: expected string naming target role" \
+            f" (has to be a valid Python identifier); got {type(spec)}"
+        assert spec == None or isinstance(spec, str) or callable(spec), \
+            f"spec: expected None, a string describing a filtering spec" \
+            f" or a filtering function; got {type(spec)}"
+        if spec_args:
+            commonl.assert_dict_key_strings(spec_args, "spec_args")
+        assert ic_spec == None or isinstance(ic_spec, str) or callable(ic_spec), \
+            f"ic_spec: expected None, a string describing a filtering spec" \
+            f" or a filtering function; got {type(ic_spec)}"
+        if ic_spec_args:
+            commonl.assert_dict_key_strings(ic_spec_args, "ic_spec_args")
+        if origin != None:
+            assert isinstance(origin, str), \
+                f"origin: expected None or a string describing origin" \
+                f" (note *origin* cannot be used as an axis name);" \
+                f" got {type(origin)}"
+        tc_c._axes_verify(axes)
+        tc_c._axes_verify(axes_extra)
+        assert isinstance(interconnect, bool), \
+            f"interconnect: expected bool; got {type(interconnect)}"
+        assert isinstance(count, int) and count >= 1, \
+            f"count: expected > 1 integert; got {type(count)}"
+
+
+    def role_add(self, role_name = "target",
+                 axes = None, axes_extra = None,
+                 spec = None, spec_args = None,
+                 ic_spec = None, ic_spec_args = None,
+                 origin = None, interconnect = False, count = 1):
+        """Add a :term:`target role` to an instance of a test case
+
+        :param str role_name: (optional; default *target*) name for the
+          role; this shall be a simple string and a valid python
+          identifier.
+
+          Examples: *client*, *server*, *target*
+
+        :param dict axes: (optional) dictionary keyed by string of the
+          axes on which to spin the target role (see :ref:`testcase
+          pairing testcase_pairing`).
+
+          >>> dict(
+          >>>     AXISNAME = [ VALUE0, VALUE 1... ],
+          >>>     AXISNAME = None,
+          >>> ...)
+
+          The key name is the axis name, which as to be a valid Python
+          identifier and the values are *None* (to get all the values
+          from the inventory) or a list of values valid axis values
+          (which an be *bool*, *int*, *float* or *str*).
+
+          Note that when getting the values from the inventory, only
+          values that apply to a target that matches the *spec* will
+          be considered [*ic_spec* is ignored for this].
+
+          See :func:`tcfl.tc.axes` for more descriptions on axis.
+
+          By default, this is set to only spin on the *type* axis; to
+          add to this default, set instead the *axes_extra*
+          parameter. To override the default, set this parameter.
+
+        :param dict axes_extra: (optional) same as *axes*, but to add
+          to it instead of overriding.
+
+        :param str,callable spec: (optional) target specification
+          filter--used to filter which targets are acceptable for this
+          role.
+
+          This can be a string describing a logical expression or a
+          function that does the filtering; the function *MUST* be
+          not depend on global data other than the target inventory
+          and be estable over calls, since its results will be cached.
+
+          See :ref:'target filtering <target_filtering>` for more
+          information
+
+        :param dict spec_args: (optional) dictionary of arguments to
+          the *spec* call (if used)
+
+        :param str,callable ic_spec: (optional) target specification
+          filter for interconnectivity--used to filter which targets
+          meet the connectivity needs of the testcase (eg: is target *A*
+          is connected to networks *E* and *F*?).
+
+          This is separate from the *spec* filter above for
+          performance reasons. To calculate connectivity maps the
+          permutations are heavily reduced if we have been able to
+          first reduce and cache the valid targets and then cache by
+          connectivity.
+
+          For example, to request a target that is connected to
+          another two targets (declared as interconnects)
+
+          >>> ic_spec = pairer._spec_filter_target_in_interconnect,
+          >>> ic_spec_args = { 'interconnects': [ 'ctl', 'nut' ] }
+
+          See :ref:'target filtering and interconnectivity
+          <target_filtering_ic>` for more information
+
+        :param dict ic_spec_args: (optional) dictionary of arguments to
+          the *ic_spec* call (if used)
+
+        :param str origin: (optional) where is this being registered;
+          defaults to the caller of this function.
+
+        :param bool interconnects: if *True* consider, consider this
+          role as an interconnect, a target that interconnects other
+          targets (eg: a network).
+
+        :param int count: (optional, default 1) positive number that
+          indicates how many roles to create--this is used to easily
+          add targets that will be called the same, with the same
+          *spec*, adding an index to their name (eg: target, target1,
+          target2...targetN)
+
+        """
+        if axes == None:
+            axes = { "type": None }
+        self._role_add_args_verify(role_name, axes, axes_extra,
+                                   spec, spec_args, ic_spec, ic_spec_args,
+                                   origin, interconnect, count)
+
+        _axes = collections.OrderedDict(axes)
+        if axes_extra:	# FIXME: just ove this to target_c
+            assert isinstance(axes_extra, dict)
+            # FIXME: verify
+            _axes.update(axes_extra)
+
+        for index in range(count):
+            _role_name = role_name if index == 0 else role_name + f"{index}"
+            self.target_roles[_role_name] = target_c(
+                _role_name, origin, _axes,
+                spec, spec_args, ic_spec, ic_spec_args,
+                interconnect)
+
+    #
+    # Execution
+    #
+    # FIXME: move to executor_c
+    #
+    # - we end up passing the testcase around; not sure I fully like
+    #   it, since it means it has to be pickable -- oh well?
+    #
+    #   generators are not pickable
+    #
+    # - break execution in static and tg
+    #
+    # - basically piece stuff in a queue; mp pool picks things to do
+    #   from the queue
+    #
+    allocation_groups = 10
+
+    def _report_results(self, r):
+        self.log(f"NOTIMPLEMENTED: report_results {r}")
+
+    def _run_static(self):
+        # FIXME: move to executor_c
+        # _run_for_axes_permutation has set
+        #
+        # self.{axes_permutation}{,_id}, target_group_permutation
+
+        # FIXME configure, build
+        self.report_info(f"running configure/build")
+        if not self.target_roles:
+            self.report_info(f"running cleanup")
+            self._report_results("FIXME")
+
+    def _run_tg(self):
+        # scheduled by the allocator when the target group is allocated
+        self.log(f"DEBUG: running eval")
+        self.log(f"DEBUG: running cleanup")
+        self._report_results("FIXME")
+
+
+    # temporary hack
+    ts0 = None
+    level_max = int(os.environ.get("VERBOSITY", 3))
+
+    def report_info(self, *args, **kwargs):
+        global tls
+        if tls.pid == None:
+            # FIXME: not sure this is working at multiprocess level
+            tls.pid = os.getpid()
+        ts = time.time()
+        if self.ts0 == None:
+            self.ts0 = ts
+        level = kwargs.get("level", 0)
+        if level < self.level_max:
+            print(f"I{level} {self.id}: [+{ts - self.ts0:0.1f}/{os.getpid()}]",
+                  *args, file = sys.stderr)
+
+#
+# tc_c decorators
+# ---------------
+
+def axes(origin = None, **kwargs):
+    """
+    Add axes to a testcase class
+
+    This is used as a decorator to a testcase class to add axes that
+    need to be considered during execution.
+
+    >>> @tcfl.tc.axes(axisA = [ 'valA0', 'valA1', 'valA2' ],
+    >>>               axisB = [ 'valB0', 'valB1' ])
+    >>> class _test(tcfl.tc.tc_c):
+    >>      pass
+
+    To add axes to an instance of a testcase, use
+    :meth:`tcfl.tc.tc_c.axes_update()`
+
+    :param str origin: (optional; defaults to current file and line
+      number) record a file origin from where axes were added.
+
+    :param axes: the rest of the parameters are in the form *AXISNAME
+      = LIST(VALUES)*, where *AXISNAME* will be the axis name and has to
+      be a valid Python identifier. *LIST(VALUES)* is a list of valid
+      axis values (which an be *bool*, *int*, *float* or *str*).
+
+      A common construct to get axis valus from the environment is:
+
+      >>> @tcfl.tc.axes(axisA = [ 'valA0', 'valA1', 'valA2' ],
+      >>>               axisB = os.environ.get(AXISB_VALUES, "valB0 valB1").split())
+      >>> class _test(tcfl.tc.tc_c):
+      >>>     pass
+
+
+    """
+    assert origin == None or isinstance(origin, str), \
+        "origin: expected None or a string describing origin" \
+        " (note *origin* cannot be used as an axis name)"
+    tc_c._axes_verify(kwargs)
+    if origin == None:
+        origin = commonl.origin_get(2)
+
+    def decorate_class(cls):
+        assert isinstance(cls, type)
+        assert issubclass(cls, tc_c)
+        cls._axes.update(kwargs)
+        cls.axes_origin.append(origin)
+        return cls
+
+    return decorate_class
+
+
+def role_add(name = "target",
+             axes = None, axes_extra = None,
+             spec = None, spec_args = None,
+             ic_spec = None, ic_spec_args = None,
+             origin = None, interconnect = False, count = 1,
+             # legacy
+             mode = None):
+    """
+    Add a generic target role (target or interconnect) to a testcase class
+
+    For more clarity, you might want to use :func:`tcfl.tc.target` or
+    :func:`tcfl.tc.interconnect` instead.
+
+    See :tcfl.tc.tc_c.role_add() for parameter information
+    :param axes: the rest of the parameters are in
+
+    A common construct would be:
+
+    >>> @tcfl.tc.role_add(
+    >>>     name = "target",
+    >>>     axisA = [ 'valA0', 'valA1', 'valA2' ],
+    >>>     axisB = os.environ.get(AXISB_VALUES, "valB0 valB1").split())
+    >>> class _test(tcfl.tc.tc_c):
+    >>>     ...
+    """
+    if axes == None:
+        axes = { "type": None }
+    tc_c._role_add_args_verify(name, axes, axes_extra,
+                               spec, spec_args, ic_spec, ic_spec_args,
+                               origin, interconnect, count)
+
+    _axes = collections.OrderedDict(axes)
+    if axes_extra:	# FIXME: just ove this to target_c
+        assert isinstance(axes_extra, dict)
+        # FIXME: verify
+        _axes.update(axes_extra)
+
+    def decorate_class(cls):
+        assert isinstance(cls, type)
+        assert issubclass(cls, tc_c)
+
+        # Ugly way of doing it; we want to build upon the base class's
+        # dictionary -- but not modify them; so when we add, we COPY the
+        # base's dictionary and modify it to this.
+        super_cls = super(cls, cls)
+        if id(super_cls.target_roles) == id(cls.target_roles):
+            cls.target_roles = collections.OrderedDict(super_cls.target_roles)
+
+        for index in range(count):
+            _role_name = name if index == 0 else name + f"{index}"
+            cls.target_roles[_role_name] = target_c(
+                _role_name, origin, _axes,
+                spec, spec_args, ic_spec, ic_spec_args,
+                interconnect = interconnect)
+
+        if mode != None:
+            tc_c._legacy_mode_set(cls, mode)
+
+        return cls
+
+    return decorate_class
+
+
+def target(spec = None, name = "target", count = 1, **kwargs):
+    """
+    Add a target role to a testcase class
+
+    See :tcfl.tc.tc_c.role_add() for parameter information.
+
+    A common construct would be:
+
+    >>> @tcfl.tc.target(
+    >>>     name = "target",
+    >>>     axisA = [ 'valA0', 'valA1', 'valA2' ],
+    >>>     axisB = os.environ.get(AXISB_VALUES, "valB0 valB1").split())
+    >>> class _test(tcfl.tc.tc_c):
+    >>>     ...
+    """
+    try:
+        del kwargs['interconnect']
+    except KeyError:
+        pass
+    return role_add(spec = spec, name = name, count = count, interconnect = False,
+                    **kwargs)
+
+
+def interconnect(*args, **kwargs):
+    """
+    Add an interconnect role to a testcase class
+
+    See :tcfl.tc.tc_c.role_add() for parameter information.
+
+    A common construct to get axis valus from the environment is:
+
+    >>> @tcfl.tc.interconnect(name = "ic", spec = "ipv4_address")
+    >>> @tcfl.target(name = "target",
+    >>>              ic_spec = pairer._spec_filter_target_in_interconnect,
+    >>>              ic_spec_args = { 'interconnects': [ 'ic' ] })
+    >>> class _test(tcfl.tc.tc_c):
+    >>>     ...
+    """
+    try:
+        del kwargs['interconnect']
+    except KeyError:
+        pass
+    if len(args) < 1:
+        kwargs.setdefault('name', "ic")
+    # default for interconnects, if you override, assume you know
+    # what you are doing i ¯\_(ツ)_/¯
+    kwargs.setdefault('axes', { 'interfaces.interconnect_c':  [ {} ] })
+    return role_add(*args, interconnect = True, **kwargs)
+
+
+def execution_mode(
+        axes_permutations = None, axes_randomizer = None,
+        axes_permutation_filter = None,
+        target_group_permutations = None, target_group_randomizer = None):
+    """
+    Decorator to change the execution mode of a testcase
+
+    >>> @tcfl.tc.execution_mode(ARGUMENTS)
+    >>> class _test(tcfl.tc.tc_c):
+    >>>     ...
+
+    See the documentation in:
+
+    - :attr:tc_c.axes_permutations
+    - :attr:tc_c.axes_randomizer
+    - :attr:tc_c.axes_permutation_filter
+    - :attr:tc_c.target_group_permutations
+    - :attr:tc_c.target_group_randomizer
+
+    for valid values. All arguments are optional
+    """
+    def decorate_class(cls):
+        assert isinstance(cls, type)
+        assert issubclass(cls, tc_c)
+
+        # it's kinda hard to make setters for class variables, so just
+        # do it straight
+        if axes_permutations != None:
+            assert isinstance(axes_permutations, int) \
+                and axes_permutations >= 0, \
+                f"axes_permutations: expected >= integer," \
+                f" got {type(axes_permutations)}"
+            cls._axes_permutations = axes_permutations
+        if axes_randomizer != None:
+            cls._axes_randomizer = cls._randomizer_make(
+                axes_randomizer, "axes_randomizer")
+        if axes_permutation_filter != None:
+            assert callable(axes_permutation_filter), \
+                f"axes_permutation_filter: expected a callable function;" \
+                f" got {type(axes_permutation_filter)}"
+            cls._axes_permutation_filter = axes_permutation_filter
+        if target_group_permutations != None:
+            assert isinstance(target_group_permutations, int) \
+                and target_group_permutations >= 0, \
+                f"target_group_permutations: expected >= integer," \
+                f" got {type(target_group_permutations)}"
+            cls._target_group_permutations = target_group_permutations
+        if target_group_randomizer != None:
+            cls._target_group_randomizer = cls._randomizer_make(
+                target_group_randomizer, "target_group_randomizer")
+        return cls
+
+    return decorate_class
+
+
+
+def _spec_filter_target_in_interconnect(target_roles, target_group,
+                                        target_role, extra_args, target_rt):
+    # inventory is now in target_roles.target_inventory
+    # FIXME: not clear how we can do this here--this wants to check if
+    # target_rt is in an interconnect
+
+    ic_role_names = extra_args.get('interconnects', None)
+    if ic_role_names == None:
+        raise ValueError(
+            f'filter configuration error: target role {target_role.role} '
+            'needs to specify argument "ic_spec_args" as a dictionary '
+            'containing a "interconnects" entry with the name (or '
+            'list of names) of the '
+            'interconnect/s the target has to be connected to')
+
+    if isinstance(ic_role_names, str):
+        ic_role_names = [ ic_role_names ]
+    else:
+        commonl.assert_list_of_strings(ic_role_names,
+                                       "ic_role_names", "role name")
+    for ic_role_name in ic_role_names:
+        # the target group creation process first resolves the
+        # interconnects, so by the time we get to the targets, the
+        # interconnect name has been assigned already. This means that
+        # interconnect depedencies can't be circular.
+        ic_fullid = target_group.get(ic_role_name, None)
+        if ic_fullid == None:
+            raise RuntimeError(
+                f'target role {target_role.role} interconnectivity spec error: '
+                f'it is demanding being connected to interconnect {ic_role_name} '
+                f'but it is not yet known/resolved'
+                #FIXME needs better explanation
+                )
+
+
+        # Because interconnects span servers, we refer to them with
+        # their ID (vs their *fullid* which includes the server name);
+        # so in the interconnect info they are referred to as *id* only.
+        #
+        # thus convert fullid -> id
+        ic_server, ic_id = ic_fullid.split("/", 1)
+
+        # List the target's interconnects  and let's see if one of
+        # them is the interconnect ic_id
+        target_interconnects = target_rt.get('interconnects', {})
+        if ic_id not in target_interconnects:
+            return False, f"target is not in interconnect {ic_fullid}"
+
+    return True, None
+
+        
+def shutdown():
+    """
+    Shutdown API, saving state in *path*.
+
+    :param path: Path to where to save state information
+    :type path: str
+    """
+    if not server_c.servers:
+        return
+    with concurrent.futures.ThreadPoolExecutor(len(server_c.servers)) as e:
+        e.map(lambda server: server._state_save(), server_c.servers.values())
+
+
 # we don't need too much logging level from this
 logging.getLogger("filelock").setLevel(logging.CRITICAL)
 
