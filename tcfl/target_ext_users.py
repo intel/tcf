@@ -25,6 +25,7 @@ from . import tc
 from . import ttb_client
 from . import msgid_c
 
+logger = logging.getLogger("users")
 
 def _user_list(rtb, userids):
     result = {}
@@ -33,31 +34,34 @@ def _user_list(rtb, userids):
             try:
                 result.update(rtb.send_request("GET", "users/" + userid))
             except Exception as e:
-                logging.error("%s: error getting user's info: %s", userid, e)
+                logger.error("%s: error getting user's info: %s", userid, e)
     else:
         try:
             result.update(rtb.send_request("GET", "users/"))
         except Exception as e:
-            logging.error("error getting all user info: %s", e)
+            logger.error("error getting all user info: %s", e)
     return result
 
 
 def _cmdline_user_list(args):
-    with msgid_c("cmdline"):
-        threads = {}
-        tp = ttb_client._multiprocessing_pool_c(
-            processes = len(ttb_client.rest_target_brokers))
-        if not ttb_client.rest_target_brokers:
-            logging.error("E: no servers available, did you configure?")
-            return
-        for rtb in sorted(ttb_client.rest_target_brokers.values(), key = str):
-            threads[rtb] = tp.apply_async(_user_list, (rtb, args.userid))
-        tp.close()
-        tp.join()
-
-        result = {}
-        for rtb, thread in threads.items():
-            result[rtb.aka] = thread.get()
+    result = {}
+    if not tcfl.server_c.servers:
+        logging.error("E: no servers available, did you configure?")
+        return
+    with msgid_c("cmdline"), \
+         concurrent.futures.ThreadPoolExecutor(len(tcfl.server_c.servers)) as ex:
+        futures = {
+            ex.submit(_user_list, server, args.userid): server
+            for server in tcfl.server_c.servers.values()
+        }
+        for future in concurrent.futures.as_completed(futures):
+            server = futures[future]
+            try:
+                r = future.result()
+                result[server.aka] = r
+            except Exception as e:
+                logger.exception(f"{server.url}: exception {e}")
+                continue
 
     if args.verbosity == 0:
         headers = [
@@ -111,7 +115,7 @@ def _user_role(rtb, username, action, role):
         return rtb.send_request(
             "PUT", "users/" + username + "/" + action + "/" + role)
     except ttb_client.requests.exceptions.HTTPError as e:
-        logging.error(f"{rtb.aka}: {e} (ignored)")
+        logger.error(f"{rtb.aka}: {e} (ignored)")
 
 
 def _cmdline_role_gain(args):
@@ -149,7 +153,7 @@ def _cmdline_servers(args):
                 server = tcfl.server_c.servers[target.rtb.parsed_url.geturl()]
                 servers[server.url] = server
             except IndexError as e:
-                logging.error("%s: invalid target" % target_name)
+                logger.error("%s: invalid target" % target_name)
     else:
         rtb_list = ttb_client.rest_target_brokers
         servers = tcfl.server_c.servers
@@ -168,7 +172,7 @@ def _cmdline_servers(args):
                 urllib3.exceptions.MaxRetryError,
                 RuntimeError
         ) as e:
-            logging.warning("%s: can't reach server: %s", name, e)
+            logger.warning("%s: can't reach server: %s", name, e)
             username = "n/a"
         server = servers[rtb.parsed_url.geturl()]
         r.append(( rtb.aka, str(rtb), username, server.origin ))
