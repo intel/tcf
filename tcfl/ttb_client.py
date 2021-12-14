@@ -983,17 +983,3 @@ def rest_target_find_all(all_targets = False):
             continue
         targets.append(rt)
     return targets
-
-def rest_target_release(args):
-    """
-    :param argparse.Namespace args: object containing the processed
-      command line arguments; need args.target
-    :raises: IndexError if target not found
-    """
-    for target in args.target:
-        rtb, rt = tcfl.server_c.get_by_id(target)
-        try:
-            rtb.rest_tb_target_release(rt, force = args.force,
-                                       ticket = args.ticket)
-        except requests.HTTPError as e:
-            logging.warning("%s: error releasing: %s", target, e)

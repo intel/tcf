@@ -478,22 +478,14 @@ if __name__ == "__main__":
                     default = None, help = "Name of property")
     ap.set_defaults(func = _target_property_get)
 
-
-    arg_parser_target_release = arg_subparsers.add_parser(
-        "release", help = "Release ownership of a target")
-    arg_parser_target_release.add_argument(
-        "-f", "--force", action = "store_true", default = False,
-        help = "Force release of a target you don't own (only admins)")
-    arg_parser_target_release.add_argument(
-        "target", metavar = "TARGET", action = "store", default = None,
-        nargs = "+", help = "Target's name or URL")
-    arg_parser_target_release.set_defaults(func = ttb_client.rest_target_release)
-
     # Setup different modules and drivers
     tcfl.tc.argp_setup(arg_subparsers)
     # imported by tcfl.tc
     tcfl.tc.pos.cmdline_setup(arg_subparsers)
+    # FIXME: move UI parts of this to ui_cli_targets
     tcfl.tc.target_ext_alloc._cmdline_setup(arg_subparsers)
+    import tcfl.ui_cli_alloc
+    tcfl.ui_cli_alloc._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_certs.cmdline_setup(arg_subparsers)

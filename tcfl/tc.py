@@ -1542,11 +1542,11 @@ class target_c(reporter_c):
 
     def release(self):
         """
-        Release a target
+        Release the target
         """
         # This one is annoying, so debuglevel it up
         self.report_info("releasing", dlevel = 3)
-        self.rtb.rest_tb_target_release(self.rt, ticket = self.ticket)
+        self.rtb.target_release(self.id)
         self.report_info("released", dlevel = 2)
 
     def active(self):

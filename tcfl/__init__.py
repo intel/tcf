@@ -1002,7 +1002,25 @@ class server_c:
         self.aka = aka
         return aka
 
-    #: List of servers found indexed by AKA
+
+    def target_release(self, target_id: str, force: bool = False):
+        """
+        Tell the server to release a target from ownership
+
+        :param str target_id: target name
+
+        :param bool force: request the server to force the releasing
+          (might be denied by policy)
+
+        :returns: same as :meth:`send_request`, an empy dictionary on
+          success
+        """
+        return self.send_request(
+            "PUT", f"targets/{target_id}/release",
+            data = { 'force': force })
+
+
+    #: List of servers found indexed by URL
     servers = {}
 
     @classmethod
