@@ -811,32 +811,6 @@ def rest_target_print(rt, verbosity = 0):
     else:
         print(json.dumps(rt, skipkeys = True, indent = 4))
 
-def _rest_target_find_by_id(_target):
-    """
-    Find a target by ID.
-
-    Ignores if the target is disabled or enabled.
-
-    :param str target: Target to locate; it can be a *name* or a full *url*.
-    """
-    # Try to see if it is cached by that ID
-    rt = rest_target_broker.rts_cache.get(_target, None)
-    if rt != None:
-        return rt['rtb'], rt
-    # Dirty messy search
-    for rt in rest_target_broker.rts_cache.values():
-        if rt['id'] == _target:
-            return rt['rtb'], rt
-    raise IndexError("target-id '%s': not found" % _target)
-
-def _rest_target_broker_find_by_id_url(target):
-    # Note this function finds by ID and does nt care if the target is
-    # disabled or enabled
-    if target in rest_target_brokers:
-        return rest_target_brokers[target]
-    rtb, _rt = _rest_target_find_by_id(target)
-    return rtb
-
 
 def _target_select_by_spec( rt, spec, _kws = None):
     if not _kws:
@@ -1017,7 +991,7 @@ def rest_target_release(args):
     :raises: IndexError if target not found
     """
     for target in args.target:
-        rtb, rt = _rest_target_find_by_id(target)
+        rtb, rt = tcfl.server_c.get_by_id(target)
         try:
             rtb.rest_tb_target_release(rt, force = args.force,
                                        ticket = args.ticket)

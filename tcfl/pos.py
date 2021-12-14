@@ -75,6 +75,7 @@ import Levenshtein
 from . import biosl
 import commonl
 import commonl.yamll
+import tcfl
 import tcfl._install
 from . import tc
 from . import tl
@@ -2682,7 +2683,7 @@ def cmdline_pos_capability_list(args):
                     fn.__name__, fn.__doc__))
     else:
         for target in args.target:
-            _rtb, rt = tc.ttb_client._rest_target_find_by_id(target)
+            rt = tcfl.target_c.get_rt_by_id(target)
             pos_capable = rt.get('pos_capable', {})
             if isinstance(pos_capable, bool):
                 # backwards compat

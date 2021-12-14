@@ -2121,7 +2121,7 @@ class target_c(reporter_c):
         :returns: instance of :class:`tcfl.tc.target_c` representing
           said target, if it is available.
         """
-        _rtb, rt = ttb_client._rest_target_find_by_id(target_name)
+        rt = tcfl.target_c.get_rt_by_id(target_name)
         target = target_c(rt, tc_global, None, "target",
                           extensions_only = extensions_only)
         if iface != None and not iface in target.rt.get('interfaces', []):
