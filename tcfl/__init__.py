@@ -2903,7 +2903,7 @@ def _spec_filter_target_in_interconnect(target_roles, target_group,
 
     return True, None
 
-        
+
 def shutdown():
     """
     Shutdown API, saving state in *path*.

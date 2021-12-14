@@ -427,6 +427,31 @@ def _cmdline_alloc_ls(args):
         else:
             _alloc_ls(args.verbosity - args.quietosity, args.username)
 
+
+def _rtb_allocid_extract(allocid):
+    rtb = None
+    # A server is specified, use it
+    if '/' in allocid:
+        server_aka, allocid = allocid.split('/', 1)
+        server = tcfl.server_c.get_by_aka(server_aka)
+        return server, allocid
+
+    with concurrent.futures.ThreadPoolExecutor(len(tcfl.server_c.servers)) as ex:
+        futures = {
+            ex.submit(_guests_list, server, allocid): server
+            for server in tcfl.server_c.servers.values()
+        }
+        for future in concurrent.futures.as_completed(futures):
+            server = futures[future]
+            try:
+                r = future.result()
+                return server, allocid
+            except Exception as e:
+                continue
+
+    raise KeyError(f"{allocid}: unknown allocation ID")
+
+
 def _cmdline_alloc_delete(args):
     with msgid_c("cmdline"):
 
