@@ -24,6 +24,7 @@ import collections
 import contextlib
 import errno
 import fnmatch
+import functools
 import glob
 import hashlib
 import imp
@@ -64,7 +65,7 @@ if False:
         keyring_available = False
 else:
     keyring_available = False
-    
+
 from . import expr_parser
 
 logging.addLevelName(50, "C")
@@ -3178,3 +3179,77 @@ class fsdb_file_c(fsdb_symlink_c):
 
     def _raw_rename(self, location_new, location):
         os.replace(location_new, location)
+
+
+
+def retry_cb_tries(ExceptionToCheck,
+                   tries: int = 4, delay: float = 3, backoff: float = 1,
+                   header: str = None,
+                   logger: logging.Logger = None):
+    """
+    Retry/Circuit-Breaker decorator -- circuit-break after X tries
+    with optional backoff
+
+
+    Usage example:
+
+    >>> def run_online(target):
+    >>>
+    >>>     top_tries = 4
+    >>>
+    >>>     @retry_cb_tries(subprocess.SubprocessError, tries = top_tries,
+    >>>                     header = "ping: ", logger = target.report_info)
+    >>>     def _ping(target, ipv4_addr):
+    >>>         subprocess.check_output([ "ping", "-c", "3", ipv4_addr ],
+    >>>                                 stderr = subprocess.STDOUT, timeout = 5)
+    >>>         target.report_pass(f"NUC {ipv4_addr} pings online")
+    >>>
+    >>>     ipv4_addr = target.kws['ipv4_addr']
+    >>>     try:
+    >>>         _ping(target, ipv4_addr)
+    >>>     except subprocess.TimeoutExpired as e:
+    >>>         raise tcfl.fail_e(
+    >>>             f"NUC {ipv4_addr} is not online after {top_tries} tries") from e
+
+
+
+    :param ExceptionToCheck: the exception to check. may be a tuple of
+        exceptions to check
+
+    :param int tries: number of times to try (not retry) before giving up
+
+    :param float delay: initial delay between retries in seconds
+
+    :param float backoff: backoff multiplier e.g. value of 2 will
+        double the delay each retry
+
+    :param callable logger: logging function to use for warnings on retry
+
+    References:
+    - https://www.saltycrane.com/blog/2009/11/trying-out-retry-decorator-python/
+    - http://wiki.python.org/moin/PythonDecoratorLibrary#Retyr
+
+    """
+    def deco_retry(f):
+
+        @functools.wraps(f)
+        def f_retry(*args, **kwargs):
+            mtries, mdelay = tries, delay
+            while mtries > 1:
+                try:
+                    return f(*args, **kwargs)
+                except ExceptionToCheck as e:
+                    if mdelay <= 0:
+                        logger(f"{header}retrying due to exception: {e}")
+                        pass
+                    if logger:
+                        logger(f"{header}retrying in {mdelay} seconds"
+                               f" due to exception {type(e).__name__}: {e}")
+                    time.sleep(mdelay)
+                    mtries -= 1
+                    mdelay *= backoff
+            return f(*args, **kwargs)
+
+        return f_retry  # true decorator
+
+    return deco_retry
