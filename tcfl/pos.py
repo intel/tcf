@@ -737,7 +737,7 @@ class extension(tc.target_extension_c):
             attachments = dict(output = output))
         return False
 
-    def boot_to_pos(self, pos_prompt = None,
+    def boot_to_pos(self,
                     # plenty to boot to an nfsroot, hopefully
                     timeout = 60,
                     boot_to_pos_fn = None):
@@ -1640,7 +1640,6 @@ EOF""")
                      boot_dev = None, root_part_dev = None,
                      partitioning_fn = None,
                      extra_deploy_fns = None,
-                     pos_prompt = None,
                      # plenty to boot to an nfsroot, hopefully
                      timeout = 60,
                      # When flushing to USB drives, it can be slow
@@ -1707,18 +1706,12 @@ EOF""")
         assert isinstance(image, str)
         target = self.target
         testcase = target.testcase
-        if not pos_prompt:
-            # soft prompt until we login and update it
-            _pos_prompt = re.compile(r' [0-9]+ \$ ')
-        else:
-            _pos_prompt = pos_prompt
         boot_dev = self._boot_dev_guess(boot_dev)
         # do not set target.shell.context("POS"), as we want to leave
         # the same prompt REGEX for other code that will run after this
         with msgid_c("POS"):
 
             original_timeout = testcase.tls.expect_timeout
-            original_prompt = target.shell.prompt_regex
             original_console_default = target.console.default
             try:
                 # FIXME: this is a hack because now the expecter has a
@@ -1735,19 +1728,9 @@ EOF""")
                 ))
                 testcase.tls.expect_timeout = bios_boot_time + timeout
 
-                self.boot_to_pos(pos_prompt = _pos_prompt, timeout = timeout,
+                self.boot_to_pos(timeout = timeout,
                                  boot_to_pos_fn = target_power_cycle_to_pos)
                 target.console.select_preferred(user = 'root')
-                if not pos_prompt:
-                    # Adopt a harder to false positive prompt regex;
-                    # the TCF-HASHID is set by target.shell.up() after
-                    # we logged in; so if no prompt was specified, use
-                    target.shell.prompt_regex = \
-                        re.compile("TCF-%(tc_hash)s:POS%% " % testcase.kws)
-                    target.shell.run(
-                        "export PS1='TCF-%(tc_hash)s:POS%% '  "
-                        "# a simple prompt is harder to confuse"
-                        " with general output" % testcase.kws)
 
                 testcase.targets_active()
                 kws = dict(
