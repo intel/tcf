@@ -94,29 +94,40 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
     retry_ts = None
     retry_timeout = 40
     while wait_in_queue:
-        if queue_timeout and ts - ts0 > queue_timeout:
-            raise tcfl.tc.blocked_e(
-                "can't acquire targets, still busy after %ds"
-                % queue_timeout, dict(targets = groups))
-        time.sleep(keepalive_period)
-        ts = time.time()
-        state = data[allocid]
         try:
-            #print(f"DEBUG: alloc/keepalive", file = sys.stderr)
-            r = rtb.send_request("PUT", "keepalive", json = data)
-        except requests.exceptions.RequestException as e:
+            if queue_timeout and ts - ts0 > queue_timeout:
+                raise tcfl.tc.blocked_e(
+                    "can't acquire targets, still busy after %ds"
+                    % queue_timeout, dict(targets = groups))
+            time.sleep(keepalive_period)
             ts = time.time()
-            if retry_ts == None:
-                retry_ts = ts
-            else:
-                if ts - retry_ts > retry_timeout:
-                    raise RuntimeError(
-                        f"alloc/keepalive giving up after {retry_timeout}s"
-                        f" retrying connection errors") from e
-            logging.warning(
-                f"retrying for {retry_timeout - (ts - retry_ts):.0f}s"
-                f" alloc/keepalive after connection error {type(e)}: {e}")
-            continue
+            state = data[allocid]
+            try:
+                #print(f"DEBUG: alloc/keepalive", file = sys.stderr)
+                r = rtb.send_request("PUT", "keepalive", json = data)
+            except requests.exceptions.RequestException as e:
+                ts = time.time()
+                if retry_ts == None:
+                    retry_ts = ts
+                else:
+                    if ts - retry_ts > retry_timeout:
+                        raise RuntimeError(
+                            f"alloc/keepalive giving up after {retry_timeout}s"
+                            f" retrying connection errors") from e
+                logging.warning(
+                    f"retrying for {retry_timeout - (ts - retry_ts):.0f}s"
+                    f" alloc/keepalive after connection error {type(e)}: {e}")
+                continue
+        except KeyboardInterrupt:
+            # HACK: if we are interrupted, cancel this allocation so
+            # it is not left hanging and makes it all confusing
+            ts0 = ts
+            ts = time.time()
+            if allocid:
+                print("\nallocation ID %s: [+%.1fs] releasing due to user interruption" % (
+                    allocid, ts - ts0))
+                _delete(rtb, allocid)
+            raise
 
         # COMPAT: old version packed the info in the 'result' field,
         # newer have it in the first level dictionary
