@@ -890,7 +890,7 @@ def dialog_changes_not_saved_expect(target, action):
       \---------------------------------------------------------------------/
     """
     assert isinstance(target, tcfl.tc.target_c)
-    assert action in [ "Y", "N", "0x1b" ]
+    assert action in [ "y", "Y", "n", "N", "0x1b" ]
 
     submenu_header_expect(
         target, "Changes have not saved. Save Changes and exit",
@@ -940,9 +940,15 @@ def menu_config_network_enable(target):
     # geee ... some do Enable, some Enabled (see the missing d)
     multiple_entry_select_one(target, "Enabled?")
     entry_select(target)			# select it
-    # Need to hit ESC twice to get the "save" menu
-    target.console_tx("\x1b\x1b")
+    # hit F10 to save -- this way we don't have to deal with the
+    # "changes not saved" dialog, which is very error prone
+    bios_terminal = target.kws.get("bios.terminal_emulation", "vt100")
+    target.console.write(ansi_key_code("F10", bios_terminal))
     dialog_changes_not_saved_expect(target, "Y")
+    # when this is succesful saving, we end up in this menu
+    submenu_header_expect(
+        target, "Platform Configuration",
+        canary_end_menu_redrawn = None)
     return True
 
 
@@ -985,10 +991,18 @@ def menu_config_network_disable(target):
     # use ? as a regex
     tcfl.biosl.multiple_entry_select_one(target, "Disable?")
     tcfl.biosl.entry_select(target)			# select it
+    # hit F10 to save -- this way we don't have to deal with the
+    # "changes not saved" dialog, which is very error prone
     # Need to hit ESC twice to get the "save" menu
     target.console_tx("\x1b\x1b")
-    tcfl.biosl.dialog_changes_not_saved_expect(target, "Y")
-
+    # Need to hit ESC twice to get the "save" menu
+    bios_terminal = target.kws.get("bios.terminal_emulation", "vt100")
+    target.console.write(ansi_key_code("F10", bios_terminal))
+    dialog_changes_not_saved_expect(target, "Y")
+    # when this is succesful saving, we end up in this menu
+    submenu_header_expect(
+        target, "Platform Configuration",
+        canary_end_menu_redrawn = None)
     return True
 
 
@@ -1214,7 +1228,7 @@ def boot_network_http_boot_add_entry(target, entry, url):
     bios_terminal = target.kws.get("bios.terminal_emulation", "vt100")
     target.console_tx(ansi_key_code("F10", bios_terminal))
     target.expect("Press 'Y' to save and exit")
-    target.console_tx("Y")
+    target.console_tx("y")
 
 
 def main_boot_select_entry(target, boot_entry):
