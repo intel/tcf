@@ -81,6 +81,7 @@ Note the columns and the messages:
 
 """
 import io
+import logging
 import os
 import subprocess
 import sys
@@ -89,10 +90,9 @@ if sys.platform != "win32":
 import threading
 
 import commonl
-from . import msgid_c
-from . import tc
+import tcfl
 
-class driver(tc.report_driver_c):
+class driver(tcfl.report_driver_c):
     """
     Driver to write progress messages to console and a log file
 
@@ -113,7 +113,7 @@ class driver(tc.report_driver_c):
     """
     def __init__(self, verbosity, log_file = None,
                  verbosity_logf = 999):
-        tc.report_driver_c.__init__(self)
+        tcfl.report_driver_c.__init__(self)
         if log_file:
             assert isinstance(log_file, str)
 

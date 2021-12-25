@@ -101,7 +101,7 @@ def jinja2_xml_escape(data):
     return new
 
 
-class driver(tc.report_driver_c):
+class driver(tcfl.report_driver_c):
 
     # timezone the reports will have. You can set it in various ways:
     # you can set it as an enviorment variable named REPORT_TZ or TZ.
@@ -126,7 +126,7 @@ class driver(tc.report_driver_c):
         assert all([ isinstance(template, dict)
                      for template in self.templates.values() ])
 
-        tc.report_driver_c.__init__(self)
+        tcfl.report_driver_c.__init__(self)
         # Where we write the final reports
         self.log_dir = log_dir
         # dictionary where we store the names of the temporary files
@@ -399,6 +399,7 @@ class driver(tc.report_driver_c):
         # use it
 
         # FIXME: initialize this in the core, so it shows in test_dump_kws*.py
+        print(f"DEBUG _tc.kws is {_tc} {_tc.kws}")
         kws = commonl.dict_missing_c(_tc.kws)
         kws['msg_tag'] = msg_tag
         kws['result'] = tc.valid_results.get(
@@ -412,13 +413,8 @@ class driver(tc.report_driver_c):
         # FIXME: move to common infra in
         # report_driver_c.mk_t_option()
         tfids = []
-        for target_want_name, target in _tc.targets.items():
-            if len(target.rt.get('bsp_models', {})) > 1:
-                tfids.append(
-                    '(' + target.fullid
-                    + ' and bsp_model == "%s")' % target.bsp_model)
-            else:
-                tfids.append(target.fullid)
+        for _target_role, target in _tc.target_roles.items():
+            tfids.append(target.fullid)
         if tfids:
             kws['t_option'] = " -t '" + " or ".join(tfids) + "'"
         else:
@@ -442,9 +438,10 @@ class driver(tc.report_driver_c):
                 pass
 
         kws['targets'] = []
-        for target_want_name, target in _tc.targets.items():
+        for target_role_name, target in _tc.target_roles.items():
             entry = {}
-            entry['want_name'] = target_want_name
+            entry['want_name'] = target_role_name	# COMPAT
+            entry['role_name'] = target_role_name
             entry['fullid'] = target.fullid
             entry['type'] = _tc.type_map.get(target.type, target.type)
             kws['targets'].append(entry)

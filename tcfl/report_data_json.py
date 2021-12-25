@@ -9,7 +9,7 @@ Report data to a JSON file
 --------------------------
 
 This driver dumps all reported data with
-:meth:`tcfl.tc.report_c.report_data` in scripts to a JSON file.
+:meth:`tcfl.reporter_c.report_data` in scripts to a JSON file.
 
 It is structured as a top level dictionary; each domain is a top level
 key and each data is a key entry in there. When the script completes
@@ -18,7 +18,7 @@ execution, the JSON file is written to
 
 For example, if the testcase:
 
->>> class _test(tcfl.tc.tc_c):
+>>> class _test(tcfl.tc_c):
 >>>     def eval(self):
 >>>         self.report_data("DOMAIN1", "NAMEA", 1)
 >>>         self.report_data("DOMAIN1", "NAMEB", 4.3)
@@ -42,17 +42,19 @@ would generate a json file like::
 
 """
 
+import json
+import logging
 
-from . import tc
+import tcfl
 
-class driver(tc.report_driver_c):
+class driver(tcfl.report_driver_c):
     """
     Report data to a JSON file
 
     No configuration is needed
     """
     def __init__(self):
-        tc.report_driver_c.__init__(self)
+        tcfl.report_driver_c.__init__(self)
         self.docs = {}
 
 
@@ -69,7 +71,7 @@ class driver(tc.report_driver_c):
             if not doc:		# no data collected, shrug
                 return
             with open(testcase.report_file_prefix + "data.json", "w") as f:
-                tc.json.dump(doc, f, skipkeys = True, indent = 4)
+                json.dump(doc, f, skipkeys = True, indent = 4)
             del self.docs[hashid]
             return
 

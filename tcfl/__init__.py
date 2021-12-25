@@ -16,6 +16,10 @@ import itertools
 import json
 import logging
 import os
+import pickle
+import pprint
+import random
+import re
 import shutil
 import socket
 import urllib
@@ -28,8 +32,11 @@ import subprocess
 import sys
 import traceback
 import threading
+import urllib
+import warnings
 
 import filelock
+import requests
 
 import commonl
 import tcfl.ttb_client # ...ugh
@@ -255,12 +262,19 @@ class result_c:
         subcase_base = getattr(e, '_subcase_base', None)
 
         # FIXME:HACK until we are done solving the import hell
-        from . import tc
-        if isinstance(_tc, tc.target_c):
+        #if isinstance(_tc, target_c):
+        #    tc = _tc.testcase
+        #else:
+        #    assert isinstance(_tc, tc_c)
+        #    tc = _tc
+        if type(_tc).__name__ == "tc_c":
             tc = _tc.testcase
-        else:
-            assert isinstance(_tc, tc.tc_c)
+        elif type(_tc).__name__ == "target_c":
             tc = _tc
+        else:
+            raise AssertionError(
+                "_tc: expected type tc_c or target_c or subclass;"
+                f" got {type(_tc)}")
 
         trace_alevel = 1
         if force_result == None:
@@ -757,8 +771,6 @@ def inventory_keys_fix(d):
             del d[key]
     return d
 
-
-import tcfl.config		# FIXME: this is bad, will be removed
 
 
 @commonl.lru_cache_disk(
@@ -1504,6 +1516,7 @@ class server_c:
             " (configuration/cmdline) seeding")
 
         # from tcfl.config.url_add()	# COMPAT
+        import tcfl.config		# FIXME: this is bad, will be removed
         for url, _ssl_ignore, aka, ca_path in tcfl.config.urls:
             origin = tcfl.config.urls_data[url].get(
                 'origin', 'probably tcfl.config.url_add() in a config file')
@@ -1856,6 +1869,618 @@ class server_c:
         log_server.info("read all targets")
 
 
+#: Character used to separate RUNID/HASHID in reports
+#:
+#: This is the consequence of a very bad past design decisison which
+#: called for a filename *report-RUNID:HASHID.txt* and of course,
+#: colons are bad because they are used to mean a lot of things.
+#:
+#: Trying to move to hashes, but there is a lot of legacy, so these
+#: variables allow to quickly to new behaviour via configuration.
+#:
+#: Defaults to existing *:*
+report_runid_hashid_separator = ":"
+
+#: Character used to separate RUNID/HASHID in filenames
+#:
+#: Defaults to existing *:* (see comments for
+#: data:`report_runid_hashid_separator`)
+report_runid_hashid_file_separator = ":"
+
+
+class report_driver_c:
+    """Reporting driver interface
+
+    To create a reporting driver, subclass this class, implement
+    :meth:`report` and then create an instance, adding it calling
+    :meth:`add`.
+
+    A testcase reports information by calling the `report_*()` APIs in
+    :class:`reporter_c`, which multiplexes into each reporting driver
+    registered with :meth:`add`, calling each drivers :meth:`report`
+    function which will direct it to the appropiate place.
+
+    Drivers can be created to dump the information in any format and
+    to whichever location, as needed.
+
+    For examples, look at:
+
+    - :mod:`tcfl.report_console`
+    - :mod:`tcfl.report_jinja2`
+    - :mod:`tcfl.report_taps`
+    - :mod:`tcfl.report_mongodb`
+
+    """
+
+    #: Name for the driver
+    #
+    #: This is optional and can be set with the
+    #: :meth:`report_driver_c.add() <add>` call.
+    name = None
+
+    def report(self, testcase, target, tag, ts, delta,
+               level, message, alevel, attachments):
+        """Low level report from testcases
+
+        The reporting API calls this function for the final recording
+        of a reported message. In here basically anything can be
+        done--but they being called frequently, it has to be efficient
+        or will slow testcase execution considerably. Actions done in
+        this function can be:
+
+        - filtering (to only run for certain testcases, log levels, tags or
+          messages)
+        - dump data to a database
+        - record to separate files based on whichever logic
+        - etc
+
+        When a testcase is completed, it will issue a message
+        *COMPLETION <result>*, which marks the end of the testcase.
+
+        When all the testcases are run, the global testcase reporter
+        (:data:`tcfl.tc.tc_global`) will issue a *COMPLETION <result>*
+        message. The global testcase reporter can be identified because
+        it has an attribute *skip_reports* set to *True* and thus can
+        be identified with:
+
+        .. code-block:: python
+
+           if getattr(_tc, "skip_reports", False) == True:
+               do_somethin_for_the_global_reporter
+
+        Important points:
+
+        - **do not rely on globals**; this call is not lock protected
+          for concurrency; will be called for *every* single report the
+          internals of the test runner and the testcases do from
+          multiple threads at the same time. Expect a *lot* of calls.
+
+          Must be ready to accept multiple threads calling from
+          different contexts. It is a good idea to use thread local
+          storage (TLS) to store state if needed. See an example in
+          :class:`tcfl.report_console.driver`).
+
+        :param tcfl.tc_c testcase: testcase tho is reporting
+          this. Note this might be a top level or a subcase.
+
+        :param tcfl.target_c target: target who is reporting this;
+          might be *None* if the report is not associated to a target.
+
+        :param str tag: type of report (PASS, ERRR, FAIL, BLCK, INFO,
+          DATA); note they are all same length and described in
+          :data:`valid_results`.
+
+        :param float ts: timestamp for when the message got generated
+          (in seconds)
+
+        :param float delta: time lapse from when the testcase started
+          execution until this message was generated.
+
+        :param int level: report level for the *message* (versus for
+          the attachments); note report levels greater or equal to
+          1000 are used to pass control messages, so they might not be
+          subject to normal verbosity control (for example, for a log
+          file you might want to always include them).
+
+        :param str message: single line string describing the message
+          to report.
+
+          If the message starts with  *"COMPLETION "*, this is the
+          final message issued to mark the result of executing a
+          single testcase. At this point, you can use fields such
+          as :data:`tc_c.result` and :data:`tc_c.result_eval` and it
+          can be used as a synchronization point to for example, flush
+          a file to disk or upload a complete record to a database.
+
+          Python2: note this has been converted to unicode UTF-8
+
+        :param int alevel: report level for the attachments
+
+        :param dict attachments: extra information to add to the
+          message being reported; shall be reported as *KEY: VALUE*;
+          VALUE shall be recursively reported:
+
+          - lists/tuples/sets shall be reported indicating the index
+            of the member (such as *KEYNAME[3]: VALUE*
+
+          - dictionaries shall be recursively reported
+
+          - strings and integers shall be reported as themselves
+
+          - any other data type can be reported as what it's *repr*
+            function returns when converting it to unicode ro whatever
+            representation the driver can do.
+
+          You can use functions such :func:`commonl.data_dump_recursive`
+          to convert a dictionary to a unicode representation.
+
+          This might contain strings that are not valid UTF-8, so you
+          need to convert them using :func:`commonl.mkutf8` or
+          similar. :func:`commonl.data_dump_recursive` do that for you.
+
+        """
+        raise NotImplementedError
+
+    _drivers = []
+
+    @classmethod
+    def add(cls, obj, name = None, origin = None):
+        """
+        Add a driver to handle other report mechanisms
+
+        A report driver is used by *tcf run*, the meta test runner, to
+        report information about the execution of testcases.
+
+        A driver implements the reporting in whichever way it decides
+        it needs to suit the application, uploading information to a
+        server, writing it to files, printing it to screen, etc.
+
+        >>> class my_report_driver(tcfl.report_driver_c)
+        >>>     ...
+        >>> tcfl.report_driver_c.add(my_report_driver())
+
+        :param tcfl.report_driver_c obj: object subclasss of
+          :class:`tcfl.report_driver_c` that implements the
+          reporting.
+
+        :param str name: (optional) driver name; useful so
+          :data:`reporter_c.level_driver_max` can be used.
+
+          The name *console* refers to a driver used to print stuff to
+          the console/command line from which *tcf run* (for example)
+          is exectuted.
+
+          If from a configuration file a report driver is added as
+          *console*, then core will not add the default one
+          (:class:`tcfl.report_console.driver`).
+
+        :param str origin: (optional) where is this being registered;
+          defaults to the caller of this function.
+        """
+        assert isinstance(obj, cls)
+        if origin == None:
+            origin = commonl.origin_get(2)
+        argspec = inspect.getfullargspec(cls.report)
+        if len(argspec.args) != 10:
+            # old style, bail out
+            raise RuntimeError(
+                f"WARNING! Driver {cls} (@{origin}) is old style,"
+                f" please update to new report_driver_c.report() [{len(argspec.args)}]")
+
+        setattr(obj, "origin", origin)
+        obj.name = name
+        cls._drivers.append(obj)
+
+    @classmethod
+    def get_by_name(cls, name: str):
+        """
+        Return a reporting driver given its name
+
+        :param str: name the driver was registered with
+        :returns tcfl.report_driver_c: driver instance
+        :raises ValueError: if not found
+        """
+        for driver in cls._drivers:
+            if driver.name == name:
+                return driver
+        raise ValueError("%s: report driver does not exist" % name)
+
+    @classmethod
+    def remove(cls, obj):
+        """
+        Remove a report driver previously added with :meth:`add`
+
+        :param tcfl.report_driver_c obj: object subclasss of
+          :class:`tcfl.report_driver_c` that implements the
+          reporting.
+
+        """
+        assert isinstance(obj, cls)
+        cls._drivers.remove(obj)
+
+
+class reporter_c(object):
+    """
+    High level reporting API
+
+    Embedded as part of a target or testcase, allows them to report in
+    a unified way
+
+    This class accesses members that are undefined in here but defined
+    by the class that inherits it (tc_c and target_c):
+
+    - self.kws
+
+    """
+    def __init__(self, testcase = None):
+        # this is to be set by whoever inherits this
+        self._report_prefix = "reporter_c._report_prefix/uninitialized"
+        #: time when this testcase or target was created (and thus all
+        #: references to it's inception are done); note if this is for
+        #: a testcase, in __init_shallow__() we update this for when
+        #: we assign it to a target group to run.
+        if testcase:
+            self.ts_start = testcase.ts_start
+            # COMPAT
+            assert isinstance(testcase, tc_c) \
+                or type(testcase).__name__ == "tc_c", \
+                f"testcase: expected tcfl.tc_c; got {type(testcase)}"
+            self.testcase = testcase	# record who our testcase is
+        else:
+            self.ts_start = time.time()
+            assert isinstance(self, tc_c)
+            self.testcase = self
+
+        self._ticket = None
+        # this will actually come from the testcase/target definition
+        # and be initialized in the testcase/target constructions
+        self.kws = {}
+
+
+    #: Ignore messages with verbosity about this level
+    #:
+    #: >>> self.level_max = 4
+    report_level_max = None
+
+    #: Ignore messages with verbosity about this level (per driver)
+    #:
+    #: >>> class _test(tcf.tc.tc_c):
+    #: >>>     ...
+    #: >>>     report_level_driver_max = {
+    #: >>>         "DRIVERNAME": 4,
+    #: >>>         "DRIVERNAME2": 7
+    #: >>>     }
+    #:
+    report_level_driver_max = {}
+
+    @staticmethod
+    def _argcheck(message, attachments, level, dlevel, alevel):
+        assert isinstance(message, str), \
+            f"message: expected str, got {type(message)}"
+        if attachments:
+            assert isinstance(attachments, dict)
+            # FIXME: valid values?
+        assert level >= 0
+        # just check is some kind of integer (positive, negative or zero)
+        assert dlevel >= 0 or dlevel < 0
+        assert alevel >= 0 or alevel < 0
+
+    def _report(self, level, alevel, tag, message,
+                attachments, subcase = None, subcase_base = None):
+        assert subcase == None or isinstance(subcase, str), \
+            f"subcase: expected short string; got {type(subcase)}"
+        if self.report_level_max != None and level >= self.report_level_max:
+            return
+        ts = time.time()
+        delta = ts - self.ts_start
+
+        testcase = self.testcase
+        subl = []
+        # If there is no subcase_base, then we take it from the TLS
+        # stack; this is normally used when we raise an exception that
+        # has to be reported in a different subcase path, not in the
+        # current one in the stack. That is done by tcfl.msgid_c.__exit__
+        if subcase_base == None:
+            subcase_base = msgid_c.subcase()
+        if subcase_base:
+            subl.append(subcase_base)
+        if subcase:
+            subl.append(subcase)
+        subcase = "##".join(subl)
+
+        if subcase:
+            subtc = testcase._subcase_get(subcase)
+            if tag == "PASS":
+                subtc.result.passed += 1
+            elif tag == "FAIL":
+                subtc.result.failed += 1
+            elif tag == "ERRR":
+                subtc.result.errors += 1
+            elif tag == "BLCK":
+                subtc.result.blocked += 1
+            elif tag == "SKIP":
+                subtc.result.skipped += 1
+            report_on = subtc
+        else:
+            report_on = testcase
+
+        for driver in report_driver_c._drivers:
+            if driver.name:
+                level_driver_max = self.report_level_driver_max.get(driver.name, None)
+                if level_driver_max != None and level >= level_driver_max:
+                    continue
+            if isinstance(self, target_c):
+                target = self
+            else:
+                target = None
+            driver.report(
+                report_on, target, tag, ts, delta, level,
+                commonl.mkutf8(message), alevel, attachments)
+
+    def report_pass(self, message, attachments = None,
+                    level = None, dlevel = 0, alevel = 2, subcase = None):
+        """Report a check has passed (a positive condition we were
+        looking for was found).
+
+        >>> report_pass("this thing worked ok",
+        >>>             dict(
+        >>>                 measurement1 = 34,
+        >>>                 log = commonl.generator_factory_c(
+        >>>                     commonl.file_iterator, "LOGILENAME")
+        >>>             ),
+        >>>             subcase = "subtest1")
+
+        A check, described by *message* has passed
+
+        :param str message: message describing the check or condition
+          that has passed
+
+        :param dict attachments: (optional) a dictionary of extra data
+          to append to the report, keyed by string. Stick to simple
+          values (bool, int, float, string, nested dict of the same )
+          for all report drivers to be able to handle it.
+
+          Additionally, use class:`commonl.generator_factory_c` for
+          generators (since the report drivers will have to spin the
+          generator once each).
+
+        :param str subcase: (optional, default *None*) report this
+          message as coming from a subcase
+
+        :param int level: (optional, default set by
+          :class:`tcfl.msgid_c` context depth) verbosity level of this
+          message. Must be a zero or positive integer. 0 is most
+          important. Usually you want to set *dlevel*.
+
+        :param int dlevel: (optional, default 0) verbosity level of
+          this message relative to level (normally to the default
+          level).
+
+          Eg: if given -2 and level resolves to 4, the verbosity level
+          would be 2.
+
+        :param int alevel: (optional, default 2) verbosity level of
+          the attachments to this message relative to level (normally
+          to the default level).
+
+          The attachments might contain a lot of extra data that in
+          some cases is not necessary unless more verbosity is
+          declared.
+
+        """
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "PASS", message,
+                     attachments, subcase = subcase)
+
+    def report_fail(self, message, attachments = None,
+                    level = None, dlevel = 0, alevel = 2, subcase = None):
+        """
+        Report a check that has failed (an negative condition we were
+        looking for was found).
+
+        Same parameters as :meth:`report_pass`.
+        """
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "FAIL", message,
+                     attachments, subcase = subcase)
+
+    def report_error(self, message, attachments = None,
+                     level = None, dlevel = 0, alevel = 2, subcase = None):
+        """
+        Report a check that has errored (a negative condition we were
+        not looking for was found).
+
+        Same parameters as :meth:`report_pass`.
+        """
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "ERRR", message,
+                     attachments, subcase = subcase)
+
+    def report_blck(self, message, attachments = None,
+                    level = None, dlevel = 0, alevel = 2, subcase = None):
+        """
+        Report a check that has blocked (something has happened most
+        likely in infrastructure that disallows us for checking
+        conditions to determine pass/fail/error/skip).
+
+        Same parameters as :meth:`report_pass`.
+        """
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "BLCK", message,
+                     attachments, subcase = subcase)
+
+    def report_skip(self,  message, attachments = None,
+                    level = None, dlevel = 0, alevel = 2, subcase = None):
+        """
+        Report a check that has skipped (the conditions needed to test
+        are not met).
+
+        Same parameters as :meth:`report_pass`.
+        """
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "SKIP", message,
+                     attachments, subcase = subcase)
+
+    def report_info(self, message, attachments = None,
+                    level = None, dlevel = 0, alevel = 2, subcase = None):
+        """
+        Report an informational progress message.
+
+        Same parameters as :meth:`report_pass`.
+        """
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(message, attachments, level, dlevel, alevel)
+        level += dlevel
+        self._report(level, level + alevel, "INFO", message,
+                     attachments, subcase = subcase)
+
+    def report_data(self, domain, name, value, expand = True,
+                    level = 2, dlevel = 0, subcase = None):
+        """Report measurable data
+
+        When running a testcase, if data is collected that has to be
+        reported for later analysis, use this function to report
+        it. This will be reported by the report driver in a way that
+        makes it easy to collect later on.
+
+        Measured data is identified by a *domain* and a *name*, plus
+        then the actual value.
+
+        A way to picture how this data can look once aggregated is as
+        a table per domain, on which each invocation is a row and each
+        column will be the values for each name.
+
+        :param str domain: to which domain this measurement applies
+          (eg: "Latency Benchmark %(type)s");
+
+          Well known domains:
+
+           - *Warnings [%(type)s]*: values would be accumulated over
+             how many times it has been reported
+
+             >>> # self is a tcfl.tc.tc_c
+             >>> condition = "SOMENAME"
+             >>> with self.lock:
+             >>>     self.buffers.setdefault(condition, 0)
+             >>>     self.buffers[condition] += 1
+             >>> self.report_data("Warnings [%(type)s]", condition,
+             >>>     self.buffers[condition])
+
+           - *Recovered conditions [%(type)s]*: values would be
+             accumulated over how many times it has been reported
+
+             Same reporting example as for *Warnings* above.
+
+        :param str name: name of the value  (eg: "context switch
+          (microseconds)"); it is recommended to always add the unit
+          the measurement represents.
+
+        :param value: value to report for the given domain and name;
+           any type can be reported.
+
+        :param bool expand: (optional) by default, the *domain* and
+          *name* fields will be %(FIELD)s expanded with the keywords
+          of the testcase or target. If *False*, it will not be
+          expanded.
+
+          This enables to, for example, specify a domain of "Latency
+          measurements for target %(type)s" which will automatically
+          create a different domain for each type of target.
+        """
+        assert isinstance(domain, str)
+        assert isinstance(name, str)
+        assert level >= 0
+        assert dlevel >= 0
+        assert isinstance(expand, bool)
+
+        if expand:
+            domain = domain % self.kws
+            name = name % self.kws
+        level += dlevel
+
+        self._report(
+            level, 1000, "DATA",
+            domain + "::" + name + "::" + str(value), subcase = subcase,
+            attachments = dict(domain = domain, name = name, value = value))
+
+    def report_tweet(self, what, result, extra_report = "",
+                     ignore_nothing = False, attachments = None,
+                     level = None, dlevel = 0, alevel = 2,
+                     dlevel_failed = 0, dlevel_blocked = 0,
+                     dlevel_passed = 0, dlevel_skipped = 0, dlevel_error = 0,
+                     subcase = None):
+        if level == None:		# default args are computed upon def'on
+            level = msgid_c.depth()
+        self._argcheck(what, attachments, level, dlevel, alevel)
+        assert dlevel_failed >= 0
+        assert dlevel_blocked >= 0
+        assert dlevel_passed >= 0
+        assert dlevel_skipped >= 0
+        assert dlevel_error >= 0
+        level += dlevel
+        r = False
+        if result.failed > 0:
+            tag = "FAIL"
+            msg = valid_results[tag][1]
+            level += dlevel_failed
+        elif result.errors > 0:
+            tag = "ERRR"
+            msg = valid_results[tag][1]
+            level += dlevel_error
+        elif result.blocked > 0:
+            tag = "BLCK"
+            msg = valid_results[tag][1]
+            level += dlevel_blocked
+        elif result.passed > 0:
+            tag = "PASS"
+            msg = valid_results[tag][1]
+            r = True
+            level += dlevel_passed
+        elif result.skipped > 0:
+            tag = "SKIP"
+            msg = valid_results[tag][1]
+            r = True
+            level += dlevel_skipped
+        else:            # When here, nothing was run, all the counts are zero
+            if ignore_nothing == True:
+                return True
+            self._report(level, level + alevel, "BLCK",
+                         what + " / nothing ran " + extra_report,
+                         attachments, subcase = subcase)
+            return False
+        self._report(level, level + alevel,
+                     tag, what + " " + msg + " " + extra_report,
+                     attachments, subcase = subcase)
+        return r
+
+    # Deprecated APIs
+    @property
+    def ticket(self):
+        warnings.warn("reporter_c.ticket", DeprecationWarning)
+        return self._ticket
+
+
+    @ticket.setter
+    def ticket(self, value):
+        warnings.warn("reporter_c.ticket", DeprecationWarning)
+        self._ticket = value
+        return self._ticket
 
 
 class target_c:
@@ -2001,7 +2626,19 @@ class target_c:
         self.allocid = allocid
 
 
-class tc_c:
+class tc_logadapter_c(logging.LoggerAdapter):
+    """
+    Logging adapter to prefix test case's current prefix and target name.
+    """
+    id = 0
+    prefix = ""
+    def process(self, msg, kwargs):
+        return '[%08x] %s: %s ' % (self.id, self.prefix, msg), kwargs
+
+    def isEnabledFor(self, level):
+        return True
+
+class tc_c(reporter_c):
 
     """FIXME:
 
@@ -2029,6 +2666,7 @@ class tc_c:
     """
     def __init__(
             self,
+            name: str, tc_file_path: str, origin: str,
             # FIXME: this needs to be controlled from somewhere
             # else? not feasible here -- maybe max can be computed
             # dynamically, but not really a good idea....
@@ -2040,6 +2678,124 @@ class tc_c:
             " 0: all targets randomly, N targets alphabetically)"
         assert replication_factor >= 1 and isinstance(replication_factor, int), \
             "replication_factor: expected > 0 integer"
+        assert isinstance(origin, str)
+        #
+        # need this before calling reporter_c.__init__
+        #
+        #: Time when this testcase was created (and thus all
+        #: references to it's inception are done); note in
+        #: __init_shallow__() we update this for when we assign it to
+        #: a target group to run.
+        self.ts_start = time.time()
+        self.ts_end = None
+
+        reporter_c.__init__(self, testcase = self)
+
+        self.name = name
+        self.tc_file_path = tc_file_path
+        self.origin = origin
+
+        # most of these will be initialized later in
+        # testcase.discovery_init() or others FIXME
+        #: :term:`hashid` for this execution
+        self.hashid = None
+
+        #: Identification of the target group where this testcase is
+        #: running (set when exeuting on a target group and bound to
+        #: it)
+        self.tgid = None
+
+        #: FIXME: in the report, always use this to say who this is a
+        #: child of
+        #: Parent testcase (when this is a subcase of someone)
+        self.parent = None
+
+        #: Keywords for *%(KEY)[sd]* substitution specific to this
+        #: testcase.
+        #:
+        #: Note these do not include values gathered from remote
+        #: targets (as they would collide with each other). Look at
+        #: data:`target.kws <tcfl.tc.target_c.kws>` for that.
+        #:
+        #: These can be used to generate strings based on information,
+        #: as:
+        #:
+        #:   >>>  print "Something %(FIELD)s" % target.kws
+        #:   >>>  target.shcmd_local("cp %(FIELD)s.config final.config")
+        #:
+        #: Fields available:
+        #:
+        #:   - `runid`: string specified by the user that applies to
+        #:     all the testcases
+        #:
+        #:   - `srcdir` and `srcdir_abs`: directory where this
+        #:     testcase was found
+        #:
+        #:   - `thisfile`: file where this testscase as found
+        #:
+        #:   - `tc_hash`: unique four letter ID assigned to this
+        #:     testcase instance. Note that this is the same for all
+        #:     the targets it runs on. A unique ID for each target of
+        #:     the same testcase instance is the field *tg_hash* in the
+        #:     target's keywords :data:`target.kws
+        #:     <tcfl.tc.target_c.kws>` (FIXME: generate, currently
+        #:     only done by app builders)
+        #:
+        #: (this will actually be fully initialzied in *__init_shallow__()*)
+        self.kws = {}
+        self.kws_origin = {}
+
+        # This is initialized by tcfl.testcase.discovery_init()
+        #: Report file prefix
+        #:
+        #: When needing to create report file collateral of any kind,
+        #: prefix it with this so it always shows in the same location
+        #: for all the collateral related to this testcase:
+        #:
+        #: >>>    target.shell.file_copy_from("remotefile",
+        #: >>>                                self.report_file_prefix + "remotefile")
+        #:
+        #: will produce *LOGDIR/report-RUNID:HASHID.remotefile* if
+        #: *--log-dir LOGDIR -i RUNID* was provided as command line.
+        #:
+        #: >>>    target.capture.get('screen',
+        #: >>>                       self.report_file_prefix + "screenshot.png")
+        #:
+        #: will produce *LOGDIR/report-RUNID:HASHID.screenshot.png*
+        #:
+        self.report_file_prefix = "report_file_prefix-UNINITIALIZED"
+
+        # if tags were set with the tcfl.tags() decorator at the class
+        # level, make a copy so we can alter them dictionary of tags
+        # this test case has been stamped with
+        self._tags = dict(self._tags)
+        self._tags_origin = dict(self._tags_origin)
+        self.tag_set('name', self.name)
+
+        # specialize the list of places where this testcase was
+        # declared build only, so each instance can further refine its
+        # own
+        self.build_only = list(self.build_only)
+
+        # Initialized by testcase.discovery_init()
+        #: directory where collaterals are placed
+        self.log_dir = os.getcwd()
+
+        # Initialized by testcase.discovery_init()
+        #: directory where temporary files can be placed
+        self.tmpdir = None
+
+        #: object for logging
+        self.log = tc_logadapter_c(logger, None)
+
+        # especialize this from the class version, so the instance can
+        # control what it cleans up
+        self.cleanup_files = set(self.cleanup_files)
+
+        ##
+        ## FIXME: let's wrap this on a run_data structure and move it
+        ## away from the testcase to make it leaner
+        ##
 
         # we need an OrderedDict so we have move_to_end(), which we
         # need in role_add(). Also, the order is
@@ -2066,8 +2822,6 @@ class tc_c:
         #: integer
         self.axes_permutation_id = None	# FIXME: integer
 
-        self.id = "TESTID"
-
         # Data used by the allocation phase; see
         # __init__allocation__()
         #
@@ -2083,6 +2837,91 @@ class tc_c:
         ## { GROUPNAME: { ( rtb.aka, allocid ) } }
         self._allocations_complete = None
 
+
+    #
+    # Variables for a class of testcases
+    #
+    # maybe especialized later by the instance
+
+    # These are set with tag_set() and tags_set(), accessed with tag()
+    _tags = dict()
+    _tags_origin = dict()
+
+
+    #: list of files to remove when the testcase is done
+    cleanup_files = set()
+
+
+    #
+    # Variables for all testcases (read only for the testcase)
+    #
+
+    #: List of places where we declared this testcase is build only
+    build_only = []
+
+    #: Salt used to generate the testcase :term:`hash`
+    hash_salt = ""
+
+    #: Number of characters in the testcase's :term:`hash`
+    #:
+    #: The testcase's *HASHID* is a unique identifier to identify a
+    #: testcase the group of test targets where it ran.
+    #:
+    #: This defines the lenght of such hash; before it used 4 to be
+    #: four but once over 40k testcases are being run, conflicts start
+    #: to pop up, where more than one testcase/target combo maps to
+    #: the same hash.
+    #:
+    #:  32 ^ 4 = 1048576 unique combinations
+    #:
+    #:  32 ^ 6 = 1073741824 unique combinations
+    #:
+    #: 6 chars offers a keyspace 1024 times larger with base32 than
+    #: 4 chars. Base64 increases the amount, but not that much
+    #: compared to the ease of confusion between caps and non caps.
+    #:
+    #: So it has been raised to 6.
+    #:
+    #: FIXME: add a registry to warn of used ids
+    hashid_len = 6
+
+    # initialized by tcfl.testcase.discovery_setup()
+    #: Identification of this execution
+    runid = ""
+
+    #: Temporary directory where testcases can drop things; this will
+    #: be specific to each testcase instance (testcase and target
+    #: group where it runs). It will be wiped upon test completion.
+    #:
+    #: For test collateral, use instead :data:`report_file_prefix`.
+    #:
+    #: It's initialized at by :func:tcfl.testcase.discovery_init();
+    #: three uses:
+    #:
+    #: - For writing a temporary file that is common to all testcases:
+    #:
+    #:   >>> tcfl.tc_c.tmpdir
+    #:
+    #: - For writing a temporary file that is common to one testcases:
+    #:
+    #:   >>> self.tmpdir
+    #:
+    tmpdir = None
+
+    #: Map exception types to results
+    #:
+    #: this allows to automaticall map an exception raised
+    #: automatically and be converted to a type. Any testcase can
+    #: define their own version of this to decide how to convert
+    #: exceptions from the default of them being considered blockage
+    #: to skip, fail or pass
+    #:
+    #: >>> class _test(tcfl.tc.tc_c):
+    #: >>>     def configure_exceptions(self):
+    #: >>>         self.exception_to_result[OSError] = tcfl.tc.error_e
+    exception_to_result = {
+        AssertionError: blocked_e,
+    }
 
     def __init__allocation__(self):
         # Used by target_ext_run.executor_c._alloc_create()
@@ -2114,9 +2953,173 @@ class tc_c:
         return c
 
 
-    def log(self, *args, **kwargs):
-        # LAME
-        print(self.id, *args, **kwargs)
+    def kw_set(self, key, value, origin = None):
+        """
+        Set a string keyword for later substitution in commands
+
+        :param str kw: keyword name
+        :param str value: value for the keyword
+        :param str origin: origin of this setting; if none, it will be
+          taken from the stack
+        """
+        assert isinstance(key, str)
+        assert isinstance(value, (str, int)), \
+                "value: expected str|int, got %s: %s" % (type(value).__name__, value)
+        if origin == None:
+            origin = commonl.origin_get(1)
+        else:
+            assert isinstance(origin, str)
+        self.kws[key] = value
+        self.kws_origin.setdefault(key, []).append(origin)
+
+
+    def _tags_update(self, tags = None):
+        # Tag/s are to be updated, see if there are any special ones
+        # we need to handle; expect the tag is set already, alng with origin
+        if not tags:
+            return
+        for name, value in tags.items():
+            origin = self._tags_origin.get(name, "n/a")
+            if name == 'build_only' and value == True:
+                self.build_only.append('tag:' + origin)
+
+
+    def tag_set(self, tagname, value = None, origin = None):
+        """
+        Set a testcase tag.
+
+        :param str tagname: name of the tag (string)
+        :param value: (optional) value for the tag; can be a string,
+          bool; if none specified, it is set to True
+        :param str origin: (optional) origin of the tag; defaults to
+          the calling function
+        """
+
+        assert isinstance(tagname, str), (
+            "tagname has to be a string, not a %s" % type(tagname).__name__)
+        if value == None:
+            value = True
+        else:
+            assert isinstance(value, ( str, bool ))
+        if origin == None:
+            origin = "[builtin default] " + commonl.origin_get(1)
+        else:
+            assert isinstance(origin, str)
+        self._tags[tagname] = value
+        self._tags_origin[tagname] = origin
+        self._tags_update({ tagname: value } )
+
+
+    def tags_set(self, tags, origin = None, overwrite = True):
+        """
+        Set multiple testcase tags.
+
+        :param dict tags: dictionary of tags and values
+        :param str origin: (optional) origin of the tag; defaults to
+          the calling function
+
+        Same notes as for :meth:`tag_set` apply
+        """
+        if origin == None:
+            origin = "[builtin default] " + commonl.origin_get(1)
+
+        for name, value in tags.items():
+            assert isinstance(name, str), \
+                f"name has to be a string, not a {type(name)}"
+            if value == None:
+                value = True
+            else:
+                assert isinstance(value, (str, bool)), \
+                    "tag value has to be None (taken as True), bool, " \
+                    "string, not a %s" % type(value).__name__
+            if name in self._tags and overwrite == False:
+                continue
+            self._tags[name] = value
+            self._tags_origin[name] = origin
+        self._tags_update(tags)
+
+
+    def tag_get(self, tagname, value_default, origin_default = None):
+        """
+        Return a tags' value
+
+        :returns tuple: Return a tuple *(value, origin)* with the
+          value of the tag and where it was defined.
+        """
+        if origin_default == None:
+            origin_default = "[builtin default] " + commonl.origin_get(1)
+        return (
+            self._tags.get(tagname, value_default),
+            self._tags_origin.get(tagname, origin_default)
+        )
+
+
+    #
+    # Internal APIs
+    #
+    # FIXME: rename to _
+
+    # Linkage into the report API and support for it
+    @staticmethod
+    def ident():
+        """
+        Returns the current phase identifier for the testcase
+
+        The phase identifier is accumulated per thread and the user
+        can add more to it by running:
+
+        >>> with tcfl.msgid_c("L1"):
+        >>>    ...more code...
+
+        Any calls inside the *with* block will be reported as:
+
+          RUNID:HASHIDL1
+
+        If a second with is done (eg: inside another function):
+
+        >>> with tcfl.msgid_c("L1"):
+        >>>    ...more code...
+        >>>    with tcfl.msgid_c("L2"):
+        >>>        ...more code...
+
+        It would be reported as:
+
+          RUNID:HASHIDL2L3
+
+        :returns: a string with the current accumulated phase
+          identifier.
+        """
+        return msgid_c.ident()
+
+
+    # Deprecated APIs
+    @property
+    def ticket(self):
+        warnings.warn("tcfl.tc_c.ticket", DeprecationWarning)
+        return self.hashid
+
+    @ticket.setter
+    def ticket(self, value):
+        warnings.warn("tcfl.tc_c.ticket", DeprecationWarning)
+        self.hashid = value
+        return self.hashid
+
+    @property
+    def id(self):
+        # FIXME: also replace in tc.kws
+        warnings.warn("tcfl.tc_c.id", DeprecationWarning)
+        return self.name
+
+    @property
+    def runid_visible(self):
+        # FIXME: also replace in tc.kws
+        warnings.warn("tcfl.tc_c.runid_visible", DeprecationWarning)
+        return self.name
+
+    def _kw_set(self, *args, **kwargs):
+        warnings.warn("tcfl.tc_c._kw_set", DeprecationWarning)
+        return self.kw_set(*args, **kwargs)
+
 
     _axes = collections.OrderedDict()
     axes_origin = []
@@ -2649,6 +3652,118 @@ class tc_c:
             print(f"I{level} {self.id}: [+{ts - self.ts0:0.1f}/{os.getpid()}]",
                   *args, file = sys.stderr)
 
+    # Driver API
+
+    @classmethod
+    def driver_setup(cls, *args, **kwargs):
+        """
+        Steps to perform to configure the driver; called when added
+
+        Driver writers can subclass to perform steps upon addition
+
+        Parameters are as passed to :meth:`tcfl.testcase.driver_add`.
+        """
+        return
+
+
+    @classmethod
+    def find_testcases(cls, testcases, testcase_path, subcases_cmdline):
+        """Find testcases in a given path
+
+        WARNING! It is unlikely a testcase driver has to define this method
+
+        Given a path, scan for test cases and put them in the
+        dictionary @testcases based on filename where found. list of zero
+        or more paths, scan them for files that contain testcase tc
+        information and report them.
+
+        Normally all you need for a new driver is subclassing
+        :meth:`is_testcase`.
+
+        :param dict tcs: dictionary where to add the test cases found,
+          keyed by testcase name, values have to be a class or
+          subclass of :class:`tcfl.tc_c`
+
+        :param str path: path where to scan for test cases
+
+        :param list subcases: list of subcase names the testcase should
+          consider
+
+        :returns: :class:`tcfl.result_c` with counts of tests
+          passed/failed (zero, as at this stage we cannot know),
+          blocked (due to error importing) or skipped(due to whichever
+          condition).
+
+        """
+        return result_c()
+
+
+    @classmethod
+    def is_testcase(cls, path, from_path, tc_name, subcases_cmdline):
+        """Determine if a given file describes one or more testcases and
+        crete them
+
+        TCF's test case discovery engine calls this method for each
+        file that could describe one or more testcases. It will
+        iterate over all the files and paths passed on the command
+        line files and directories, find files and call this function
+        to enquire on each.
+
+        This function's responsibility is then to look at the contents
+        of the file and create one or more objects of type
+        :class:`tcfl.tc.tc_c` which represent the testcases to be
+        executed, returning them in a list.
+
+        When creating :term:`testcase driver`, the driver has to
+        create its own version of this function. The default
+        implementation recognizes python files called *test_\*.py* that
+        contain one or more classes that subclass :class:`tcfl.tc.tc_c`.
+
+        See examples of drivers in:
+
+        - :meth:`tcfl.tc_clear_bbt.tc_clear_bbt_c.is_testcase`
+        - :meth:`tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c.is_testcase`
+        - :meth:`examples.test_ptest_runner` (:term:`impromptu
+          testcase driver`)
+
+        note drivers need to be registered with
+        :meth:`tcfl.tc.tc_c.driver_add`; on the other hand, a Python
+        :term:`impromptu testcase driver` needs no registration, but
+        the test class has to be called *_driver*.
+
+        :param str path: path and filename of the file that has to be
+          examined; this is always a regular file (or symlink to it).
+
+        :param str from_path: source command line argument this file
+          was found on; e.g.: if *path* is *dir1/subdir/file*, and the
+          user ran::
+
+            $ tcf run somefile dir1/ dir2/
+
+          *tcf run* found this under the second argument and thus:
+
+          >>> from_path = "dir1"
+
+        :param str tc_name: testcase name the core has determine based
+          on the path and subcases specified on the command line; the
+          driver can override it, but it is recommended it is kept.
+
+        :param list(str) subcases_cmdline: list of subcases the user
+          has specified in the command line; e.g.: for::
+
+            $ tcf run test_something.py#sub1#sub2
+
+          this would be:
+
+          >>> subcases_cmdline = [ 'sub1', 'sub2']
+
+        :returns: list of testcases found in *path*, empty if none
+          found or file not recognized / supported.
+
+        """
+        raise NotImplementedError
+
+
 #
 # tc_c decorators
 # ---------------
@@ -2869,6 +3984,54 @@ def execution_mode(
 
     return decorate_class
 
+
+def serially():
+    """
+    Force a testcase method to run serially (vs :func:`concurrently`).
+
+    Remember methods that are ran serially are run first and by
+    default are those that
+
+    - take more than one target as arguments
+
+    - are evaluation methods
+
+    >>> class _test(tcfl.tc_c):
+    >>>    ...
+    >>>    @tcfl.serially
+    >>>    def deploy(self, target):
+    >>>        ...
+    """
+    def decorate_fn(fn):
+        setattr(fn, "execution_mode", 'serial')
+        return fn
+    return decorate_fn
+
+
+def concurrently():
+    """
+    Force a testcase method to run concurrently after all the serial
+    methods (vs decorator :func:`serially`).
+
+    Remember methods that are ran concurrently are run after the
+    serial methods and by default those that:
+
+    - are not evaluation methods
+
+    - take only one target as argument (if you force two methods that
+      share a target to run in parallel, it is your responsiblity to
+      ensure proper synchronization
+
+    >>> class _test(tcfl.tc_c):
+    >>>    ...
+    >>>    @tcfl.concurrently()
+    >>>    def deploy(self, target):
+    >>>        ...
+    """
+    def decorate_fn(fn):
+        setattr(fn, "execution_mode", 'parallel')
+        return fn
+    return decorate_fn
 
 
 def _spec_filter_target_in_interconnect(target_roles, target_group,

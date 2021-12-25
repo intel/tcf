@@ -33,15 +33,17 @@ Usage
 In any :ref:`TCF configuration file <tcf_client_configuration>`, add::
 
 >>> import tcfl.report_taps
->>> tcfl.tc.report_driver_c.add(tcfl.report_taps.driver(), name = "console")
+>>> tcfl.report_driver_c.add(tcfl.report_taps.driver(), name = "console")
 
 """
-from . import tc
+import logging
 
-class driver(tc.report_driver_c):
+import tcfl
+
+class driver(tcfl.report_driver_c):
 
     def __init__(self):
-        tc.report_driver_c.__init__(self)
+        tcfl.report_driver_c.__init__(self)
         self.count = 1
 
     def report(self, testcase, target, tag, ts, delta,
