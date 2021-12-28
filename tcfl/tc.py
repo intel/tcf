@@ -5992,7 +5992,14 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                 parent_msgid = kwargs.pop('parent_msgid', None)
                 parent_tls = kwargs.pop('parent_tls', None)
                 with msgid_c(parent = parent_msgid) as msgid:
+                    # since we are starting a new thread, lower the
+                    # depth once to account for this msgid object we
+                    # created; note, however, that if this was called
+                    # over standalone code, we might be at zero depth
+                    # already, so compensate for that.
                     msgid._depth -= 1
+                    if msgid._depth <= 0:
+                        msgid._depth = 1
                     self.__thread_init__(parent_tls)
                     result = fn(*args, **kwargs)
                     return result, None
