@@ -5998,7 +5998,9 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                     return result, None
             except:
                 return None, sys.exc_info()
-        _decorated_fn.func_dict['threaded_decorator'] = True
+        # this sets a flag in the decorator function so we can verify
+        # later it has been decorated before trying to use it
+        setattr(_decorated_fn, "func_dict", { 'threaded_decorator': True })
         return _decorated_fn
 
     def run_for_each_target_threaded(
