@@ -81,7 +81,7 @@ def mk_windows_bat(base_dir, tcf_path):
     """
     with open(os.path.join(base_dir, "tcf.bat"), "w") as f:
         f.write(f"""\
-@py -3.9 {tcf_path}\\tcf %*
+@py -{sys.version_info[0]}.{sys.version_info[1]} {tcf_path}\\tcf %*
 """)
 
 def get_install_paths(
