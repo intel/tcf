@@ -188,6 +188,7 @@ def is_tcf_testcase(path, from_path, tc_name, subcases_cmdline):
         logging.info(f"{path}: skipping, doesn't match {file_regex.pattern}")
         return []
     # try to load the module.
+    # FIXME: move to tcf-detect.py
     try:
         loader = importlib.machinery.SourceFileLoader("module", path)
         spec = importlib.util.spec_from_loader(loader.name, loader)
@@ -210,10 +211,12 @@ def is_tcf_testcase(path, from_path, tc_name, subcases_cmdline):
     if classes == []:
         logger.warning("%s: no suitable classes found in %s",
                        path, module)
-        # Nothing found, so let's try to fully unload & delete the
-        # module and garbage collect it
-        del sys.modules[module.__name__]
+        # Nothing found, so let's try to fully delete the module and
+        # garbage collect it--note seems that when we load like we
+        # did, it doesn't end up in sys.modules
         del module
+        return []
+
     tcs = []
     for _cls in classes:
         subcase_name = _cls.__name__
@@ -237,7 +240,10 @@ def is_tcf_testcase(path, from_path, tc_name, subcases_cmdline):
             # might not find it funny and make it easy to find the
             # line number
             source_line = str(inspect.getsourcelines(_cls)[1])
-        except IOError as e:
+        except ( TypeError, IOError ) as e:
+            # TypeError happens in deep classes (a class within a
+            # class) because Pyhton can't find the line number for
+            # that (??)
             source_line = "n/a"
         tc = _cls(name, path, path + ":" + source_line)
         if subcase_name in ( "_test", "_driver" ):

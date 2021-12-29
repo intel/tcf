@@ -399,7 +399,6 @@ class driver(tcfl.report_driver_c):
         # use it
 
         # FIXME: initialize this in the core, so it shows in test_dump_kws*.py
-        print(f"DEBUG _tc.kws is {_tc} {_tc.kws}")
         kws = commonl.dict_missing_c(_tc.kws)
         kws['msg_tag'] = msg_tag
         kws['result'] = tc.valid_results.get(

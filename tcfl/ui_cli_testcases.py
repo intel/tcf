@@ -67,7 +67,10 @@ def _testcase_info_print(testcase):
             if role.axes:
                 print(f"      declares {len(role.axes)} axes to spin on:")
                 for axis, values in role.axes.items():
-                    print(f"        - {axis}: {values}")
+                    if values:
+                        print(f"        - {axis}: {values}")
+                    else:
+                        print(f"        - {axis}")
             else:
                 print(f"      declares no axes to spin on")
 
@@ -164,13 +167,8 @@ def _cmdline_info(args):
                       f" (tried drivers: {' '.join(names)})")
         return
 
-    with tcfl.run.executor_c() as executor:
-        # FIXME: move executor.testcases to parameter --  this is now
-        # a global being used to provide input, which is bad (TM)
-        executor.testcases.update(tcs_filtered)
-        executor.target_discover()
-        executor.axes_expand()
-        _testcase_info_print(testcase)
+    for _name, tc in tcs_filtered.items():
+        _testcase_info_print(tc)
 
 
 def _common_args_add(ap):
