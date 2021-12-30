@@ -581,6 +581,7 @@ def discover(tcs_filtered, sources, manifests = None, filter_spec = None,
         tags_spec = "(" + ") or (".join(filter_spec) +  ")"
 
     for tc_path, tc in tcs.items():
+        discovery_init(tc)
         try:
             # This is a TC unit testcase aid
             if testcase_name and tc.name != testcase_name:
@@ -607,9 +608,8 @@ def discover(tcs_filtered, sources, manifests = None, filter_spec = None,
             # Fill in any arguments from the command line
             # We will consider this testcase
             tcs_filtered[tc_path] = tc
-        except exception as e:
-            tc.mkticket()
-            with msgid_c() as _msgid:
+        except Exception as e:
+            with tcfl.msgid_c() as _msgid:
                 result += tcfl.result_c.report_from_exception(tc, e)
 
     # FIXME: this should be printed by caller? or not by caller and here
@@ -663,6 +663,7 @@ def mkhashid(tc: tcfl.tc_c, hashid: str = None):
 
 
 def discovery_init(tc: tcfl.tc_c):
+    print(f"DEBUG discovery_init {id(tc)} STARTING")
     # init a testcase to be able to do basic discovery
     mkhashid(tc)
     tc.tmpdir = os.path.join(tcfl.tc_c.tmpdir, tc.hashid)
@@ -692,7 +693,7 @@ def discovery_init(tc: tcfl.tc_c):
     # Calculate the report file prefix and set it
     tc.report_file_prefix = os.path.join(tcfl.tc_c.log_dir, f"report-{tc.runid_hashid}")
     tc.kws['report_file_prefix'] = tc.report_file_prefix
-
+    print(f"DEBUG discovery_init {id(tc)} DONE")
 
 def run_cleanup(tc):
     # Remove and wipe files left behind

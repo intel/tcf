@@ -144,7 +144,6 @@ def _testcase_info_print(testcase):
 def _cmdline_info(args):
 
     import tcfl.testcase		# lazy imports
-    import tcfl.run
 
     tcfl.testcase.discovery_setup(
         log_dir = args.log_dir,

@@ -238,6 +238,7 @@ class driver(tcfl.report_driver_c):
             "SKIP": ( 'cyan', ),	# no orange available...
             'DATA': ( "blue", ),
         }
+
         console_p, logfile_p = self._shall_do(testcase, level, message)
         if console_p:
             # if this is a terminal, colorize the TAG in the main

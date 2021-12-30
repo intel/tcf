@@ -261,15 +261,10 @@ class result_c:
         # context
         subcase_base = getattr(e, '_subcase_base', None)
 
-        # FIXME:HACK until we are done solving the import hell
-        #if isinstance(_tc, target_c):
-        #    tc = _tc.testcase
-        #else:
-        #    assert isinstance(_tc, tc_c)
-        #    tc = _tc
-        if type(_tc).__name__ == "tc_c":
+        # COMPAT: type(_tc).__name__ == "target_c" for old style tcfl.tc
+        if isinstance(_tc, target_c) or type(_tc).__name__ == "target_c":
             tc = _tc.testcase
-        elif type(_tc).__name__ == "target_c":
+        elif isinstance(reporter, tc_c) or type(_tc).__name__ == "tc_c":
             tc = _tc
         else:
             raise AssertionError(
@@ -3635,23 +3630,6 @@ class tc_c(reporter_c):
         self._report_results("FIXME")
 
 
-    # temporary hack
-    ts0 = None
-    level_max = int(os.environ.get("VERBOSITY", 3))
-
-    def report_info(self, *args, **kwargs):
-        global tls
-        if tls.pid == None:
-            # FIXME: not sure this is working at multiprocess level
-            tls.pid = os.getpid()
-        ts = time.time()
-        if self.ts0 == None:
-            self.ts0 = ts
-        level = kwargs.get("level", 0)
-        if level < self.level_max:
-            print(f"I{level} {self.id}: [+{ts - self.ts0:0.1f}/{os.getpid()}]",
-                  *args, file = sys.stderr)
-
     # Driver API
 
     @classmethod
@@ -3899,11 +3877,12 @@ def target(spec = None, name = "target", count = 1, **kwargs):
         del kwargs['interconnect']
     except KeyError:
         pass
-    return role_add(spec = spec, name = name, count = count, interconnect = False,
-                    **kwargs)
+    return role_add(
+        spec = spec, name = name, count = count, interconnect = False,
+        **kwargs)
 
 
-def interconnect(*args, **kwargs):
+def interconnect(spec = None, name = "ic", count = 1, **kwargs):
     """
     Add an interconnect role to a testcase class
 
@@ -3922,12 +3901,12 @@ def interconnect(*args, **kwargs):
         del kwargs['interconnect']
     except KeyError:
         pass
-    if len(args) < 1:
-        kwargs.setdefault('name', "ic")
     # default for interconnects, if you override, assume you know
     # what you are doing i ¯\_(ツ)_/¯
     kwargs.setdefault('axes', { 'interfaces.interconnect_c':  [ {} ] })
-    return role_add(*args, interconnect = True, **kwargs)
+    return role_add(
+        spec = spec, name = name, count = count, interconnect = True,
+        **kwargs)
 
 
 def execution_mode(
