@@ -193,8 +193,9 @@ class method_abc:
 
     def install(self, package, package_alternate, package_data, method_details):
         # return
-        # False: didn't install, try something else
+        # None: didn't install, not supported
         # True: installed
+        # False (or anything else): didn't install, try something else
         #
         # raise exception for a "stop right now" problem
         raise NotImplementedError
@@ -328,10 +329,10 @@ class method_windows_c(method_abc):
         method_abc.__init__(self, "windows", [ 'windows' ])
 
     def install(self, package, package_alternate, package_data, method_details):
-        logging.error(
+        logging.info(
             f"{package} [windows/{package_alternate}]: not installing"
             f" as windows package because Windows can't")
-        return False
+        return None
 
 
 
@@ -948,14 +949,20 @@ def _command_install(args):
                 logging.info(
                     f"{package} [{method.name}/{package_alternate}]:"
                     f" method details {_method_details}")
-                if method.install(
+                r = method.install(
                         package, package_alternate, package_data,
-                        _method_details):
+                        _method_details)
+                if r == True:
                     logging.warning(f"{package}: installed with {method.name}")
                     break
-                logging.warning(
-                    f"{package} [{method.name}/{package_alternate}]:"
-                    f" did not install")
+                elif r == None:
+                    logging.info(
+                        f"{package} [{method.name}/{package_alternate}]:"
+                        f" did not install: not supported")
+                elif r == False:
+                    logging.info(
+                        f"{package} [{method.name}/{package_alternate}]:"
+                        f" did not install (returned {r})")
             except Exception as e:
                 logging.exception(
                     f"BUG! {package} installation raised: {e}")
