@@ -2024,8 +2024,110 @@ With the TCF client, use the *tcf store-upload TARGETNAME
 REMOTEFILENAME LOCALFILENAME* command.
 
 
+GET /store/list2 [ARGUMENTS] -> DICTIONARY
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+(note this is version 2 of the call, which superseeds by version 1, *list*
+described below)
+
+List files in user’s storage or global storage and their digital
+signature.
+
+Note this only lists a single subdirectory without recursing into
+other subdirectories--this is intended by design to avoid recursive
+operation that might be costly to the server. The user can use the
+*path* argument to specify a subdirectory of an storage area.
+
+**Access control:** only the logged in user can call this to access
+their own storage area and of common areas.
+
+**Arguments**
+
+- *filenames*: (optional) list of filenames to list; defaults to all
+  if not specified. This is useful when the caller wants to check the
+  existence of certain files and their signatures and is not
+  interested in the rest.
+
+- *path*: (optional) path to the storage area; if not specified,
+  it will list in the user's storage area. Otherwise, it refers to the
+  given storage area. The server's administrator will, upon
+  configuration, specify which paths are allowed.
+
+  The path */* refers to the top level storage area and can be used to
+  list the top level storage areas the administrator has configured.
+
+- *digest*: (optional, default *zero*) digest to use to calculate
+  digital signatures. Valid are:
+
+  - *md5*
+  - *sha256*
+  - *sha512*
+  - *zero* (no digest)
+
+**Returns**
+
+- On success, 200 HTTP code and a JSON dictionary keyed by filename
+  containing the information for each file.
+
+  The dictionary will contain the following keys:
+
+  - *type*: a string describing the type of the entry:
+
+    - *directory* (a directory which might contain other entries)
+
+    - *file* (a file which contains data)
+
+    - *unknown* (other)
+
+  - *size*: (only for *type* being *file*) integer describing ghre
+    size (in bytes) of the file
+
+  - *aliases*: if the entry is a link or an alias for another, a
+    string describing the name the entry being aliased
+
+  - *digest*: (only for *type* being *file* and for *digest* being a
+    valid, non *zero* digest) string describing the digest of the
+    data.
+
+- On error, non-200 HTTP code and a JSON dictionary with diagnostics
+
+.. note:: implementations are allowed to rate limit this call, since
+          digest computation can be costly to avoid denial of service
+          attacks.
+
+          Eg: allowing a user to call this only once every five minutes
+          and delaying the execution of the next if it came before
+          five minutes.
+
+**Differences with list**:
+
+- default digest is zero (no digest)
+- more information returned for each entry
+- ability to tell destination of links / aliases
+
+**Example**
+
+::
+
+   $ curl -sk -b cookies.txt -X GET \
+     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/store/list \
+     | python -m json.tool
+   {
+       "_diagnostics": "",
+       ...
+       "bios.bin.xz": "50c3c3ed1e54deddfe831198883af91ad6e9112f8f1487214cdd789125f737f0",
+       "bmc.bin.xz": "5d12bddb65567e9cb74b6a0d72ed1ecac2bbb629f167d10e496d535461f8fd54",
+       ...
+   }
+
+With the TCF client, use the *tcf store-ls TARGETNAME* command.
+
+
 GET /store/list [ARGUMENTS] -> DICTIONARY
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+(note this is version 1 of the call, superseeded by version 2, *list2*
+described above)
 
 List files in user’s storage or global storage and their digital
 signature.
@@ -3154,7 +3256,7 @@ that came out of it. This call allows the user to query that data. See
     header will return the maximum offset allowed (which matches the
     current size).
 
-    See :ref:`console reading workflows 
+    See :ref:`console reading workflows
     <http_target_console_reading_workflow>` above for how these
     values are used for the client to read through power cycles of
     the platform.

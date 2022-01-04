@@ -25,11 +25,13 @@ Examples:
   use to (eg: burn into a  Flash ROM).
 
 """
-
 import errno
+import glob
 import hashlib
 import os
+import pathlib
 import re
+import stat
 
 import commonl
 import ttbl
@@ -128,7 +130,7 @@ class interface(ttbl.tt_interface):
         "zero": "no signature"
     }
 
-    def get_list(self, target, _who, args, _files, user_path):
+    def _get_list(self, target, _who, args, _files, user_path, version):
         filenames = self.arg_get(args, 'filenames', list,
                                  allow_missing = True, default = [ ])
         path = self.arg_get(args, 'path', str,
@@ -139,29 +141,76 @@ class interface(ttbl.tt_interface):
             pass	# special handling
         else:
             path = self._validate_path(target, path)
+
+        if version == 1:
+            digest_default = "sha256"
+        else:
+            digest_default = "zero"
         digest = self.arg_get(args, 'digest', str,
-                              allow_missing = True, default = "sha256")
+                              allow_missing = True, default = digest_default)
         if digest not in self.valid_digests:
             raise RuntimeError("%s: digest not allowed (only %s)"
                                % digest, ", ".join(self.valid_digests))
+
+        def _entry(path, digest):
+            # return data about a path
+            #
+            # version 1
+            # - default digest: sha256
+            # - returns a string with digest or "directory"
+            #
+            # version 2
+            # - default digest: zero (less load on the system)
+            # - returns dict
+            #     type: directory / file / link / unknown (others)
+            #     size: (if type == "file") in bytes
+            #     digest: (if file and not default digest) str
+            #     aliases: if link, target of link
+            if version == 1:
+                s = os.stat(path)
+                if stat.S_ISDIR(s.st_mode):
+                    return "directory"
+                if digest == "zero":
+                    return "0"
+                return commonl.hash_file_cached(path, digest)
+
+            s = os.stat(path, follow_symlinks = False)
+            d = {}
+            if stat.S_ISDIR(s.st_mode):
+                d['type'] = "directory"
+            elif stat.S_ISLNK(s.st_mode):
+                real_path = str(pathlib.Path(path).resolve())
+                d = _entry(real_path, digest)
+                # we don't want to publish the whole path, only the first
+                # link. Why? Because we can assume the user who is opening the
+                # path has control over the path itself, but if this is
+                # pointing to internals of the system, then the user might
+                # have no more control. So we resolve to get the data, but we
+                # only publish the first link.
+                d['aliases'] = os.readlink(path)
+            elif stat.S_ISREG(s.st_mode):
+                d['type'] = "file"
+                d['size'] = s.st_size
+                if digest and digest != "zero":
+                    # note file path is normalized, so we shouldn't
+                    # get multiple cache entries for different paths
+                    d['digest'] = commonl.hash_file_cached(path, digest)
+            else:
+                d['type'] = "unknown"
+            return d
+
 
         file_data = {}
         if path == "/":
             # we want the top level list of folders, handle it specially
             for path in paths_allowed:
-                file_data[path] = "directory"
-            file_data['result'] = dict(file_data)	# COMPAT
+                file_data[path] = _entry(paths_allowed[path], digest)
             return file_data
 
         def _list_filename(index_filename, filename):
             file_path = os.path.join(path, filename)
             try:
-                if digest == "zero":
-                    file_data[index_filename] = "0"
-                else:
-                    # note file path is normalized, so we shouldn't
-                    # get multiple cahce entries for different paths
-                    file_data[index_filename] = commonl.hash_file_cached(file_path, digest)
+                file_data[index_filename] = _entry(file_path, digest)
             except ( OSError, IOError ) as e:
                 if e.errno != errno.ENOENT:
                     raise
@@ -172,25 +221,27 @@ class interface(ttbl.tt_interface):
                 if not isinstance(filename, str):
                     continue
                 file_path, _rw = self._validate_file_path(target, filename, path)
-                if os.path.isdir(file_path):
-                    file_data[filename] = 'directory'
-                else:
-                    _list_filename(filename, file_path)
+                _list_filename(filename, file_path)
         else:
-            for _path, dirnames, files in os.walk(path, topdown = True):
-                for filename in files:
-                    _list_filename(filename, filename)
-                for dirname in dirnames:
-                    file_data[dirname] = 'directory'
-                # WE ONLY generate the list of the path, not for
-                # subpaths -- by design we only do the first level
-                # because otherwise we could be generating a lot of
-                # load in the system if a user makes a mistake and
-                # keeps asking for a recursive list.
-                # FIXME: throttle this call
-                break
-        file_data['result'] = dict(file_data)	# COMPAT
+            # we only list what is in that path, no going down, so use
+            # glob, kinda simpler
+            for name in glob.glob(path + "/*"):
+                index_filename = os.path.basename(name)
+                _list_filename(index_filename, index_filename)
         return file_data
+
+
+    def get_list(self, target, _who, args, _files, user_path):
+        r = self._get_list(target, _who, args, _files, user_path,
+                           version = 1)
+        r['result'] = dict(r)	# COMPAT
+        return r
+
+
+    def get_list2(self, target, _who, args, _files, user_path):
+        r = self._get_list(target, _who, args, _files, user_path,
+                           version = 2)
+        return r
 
 
     def post_file(self, target, _who, args, files, user_path):

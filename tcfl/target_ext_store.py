@@ -19,6 +19,7 @@ import pprint
 import tabulate
 
 import commonl
+import tcfl
 from . import tc
 from . import msgid_c
 
@@ -152,6 +153,76 @@ class extension(tc.target_extension_c):
         return r
 
 
+    def list2(self, filenames = None, path = None, digest = None):
+        """
+        List available files and their digital signatures
+
+        v2 of the call, returns more data
+
+        :param list(str) filenames: (optional; default all) filenames
+          to list. This is used when we only want to get the digital
+          signature of an specific file that might or might not be
+          there.
+
+        :param str path: (optional; default's to user storage) path to
+          list; only allowed paths (per server configuration) can be
+          listed.
+
+          To get the list of allowed paths other than the default
+          user's storage path, specify path */*.
+
+        :param str digest: (optional; default *none*) digest to
+          use. Valid values so far are *md5*, *sha256* and *sha512*.
+
+        :return: dictionary keyed by filename of dictionary with data
+          for each entry:
+
+          - *type*: a string describing the type of the entry:
+
+            - *directory* (a directory which might contain other entries)
+
+            - *file* (a file which contains data)
+
+            - *unknown* (other)
+
+          - *size*: (only for *type* being *file*) integer describing ghre
+            size (in bytes) of the file
+
+          - *aliases*: if the entry is a link or an alias for another, a
+            string describing the name the entry being aliased
+
+          - *digest*: (only for *type* being *file* and for *digest* being a
+            valid, non *zero* digest) string describing the digest of the
+            data.
+
+      """
+        commonl.assert_none_or_list_of_strings(filenames, "filenames", "filename")
+        try:
+            return self.target.ttbd_iface_call(
+                "store", "list2", path = path, digest = digest,
+                filenames = filenames, method = "GET")
+        except tcfl.exception as e:
+            if 'list2: unsupported' not in repr(e):
+                raise
+            r = self.target.ttbd_iface_call(
+                "store", "list", path = path, digest = digest,
+                filenames = filenames, method = "GET")
+            if 'result' in r:
+                r = r['result']	# COMPAT
+            # no xlate this to the v2 format, which is a dict of dicts
+            # we can't do much, since the v1 format is very succint
+            entries = {}
+            for entry, data in r.items():
+                if data == 'directory':
+                    entries[entry] = { "type": "directory" }
+                elif data != "0":
+                    # we have a non-default digest
+                    entries[entry] = { "type": "file", "digest": data }
+                else:
+                    entries[entry] = { "type": "file" }
+            return entries
+
+
     def _healthcheck(self):
         target = self.target
         l0 = target.store.list()
@@ -219,18 +290,28 @@ def _cmdline_store_list(args):
             args, extensions_only = "store", iface = "store")
         if not args.filename:
             args.filename = None
-        data = target.store.list(path = args.path, filenames = args.filename,
-                                 digest = args.digest)
-
+        data = target.store.list2(path = args.path, filenames = args.filename,
+                                  digest = args.digest)
+        # this assumes v2 of the call, which if talking to a v1 server
+        # will convert the data to v2 format
         if args.verbosity == 0:
-            for file_name, file_hash in data.items():
-                print(file_hash, file_name)
+            # simple one entry per line
+            for file_name, file_data in data.items():
+                print(file_name, ' '.join(f"{k}:{v}" for k, v in file_data.items()))
         elif args.verbosity == 1:
             headers = [
-                "File name",
+                "Name",
+                "Type",
+                "Aliases",
                 "Hash " + (args.digest if args.digest else "(default)"),
             ]
-            print(tabulate.tabulate(data.items(), headers = headers))
+            entries = []
+            for file_name, file_data in data.items():
+                entry = [ file_name, file_data['type'] ]
+                entry.append(file_data.get("aliases", ""))
+                entry.append(file_data.get("digest", ""))
+                entries.append(entry)
+            print(tabulate.tabulate(entries, headers = headers))
         elif args.verbosity == 2:
             commonl.data_dump_recursive(data)
         elif args.verbosity == 3:
