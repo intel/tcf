@@ -518,15 +518,6 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
                 logger.warning("diagnostics: " + line)
         return rdata
 
-    def login(self, email, password):
-        data = {"email": email, "password": password}
-        try:
-            self.send_request('PUT', "login", data)
-        except requests.exceptions.HTTPError as e:
-            if e.status_code == 404:
-                logger.error("%s: login failed: %s", self._url, e)
-            return False
-        return True
 
     def logged_in_username(self):
         """
@@ -549,13 +540,6 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
                 raise RuntimeError(
                     "server can't translate user 'self'; got '%s'" % ur)
         return username
-
-    def logout(self, username = None):
-        if username:
-            self.send_request('DELETE', "users/" + username)
-        else:
-            # backwards compath
-            self.send_request('PUT', "logout")
 
     def validate_session(self, validate = False):
         if self.valid_session is None or validate:
@@ -675,102 +659,6 @@ def rest_shutdown(path):
     for rtb in rest_target_brokers.values():
         rtb.tb_state_save(path)
 
-
-def _credentials_get(domain, aka, args):
-    # env general
-    user_env = os.environ.get("TCF_USER", None)
-    password_env = os.environ.get("TCF_PASSWORD", None)
-    # server specific
-    user_env_aka = os.environ.get("TCF_USER_" + aka, None)
-    password_env_aka = os.environ.get("TCF_PASSWORD_" + aka, None)
-
-    # from commandline
-    user_cmdline = args.user
-    password_cmdline = args.password
-
-    # default to what came from environment
-    user = user_env
-    password = password_env
-    # override with server specific from envrionment
-    if user_env_aka:
-        user = user_env_aka
-    if password_env_aka:
-        password = password_env_aka
-    # override with what came from the command line
-    if user_cmdline:
-        user = user_cmdline
-    if password_cmdline:
-        password = password_cmdline
-
-    if not user:
-        if args.quiet:
-            raise RuntimeError(
-                "Cannot obtain login name and"
-                " -q was given (can't ask); "
-                " please specify a login name or use environment"
-                " TCF_USER[_AKA]")
-        if not sys.stdout.isatty():
-            raise RuntimeError(
-                "Cannot obtain login name and"
-                " terminal is not a TTY (can't ask); "
-                " please specify a login name or use environment"
-                " TCF_USER[_AKA]")
-        user = input('Login for %s [%s]: ' \
-                     % (domain, getpass.getuser()))
-        if user == "":	# default to LOGIN name
-            user = getpass.getuser()
-            print("I: defaulting to login name %s (login name)" % user)
-
-    if not password:
-        if args.quiet:
-            raise RuntimeError(
-                "Cannot obtain password and"
-                " -q was given (can't ask); "
-                " please specify a login name or use environment"
-                " TCF_PASSWORD[_AKA]")
-        if not sys.stdout.isatty():
-            raise RuntimeError(
-                "Cannot obtain password and"
-                " terminal is not a TTY (can't ask); "
-                " please specify a login name or use environment"
-                " TCF_PASSWORD[_AKA]")
-        password = getpass.getpass("Password for %s at %s: " % (user, domain))
-    return user, password
-
-def rest_login(args):
-    """
-    Login into remote servers.
-
-    :param argparse.Namespace args: login arguments like -q (quiet) or
-      userid.
-    :returns: True if it can be logged into at least 1 remote server.
-    """
-    logged = False
-    if not args.split and sys.stdout.isatty() and not args.quiet:
-        if args.user == None:
-            args.user = input('Login [%s]: ' % getpass.getuser())
-        if args.password in ( "ask", None):
-            args.password = getpass.getpass("Password: ")
-    for rtb in rest_target_brokers.values():
-        logger.info("%s: checking for a valid session", rtb._url)
-        if not rtb.valid_session:
-            user, password = _credentials_get(rtb._url, rtb.aka, args)
-            try:
-                if rtb.login(user, password):
-                    logged = True
-                else:
-                    logger.error("%s (%s): cannot login: with given "
-                                 "credentials %s", rtb._url, rtb.aka, user)
-            except Exception as e:
-                logger.exception("%s (%s): cannot login: %s",
-                                 rtb._url, rtb.aka, e)
-                continue         # if we are login into many, we are good
-        else:
-            logged = True
-    if not logged:
-        logger.error("Could not login to any server, "
-                     "please check your config")
-        exit(1)
 
 def rest_target_print(rt, verbosity = 0):
     """

@@ -45,6 +45,18 @@ import tcfl.ttb_client # ...ugh
 logger = logging.getLogger("tcfl")
 log_sd = logging.getLogger("server-discovery")
 
+
+tls = threading.local()
+
+
+def tls_var(name, factory, *args, **kwargs):
+    value = getattr(tls, name, None)
+    if value == None:
+        value = factory(*args, **kwargs)
+        setattr(tls, name, value)
+    return value
+
+
 class result_c:
     def __init__(self, passed = 0, errors = 0, failed = 0,
                  blocked = 0, skipped = 0):
@@ -432,6 +444,9 @@ class exception(Exception, result_c):
         self.attachments.update(d)
 
     def __repr__(self):
+        return self.args[0]
+
+    def __str__(self):
         return self.args[0]
 
     tag = None
@@ -967,6 +982,8 @@ class server_c:
         if self.parsed_url.scheme == "" or self.parsed_url.netloc == "":
             raise ValueError(f"{url}: malformed URL? missing hostname/schema")
         self.url = url
+        self.base_url = urllib.parse.urljoin(
+            self.url, self.API_PREFIX)
         self.ssl_verify = ssl_verify
         self.aka = aka
         self.ca_path = ca_path
@@ -982,6 +999,13 @@ class server_c:
         self.reason = None
         self.cache_lockfile = None
         self.fsdb = None
+
+
+    #: Version of the API this client library understands
+    API_VERSION = 2
+
+    #: Prefix on the server's URL
+    API_PREFIX = "/ttb-v" + str(API_VERSION) + "/"
 
 
     def setup(self):
@@ -1009,6 +1033,206 @@ class server_c:
             aka += "_unencrypted"
         self.aka = aka
         return aka
+
+
+    def _cookies_trash(self):
+        with filelock.FileLock(self.cache_lockfile):
+            cookiejar = os.path.join(self.cookie_dir, self.aka)
+            commonl.rm_f(cookiejar)
+
+
+    def _cookies_save(self, cookies):
+        if cookies:
+            # got cookies, update them -- otherwise ignore, otherwise
+            # if we get empty cooikes in send_request() this will
+            # wipe'em.
+            cookiejar = os.path.join(self.cookie_dir,self.aka)
+            with filelock.FileLock(self.cache_lockfile):
+                # weirdo open
+                with open(cookiejar, "wb", ) as f:
+                    pickle.dump(cookies, f)
+                    logger.debug("%s: cookies saved %s",
+                                 self.url, pprint.pformat(cookies))
+
+    def _cookies_load(self):
+        # FIXME: these cookies need to be loaded from the cache
+        # each time they are used since they might have updated by
+        # another client in another process/thread
+        with filelock.FileLock(self.cache_lockfile):
+            cookiejar = os.path.join(self.cookie_dir, self.aka)
+            try:
+                with open(cookiejar, "rb", ) as f:
+                    cookies = pickle.load(f)
+                    logger.debug("%s: cookies loaded %s",
+                                 self.url, pprint.pformat(cookies))
+                    return cookies
+            except pickle.UnpicklingError as e: #invalid state, clean file
+                logger.debug("%s: bad state file %s", cookiejar, e)
+                commonl.rm_f(cookiejar)
+            except IOError as e:
+                if e.errno != errno.ENOENT:
+                    raise e
+                logger.debug("%s: no state-file, will not load", cookiejar)
+            return {}
+
+
+    def send_request(self, method, url,
+                     data = None, json = None, files = None,
+                     stream = False, raw = False, timeout = 160,
+                     retry_timeout = 0, retry_backoff = 0.5,
+                     skip_prefix = False):
+        """
+        Send request to server using url and data, save the cookies
+        generated from request, search for issues on connection and
+        raise and exception or return the response object.
+
+        :param str url: url to request
+        :param dict data: args to send in the request. default None
+        :param str method: method used to request GET, POST and
+          PUT. Defaults to PUT.
+        :param bool raise_error: if true, raise an error if something goes
+           wrong in the request. default True
+
+        :param float retry_timeout: (optional, default 0--disabled)
+          how long (in seconds) to retry connections in case of failure
+          (:class:`requests.exceptions.ConnectionError`,
+          :class:`requests.exceptions.ReadTimeout`)
+
+          Note a retry can have side effects if the request is not
+          idempotent (eg: writing to a console); retries shall only be
+          enabled for GET calls. Support for non-idempotent calls has
+          to be added to the protocol.
+
+          See also :meth:`tcfl.tc.target_c.ttbd_iface_call`
+
+        :returns requests.Response: response object
+
+        """
+        assert not (data and json), \
+            "can't specify data and json at the same time"
+        assert isinstance(retry_timeout, (int, float)) and retry_timeout >= 0, \
+            f"retry_timeout: {retry_timeout} has to be an int/float >= 0"
+        assert isinstance(retry_backoff, (int, float)) and retry_backoff > 0
+        if retry_timeout > 0:
+            assert retry_backoff < retry_timeout, \
+                f"retry_backoff {retry_backoff} has to be" \
+                f" smaller than retry_timeout {retry_timeout}"
+
+        # create the url to send request based on API version
+        if url.startswith("/"):
+            url = url[1:]
+        if skip_prefix:
+            url_request = urllib.parse.urljoin(self.parsed_url.geturl(), url)
+        else:
+            url_request = urllib.parse.urljoin(self.base_url, url)
+        logger.debug("send_request: %s %s", method, url_request)
+        cookies = self._cookies_load()
+        session = tls_var("session", requests.Session)
+        retry_count = -1
+        retry_ts = None
+        r = None
+        while True:
+            retry_count += 1
+            try:
+                if method == 'GET':
+                    r = session.get(url_request, cookies = cookies, json = json,
+                                    data = data, verify = self.ssl_verify,
+                                    stream = stream, timeout = (timeout, timeout))
+                elif method == 'PATCH':
+                    r = session.patch(url_request, cookies = cookies, json = json,
+                                      data = data, verify = self.ssl_verify,
+                                      stream = stream, timeout = ( timeout, timeout ))
+                elif method == 'POST':
+                    r = session.post(url_request, cookies = cookies, json = json,
+                                     data = data, files = files,
+                                     verify = self.ssl_verify,
+                                     stream = stream, timeout = ( timeout, timeout ))
+                elif method == 'PUT':
+                    r = session.put(url_request, cookies = cookies, json = json,
+                                    data = data, verify = self.ssl_verify,
+                                    stream = stream, timeout = ( timeout, timeout ))
+                elif method == 'DELETE':
+                    r = session.delete(url_request, cookies = cookies, json = json,
+                                       data = data, verify = self.ssl_verify,
+                                       stream = stream, timeout = ( timeout, timeout ))
+                else:
+                    raise AssertionError("{method}: unknown HTTP method" )
+                break
+            except (
+                    requests.exceptions.ConnectionError,
+                    requests.exceptions.ReadTimeout,
+            ) as e:
+                # Retry only these; note these cannot report
+                # Report how many retries we have done, wait a backoff
+                # and then loop it.
+                if retry_timeout == 0:
+                    raise
+                ts = time.time()
+                if retry_ts == None:
+                    retry_ts = ts	# first one
+                else:
+                    if ts - retry_ts > retry_timeout:
+                        raise RuntimeError(
+                            f"{url_request}: giving up after {retry_timeout}s"
+                            f" retrying {retry_count} connection errors") from e
+                time.sleep(retry_backoff)
+                # increase the backoff to avoid pestering too much,
+                # but make sure it doesn't get too big so we at least
+                # get 10 tries in the timeout period
+                if retry_backoff < retry_timeout / 10:
+                    retry_backoff *= 1.2
+                continue
+
+        self._cookies_save(dict(r.cookies))
+        commonl.request_response_maybe_raise(r)
+        if raw:
+            return r
+        rdata = r.json(object_pairs_hook = collections.OrderedDict)
+        if '_diagnostics' in rdata:
+            diagnostics = rdata.pop('_diagnostics')
+            # this is not very...memory efficient
+            for line in diagnostics.split("\n"):
+                logger.warning("diagnostics: " + line)
+        return rdata
+
+
+    def login(self, username, password):
+        """
+        Login to the server
+
+        :param str username: name of user to login
+
+        :param str password: password/token for the user to login
+
+        :raises requests.exceptions.HTTPError: on error
+        """
+        try:
+            # send_request() updates cookies in CACHEDIR/SERVER.cookies
+            self.send_request(
+                'PUT', "login",
+                data = { "username": username, "password": password })
+        except requests.exceptions.HTTPError as e:
+            raise tcfl.error_e(f"{username}@{self.url}: login failed: {e}") from e
+
+
+    def logout(self, username: str = None):
+        """
+        Logout a user or self
+
+        :param str username: name of user to logout (defaults to self)
+
+        :raises requests.exceptions.HTTPError: on error
+        """
+        try:
+            if username:
+                self.send_request('DELETE', "users/" + username)
+            else:
+                # backwards compat
+                self.send_request('PUT', "logout")
+        except requests.exceptions.HTTPError as e:
+            if username == None:
+                username = "self"
+            raise tcfl.error_e(f"{username}@{self.url}: logout failed: {e}") from e
 
 
     def target_release(self, target_id: str, force: bool = False):
@@ -1469,6 +1693,9 @@ class server_c:
         cls.cache_dir = os.path.expanduser(
             os.path.join("~", ".cache", "tcf", "servers"))
         commonl.makedirs_p(cls.cache_dir, reason = "server cache")
+        cls.cookie_dir = os.path.expanduser(
+            os.path.join("~", ".cache", "tcf", "cookies"))
+        commonl.makedirs_p(cls.cookie_dir, reason = "cookie cache")
 
         bad_servers = collections.defaultdict(int)
 

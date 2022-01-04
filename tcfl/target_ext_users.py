@@ -99,17 +99,6 @@ def _cmdline_user_list(args):
         print(json.dumps(result, skipkeys = True, indent = 4))
 
 
-def _cmdline_logout(args):
-    """
-    Logout user from all the servers
-    """
-    rtbs = ttb_client.rest_target_brokers.values()
-    with concurrent.futures.ThreadPoolExecutor(len(rtbs)) as executor:
-        rs = executor.map(
-            lambda rtb: rtb.logout(args.username),
-            rtbs)
-
-
 def _user_role(rtb, username, action, role):
     try:
         return rtb.send_request(
@@ -267,15 +256,6 @@ def _cmdline_setup(arg_subparsers):
         "(none is a table, -v table with more details, "
         "-vv hierarchical, -vvv Python format, -vvvv JSON format)")
     ap.set_defaults(func = _cmdline_user_list)
-
-    ap = arg_subparsers.add_parser(
-        "logout",
-        help = "Log user out of the servers brokers")
-    ap.add_argument(
-        "username", nargs = '?', action = "store", default = None,
-        help = "User to logout (defaults to current); to logout others "
-        "*admin* role is needed")
-    ap.set_defaults(func = _cmdline_logout)
 
     ap = arg_subparsers.add_parser(
         "role-gain",
