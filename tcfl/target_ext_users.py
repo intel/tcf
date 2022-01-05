@@ -99,30 +99,6 @@ def _cmdline_user_list(args):
         print(json.dumps(result, skipkeys = True, indent = 4))
 
 
-def _user_role(rtb, username, action, role):
-    try:
-        return rtb.send_request(
-            "PUT", "users/" + username + "/" + action + "/" + role)
-    except ttb_client.requests.exceptions.HTTPError as e:
-        logger.error(f"{rtb.aka}: {e} (ignored)")
-
-
-def _cmdline_role_gain(args):
-    rtbs = ttb_client.rest_target_brokers.values()
-    with concurrent.futures.ThreadPoolExecutor(len(rtbs)) as executor:
-        rs = executor.map(
-            lambda rtb: _user_role(rtb, args.username, "gain", args.role),
-            rtbs)
-
-
-def _cmdline_role_drop(args):
-    rtbs = ttb_client.rest_target_brokers.values()
-    with concurrent.futures.ThreadPoolExecutor(len(rtbs)) as executor:
-        rs = executor.map(
-            lambda rtb: _user_role(rtb, args.username, "drop", args.role),
-            rtbs)
-
-
 
 def _cmdline_servers(args):
     # collect data in two structures, makes it easier to print at
@@ -256,26 +232,6 @@ def _cmdline_setup(arg_subparsers):
         "(none is a table, -v table with more details, "
         "-vv hierarchical, -vvv Python format, -vvvv JSON format)")
     ap.set_defaults(func = _cmdline_user_list)
-
-    ap = arg_subparsers.add_parser(
-        "role-gain",
-        help = "Gain access to a role which has been dropped")
-    ap.add_argument("-u", "--username", action = "store", default = "self",
-                    help = "ID of user whose role is to be dropped"
-                    " (optional, defaults to yourself)")
-    ap.add_argument("role", action = "store",
-                    help = "Role to gain")
-    ap.set_defaults(func = _cmdline_role_gain)
-
-    ap = arg_subparsers.add_parser(
-        "role-drop",
-        help = "Drop access to a role")
-    ap.add_argument("-u", "--username", action = "store", default = "self",
-                    help = "ID of user whose role is to be dropped"
-                    " (optional, defaults to yourself)")
-    ap.add_argument("role", action = "store",
-                    help = "Role to drop")
-    ap.set_defaults(func = _cmdline_role_drop)
 
     ap = arg_subparsers.add_parser(
         "servers",

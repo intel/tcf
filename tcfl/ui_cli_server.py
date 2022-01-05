@@ -164,6 +164,62 @@ def _cmdline_logout(args):
         return 0
 
 
+def _cmdline_role_drop(args):
+    if not tcfl.server_c.servers:
+        logging.error("E: no servers available, did you configure/discover?")
+        return 0
+
+    with concurrent.futures.ThreadPoolExecutor(len(tcfl.server_c.servers)) as ex:
+        futures = {}
+        for server in tcfl.server_c.servers.values():
+            futures[server] = ex.submit(
+                server.role_drop,
+                args.role, args.username
+            )
+
+        passed = 0
+        failed = 0
+        for server, future in futures.items():
+            try:
+                _r = future.result()	# access to trigger exception check
+                passed += 1
+            except Exception as e:
+                logger.error(f"{server.url}: role drop failed: {e}")
+                failed += 1
+        if not passed:
+            return 1
+        return 0
+
+
+def _cmdline_role_gain(args):
+    if not tcfl.server_c.servers:
+        logging.error("E: no servers available, did you configure/discover?")
+        return 0
+
+    with concurrent.futures.ThreadPoolExecutor(len(tcfl.server_c.servers)) as ex:
+        futures = {}
+        for server in tcfl.server_c.servers.values():
+            futures[server] = ex.submit(
+                server.role_gain,
+                args.role, args.username
+            )
+
+        passed = 0
+        failed = 0
+        for server, future in futures.items():
+            try:
+                _r = future.result()	# access to trigger exception check
+                passed += 1
+            except Exception as e:
+                logger.error(f"{server.url}: role gain failed: {e}")
+                failed += 1
+        if not passed:
+            return 1
+        return 0
+
+
+
+
 def _cmdline_setup(arg_subparsers):
 
     ap = arg_subparsers.add_parser("login",
@@ -195,3 +251,25 @@ def _cmdline_setup(arg_subparsers):
         help = "User to logout (defaults to current); to logout others "
         "*admin* role is needed")
     ap.set_defaults(func = _cmdline_logout)
+
+
+    ap = arg_subparsers.add_parser(
+        "role-gain",
+        help = "Gain access to a role which has been dropped")
+    ap.add_argument("-u", "--username", action = "store", default = "self",
+                    help = "ID of user whose role is to be dropped"
+                    " (optional, defaults to yourself)")
+    ap.add_argument("role", action = "store",
+                    help = "Role to gain")
+    ap.set_defaults(func = _cmdline_role_gain)
+
+
+    ap = arg_subparsers.add_parser(
+        "role-drop",
+        help = "Drop access to a role")
+    ap.add_argument("-u", "--username", action = "store", default = "self",
+                    help = "ID of user whose role is to be dropped"
+                    " (optional, defaults to yourself)")
+    ap.add_argument("role", action = "store",
+                    help = "Role to drop")
+    ap.set_defaults(func = _cmdline_role_drop)

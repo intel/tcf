@@ -1235,6 +1235,44 @@ class server_c:
             raise tcfl.error_e(f"{username}@{self.url}: logout failed: {e}") from e
 
 
+    def role_gain(self, role: str, username: str = "self"):
+        """
+        Ask the server to gain (activate) a role for a user
+
+        :param str role: role name (eg: *user*, *admin* )
+
+        :param str username: (optional, defaults to current user)
+
+        :raises tcfl.error_e: on error
+        """
+        try:
+            return self.send_request(
+                "PUT", f"users/{username}/gain/{role}")
+        except requests.exceptions.HTTPError as e:
+            raise tcfl.error_e(
+                f"{username}@{self.url}: gaining role '{role}' failed: {e}") \
+                from e
+
+
+    def role_drop(self, role: str, username: str = "self"):
+        """
+        Ask the server to drop (activate) a role for a user
+
+        :param str role: role name (eg: *user*, *admin* )
+
+        :param str username: (optional, defaults to current user)
+
+        :raises tcfl.error_e: on error
+        """
+        try:
+            return self.send_request(
+                "PUT", f"users/{username}/drop/{role}")
+        except requests.exceptions.HTTPError as e:
+            raise tcfl.error_e(
+                f"{username}@{self.url}: dropping role '{role}' failed: {e}") \
+                from e
+
+
     def target_release(self, target_id: str, force: bool = False):
         """
         Tell the server to release a target from ownership
