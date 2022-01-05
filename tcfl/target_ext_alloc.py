@@ -212,9 +212,12 @@ def _alloc_hold(rtb, allocid, state, ts0, max_hold_time, keep_alive_period):
                 allocid, ts - ts0, state, new_state))
         state = new_state
 
+
 def _cmdline_alloc_targets(args):
+    import tcfl.targets
+
     with msgid_c("cmdline"):
-        targetl = tcfl.ttb_client.cmdline_list(args.target, args.all)
+        targetl = tcfl.targets.list_by_spec(args.target, args.all)
         if not targetl:
             logging.error("No targets could be used (missing? disabled?)")
             return
@@ -386,13 +389,15 @@ def _alloc_ls(verbosity, username = None):
         print(tabulate.tabulate(table, headers = headers1))
 
 def _cmdline_alloc_ls(args):
-    with msgid_c("cmdline"):
-        targetl = tcfl.ttb_client.cmdline_list(args.target, args.all)
-        targets = collections.OrderedDict()
+    import tcfl.targets
 
+    with msgid_c("cmdline"):
         if not tcfl.ttb_client.rest_target_brokers:
             logging.error("E: no servers available, did you configure?")
             return
+
+        targetl = tcfl.targets.list_by_spec(args.target, args.all)
+        targets = collections.OrderedDict()
 
         # to use fullid, need to tweak the refresh code to add the aka part
         for rt in sorted(targetl, key = lambda x: x['fullid']):

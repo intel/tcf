@@ -21,6 +21,7 @@ import tcfl.ttb_client
 from . import msgid_c
 
 def _cmdline_alloc_monitor(args):
+    import tcfl.targets
 
     try:
         # yup, import here so we only do it if we need it. Lots of
@@ -168,7 +169,7 @@ def _cmdline_alloc_monitor(args):
 
     with msgid_c("cmdline"):
         servers = set()
-        targetl = tcfl.ttb_client.cmdline_list(args.target, args.all)
+        targetl = tcfl.targets.list_by_spec(args.target, args.all)
         targets = collections.OrderedDict()
 
         # to use fullid, need to tweak the refresh code to add the aka part

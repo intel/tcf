@@ -332,31 +332,6 @@ if __name__ == "__main__":
     import tcfl.ui_cli_target
     tcfl.ui_cli_target._cmdline_setup(arg_subparsers)
 
-    arg_parser_target_list = arg_subparsers.add_parser(
-        "ls", help = "List the targets; by default, in a terminal, it will "
-        "print a multi-column display with '!' next to powered-on targets, "
-        "and @ next to owned targets; -v adds more detail)")
-    commonl.argparser_add_aka(arg_subparsers, "ls", "list")
-    arg_parser_target_list.add_argument(
-        "-v", dest = "verbosity", action = "count", default = 0,
-        help = "Increase information to display about the targets (-v "
-        "adds ownership/power state, -vv summarized tags, -vvv all tags "
-        "in Python format, -vvvv all tags in JSON format)")
-    arg_parser_target_list.add_argument(
-        "-a", "--all", action = "store_true", default = False,
-        help = "List also disabled targets")
-    arg_parser_target_list.add_argument(
-        "-p", "--projection", action = "append",
-        help = "List of fields to return (*? [CHARS] or [!CHARS] supported)"
-        " as per python's fnmatch module")
-    arg_parser_target_list.add_argument(
-        "target", metavar = "TARGETSPEC", nargs = "*",
-        action = "store", default = None,
-        help = "Target's names or URLs or a general target specification "
-        "which might include values of tags, etc, in single quotes (eg: "
-        "'zephyr_board and not type:\"^qemu.*\"'")
-    arg_parser_target_list.set_defaults(func = ttb_client.rest_target_list)
-
     ap = arg_subparsers.add_parser(
         "patch", help = "Store target information in the server")
     ap.add_argument("target", metavar = "TARGET", action = "store",

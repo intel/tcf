@@ -1887,6 +1887,8 @@ def _cmdline_console_disable(args):
         target.console.disable(args.console)
 
 def _cmdline_console_wall(args):
+    import tcfl.targets
+
     # for all the targets in args.targets, query the consoles they
     # offer and display them in a grid in the current terminal using
     # GNU screen to divide it in a mesh of sub-windows; then keep
@@ -1899,7 +1901,7 @@ def _cmdline_console_wall(args):
             args.name = "TCF Wall: " + " ".join(args.target)
 
     with msgid_c("cmdline"):
-        rtl = tc.ttb_client.cmdline_list(args.target, args.all)
+        rtl = tcfl.targets.list_by_spec(args.target, args.all)
 
         # Collect information about which targets we want to display
         # on the wall
