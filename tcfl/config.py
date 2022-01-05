@@ -201,4 +201,7 @@ def setup(*args,
         for report_driver in report_drivers:
             tcfl.tc.report_driver_c.add(report_driver)
     load(*args, **kwargs)
+    # setup() expects full initialization, so let's ensure targets are
+    # loaded.
+    tcfl.target_c.subsystem_initialize(*args, **kwargs)
     tcfl.msgid_c.tls.msgid_lifo.append(tcfl.msgid_c(""))

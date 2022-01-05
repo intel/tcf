@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+import bisect
 import collections
 import concurrent.futures
 import copy
@@ -44,7 +45,7 @@ import tcfl.ttb_client # ...ugh
 
 logger = logging.getLogger("tcfl")
 log_sd = logging.getLogger("server-discovery")
-
+log_server = logging.getLogger("server")
 
 tls = threading.local()
 
@@ -783,7 +784,6 @@ def inventory_keys_fix(d):
     return d
 
 
-
 @commonl.lru_cache_disk(
     os.path.join(os.path.expanduser("~"),
                  ".cache", "tcf", "socket_gethostbyname_ex"),
@@ -799,6 +799,21 @@ def socket_gethostbyname_ex_cached(*args, **kwargs):
     512)
 def socket_gethostbyaddr_cached(*args, **kwargs):
     return socket.gethostbyaddr(*args, **kwargs)
+
+
+#: Remote target inventory (cached)
+rts = dict()
+
+#: Remote target inventory in deep and flat format
+rts_flat = dict()
+
+#: Sorted list of remote target full IDs (SERVER/NAME)
+#:
+#: This is used for iteration algorithms so we can reproduce the
+#: iterations if wished without needing to resort all the time.
+rts_fullid_sorted = list()
+rts_fullid_disabled = set()
+rts_fullid_enabled = set()
 
 
 class server_c:
@@ -2837,6 +2852,15 @@ class target_c:
         :returns dict: inventory data for target
 
         :raises KeyError: if target name not found
+
+        *rt*'s field *server* contains the URL of the server,
+        *server_aka* the server's short name, which can be used to
+        locate the server:
+
+        >>> url = rt['server']
+        >>> aka = rt['server_aka']
+        >>> server = tcfl.server_c.servers[url]
+
         """
         global rts
         if '/' in targetid:		# targetid is a fullid (SERVER/TARGET)
@@ -2885,6 +2909,21 @@ class target_c:
         self.id = target_id
         self.fullid = target_fullid
         self.allocid = allocid
+
+
+    @classmethod
+    def subsystem_initialize(cls):
+        """
+        Initialize the target's subsystem
+
+        This queries all discovered servers for target information;
+        when doing partial initializations, this has to be called
+        after initializing the server subsystem:
+
+        >>> tcfl.config.load()
+        >>> tcfl.target_c.subsystem_initialize()
+        """
+        server_c.targets_load()
 
 
 class tc_logadapter_c(logging.LoggerAdapter):
