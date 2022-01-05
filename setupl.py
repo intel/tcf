@@ -104,13 +104,12 @@ def get_install_paths(
     elif 'prefix' in install:
         # this means --prefix was given
         installer.prefix = install.get('prefix', (None, None))[1]
+        sysconfigdir = os.path.join(installer.prefix, 'etc')
         if sys.platform == "win32":
             pass
         else:
             if installer.prefix == "/usr":
                 sysconfigdir = "/etc"
-            else:
-                sysconfigdir = os.path.join(installer.prefix, 'etc')
         sharedir = os.path.join(installer.prefix, "share")
     else:
         if sys.platform == "win32":
