@@ -340,6 +340,9 @@ if __name__ == "__main__":
         "config", help = "Print information about configuration")
     ap.set_defaults(func = _cmdline_config)
 
+    import tcfl.ui_cli_server
+    tcfl.ui_cli_server._cmdline_setup(arg_subparsers)
+
     import tcfl.ui_cli_user
     tcfl.ui_cli_user._cmdline_setup(arg_subparsers)
 
@@ -445,7 +448,6 @@ if __name__ == "__main__":
     tcfl.tc.target_ext_store._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_things._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_tunnel.cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_users._cmdline_setup(arg_subparsers)
 
     tcfl.ui_cli_user._cmdline_setup_advanced(arg_subparsers)
 

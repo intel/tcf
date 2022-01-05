@@ -4,82 +4,72 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-"""
-Utilities to see user's information
------------------------------------
+# Command line interface UI to manage servers
 
-"""
-from __future__ import print_function
 import concurrent.futures
 import json
 import logging
 import pprint
-import urllib3
 
-import requests
 import tabulate
 
 import commonl
 import tcfl
-from . import tc
-from . import ttb_client
-from . import msgid_c
 
-logger = logging.getLogger("users")
+logger = logging.getLogger("server")
 
 def _cmdline_servers(args):
     # collect data in two structures, makes it easier to print at
     # different verbosity levels...yah, lazy
-    r = []
-    d = {}
-    rtbs = {}		# COMPAT
-    servers = {}	# new stuff
+    servers = {}
 
     if args.targets:
-        rtb_list = {}
+        # a target? initialize targets first, basic init
+        tcfl.target_c.subsystem_initialize()
         for target_name in args.targets:
             try:
-                target = tc.target_c.create_from_cmdline_args(
-                    args, target_name, extensions_only = [])
-                rtb_list[target.rtb.aka] = target.rtb
-                server = tcfl.server_c.servers[target.rtb.parsed_url.geturl()]
-                servers[server.url] = server
+                rt = tcfl.target_c.get_rt_by_id(args.target)
+                url = rt['server']
+                logger.info(f"{args.target} is in server {url}")
+                servers[url] = tcfl.server_c.servers[url]
             except IndexError as e:
                 logger.error("%s: invalid target" % target_name)
     else:
-        rtb_list = ttb_client.rest_target_brokers
         servers = tcfl.server_c.servers
 
-    for name, rtb in rtb_list.items():
-        username = "n/a"
-        try:
-            if args.verbosity >= 0:
-                # FIXME: this should be parallelized
-                # we don't need this if verbosity < 0 and it takes time
-                username = rtb.logged_in_username()
-        # FIXME: we need a base exception for errors from the API
-        except (
-                requests.exceptions.ConnectionError,
-                ttb_client.requests.HTTPError,
-                urllib3.exceptions.MaxRetryError,
-                RuntimeError
-        ) as e:
-            logger.warning("%s: can't reach server: %s", name, e)
-            username = "n/a"
-        server = servers[rtb.parsed_url.geturl()]
-        r.append(( rtb.aka, str(rtb), username, server.origin ))
-        d[rtb.aka] = dict(url = str(rtb), username = username,
-                          origin = server.origin)
-        rtbs[rtb.aka] = rtb
+    username = {}
+    if args.verbosity >= 0:
+
+        with concurrent.futures.ThreadPoolExecutor(len(tcfl.server_c.servers)) as ex:
+            futures = {}
+            for server in tcfl.server_c.servers.values():
+                futures[server] = ex.submit(server.logged_in_username)
+
+            for server, future in futures.items():
+                try:
+                    username[server] = future.result()
+                except Exception as e:
+                    logger.error(f"{server.url}: finding logged-in user failed: {e}")
+                    username[server] = "n/a"
 
     verbosity = args.verbosity - args.quietosity
 
+    def _to_dict(servers):
+        d = {}
+        for server in servers.values():
+            d[server.aka] = {
+                "url": server.url,
+                "userid": username.get(server, "n/a"),
+                "origin": server.origin
+            }
+        return d
+
     if verbosity < -1:
-        for aka in d:
-            print(aka)
+        for server in servers.values():
+            print(server.aka)
     elif verbosity == -1:
-        for rtb in rtbs.values():
-            print(rtb.parsed_url.hostname)
+        for server in servers.values():
+            print(server.parsed_url.hostname)
     elif verbosity == 0:
         for aka, url, username, _origin in r:
             print(aka, url, username)
@@ -90,13 +80,21 @@ def _cmdline_servers(args):
             "UserID",
             "Origin"
         ]
-        print(tabulate.tabulate(r, headers = headers))
+        table = []
+        for server in servers.values():
+            table.append([
+                server.aka,
+                server.url,
+                username.get(server, "n/a"),
+                server.origin
+            ])
+        print(tabulate.tabulate(table, headers = headers))
+    elif verbosity == 2:
+        commonl.data_dump_recursive(_to_dict(servers))
     elif verbosity == 3:
-        commonl.data_dump_recursive(d)
-    elif verbosity == 4:
-        pprint.pprint(d)
-    elif verbosity >= 5:
-        print(json.dumps(d, skipkeys = True, indent = 4))
+        pprint.pprint(_to_dict(servers))
+    elif verbosity >= 4:
+        print(json.dumps(_to_dict(servers), skipkeys = True, indent = 4))
 
 
 def _cmdline_servers_flush(_args):
@@ -158,7 +156,7 @@ def _cmdline_setup(arg_subparsers):
         "-qq the hostnames, -qqq the shortnames"
         "; all one per line")
     ap.add_argument(
-        "-v", dest = "verbosity", action = "count", default = 1,
+        "-v", dest = "verbosity", action = "count", default = 0,
         help = "Increase verbosity of information to display "
         "(none is a table, -v table with more details, "
         "-vv hierarchical, -vvv Python format, -vvvv JSON format)")

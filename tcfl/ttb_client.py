@@ -519,28 +519,6 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
         return rdata
 
 
-    def logged_in_username(self):
-        """
-        Return the user name logged into a server
-
-        Based on the cookies, ask the server to translate the special name
-        *self* to the currently logged in user with the cookies stored.
-
-        :returns: name of the user we are logged in as
-        """
-        r = self.send_request("GET", "users/self")
-        # this call returns a dictionary with the user name in the
-        # key name, because we asked for "self", the server will
-        # return only one, but maybe also fields with diagnostics, that
-        # start with _; filter them
-        for username in r:
-            if not username.startswith("_"):
-                break
-            else:
-                raise RuntimeError(
-                    "server can't translate user 'self'; got '%s'" % ur)
-        return username
-
     def validate_session(self, validate = False):
         if self.valid_session is None or validate:
             valid_session = False
