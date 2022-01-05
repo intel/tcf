@@ -95,23 +95,6 @@ servers: {len(tcfl.ttb_client.rest_target_brokers)}""")
     # https://stackoverflow.com/questions/21318427/get-dns-search-suffix-in-python
 
 
-
-def _target_get(args):
-    # pure target get w/o going through the cache
-
-    if args.projection:
-        data = { 'projections': json.dumps(args.projection) }
-    else:
-        data = None
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    r = rtb.send_request("GET", "targets/" + rt['id'], data = data,
-                         raw = True)
-    # Keep the order -- even if json spec doesn't contemplate it, we
-    # use it so the client can tell (if they want) the order in which
-    # for example, power rail components are defined in interfaces.power
-    rt = json.loads(r.text, object_pairs_hook = collections.OrderedDict)
-    print(json.dumps(rt, skipkeys = True, indent = 4))
-
 def _target_patch(args):
     # set data
     data = collections.OrderedDict()	# respect user's order
@@ -346,6 +329,9 @@ if __name__ == "__main__":
     import tcfl.ui_cli_user
     tcfl.ui_cli_user._cmdline_setup(arg_subparsers)
 
+    import tcfl.ui_cli_target
+    tcfl.ui_cli_target._cmdline_setup(arg_subparsers)
+
     arg_parser_target_list = arg_subparsers.add_parser(
         "ls", help = "List the targets; by default, in a terminal, it will "
         "print a multi-column display with '!' next to powered-on targets, "
@@ -370,18 +356,6 @@ if __name__ == "__main__":
         "which might include values of tags, etc, in single quotes (eg: "
         "'zephyr_board and not type:\"^qemu.*\"'")
     arg_parser_target_list.set_defaults(func = ttb_client.rest_target_list)
-
-    ap = arg_subparsers.add_parser(
-        "get", help = "Return target information straight from the "
-        "server formated as JSON (unlike 'list', which will add some "
-        "client fields)")
-    ap.add_argument(
-        "-p", "--projection", action = "append",
-        help = "List of fields to return (*? [CHARS] or [!CHARS] supported)"
-        " as per python's fnmatch module")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name")
-    ap.set_defaults(func = _target_get)
 
     ap = arg_subparsers.add_parser(
         "patch", help = "Store target information in the server")
