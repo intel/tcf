@@ -295,6 +295,39 @@ def _cmdline_user_list(args):
         print(json.dumps(result, skipkeys = True, indent = 4))
 
 
+def _cmdline_cookies(args):
+    while True:
+        # is that a URL?
+        if args.target in tcfl.server_c.servers:
+            url = args.target
+            break
+        # a target? initialize targets first, basic init
+        tcfl.target_c.subsystem_initialize()
+        try:
+            # consider a target
+            rt = tcfl.target_c.get_rt_by_id(args.target)
+            url = rt['server']
+            logger.info(f"{args.target} is in server {url}")
+            break
+        except KeyError:
+            pass
+        logging.error(f"can't find a target or server URL named {args.target}")
+        sys.exit(1)
+    server = tcfl.server_c.servers[url]
+    cookies = server._cookies_load()
+    if args.json:
+        json.dump(cookies, sys.stdout, indent = 4)
+        print()
+    elif args.cookiejar:
+        # Follow https://curl.se/docs/http-cookies.html
+        # Note we don't keep the TTL field, so we set it at zero
+        for cookie, value in cookies.items():
+            print(f"{server.parsed_url.hostname}\tFALSE\t/\tTRUE\t0"
+                  f"\t{cookie}\t{value}")
+    else:
+        commonl._dict_print_dotted(cookies, separator = "")
+
+
 def _cmdline_setup(arg_subparsers):
 
     ap = arg_subparsers.add_parser("login",
@@ -329,6 +362,19 @@ def _cmdline_setup(arg_subparsers):
 
 
 def _cmdline_setup_advanced(arg_subparsers):
+
+    ap = arg_subparsers.add_parser("cookies",
+                                   help = "Show log-in cookies (to feed"
+                                   " into curl, etc) maybe only for one server")
+    ap.add_argument("target", metavar = "TARGET|URL", action = "store",
+                    default = [], help = "Target name or URL to server")
+    ap.add_argument("-c","--cookiejar", action = "store_true", default = False,
+                    help = "Print in cookiejar format"
+                    " (https://curl.se/docs/http-cookies.html)")
+    ap.add_argument("-j","--json", action = "store_true", default = False,
+                    help = "Print in JSON format")
+    ap.set_defaults(func = _cmdline_cookies)
+
 
     ap = arg_subparsers.add_parser(
         "role-gain",
