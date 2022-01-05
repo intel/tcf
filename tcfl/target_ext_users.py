@@ -27,79 +27,6 @@ from . import msgid_c
 
 logger = logging.getLogger("users")
 
-def _user_list(rtb, userids):
-    result = {}
-    if userids:
-        for userid in userids:
-            try:
-                result.update(rtb.send_request("GET", "users/" + userid))
-            except Exception as e:
-                logger.error("%s: error getting user's info: %s", userid, e)
-    else:
-        try:
-            result.update(rtb.send_request("GET", "users/"))
-        except Exception as e:
-            logger.error("error getting all user info: %s", e)
-    return result
-
-
-def _cmdline_user_list(args):
-    result = {}
-    if not tcfl.server_c.servers:
-        logging.error("E: no servers available, did you configure?")
-        return
-    with msgid_c("cmdline"), \
-         concurrent.futures.ThreadPoolExecutor(len(tcfl.server_c.servers)) as ex:
-        futures = {
-            ex.submit(_user_list, server, args.userid): server
-            for server in tcfl.server_c.servers.values()
-        }
-        for future in concurrent.futures.as_completed(futures):
-            server = futures[future]
-            try:
-                r = future.result()
-                result[server.aka] = r
-            except Exception as e:
-                logger.exception(f"{server.url}: exception {e}")
-                continue
-
-    if args.verbosity == 0:
-        headers = [
-            "Server",
-            "UserID",
-        ]
-        table = []
-        for rtb, r in result.items():
-            for userid, data in r.items():
-                table.append([ rtb, userid ])
-        print((tabulate.tabulate(table, headers = headers)))
-    elif args.verbosity == 1:
-        headers = [
-            "Server",
-            "UserID",
-            "Roles",
-        ]
-        table = []
-        for rtb, r in result.items():
-            for userid, data in r.items():
-                rolel = []
-                for role, state in data['roles'].items():
-                    if state == False:
-                        rolel.append(role + " (dropped)")
-                    else:
-                        rolel.append(role)
-                table.append([
-                    rtb, userid, "\n".join(rolel) ])
-        print((tabulate.tabulate(table, headers = headers)))
-    elif args.verbosity == 2:
-        commonl.data_dump_recursive(result)
-    elif args.verbosity == 3:
-        pprint.pprint(result)
-    elif args.verbosity >= 4:
-        print(json.dumps(result, skipkeys = True, indent = 4))
-
-
-
 def _cmdline_servers(args):
     # collect data in two structures, makes it easier to print at
     # different verbosity levels...yah, lazy
@@ -219,19 +146,6 @@ def _cmdline_servers_discover(args):
 
 
 def _cmdline_setup(arg_subparsers):
-    ap = arg_subparsers.add_parser(
-        "user-ls",
-        help = "List users known to the server (note you need "
-        "admin role privilege to list users others than your own)")
-    ap.add_argument("userid", action = "store",
-                    default = None, nargs = "*",
-                    help = "Users to list (default all)")
-    ap.add_argument(
-        "-v", dest = "verbosity", action = "count", default = 0,
-        help = "Increase verbosity of information to display "
-        "(none is a table, -v table with more details, "
-        "-vv hierarchical, -vvv Python format, -vvvv JSON format)")
-    ap.set_defaults(func = _cmdline_user_list)
 
     ap = arg_subparsers.add_parser(
         "servers",

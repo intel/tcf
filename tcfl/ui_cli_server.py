@@ -7,10 +7,15 @@
 # Command line interface UI to manage servers
 import concurrent.futures
 import getpass
+import json
 import logging
 import os
+import pprint
 import sys
 
+import tabulate
+
+import commonl
 import tcfl
 
 logger = logging.getLogger("ui_cli_server")
@@ -218,6 +223,76 @@ def _cmdline_role_gain(args):
         return 0
 
 
+def _user_list(server, userids):
+    result = {}
+    if userids:
+        for userid in userids:
+            try:
+                result.update(server.send_request("GET", "users/" + userid))
+            except Exception as e:
+                logger.error("%s: error getting user's info: %s", userid, e)
+    else:
+        try:
+            result.update(server.send_request("GET", "users/"))
+        except Exception as e:
+            logger.error("error getting all user info: %s", e)
+    return result
+
+
+def _cmdline_user_list(args):
+    result = {}
+    if not tcfl.server_c.servers:
+        logging.error("E: no servers available, did you configure?")
+        return
+    with tcfl.msgid_c("cmdline"), \
+         concurrent.futures.ThreadPoolExecutor(len(tcfl.server_c.servers)) as ex:
+        futures = {
+            ex.submit(_user_list, server, args.userid): server
+            for server in tcfl.server_c.servers.values()
+        }
+        for future in concurrent.futures.as_completed(futures):
+            server = futures[future]
+            try:
+                r = future.result()
+                result[server.aka] = r
+            except Exception as e:
+                logger.exception(f"{server.url}: exception {e}")
+                continue
+
+    if args.verbosity == 0:
+        headers = [
+            "Server",
+            "UserID",
+        ]
+        table = []
+        for server, r in result.items():
+            for userid, data in r.items():
+                table.append([ server, userid ])
+        print((tabulate.tabulate(table, headers = headers)))
+    elif args.verbosity == 1:
+        headers = [
+            "Server",
+            "UserID",
+            "Roles",
+        ]
+        table = []
+        for server, r in result.items():
+            for userid, data in r.items():
+                rolel = []
+                for role, state in data['roles'].items():
+                    if state == False:
+                        rolel.append(role + " (dropped)")
+                    else:
+                        rolel.append(role)
+                table.append([
+                    server, userid, "\n".join(rolel) ])
+        print((tabulate.tabulate(table, headers = headers)))
+    elif args.verbosity == 2:
+        commonl.data_dump_recursive(result)
+    elif args.verbosity == 3:
+        pprint.pprint(result)
+    elif args.verbosity >= 4:
+        print(json.dumps(result, skipkeys = True, indent = 4))
 
 
 def _cmdline_setup(arg_subparsers):
@@ -253,6 +328,8 @@ def _cmdline_setup(arg_subparsers):
     ap.set_defaults(func = _cmdline_logout)
 
 
+def _cmdline_setup_advanced(arg_subparsers):
+
     ap = arg_subparsers.add_parser(
         "role-gain",
         help = "Gain access to a role which has been dropped")
@@ -273,3 +350,17 @@ def _cmdline_setup(arg_subparsers):
     ap.add_argument("role", action = "store",
                     help = "Role to drop")
     ap.set_defaults(func = _cmdline_role_drop)
+
+    ap = arg_subparsers.add_parser(
+        "user-ls",
+        help = "List users known to the server (note you need "
+        "admin role privilege to list users others than your own)")
+    ap.add_argument("userid", action = "store",
+                    default = None, nargs = "*",
+                    help = "Users to list (default all)")
+    ap.add_argument(
+        "-v", dest = "verbosity", action = "count", default = 0,
+        help = "Increase verbosity of information to display "
+        "(none is a table, -v table with more details, "
+        "-vv hierarchical, -vvv Python format, -vvvv JSON format)")
+    ap.set_defaults(func = _cmdline_user_list)

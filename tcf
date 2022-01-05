@@ -483,6 +483,8 @@ if __name__ == "__main__":
     tcfl.tc.target_ext_tunnel.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_users._cmdline_setup(arg_subparsers)
 
+    tcfl.ui_cli_server._cmdline_setup_advanced(arg_subparsers)
+
     # extra stuff that is not adding to the API, just to the command
     # line interface
     import tcfl.target_ext_alloc_ui
