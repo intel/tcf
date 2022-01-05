@@ -376,8 +376,8 @@ if __name__ == "__main__":
                     help = "Print in JSON format")
     ap.set_defaults(func = _cookies)
 
-    import tcfl.ui_cli_server
-    tcfl.ui_cli_server._cmdline_setup(arg_subparsers)
+    import tcfl.ui_cli_user
+    tcfl.ui_cli_user._cmdline_setup(arg_subparsers)
 
     arg_parser_target_list = arg_subparsers.add_parser(
         "ls", help = "List the targets; by default, in a terminal, it will "
@@ -483,7 +483,7 @@ if __name__ == "__main__":
     tcfl.tc.target_ext_tunnel.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_users._cmdline_setup(arg_subparsers)
 
-    tcfl.ui_cli_server._cmdline_setup_advanced(arg_subparsers)
+    tcfl.ui_cli_user._cmdline_setup_advanced(arg_subparsers)
 
     # extra stuff that is not adding to the API, just to the command
     # line interface

@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-# Command line interface UI to manage servers
+# Command line interface UI to manage users
 import concurrent.futures
 import getpass
 import json
