@@ -33,6 +33,9 @@ import distutils.command.install_scripts
 import distutils.command.install_lib
 
 def is_virtual_env():
+    """
+    Returns True if running in a python virtual environment, false otherwise
+    """
     return os.getenv('VIRTUAL_ENV') != None
 
 def mk_installs_py(base_dir, sysconfigdir, sharedir):
@@ -84,7 +87,8 @@ def mk_windows_bat(base_dir, tcf_path):
     """
     with open(os.path.join(base_dir, "tcf.bat"), "w") as f:
         if is_virtual_env():
-            python_path = os.path.join(os.getenv('VIRTUAL_ENV'), "Scripts", "python.exe")
+            python_path = os.path.join(
+                os.getenv('VIRTUAL_ENV'), "Scripts", "python.exe")
         else:
             python_path = f"@py -{sys.version_info[0]}.{sys.version_info[1]}"
         f.write(f"""\
