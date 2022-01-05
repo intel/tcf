@@ -32,6 +32,9 @@ import distutils.command.install_data
 import distutils.command.install_scripts
 import distutils.command.install_lib
 
+def is_virtual_env():
+    return os.getenv('VIRTUAL_ENV') != None
+
 def mk_installs_py(base_dir, sysconfigdir, sharedir):
     _sysconfigdir = os.path.join(sysconfigdir, "tcf").replace("\\", "\\\\")
     _share_path = os.path.join(sharedir, "tcf").replace("\\", "\\\\")
@@ -80,8 +83,13 @@ def mk_windows_bat(base_dir, tcf_path):
     Create a windows .bat file to allow tcf to run without using "python tcf"
     """
     with open(os.path.join(base_dir, "tcf.bat"), "w") as f:
+        if is_virtual_env():
+            python_path = os.path.join(os.getenv('VIRTUAL_ENV'), "Scripts", "python.exe")
+        else:
+            python_path = f"@py -{sys.version_info[0]}.{sys.version_info[1]}"
         f.write(f"""\
-@py -{sys.version_info[0]}.{sys.version_info[1]} {tcf_path}\\tcf %*
+@echo off
+{python_path} {tcf_path}\\tcf %*
 """)
 
 def get_install_paths(
@@ -143,7 +151,11 @@ class _install_scripts(distutils.command.install_scripts.install_scripts):
         # Create a .bat file for windows to run tcf without invoking python first
         if sys.platform == "win32":
             # target_dir is the scripts folder in the python installation
-            target_dir = os.path.join(os.path.dirname(sys.executable),"Scripts")
+            target_dir = os.path.dirname(sys.executable)
+            # path to python executable when running from venv has Scripts as
+            # part of the path, but need to add when not in venv
+            if not is_virtual_env():
+                os.path.join(target_dir, "Scripts")
             # If --user is specified, need to change path to where the script is
             if 'user' in install:
                 python_version = ''.join(str(i) for i in sys.version_info[:2])
