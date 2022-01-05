@@ -331,7 +331,7 @@ def _cmdline_cookies(args):
 def _cmdline_setup(arg_subparsers):
 
     ap = arg_subparsers.add_parser("login",
-                                   help = "Login to the different servers")
+                                   help = "Login to servers")
     ap.add_argument("--password", "-p", metavar = "PASSWORD", action = "store",
                     default = None,
                     help = "User's password ('ask' to get it asked on"
@@ -353,7 +353,7 @@ def _cmdline_setup(arg_subparsers):
 
     ap = arg_subparsers.add_parser(
         "logout",
-        help = "Log user out of the servers brokers")
+        help = "Logout from servers")
     ap.add_argument(
         "username", nargs = '?', action = "store", default = None,
         help = "User to logout (defaults to current); to logout others "
