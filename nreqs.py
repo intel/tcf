@@ -380,7 +380,10 @@ class method_pip_c(method_abc):
         # close.
 
         if not admin:
-            cmdline.append("--user")
+            if os.getenv('VIRTUAL_ENV') != None:
+                logging.info("pip not using --user due to venv")
+            else:
+                cmdline.append("--user")
 
         _indexes = []
         _index = method_details.get('index', None)
