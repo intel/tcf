@@ -33,11 +33,12 @@ def _delete(rtb, allocid):
         rtb.send_request("DELETE", "allocation/%s" % allocid)
     except requests.ConnectionError as e:
         # this server is out
-        logging.warning(e)
+        logging.warning("%s: %s", rtb, e)
         return
     except requests.HTTPError as e:
-        if 'invalid allocation' not in str(e):
-            raise
+        message = str(e)
+        if 'invalid allocation' not in message:
+            raise tcfl.error_e(f"{rtb}: {message}") from e
         # FIXME: HACK: this means invalid allocation,
         # already wiped
 
