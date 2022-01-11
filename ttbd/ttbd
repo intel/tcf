@@ -1221,6 +1221,11 @@ if __name__ == "__main__":
         help = "Run in system wide mode, with an instance name (none by "
         "default, sets the config, state and file storage to "
         "{/etc/,/var/run,/var/cache}ttbd[-NAME]/")
+    arg_parser.add_argument(
+        "-d", "--debug", action = "store_true", default = True,
+        help = "Enable internal debug prints and checks and"
+        " extra logging info -- especially needed to print"
+        " debug info on bad config files")
 
     args = arg_parser.parse_args()
 
@@ -1228,6 +1233,12 @@ if __name__ == "__main__":
         host = args.host
     if args.port != None:
         port = args.port
+
+    if args.debug:
+        # I mean, this is ugly, but simple
+        commonl.debug_traces = True
+    else:
+        commonl.debug_traces = False
 
     log_format = "%(levelname)s %(module)s.%(funcName)s():%(lineno)d: %(message)s"
     log_format = commonl.log_format_compose(log_format, True)
