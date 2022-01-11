@@ -2089,6 +2089,40 @@ class test_target(object):
             impl.upid, [ component ])
 
 
+    def fsdb_cleanup_initial(self, *key_globs):
+        """
+        This cleans an initial list of fields that might be lefover
+        from previous executions. fsdb_cleanup() below is called
+        once th econfiguration is done, but it is not good enough.
+        now collect the list of instruments exposed in the FSDB
+
+        This has to be called before actually running the target
+        configuration sequence:
+
+        >>> target = ttbl.test_target()
+        >>> target.fsdb_cleanup_initial("sometree.*", "anothertree.*")
+
+        Ensures that data in the FSDB for trees *sometree* and
+        *anothertree* is wiped but doesn't touch others.
+        """
+        # Note this is a hacky solution; we also wipe interfaces
+        # (since only we, not the user, should be polking therer).
+        # FIXME: a proper solution will involve keeping track of who
+        # wrote what so that user sets are understood and kepts and
+        # everything else is wiped upon reinitialization.
+        # There is a task to encode information such as that in the
+        # key name (including ACLs and when the key has to be
+        # wiped). This should be added there.
+        commonl.assert_list_of_strings(key_globs, "key globs", "glob")
+        for key in self.fsdb.keys("interfaces.*"):
+            self.fsdb.set(key, None)
+
+        # wipe any other set of keys described in config
+        for key_glob in key_globs:
+            for key in self.fsdb.keys(key_glob):
+                self.fsdb.set(key, None)
+
+
     def fsdb_cleanup(self):
         # Cleanup the inventory database for the target
         #
