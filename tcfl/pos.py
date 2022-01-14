@@ -1161,7 +1161,7 @@ EOF""")
             target.shcmd_local(
                 # don't be verbose, makes it too slow and timesout when
                 # sending a lot of files
-                "time -p rsync -cHaAX %s --force --numeric-ids --delete"
+                "rsync -cHaAX %s --force --numeric-ids --delete"
                 " --port %%(rsync_port)s "
                 " %s%s %%(rsync_server)s::rootfs/%s/%s"
                 % (rsync_extra, src, path_append, persistent_dir,
@@ -1248,7 +1248,7 @@ EOF""")
         # don't be verbose, makes it too slow and timesout when
         # sending a lot of files
         cmdline = \
-            "time sudo rsync -cHaAX %s --numeric-ids %s" \
+            "rsync -cHaAX %s --numeric-ids %s" \
             " --inplace" \
             " --exclude=%s --exclude='%s/*'" \
             " --port %%(rsync_port)s %s%s %%(rsync_server)s::rootfs/%s%s" \
