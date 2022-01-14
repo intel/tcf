@@ -907,7 +907,13 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
     # console interface; state() is implemented by generic_c
     def on(self, target, component):
         if self.usb_serial_number:
-            self.kws['device'] = ttbl.tty_by_usb_serial_number(self.usb_serial_number)
+            # Get the USB Serial Number of the TTY, but it might have
+            # been updated, so maybe also from the FSDB and default to
+            # the configured one
+            usb_serial_number = target.fsdb.get(
+                f"instrumentation.{self.upid_index}.usb_serial_number",
+                self.usb_serial_number)
+            self.kws['device'] = ttbl.tty_by_usb_serial_number(usb_serial_number)
         ttbl.power.socat_pc.on(self, target, component)
         generation_set(target, component)
         generic_c.enable(self, target, component)
