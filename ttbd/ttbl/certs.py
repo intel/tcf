@@ -121,6 +121,22 @@ import ttbl
 
 class interface(ttbl.tt_interface):
 
+    #: Allow the certificate infomation to survive server reboots
+    #:
+    #: When set to *True*, when the server starts it will not wipe
+    #: existing certificates from existing allocations, thus allowing
+    #: sessions to continue.
+    #:
+    #: Note if security-wise this is an issue, it is for you to decide,
+    #: hence it defaults to being disabled. If your server might have
+    #: frequent restarts, this will be usefult to not disturb remote
+    #: users. Even when enabled, it is highly unlikely anyone can
+    #: impersonate a remote end since they will require access to the
+    #: server, at which point is way easier to do others things way
+    #: worse.
+    survive_reboots = False
+
+
     def __init__(self, key_size = 2048):
         ttbl.tt_interface.__init__(self)
         self.key_size = key_size
@@ -195,7 +211,8 @@ class interface(ttbl.tt_interface):
         # previous execution
         # the certificate storage access is read only
         target.store.target_sub_paths['certificates_client'] = False
-        self._release_hook(target, True)
+        if self.survive_reboots == False:
+            self._release_hook(target, True)
 
 
     def _allocate_hook(self, target, iface_name, allocdb):
