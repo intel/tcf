@@ -2553,6 +2553,13 @@ class socat_pc(daemon_c):
         assert isinstance(address2, str)
         if extra_cmdline == None:
             extra_cmdline = []
+        _env_add = {
+            # this is needed so socat generates timestamps for UTC,
+            # since we don't need to care where the server is
+            "TZ": "UTC"
+        }
+        if env_add:
+            _env_add.update(env_add)
         # extra_cmdline has to be before the address pair otherwise
         # it'll fail
         daemon_c.__init__(
@@ -2566,11 +2573,14 @@ class socat_pc(daemon_c):
                 # FIXME: allow individual control/configure strace debug
                 #  "-v", "-x", prints the data as it goes back and forth
                 "-d", "-d",
+                "-d",		# THIRD -d is very important to get
+                                # timestamp/offset information in the
+                                # log file which we'll use
                 address1,		# will be formatted against kws
                 address2,		# will be formatted against kws
             ],
             precheck_wait = precheck_wait,
-            env_add = env_add,
+            env_add = _env_add,
             **kwargs)
 
 
