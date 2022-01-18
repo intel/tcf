@@ -2210,9 +2210,11 @@ class rpyc_c(daemon_podman_container_c):
         cmdline += [
             # Port where RPYC serves
             "--publish", f"{rpyc_port}:{rpyc_port}",
-            "--volume", "%(path)s/%(component)s.etc:/etc/ttbd:ro",
+            # Z: ensure mounting fixes SELinux labels too, because SELinux...
+            "--volume", "%(path)s/%(component)s.etc:/etc/ttbd:ro,Z",
             image_name,
             "/bin/bash", "-xeuc",
+            "ls -lR /etc/ttbd; "	# DEBUG info on the console
             # for PIP: "rpyc_classic.py",
             "run-parts /etc/ttbd/run; "
             "cd $HOME;"
@@ -2222,6 +2224,10 @@ class rpyc_c(daemon_podman_container_c):
             f" --port {str(rpyc_port)} --host 0 --mode forking"
         ]
         if ssl_enabled:
+            # rpyc_c.on() will copy ca* and server* from the
+            # certificates directory (target STATEDIr/certiticates) to
+            # the cfg dir (target's STATEDIR/COMPONENT.etc) which is
+            # mapped with --volume to /etc/ttbd.
             # note the /etc/ttbd/certificates path is mapped by
             # the container from the certificates in the target's
             # directory TARGETSTATEDIR/certificates -- these are
@@ -2230,6 +2236,7 @@ class rpyc_c(daemon_podman_container_c):
                 " --ssl-cafile /etc/ttbd/ca.cert" \
                 " --ssl-certfile /etc/ttbd/server.cert" \
                 " --ssl-keyfile /etc/ttbd/server.key"
+        self.ssl_enabled = ssl_enabled
 
         daemon_podman_container_c.__init__(
             self, "rpyc", cmdline,
@@ -2274,6 +2281,8 @@ RUN \
 
     def on(self, target, component):
         # Container configuration dir
+        # note this is mapped by the on() method to /etc/ttbd inside
+        # the container
         cfg_dir = os.path.join(target.state_dir, component + ".etc")
         run_dir = os.path.join(cfg_dir, "run")
         data_dir = os.path.join(cfg_dir, "data")
