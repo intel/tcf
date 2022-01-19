@@ -10,6 +10,7 @@ Copy files from and to the server's user storage area
 
 """
 
+import bisect
 import contextlib
 import json
 import hashlib
@@ -296,7 +297,7 @@ def _cmdline_store_list(args):
         # will convert the data to v2 format
         if args.verbosity == 0:
             # simple one entry per line
-            for file_name, file_data in data.items():
+            for file_name, file_data in sorted(data.items()):
                 print(file_name, ' '.join(f"{k}:{v}" for k, v in file_data.items()))
         elif args.verbosity == 1:
             headers = [
@@ -310,7 +311,7 @@ def _cmdline_store_list(args):
                 entry = [ file_name, file_data['type'] ]
                 entry.append(file_data.get("aliases", ""))
                 entry.append(file_data.get("digest", ""))
-                entries.append(entry)
+                bisect.insort(entries, entry)
             print(tabulate.tabulate(entries, headers = headers))
         elif args.verbosity == 2:
             commonl.data_dump_recursive(data)
@@ -357,7 +358,7 @@ def _cmdline_setup(arg_subparsers):
     ap = arg_subparsers.add_parser("store-ls",
                                    help = "List files stored in the server")
     ap.add_argument(
-        "-v", dest = "verbosity", action = "count", default = 0,
+        "-v", dest = "verbosity", action = "count", default = 1,
         help = "Increase verbosity of information to display "
         "(-v is a table , "
         "-vv hierarchical, -vvv Python format, -vvvv JSON format)")
