@@ -205,7 +205,7 @@ def _cmdline_button_sequence(args):
             else:
                 sequence.append(( gd['action'], gd['component']))
         target.button.sequence(sequence,
-                              timeout = args.timeout + 1.5 * total_wait)
+                               timeout = args.timeout + 1.5 * total_wait)
 
 def _cmdline_button_press(args):
     with msgid_c("cmdline"):
