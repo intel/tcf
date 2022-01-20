@@ -11,6 +11,7 @@ Press and release buttons in the target
 """
 import json
 import logging
+import re
 
 from . import tc
 from . import ttb_client
@@ -177,7 +178,35 @@ class extension(tc.target_extension_c):
             l[name] = data.get('state', None)
         return l
 
-        
+# this is a very loose match in the format, so we can easily support
+# new functionailities in the server
+_sequence_valid_regex = re.compile(
+    r"^("
+    r"(?P<wait>wait):(?P<time>[\.0-9]+)"
+    r"|"
+    r"(?P<action>\w+):(?P<component>[ /\w]+)"
+    r")$")
+
+def _cmdline_button_sequence(args):
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(
+            args, iface = "button", extensions_only = [ 'button' ])
+        sequence = []
+        total_wait = 0
+        for s in args.sequence:
+            m = _sequence_valid_regex.match(s)
+            if not m:
+                raise ValueError("%s: invalid specification, see --help" % s)
+            gd = m.groupdict()
+            if gd['wait'] == 'wait':
+                time_to_wait = float(gd['time'])
+                sequence.append(( 'wait', time_to_wait))
+                total_wait += time_to_wait
+            else:
+                sequence.append(( gd['action'], gd['component']))
+        target.button.sequence(sequence,
+                              timeout = args.timeout + 1.5 * total_wait)
+
 def _cmdline_button_press(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(
@@ -241,6 +270,25 @@ def _cmdline_setup(argsp):
                     action = "store", type = float, default = 0.25,
                     help = "Seconds to click for (%(default).2fs)")
     ap.set_defaults(func = _cmdline_button_click)
+
+    ap = argsp.add_parser(
+        "button-sequence",
+        help = "Execute a button sequence")
+    ap.add_argument(
+        "target",
+        metavar = "TARGET", action = "store",
+        help = "Names of target to execute the sequence on")
+    ap.add_argument(
+        "sequence",
+        metavar = "STEP", action = "store", nargs = "+",
+        help = "sequence steps (list {on,off,cycle}:{COMPONENT,all,full}"
+        " or wait:SECONDS; *all* means all components except explicit ones,"
+        " *full* means all components including explicit ones")
+    ap.add_argument("-t", "--timeout",
+                    action = "store", default = 60, type = int,
+                    help = "timeout in seconds [%(default)d, plus "
+                    " all the waits +50%%]")
+    ap.set_defaults(func = _cmdline_button_sequence)
 
     ap = argsp.add_parser("button-double-click",
                           help = "double-click a button")
