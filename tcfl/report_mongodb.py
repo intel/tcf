@@ -279,19 +279,20 @@ class driver(tcfl.tc.report_driver_c):
             assert isinstance (domain, str), \
                 "data name '%s' is a %s, need a string" \
                 % (name, type(name).__name__)
-            # because MongoDB storage will loose from which target
-            # this report comes, append the target id it to the name.
-            if fullid and not fullid in name:
-                name += f" ({fullid})"
             name = name.replace(".", "_")
             if name.startswith("$"):
                 name = name.replace("$", "_", 1)
             value = attachments['value']
+            # there are  scripts that depend on this, thus keep both
+            doc.setdefault('data', {})
             doc['data'].setdefault(domain, {})
+            doc.setdefault('data-v2', {})
+            doc['data-v2'].setdefault(domain, {})
             if isinstance(value, str):
                 # MongoDB doesn't like bad UTF8, so filter a wee bit
                 value = commonl.mkutf8(value)
             doc['data'][domain][name] = value
+            doc['data-v2'][domain][name] = ( fullid, value )
         else:
             if attachments:
                 result['attachment'] = {}
