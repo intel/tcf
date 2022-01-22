@@ -7,6 +7,7 @@
 
 import collections
 import concurrent.futures
+import datetime
 import inspect
 import itertools
 import json
@@ -1119,6 +1120,13 @@ class server_c:
         except requests.RequestException as e:
             return self, None, \
                 f"{self.url}/ttb: got HTTP exception {e}"
+
+        # this we set it as an UTC YYYYmmddHHMMSS -- we'll check it
+        # later when doing discovery to avoid doing them too often
+        self._cache_set(
+            "last_discovery",
+            datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
+
         if r.status_code != 200:
             if r.status_code != 404:
                 return self, None, \
@@ -1306,6 +1314,10 @@ class server_c:
             origin = origin if origin else commonl.origin_get(1)
         )
 
+    #: Maximum time we consider a discovered server's data fresh
+    #:
+    #: After this time, we'll rescan it
+    max_cache_age = 10 * 60
 
     @classmethod
     def discover(cls, ssl_ignore = True,
@@ -1314,6 +1326,7 @@ class server_c:
                  seed_port = 5000,
                  herds_exclude = None, herds_include = None,
                  zero_strikes_max = 2,
+                 max_cache_age = None,
                  loops_max = 4,
                  origin = "source code defaults",
                  ignore_cache = False):
@@ -1508,8 +1521,50 @@ class server_c:
             server.setup()
 
         zero_strikes = 0
-        cls.servers = dict(cls.servers)
-        new_servers = cls.servers
+        cls.servers = dict(cls.servers)	# yup, make a copy of the dict
+        new_servers = dict()
+
+        if max_cache_age == None:
+            max_cache_age = tcfl.server_c.max_cache_age
+
+        # So now for each of those servers we know of, let's
+        # re-discover only those who have been not discovered for a
+        # long time, since they don't change this often
+        for server_name, server in cls.servers.items():
+            try:
+                last_discovery = int(server._cache_get("last_discovery"))
+                # this we set it as an UTC YYYYmmddHHMMSS
+                utcnow = int(datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
+                ellapsed = utcnow - last_discovery
+                if max_cache_age == 0:
+                    log_sd.warning(
+                        f"{server_name}: ignoring cache age; re-discovering")
+                elif ellapsed < 0:
+                    log_sd.warning(
+                        f"{server_name}: last discovery happened in the"
+                        f" future ({ellapsed}); clock skew?: re-discovering")
+                elif ellapsed < max_cache_age:
+                    log_sd.info(
+                        f"{server_name}: last discovery happened"
+                        f" {ellapsed} seconds ago, under {max_cache_age};"
+                        f" not forcing re-discovery")
+                    continue
+                else:
+                    log_sd.warning(
+                        f"{server_name}: last discovery happened"
+                        f" {ellapsed} seconds ago, over {max_cache_age};"
+                        f" re-discovering")
+            except Exception as e:
+                log_sd.info(f"{server_name}: can't get last discovery"
+                            f" date or invalid; forcing re-discovery: {e}")
+            new_servers[server_name] = server
+
+        if not new_servers:
+            log_sd.warning(
+                f"not discovering, all {len(cls.servers)} servers' "
+                f"info is warm")
+            return
+
         for count in range(1, loops_max + 1):
             # start searching the seed servers, but then only search
             # the new servers found in the previous run

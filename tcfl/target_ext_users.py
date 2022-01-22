@@ -241,6 +241,7 @@ def _cmdline_servers_discover(args):
         herds_exclude = args.herd_exclude,
         herds_include = args.herd_include,
         loops_max = args.iterations,
+        max_cache_age = 0,	        # force discoverying all known servers
         ignore_cache = args.flush,
         zero_strikes_max = args.zero_strikes_max,
         origin = "command line",
