@@ -103,7 +103,7 @@ qemu-system-x86_64 -no-reboot \
                    -enable-kvm -cpu host -m 3072 \
                    -kernel $tmpdir/vmlinuz \
                    -initrd $tmpdir/initrd.img \
-                   -append "console=ttyS0,115200n81 text ks=hd:LABEL=KS:/ks.cfg" \
+                   -append "console=ttyS0,115200n81 inst.text inst.ks=hd:LABEL=KS:/ks.cfg" \
                    -bios /usr/share/edk2/ovmf/OVMF_CODE.fd \
                    -cdrom $isofile \
                    -nographic \
