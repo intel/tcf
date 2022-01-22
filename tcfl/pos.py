@@ -2180,7 +2180,7 @@ def ipxe_seize(target):
                        "iPXE prompt time (s)", ts_prompt - ts_init)
 
 
-def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
+def ipxe_seize_and_boot(target, dhcp = None, pos_image = None, url = None):
     """Wait for iPXE to boot on a serial console, seize control and
     direct boot to a given TCF POS image
 
@@ -2195,6 +2195,9 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
 
     :param bool dhcp: (optional) have iPXE issue DHCP for IP
       configuration or manually configure using target's data.
+
+      If *None*, the default is taken from the machine's inventory
+      *ipxe.dhcp* setting, which defaults to *True* if not present.
 
     :param str url: (optional) base URL where to load the *pos_image*
       from; this will ask to load *URL/vmlinuz-POSIMAGE* and
@@ -2221,6 +2224,9 @@ def ipxe_seize_and_boot(target, dhcp = True, pos_image = None, url = None):
         timeout = 0, poll_period = 1,
         raise_on_found = tc.error_e("iPXE error detected")
     )
+
+    if dhcp == None:
+        dhcp = bool(target.property_get("ipxe.dhcp", True))
 
     with target.shell.context("iPXE boot"):
         try:
@@ -2817,7 +2823,7 @@ def edkii_pxe_ipxe_target_power_cycle_to_pos(target):
             # this will make it boot the iPXE bootloader and then we seize it
             # and direct it to our POS provide
             target.report_info("POS: seizing iPXE boot", )
-            ipxe_seize_and_boot(target, dhcp = False,
+            ipxe_seize_and_boot(target,
                                 url = url_resolved.geturl())
             break	# exit the retry loop
         except tc.exception as e:
@@ -3142,7 +3148,7 @@ def target_power_cycle_to_pos_uefi_http_boot_ipxe(target):
             # ipxe_seize_and_boot() to not use DHCP (we know the IP
             # assignment; dhcp is slower).
             target.report_info("POS: seizing iPXE boot")
-            ipxe_seize_and_boot(target, dhcp = False, url = url_resolved.geturl())
+            ipxe_seize_and_boot(target, url = url_resolved.geturl())
             break	# exit the retry loop
         except tc.exception as e:
             # catches anything infrastructure/failure related and puts it
