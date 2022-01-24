@@ -151,7 +151,7 @@ class _test(tcfl.pos.tc_pos_base):
         target.console.write("\x02\x02")	# use this iface so expecter
         time.sleep(0.3)
         target.expect("iPXE>")
-        prompt_orig = target.shell.shell_prompt_regex
+        prompt_orig = target.shell.prompt_regex
         try:
             #
             # When matching end of line, match against \r, since depends
@@ -161,7 +161,7 @@ class _test(tcfl.pos.tc_pos_base):
             #
             # FIXME: block on anything here? consider infra issues
             # on "Connection timed out", http://ipxe.org...
-            target.shell.shell_prompt_regex = "iPXE>"
+            target.shell.prompt_regex = "iPXE>"
             kws = dict(target.kws)
             boot_ic = target.kws['pos_boot_interconnect']
             mac_addr = target.kws['interconnects'][boot_ic]['mac_addr']
@@ -209,12 +209,17 @@ class _test(tcfl.pos.tc_pos_base):
                 )
             ifname = m.groupdict()['ifname']
 
-            # static is much faster and we know the IP address already
-            # anyway; but then we don't have DNS as it is way more
-            # complicated to get it
-            target.shell.run("set %s/ip %s" % (ifname, ipv4_addr))
-            target.shell.run("set %s/netmask %s" % (ifname, kws['ipv4_netmask']))
-            target.shell.run("ifopen " + ifname)
+            dhcp = bool(target.property_get("ipxe.dhcp", True))
+            if dhcp:
+                target.shell.run("dhcp " + ifname, re.compile("Configuring.*ok"))
+                target.shell.run("show %s/ip" % ifname, "ipv4 = %s" % ipv4_addr)
+            else:
+                # static is much faster and we know the IP address already
+                # anyway; but then we don't have DNS as it is way more
+                # complicated to get it
+                target.shell.run("set %s/ip %s" % (ifname, ipv4_addr))
+                target.shell.run("set %s/netmask %s" % (ifname, kws['ipv4_netmask']))
+                target.shell.run("ifopen " + ifname)
 
             if self.sanboot_url == "skip":
                 target.report_info("not booting", level = 0)
@@ -224,4 +229,4 @@ class _test(tcfl.pos.tc_pos_base):
                 # ESXi would print now...
                 #target.expect("Booting from SAN device")
         finally:
-            target.shell.shell_prompt_regex = prompt_orig
+            target.shell.prompt_regex = prompt_orig
