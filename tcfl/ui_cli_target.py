@@ -17,7 +17,6 @@ import tcfl.targets
 logger = logging.getLogger("ui_cli_target")
 
 
-
 def _rt_get_owner_allocid_power(rt):
     # rt is in most cases the deep one vs the flat one
     powered = rt.get('interfaces', {}).get('power', {}).get('state', False)
@@ -93,6 +92,7 @@ def _cmdline_ls_table(targetl):
         sys.stdout.write("\n")
 
 
+
 def _cmdline_ls(args):
     tcfl.target_c.subsystem_initialize()
 
@@ -158,7 +158,7 @@ def _cmdline_target_get(args):
         data = None
     server = tcfl.server_c.servers[rt['server']]
     # note the raw -> so we can do JSON decoding our own
-    r = server.send_request("GET", "targets/" + rt['id'], json = data,
+    r = server.send_request("GET", "targets/" + rt['id'], data = data,
                             raw = True)
     # Keep the order -- even if json spec doesn't contemplate it, we
     # use it so the client can tell (if they want) the order in which
