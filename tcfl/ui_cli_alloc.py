@@ -15,7 +15,7 @@ import tcfl.report_jinja2
 
 
 def _target_release(target, force = False):
-    server, rt = tcfl.server_c.get_by_target_id(target)
+    server, rt = tcfl.target_c.get_server_rt_by_id(target)
     server.target_release(rt['id'], force)
 
 def _cmdline_target_release(args):

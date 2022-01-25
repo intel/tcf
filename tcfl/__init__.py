@@ -2882,6 +2882,10 @@ class target_c:
         >>> aka = rt['server_aka']
         >>> server = tcfl.server_c.servers[url]
 
+        or you can also use :meth:`tcfl.target_c.get_server_rt_by_id`
+
+        >>> server, rt = tcfl.target_c.get_server_rt_by_id(target)
+
         """
         global rts
         if '/' in targetid:		# targetid is a fullid (SERVER/TARGET)
@@ -2890,6 +2894,21 @@ class target_c:
             if rt['id'] == targetid:
                 return rt
         raise KeyError(f"unknown target {targetid}")
+
+
+    @staticmethod
+    def get_server_rt_by_id(targetid):
+        """
+        Similar :meth:`tcfl.target_c.get_server_rt_by_id`, but also returns the server
+
+        :returns tuple(tcfl.target_c,dict): a tuple of the server
+          structure and inventory data for target.
+
+        """
+        rt = target_c.get_rt_by_id(targetid)
+        url = rt['server']
+        return tcfl.server_c.servers[url], rt
+
 
     @classmethod
     def _inventory_update(cls):
