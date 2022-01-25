@@ -2856,6 +2856,8 @@ class target_c:
         self.id = None		# filled by _bind()
         self.rt = None		# filled by _bind()
         self.allocid = None	# filled by _bind()
+        self.server = None	# filled by _bind()
+
 
     def __repr__(self):
         #return f"role:{self.role} spec:'{self.spec}' axes:{self.axes}"
@@ -2949,6 +2951,9 @@ class target_c:
         self.id = target_id
         self.fullid = target_fullid
         self.allocid = allocid
+        self.rt = dict(rts[target_fullid])
+        self.rt.update(rts_flat[target_fullid])
+        self.server = server_c.servers[self.rt['server']]
 
 
     @classmethod
