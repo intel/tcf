@@ -2965,7 +2965,59 @@ class target_c(reporter_c):
         self.server = server_c.servers[self.rt['server']]
 
 
+    @staticmethod
+    def create(target_name, iface = None, extensions_only = None):
+        """
+        Create a :class:`tcfl.tc.target_c` object for a direct test
+
+        :param str target_name: name of the target; this can be just
+          an ID or a fullid (SERVER/ID).
+        :param str iface: (optional) target must support the given
+          interface, otherwise an exception is raised.
+        :param list extensions_only: (optional) list of extensions to
+          load; if *[]*, load no extensions, if *None* load all
+          extensions available/needed; otherwise, load only the
+          extensions listed by name.
+        :returns: instance of :class:`tcfl.tc.target_c` representing
+          said target, if it is available.
+        """
+        server, rt = tcfl.target_c.get_server_rt_by_id(target_name)
+        if iface != None and not iface in rt.get('interfaces', []):
+            raise RuntimeError("%s: target does not support the %s interface"
+                               % (target_name, iface))
+        target = target_c("target", commonl.origin_get(1))
+        target._bind(server.aka, rt['id'], rt['fullid'], "FIXME:n/a")
+        return target
+
+
     @classmethod
+    def create_from_cmdline_args(cls, args, target_name = None, iface = None,
+                                 extensions_only = None):
+        """
+        Create a :class:`tcfl.tc.target_c` object from command line
+          arguments
+
+        :param argparse.Namespace args: arguments from argparse
+        :param str target_name: (optional) name of the target, by
+          default is taken from *args.target*.
+        :param str iface: (optional) target must support the given
+          interface, otherwise an exception is raised.
+        :param list extensions_only: (optional) list of extensions to
+          load; if *[]*, load no extensions, if *None* load all
+          extensions available/needed; otherwise, load only the
+          extensions listed by name.
+        :returns: instance of :class:`tcfl.tc.target_c` representing
+          said target, if it is available.
+        """
+        if target_name == None:
+            if not hasattr(args, 'target'):
+                raise RuntimeError("missing 'target' argument")
+            target_name = getattr(args, 'target', None)
+        target = cls.create(target_name,
+                            iface = iface, extensions_only = extensions_only)
+        return target
+
+
     def subsystem_initialize(cls):
         """
         Initialize the target's subsystem
