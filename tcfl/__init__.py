@@ -16,6 +16,7 @@ import inspect
 import itertools
 import json
 import logging
+import numbers
 import os
 import pickle
 import pprint
@@ -3018,6 +3019,127 @@ class target_c(reporter_c):
         return target
 
 
+    def property_get(self, property_name, default = None):
+        """
+        Read a property from the target
+
+        :param str property_name: Name of the property to read
+        :returns str: value of the property (if set) or None
+
+        Note that getting a property named *a.b.c* expects the target
+        to have a property *a* that contains a field *b* that is also
+        a dictionary and this will return its value *c*.
+        """
+        self.report_info("reading property '%s'" % property_name, dlevel = 3)
+        data = { "projection": json.dumps([ property_name ]) }
+        if self.ticket:
+            data['ticket'] = self.ticket
+        r = self.server.send_request("GET", "targets/" + self.id, data = data)
+        # unfold a.b.c.d which returns { a: { b: { c: { d: value } } } }
+        propertyl = property_name.split(".")
+        for prop_name in propertyl:
+            r = r.get(prop_name, None)
+            if r == None:
+                val = None
+                break
+        else:
+            val = r
+        self.report_info("read property '%s': '%s' [%s]"
+                         % (property_name, val, default), dlevel = 4)
+        if val == None and default != None:
+            return default
+        return val
+
+
+    def property_set(self, property_name, value = None):
+        """
+        Set a property on the target
+
+        :param str property_name: Name of the property to read
+        :param value: (optional) Value to set; *None* to unset it
+        """
+        if value:
+            assert isinstance(value, (str, numbers.Integral, numbers.Real, bool))
+        self.report_info("setting property '%s' to '%s'"
+                         % (property_name, value), dlevel = 4)
+        data = { property_name: value }
+        if self.ticket:
+            data['ticket'] = self.ticket
+        self.server.send_request("PATCH", "targets/" + self.id, json = data)
+        self.report_info("set property '%s' to '%s'" % (property_name, value),
+                         dlevel = 2)
+
+
+    def properties_set(self, d):
+        """
+        Set a recursive dictionary tree of properties
+
+        :param dict d: Dictionary of properties and values
+        """
+        assert isinstance(d, dict)
+        self.report_info("setting %d properties" % (len(d)), dlevel = 3)
+        if self.ticket:
+            d['ticket'] = self.ticket
+        self.server.send_request("PATCH", "targets/" + self.id,
+                                 json = d)
+        self.report_info("set %d properties" % (len(d)), dlevel = 2)
+
+
+    def properties_get(self, *projections):
+        """
+        Get a dictionary of properties from the server
+
+        :param str projections: (optional: default all) zero or more
+          name of fields to ask for
+
+          Field names can use periods to dig into dictionaries.
+
+          Field names can match :mod:`fnmatch` regular
+          expressions.
+
+          >>> target.properties_get("interfaces.tunnel", "instrumentation")
+
+          would return the tree:
+
+          >>> {
+          >>>     interfaces: {
+          >>>         tunnel: { ... },
+          >>>         instrumentation: { ... }
+          >>> }
+
+        """
+        commonl.assert_none_or_list_of_strings(projections, "projections", "projection")
+        if projections:
+            data = { 'projections': json.dumps(projections) }
+        else:
+            data = None
+        return self.server.send_request(
+            "GET", "targets/" + self.id, data = data)
+
+
+    def disable(self, reason = 'disabled by the administrator'):
+        """
+        Disable a target, setting an optional reason
+
+        :param str reason: (optional) string describing the reason
+          [default: none]
+
+        This sets a field *disabled* in the inventory with
+        the messages; convention is this means it is disabled.
+        """
+        self.property_set('disabled', reason)
+
+
+    def enable(self):
+        """
+        Enable a (maybe disabled) target
+
+        This removes the *disabled* field from the inventory.
+        """
+        self.property_set('disabled', None)
+
+
+    @classmethod   # FIXME: move to tcfl.targets.?
     def subsystem_initialize(cls):
         """
         Initialize the target's subsystem

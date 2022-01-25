@@ -167,6 +167,48 @@ def _cmdline_target_get(args):
     json.dump(rt, sys.stdout, skipkeys = True, indent = 4)
 
 
+
+def _cmdline_target_patch(args):
+    import json
+    tcfl.target_c.subsystem_initialize()
+    # set data
+    data = collections.OrderedDict()	# respect user's order
+    for data_s in args.data:
+        if not "=" in data_s:
+            raise AssertionError(
+                "data specification has to be in the format KEY=JSON-DATA;"
+                " got (%s) %s" % (type(data_s), data_s))
+        k, v = data_s.split("=", 1)
+        data[k] = v
+
+    server, rt = tcfl.target_c.get_server_rt_by_id(args.target)
+
+    if data:
+        server.send_request("PATCH", "targets/" + rt['id'], data = data)
+    else:
+        # JSON from stdin
+        server.send_request("PATCH", "targets/" + rt['id'],
+                            json = json.loads(sys.stdin.read()))
+
+
+def _cmdline_target_disable(args):
+    tcfl.target_c.subsystem_initialize()
+    with tcfl.msgid_c("cmdline"):
+        for target_name in args.target:
+            target = tcfl.target_c.create_from_cmdline_args(
+                args, target_name = target_name)
+            target.disable(args.reason)
+
+
+def _cmdline_target_enable(args):
+    tcfl.target_c.subsystem_initialize()
+    with tcfl.msgid_c("cmdline"):
+        for target_name in args.target:
+            target = tcfl.target_c.create_from_cmdline_args(
+                args, target_name = target_name)
+            target.enable()
+
+
 def _cmdline_setup(arg_subparsers):
 
     ap = arg_subparsers.add_parser(
@@ -208,3 +250,30 @@ def _cmdline_setup(arg_subparsers):
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target's name")
     ap.set_defaults(func = _cmdline_target_get)
+
+
+def _cmdline_setup_advanced(arg_subparsers):
+
+    ap = arg_subparsers.add_parser(
+        "patch", help = "Store target information in the server")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target's name")
+    ap.add_argument("data", metavar = "KEY=JSON-VALUE", nargs = "*",
+                    default = None, help = "Data items to store; if"
+                    " none, specify a JSON dictionary over stdin")
+    ap.set_defaults(func = _cmdline_target_patch)
+
+    ap = arg_subparsers.add_parser("enable",
+                                   help = "Enable a disabled target")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    nargs = "+", default = None, help = "Target's name or URL")
+    ap.set_defaults(func = _cmdline_target_enable)
+
+    ap = arg_subparsers.add_parser("disable",
+                                   help = "Disable an enabled target")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    nargs = "+", default = None, help = "Target's name or URL")
+    ap.add_argument("-r", "--reason", metavar = "REASON", action = "store",
+                    default = 'disabled by the administrator',
+                    help = "Reason why targets are disabled")
+    ap.set_defaults(func = _cmdline_target_disable)
