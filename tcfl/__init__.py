@@ -2780,7 +2780,7 @@ class reporter_c(object):
         return self._ticket
 
 
-class target_c:
+class target_c(reporter_c):
 
     #: Length of the hash used to identify groups or lists of targets
     #:
@@ -2812,7 +2812,8 @@ class target_c:
                  spec_args = None,
                  ic_spec = None,
                  ic_spec_args = None,
-                 interconnect = False):
+                 interconnect = False,
+                 testcase = None):
         """FIXME
 
         **Internal API for testcase/target pairing**
@@ -2842,12 +2843,20 @@ class target_c:
         # inventory, thus we'll be demanding it is present in the
         # inventory
         # See also the note in tc_c._axes_all.
-        self.axes = collections.OrderedDict(axes)
+        if axes:
+            self.axes = collections.OrderedDict(axes)
+        else:
+            self.axes = collections.OrderedDict()
         #FIXME: this is expanded by executor_c.axes_expand() once we
         #have read the inventory of targets
         self.axes_from_inventory = set()
         self.interconnect = interconnect
         self.origin = origin
+
+        if testcase == None:
+            reporter_c.__init__(self, testcase = tc_global)
+        else:
+            reporter_c.__init__(self, testcase = testcase)
 
         # these are not defined until _bind() is called
         self.rtb_aka = None	# filled by _bind
@@ -4426,6 +4435,7 @@ def shutdown():
     with concurrent.futures.ThreadPoolExecutor(len(server_c.servers)) as e:
         e.map(lambda server: server._state_save(), server_c.servers.values())
 
+tc_global = tc_c("global", __file__, __file__)
 
 # we don't need too much logging level from this
 logging.getLogger("filelock").setLevel(logging.CRITICAL)
