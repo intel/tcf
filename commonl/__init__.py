@@ -37,8 +37,8 @@ import numbers
 import os
 import random
 import re
-import requests
 import signal
+import shutil
 import socket
 import string
 import struct
@@ -49,6 +49,9 @@ import threading
 import time
 import traceback
 import types
+
+import filelock
+import requests
 
 import urllib.parse
 
@@ -483,6 +486,77 @@ def hash_file(hash_object, filepath, blk_size = 8192):
     return hash_object
 
 
+class fs_cache_c():
+    """
+    Very simple disk-based cache
+
+    Note this is multiprocess using a file-based lock (ssee
+    :module:`filelock`):
+
+    >>> with self.lock():
+    >>>    self.get_unlocked()
+
+    """
+    def __init__(self, cache_dir):
+        self.cache_dir = cache_dir
+        # don't call from initialization, only once we start using it
+        # in earnest
+        self.cache_lockfile = os.path.join(
+            self.cache_dir, "lockfile")
+        self.fsdb = fsdb_c.create(self.cache_dir)
+
+    def lock(self):
+        return filelock.FileLock(self.cache_lockfile)
+
+    def set_unlocked(self, field, value):
+        self.fsdb.set(field, value)
+
+    def set(self, field, value):
+        with self.lock():
+            self.fsdb.set(field, value)
+
+    def get_unlocked(self, field, default = None):
+        return self.fsdb.get(field, default)
+
+    def get(self, field, default = None):
+        with self.lock():
+            return self.fsdb.get(field, default)
+
+    def lru_cleanup_unlocked(self, max_entries):
+        """
+        Delete the oldest in a list of entries that are used as a cache
+        until only *max_entries* are left
+
+        :param int max_entries: maximum number of entries which should be
+          left
+
+        """
+        assert isinstance(max_entries, int) and max_entries > 0
+
+        mtimes_sorted_list = []
+        mtimes = {}
+
+        for path, _dirs, filenames in os.walk(self.cache_dir):
+            # note there should be no subdirs we care for because it's
+            # asingle level
+            for filename in filenames:
+                if filename == "lockfile":
+                    continue
+                filepath = os.path.join(path, filename)
+                mtime = self.fsdb._raw_stat(filepath).st_mtime
+                mtimes[mtime] = filepath
+                bisect.insort(mtimes_sorted_list, mtime)
+            break	# only one directory level
+
+        clean_number = len(mtimes_sorted_list) - max_entries
+        if clean_number < 0:
+            return
+        for mtime in mtimes_sorted_list[:clean_number]:
+            rm_f(mtimes[mtime])
+
+
+
+
 _hash_sha512 = hashlib.sha512()
 
 def _hash_file_cached(filepath, digest, cache_path, cache_entries):
@@ -494,28 +568,23 @@ def _hash_file_cached(filepath, digest, cache_path, cache_entries):
     if cache_path == None:
         cache_path = os.path.join(
             os.path.expanduser("~"), ".cache", "file-hashes")
-        makedirs_p(cache_path)
-    symlink_lru_cleanup(cache_path, cache_entries)
-    cached_filename = os.path.join(cache_path, filepath_stat_hash)
-    try:
-        value = os.readlink(cached_filename)
+    makedirs_p(cache_path)
+    cache = fs_cache_c(cache_path)
+    with cache.lock():
+        cache.lru_cleanup_unlocked(cache_entries)
+        value = cache.get_unlocked(filepath_stat_hash)
         # we have read the value, so now we remove the entry and
         # if it is "valid", we recreate it, so the mtime is
         # updated and thus an LRU cleanup won't wipe it.
         # FIXME: python3 just update utime
-        rm_f(cached_filename)
         if value and isinstance(value, str) \
            and len(value) == 2 * _hash_sha512.digest_size:
-            os.symlink(value, cached_filename)
+            cache.set_unlocked(filepath_stat_hash, value)
             return value
-        # fallthrough to re-calculate it
-    except OSError as e:
-        if e.errno != errno.ENOENT:
-            raise
-    hoc = hash_file(hashlib.new(digest), filepath, blk_size = 8192)
-    value = hoc.hexdigest()
-    os.symlink(hoc.hexdigest(), cached_filename)
-    return value
+        hoc = hash_file(hashlib.new(digest), filepath, blk_size = 8192)
+        cache.set_unlocked(filepath_stat_hash, hoc.hexdigest())
+        return hoc.hexdigest()
+
 
 def hash_file_cached(filepath, digest,
                      cache_path = None, cache_entries = 1024):
@@ -557,38 +626,6 @@ def hash_file_cached(filepath, digest,
             if tries >= tries_max:
                 raise
             tries += 1
-
-
-def symlink_lru_cleanup(dirname, max_entries):
-    """
-    Delete the oldest in a list of symlinks that are used as a cache
-    until only *max_entries* are left
-
-    :param str dirname: path where the files are located
-
-    :param int max_entries: maximum number of entries which should be
-      left
-
-    """
-    assert isinstance(dirname, str)
-    assert isinstance(max_entries, int) and max_entries > 0
-
-    mtimes_sorted_list = []
-    mtimes = {}
-
-    for path, _dirs, filenames in os.walk(dirname):
-        for filename in filenames:
-            filepath = os.path.join(path, filename)
-            mtime = os.lstat(filepath).st_mtime
-            mtimes[mtime] = filepath
-            bisect.insort(mtimes_sorted_list, mtime)
-        break	# only one directory level
-
-    clean_number = len(mtimes_sorted_list) - max_entries
-    if clean_number < 0:
-        return
-    for mtime in mtimes_sorted_list[:clean_number]:
-        rm_f(mtimes[mtime])
 
 
 def hash_file_maybe_compressed(hash_object, filepath, cache_entries = 128,
@@ -661,32 +698,25 @@ def hash_file_maybe_compressed(hash_object, filepath, cache_entries = 128,
         if cache_path == None:
             cache_path = os.path.join(
                 os.path.expanduser("~"), ".cache", "compressed-hashes")
-            makedirs_p(cache_path)
-        symlink_lru_cleanup(cache_path, cache_entries)
-        cached_filename = os.path.join(cache_path, hoc.hexdigest())
-        try:
-            value = os.readlink(cached_filename)
+        makedirs_p(cache_path)
+        cache = fs_cache_c(cache_path)
+        with cache.lock():
+            cache.lru_cleanup_unlocked(cache_entries)
+            value = cache.get_unlocked(hexdigest_compressed)
             # we have read the value, so now we remove the entry and
             # if it is "valid", we recreate it, so the mtime is
             # updated and thus an LRU cleanup won't wipe it.
             # FIXME: python3 just update utime
-            rm_f(cached_filename)
+            cache.set_unlocked(hexdigest_compressed, None)
             # basic verification, it has to look like the hexdigest()
-            if len(value) != len(hoc.hexdigest()):
-                value = None
-            # recreate it, so that the mtime shows we just used it
-            try:
-                os.symlink(value, cached_filename)
-            except FileExistsError:
-                # this means someone has created the entry between us
-                # deleting it and now, which is fine -- it shall be
-                # the same
-                pass
-            return value
-        except OSError as e:
-            if e.errno != errno.ENOENT:
-                raise
-            value = None
+            if len(value) == len(hoc.hexdigest()):
+                # recreate it, so that the mtime shows we just used it
+                # and LRU will keep it around
+                cache.set_unlocked(hexdigest_compressed, value)
+                return value
+
+    # ok, we have to decompress and set a hash
+    # note we relesae the lock, as this might take time
 
     # decompress and generate hash
     #
@@ -701,7 +731,11 @@ def hash_file_maybe_compressed(hash_object, filepath, cache_entries = 128,
     # with the extension to the tmpdir and tell maybe_decompress() to
     # do its thing -- then we has the raw data
     filename_tmp_compressed = os.path.join(tmpdir, os.path.basename(filepath))
-    os.symlink(os.path.abspath(filepath), filename_tmp_compressed)
+    if sys.platform in ( 'linux', 'macos' ):
+        os.symlink(os.path.abspath(filepath), filename_tmp_compressed)
+    else:
+        # sigh Windows and symlinks...
+        shutil.copyfile(os.path.abspath(filepath), filename_tmp_compressed)
     try:
         filename_tmp = maybe_decompress(filename_tmp_compressed)
         ho = hash_file(hash_object, filename_tmp)
@@ -711,12 +745,10 @@ def hash_file_maybe_compressed(hash_object, filepath, cache_entries = 128,
         if tmpdir_delete:
             os.rmdir(tmpdir)
 
-    hexdigest = ho.hexdigest()
-
     if cache_entries:
-        symlink_f(hexdigest, os.path.join(cache_path, hexdigest_compressed))
+        cache.set(hexdigest_compressed, ho.hexdigest())
 
-    return hexdigest
+    return ho.hexdigest()
 
 
 def request_response_maybe_raise(response):
@@ -2991,6 +3023,10 @@ class fsdb_symlink_c(fsdb_c):
     def _raw_rename(self, location_new, location):
         os.replace(location_new, location)
 
+    @staticmethod
+    def _raw_stat(location):
+        return os.lstat(location)
+
     def keys(self, pattern = None):
         l = []
         for _rootname, _dirnames, filenames_raw in os.walk(self.location):
@@ -3180,6 +3216,8 @@ class fsdb_file_c(fsdb_symlink_c):
     def _raw_rename(self, location_new, location):
         os.replace(location_new, location)
 
+    def _raw_stat(self, location):
+        return os.lstat(location)
 
 
 def retry_cb_tries(ExceptionToCheck,
