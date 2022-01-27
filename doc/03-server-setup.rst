@@ -959,12 +959,15 @@ c. Make the kernel and initrd for POS available via Apache for
    ii. Regenerate the *initrd* with nfs-root support, as the initrd
        generated does not have nfs-root enabled::
 
-         # dracut -v -H --kver $(ls /home/ttbd/images/tcf-live/x86_64/lib/modules) \
-                -k /home/ttbd/images/tcf-live/x86_64/lib/modules/* \
-               --kernel-image /home/ttbd/images/tcf-live/x86_64/boot/vmlinuz-* \
-               --add-drivers "igb i40e e1000e r8169 virtio_net ftdi_sio" \
-               -m "nfs base network kernel-modules kernel-network-modules" \
+         # KVER=$(ls /home/ttbd/images/tcf-live/x86_64/lib/modules)  # or set manually
+         # dracut -v --no-hostonly \
+               --kver $KVER
+               -k /home/ttbd/images/tcf-live/x86_64/lib/modules/$KVER \
+               --kernel-image /home/ttbd/images/tcf-live/x86_64/boot/vmlinuz-$KVER \
+               --add-drivers "e1000 e1000e e100 i40e iavf ice igbvf igc ixgb ixgbe ixgbevf r8169 virtio_net ftdi_sio" \
+               --add "nfs" \
                /home/ttbd/public_html/x86_64/initramfs-tcf-live
+         # chmod a+r /home/ttbd/public_html/x86_64/initramfs-tcf-live
 
        .. warning:: ``--kver`` is needed to not default to the kernel
                     version of the system running the command.
