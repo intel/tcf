@@ -88,8 +88,10 @@ sudo chroot $IMAGEDIR /bin/systemctl enable sshd
 # allow to initialize it properly--as it is done way early before we
 # mount the overlayfs. Probably we can do a better fix, but this does
 # it for now.
-echo 00000000000000000000000000000001 \
-    | sudo tee $IMAGEDIR/etc/machine-id > /dev/null
+#
+# dbus-broker launch is all over this file and if we pre-create it in
+# any way it just fails; this lets it create it
+( cd $IMAGEDIR/etc; ln -sf ../run/machine-id machine-id )
 
 info "install required packages"
 # install things we need in the image
