@@ -82,7 +82,7 @@ def ansi_render_approx(s, width = 80, height = 2000):
     return r
 
 
-def ipxe_sanboot_url(target, sanboot_url):
+def ipxe_sanboot_url(target, sanboot_url, dhcp = None):
     """
     Use iPXE to sanboot a given URL
 
@@ -99,9 +99,17 @@ def ipxe_sanboot_url(target, sanboot_url):
 
     :param tcfl.tc.target_c target: target where to perform the
       operation
+
     :param str sanboot_url: URL to download and map into a drive to
       boot into. If *skip* nothing is done and you are left with an
       iPXE console connected to the network.
+
+    :param bool dhcp: (optional) have iPXE issue DHCP for IP
+      configuration or manually configure using target's data.
+
+      If *None*, the default is taken from the machine's inventory
+      *ipxe.dhcp* setting, which defaults to *True* if not present.
+
     """
     target.power.cycle()
 
@@ -198,12 +206,18 @@ def ipxe_sanboot_url(target, sanboot_url):
             )
         ifname = m.groupdict()['ifname']
 
-        # static is much faster and we know the IP address already
-        # anyway; but then we don't have DNS as it is way more
-        # complicated to get it
-        target.shell.run("set %s/ip %s" % (ifname, ipv4_addr))
-        target.shell.run("set %s/netmask %s" % (ifname, kws['ipv4_netmask']))
-        target.shell.run("ifopen " + ifname)
+        if dhcp == None:
+            dhcp = bool(target.property_get("ipxe.dhcp", True))
+        if dhcp:
+            target.shell.run("dhcp " + ifname, re.compile("Configuring.*ok"))
+            target.shell.run("show %s/ip" % ifname, "ipv4 = %s" % ipv4_addr)
+        else:
+            # static is much faster and we know the IP address already
+            # anyway; but then we don't have DNS as it is way more
+            # complicated to get it
+            target.shell.run("set %s/ip %s" % (ifname, ipv4_addr))
+            target.shell.run("set %s/netmask %s" % (ifname, kws['ipv4_netmask']))
+            target.shell.run("ifopen " + ifname)
 
         if sanboot_url == "skip":
             target.report_info("not booting", level = 0)
