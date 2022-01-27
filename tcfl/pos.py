@@ -2128,7 +2128,14 @@ pos_cmdline_opts = {
         "plymouth.enable=0 ",		# No installer to run
         # so syscfg BIOS config utility can run in POS environment
         "iomem=relaxed",
-        "root=nfs:%(pos_nfs_server)s:%(pos_nfs_path)s,soft,nolock",
+        # newer dracuts seem to confused by nfs: (as in
+        # root=nfs:SERVER:PATH:OPTIONS, removing it, leaving just the
+        # colon.
+        # Hardcode NFS v3 (nfsvers=3) since if it is a NFS4 and we don't
+        # have an idmap daemon running on the client, files owned as
+        # root will be mapped as something else and the system won't
+        # boot (since it can't do UID mapping).
+        "root=nfs:%(pos_nfs_ip)s:%(pos_nfs_path)s:soft,nolock,nfsvers=3",
     ]
 }
 
@@ -2315,6 +2322,8 @@ def ipxe_seize_and_boot(target, dhcp = None, pos_image = None, url = None):
             pos_kernel_image = target.kws.get('pos.kernel_image', pos_image)
             if 'pos_kernel_image' not in kws:
                 kws['pos_kernel_image'] = pos_kernel_image
+            if not 'pos_nfs_ip' in kws:
+                kws['pos_nfs_ip'] = socket.gethostbyname(kws["pos_nfs_server"])
             # split cmdline in two chunks, sometimes it is too long
             cmdline = pos_cmdline_opts[pos_image]
             cmdline_len = len(cmdline)
