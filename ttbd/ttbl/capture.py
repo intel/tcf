@@ -229,7 +229,7 @@ class impl_c(ttbl.tt_interface_impl_c):
         # set the tags as reference
         publish_dict = target.tags['interfaces'][iface_name]
         publish_dict[component]['snapshot'] = self.snapshot
-        publish_dict[component]['stream'] = {}
+        publish_dict[component].setdefault('stream', {})
         for stream_name in self.stream:
             publish_dict[component]['stream'][stream_name] = {}
             publish_dict[component]['stream'][stream_name]['mimetype'] = \
