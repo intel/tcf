@@ -902,7 +902,7 @@ def _cmdline_capture_list(args):
         capturers_data = target.capture._capturers_data_get()
         capturers = target.capture.list()
         for name, state in capturers.items():
-            streams = capturers_data[name]['stream']
+            streams = capturers_data[name].get('stream', {})
             l = [
                 name + ":" + data.get('mimetype', "mimetype-n/a")
                 for name, data in streams.items()
