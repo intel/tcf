@@ -191,6 +191,16 @@ class pci(ttbl.power.impl_c, ttbl.capture.impl_c): # pylint: disable = abstract-
             self._outlet_rpc = outlets[self.outlet_number]
         return self._outlet_rpc
 
+    def target_setup(self, target, iface_name, component):
+        if iface_name == "power":
+            ttbl.power.impl_c.target_setup(self, target, iface_name, component)
+        elif iface_name == "capture":
+            ttbl.capture.impl_c.target_setup(self, target, iface_name, component)
+        else:
+            raise RuntimeError(
+                "{target.id}: unknown interface {iface_name} for setting"
+                f" up component {component}")
+
     def on(self, _target, _component):
         self._outlet.setPowerState(
             raritan.rpc.pdumodel.Outlet.PowerState.PS_ON)
