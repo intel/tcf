@@ -258,7 +258,10 @@ def _cookies(args):
         else:
             raise ValueError("%s: unknown target" % args.target)
 
-    if args.cookiejar:
+    if args.json:
+        json.dump(rtb.cookies, sys.stdout, indent = 4)
+        print()
+    elif args.cookiejar:
         # Follow https://curl.se/docs/http-cookies.html
         # Note we don't keep the TTL field, so we set it at zero
         for cookie, value in rtb.cookies.items():
@@ -389,6 +392,8 @@ if __name__ == "__main__":
     ap.add_argument("-c","--cookiejar", action = "store_true", default = False,
                     help = "Print in cookiejar format"
                     " (https://curl.se/docs/http-cookies.html)")
+    ap.add_argument("-j","--json", action = "store_true", default = False,
+                    help = "Print in JSON format")
     ap.set_defaults(func = _cookies)
 
     arg_parser_target_list = arg_subparsers.add_parser(
