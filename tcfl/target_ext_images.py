@@ -276,6 +276,13 @@ class extension(tc.target_extension_c):
 
             $ tcf get TARGETNAME -p interfaces.images
 
+          Note that the specification can include strings *%(FIELD)s* to be
+          replaced by values extracted from the inventory and
+          formatted using Python % formatting. This resolution will
+          recurse up to five times (eg: if string *some-%(FIELD1)s* resolves
+          into *some-thing-%(FIELD2)s* and expansion of *FIELD2*
+          yields *some-thing-nice*).
+
         The string specification will be taken, in this order from the
         following list
 
@@ -385,6 +392,9 @@ class extension(tc.target_extension_c):
             if entry == "no-upload":
                 upload = False
                 continue
+            # Expand keywords, so we can do things like
+            # bios:/BIOSDIR/%(type)s/LATEST-%(bsps.x86_64.cpu-CPU0.family)s
+            entry = commonl.kws_expand(entry, target.kws)
             # see if we can assume this is in the form
             # [SOMEPATH/]FILENAME[.EXT]; if FILENAME matches a known
             # flashing destination, we take it
@@ -456,7 +466,9 @@ def _cmdline_setup(arg_subparser):
                     " TYPE can be omitted if the file name starts with"
                     " the name of an image (eg: ~/place/bios-433 would"
                     " be flashed into 'bios' if the target exposes the"
-                    " 'bios' flash destination)")
+                    " 'bios' flash destination)."
+                    " Note filenames can contain %(FIELD)s strings"
+                    " that will be expanded from the inventory.")
     ap.add_argument("-u", "--upload",
                     action = "store_true", default = False,
                     help = "upload FILENAME first and then flash")
