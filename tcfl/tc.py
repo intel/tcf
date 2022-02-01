@@ -7222,6 +7222,11 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                         # the console, so we verbose level it one up
                         f"client version {version}",
                         dlevel = 3 if self.parent else 1)
+                    if self.parent:
+                        self.report_info(
+                            f"NOTE: this is a subtestcase of"
+                            f" {self.parent.name} ({self.parent.runid_hashid});"
+                            " refer to it for full information", dlevel = 1)
                     for _target in list(self.target_group.targets.values()):
                         # We need to update all the target's KWS, as we
                         # have added KWS to the tescase (tc_hash and
