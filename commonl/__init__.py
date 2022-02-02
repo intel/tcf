@@ -709,7 +709,7 @@ def hash_file_maybe_compressed(hash_object, filepath, cache_entries = 128,
             # FIXME: python3 just update utime
             cache.set_unlocked(hexdigest_compressed, None)
             # basic verification, it has to look like the hexdigest()
-            if len(value) == len(hoc.hexdigest()):
+            if value and len(value) == len(hoc.hexdigest()):
                 # recreate it, so that the mtime shows we just used it
                 # and LRU will keep it around
                 cache.set_unlocked(hexdigest_compressed, value)
@@ -736,11 +736,13 @@ def hash_file_maybe_compressed(hash_object, filepath, cache_entries = 128,
     else:
         # sigh Windows and symlinks...
         shutil.copyfile(os.path.abspath(filepath), filename_tmp_compressed)
+    filename_tmp = None
     try:
         filename_tmp = maybe_decompress(filename_tmp_compressed)
         ho = hash_file(hash_object, filename_tmp)
     finally:
-        rm_f(filename_tmp)
+        if filename_tmp:
+            rm_f(filename_tmp)
         rm_f(filename_tmp_compressed)
         if tmpdir_delete:
             os.rmdir(tmpdir)
