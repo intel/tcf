@@ -47,6 +47,10 @@ values that are inherit to the BIOS:
 - *bios.boot_time* (positive integer; SECONDS; default 60): time in
   seconds it takes the BIOS to boot (ie: to show *bios.boot_prompt*)
 
+- *bios.boot_menu_time* (positive integer; SECONDS; default 60):
+  maximum time in seconds it takes the BIOS to go from the main menu
+  to the BIOS Boot menu when selected.
+
 - *bios.boot_prompt* (Python regular expression string; no default):
   regex defining what string the BIOS prints when it is done booting
   and is ready to take input, for example::
@@ -607,7 +611,8 @@ def submenu_header_expect(
         target, menu_title,
         # FIXME: move to BIOS profile
         canary_end_menu_redrawn = "^v=Move Highlight",
-        menu_name = None):
+        menu_name = None,
+        timeout = None):
     """
     Wait for a submenu header to show up
 
@@ -651,9 +656,13 @@ def submenu_header_expect(
     start_of_menu = re.compile(br"/-+\\")
     end_of_menu = re.compile(br"\-+/")
     target.expect(start_of_menu,
-                  name = menu_name + ":menu-box-start")
+                  name = menu_name + ":menu-box-start",
+                  timeout = timeout)
     target.expect(menu_title,
-                  name = menu_name + ":menu-title")
+                  name = menu_name + ":menu-title",
+                  timeout = timeout)
+    # no need to use the args timeout on the box end, at this point
+    # the menu itself has been drawn, so the rest SHALL be fast.
     target.expect(end_of_menu,
                   name = menu_name + ":menu-box-end" )
     if canary_end_menu_redrawn:
@@ -1257,7 +1266,8 @@ def main_boot_select_entry(target, boot_entry):
         raise tcfl.tc.error_e("BIOS: can't find boot manager menu")
     entry_select(target)			# select it
     submenu_header_expect(target, "Boot Manager Menu",
-                          canary_end_menu_redrawn = None)
+                          canary_end_menu_redrawn = None,
+                          timeout = target.kws.get('bios.boot_menu_time', 120))
     max_scrolls = target.kws.get("bios.boot_menu_max_scrolls", 60)
     r = menu_scroll_to_entry(target, boot_entry,
                              level = "Boot Manager Menu",
