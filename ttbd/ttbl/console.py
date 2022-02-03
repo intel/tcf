@@ -25,8 +25,11 @@ import sys
 import time
 import tty
 
+
 import commonl
+import commonl.keys
 import ttbl
+import ttbl.config
 import ttbl.power
 
 import pexpect
@@ -1165,7 +1168,8 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
         self.kws['port'] = port
         # this is used for sshpass to send the password; we dont' keep
         # the password in the default parameters because then it'd
-        # leak easily to anyone
+        # leak easily to anyone--however, we'll use it as default if
+        # not found in the keyring
         self.password = password
         # SSHPASS always has to be defined
         self.env_add['SSHPASS'] = password if password else ""
@@ -1174,6 +1178,15 @@ class ssh_pc(ttbl.power.socat_pc, generic_c):
         self.upid_set(f"console over SSH to {hostname}:{port}",
                       name = f"ssh:{hostname}:{port}",
                       hostname = hostname, port = port)
+        # we use the kernel keyring to set things -- to avoid conflict
+        # we do a separate instance; note separate instances (on
+        # multiple daemons, etc) will still use the same session
+        # keyring, so the description of the keys will contain context
+        # info to avoid conflicts--note we do not use it via the
+        # keyring library because we want to FORCE using keyctl and
+        # not conflict with other keyring module users.
+        self.keyring = commonl.keys.keyring_keyctl_c()
+
 
     def target_setup(self, target, iface_name, component):
         generic_c.target_setup(self, target, iface_name, component)
@@ -1207,8 +1220,11 @@ EscapeChar = none
             "interfaces.console." + component + ".parameter_user", None)
         ssh_port = target.fsdb.get(
             "interfaces.console." + component + ".parameter_port", None)
-        ssh_password = target.fsdb.get(
-            "interfaces.console." + component + ".parameter_password", None)
+        ssh_password = self.keyring.get_password(
+            f"{ttbl.config.instance}.{target.id}",
+            f"interfaces.console.{component}.parameter_password")
+        if ssh_password == None:
+            ssh_password = self.password
         # FIXME: validate port, username basic format
         if ssh_user:
             self.kws['username'] = ssh_user
@@ -1236,6 +1252,9 @@ EscapeChar = none
             for key, value in self.parameters_default.items():
                 target.fsdb.set("interfaces.console."
                                 + component + ".parameter_" + key, value, True)
+            self.keyring.delete_password(
+                f"{ttbl.config.instance}.{target.id}",
+                f"interfaces.console.{component}.parameter_password")
             return {}
 
         # things we allow
@@ -1252,6 +1271,14 @@ EscapeChar = none
 
         # ok, all verify, let's set it
         for key, value in parameters.items():
+            if key == "password":
+                # passwords go to the keyring!
+                if key == 'password':
+                    self.keyring.set_password(
+                        f"{ttbl.config.instance}.{target.id}",
+                        f"interfaces.console.{component}.parameter_password",
+                        value)
+                continue
             target.fsdb.set("interfaces.console."
                             + component + ".parameter_" + key, value, True)
         return {}
@@ -1448,12 +1475,25 @@ class telnet_pc(ttbl.power.socat_pc, generic_c):
         self.kws['hostname'] = _hostname
         self.kws['username'] = username
         self.kws['port'] = port
+        # this is used for sshpass to send the password; we dont' keep
+        # the password in the default parameters because then it'd
+        # leak easily to anyone--however, we'll use it as default if
+        # not found in the keyring
+        self.password = password
         self.paranoid_get_samples = 1
         self.upid_set(f"console over telnet to {username}@{_hostname}:{port}",
                       name = f"telnet:{username}@{_hostname}:{port}",
                       username = username,
                       hostname = _hostname,
                       port = port)
+        # we use the kernel keyring to set things -- to avoid conflict
+        # we do a separate instance; note separate instances (on
+        # multiple daemons, etc) will still use the same session
+        # keyring, so the description of the keys will contain context
+        # info to avoid conflicts--note we do not use it via the
+        # keyring library because we want to FORCE using keyctl and
+        # not conflict with other keyring module users.
+        self.keyring = commonl.keys.keyring_keyctl_c()
 
 
     def target_setup(self, target, iface_name, component):
@@ -1466,8 +1506,11 @@ class telnet_pc(ttbl.power.socat_pc, generic_c):
             "interfaces.console." + component + ".parameter_user", None)
         telnet_port = target.fsdb.get(
             "interfaces.console." + component + ".parameter_port", None)
-        telnet_password = target.fsdb.get(
-            "interfaces.console." + component + ".parameter_password", None)
+        telnet_password = self.keyring.get_password(
+            f"{ttbl.config.instance}.{target.id}",
+            f"interfaces.console.{component}.parameter_password")
+        if telnet_password == None:
+            telnet_password = self.password
         # FIXME: validate port, username basic format
         if telnet_user:
             self.kws['username'] = telnet_user
@@ -1489,6 +1532,49 @@ class telnet_pc(ttbl.power.socat_pc, generic_c):
 
     def disable(self, target, component):
         return self.off(target, component)
+
+
+    # console interface
+    def setup(self, target, component, parameters):
+        if parameters == {}:		# reset
+            # wipe existing parameters
+            for param_key in target.fsdb.keys("interfaces.console."
+                                              + component + ".parameter_*"):
+                target.fsdb.set(param_key, None, True)
+            for key, value in self.parameters_default.items():
+                target.fsdb.set("interfaces.console."
+                                + component + ".parameter_" + key, value, True)
+            self.keyring.delete_password(
+                f"{ttbl.config.instance}.{target.id}",
+                f"interfaces.console.{component}.parameter_password")
+            return {}
+
+        # things we allow
+        allowed_keys = [ 'user', 'password' ]
+        for key in list(parameters.keys()):
+            if key not in allowed_keys:
+                raise RuntimeError("field '%s' cannot be set" % key)
+
+        # some lame security checks
+        for key, value in parameters.items():
+            if '\n' in value:		# could be used to enter other fields
+                raise RuntimeError(
+                    "field '%s': value contains invalid newline" % key)
+
+        # ok, all verify, let's set it
+        for key, value in parameters.items():
+            if key == "password":
+                # passwords go to the keyring!
+                if key == 'password':
+                    self.keyring.set_password(
+                        f"{ttbl.config.instance}.{target.id}",
+                        f"interfaces.console.{component}.parameter_password",
+                        value)
+                continue
+            target.fsdb.set("interfaces.console."
+                            + component + ".parameter_" + key, value, True)
+        return {}
+
 
     def state(self, target, component):
         # we want to use this to gather state, since the generic_c
