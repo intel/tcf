@@ -2721,3 +2721,18 @@ class buttons_released_pc(impl_c):
 
     def get(self, target, _component):
         return None			# no real press status, so can't tell
+
+
+def create_pc_from_spec(power_spec, **kwargs):
+    # FIXME: this needs to be improved, it assumes raritan now and has
+    # to be more generic (take as stanza the driver name, for example)
+    if isinstance(power_spec, str):
+        pdu_hostname, pdu_port = power_spec.split(":", 1)
+        if "pdu_password" not in kwargs:
+            pdu_password = commonl.password_lookup(pdu_hostname)
+        return ttbl.raritan_emx.pci(
+            "https://" + pdu_hostname, int(pdu_port), password = pdu_password,
+            https_verify = False, **kwargs)
+    if isinstance(power_spec, ttbl.power.impl_c):
+        return power_spec
+    raise RuntimeError(f"power_spec: unknown type {type(power_spec)}")
