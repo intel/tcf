@@ -1271,13 +1271,11 @@ EscapeChar = none
 
         # ok, all verify, let's set it
         for key, value in parameters.items():
-            if key == "password":
-                # passwords go to the keyring!
-                if key == 'password':
-                    self.keyring.set_password(
-                        f"{ttbl.config.instance}.{target.id}",
-                        f"interfaces.console.{component}.parameter_password",
-                        value)
+            if key == "password":	# passwords go to the keyring!
+                self.keyring.set_password(
+                    f"{ttbl.config.instance}.{target.id}",
+                    f"interfaces.console.{component}.parameter_password",
+                    value)
                 continue
             target.fsdb.set("interfaces.console."
                             + component + ".parameter_" + key, value, True)
