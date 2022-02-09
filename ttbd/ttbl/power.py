@@ -2262,9 +2262,9 @@ RUN \
     microdnf install -y \
        crontabs \
        procps \
-       python3-rpyc; \
+       python3-rpyc \
        strace \
-       usbutils \
+       usbutils; \
     microdnf clean all
 """
 
