@@ -2893,6 +2893,9 @@ class fsdb_c(object):
 
     This will be used to store data for each target; for implemntation
     examples, look at :class:`commonl.fsdb_symlink_c`.
+
+    FIXME:
+    - introduce an official method set_last_mtime()
     """
     class exception(Exception):
         pass
@@ -2955,6 +2958,19 @@ class fsdb_c(object):
         assert isinstance(value, (NoneType, str, int, float, bool)), \
             f"value must be None, str, int, float, bool; got {type(value)}"
 
+
+    def get_last_mtime(self, key):
+        """
+        Return the time of the last modification (in seconds)
+
+        :param str key: name of the key that was modified
+
+        :returns: time (in seconds) of the last modification since the
+          Epoch [same time reference as :func:`time.time`.
+
+        :raises KeyError: if key not found
+        """
+        raise NotImplementedError
 
     def get(self, key, default = None):
         """
@@ -3196,10 +3212,19 @@ class fsdb_symlink_c(fsdb_c):
                 return default
             raise
 
+
     def get(self, key, default = None):
         # escape out slashes and other unsavory characters in a non
         # destructive way that won't work as a filename
         return self._get_raw(self._key_quote(key), default = default)
+
+
+    def get_last_mtime(self, key):
+        _key_quoted, filepath = self._location_get(key)
+        try:
+            return self._raw_stat(filepath).st_mtime
+        except FileNotFoundError as e:
+            raise KeyError(key) from e
 
 
 class fsdb_file_c(fsdb_symlink_c):
