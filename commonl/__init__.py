@@ -597,6 +597,58 @@ class fs_cache_c():
 
 
 
+def lru_cache_disk(path, max_age_s, max_entries):
+    """
+    Decorator to implement an aged LRU memoize pattern (like
+    :python:`functools.lru_cache`) in disk to cache value of functions.
+
+    >>> @commonl.lru_cache_disk(
+    >>>      os.path.join(os.path.expanduser("~"),
+    >>>                   ".cache", "tcf", "socket_gethostbyname_ex"),
+    >>>      10 * 60)	# age this cache after 10min
+    >>> def socket_gethostbyname_ex_cached(*args, **kwargs):
+    >>>     return socket.gethostbyname_ex(*args, **kwargs)
+
+    This will cache the value returned by *socket.gethostbyname_ex()*
+    (value or exception) for 10minutes across different python
+    invocations.
+
+    """
+
+    def _lru_cache_disk(fn):
+        makedirs_p(path, reason = "cache for lru_cache_disk")
+        # need to use files so we can contain pickle stuff
+        fn.cache = fs_cache_c(path, base_type = fsdb_file_c)
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            # can't use hash() because it is not stable across runs, so use mkid()
+            key = mkid(json.dumps(( args, kwargs ), sort_keys = True), 20)
+            value = fn.cache.get(key, __file__, max_age = max_age_s)
+            if value == __file__:
+                # miss! get the return value and set the cache
+                try:
+                    # call before taking the lock, it could be long
+                    r = fn(*args, **kwargs)
+                    with fn.cache.lock():
+                        fn.cache.lru_cleanup_unlocked(max_entries)
+                        fn.cache.set_unlocked(key, pickle.dumps((r, None )))
+                    return r
+                except Exception as e:
+                    with fn.cache.lock():
+                        fn.cache.lru_cleanup_unlocked(max_entries)
+                        fn.cache.set_unlocked(key, pickle.dumps((None, e)))
+                    raise
+
+            r, e = pickle.loads(value)
+            if e != None:
+                raise e
+            return r
+
+        return wrapper
+
+    return _lru_cache_disk
+
+
 _hash_sha512 = hashlib.sha512()
 
 def _hash_file_cached(filepath, digest, cache_path, cache_entries):
