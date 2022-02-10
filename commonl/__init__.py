@@ -526,12 +526,41 @@ class fs_cache_c():
         with self.lock():
             self.fsdb.set(field, value)
 
-    def get_unlocked(self, field, default = None):
+    def get_unlocked(self, field: str, default = None, max_age: float = None):
+        """
+        Return a fields's value (or a default if missing or too old)
+
+        This accesses the database without locking for exclusive access.
+
+        :param default: value to return if missing
+
+        :param float,int max_age: (optional, default None) maximum age
+          in seconds. If the record was created longer than this time,
+          remove and consider missing, returning *default*.
+        """
+        if max_age:
+            try:
+                mtime = self.fsdb.get_last_mtime(field)
+                now = time.time()
+                if now - mtime >= max_age:	# too old, wipe
+                    self.fsdb.set(field, None)
+                    return default
+            except KeyError:
+                return default
+
         return self.fsdb.get(field, default)
 
-    def get(self, field, default = None):
+    def get(self, field, default = None, max_age = None):
+        """
+        Get a field's value, locking the database for exclusive access
+        see :meth:`get_unlocked`
+        This accesses the database without locking for exclusive access.
+
+        :param int max_age: (optional, default none) maximum time in
+            seconds this record can have existed.
+        """
         with self.lock():
-            return self.fsdb.get(field, default)
+            return self.get_unlocked(field, default, max_age)
 
     def lru_cleanup_unlocked(self, max_entries):
         """
