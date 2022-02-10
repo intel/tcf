@@ -971,7 +971,9 @@ class server_c:
         return self.url + f"@{id(self)}"
 
 
-    def aka_make(self):
+    def aka_make(self, override = False):
+        if self.aka and not override:
+            return
         aka = self.parsed_url.hostname.split('.')[0]
         if self.parsed_url.port:
             aka += f"_{self.parsed_url.port}"
@@ -1012,7 +1014,16 @@ class server_c:
 
         servers_from_addresses = set()
         for address in addresses:
-            name, _aliases, _addresses = socket.gethostbyaddr(address)
+            try:
+                name, _aliases, _addresses = socket.gethostbyaddr(address)
+            except socket.herror as e:
+                log_sd.info(
+                    f"{address}: can't revers DNS lookup, using IP address:"
+                    f" {e}")
+                # Overwrite the AKA
+                # replace IPv4 or IPv6, because other code will
+                # puke on .s and :s
+                aka = address.replace(".", "_").replace(":", "_")
             server = cls(
                 f"https://{name}:{seed_port}",
                 origin = f"{origin} -> DNS address {address} for" \
