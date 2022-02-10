@@ -35,6 +35,7 @@ import json
 import logging
 import numbers
 import os
+import pickle
 import random
 import re
 import signal
@@ -3122,7 +3123,8 @@ class fsdb_symlink_c(fsdb_c):
         return os.path.islink(location)
 
     def _raw_read(self, location):
-        return os.readlink(location)
+        # we default to bytes so we return bytes
+        return os.readlink(location.encode())
 
     def _raw_write(self, location, value):
         os.symlink(value, location)
@@ -3223,6 +3225,8 @@ class fsdb_symlink_c(fsdb_c):
                    or value.startswith("s:") \
                    or value == "":
                     value = "s:" + value
+            elif isinstance(value, bytes):
+                value = b"x:" + value
             else:
                 raise ValueError("can't store value of type %s" % type(value))
             assert len(value) < 4096
@@ -3284,10 +3288,13 @@ class fsdb_symlink_c(fsdb_c):
                     return False
                 raise ValueError("fsdb %s: key %s bad boolean '%s'"
                                  % (self.location, key, value))
-            if value.startswith("s:"):
+            if value.startswith(b"x:"):
+                # raw byes string
+                return value[2:]
+            if value.startswith(b"s:"):
                 # string that might start with s: or empty
-                return value.split(":", 1)[1]
-            return value	# other string
+                return value[2:].decode()
+            return value.decode()	# other string
         except OSError as e:
             if e.errno == errno.ENOENT:
                 return default
@@ -3330,11 +3337,11 @@ class fsdb_file_c(fsdb_symlink_c):
         return os.path.isfile(location)
 
     def _raw_read(self, location):
-        with open(location, "r") as f:
+        with open(location, "rb") as f:
             return f.read()
 
     def _raw_write(self, location, value):
-        with open(location, "x") as f:
+        with open(location, "xb") as f:
             f.write(value)
 
     def _raw_unlink(self, location):
