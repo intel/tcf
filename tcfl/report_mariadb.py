@@ -630,9 +630,8 @@ class driver_summary(tcfl.tc.report_driver_c):
                     continue
 
 
-    def report(self, reporter, tag, ts, delta,
-               level, message,
-               alevel, attachments):
+    def report(self, testcase, target, tag, ts, delta,
+               level, message, alevel, attachments):
         # Entry point for the reporting driver from the reporting API
         #
         # We filter the messages we report, since we only do
@@ -645,11 +644,11 @@ class driver_summary(tcfl.tc.report_driver_c):
         if tag != "DATA" and not message.startswith("COMPLETION"):
             return
         # skip global reporter, not meant to be used here
-        if reporter == tcfl.tc.tc_global:
+        if testcase == tcfl.tc.tc_global:
             return
 
-        runid = reporter.kws.get('runid', "no RunID")
-        hashid = reporter.kws.get('tc_hash', None)
+        runid = testcase.kws.get('runid', "no RunID")
+        hashid = testcase.kws.get('tc_hash', None)
         if not hashid:	            # can't do much if we don't have this
             return
         if not runid:
@@ -657,15 +656,7 @@ class driver_summary(tcfl.tc.report_driver_c):
 
         # Extract the target name where this message came from (if the
         # reporter is a target)
-        if isinstance(reporter, tcfl.tc.target_c):
-            tc_name = reporter.testcase.name
-            target = reporter
-        elif isinstance(reporter, tcfl.tc.tc_c):
-            tc_name = reporter.name
-            target = None
-        else:
-            raise AssertionError(
-                "reporter is not tcfl.tc.{tc,target}_c but %s" % type(reporter))
+        tc_name = testcase.name
 
         doc = self.docs.setdefault((runid, hashid, tc_name),
                                    dict(data = {}))
@@ -689,9 +680,12 @@ class driver_summary(tcfl.tc.report_driver_c):
                 value = commonl.mkutf8(value)
             # append target name to the column -- otherwise summaries
             # loose that information
-            if target and target.fullid not in name:
-                name = name + f" ({target.fullid})"
-            doc['data'][domain][name] = value
+            if target:
+                fullid = target.fullid
+            else:
+                fullid = "local"
+            doc['data'][domain].setdefault(name, {})
+            doc['data'][domain][name][fullid] = value
             return
 
         if message.startswith("COMPLETION"):
@@ -744,13 +738,13 @@ class driver_summary(tcfl.tc.report_driver_c):
                 logging.error(f"HashIDs: {tc_name}:{hashid}: MariaDB error: {str(e)}")
 
             # Update --id-extra KEY=VALUE
-            if reporter.runid_extra:
+            if testcase.runid_extra:
                 # Note we might be overriding existing values--in
                 # theory we shouldn't because reporters.runid_extra
                 # should be always all the same.
                 try:
                     self.table_row_update("Summary", "RunID", runid,
-                                          **reporter.runid_extra)
+                                          **testcase.runid_extra)
                 except mariadb.Error as e:
                     logging.error(f"HashIDs: {tc_name}:{hashid}: MariaDB error: {str(e)}")
 

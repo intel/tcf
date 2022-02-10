@@ -506,9 +506,8 @@ class driver(tc.report_driver_c):
                     fo.write(text)
 
 
-    def report(self, reporter, tag, ts, delta,
-               level, message,
-               alevel, attachments):
+    def report(self, testcase, target, tag, ts, delta,
+               level, message, alevel, attachments):
         """
         Writes data to per-testcase/target temporary logfiles to
         render upon completion all the configured templates.
@@ -521,25 +520,17 @@ class driver(tc.report_driver_c):
         message is reported, we assume the testcase is completed and
         call _mkreport() to render the templates.
         """
-        if reporter == tc.tc_global:		# ignore the global reporter
+        if testcase == tc.tc_global:		# ignore the global reporter
             return
         # FIXME: config
         if tag == "INFO" and level > 4:	# ignore way chatty stuff
             return
 
-        # Who's the testcase? also extract the target name where this
-        # message came from (if the reporter is a target, otherwise we
-        # consider it a local message)
-        if isinstance(reporter, tc.tc_c):
-            testcase = reporter
-            tgname = "@local"
-        elif isinstance(reporter, tc.target_c):
-            tgname = "@" + reporter.fullid + reporter.bsp_suffix()
-            testcase = reporter.testcase
+        # Who's is this coming from?
+        if target:
+            tgname = "@" + target.fullid
         else:
-            raise AssertionError(
-                f"%{type(reporter)}: unknown reporter type;"
-                " expected tcfl.tc.tc_c or tcfl.tc.target_c")
+            tgname = "@local"
 
         # Note we open the file for every thing we report -- we can be
         # running *A LOT* of stuff in parallel and run out of file
@@ -549,7 +540,7 @@ class driver(tc.report_driver_c):
         # NOTE WE ALWAYS save relative to the testcase's tmpdir, not
         # the reporter.tmpdir, which might be different (if the
         # reporter is a target)
-        of = self._get_fd(reporter.ticket, testcase.tmpdir)
+        of = self._get_fd(testcase.ticket, testcase.tmpdir)
         # Remove the ticket from the ident string, as it will be
         # the same for all and makes no sense to have it.
         ident = testcase.ident()
@@ -589,11 +580,11 @@ class driver(tc.report_driver_c):
         # can generate final reports
         if message.startswith("COMPLETION "):
             of.flush()
-            self._mkreport(tag, reporter.ticket, reporter, message)
+            self._mkreport(tag, testcase.ticket, testcase, message)
             # Wipe the file, it might have errors--it might be not
             # a file, so wipe hard
             #commonl.rm_f(self.fs[reporter.ticket])
-            del self.fs[reporter.ticket]
+            del self.fs[testcase.ticket]
             # can't remove from the _get_fd() cache, but it will be
             # removed once it's unused
             of.close()

@@ -56,14 +56,11 @@ class driver(tc.report_driver_c):
         self.docs = {}
 
 
-    def report(self, reporter, tag, ts, delta,
-               level, message,
-               alevel, attachments):
-        testcase = reporter.testcase
+    def report(self, testcase, target, tag, ts, delta,
+               level, message, alevel, attachments):
         if testcase == tc.tc_global:	# not meant for the global reporter
             return
         hashid = testcase.kws.get('tc_hash', None)
-        hashid = testcase.ticket
         if not hashid:	            # can't do much if we don't have this
             return
 
@@ -86,7 +83,11 @@ class driver(tc.report_driver_c):
         value = attachments['value']
 
         doc.setdefault(domain, {})
-        doc[domain][name] = value
+        doc[domain].setdefault(name, {})
+        if target:
+            doc[domain][name][target.fullid] = value
+        else:
+            doc[domain][name]["local"] = value
 
         # we keep running this everytime the script calls report_data;
         # however, when the script ends (COMPLETION message), it is

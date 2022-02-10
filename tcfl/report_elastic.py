@@ -89,7 +89,7 @@ class driver(tcfl.tc.report_driver_c):
         # create/update a connection
         self.es = elasticsearch.Elasticsearch(self.es_hosts, **self.es_args)
 
-    def report(self, reporter, tag, ts, delta,
+    def report(self, testcase, target, tag, ts, delta,
                level, message, alevel, attachments):
         if not self.es:
             self._connect()
@@ -103,19 +103,13 @@ class driver(tcfl.tc.report_driver_c):
             tag = tag,
         )
 
-        if isinstance(reporter, tcfl.tc.target_c):
+        if target:
             # We are reporting from an specific target, so fill the field
             doc['target'] = {}
-            doc['target']['fullid'] = reporter.fullid
-            doc['target']['id'] = reporter.id
-            doc['target']['server'] = reporter.rtb.aka
-            doc['target']['type'] = reporter.type
-            testcase = reporter.testcase
-        elif isinstance(reporter, tcfl.tc.tc_c):
-            testcase = reporter
-        else:
-            raise AssertionError(
-                "reporter is not tcfl.tc.{tc,target}_c but %s" % type(reporter))
+            doc['target']['fullid'] = target.fullid
+            doc['target']['id'] = target.id
+            doc['target']['server'] = target.rtb.aka
+            doc['target']['type'] = target.type
 
         doc['tc_name'] = testcase.name
         doc['runid'] = testcase.runid
@@ -141,7 +135,13 @@ class driver(tcfl.tc.report_driver_c):
             domain = attachments['domain']
             name = attachments['name']
             value = attachments['value']
-            doc.setdefault('data',  {}).setdefault(domain, {})[name] = value
+            if target:
+                fullid = target.fullid
+            else:
+                fullid = "local"
+            doc.setdefault('data',  {})\
+               .setdefault(domain, {})\
+               .setdefault(name, {})[fullid] = value
         else:
             # attachments maybe should be appended after the message,
             # so the types are not overriden?

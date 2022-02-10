@@ -209,9 +209,8 @@ class driver(tc.report_driver_c):
         return console, logfile
 
 
-    def report(self, reporter, tag, ts, delta,
-               level, message,
-               alevel, attachments):
+    def report(self, testcase, target, tag, ts, delta,
+               level, message, alevel, attachments):
         """
         Report messages to the console or logfile in a line-by-line
         format prefixing each line.
@@ -225,13 +224,11 @@ class driver(tc.report_driver_c):
         # (with commonl.tls_prefix_c), where it is picked up by the
         # stream buffer object commonl.io_tls_prefix_lines_c. This,
         # before printing, adds the prefix to each line.
-        if isinstance(reporter, tc.target_c):
-            testcase = reporter.testcase
-        elif isinstance(reporter, tc.tc_c):
-            testcase = reporter
+
+        if target:
+            fullid = "|" + target.fullid
         else:
-            raise AssertionError(
-                "reporter is not tcfl.tc.{tc,target}_c but %s" % type(reporter))
+            fullid = ""
 
         tag_to_color = {
             "PASS": ( "green", ),
@@ -254,19 +251,19 @@ class driver(tc.report_driver_c):
                 _taglevel = termcolor.colored(f"{tag}{level}", *args, attrs = [ 'bold' ])
                 _prefix = _taglevel + \
                     f"/{termcolor.colored(testcase.runid_hashid, attrs = [ 'bold' ])}{testcase.ident()}" \
-                    f" {termcolor.colored(reporter._report_prefix, *args)}" \
+                    f" {termcolor.colored(testcase._report_prefix, *args)}{fullid}" \
                     f" [+{delta:0.1f}s]: "
             else:
                 _prefix = \
                     f"{tag}{level}/{testcase.runid_hashid}{testcase.ident()}" \
-                    f" {reporter._report_prefix} [+{delta:0.1f}s]: "
+                    f" {testcase._report_prefix}{fullid} [+{delta:0.1f}s]: "
             with commonl.tls_prefix_c(self.tls, _prefix):
                 message += "\n"
                 self.consolef.write(message)
         if logfile_p:
             _prefix = \
                 f"{tag}{level}/{testcase.runid_hashid}{testcase.ident()}" \
-                f" {reporter._report_prefix} [+{delta:0.1f}s]: "
+                f" {testcase._report_prefix}{fullid} [+{delta:0.1f}s]: "
             with commonl.tls_prefix_c(self.tls, _prefix):
                 message += "\n"
                 if self.logf and logfile_p:
@@ -281,7 +278,7 @@ class driver(tc.report_driver_c):
                 # easier to read
                 _aprefix = \
                     f"{tag}{alevel}/{testcase.runid_hashid}{testcase.ident()}"  \
-                    f" {reporter._report_prefix} [+{delta:0.1f}s]:   "
+                    f" {testcase._report_prefix}{fullid} [+{delta:0.1f}s]:   "
                 with commonl.tls_prefix_c(self.tls, _aprefix):
                     if console_p:
                         commonl.data_dump_recursive_tls(attachments, self.tls,

@@ -44,9 +44,8 @@ class driver(tc.report_driver_c):
         tc.report_driver_c.__init__(self)
         self.count = 1
 
-    def report(self, reporter, tag, ts, delta,
-               level, message,
-               alevel, attachments):
+    def report(self, testcase, target, tag, ts, delta,
+               level, message, alevel, attachments):
         """
         Report into TAPS driver
 
@@ -61,8 +60,6 @@ class driver(tc.report_driver_c):
         # this only reports the final completion status
         if not message.startswith("COMPLETION"):
             return
-        assert isinstance(reporter, tc.tc_c)
-        testcase = reporter
 
         # translate from TCF result to TAPS result
         tag_prefix = ""
@@ -84,11 +81,11 @@ class driver(tc.report_driver_c):
         else:
             result = "not ok"
 
-        if reporter.target_group:
-            location = "@ " + reporter.target_group.name
+        if testcase.target_group:
+            location = "@ " + testcase.target_group.name
         else:
             location = ""
         print("%s %d %s %s/%s %s %s %s\n" \
             % (result, self.count, tag_prefix, tag, testcase.ident(),
-               reporter.name, location, tag_suffix))
+               testcase.name, location, tag_suffix))
         self.count += 1

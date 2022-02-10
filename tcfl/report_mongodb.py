@@ -201,9 +201,8 @@ class driver(tcfl.tc.report_driver_c):
     #: will be added.
     console_max_size = 0
 
-    def report(self, reporter, tag, ts, delta,
-               level, message,
-               alevel, attachments):
+    def report(self, testcase, target, tag, ts, delta,
+               level, message, alevel, attachments):
         """
         Collect data to report to a MongoDB record
 
@@ -216,33 +215,27 @@ class driver(tcfl.tc.report_driver_c):
         if tag == "INFO" and level >= 6:
             return
         # skip global reporter, not meant to be used here
-        if reporter == tcfl.tc.tc_global:
+        if testcase == tcfl.tc.tc_global:
             return
 
-        runid = reporter.kws.get('runid', None)
-        hashid = reporter.kws.get('tc_hash', None)
+        runid = testcase.kws.get('runid', None)
+        hashid = testcase.kws.get('tc_hash', None)
         if not hashid:	            # can't do much if we don't have this
             return
 
         # Extract the target name where this message came from (if the
         # reporter is a target)
-        if isinstance(reporter, tcfl.tc.target_c):
-            fullid = reporter.fullid
-            target_name = " @" + reporter.fullid + reporter.bsp_suffix()
-            target_server = reporter.rtb.aka
-            target_type = reporter.type
-            tc_name = reporter.testcase.name
-            testcase = reporter.testcase
-        elif isinstance(reporter, tcfl.tc.tc_c):
+        tc_name = testcase.name
+        if target:
+            fullid = target.fullid
+            target_name = " @" + target.fullid
+            target_server = target.rtb.aka
+            target_type = target.type
+        else:
             fullid = None
             target_name = None
             target_server = None
             target_type = None
-            tc_name = reporter.name
-            testcase = reporter
-        else:
-            raise AssertionError(
-                "reporter is not tcfl.tc.{tc,target}_c but %s" % type(reporter))
 
         doc = self.docs.setdefault((runid, hashid, tc_name),
                                    dict(results = [], data = {}))
@@ -292,7 +285,11 @@ class driver(tcfl.tc.report_driver_c):
                 # MongoDB doesn't like bad UTF8, so filter a wee bit
                 value = commonl.mkutf8(value)
             doc['data'][domain][name] = value
-            doc['data-v2'][domain][name] = ( fullid, value )
+            doc['data-v2'][domain].setdefault(name, {})
+            if target:
+                doc['data-v2'][domain][name][fullid] = value
+            else:
+                doc['data-v2'][domain][name]["local"] = value
         else:
             if attachments:
                 result['attachment'] = {}
@@ -357,7 +354,7 @@ class driver(tcfl.tc.report_driver_c):
         # collection
         if message.startswith("COMPLETION"):
             doc['result'] = tag
-            self._complete(reporter, runid, hashid, tc_name, doc)
+            self._complete(testcase, runid, hashid, tc_name, doc)
             del self.docs[(runid, hashid, tc_name)]
             del doc
 
@@ -369,7 +366,7 @@ class driver(tcfl.tc.report_driver_c):
         self.results = self.db[self.collection_name]
         self.made_in_pid = os.getpid()
 
-    def _complete(self, reporter, runid, hashid, tc_name, doc):
+    def _complete(self, testcase, runid, hashid, tc_name, doc):
         # Deliver to mongodb after adding a few more fields
 
         doc['runid'] = runid
@@ -381,17 +378,17 @@ class driver(tcfl.tc.report_driver_c):
         else:
             doc['_id'] = hashid
 
-        doc['target_name'] = reporter.target_group.name \
-                             if reporter.target_group else 'n/a'
-        if reporter.targets:
+        doc['target_name'] = testcase.target_group.name \
+                             if testcase.target_group else 'n/a'
+        if testcase.targets:
             servers = set()		# We don't care about reps in servers
             target_types = []	# Here we want one per target
             doc['targets'] = {}
             # Note this is sorted by target-want-name, the names
             # assigned by the testcase to the targets, so all the
             # types and server lists are sorted by that.
-            for tgname in sorted(reporter.targets.keys()):
-                target = reporter.targets[tgname]
+            for tgname in sorted(testcase.targets.keys()):
+                target = testcase.targets[tgname]
                 doc['targets'][tgname] = dict(
                     server = target.rtb.aka, id = target.id,
                     type = target.type, bsp_model = target.bsp_model)
@@ -408,8 +405,8 @@ class driver(tcfl.tc.report_driver_c):
 
         tags = {}
         components = []
-        for tag in reporter._tags:
-            (value, _origin) = reporter.tag_get(tag, "", "")
+        for tag in testcase._tags:
+            (value, _origin) = testcase.tag_get(tag, "", "")
             tags[tag] = str(value)
             if tag == 'components':
                 components = value.split()
@@ -436,13 +433,13 @@ class driver(tcfl.tc.report_driver_c):
                 # don't really know what PyMongo can't throw at us
                 # (pymongo.errors, bson errors...the lot)
                 if retry_count > 3:
-                    reporter.log.error(
+                    testcase.log.error(
                         f"{tc_name}:{hashid}: MongoDB error: {str(e)}")
                     break
                 else:
                     retry_count += 1
                     self.results = None
-                    reporter.log.warning(
+                    testcase.log.warning(
                         f"{tc_name}:{hashid}: MongoDB error, retrying"
                         " ({retry_count}/3): {str(e)}")
 

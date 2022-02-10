@@ -387,7 +387,7 @@ class report_driver_c(object):
     #: :meth:`report_driver_c.add() <add>` call.
     name = None
 
-    def report(self, reporter, tag, ts, delta,
+    def report(self, testcase, target, tag, ts, delta,
                level, message, alevel, attachments):
         """Low level report from testcases
 
@@ -429,8 +429,11 @@ class report_driver_c(object):
           storage (TLS) to store state if needed. See an example in
           :class:`tcfl.report_console.driver`).
 
-        :param reporter_c reporter: who is reporting this; this can be
-          a :class:`testcase <tc_c>` or a :class:`target <target_c>`.
+        :param tcfl.tc_c testcase: testcase tho is reporting
+          this. Note this might be a top level or a subcase.
+
+        :param tcfl.target_c target: target who is reporting this;
+          might be *None* if the report is not associated to a target.
 
         :param str tag: type of report (PASS, ERRR, FAIL, BLCK, INFO,
           DATA); note they are all same length and described in
@@ -526,8 +529,16 @@ class report_driver_c(object):
         assert isinstance(obj, cls)
         if origin == None:
             o = inspect.stack()[1]
-            origin = "%s:%s" % (o[1], o[2])
+            origin = commonl.origin_get(2)
         setattr(obj, "origin", origin)
+
+        argspec = inspect.getfullargspec(cls.report)
+        if len(argspec.args) != 10:
+            # old style, bail out
+            raise RuntimeError(
+                f"WARNING! Driver {cls} (@{origin}) is old style,"
+                f" please update to new report_driver_c.report() [{len(argspec.args)}]")
+
         obj.name = name
         cls._drivers.append(obj)
 
@@ -647,16 +658,21 @@ class reporter_c(object):
                 subtc.result.skipped += 1
             report_on = subtc
         else:
-            report_on = self
+            report_on = testcase
 
         for driver in report_driver_c._drivers:
             if driver.name:
                 level_driver_max = self.report_level_driver_max.get(driver.name, None)
                 if level_driver_max != None and level >= level_driver_max:
                     continue
+            if isinstance(self, target_c):
+                target = self
+            else:
+                target = None
             driver.report(
-                report_on, tag, ts, delta, level, commonl.mkutf8(message),
-                alevel, attachments)
+                report_on, target, tag, ts, delta, level,
+                commonl.mkutf8(message), alevel, attachments)
+
 
     def report_pass(self, message, attachments = None,
                     level = None, dlevel = 0, alevel = 2, subcase = None):
