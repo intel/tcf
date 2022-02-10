@@ -490,6 +490,13 @@ class fs_cache_c():
     """
     Very simple disk-based cache
 
+    :param type base_type: which type of database implementation to
+      use as base; must be a subclass of
+      :class:`commonl.fsdb_c`. Otherwise, it automatically determines
+      which type to use based on the system's capabilities. Current
+      choices are :class:`commonl.fsdb_symlink_c` and
+      :class:`commonl.fsdb_file_c`.
+
     Note this is multiprocess using a file-based lock (ssee
     :module:`filelock`):
 
@@ -497,13 +504,17 @@ class fs_cache_c():
     >>>    self.get_unlocked()
 
     """
-    def __init__(self, cache_dir):
+    def __init__(self, cache_dir, base_type = None):
         self.cache_dir = cache_dir
         # don't call from initialization, only once we start using it
         # in earnest
         self.cache_lockfile = os.path.join(
             self.cache_dir, "lockfile")
-        self.fsdb = fsdb_c.create(self.cache_dir)
+        if base_type == None:
+            self.fsdb = fsdb_c.create(self.cache_dir)
+        else:
+            assert issubclass(base_type, fsdb_c)
+            self.fsdb = base_type(self.cache_dir)
 
     def lock(self):
         return filelock.FileLock(self.cache_lockfile)
