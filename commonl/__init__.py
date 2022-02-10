@@ -3029,6 +3029,18 @@ class fsdb_symlink_c(fsdb_c):
     def _raw_stat(location):
         return os.lstat(location)
 
+    @staticmethod
+    def _key_quote(key):
+        return urllib.parse.quote(
+            key, safe = '-_ ' + string.ascii_letters + string.digits)
+
+    def _location_get_raw(self, key):
+        return os.path.join(self.location, key)
+
+    def _location_get(self, key):
+        key_quoted = self._key_quote(key)
+        return key_quoted, self._location_get_raw(key_quoted)
+
     def keys(self, pattern = None):
         l = []
         for _rootname, _dirnames, filenames_raw in os.walk(self.location):
@@ -3081,9 +3093,7 @@ class fsdb_symlink_c(fsdb_c):
         # escape out slashes and other unsavory characters in a non
         # destructive way that won't work as a filename
         key_orig = key
-        key = urllib.parse.quote(
-            key, safe = '-_ ' + string.ascii_letters + string.digits)
-        location = os.path.join(self.location, key)
+        key, location = self._location_get(key)
         if value != None:
             # the storage is always a string, so encode what is not as
             # string as T:REPR, where T is type (b boolean, n number,
@@ -3149,7 +3159,7 @@ class fsdb_symlink_c(fsdb_c):
         return True
 
     def _get_raw(self, key, default = None):
-        location = os.path.join(self.location, key)
+        location = self._location_get_raw(key)
         try:
             value = self._raw_read(location)
             # if the value was type encoded (see set()), decode it;
@@ -3178,9 +3188,7 @@ class fsdb_symlink_c(fsdb_c):
     def get(self, key, default = None):
         # escape out slashes and other unsavory characters in a non
         # destructive way that won't work as a filename
-        key = urllib.parse.quote(
-            key, safe = '-_ ' + string.ascii_letters + string.digits)
-        return self._get_raw(key, default = default)
+        return self._get_raw(self._key_quote(key), default = default)
 
 
 class fsdb_file_c(fsdb_symlink_c):
