@@ -2587,11 +2587,11 @@ def cmdline_str_to_value(value):
     :returns: value as int, float, bool or string
     """
     if value.startswith("i:"):
-        return int(value.split(":", 1)[1])
+        return int(value[2:])
     if value.startswith("f:"):
-        return float(value.split(":", 1)[1])
+        return float(value[2:])
     if value.startswith("b:"):
-        val = value.split(":", 1)[1]
+        val = value[2:]
         if val.lower() == "true":
             return True
         if val.lower() == "false":
@@ -2600,7 +2600,7 @@ def cmdline_str_to_value(value):
                          % (value, val))
     if value.startswith("s:"):
         # string that might start with s: or empty
-        return value.split(":", 1)[1]
+        return value[2:]
     return value
 
 def str_cast_maybe(s):
@@ -3154,15 +3154,15 @@ class fsdb_symlink_c(fsdb_c):
             value = self._raw_read(location)
             # if the value was type encoded (see set()), decode it;
             # otherwise, it is a string
-            if value.startswith("i:"):
-                return json.loads(value.split(":", 1)[1])
-            if value.startswith("f:"):
-                return json.loads(value.split(":", 1)[1])
-            if value.startswith("b:"):
-                val = value.split(":", 1)[1]
-                if val == "True":
+            if value.startswith(b"i:"):
+                return json.loads(value[2:])
+            if value.startswith(b"f:"):
+                return json.loads(value[2:])
+            if value.startswith(b"b:"):
+                val = value[2:]
+                if val == b"True":
                     return True
-                elif val == "False":
+                if val == b"False":
                     return False
                 raise ValueError("fsdb %s: key %s bad boolean '%s'"
                                  % (self.location, key, value))
