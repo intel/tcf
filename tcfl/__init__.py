@@ -758,6 +758,23 @@ def inventory_keys_fix(d):
 import tcfl.config		# FIXME: this is bad, will be removed
 
 
+@commonl.lru_cache_disk(
+    os.path.join(os.path.expanduser("~"),
+                 ".cache", "tcf", "socket_gethostbyname_ex"),
+    10 * 60,	# age this cache after 10min
+    512)
+def socket_gethostbyname_ex_cached(*args, **kwargs):
+    return socket.gethostbyname_ex(*args, **kwargs)
+
+@commonl.lru_cache_disk(
+    os.path.join(os.path.expanduser("~"),
+                 ".cache", "tcf", "socket_gethostbyaddr"),
+    10 * 60,	# age this cache after 10min
+    512)
+def socket_gethostbyaddr_cached(*args, **kwargs):
+    return socket.gethostbyaddr(*args, **kwargs)
+
+
 class server_c:
     """Describe a Remote Target Server.
 
@@ -1006,7 +1023,7 @@ class server_c:
         # names and use defaults on them (HTTPS)
         hostname = url
         try:
-            name, aliases, addresses = socket.gethostbyname_ex(hostname)
+            name, aliases, addresses = socket_gethostbyname_ex_cached(hostname)
             log_sd.info(f"seed hostname '{hostname}' [{origin}] -> {name}, {aliases}, {addresses}")
         except OSError as e:
             log_sd.warning(f"ignoring hostname '{hostname}' [{origin}]: {e}")
@@ -1016,6 +1033,7 @@ class server_c:
         for address in addresses:
             try:
                 name, _aliases, _addresses = socket.gethostbyaddr(address)
+                name, _aliases, _addresses = socket_gethostbyaddr_cached(address)
             except socket.herror as e:
                 log_sd.info(
                     f"{address}: can't revers DNS lookup, using IP address:"
@@ -1079,6 +1097,11 @@ class server_c:
         with filelock.FileLock(self.cache_lockfile):
             return self.fsdb.get(self.aka + "." + field, default)
 
+    def _cache_wipe(self):
+        # a wee bit obscure; writing None wipes the field and all
+        # the subfields (NAME. and NAME.*)
+        return self.fsdb.set(self.aka, None)
+
     def _cache_setup(self):
         # don't call from initialization, only once we start using it
         # in earnest
@@ -1091,17 +1114,47 @@ class server_c:
             self._cache_set_unlocked("ssl_verify", self.ssl_verify)
             self._cache_set_unlocked("origin", self.origin)
             self._cache_set_unlocked("ca_path", self.ca_path)
+            val = self._cache_get_unlocked("last_success", None)
+            if val == None:
+                # first time set up, so we count it as success so we
+                # have a base
+                self._cache_set_unlocked(	# same as _record success
+                    "last_success",
+                    datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
 
 
-    def _record_success(self, reason = "n/a"):
-        self._cache_set("last_success", reason)
+    def _record_success(self):
+        self._cache_set(
+            "last_success",
+            datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
 
     def _record_failure(self):
         with filelock.FileLock(self.cache_lockfile):
             current_count = int(self._cache_get_unlocked("failure_count", 0))
             current_count += 1
             self._cache_set_unlocked("failure_count", str(current_count))
+            utcnow = int(datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
+            self._cache_set_unlocked("last_failure", utcnow)
 
+    def _destroy_if_too_bad(self):
+        utcnow = int(datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
+        elapsed_success_max = 7 * 24 * 60 * 60 # a week in seconds
+        try:
+            # last success is an integer YYYYMMDDHHMMSS
+            last_success = int(self._cache_get("last_success", 0))
+        except ( ValueError, TypeError ):
+	    # we might get corrupted, bad stuff, older versions, ignore'em
+            self._cache_set("last_success", None)
+            last_success = 0
+        elapsed_success = utcnow - last_success
+        if elapsed_success > elapsed_success_max:
+            # last success was too long, just wipe it
+            days = elapsed_success / 60 / 60 / 24
+            days_max = elapsed_success_max / 60 / 60 / 24
+            log_sd.info(
+                f"{self.aka}: destroying:"
+                f" last success was {days:.0} days ago (more than {days_max:.1})")
+            self._cache_wipe()
 
     def _herds_get(self, count, loops_max):
         """
@@ -1178,7 +1231,7 @@ class server_c:
         #   ...
         new_hosts = {}
 
-        self._record_success("got some herd info")
+        self._record_success()
         # If we get here, this means we got data from this host, so we'll
         # add it as a possible one -- note we don't know if it has any
         # herds, so we just add it
@@ -1603,6 +1656,7 @@ class server_c:
 
         # prune bad servers that might have sneaked in
         for bad_url, bad_server in bad_servers.items():
+            bad_server._destroy_if_too_bad()
             if bad_url not in cls.servers:
                 continue
             # these 'command line' or 'configured' settings are
