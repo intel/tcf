@@ -3210,21 +3210,26 @@ class fsdb_symlink_c(fsdb_c):
             # s string) and REPR is the textual repr, json valid
             if isinstance(value, bool):
                 # do first, otherwise it will test as int
-                value = "b:" + str(value)
+                # str first so we get True/False
+                value = b"b:" + str(value).encode()
             elif isinstance(value, numbers.Integral):
                 # sadly, this looses precission in floats. A lot
-                value = "i:%d" % value
+                value = b"i:%d" % value
             elif isinstance(value, numbers.Real):
                 # sadly, this can loose precission in floats--FIXME:
                 # better solution needed
-                value = "f:%.10f" % value
+                value = b"f:%.10f" % value
             elif isinstance(value, str):
+                # take care of special strings that might look like
+                # our formatting, escape them
                 if value.startswith("i:") \
                    or value.startswith("f:") \
                    or value.startswith("b:") \
                    or value.startswith("s:") \
                    or value == "":
-                    value = "s:" + value
+                    value = b"s:" + value.encode()
+                else:
+                    value = value.encode()
             elif isinstance(value, bytes):
                 value = b"x:" + value
             else:
