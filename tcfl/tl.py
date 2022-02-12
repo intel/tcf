@@ -817,6 +817,28 @@ def linux_wait_host_online(target, hostname, loops = 20):
         timeout = (loops + 1) * 3 * 1)
 
 
+def linux_wait_host_port_online(target, hostname, port, loops = 5):
+    """
+    Wait on the console until the given hostname and port are connectable
+
+    We make the assumption that once the system is assigned the IP
+    that is expected on the configuration, the system has upstream
+    access and thus is online.
+    """
+    assert isinstance(target, tcfl.tc.target_c)
+    assert isinstance(hostname, str), \
+        "hostname: expected str; got {type(hostname)}"
+    assert loops > 0
+    target.shell.run(
+        f"for i in {{1..{loops}}}; do"
+        # this assumes netcat/nc is available
+        f"  echo Checking for 5s if TCP:{hostname}:{port} is open;"
+        f"  nc -w 5 -vz {hostname} {port} && break; "
+        f"done",
+        # N loops at 5s second each, timeout one loop early
+        timeout = (loops - 1) * 5)
+
+
 def linux_rsync_cache_lru_cleanup(target, path, max_kbytes):
     """Cleanup an LRU rsync cache in a path in the target
 
@@ -1318,18 +1340,30 @@ def linux_package_add(ic, target, *packages,
                          % str(datetime.datetime.utcnow()))
 
     if proxy_wait_online:
-        proxy_hosts = set()
-        if 'ftp_proxy' in ic.kws:
-            proxy_hosts.add(urllib.parse.urlparse(ic.kws['ftp_proxy']).hostname)
-        if 'http_proxy' in ic.kws:
-            proxy_hosts.add(urllib.parse.urlparse(ic.kws['http_proxy']).hostname)
-        if 'https_proxy' in ic.kws:
-            proxy_hosts.add(urllib.parse.urlparse(ic.kws['https_proxy']).hostname)
-        if proxy_hosts:
-            target.report_info(
-                f"waiting for proxies to be online (ping): {', '.join(proxy_hosts)}")
-            for hostname in proxy_hosts:
-                linux_wait_host_online(target, hostname)
+        with target.testcase.lock:
+            # don't do this repeatedly, it is pointless
+            checked = target.testcase.buffers.get(
+                f"linux_package_add.proxy_wait_online.{ic.id}.{target.id}",
+                None)
+        if not checked:
+            proxy_hosts = set()
+            if 'ftp_proxy' in ic.kws:
+                url = urllib.parse.urlparse(ic.kws['ftp_proxy'])
+                proxy_hosts.add(( url.hostname, url.port ))
+            if 'http_proxy' in ic.kws:
+                url = urllib.parse.urlparse(ic.kws['http_proxy'])
+                proxy_hosts.add(( url.hostname, url.port ))
+            if 'https_proxy' in ic.kws:
+                url = urllib.parse.urlparse(ic.kws['https_proxy'])
+                proxy_hosts.add(( url.hostname, url.port ))
+            if proxy_hosts:
+                for hostname, port in proxy_hosts:
+                    target.report_info(
+                        f"waiting for proxies {hostname} to respond on port {port}")
+                    linux_wait_host_port_online(target, hostname, port)
+            with target.testcase.lock:
+                target.testcase.buffers["linux_package_add.proxy_wait_online"
+                                        f".{ic.id}.{target.id}"] = True
 
     packages = list(packages)
     if distro.startswith('clear'):
