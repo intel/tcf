@@ -557,7 +557,7 @@ class driver(tcfl.report_driver_c):
         # NOTE WE ALWAYS save relative to the testcase's tmpdir, not
         # the reporter.tmpdir, which might be different (if the
         # reporter is a target)
-        of = self._get_fd(testcase.ticket, testcase.tmpdir)
+        of = self._get_fd(testcase.hashid, testcase.tmpdir)
         # Remove the ticket from the ident string, as it will be
         # the same for all and makes no sense to have it.
         ident = testcase.ident()

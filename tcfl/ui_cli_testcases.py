@@ -46,7 +46,7 @@ def _cmdline_find(args):
 def _testcase_info_print(testcase):
     # Print information about a testcase
 
-    print("Testcase ID: ", testcase.id)
+    print("Testcase name: ", testcase.name)
     if testcase.__doc__:
         print(testcase.__doc__)
 

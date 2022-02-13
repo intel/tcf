@@ -652,14 +652,14 @@ def mkhashid(tc: tcfl.tc_c, hashid: str = None):
     tc.hashid = commonl.mkid(tc.name + tc.hash_salt + tc.runid + str(tc.tgid),
                              tc.hashid_len)
 
-    tc._kw_set("tc_hash", tc.hashid)
-    tc._kw_set("hashid", tc.hashid)
+    tc.kw_set("tc_hash", tc.hashid)
+    tc.kw_set("hashid", tc.hashid)
     tc.ticket = tc.hashid		# COMPAT/FIXME reporter_c
     if tc.runid:
         tc.runid_hashid = f"{tc.runid}{tcfl.report_runid_hashid_separator}{tc.hashid}"
     else:
         tc.runid_hashid = tc.hashid
-    tc._kw_set("runid_hashid", tc.runid_hashid)
+    tc.kw_set("runid_hashid", tc.runid_hashid)
 
 
 def discovery_init(tc: tcfl.tc_c):

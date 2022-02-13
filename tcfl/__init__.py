@@ -3623,29 +3623,34 @@ class tc_c(reporter_c):
     # Deprecated APIs
     @property
     def ticket(self):
-        warnings.warn("tcfl.tc_c.ticket", DeprecationWarning)
+        warnings.warn("tcfl.tc_c.ticket, use .hashid",
+                      DeprecationWarning, stacklevel = 2)
         return self.hashid
 
     @ticket.setter
     def ticket(self, value):
-        warnings.warn("tcfl.tc_c.ticket", DeprecationWarning)
+        warnings.warn("tcfl.tc_c.ticket, use .hashid",
+                      DeprecationWarning, stacklevel = 2)
         self.hashid = value
         return self.hashid
 
     @property
     def id(self):
         # FIXME: also replace in tc.kws
-        warnings.warn("tcfl.tc_c.id", DeprecationWarning)
+        warnings.warn("tcfl.tc_c.id, use .name",
+                      DeprecationWarning, stacklevel = 2)
         return self.name
 
     @property
     def runid_visible(self):
         # FIXME: also replace in tc.kws
-        warnings.warn("tcfl.tc_c.runid_visible", DeprecationWarning)
-        return self.name
+        warnings.warn("tcfl.tc_c.runid_visible, use runid",
+                      DeprecationWarning, stacklevel = 2)
+        return self.runid
 
     def _kw_set(self, *args, **kwargs):
-        warnings.warn("tcfl.tc_c._kw_set", DeprecationWarning)
+        warnings.warn("tcfl.tc_c._kw_set, use .kw_set",
+                      DeprecationWarning, stacklevel = 2)
         return self.kw_set(*args, **kwargs)
 
 
