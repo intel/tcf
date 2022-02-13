@@ -21,6 +21,7 @@ import argparse
 import base64
 import bisect
 import collections
+import collections.abc
 import contextlib
 import errno
 import fnmatch
