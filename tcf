@@ -285,6 +285,9 @@ if __name__ == "__main__":
         " for fresh information (%(default)s); set to zero to force"
         " rediscovery")
 
+    # Setup commandline options for different modules and drivers
+    # FIXME: more split pending into "basic" and advanced parts as we
+    # move UI to ui_cli_*
     ap = arg_subparsers.add_parser(
         "config", help = "Print information about configuration")
     ap.set_defaults(func = _cmdline_config)
@@ -319,38 +322,15 @@ if __name__ == "__main__":
                     default = None, help = "Name of property")
     ap.set_defaults(func = _target_property_get)
 
-    # Setup different modules and drivers
-    tcfl.tc.argp_setup(arg_subparsers)
-    # imported by tcfl.tc
-    tcfl.tc.pos.cmdline_setup(arg_subparsers)
-    # FIXME: move UI parts of this to ui_cli_targets
     tcfl.tc.target_ext_alloc._cmdline_setup(arg_subparsers)
     import tcfl.ui_cli_alloc
     tcfl.ui_cli_alloc._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_certs.cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_console._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_debug._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_images._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_ioc_flash_server_app._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_fastboot._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_power._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_store._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_things._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_tunnel.cmdline_setup(arg_subparsers)
 
-    # FIXME: maybe print these only on --help-advanced?
-    tcfl.ui_cli_user._cmdline_setup_advanced(arg_subparsers)
-    tcfl.ui_cli_target._cmdline_setup_advanced(arg_subparsers)
-
-
-    # extra stuff that is not adding to the API, just to the command
-    # line interface
     import tcfl.target_ext_alloc_ui
     tcfl.target_ext_alloc_ui._cmdline_setup(arg_subparsers)
     import tcfl.ui_cli_testcases
     tcfl.ui_cli_testcases._cmdline_setup(arg_subparsers)
+    tcfl.tc.argp_setup(arg_subparsers)
 
     ap = arg_subparsers.add_parser("healthcheck",
                                    help = "Do a very basic health check")
@@ -369,6 +349,26 @@ if __name__ == "__main__":
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target's name or URL")
     ap.set_defaults(func = healthcheck)
+
+    # imported by tcfl.tc
+    tcfl.tc.pos.cmdline_setup(arg_subparsers)
+
+    tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_certs.cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_console._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_debug._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_images._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_ioc_flash_server_app._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_fastboot._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_power._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_store._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_things._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_tunnel.cmdline_setup(arg_subparsers)
+
+    # FIXME: maybe print these only on --help-advanced?
+    tcfl.ui_cli_user._cmdline_setup_advanced(arg_subparsers)
+    tcfl.ui_cli_target._cmdline_setup_advanced(arg_subparsers)
 
     global args
     args = arg_parser.parse_args()
