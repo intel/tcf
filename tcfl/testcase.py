@@ -90,7 +90,7 @@ def this_filename_get(level = 1):
 file_regex = re.compile(r'^test[^/]*\.py$')
 
 def _classes_enumerate(path, module, prefix = ""):
-    logger.warning("%s: enumerating", module.__name__)
+    logger.warning("enumerating classes in %s", module.__name__)
     classes = []
     members = inspect.getmembers(module)
     for member_name, member in members:
@@ -115,8 +115,11 @@ def _classes_enumerate(path, module, prefix = ""):
             continue
         logging.debug(f"{path}/{prefix}{member_name}: considering, subclass of tcfl.tc_c")
         classes.append(member)
-    logger.warning("%s: enumerated: %s", module.__name__,
-                   ' '.join(cls.__name__ for cls in classes))
+    if classes:
+        logger.warning("%s: found classes: %s", module.__name__,
+                       ' '.join(cls.__name__ for cls in classes))
+    else:
+        logger.warning("%s: found no classes", module.__name__)
     return classes
 
 
