@@ -1464,25 +1464,35 @@ class server_c:
             utcnow = int(datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
             self._cache_set_unlocked("last_failure", utcnow)
 
+    #: Maximum number of seconds a bad server entry is kept (and we
+    #: keep retrying)
+    elapsed_success_max = 7 * 24 * 60 * 60 # a week in seconds
+
     def _destroy_if_too_bad(self):
-        utcnow = int(datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S"))
-        elapsed_success_max = 7 * 24 * 60 * 60 # a week in seconds
+        utcnow_s = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        utcnow = int(utcnow_s)
         try:
             # last success is an integer YYYYMMDDHHMMSS
             last_success = int(self._cache_get("last_success", 0))
         except ( ValueError, TypeError ):
-	    # we might get corrupted, bad stuff, older versions, ignore'em
-            self._cache_set("last_success", None)
-            last_success = 0
+	    # we might get corrupted, bad stuff, older versions, reset'em
+            self._cache_set("last_success",  utcnow)
+            last_success = utcnow_s
         elapsed_success = utcnow - last_success
-        if elapsed_success > elapsed_success_max:
+        days = elapsed_success / 60 / 60 / 24
+        days_max = self.elapsed_success_max / 60 / 60 / 24
+        if elapsed_success > self.elapsed_success_max:
             # last success was too long, just wipe it
-            days = elapsed_success / 60 / 60 / 24
-            days_max = elapsed_success_max / 60 / 60 / 24
             log_sd.info(
                 f"{self.aka}: destroying:"
-                f" last success was {days:.0} days ago (more than {days_max:.1})")
+                f" last success was {days:.2f} days ago (more than"
+                f" {days_max:.1f})")
             self._cache_wipe()
+        else:
+            log_sd.info(
+                f"{self.aka}: not destroying yet:"
+                f" last success was {days:.2f} days ago (not more"
+                f" than {days_max:.1f})")
 
     def _herds_get(self, count, loops_max):
         """
