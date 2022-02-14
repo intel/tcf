@@ -339,7 +339,10 @@ def _create_from_file_name(tcis, file_name, from_path,
         tc_name = file_name
     for _tc_driver in _drivers:
         tc_instances = []
-        # new one all the time, in case we use it and close it
+        # FIXME: move this block to _create_from_file_name_driver()
+        # create a "fake" testcase representing this file we are
+        # trying to determine if it is a testcase or not, since we'll
+        # use it for reporting progress/errors
         tc_fake = tcfl.tc_c(tc_name, file_name,
                             f"builtin @{commonl.origin_get(1)}")
         tcfl.testcase.discovery_init(tc_fake)
@@ -488,7 +491,7 @@ def _match_tags(tc, tags_spec, origin = None):
 
 def discover(tcs_filtered, sources, manifests = None, filter_spec = None,
              testcase_name = None):
-    """
+    """Discover testcases in given locations
 
     :param str testcase_name: (optional) used for unit testing
 
@@ -499,6 +502,14 @@ def discover(tcs_filtered, sources, manifests = None, filter_spec = None,
     - discover using a multiprocess Pool external program to avoid
       loading into the current address space (Pool is platform
       agnostic)
+
+    This process works by loading the list of paths and testcase files
+    to discover (provided as a list in *sources* or in manifest files).
+
+    For each, the *_find_in_path()* function is called, which scans
+    each file for signs of it being a testcase (querying the different
+    drivers).
+
     """
     if manifests != None:
         commonl.assert_list_of_strings(manifests, "list of manifests",
@@ -564,6 +575,8 @@ def discover(tcs_filtered, sources, manifests = None, filter_spec = None,
         if not os.path.exists(tc_path):
             logger.error("%s: does not exist; ignoring", tc_path)
             continue
+        # this is only finding files (in the path) that might be
+        # testcases, not necessary loading them for operation
         result += _find_in_path(tcs, tc_path, subcases_cmdline)
         for driver in _drivers:
             if driver == tcfl.tc_c:
@@ -655,7 +668,7 @@ def mkhashid(tc: tcfl.tc_c, hashid: str = None):
     tc.hashid = commonl.mkid(tc.name + tc.hash_salt + tc.runid + str(tc.tgid),
                              tc.hashid_len)
 
-    tc.kw_set("tc_hash", tc.hashid)
+    tc.kw_set("tc_hash", tc.hashid)	# COMPAT
     tc.kw_set("hashid", tc.hashid)
     tc.ticket = tc.hashid		# COMPAT/FIXME reporter_c
     if tc.runid:
