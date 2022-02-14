@@ -420,12 +420,12 @@ def _find_in_path(tcs, path, subcases_cmdline):
     # times--if the ctime hasn't changed since our cache entry, then
     # we use the cached value
     result = tcfl.result_c(0, 0, 0, 0, 0)
-    tcfl.tc.tc_global.report_info(
+    tcfl.tc_global.report_info(
         "%s: scanning argument" % path, dlevel = 4)
     if os.path.isdir(path):
         for tc_path, _dirnames, _filenames in os.walk(path):
             logger.log(5, "%s: scanning directory", tc_path)
-            tcfl.tc.tc_global.report_info("%s: scanning directory" % tc_path,
+            tcfl.tc_global.report_info("%s: scanning directory" % tc_path,
                                           dlevel = 5)
             # Remove directories we don't care about
             # FIXME: very o(n)
@@ -514,7 +514,7 @@ def discover(tcs_filtered, sources, manifests = None, filter_spec = None,
                        "current directory, %s", os.getcwd())
         sources = [ '.' ]
     tcs = {}
-    tcfl.tc.tc_global.report_info("scanning for test cases", dlevel = 2)
+    tcfl.tc_global.report_info("scanning for test cases", dlevel = 2)
 
     # Read all manifest files provided; this is just reading lines
     # that are not empty; later we'll check if we can read them or
@@ -525,23 +525,23 @@ def discover(tcs_filtered, sources, manifests = None, filter_spec = None,
     for manifest_file in manifests:
         try:
             with open(os.path.expanduser(manifest_file)) as manifest_fp:
-                tcfl.tc.tc_global.report_info(
+                tcfl.tc_global.report_info(
                     f"{manifest_file}: reading testcases from manifest file",
                     dlevel = 2)
                 for tc_path_line in manifest_fp:
                     tc_path_line = tc_path_line.strip()
                     if ignore_r.match(tc_path_line):
-                        tcfl.tc.tc_global.report_info(
+                        tcfl.tc_global.report_info(
                             f"{manifest_file}: {tc_path_line}: ignored"
                             f" (doesn't match regex '{ignore_r.pattern}')",
                             dlevel = 3)
                         continue
-                    tcfl.tc.tc_global.report_info(
+                    tcfl.tc_global.report_info(
                         f"{manifest_file}: {tc_path_line}: considering",
                         dlevel = 3)
                     sources.append(os.path.expanduser(tc_path_line))
         except OSError as e:
-            tcfl.tc.tc_global.report_blck(
+            tcfl.tc_global.report_blck(
                 f"{manifest_file}: can't read manifes file: {e}", dlevel = 3)
             result.blocked += 1
 
@@ -590,7 +590,7 @@ def discover(tcs_filtered, sources, manifests = None, filter_spec = None,
             if testcase_name and tc.name != testcase_name:
                 # Note this is only use for unit testing, so we don't
                 # account it in the list of skipped TCs
-                tcfl.tc.tc_global.report_info(
+                tcfl.tc_global.report_info(
                     "ignoring because of testcase name '%s' not "
                     "matching sources_name %s'"
                     % (tc.name, sources_name),
@@ -666,7 +666,7 @@ def mkhashid(tc: tcfl.tc_c, hashid: str = None):
 
 
 def discovery_init(tc: tcfl.tc_c):
-    print(f"DEBUG discovery_init {id(tc)} STARTING")
+    tc.log.debug(f"discovery_init() STARTING")
     # init a testcase to be able to do basic discovery
     mkhashid(tc)
     tc.tmpdir = os.path.join(tcfl.tc_c.tmpdir, tc.hashid)
@@ -696,7 +696,8 @@ def discovery_init(tc: tcfl.tc_c):
     # Calculate the report file prefix and set it
     tc.report_file_prefix = os.path.join(tcfl.tc_c.log_dir, f"report-{tc.runid_hashid}")
     tc.kws['report_file_prefix'] = tc.report_file_prefix
-    print(f"DEBUG discovery_init {id(tc)} DONE")
+    tc.log.debug(f"discovery_init() DONE")
+
 
 def run_cleanup(tc):
     # Remove and wipe files left behind
