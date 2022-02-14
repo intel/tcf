@@ -705,8 +705,14 @@ def discovery_init(tc: tcfl.tc_c):
     tc.kw_set('tc_name_short', tc.name)
     tc.kw_set('tc_origin', tc.origin)
 
-    # Calculate the report file prefix and set it
-    tc.report_file_prefix = os.path.join(tcfl.tc_c.log_dir, f"report-{tc.runid_hashid}")
+    # Calculate the report file prefix and set it; NOTE THE TRAILING
+    # PERIOD! we have it there so we can easily do around the code
+    #
+    # >>> somefilename = self.report_file_prefix + "blabhlah"
+    #
+    # and this way none forgets the period and make a mess
+    tc.report_file_prefix = os.path.join(tcfl.tc_c.log_dir,
+                                         f"report-{tc.runid_hashid}.")
     tc.kws['report_file_prefix'] = tc.report_file_prefix
     tc.log.debug(f"discovery_init() DONE")
 
