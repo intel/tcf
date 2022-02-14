@@ -3168,10 +3168,16 @@ class tc_logadapter_c(logging.LoggerAdapter):
     """
     Logging adapter to prefix test case's current prefix and target name.
     """
-    id = 0
+    def __init__(self, *args, **kwargs):
+        logging.LoggerAdapter.__init__(self, *args, **kwargs)
+        # will be filled up by caller
+        self.testcase = None
+
     prefix = ""
     def process(self, msg, kwargs):
-        return '[%08x] %s: %s ' % (self.id, self.prefix, msg), kwargs
+        # FIXME: this is missing |TGNAME; add a prefix to be shared
+        # with the reporting infra
+        return f"{self.testcase.hashid} {self.testcase.name} {msg}", kwargs
 
     def isEnabledFor(self, level):
         return True
@@ -3233,10 +3239,17 @@ class tc_c(reporter_c):
         self.tc_file_path = tc_file_path
         self.origin = origin
 
+        #: :term:`runid` for this testcase
+        self.runid = ""
+
         # most of these will be initialized later in
         # testcase.discovery_init() or others FIXME
         #: :term:`hashid` for this execution
         self.hashid = None
+
+        #: Combo of :term:`runid` and :term:`hashid`, formatted
+        #: following some rules.
+        self.runid_hashid = None
 
         #: Identification of the target group where this testcase is
         #: running (set when exeuting on a target group and bound to
@@ -3325,6 +3338,7 @@ class tc_c(reporter_c):
 
         #: object for logging
         self.log = tc_logadapter_c(logger, None)
+        self.log.testcase = self
 
         # especialize this from the class version, so the instance can
         # control what it cleans up
