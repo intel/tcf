@@ -47,6 +47,7 @@ import tcfl.ttb_client # ...ugh
 logger = logging.getLogger("tcfl")
 log_sd = logging.getLogger("server-discovery")
 log_server = logging.getLogger("server")
+log_report = logging.getLogger("report")
 
 tls = threading.local()
 
@@ -2511,9 +2512,18 @@ class reporter_c(object):
                 target = self
             else:
                 target = None
-            driver.report(
-                report_on, target, tag, ts, delta, level,
-                commonl.mkutf8(message), alevel, attachments)
+            try:
+                driver.report(
+                    report_on, target, tag, ts, delta, level,
+                    commonl.mkutf8(message), alevel, attachments)
+            except Exception as e:
+                if commonl.debug_traces:
+                    logging.exception(
+                        f"BUG: reporting driver {driver} raised: {e}")
+                else:
+                    logging.error(
+                        f"BUG: reporting driver {driver} raised: {e}")
+
 
     def report_pass(self, message, attachments = None,
                     level = None, dlevel = 0, alevel = 2, subcase = None):
