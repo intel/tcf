@@ -663,8 +663,7 @@ def mkhashid(tc: tcfl.tc_c, hashid: str = None):
     # - the RunID
     # - the target group ID where the testcase is runing
     #   [str in case it's None at the time]
-    logging.error("FIXME: _mkhashid feed APID")
-    logging.error("FIXME: _mkhashid feed TGID")
+    tc.log.error("FIXME: _mkhashid feed APID, TGID")
     tc.hashid = commonl.mkid(tc.name + tc.hash_salt + tc.runid + str(tc.tgid),
                              tc.hashid_len)
 
