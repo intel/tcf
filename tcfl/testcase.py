@@ -779,6 +779,8 @@ def discovery_setup(log_dir = None, tmpdir = None,
     # Minimum initialization of the testcase discovery system
     #
 
+    # DO NOT USE tcfl.tc_global; since we init it at the end of this
+
     tcfl.tc_c.runid = runid
     # Where we place collateral
     if log_dir == None or not log_dir:
@@ -816,6 +818,7 @@ def discovery_setup(log_dir = None, tmpdir = None,
             sys.stderr.write,
             "I: %s: not removing temporary directory\n" % tcfl.tc_c.tmpdir)
 
+    discovery_init(tcfl.tc_global)
 
 # Add the core test driver class which recognizes TCF testcases
 driver_add(tcfl.tc_c)
