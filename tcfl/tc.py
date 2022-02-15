@@ -6912,7 +6912,9 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                     self.report_skip(
                         "%s group %s: no remote targets (or group of) "
                         "can satisfy the conditions for wanted target '%s'" %
-                        (tag, name_prefix, target_want_name))
+                        (tag, name_prefix, target_want_name),
+                        attachments = { "length_perm": len(perm), "perm": perm },
+                        alevel = 1)
                     perm.clear()
                     type(self).class_result += result_c(0, 0, 0, 0, 1)
                     break
@@ -7574,9 +7576,10 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                 # FIXME: fix so if tgid == None, nothjing is printed
                 rt_permutations[(icgid, None)] = {}
             else:
-                self.report_info("interconnect group %s: "
+                self.report_skip("interconnect group %s: "
                                  "not enough targets" % (icgid),
-                                 dlevel = 4)
+                                 dlevel = 1, alevel = 1,
+                                 attachments = { "icg" : icg})
         return ic_permutations, rt_permutations
 
 
