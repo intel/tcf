@@ -652,6 +652,66 @@ def linux_ipv4_addr_get_from_console(target, ifname):
         raise tcfl.tc.error_e("can't find IP addr")
     return matches.groupdict()['name']
 
+def proxy_collect(ic, target):
+    """
+    Collect proxy information from the inventory and return it
+
+    Note the proxies might be different based on which network the
+    target is connected to.
+
+    The order of sources tried is:
+
+    - TARGET.interconnects.INTERCONNECTNAME.<XYZ>_proxy
+    - INTERCONNECTNAME.<XYZ>_proxy
+    - TARGET.support.<XYZ>_proxy
+
+    :param tcfl.target_c ic: interconnect the target is connected to
+    :param tcfl.target_c target: target for which we want proxies
+    :return dict: dictionary with the final proxy information:
+
+      - *http_proxy*: string for the proxy
+      - *https_proxy*: string for the proxy
+      - *ftp_proxy*: string for the proxy
+      - *no_proxy*: *list* of strings describing hostnames/ips/domains
+        for which no proxy has to be added
+
+      any of this fields maybe missing if not present
+
+    """
+
+    d = {}
+    ftp_proxy =  target.ic_key_get(
+        ic, 'ftp_proxy', target.kws.get('support.ftp_proxy', None))
+    http_proxy =  target.ic_key_get(
+        ic, 'http_proxy', target.kws.get('support.http_proxy', None))
+    https_proxy =  target.ic_key_get(
+        ic, 'https_proxy', target.kws.get('support.https_proxy', None))
+    # no proxy list is harder, locallost, defaults and the IPv4/IPv6
+    no_proxyl = set(target.ic_key_get(
+        ic, 'no_proxy', target.kws.get('support.no_proxy', "")).split(","))
+    # if we are setting a proxy, make sure it doesn't do the
+    # local networks
+    no_proxyl.add("127.0.0.1")
+    no_proxyl.add("localhost")
+    if 'ipv4_addr' in ic.kws:
+        no_proxyl.add("%(ipv4_addr)s/%(ipv4_prefix_len)s" % ic.kws)
+    if 'ipv6_addr' in ic.kws:
+        no_proxyl.add("%(ipv6_addr)s/%(ipv6_prefix_len)s" % ic.kws)
+
+    # Collect and fill out the dictionary
+    if ftp_proxy:
+        d['http_proxy'] = http_proxy
+    if http_proxy:
+        d['http_proxy'] = http_proxy
+    if https_proxy:
+        d['https_proxy'] = https_proxy
+    if d and no_proxyl:
+        # only set no_proxy if any proxy was set
+        d['no_proxy'] = ",".join(no_proxyl)
+
+    return d
+
+
 def sh_export_proxy(ic, target):
     """
     If the interconnect *ic* defines a proxy environment, issue a
@@ -676,28 +736,21 @@ def sh_export_proxy(ic, target):
     being executed in the target
 
     """
-    proxy_cmd = ""
-    proxy_hosts = {}
-    if 'http_proxy' in ic.kws:
+    proxies = proxy_collect(ic, target)
+    if 'http_proxy' in proxies:
         target.shell.run("export http_proxy=%(http_proxy)s; "
-                          "export HTTP_PROXY=$http_proxy" % ic.kws)
-        proxy_hosts['http_proxy'] = ic.kws['http_proxy']
-    if 'https_proxy' in ic.kws:
+                          "export HTTP_PROXY=$http_proxy" % proxies)
+    if 'https_proxy' in proxies:
         target.shell.run("export https_proxy=%(https_proxy)s; "
-                         "export HTTPS_PROXY=$https_proxy" % ic.kws)
-        proxy_hosts['https_proxy'] = ic.kws['https_proxy']
-    if proxy_hosts:
-        # if we are setting a proxy, make sure it doesn't do the
-        # local networks
-        no_proxyl = [ "127.0.0.1", "localhost" ]
-        if 'ipv4_addr' in ic.kws:
-            no_proxyl += [ "%(ipv4_addr)s/%(ipv4_prefix_len)s" ]
-        if 'ipv6_addr' in ic.kws:
-            no_proxyl += [ "%(ipv6_addr)s/%(ipv6_prefix_len)s" ]
-        proxy_cmd += " no_proxy=" + ",".join(no_proxyl)
-        target.shell.run("export " + proxy_cmd % ic.kws)
-        target.shell.run("export NO_PROXY=$no_proxy")
-    return proxy_hosts
+                         "export HTTPS_PROXY=$https_proxy" % proxies)
+    if 'ftp_proxy' in proxies:
+        target.shell.run("export ftp_proxy=%(ftp_proxy)s; "
+                         "export FTP_PROXY=$ftp_proxy" % proxies)
+    if 'no_proxy' in proxies:
+        target.shell.run("export no_proxy=%(no_proxy)s; "
+                         "export NO_PROXY=$no_proxy" % proxies)
+    return proxies
+
 
 def sh_proxy_environment(ic, target, prefix = "/"):
     """
@@ -711,6 +764,7 @@ def sh_proxy_environment(ic, target, prefix = "/"):
 
     See :func:`tcfl.tl.sh_export_proxy`
     """
+    proxies = proxy_collect(ic, target)
     apt_proxy_conf = []
     dnf_proxy = None
 
@@ -718,35 +772,35 @@ def sh_proxy_environment(ic, target, prefix = "/"):
     # proxy hierarchy as a backup? they are always network specific anyway?
     proxy_hosts = {}
 
-    if 'ftp_proxy' in ic.kws:
+    if 'ftp_proxy' in proxies:
         target.shell.run(
-            "echo -e 'ftp_proxy=%(ftp_proxy)s\nFTP_PROXY=%(ftp_proxy)s'"
-            " >> /etc/environment"
-            % ic.kws)
-        apt_proxy_conf.append('FTP::proxy "%(ftp_proxy)s";' % ic.kws)
-        proxy_hosts['ftp_proxy'] = ic.kws['ftp_proxy']
+            "grep -qi 'ftp_proxy=%(ftp_proxy)s}' /etc/environment"
+            " || echo -e 'ftp_proxy=%(ftp_proxy)s\nFTP_PROXY=%(ftp_proxy)s'"
+            " >> /etc/environment" % proxies)
+        apt_proxy_conf.append('FTP::proxy "%(ftp_proxy)s";' % proxies)
 
-    if 'http_proxy' in ic.kws:
+    if 'http_proxy' in proxies:
         target.shell.run(
-            "echo -e 'http_proxy=%(http_proxy)s\nHTTP_PROXY=%(http_proxy)s'"
-            " >> /etc/environment"
-            % ic.kws)
-        apt_proxy_conf.append('HTTP::proxy "%(http_proxy)s";' % ic.kws)
-        dnf_proxy = f"{ic.kws['http_proxy']}"	# default to HTTP proxy
-        proxy_hosts['http_proxy'] = ic.kws['http_proxy']
+            "grep -qi 'http_proxy=%(http_proxy)s}' /etc/environment"
+            " || echo -e 'http_proxy=%(http_proxy)s\nHTTP_PROXY=%(http_proxy)s'"
+            " >> /etc/environment" % proxies)
+        apt_proxy_conf.append('HTTP::proxy "%(http_proxy)s";' % proxies)
+        dnf_proxy = proxies['http_proxy']
 
-    if 'https_proxy' in ic.kws:
+    if 'https_proxy' in proxies:
         target.shell.run(
-            "echo -e 'https_proxy=%(https_proxy)s\nHTTPS_PROXY=%(https_proxy)s'"
-            " >> /etc/environment"
-            % ic.kws)
-        apt_proxy_conf.append('HTTPS::proxy "%(https_proxy)s";' % ic.kws)
-        dnf_proxy = f"{ic.kws['https_proxy']}"	# override https if available
-        proxy_hosts['https_proxy'] = ic.kws['https_proxy']
+            "grep -qi 'http_proxy=%(https_proxy)s}' /etc/environment"
+            " || echo -e 'https_proxy=%(https_proxy)s\nHTTPS_PROXY=%(https_proxy)s'"
+            " >> /etc/environment" % proxies)
+        apt_proxy_conf.append('HTTPS::proxy "%(https_proxy)s";' % proxies)
+        dnf_proxy = proxies['https_proxy']	# override https if available
 
-    if 'no_proxy' in ic.kws:
-        target.shell.run("echo 'export NO_PROXY=%(no_proxy)s"
-                         " no_proxy=%(no_proxy)s' >> ~/.bashrc" % ic.kws)
+    if 'no_proxy' in proxies:
+        target.shell.run(
+            "grep -qi 'http_proxy=%(https_proxy)s' /etc/environment"
+            " || echo -e 'no_proxy=%(no_proxy)s\nNO_PROXY=%(no_proxy)s'"
+            " >> /etc/environment" % proxies)
+
     if apt_proxy_conf:
         target.shell.run(
             "test -d /etc/apt/apt.conf.d"
