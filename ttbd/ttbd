@@ -1065,6 +1065,30 @@ def load_user(userid):
     """
     return ttbl.user_control.User.search_user(userid)
 
+@login_manager.request_loader
+def load_user_from_request(request):
+    """
+    Iterate between each authtenticator to see if we can auth a user with
+    the headers of the request. (token, cookies, etc.)
+    """
+    headers = request.headers
+    for authenticator in ttbl.config._authenticators:
+        try:
+            user = authenticator.auth_with_headers(headers)
+        except ttbl.authenticator_c.invalid_credentials_e as e:
+            logi("user cannot validate with header credentials")
+            pass
+        except ttbl.authenticator_c.unknown_user_e as e:
+            logi("unkown user from header credentials")
+            pass
+        except Exception as e:
+            logi("authentication error, when trying to use header credentials")
+            logx(e)
+            pass
+        # try next auth
+
+    return user # this will be either None or a User
+
 @login_manager.unauthorized_handler
 def unauthorized():
     """

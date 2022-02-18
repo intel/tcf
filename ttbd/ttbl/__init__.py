@@ -2252,6 +2252,15 @@ class authenticator_c(object):
         assert isinstance(password, str)
         raise NotImplementedError
 
+    @staticmethod
+    def auth_with_headers(headers):
+        """
+        Method that receives headers and tries to authenticate a user with
+        them.  it should return an objects of the User class, or None if the
+        headers are not valid
+        """
+        return None
+
     class error_e(ValueError):
         pass
 
