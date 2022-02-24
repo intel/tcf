@@ -3726,6 +3726,15 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     # (internally: setting this forces the testcase to use the given
     # allocation ID)
 
+    #: Max runs for each testcase
+    #:
+    #: When calculating how many permutations of targets are executed,
+    #: limit it to this total on each.
+    #:
+    #: This is currently a hack to tie-us up with current orchestrator
+    #: limitations until the improved orchestrator is ready.
+    max_runs_per_tc = 0
+
     def __init__(self, name, tc_file_path, origin, hashid = None):
         #
         # need this before calling reporter_c.__init__
@@ -6693,7 +6702,9 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                 "selected from %d available eliminated by "
                 "testcase filtering)" %
                 (target_want_name, len(rts_bsp_models),
-                 len(self.rt_all)))
+                 len(self.rt_all)),
+                { "candidates": [ i[0] for i in rts_bsp_models ] },
+                dlevel = 1)
         return candidates
 
     def _rt_types(self, rt_bsp_model_set):
@@ -7618,8 +7629,18 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             ic_permutations, rt_permutations = self._permutations_make(
                 rt_all, rt_selected, ic_selected)
 
-            # So now we are going to iterate over all the groups
-            for (icgid, tgid), tg in rt_permutations.items():
+            # So now we are going to iterate over all the groups; as a
+            # hack to tie us up until the orchestrator is fix, respect
+            # the limit on how many runs of each single testcase will
+            # be run
+            permutations = rt_permutations.items()
+            if self.max_runs_per_tc > 0:
+                permutation = rt_permutations.items()
+                max_runs_per_tc = min(len(permutations), self.max_runs_per_tc)
+                permutations = random.sample(rt_permutations.items(),
+                                             max_runs_per_tc)
+
+            for (icgid, tgid), tg in permutations:
                 if tgid == None:
                     # no targets, but interconnects
                     tg_name = icgid
@@ -8467,6 +8488,7 @@ def _run(args):
         tc_c.runid_extra[key] = value
 
     tc_c.max_permutations = args.max_permutations
+    tc_c.max_runs_per_tc = args.max_runs_per_tc
 
     # Establish what is our log directory
     global log_dir
@@ -8881,6 +8903,10 @@ def argp_setup(arg_subparsers):
         action = "store", type = int, default = 10,
         help = "Maximum number of permutuations of targets for a "
         "single test that shall be considered")
+    ap.add_argument(
+        "--max-runs-per-tc",
+        action = "store", type = int, default = 0,
+        help = "Maximum number of runs for each testcase")
     ap.add_argument(
         "--extra-report", action = "store", default = None,
         help = "Specify extra format information that is to be printed for "
