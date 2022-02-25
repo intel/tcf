@@ -31,8 +31,8 @@ Execute :download:`the testcase
   *~/.local/share/tcf/examples*)
 
 """
-
 import os
+import re
 
 import tcfl.biosl
 import tcfl.tc
@@ -56,8 +56,14 @@ class _test(tcfl.tc.tc_c):
 
     
     def eval(self, target):
-    
-        target.power.cycle()
-        tcfl.biosl.boot_efi_shell(target)
-        target.shell.prompt_regex = "[^>]+>"
-        target.shell.run("echo I booted", b"I booted", timeout = 80)
+
+        target.capture.streamers_start()
+        try:
+            target.power.cycle()
+            tcfl.biosl.boot_efi_shell(target)
+            target.shell.prompt_regex = re.compile("[^>]+>")
+            target.shell.run("echo I booted", "I booted", timeout = 80)
+            target.capture.streamers_stop()
+        finally:
+            target.capture.streamers_stop_and_get()
+            target.capture.snapshoters_get()
