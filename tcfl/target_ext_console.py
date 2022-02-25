@@ -1486,9 +1486,17 @@ _flags_set = None
 _flags_old = None
 
 class _console_reader_c:
+    """
+    :param bool rawmode: (optional; default *False*) operate the
+      stream in raw mode.
+
+      - *rawmode == False*:
+         - do not process EOLs (convert CRLF to LF, etc)
+         - do not report generation changes (power cycles) to stderr
+    """
     def __init__(self, target, console, fd, offset,
                  backoff_wait_max, server_connection_errors_max,
-                 timestamp = None):
+                 timestamp = None, rawmode: bool = False):
         self.target = target
         self.console = console
         self.fd = fd
@@ -1499,6 +1507,7 @@ class _console_reader_c:
         self.backoff_wait_max = backoff_wait_max
         self.generation_prev = None
         self.timestamp = timestamp
+        self.rawmode = rawmode
 
     def read(self, flags_restore = None, timestamp = None):
         """
@@ -1506,38 +1515,49 @@ class _console_reader_c:
         """
         data_len = 0
 
-        # Instead of reading and sending directy to the
-        # stdout, we need to break it up in chunks; the
-        # console is in non-blocking mode (for reading
-        # keystrokes) and also in raw mode, so it doesn't do
-        # \n to \r\n xlation for us.
-        # So we chunk it and add the \r ourselves; there might
-        # be a better method to do this.
-        generation, self.offset, data = \
-            self.target.console.read_full(
-                self.console, self.offset, 4096,
-                # when reading, we are ok with retrying a lot, since
-                # this is an idempotent operation
-                retry_backoff = self.backoff_wait,
-                retry_timeout = 60)
-        print(f"DEBUG generation {generation} offset {self.offset}", file = sys.stderr)
-        if self.generation_prev != None and self.generation_prev != generation:
-            sys.stderr.write(
-                "\n\r\r\nWARNING: console was restarted\r\r\n\n")
-            self.offset = len(data)
-        self.generation_prev = generation
+        if self.rawmode:
 
-        if data:
-            # add CR, because the console is in raw mode
-            for line in data.splitlines(True):
-                # note line is strings, UTF-8 encode, which is
-                # what we get from the protocol
-                if self.timestamp:
-                    timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S ")
-                    self.fd.write(timestamp.encode('utf-8'))
-                f_write_retry_eagain(self.fd, line.encode('utf-8'))
-                if '\n' in line:
-                    f_write_retry_eagain(self.fd, b"\r")
+            generation, self.offset, data_len = \
+                self.target.console.read_full(
+                    self.console, self.offset,
+                    # when reading, we are ok with retrying a lot, since
+                    # this is an idempotent operation
+                    fd = self.fd,
+                    retry_backoff = self.backoff_wait,
+                    retry_timeout = 60)
+        else:
+            # Instead of reading and sending directy to the
+            # stdout, we need to break it up in chunks; the
+            # console is in non-blocking mode (for reading
+            # keystrokes) and also in raw mode, so it doesn't do
+            # \n to \r\n xlation for us.
+            # So we chunk it and add the \r ourselves; there might
+            # be a better method to do this.
+            generation, self.offset, data = \
+                self.target.console.read_full(
+                    self.console, self.offset,
+                    # when reading, we are ok with retrying a lot, since
+                    # this is an idempotent operation
+                    retry_backoff = self.backoff_wait,
+                    retry_timeout = 60)
+            #print(f"DEBUG generation {generation} offset {self.offset}", file = sys.stderr)
+            if self.generation_prev != None and self.generation_prev != generation:
+                sys.stderr.write(
+                    "\n\r\r\nWARNING: console was restarted\r\r\n\n")
+                self.offset = len(data)
+            self.generation_prev = generation
+
+            if data:
+                # add CR, because the console is in raw mode
+                for line in data.splitlines(True):
+                    # note line is strings, UTF-8 encode, which is
+                    # what we get from the protocol
+                    if self.timestamp:
+                        timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S ")
+                        self.fd.write(timestamp.encode('utf-8'))
+                    f_write_retry_eagain(self.fd, line.encode('utf-8'))
+                    if '\n' in line:
+                        f_write_retry_eagain(self.fd, b"\r")
             self.fd.flush()
             data_len = len(data)
 
@@ -1559,7 +1579,7 @@ class _console_reader_c:
 
 def _console_read_thread_fn(target, console, fd, offset, backoff_wait_max,
                             _flags_restore, timestamp = False,
-                            stop = None):
+                            stop = None, rawmode = False):
     # read in the background the target's console output and print it
     # to stdout
     # stop: if it is an iterable and is not empty, stop reading
@@ -1568,7 +1588,8 @@ def _console_read_thread_fn(target, console, fd, offset, backoff_wait_max,
         # limit how much time we keep retrying due to server connection errors
         console_reader = _console_reader_c(target, console, fd, offset,
                                            backoff_wait_max, 10,
-                                           timestamp = timestamp)
+                                           timestamp = timestamp,
+                                           rawmode = rawmode)
         while stop == None or len(stop) == 0:
             try:
                 if stop and len(stop) > 0:
@@ -1626,7 +1647,8 @@ WARNING: This is a very limited interactive console
         console_read_thread = threading.Thread(
             target = _console_read_thread_fn,
             args = ( target, console, fd, offset, max_backoff_wait,
-                     _flags_old )
+                     _flags_old ),
+            kwargs = { "rawmode": False }
         )
         console_read_thread.daemon = True
         console_read_thread.start()
@@ -1703,21 +1725,24 @@ def _cmdline_console_read(args):
         target = tc.target_c.create_from_cmdline_args(args)
         console = args.console
         offset = target.console.offset_calc(target, args.console, int(args.offset))
-        max_size = int(args.max_size)
         if args.output == None:
             fd = sys.stdout.buffer
+            rawmode = False
         else:
             fd = open(args.output, "wb")
+            rawmode = True
         try:
             # limit how much time we keep retrying due to server connection errors
             if args.follow:
                 _console_read_thread_fn(target, console, fd, offset,
                                         args.max_backoff_wait, False,
-                                        timestamp = args.timestamp)
+                                        timestamp = args.timestamp,
+                                        rawmode = rawmode)
             else:
                 console_reader = _console_reader_c(
                     target, console, fd, offset,
-                    args.max_backoff_wait, 10, timestamp = args.timestamp)
+                    args.max_backoff_wait, 10, timestamp = args.timestamp,
+                    rawmode = rawmode)
                 console_reader.read()
         finally:
             if fd != sys.stdout.buffer:
