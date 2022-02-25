@@ -226,11 +226,6 @@ class expect_text_on_console_c(tc.expectation_c):
         else:
             return self._console
 
-    #: Maximum amount of bytes to read on each read iteration in
-    #: :meth:`poll`; this is so that if a (broken) target is spewing
-    #: gigabytes of data, we don't get stuck here just reading from it.
-    max_size = 65536
-
     def poll_context(self):
         return _poll_context(self.target, self.console)
 
@@ -323,7 +318,7 @@ class expect_text_on_console_c(tc.expectation_c):
             newline = ''
             generation, new_offset, total_bytes = \
                 target.console.read_full(self.console, read_offset,
-                                         self.max_size, of, newline = newline)
+                                         fd = of, newline = newline)
             generation_prev = buffers_poll.get('generation', None)
             if generation_prev == None:
                 buffers_poll['generation'] = generation
@@ -338,8 +333,7 @@ class expect_text_on_console_c(tc.expectation_c):
                     dlevel = 5)
                 generation, new_offset, total_bytes = \
                     target.console.read_full(self.console, 0,
-                                             self.max_size, of,
-                                             newline = newline)
+                                             fd = of, newline = newline)
                 buffers_poll['generation'] = generation
             ts_end = time.time()
             of.flush()
@@ -938,7 +932,7 @@ class extension(tc.target_extension_c):
             f" (data_type {data_type})")
 
 
-    def _read(self, console = None, offset = 0, max_size = 0, fd = None,
+    def _read(self, console = None, offset = 0, _max_size = 0, fd = None,
               newline = None,
               **ttbd_iface_call_kwargs):
         """
@@ -948,18 +942,16 @@ class extension(tc.target_extension_c):
         :param int offset: (optional) offset to read from (defaults to zero)
         :param int fd: (optional) file descriptor to which to write
           the output (in which case, it returns the bytes read).
-        :param int max_size: (optional) if *fd* is given, maximum
-          amount of data to read
         :returns: tuple consisting of:
           - stream generation
           - stream size after reading
           - data read (or if written to a file descriptor,
             amount of bytes read)
+
+        *_max_size* is ignored, it is currently kept for backwards compat.
         """
         assert console == None or isinstance(console, str)
         assert offset >= 0
-        assert max_size >= 0
-        #assert fd == None or fd >= 0
         assert fd == None or isinstance(fd, io.IOBase)
 
         target = self.target
@@ -1001,8 +993,6 @@ class extension(tc.target_extension_c):
 
                     # don't use chunk_size, as it might be less
                     total += chunk_len
-                    if max_size > 0 and total >= max_size:
-                        break
                 fd.flush()
                 ret = total
                 l = total
@@ -1044,8 +1034,7 @@ class extension(tc.target_extension_c):
 
           This file needs to be opened in binary mode.
 
-        :param int max_size: (optional) if *fd* is given, maximum
-          amount of data to read
+        :param int max_size: (ignored)
 
         :param newline: (optional, defaults to *None*, universal)
           convention for end-of-line characters.
@@ -1068,7 +1057,7 @@ class extension(tc.target_extension_c):
           amount of bytes read)
         """
         return self._read(console = console, offset = offset,
-                          max_size = max_size, fd = fd, newline = newline,
+                          fd = fd, newline = newline,
                           retry_timeout = retry_timeout,
                           retry_backoff = retry_backoff,
                           **ttbd_iface_call_kwargs)[2]
@@ -1098,8 +1087,7 @@ class extension(tc.target_extension_c):
 
           This file needs to be opened in binary mode.
 
-        :param int max_size: (optional) if *fd* is given, maximum
-          amount of data to read
+        :param int max_size: (ignored) deprecated and not used anymore
 
         :param newline: (optional, defaults to *None*, universal)
           convention for end-of-line characters.
@@ -1129,7 +1117,7 @@ class extension(tc.target_extension_c):
 
         """
         return self._read(console = console, offset = offset,
-                          max_size = max_size, fd = fd, newline = newline,
+                          fd = fd, newline = newline,
                           retry_timeout = retry_timeout,
                           retry_backoff = retry_backoff,
                           **ttbd_iface_call_kwargs)
@@ -1532,6 +1520,7 @@ class _console_reader_c:
                 # this is an idempotent operation
                 retry_backoff = self.backoff_wait,
                 retry_timeout = 60)
+        print(f"DEBUG generation {generation} offset {self.offset}", file = sys.stderr)
         if self.generation_prev != None and self.generation_prev != generation:
             sys.stderr.write(
                 "\n\r\r\nWARNING: console was restarted\r\r\n\n")
@@ -1595,6 +1584,7 @@ def _console_read_thread_fn(target, console, fd, offset, backoff_wait_max,
                                       _flags_restore)
                     _flags_restore = False
                 logging.exception(e)
+                #print(f"DEBUG reader exitt {e}", file = sys.stderr)
                 raise
             finally:
                 if _flags_set:
@@ -1953,10 +1943,6 @@ def _cmdline_setup(arg_subparser):
                     dest = "offset", type = int,
                     help = "Read the console output starting from "
                     "offset (some targets might or not support this)")
-    ap.add_argument("-m", "--max-size", action = "store",
-                    dest = "max_size", default = 0,
-                    help = "Read as much bytes (approx) [only available with "
-                    "-o]")
     ap.add_argument("-o", "--output", action = "store", default = None,
                     metavar = "FILENAME",
                     help = "Write output to FILENAME")

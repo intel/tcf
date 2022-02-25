@@ -132,7 +132,17 @@ name 3 TCF-scratch \
                          + "%d" % pid)
         pid += 1
 
-    target.shell.run(cmdline)
+    for count in range(3):
+        try:
+            target.shell.run(cmdline)
+            break
+        except tcfl.error_e as e:
+            if 'we have been unable to inform the kernel of the change' not in e.console_output:
+                raise
+            if count == 2:
+                raise
+            target.report_info("trying to re-partition again, partitions busy?")
+
     target.pos.fsinfo_read(target._boot_label_name)
     # format quick
     for root_dev in root_devs:
