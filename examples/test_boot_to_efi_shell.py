@@ -63,7 +63,6 @@ class _test(tcfl.tc.tc_c):
             tcfl.biosl.boot_efi_shell(target)
             target.shell.prompt_regex = re.compile("[^>]+>")
             target.shell.run("echo I booted", "I booted", timeout = 80)
-            target.capture.streamers_stop()
         finally:
             target.capture.streamers_stop_and_get()
             target.capture.snapshoters_get()
