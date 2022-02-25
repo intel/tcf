@@ -1361,6 +1361,84 @@ class extension(tc.target_extension_c):
                 search_offset = 0
             poll_state.buffers[detect_context + 'search_offset'] = search_offset
 
+
+    def capture_complete(self, *consoles):
+        """Complete the local capture of one or more console--meaning read
+        everything extra the server might already have and append it
+        to the local capture file (reported by
+        :meth:`capture_filename` or :meth:`text_capture_file`).
+
+        :param list(str) consoles: (optional, default all) names of
+          the console whose capture has to be completed
+
+        >>> target.console.capture_complete()                  # complete capturing all consoles
+        >>> target.console.capture_complete("serial0", "ssh0") # only serial0 and ssh0
+
+        When a console has been used with functions such as
+        :meth:`<target.expect> tcfl.target_c.expect`,
+        :meth:`target.send <tcfl.target_c.send>',
+        :meth:`target.shell.run <tcfl.target_ext_shell.extension.run>,
+        etc that involves a console expecter
+        (:class:`expect_text_on_console_c`), a local capture of it is
+        kept in the system (usually called
+        *report-HASHID.console-NAME.TARGETNAMENAME.CONSOLENAME.txt*,
+        with the beginning matching
+        :data:`tcfl.tc_c.report_file_prefix`.
+
+        This function queries the server for any more output available
+        for that console and appending it to the one already captured.
+
+        """
+        # The normal reading of a console is done inside the expect
+        # flow, that creates a console_expecter using
+        # target.console.text(), yielding a expect_text_on_console_c.
+        #
+        # To poll the console (read) that creates a poll context in
+        # the testcase structure [_poll_state] which is indexed by the
+        # poll context. The poll context is global to the target and
+        # console names, so that multiple expecters readers etc can
+        # share the same read data.
+        #
+        # Once we have that, we just poll a couple times to get the
+        # data.
+        #
+        # Why so complicted? Because the local capture file might have
+        # the capture data involving multiple generations of the
+        # console (from the console being turned off and on, for
+        # example, due to a power-cycle) -- so this respects that and
+        # gives you a full capture.
+        #
+        target = self.target
+        # ensure there is a polling context for this console by just
+        # pretending we want to read whatever
+        if not consoles:
+            consoles = self.list()
+        for console in consoles:
+            if console in [ 'default', 'preferred' ]:
+                # these are aliases -- real consoles will be picked up
+                continue
+            target.expect("", console = console,
+                          # ensure we read EVERYTHING from the beginning
+                          previous_max = sys.maxsize,
+                          # we don't really want to see anything foudn
+                          report = 0)
+
+            console_expecter = target.console.text(
+                "unused", console = console,
+                timeout = 0, name = "completing console capture")
+            poll_context = console_expecter.poll_context()
+            with target.testcase.lock:
+                poll_state = target.testcase._poll_state[poll_context]
+            # try a couple of times to get more data from the
+            # console--don't over do it, in case we have a misbehaving SUT
+            # that is spewing Gigs nonstop, we don't want to be reading
+            # here for ever.
+            console_expecter.poll(
+                target, "completing console capture", poll_state.buffers)
+            console_expecter.poll(
+                target, "completing console capture", poll_state.buffers)
+
+
     def capture_iterator(self, console, offset_from = 0, offset_to = 0):
         """
         Iterate over the captured contents of the console

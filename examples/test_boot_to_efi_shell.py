@@ -66,3 +66,4 @@ class _test(tcfl.tc.tc_c):
         finally:
             target.capture.streamers_stop_and_get()
             target.capture.snapshoters_get()
+            target.console.capture_complete()
