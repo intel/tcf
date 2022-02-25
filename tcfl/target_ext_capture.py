@@ -828,6 +828,122 @@ class extension(tc.target_extension_c):
             name = name)
 
 
+    def _list_streamers(self):
+        capturers = set()
+        capturers_data = self._capturers_data_get()
+        for capturer_name, data in capturers_data.items():
+            snapshot = data.get('snapshot', False)
+            if snapshot != True:
+                capturers.add(capturer_name)
+        return capturers
+
+    def _list_snapshoters(self):
+        capturers = set()
+        capturers_data = self._capturers_data_get()
+        for capturer_name, data in capturers_data.items():
+            snapshot = data.get('snapshot', False)
+            if snapshot == True:
+                capturers.add(capturer_name)
+        return capturers
+
+
+    def streamers_start(self, capturers = None):
+        """
+        Start recording from multiple streaming capture sources
+
+        Reports and ignores errors starting any capture
+
+        :param list(str) capturers: (optional; default all) list of
+          names of streaming capture sources
+        """
+        if capturers == None:
+            capturers = self._list_streamers()
+        for capture_source in capturers:
+            try:
+                self.target.capture.start(capture_source)
+                self.target.report_info(f"{capture_source}: started capture")
+            except tc.error_e as e:
+                self.target.report_error(f"{capture_source}: can't start: {e}")
+
+
+    def streamers_stop_and_get(self, capturers = None, prefix: str = None):
+        """
+        Stop recording from multiple streaming capture sources and download
+        all streams
+
+        Reports and ignores any errors
+
+        :param list(str) capturers: (optional; default all) list of
+          names of streaming capture sources
+        :param str prefix: (optional; default the testcases collateral
+          prefix :data:tcfl.tc.tc_c.report_file_prefix) string with
+          which to prefix the names of the files downloaded.
+        """
+        if prefix == None:
+            prefix = self.target.testcase.report_file_prefix
+        if capturers == None:
+            capturers = self._list_streamers()
+        for capture_source in capturers:
+            try:
+                self.target.capture.stop(capture_source)
+                r = self.target.capture.get(capture_source, prefix = prefix)
+                self.target.report_info(
+                    f"{capture_source}: stopped capture and"
+                    f" downloaded streams: {r}")
+            except tc.error_e as e:
+                self.target.report_error(
+                    f"{capture_source}: can't stop/get: {e}")
+
+
+    def streamers_stop(self, capturers = None):
+        """
+        Stop recording from multiple streaming capture sources
+
+        Reports and ignores any errors
+
+        :param list(str) capturers: (optional; default all) list of
+          names of streaming capture sources
+        """
+        if capturers == None:
+            capturers = self._list_streamers()
+        for capture_source in capturers:
+            try:
+                self.target.capture.stop(capture_source)
+                self.target.report_info(
+                    f"{capture_source}: stopped capture")
+            except tc.error_e as e:
+                self.target.report_error(
+                    f"{capture_source}: can't stop/get: {e}")
+
+
+    def snapshoters_get(self, capturers = None, prefix = None):
+        """
+        Take a snapshot from multiple snapshot capture sources and download
+        all streams
+
+        Reports and ignores any errors
+
+        :param list(str) capturers: (optional; default all) list of
+          names of streaming capture sources
+        :param str prefix: (optional; default the testcases collateral
+          prefix :data:tcfl.tc.tc_c.report_file_prefix) string with
+          which to prefix the names of the files downloaded.
+        """
+        if prefix == None:
+            prefix = self.target.testcase.report_file_prefix
+        if capturers == None:
+            capturers = self._list_snapshoters()
+        for capture_source in capturers:
+            try:
+                self.target.capture.start(capture_source)
+                r = self.target.capture.get(capture_source, prefix = prefix)
+                self.target.report_info(
+                    f"{capture_source}: snapshoted capture: {r}")
+            except tc.error_e as e:
+                self.target.report_error(
+                    f"{capture_source}: can't snapshot/get: {e}")
+
+
 def _cmdline_capture(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "capture")
