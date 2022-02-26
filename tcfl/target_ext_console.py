@@ -975,9 +975,8 @@ class extension(tc.target_extension_c):
                 for chunk in r.iter_content(chunk_size):
                     while True:
                         try:
-                            # calc len before EOL conversion
                             chunk_len = len(chunk)
-                            fd.write(self._newline_convert(chunk, newline))
+                            fd.write(chunk)
                             break
                         except IOError as e:
                             # for those files opened in O_NONBLOCK
