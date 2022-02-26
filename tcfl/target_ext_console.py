@@ -1408,19 +1408,17 @@ class extension(tc.target_extension_c):
         # gives you a full capture.
         #
         target = self.target
-        # ensure there is a polling context for this console by just
-        # pretending we want to read whatever
         if not consoles:
             consoles = self.list()
         for console in consoles:
             if console in [ 'default', 'preferred' ]:
                 # these are aliases -- real consoles will be picked up
                 continue
-            target.expect("", console = console,
-                          # ensure we read EVERYTHING from the beginning
-                          previous_max = sys.maxsize,
-                          # we don't really want to see anything foudn
-                          report = 0)
+
+            # ensure there is a polling context for this console--just
+            # sync, even if we are not going to send anything, since
+            # this creates the context
+            self.send_expect_sync(console)
 
             console_expecter = target.console.text(
                 "unused", console = console,
