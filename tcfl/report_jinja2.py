@@ -61,6 +61,8 @@ import os
 import sys
 import threading
 import time
+import datetime
+import pytz
 
 import functools
 import jinja2
@@ -100,6 +102,18 @@ def jinja2_xml_escape(data):
 
 
 class driver(tc.report_driver_c):
+
+    # timezone the reports will have. You can set it in various ways:
+    # you can set it as an enviorment variable named REPORT_TZ or TZ.
+    # If you dont want to change your enviorment variables, you can set it
+    # like:
+    # tcfl.report_jinja2.driver.timezone = 'US/Pacific'
+    # in your tcf config directory (it's probably under your home directory
+    # ~/.tcf) you can add the variable to any file there named conf*, or
+    # create a new one yourself.
+    # NOTE: you need to write the time zone in (Canonical) names NOT in
+    # abbreviations.
+    timezone = os.environ.get('REPORT_TZ', (os.environ.get('TZ'), None))
 
     def __init__(self, log_dir):
         """
@@ -564,7 +578,30 @@ class driver(tc.report_driver_c):
             # the timestamp is a horrible hack which we have to fix
             # properly by propagating it as a field in the temporary
             # log so later the templates can decide how to render it
-            of.write(f"[+{delta:.1f}s] " + message)
+
+            # if timezone is not set we will use local, if it is, we
+            # change it to the one set by the user.
+            d = datetime.datetime.fromtimestamp(ts)
+            tz = None
+            try:
+                tz = pytz.timezone(self.timezone)
+            except pytz.exceptions.UnknownTimeZoneError:
+                logging.warning('bad timezone set for reports in your tcf '
+                                ' config. Falling back to your local time.')
+
+            # we need to localize the timezone before changing it, we can get
+            # it in UTC straight from the timestamp, so no need to be guessing
+            # the timezone of the machine.
+            if tz:
+                d = datetime.datetime.utcfromtimestamp(ts)
+                utc = pytz.timezone('UTC')
+                d = utc.localize(d)
+                d = d.astimezone(tz)
+
+            # e.g. 22-02-28.12:56:00
+            d = d.strftime('%y-%m-%d.%H:%M:%S')
+            of.write(f"[{d} +{delta:.1f}s] " + message)
+
         if attachments != None:
             # FIXME: \x01\x01 hack to denote an attachment, will
             # replace in _log_iterator() because the intermediate
