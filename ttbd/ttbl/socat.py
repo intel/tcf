@@ -60,7 +60,9 @@ class pci(ttbl.power.impl_c):
 
     def __init__(self, proto,
                  local_addr, local_port,
-                 remote_addr, remote_port, **kwargs):
+                 remote_addr, remote_port,
+                 kill_before_on = True,
+                 **kwargs):
         ttbl.power.impl_c.__init__(self, **kwargs)
         assert proto in [ 'udp', 'tcp', 'sctp',
                           'udp4', 'tcp4', 'sctp4',
@@ -73,10 +75,15 @@ class pci(ttbl.power.impl_c):
         self.tunnel_id = "%s-%s:%d-%s:%d" % (
             self.proto, self.local_addr, self.local_port,
             self.remote_addr, self.remote_port)
+        self.kill_before_on = kill_before_on
 
-    def on(self, target, _component):
+
+    def on(self, target, component):
         pidfile = os.path.join(target.state_dir,
                                "socat-" + self.tunnel_id + ".pid")
+        # kill anything that might be left lingering
+        # FIXME: this should use daemon_c
+        commonl.process_terminate(pidfile, path = self.path, tag = "socat")
         cmdline = [
             self.path,
             "-ly", "-lp", self.tunnel_id,
@@ -84,6 +91,13 @@ class pci(ttbl.power.impl_c):
                 self.proto, self.local_port, self.local_addr),
             "%s:%s:%s" % (self.proto, self.remote_addr, self.remote_port)
         ]
+        if self.kill_before_on:
+            pids = commonl.kill_by_cmdline(" ".join(cmdline))
+            if pids:
+                target.log.error(
+                    f"BUG? {component}/on: killed PIDs '{pids}'"
+                    f" with the same command line: {cmdline}")
+
         try:
             p = subprocess.Popen(cmdline, shell = False,
                                  cwd = target.state_dir,

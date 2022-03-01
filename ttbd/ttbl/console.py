@@ -18,6 +18,7 @@ import errno
 import fcntl
 import numbers
 import os
+import signal
 import socket
 import stat
 import struct
@@ -917,6 +918,17 @@ class serial_pc(ttbl.power.socat_pc, generic_c):
                 f"instrumentation.{self.upid_index}.usb_serial_number",
                 self.usb_serial_number)
             self.kws['device'] = ttbl.tty_by_usb_serial_number(usb_serial_number)
+        else:
+            self.kws['device'] = self.serial_file_name
+        # sometimes there are lingering processes that get stuck and
+        # don't release access to our device, so we just slash them
+        # out and complain about it
+        pids = commonl.kill_procs_using_device(
+            self.kws['device'], signal.SIGKILL)
+        if pids:
+            target.log.warning(
+                f"BUG? {component}/on: had to kill -9 pids using"
+                f" {self.kws['device']}: {pids}")
         ttbl.power.socat_pc.on(self, target, component)
         generation_set(target, component)
         generic_c.enable(self, target, component)

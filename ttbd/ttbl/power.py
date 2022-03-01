@@ -1198,6 +1198,11 @@ class daemon_c(impl_c):
 
       >>> os.setinheritable(FD, True)
 
+    :param bool kill_before_on: (optional; default *True*) before
+      starting the process, kill any possible process that is running
+      with the same command line and if any, report it as a possible
+      bug.
+
     Other parameters as to :class:ttbl.power.impl_c.
 
     """
@@ -1208,13 +1213,14 @@ class daemon_c(impl_c):
                  path = None, check_path = None, name = None,
                  pidfile = "%(path)s/%(component)s-%(name)s.pid",
                  mkpidfile = True, paranoid = False,
-                 close_fds = True,
+                 close_fds = True, kill_before_on: bool = True,
                  **kwargs):
         assert isinstance(cmdline, list), \
             "cmdline has to be a list of strings; got %s" \
             % type(cmdline).__name__
         assert precheck_wait >= 0
         assert isinstance(close_fds, bool)
+        assert isinstance(kill_before_on, bool)
         assert pidfile == None or isinstance(pidfile, str)
 
         impl_c.__init__(self, paranoid = paranoid, **kwargs)
@@ -1266,6 +1272,7 @@ class daemon_c(impl_c):
         self.mkpidfile = mkpidfile
         self.close_fds = close_fds
         self.stdin = None
+        self.kill_before_on = kill_before_on
 
 
     def verify(self, target, component, cmdline_expanded):
@@ -1335,6 +1342,7 @@ class daemon_c(impl_c):
                     target.log.error("%s: can't open stderr file: %s"
                                      % (component, e))
 
+
     def on(self, target, component):
         stderrf_name = os.path.join(target.state_dir,
                                     component + "-" + self.name + ".stderr")
@@ -1372,6 +1380,14 @@ class daemon_c(impl_c):
         else:
             pidfile = None
         stderrf = open(stderrf_name, "w+")
+
+        if self.kill_before_on:
+            pids = commonl.kill_by_cmdline(" ".join(_cmdline))
+            if pids:
+                target.log.error(
+                    f"BUG? {component}/on: killed PIDs '{' '.join(pids)}'"
+                    f" with the same command line: {_cmdline}")
+
         try:
             p = subprocess.Popen(_cmdline, env = env, cwd = target.state_dir,
                                  stdout = stderrf, close_fds = self.close_fds,
