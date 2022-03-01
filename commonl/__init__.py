@@ -969,6 +969,76 @@ def symlink_f(source, dest):
         if e.errno != errno.EEXIST or not os.path.islink(dest):
             raise
 
+
+
+def kill_procs_using_device(device: str, with_signal = signal.SIGTERM,
+                            log = logging, tag: str = ""):
+    """
+    Kill processes using a given device
+
+    :param str device: path to device node (eg: /dev/ttyS0)
+    :return: list of pids that got killed
+    """
+    assert isinstance(device, str)
+    if tag:
+        assert isinstance(tag, str)
+        tag = ": " + tag
+    p = subprocess.run(
+        [ 'lsof', '-Fp', device ],
+        check = False, text = True, capture_output = True)
+    if not p.stdout:
+        return []      	# no devices found
+
+    # output of the command will be
+    #
+    ## pPID1
+    ## pPID2
+    ## pPID3
+    ## ...
+    #
+    # For each pid that has the device open; we need to remove
+    # the leading *p*.
+    _lsof_pid_regex = re.compile("^p(?P<pid>[0-9]+)$")
+    pids = set()
+    for line in p.stdout.splitlines():
+        m = _lsof_pid_regex.search(line)
+        if not m:
+            log.warning(f"{tag}{device}: can't match lsof output line: {line}")
+            continue
+        pid_s = m.groupdict()['pid']
+        try:
+            pid = int(pid_s)
+        except ValueError:
+            log.warning(f"{tag}{device}: can't convert PID {pid_s} to int"
+                        f" from lsof output line: {line}")
+            continue
+        os.kill(pid, with_signal)
+        pids.add(pid)
+    return pids
+
+
+def kill_by_cmdline(cmdline):
+    """
+    Kill (9) any process that matches exactly a command line
+
+    :param str cmdline: command line to match against
+    :return: list of pids that got killed
+
+    """
+    p = subprocess.run(
+        [
+            # -e: print to stdout what was killed
+            # -f: match the full command line
+            # -x: match exactly (no regex) -- we have the
+            #     exact command line and none should be there
+            #     running the same line
+            # --signal 9: kill hard
+            "pkill", "-fx", "--signal", "9", cmdline
+        ],
+        shell = False, check = False, capture_output = True, text = True)
+    return [ int(i) for i in p.stdout.replace("\n", " ").split() ]
+
+
 def _pid_grok(pid):
     if pid == None:
         return None, None
