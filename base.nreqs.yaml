@@ -44,6 +44,8 @@ pymongo:
 
 pyte: python3-pyte
 
+pytz: python3-pytz
+
 pyserial:
   dnf:
     name: python3-pyserial
