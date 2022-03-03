@@ -69,7 +69,7 @@ import subprocess
 import time
 import urllib.parse
 
-import distutils.version
+import packaging.version
 import Levenshtein
 
 from . import biosl
@@ -188,15 +188,15 @@ def image_select_best(image, available_images, target):
     version = image_spec[2]
     if version == "":
         versions = sorted([
-            (distutils.version.LooseVersion(i[2]) if i[2] != ""
-             else distutils.version.LooseVersion('0'))
+            (packaging.version.parse(i[2]) if i[2] != ""
+             else packaging.version.parse('0'))
             for i in spin_images
         ])
         version = versions[-1]
     else:
-        version = distutils.version.LooseVersion(version)
+        version = packaging.version.parse(version)
     version_images = [x for x in spin_images if (
-            distutils.version.LooseVersion(x[2] if x[2] != "" else '0')
+            packaging.version.parse(x[2] if x[2] != "" else '0')
             == version
         )]
     if not version_images:
@@ -216,15 +216,15 @@ def image_select_best(image, available_images, target):
     subversion = image_spec[3]
     if subversion == "":
         subversions = sorted([
-            (distutils.version.LooseVersion(i[3]) if i[3] != ""
-             else distutils.version.LooseVersion('0'))
+            (packaging.version.parse(i[3]) if i[3] != ""
+             else packaging.version.parse('0'))
             for i in version_images
         ])
         subversion = subversions[-1]
     else:
-        subversion = distutils.version.LooseVersion(subversion)
+        subversion = packaging.version.parse(subversion)
     subversion_images = [x for x in version_images if (
-            distutils.version.LooseVersion(x[3] if x[3] != "" else '0')
+            packaging.version.parse(x[3] if x[3] != "" else '0')
             == subversion
         )]
     if not subversion_images:
