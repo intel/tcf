@@ -867,7 +867,7 @@ class tc_zephyr_sanity_c(tcfl.tc.tc_c):
         for name, tags in self.patch_tags.items():
             if myname.endswith(os.path.normpath(name)):
                 for tag in tags:
-                    if isinstance(tags, collections.Mapping):
+                    if isinstance(tags, collections.abc.Mapping):
                         value = tags[tag]
                     else:
                         value = True

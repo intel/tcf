@@ -115,7 +115,7 @@ class extension(tc.target_extension_c):
                 data[i[0]] = dict(state = i[1])
             substate = 'normal' # older doesn't support substates
             state = all(i['state'] in (True, None) for i in list(data.values()))
-        elif isinstance(r, collections.Mapping):
+        elif isinstance(r, collections.abc.Mapping):
             # proper response format
             #
             ## {

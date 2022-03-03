@@ -2216,7 +2216,7 @@ class target_c(reporter_c):
             else:
                 if isinstance(v, str):
                     continue
-                if isinstance(v, (collections.Sequence, collections.Mapping)):
+                if isinstance(v, (collections.Sequence, collections.abc.Mapping)):
                     kwargs[k] = json.dumps(v)
 
         if component:

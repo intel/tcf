@@ -1968,7 +1968,7 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
     :returns list: sorted list of tuples *KEY, VAL*
 
     """
-    assert isinstance(d, collections.Mapping)
+    assert isinstance(d, collections.abc.Mapping)
     fl = []
 
     def _add(field_flat, val):
@@ -1994,7 +1994,7 @@ def dict_to_flat(d, projections = None, sort = True, empty_dict = False):
         # change it like that and maybe the evaluation can be done before
         # the assignment.
 
-        if isinstance(val, collections.Mapping):
+        if isinstance(val, collections.abc.Mapping):
             if len(val) == 0 and empty_dict == True and field_needed(field_flat, projections):
                 # append an empty dictionary; do not append VAL --
                 # why? because otherwise it might be modified later by
