@@ -113,7 +113,7 @@ class driver(tc.report_driver_c):
     # create a new one yourself.
     # NOTE: you need to write the time zone in (Canonical) names NOT in
     # abbreviations.
-    timezone = os.environ.get('REPORT_TZ', (os.environ.get('TZ'), None))
+    timezone = os.environ.get('REPORT_TZ', os.environ.get('TZ', None))
 
     def __init__(self, log_dir):
         """
@@ -586,8 +586,10 @@ class driver(tc.report_driver_c):
             try:
                 tz = pytz.timezone(self.timezone)
             except pytz.exceptions.UnknownTimeZoneError:
-                logging.warning('bad timezone set for reports in your tcf '
-                                ' config. Falling back to your local time.')
+                logging.warning(
+                    f"bad timezone '{self.timezone}' set for reporting."
+                    f" REPORT_TZ: {os.environ.get('REPORT_TZ', 'n/a/')},"
+                    f" TZ: {os.environ.get('TZ', 'n/a')}; defaulting to local")
 
             # we need to localize the timezone before changing it, we can get
             # it in UTC straight from the timestamp, so no need to be guessing
