@@ -31,7 +31,9 @@ make:
 Jinja2: python3-jinja2
 
 imutils:
-  
+
+packaging: python3-packaging
+
 ply: python3-ply
 
 pykwalify: python3-pykwalify
