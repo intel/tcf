@@ -115,7 +115,7 @@ class driver(tc.report_driver_c):
     # abbreviations.
     timezone = os.environ.get('REPORT_TZ', os.environ.get('TZ', None))
 
-    def __init__(self, log_dir):
+    def __init__(self, log_dir, timezone = None):
         """
         Initialize the Jinja2 templating driver
 
@@ -136,6 +136,13 @@ class driver(tc.report_driver_c):
         self.fs = {}
         # thread local storage for TLS-based prefix formatting
         self.tls = threading.local()
+        if timezone:
+            assert isinstance(timezone, str)
+            self.timezone = timezone
+        if not self.timezone:
+            self.timezone = os.environ.get(
+                'REPORT_TZ', os.environ.get('TZ', None))
+
 
     #:
     #: To create more templates, add a new dictionary:
@@ -581,25 +588,21 @@ class driver(tc.report_driver_c):
 
             # if timezone is not set we will use local, if it is, we
             # change it to the one set by the user.
-            d = datetime.datetime.fromtimestamp(ts)
-            tz = None
-            try:
-                tz = pytz.timezone(self.timezone)
-            except pytz.exceptions.UnknownTimeZoneError:
-                logging.warning(
-                    f"bad timezone '{self.timezone}' set for reporting."
-                    f" REPORT_TZ: {os.environ.get('REPORT_TZ', 'n/a/')},"
-                    f" TZ: {os.environ.get('TZ', 'n/a')}; defaulting to local")
-
             # we need to localize the timezone before changing it, we can get
             # it in UTC straight from the timestamp, so no need to be guessing
             # the timezone of the machine.
-            if tz:
-                d = datetime.datetime.utcfromtimestamp(ts)
-                utc = pytz.timezone('UTC')
-                d = utc.localize(d)
-                d = d.astimezone(tz)
-
+            if self.timezone:
+                try:
+                    d = datetime.datetime.fromtimestamp(
+                        ts, pytz.timezone(self.timezone))
+                except pytz.exceptions.UnknownTimeZoneError:
+                    logging.warning(
+                        f"bad timezone '{self.timezone}' set for reporting."
+                        f" REPORT_TZ: {os.environ.get('REPORT_TZ', 'n/a/')},"
+                        f" TZ: {os.environ.get('TZ', 'n/a')}; defaulting to local")
+                    d = datetime.datetime.fromtimestamp(ts)
+            else:
+                d = datetime.datetime.fromtimestamp(ts)
             # e.g. 22-02-28.12:56:00
             d = d.strftime('%y-%m-%d.%H:%M:%S')
             of.write(f"[{d} +{delta:.1f}s] " + message)
