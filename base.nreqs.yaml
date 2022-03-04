@@ -89,6 +89,9 @@ termcolor:
     name: python3-termcolor
   skip_platform: win32
 
+# needed for timezones
+tzdata:
+
 xz:
   skip_platform: win32
   apt: xz-utils
