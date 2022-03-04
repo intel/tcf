@@ -18,7 +18,7 @@
 #
 #  $ podman run -v $HOME/.tcf:/home/work/.tcf:O tcf tcf ls
 #
-# don't use fedora-minimal or it'll start pruning things we need
+# don't use fedora-minimal or it'll start pruning things we need (like /usr/share/zoneinfo)
 FROM registry.fedoraproject.org/fedora:34
 LABEL maintainer https://github.com/intel/tcf
 
