@@ -1318,13 +1318,14 @@ EOF""")
             if self.metadata == None:
                 self.metadata = {}
 
-    def _post_flash_setup(self, target, root_part_dev, image_final):
+    def _post_flash_setup(self, ic, target, root_part_dev, image_final):
         # Run post setup scripts from the image's metadata
         post_flash_script = self.metadata.get('post_flash_script', "")
         if post_flash_script:
             target.report_info("POS: executing post flash script from "
                                "%s:.tcf.metadata.yaml" % image_final)
             export_vars = [
+                "HWADDR_MAIN=" + target.addr_get(ic, "mac"),
                 "ROOTDEV=" + root_part_dev,
                 "ROOT=/mnt"
             ]
@@ -1849,7 +1850,7 @@ cat > /tmp/deploy.ex
                                    "%(rsync_server)s to %(root_part_dev)s"
                                    % kws)
 
-                self._post_flash_setup(target, root_part_dev, image_final)
+                self._post_flash_setup(ic, target, root_part_dev, image_final)
 
                 # did the user provide an extra function to deploy stuff?
                 if extra_deploy_fns:
