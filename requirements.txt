@@ -8,7 +8,7 @@ filelock
 Jinja2==2.11.3      # package: python3-jinja2
 PyYAML              # package: centos,fedora=python3-pyyaml 
 imutils
-packaging
+packaging           # package: python3-packaging
 ply                 # package: python3-ply
 pykwalify           # package: python3-pykwalify
 pyte	            # pacakge: python3-pyte
