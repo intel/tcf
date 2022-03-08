@@ -185,7 +185,7 @@ def _cmdline_servers(args):
         for rtb in rtbs.values():
             print(rtb.parsed_url.hostname)
     elif verbosity == 0:
-        for aka, url, username in r:
+        for aka, url, username, _origin in r:
             print(aka, url, username)
     elif verbosity in ( 1, 2 ):
         headers = [
