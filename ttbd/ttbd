@@ -252,9 +252,11 @@ class audit:
             self.calling_user = calling_user.get_id()
         elif isinstance(calling_user, str):
             self.calling_user = calling_user
+        elif isinstance(calling_user, flask_login.mixins.AnonymousUserMixin):
+            self.calling_user = "anonymous"
         elif calling_user != None:
             raise TypeError(f"calling_user: expected None, str or"
-                            f" ttbl.user_control.User; got {type(user)}")
+                            f" ttbl.user_control.User; got {type(calling_user)}")
         if target:
             assert isinstance(target, ttbl.test_target), \
                 f"target: expected None or ttbl.test_target; got {type(target)}"
@@ -288,6 +290,7 @@ class audit:
         "console/read": "very frequent call, returns lots of data",
         "console/write": "very frequent call, can take in lots of data",
         "console/size": "very frequent call, no side effects",
+        "console/list": "very frequent call, no side effects",
     }
 
     def __call__(self,*args, **kwargs):
@@ -300,6 +303,12 @@ class audit:
         # be that kws contains keys like the names of the arguments
         # (eg: calling_user), that breaks havoc
 
+        # note this function is supposed to be almost static; always
+        # take the args except for full defaults--why? because it is
+        # ok to call this function as audit.record(ARGS); but if audit
+        # is used as a context manager, then we use the object to
+        # store the args and then __enter__/__exit__ call record().
+
         for message_header in self.censored_messages:
             if message.startswith(message_header):
                 return
@@ -309,7 +318,9 @@ class audit:
                 pass
             elif isinstance(calling_user, ttbl.user_control.User):
                 user = user.get_id()
-            else:
+            elif isinstance(calling_user, flask_login.mixins.AnonymousUserMixin):
+                self.calling_user = "anonymous"
+            elif calling_user != None:
                 raise TypeError(f"calling_user: expected None, str or"
                                 f" ttbl.user_control.User; got {type(user)}")
         else:
@@ -356,11 +367,14 @@ class audit:
         # if we are reportin results, censor out things that are kinda
         # useless and makes no sense to report and would add a lot of
         # stuff we don't need
-        if 'result' in self.kws:
-            # reporting results, chop out some fields
-            if '_diagnostics' in self.kws:
-                self.kws['result'] = dict(self.kws['result'])
-                del self.kws['result']['_diagnostics']
+        if 'result' in kws:
+            # reporting results, chop out some fields -- note we can't
+            # remove in the kws['result'] site, otherwise we might be
+            # modifying the caller's
+            if '_diagnostics' in kws['result']:
+                # make a copy, replace and modify
+                kws['result'] = dict(kws['result'])
+                del kws['result']['_diagnostics']
 
         for auditor, origin in self._auditors.items():
             try:
@@ -580,7 +594,7 @@ def login():
     with audit("login",
                calling_user = flask_login.current_user._get_current_object(),
                request = flask.request) as audit_record:
-        _login(audit_record)
+        return _login(audit_record)
 
 
 @app.route(API_PREFIX + 'logout', methods = [ 'PUT' ])
