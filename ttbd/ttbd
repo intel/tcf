@@ -257,10 +257,15 @@ class audit:
         elif calling_user != None:
             raise TypeError(f"calling_user: expected None, str or"
                             f" ttbl.user_control.User; got {type(calling_user)}")
-        if target:
-            assert isinstance(target, ttbl.test_target), \
-                f"target: expected None or ttbl.test_target; got {type(target)}"
-        self.target = target
+        if isinstance(target, ttbl.test_target):
+            self.target = target.id
+        elif isinstance(target, str):
+            self.target = target
+        elif target != None:
+            raise TypeError(
+                f"target: expected None or ttbl.test_target; got {type(target)}")
+        else:
+            self.target = None
         self.kws = kws
         self.request = request
 
@@ -320,18 +325,22 @@ class audit:
                 user = user.get_id()
             elif isinstance(calling_user, flask_login.mixins.AnonymousUserMixin):
                 self.calling_user = "anonymous"
-            elif calling_user != None:
+            else:
                 raise TypeError(f"calling_user: expected None, str or"
-                                f" ttbl.user_control.User; got {type(user)}")
+                                f" ttbl.user_control.User; got {type(calling_user)}")
         else:
             calling_user = self.calling_user
 
         if target:
-            assert isinstance(target, ttbl.test_target), \
-                f"target: expected None or ttbl.test_target; got {type(target)}"
-            target_id = target.id
+            if isinstance(target, ttbl.test_target):
+                target_id = target.id
+            elif isinstance(target, str):
+                target_id = target
+            else:
+                raise TypeError(f"target: expected None, str or"
+                                f" ttbl.test_target; got {type(target)}")
         elif self.target:
-            target_id = self.target.id
+            target_id = self.target
         else:
             target_id = None
 
@@ -877,7 +886,7 @@ def _target_patch(target_id):
                         data.pop('ticket')
                 data_flat = commonl.dict_to_flat(data)
                 # Set parameter via form parameters -- just the keys, it can be long
-                audit_record.kws['data_flat_keys'] = [ i for i in data_flat.keys() ]
+                audit_record.kws['data_flat_keys'] = [ i[0] for i in data_flat ]
                 _target_property_set_policy_check(
                     target, [ x[0] for x in data_flat ],
                     user_is_admin)
