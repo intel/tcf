@@ -287,6 +287,7 @@ class audit:
     censored_messages = {
         "console/read": "very frequent call, returns lots of data",
         "console/write": "very frequent call, can take in lots of data",
+        "console/size": "very frequent call, no side effects",
     }
 
     def __call__(self,*args, **kwargs):
@@ -1291,8 +1292,11 @@ def _target_interface(target_id, interface, call):
 
 def cleanup_files():
     for f in glob.iglob(ttbl.test_target.files_path + "/*/*"):
-       if (time.time() - os.stat(f).st_mtime ) > ttbl.config.cleanup_files_maxage:
-               os.remove(f)
+        if (time.time() - os.stat(f).st_mtime ) > ttbl.config.cleanup_files_maxage:
+            try:
+                os.remove(f)
+            except IsADirectoryError:
+                continue
 
 # Notify systemd we are alive
 #
