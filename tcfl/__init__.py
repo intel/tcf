@@ -1032,7 +1032,6 @@ class server_c:
         servers_from_addresses = set()
         for address in addresses:
             try:
-                name, _aliases, _addresses = socket.gethostbyaddr(address)
                 name, _aliases, _addresses = socket_gethostbyaddr_cached(address)
             except socket.herror as e:
                 log_sd.info(
