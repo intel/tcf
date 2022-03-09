@@ -225,9 +225,14 @@ class ssh(tc.target_extension_c):
             ql = [ '-q' ]
         else:
             ql = []
-        if self.password == None:
+        env = dict(os.environ)
+        if self.password:
+            cmdline = [ 'sshpass', "-e" ]
+            env['SSHPASS'] = self.password
+        else:
             ql += [ '-o', "BatchMode yes" ]
-        cmdline = [ "ssh", "-p", str(self._ssh_port) ] \
+            cmdline = []
+        cmdline += [ "ssh", "-p", str(self._ssh_port) ] \
             + self._ssh_cmdline_options + ql \
             + [ self.login + "@" + self._ssh_host, "-t", _cmd ]
         self.target.report_info("running SSH command: %s"
@@ -235,6 +240,7 @@ class ssh(tc.target_extension_c):
         self._known_hosts_wipe()
         returncode = subprocess.call(cmdline, stdin = None, shell = False,
                                      stdout = log_stdout, stderr = log_stderr,
+                                     env = env,
                                      encoding = 'utf-8')
         log_stdout.seek(0, 0)
         log_stderr.seek(0, 0)
@@ -342,7 +348,8 @@ class ssh(tc.target_extension_c):
                                     % " ".join(cmdline), dlevel = 2)
             self._known_hosts_wipe()
             s = subprocess.check_output(cmdline, stderr = subprocess.STDOUT,
-                                        shell = False, encoding = 'utf-8')
+                                        shell = False, encoding = 'utf-8',
+                                        env = env)
         except subprocess.CalledProcessError as e:
             self._returncode_eval(e.returncode)
             self.target.report_error(
