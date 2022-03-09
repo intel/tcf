@@ -34,6 +34,7 @@ pyroute2        # package: python3-pyroute2
 pyserial        # package: centos,fedora=python3-pyserial ubuntu=python3-serial
 pysnmp          # package: centos,fedora=python3-pysnmp ubuntu=python3-pysnmp4
 python_ldap     # package: centos,fedora=python3-ldap
+pytz            # package: python3-pytz
 pyusb           # package: centos,fedora=python3-pyusb ubuntu=python3-usb
 requests        # package: python3-requests
 rpyc            # package: centos,fedora=python3-rpyc

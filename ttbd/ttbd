@@ -25,9 +25,15 @@ FIXME: write up in progress
 # https://blog.al4.co.nz/2016/01/streaming-json-with-flask/
 
 import base64
+import collections
 import contextlib
 import io
+import math
 import pickle
+import pytz
+import socket
+import traceback
+
 import datetime
 import errno
 import fnmatch
@@ -52,7 +58,6 @@ try:
 except ImportError as e:
     import flask.ext.login as flask_login
     import flask.ext.principal as flask_principal
-import traceback
 import argparse
 import re
 import pprint
@@ -80,6 +85,7 @@ except ImportError as e:
             pass
     sd_notify = fake_SystemdNotifier()
     systemd_available = False
+
 
 # I bet there is a better way to do this...but we need the symbol to
 # be in the logging module so that it is not included in the "function
@@ -194,6 +200,237 @@ def current_user_is_admin():
     if user:
         return user.is_admin()
     return False
+
+
+class audit:
+    """
+    Record audit messages
+
+    These emit messages to one or more auditing mechanisms with a well
+    defined format (key/value based) for each.
+
+    It is used to easily record entry/exit points (with a context
+    manager), eg:
+
+    >>> with audit("some/action", calling_user = "john") as ar:
+    >>    #do some parsing
+    >>>   ar.kws['somevalue'] = somevar
+
+    would log::
+
+      some/action:ENTER calling_user=john somevalue=somevar
+      some/action:EXIT:SUCCESS calling_user=john somevalue=somevar
+
+    plus timestamps in UTC; if there was an exception it'd be
+    EXIT:EXCEPTION and the exception's type and repr.
+
+    Just calling:
+
+    >>> audit("some/action", calling_user = "john")
+
+    emits a record such as::
+
+      some/action:ENTER calling_user=john somevalue=somevar
+
+    (plust timestamp)
+
+    :param str message: main message to display; recommended short
+    :param str,ttbl.user_control.User calling_user: (optional) user
+      who is making the request
+    :param str,ttbl.test_target target: (optional) target on which the
+      request is being made
+    :param flask.request request: (optional) flask request object
+
+    :param **kws: any other key/value (recommended JSON encodeable)
+
+    """
+    def __init__(self, message,
+                 calling_user = None, target = None, request = None,
+                 **kws):
+        self.message = message
+        if isinstance(calling_user, ttbl.user_control.User):
+            self.calling_user = calling_user.get_id()
+        elif isinstance(calling_user, str):
+            self.calling_user = calling_user
+        elif calling_user != None:
+            raise TypeError(f"calling_user: expected None, str or"
+                            f" ttbl.user_control.User; got {type(user)}")
+        if target:
+            assert isinstance(target, ttbl.test_target), \
+                f"target: expected None or ttbl.test_target; got {type(target)}"
+        self.target = target
+        self.kws = kws
+        self.request = request
+
+    _auditors = {}
+    # note this will be per-process
+    _auditors_exceptions = collections.defaultdict()
+
+    @classmethod
+    def auditor_add(cls, auditor):
+        """
+        Add an auditor driver
+
+        Must match
+        >>> def _audit_logging(message, calling_user, target, **kws):
+        >>>     ...
+
+        and format them appropiately to whichever storage is to be used.
+        """
+        assert callable(auditor), \
+            f"auditor: expected callable, got {type(auditor)}"
+        cls._auditors[auditor] = commonl.origin_get(1)
+
+    #: Messages to not display
+    #:
+    #: key is the prefix of the string; value is the reason why we skip it
+    censored_messages = {
+        "console/read": "very frequent call, returns lots of data",
+        "console/write": "very frequent call, can take in lots of data",
+    }
+
+    def __call__(self,*args, **kwargs):
+        return self.record(*args, **kwargs)
+
+    def record(self, message,
+               calling_user = None, target = None, request = None, **kws):
+
+        # get a weird KeyError exception when calling this? it migth
+        # be that kws contains keys like the names of the arguments
+        # (eg: calling_user), that breaks havoc
+
+        for message_header in self.censored_messages:
+            if message.startswith(message_header):
+                return
+
+        if calling_user != None:
+            if isinstance(calling_user, str):
+                pass
+            elif isinstance(calling_user, ttbl.user_control.User):
+                user = user.get_id()
+            else:
+                raise TypeError(f"calling_user: expected None, str or"
+                                f" ttbl.user_control.User; got {type(user)}")
+        else:
+            calling_user = self.calling_user
+
+        if target:
+            assert isinstance(target, ttbl.test_target), \
+                f"target: expected None or ttbl.test_target; got {type(target)}"
+            target_id = target.id
+        elif self.target:
+            target_id = self.target.id
+        else:
+            target_id = None
+
+        if request:
+
+            @commonl.lru_cache_disk(
+                os.path.realpath(
+                    os.path.join(
+                        # FIXME: ugh, we need a global for daemon
+                        # cache path, then this can be moved up
+                        # outside of here
+                        ttbl.test_target.state_path,
+                        "..", "cache", "socket_gethostbyaddr"
+                    )
+                ),
+                10 * 60,	# age these cached entries after 5min
+                512)
+            def _socket_gethostbyaddr_cached(*args, **kwargs):
+                return socket.gethostbyaddr(*args, **kwargs)
+
+            # try to resolve the name this came from -- why? because
+            # in a dynamic environment, IP addresses will change and
+            # the current name might tell us info on who did what vs
+            # just a dynamic IP who will be reassigned
+            try:
+                remote_name, _, _ = _socket_gethostbyaddr_cached(request.remote_addr)
+                remote_name += ":" + request.remote_addr
+            except socket.herror:
+                remote_name = request.remote_addr
+            kws['remote_addr'] = remote_name
+            # FIXME: how do we get the port?
+
+        # if we are reportin results, censor out things that are kinda
+        # useless and makes no sense to report and would add a lot of
+        # stuff we don't need
+        if 'result' in self.kws:
+            # reporting results, chop out some fields
+            if '_diagnostics' in self.kws:
+                self.kws['result'] = dict(self.kws['result'])
+                del self.kws['result']['_diagnostics']
+
+        for auditor, origin in self._auditors.items():
+            try:
+                auditor(message, calling_user = calling_user,
+                        target = target_id, **kws)
+            except Exception as e:
+                # ugly hack: don't print the whole trace all the time?
+                if self._auditors_exceptions[auditor] < 2:
+                    logging.exception(
+                        f"AUDIT: BUG! driver {auditor}@{origin} raised: {e}")
+                    self._auditors_exceptions[auditor] += 1
+                else:
+                    logging.error(
+                        f"AUDIT: BUG! driver {auditor}@{origin} raised: {e}")
+
+
+    def __enter__(self):
+        self.ts0 = time.time()
+        self.ts0_dt = datetime.datetime.fromtimestamp(
+            self.ts0, pytz.timezone("UTC")).strftime('%y-%m-%d %H:%M:%S')
+        self.record(self.message + ":ENTER",
+                    calling_user = self.calling_user, target = self.target,
+                    ts_start = self.ts0_dt,
+                    request = self.request,
+                    **self.kws)
+        return self
+
+
+    def __exit__(self, ex_type, ex_value, tb):
+        ts = time.time()
+        ts_dt = datetime.datetime.fromtimestamp(
+            self.ts0, pytz.timezone("UTC")).strftime('%y-%m-%d %H:%M:%S')
+        delta = math.trunc((ts - self.ts0) * 1000) / 1000
+        if ex_type:
+            self.record(
+                self.message + ":EXIT:EXCEPTION",
+                calling_user = self.calling_user, target = self.target,
+                ts_start = self.ts0_dt, ts_end = ts_dt, delta = delta,
+                request = self.request,
+                exception_type = ex_type.__name__,
+                exception = str(ex_value),
+                **self.kws)
+        else:
+            self.record(
+                self.message + ":EXIT:COMPLETED",
+                calling_user = self.calling_user, target = self.target,
+                ts_start = self.ts0_dt, ts_end = ts_dt, delta = delta,
+                request = self.request,
+                **self.kws)
+
+
+#
+# Audit driver with the logging library
+#
+log_audit = logging.getLogger("audit")
+
+def _audit_logging(message, calling_user, target, **kws):
+    # in theory the logging library lets us journal data in the extra
+    # field, but then default driver doesn't print it ... so we just
+    # print a json record -- note this might get long
+    args = dict(message = message)
+    if calling_user:
+        args['calling_user'] = calling_user
+    if target:
+        args['target'] = target
+    if kws:
+        args.update(kws)
+    log_audit.error("AUDIT " + json.dumps(args))
+audit.auditor_add(_audit_logging)
+
+
 
 @app.route(API_PATH + "<int:version>/<path:any_route>",
            methods = [ 'GET', 'POST', 'PUT', 'PATCH', 'DELETE' ])
