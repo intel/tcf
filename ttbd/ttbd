@@ -447,8 +447,8 @@ def _bad_version(version, any_route):
                        "wrong path or method; please %s"
                        % (version, any_route, API_VERSION, action))
 
-@app.route(API_PREFIX + 'login', methods = ['PUT'])
-def login():
+
+def _login(audit_record):
     """
     Given a User ID token and a password, go over all the
     authentication mechanisms that we have defined and see who can
@@ -470,6 +470,7 @@ def login():
         flask.request.form, 'password', str, True, None)
     user = flask_login.current_user
     user_id = user.get_id()
+    audit_record.kws['user'] = user_id
 
     if user == ttbl.who_daemon():
         flask.abort(404, "user %s: not allowed (reserved)" % username)
@@ -572,19 +573,31 @@ def login():
         % (username, " ".join(token_roles))
     })
 
+
+@app.route(API_PREFIX + 'login', methods = ['PUT'])
+def login():
+    with audit("login",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request) as audit_record:
+        _login(audit_record)
+
+
 @app.route(API_PREFIX + 'logout', methods = [ 'PUT' ])
 @flask_login.login_required
 def logout():
-    # FIXME: _user_delete() has to do the same as this, doing the
-    # logout_user() and the popping of IDs
-    flask_login.current_user.wipe()
-    flask_login.logout_user()
-    for key in ('identity.name', 'identity.auth_type'):
-        flask.session.pop(key, None)
-        flask_principal.identity_changed.send(
-            flask.current_app._get_current_object(),
-            identity = flask_principal.AnonymousIdentity())
-    return flask.jsonify({'_message': "Session closed"})
+    with audit("logout",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request) as audit_record:
+        # FIXME: _user_delete() has to do the same as this, doing the
+        # logout_user() and the popping of IDs
+        flask_login.current_user.wipe()
+        flask_login.logout_user()
+        for key in ('identity.name', 'identity.auth_type'):
+            flask.session.pop(key, None)
+            flask_principal.identity_changed.send(
+                flask.current_app._get_current_object(),
+                identity = flask_principal.AnonymousIdentity())
+        return flask.jsonify({'_message': "Session closed"})
 
 
 @app.route(API_PREFIX + "validate_session", methods = ['GET'])
@@ -597,6 +610,7 @@ def validate_session():
 @app.route(API_PREFIX + 'users/<userid>', methods = [ 'GET' ])
 @flask_login.login_required
 def _users(userid = None):
+    # no need to audit: doesn't have side effects
     r = dict()
     calling_user = flask_login.current_user._get_current_object()
     if userid == "self":
@@ -634,71 +648,83 @@ def _users(userid = None):
                 
     return flask.jsonify(r)
 
+
 @app.route(API_PREFIX + 'users/', methods = [ 'DELETE' ])
 @app.route(API_PREFIX + 'users/<userid>', methods = [ 'DELETE' ])
 @flask_login.login_required
 def _user_delete(userid = None):
-    if userid == None:	# remove current user
-        user = flask_login.current_user._get_current_object()
-    elif userid == flask_login.current_user.get_id():
-        # if specified and it is the current user, proceed
-        user = flask_login.current_user._get_current_object()
-    elif flask_login.current_user.is_admin():
-        # if it is admin, can remove any existing user ID
-        try:
-            user = ttbl.user_control.User(userid, fail_if_new = True)
-        except ttbl.user_control.User.user_not_existant_e as e:
+    with audit("user/delete",
+               calling_user = flask_login.current_user._get_current_object(),
+               userid = userid,
+               request = flask.request) as audit_record:
+        if userid == None:	# remove current user
+            user = flask_login.current_user._get_current_object()
+        elif userid == flask_login.current_user.get_id():
+            # if specified and it is the current user, proceed
+            user = flask_login.current_user._get_current_object()
+        elif flask_login.current_user.is_admin():
+            # if it is admin, can remove any existing user ID
+            try:
+                user = ttbl.user_control.User(userid, fail_if_new = True)
+            except ttbl.user_control.User.user_not_existant_e as e:
+                flask_logi_abort(
+                    403, "user '%s' does not exist: %s" % (userid, e))
+        else:
             flask_logi_abort(
-                403, "user '%s' does not exist: %s" % (userid, e))
-    else:
-        flask_logi_abort(
-            403, "not enough privilege to remove user %s" % userid)
-    # FIXME: this has to do the same as logout()
-    user.wipe()
-    return flask.jsonify({'_message': "session closed"})
+                403, "not enough privilege to remove user %s" % userid)
+        # FIXME: this has to do the same as logout()
+        user.wipe()
+        return flask.jsonify({'_message': "session closed"})
+
 
 @app.route(
     API_PREFIX + 'users/<userid>/<any("drop","gain"):action>/<string:role>',
     methods = [ 'PUT' ])
 @flask_login.login_required
 def _user_role(userid, action, role):
-    if userid == "self":
-        # if specified and it is the current user, proceed
-        user = flask_login.current_user._get_current_object()
-        userid = user.userid
-    elif userid == flask_login.current_user.get_id():
-        # if specified and it is the current user, proceed
-        user = flask_login.current_user._get_current_object()
-    elif flask_login.current_user.is_admin():
-        # if it is admin, can toggle roles for any existing user ID
-        try:
-            user = ttbl.user_control.User(userid, fail_if_new = True)
-        except ttbl.user_control.User.user_not_existant_e as e:
+    with audit("user_role",
+               calling_user = flask_login.current_user._get_current_object(),
+               action = action, userid = userid,
+               request = flask.request) as audit_record:
+        if userid == "self":
+            # if specified and it is the current user, proceed
+            user = flask_login.current_user._get_current_object()
+            userid = user.userid
+        elif userid == flask_login.current_user.get_id():
+            # if specified and it is the current user, proceed
+            user = flask_login.current_user._get_current_object()
+        elif flask_login.current_user.is_admin():
+            # if it is admin, can toggle roles for any existing user ID
+            try:
+                user = ttbl.user_control.User(userid, fail_if_new = True)
+            except ttbl.user_control.User.user_not_existant_e as e:
+                flask_logi_abort(
+                    403, "user '%s' does not exist: %s" % (userid, e))
+        else:
             flask_logi_abort(
-                403, "user '%s' does not exist: %s" % (userid, e))
-    else:
-        flask_logi_abort(
-            403, "not enough privilege to change roles for user %s" % userid)
-    if action == "drop":
-        if not user.role_present(role):
-            flask_logi_abort(
-                403, "user '%s' has no access to role %s" % (userid, role))
-        user.role_drop(role)
-        r = { "_message": "user '%s' dropped role '%s'" % (userid, role) }
-    elif action == "gain":
-        if not user.role_present(role):
-            flask_logi_abort(
-                403, "user '%s' has no access to role %s" % (userid, role))
-        user.role_gain(role)
-        r = { "_message": "user '%s' gained role '%s'" % (userid, role) }
-    else:
-        r = { "_message": "user '%s' role '%s' invalid action %s"
-                        % (userid, role, action) }
-    return flask.jsonify(r)
+                403, "not enough privilege to change roles for user %s" % userid)
+        if action == "drop":
+            if not user.role_present(role):
+                flask_logi_abort(
+                    403, "user '%s' has no access to role %s" % (userid, role))
+            user.role_drop(role)
+            r = { "_message": "user '%s' dropped role '%s'" % (userid, role) }
+        elif action == "gain":
+            if not user.role_present(role):
+                flask_logi_abort(
+                    403, "user '%s' has no access to role %s" % (userid, role))
+            user.role_gain(role)
+            r = { "_message": "user '%s' gained role '%s'" % (userid, role) }
+        else:
+            r = { "_message": "user '%s' role '%s' invalid action %s"
+                            % (userid, role, action) }
+        return flask.jsonify(r)
+
 
 @app.route(API_PREFIX + 'targets/', methods = ['GET'])
 @flask_login.login_required
 def _targets_gets():
+    # no audit: no side effects and very frequent
     args = flask.request.get_json()	# passed as JSON body?
     if args == None:
         args = flask.request.form	# as form?
@@ -725,9 +751,11 @@ def _targets_gets():
     else:
         return flask.jsonify(result)
 
+
 @app.route(API_PREFIX + 'targets/<string:target_id>', methods = ['GET'])
 @flask_login.login_required
 def _target_get(target_id):
+    # no audit: no side effects and very frequent
     args = flask.request.get_json()	# passed as JSON body?
     if args == None:
         args = flask.request.form	# as form?
@@ -748,8 +776,10 @@ def _target_get(target_id):
     else:
         return flask.jsonify(d)
 
+
 @app.route('/ttb', methods = ['GET'])
 def _ttb_get():
+    # no audit: no side effects and very frequent
     d = {
         'protocol.major': API_VERSION,
         'protocol.minor': 0, # TODO currently no value in source
@@ -808,47 +838,54 @@ def _target_property_set(target, prop, value, user_is_admin, ticket):
            methods = [ 'PATCH', 'PUT' ])
 @flask_login.login_required
 def _target_patch(target_id):
-    calling_user = flask_login.current_user._get_current_object()
-    target = ttbl.test_target.get_for_user(target_id, calling_user)
-    if target == None:
-        flask.abort(404, "%s: unknown target" % target_id)
-    ticket = ttbl.tt_interface.arg_get(
-        flask.request.form, 'ticket', str, True, "")
-    user_is_admin = current_user_is_admin()
-    try:
-        # check policy setting first
-        _target_property_set_policy_check(
-            target, list(flask.request.form.keys()), user_is_admin)
-        data = flask.request.get_json()
-        if data:
-            if 'ticket' in data:
-                if not ticket:
-                    ticket = data.pop('ticket', "")
-                else:
-                    data.pop('ticket')
-            data_flat = commonl.dict_to_flat(data)
+    with audit("target/patch",
+               calling_user = flask_login.current_user._get_current_object(),
+               target = target_id,
+               request = flask.request) as audit_record:
+        calling_user = flask_login.current_user._get_current_object()
+        target = ttbl.test_target.get_for_user(target_id, calling_user)
+        if target == None:
+            flask.abort(404, "%s: unknown target" % target_id)
+        ticket = ttbl.tt_interface.arg_get(
+            flask.request.form, 'ticket', str, True, "")
+        user_is_admin = current_user_is_admin()
+        try:
+            # check policy setting first
             _target_property_set_policy_check(
-                target, [ x[0] for x in data_flat ],
-                user_is_admin)
+                target, list(flask.request.form.keys()), user_is_admin)
+            data = flask.request.get_json()
+            if data:
+                if 'ticket' in data:
+                    if not ticket:
+                        ticket = data.pop('ticket', "")
+                    else:
+                        data.pop('ticket')
+                data_flat = commonl.dict_to_flat(data)
+                # Set parameter via form parameters -- just the keys, it can be long
+                audit_record.kws['data_flat_keys'] = [ i for i in data_flat.keys() ]
+                _target_property_set_policy_check(
+                    target, [ x[0] for x in data_flat ],
+                    user_is_admin)
 
-        # Set parameter via form parameters
-        for prop in list(flask.request.form.keys()):
-            # we pop 'ticket' because we don't want to allow it as a
-            # parameter, since we use it as a descriptor until we move away
-            # from it
-            if prop == 'ticket':
-                continue
-            value = ttbl.tt_interface.arg_get(flask.request.form, prop, None)
-            _target_property_set(target, prop, value, user_is_admin, ticket)
+            # Set parameter via form parameters -- just the keys, it can be long
+            audit_record.kws['form_keys'] = [ i for i in flask.request.form.keys() ]
+            for prop in list(flask.request.form.keys()):
+                # we pop 'ticket' because we don't want to allow it as a
+                # parameter, since we use it as a descriptor until we move away
+                # from it
+                if prop == 'ticket':
+                    continue
+                value = ttbl.tt_interface.arg_get(flask.request.form, prop, None)
+                _target_property_set(target, prop, value, user_is_admin, ticket)
 
-        if data:			# Set parameter via JSON data body
-            for prop, val in data_flat:	# convert to our interal flat key space
-                _target_property_set(target, prop, val, user_is_admin, ticket)
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify({ })
+            if data:			# Set parameter via JSON data body
+                for prop, val in data_flat:	# convert to our interal flat key space
+                    _target_property_set(target, prop, val, user_is_admin, ticket)
+        except ttbl.test_target_e as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        except Exception as e:
+            flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
+        return flask.jsonify({ })
 
 
 @app.route(API_PREFIX + 'targets/<string:target_id>/active', methods = ['PUT'])
@@ -857,6 +894,7 @@ def _target_active(target_id):
     """
     If this target is owned by the caller, mark it as active
     """
+    # no audit: very frequent and only side effect is keeping the target active
     calling_user = flask_login.current_user._get_current_object()
     target = ttbl.test_target.get_for_user(target_id, calling_user)
     if target == None:
@@ -877,26 +915,30 @@ def _target_active(target_id):
 @app.route(API_PREFIX + 'targets/<string:target_id>/release', methods = ['PUT'])
 @flask_login.login_required
 def _target_release(target_id):
-    calling_user = flask_login.current_user._get_current_object()
-    target = ttbl.test_target.get_for_user(target_id, calling_user)
-    if target == None:
-        flask.abort(404, "%s: unknown target" % target_id)
-    force = ttbl.tt_interface.arg_get(
-        flask.request.form, 'force', bool, True, False)
-    ticket = ttbl.tt_interface.arg_get(
-        flask.request.form, 'ticket', str, True, "")
-    try:
-        who = who_make(ticket)
-        if force and not current_user_is_admin():
-            # FIXME: this won't be needed later on
-            raise ttbl.test_target_not_admin_e(target)
-        target.release(flask_login.current_user._get_current_object(), force,
-                       ticket = ticket)
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    return flask.jsonify(dict())
+    with audit("target/release",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request,
+               allocid = allocid) as ao:
+        calling_user = flask_login.current_user._get_current_object()
+        target = ttbl.test_target.get_for_user(target_id, calling_user)
+        if target == None:
+            flask.abort(404, "%s: unknown target" % target_id)
+        force = ttbl.tt_interface.arg_get(
+            flask.request.form, 'force', bool, True, False)
+        ticket = ttbl.tt_interface.arg_get(
+            flask.request.form, 'ticket', str, True, "")
+        try:
+            who = who_make(ticket)
+            if force and not current_user_is_admin():
+                # FIXME: this won't be needed later on
+                raise ttbl.test_target_not_admin_e(target)
+            target.release(flask_login.current_user._get_current_object(), force,
+                           ticket = ticket)
+        except ttbl.test_target_e as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        except Exception as e:
+            flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
+        return flask.jsonify(dict())
 
 
 @app.route(API_PREFIX + 'allocation', methods = [ 'PUT' ])
@@ -924,76 +966,105 @@ def _put_allocation():
     #      "targets TARGETNAMEs are busy",	# when not queued
     #    }
     # }
-    try:
-        data = flask.request.get_json()
-        if data == None:
-            # get from form encoding
-            data = dict()
-            for key in flask.request.form.keys():
-                data[key] = ttbl.tt_interface.arg_get(flask.request.form,
-                                                      key, None)
-        assert isinstance(data, dict), \
-            "need a dictionary of data parameters to make a request;" \
-            " got %s (%s)" % (data, type(data))
-        obo_user = data.get('obo', None)
-        if obo_user == None:
-            obo_user = flask_login.current_user
-        else:
-            raise NotImplementedError("no way to specify OBO user yet")
 
-        result = ttbl.allocation.request(
-            data['groups'],
-            calling_user = flask_login.current_user._get_current_object(),
-            obo_user = data.get(
-                'obo_user',
-                flask_login.current_user._get_current_object().get_id()),
-            guests = data.get('guests', list()),
-            priority = data.get('priority', None),
-            preempt = data.get('preempt', False),
-            queue = data.get('queue', False),
-            reason = data.get('reason', None),
-        )
-    except Exception as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    return flask.jsonify(result)
+    data = flask.request.get_json()
+    if data == None:
+        # get from form encoding
+        data = dict()
+        for key in flask.request.form.keys():
+            data[key] = ttbl.tt_interface.arg_get(flask.request.form,
+                                                          key, None)
+    assert isinstance(data, dict), \
+        "need a dictionary of data parameters to make a request;" \
+        " got %s (%s)" % (data, type(data))
+
+    obo_user = data.get('obo', None)
+    if obo_user == None:
+        obo_user = flask_login.current_user.get_id()
+    guests = data.get('guests', list())
+    priority = data.get('priority', None)
+    preempt = data.get('preempt', False)
+    queue = data.get('queue', False)
+    reason = data.get('reason', None)
+
+    with audit(
+            "allocation/create",
+            calling_user = flask_login.current_user.get_id(),
+            obo_user = obo_user,
+            guests = guests,
+            priority = priority,
+            preempt = preempt,
+            queue = queue,
+            reason = reason,
+            groups = data['groups'],
+            request = flask.request) as ao:
+        try:
+
+            result = ttbl.allocation.request(
+                data['groups'],
+                calling_user = flask_login.current_user._get_current_object(),
+                obo_user = obo_user,
+                guests = guests,
+                priority = priority,
+                preempt = preempt,
+                queue = queue,
+                reason = reason,
+            )
+            ao.kws['allocid'] = result['allocid']
+            ao.kws['result'] = result
+        except Exception as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        return flask.jsonify(result)
 
 
 @app.route(API_PREFIX + 'allocation/<string:allocid>',
            methods = [ 'GET' ])
 @flask_login.login_required
 def _get_allocation(allocid):
-    try:
-        result = ttbl.allocation.get(
-            allocid,
-            flask_login.current_user._get_current_object())
-        #logging.error("DEBUG get %s" % pprint.pformat(result))
-    except Exception as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    return flask.jsonify(result)
+    with audit("allocation/get",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request,
+               allocid = allocid) as ao:
+        try:
+            result = ttbl.allocation.get(
+                allocid,
+                flask_login.current_user._get_current_object())
+            # don't add ao.kws['result'] = result, no need
+        except Exception as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        return flask.jsonify(result)
+
 
 @app.route(API_PREFIX + 'allocation/',
            methods = [ 'GET' ])
 @flask_login.login_required
 def _query_allocation():
-    try:
-        result = ttbl.allocation.query(
-            flask_login.current_user._get_current_object())
-    except Exception as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    return flask.jsonify(result)
+    with audit("allocation/query",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request) as ao:
+        try:
+            result = ttbl.allocation.query(
+                flask_login.current_user._get_current_object())
+        except Exception as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        return flask.jsonify(result)
 
 
 @app.route(API_PREFIX + 'allocation/<string:allocid>',
            methods = [ 'DELETE' ])
 @flask_login.login_required	# release the allocation
 def _delete_allocation(allocid):
-    try:
-        result = ttbl.allocation.delete(
-            allocid,
-            flask_login.current_user._get_current_object())
-    except Exception as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    return flask.jsonify(result)
+    with audit("allocation/delete",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request,
+               allocid = allocid) as ao:
+        try:
+            result = ttbl.allocation.delete(
+                allocid,
+                flask_login.current_user._get_current_object())
+        except Exception as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        return flask.jsonify(result)
 
 
 # v2 changed the return format to be a dictionary per allocid (which
@@ -1025,68 +1096,81 @@ def _put_keepalive(version = 1):
     #     ....
     # }
     #
-    try:
-        data = flask.request.get_json()
-        if data == None:
-            # get from from encoding
-            data = dict()
-            for key in flask.request.form.keys():
-                #logging.error("DEBUG args key %s value %s", key, value)
-                data[key] = ttbl.tt_interface.arg_get(flask.request.form,
-                                                      key, None)
-        assert isinstance(data, dict), \
-            "need a dictionary of data parameters to make a request;" \
-            " got %s (%s)" % (data, type(data))
-        if 'pressure' in data:
-            pressure = json.loads(data.pop('pressure'))
-            assert isinstance(pressure, numbers.Integral), \
-                "pressure needs to be an number" # FIXME: range?
-        else:
-            pressure = 0
-        result = dict()
-        # FIXME: parallelize
-        for allocid, expected_state in data.items():
-            r = ttbl.allocation.keepalive(
-                allocid, expected_state, pressure,
-                flask_login.current_user._get_current_object())
-            if r['state'] == expected_state:
-                continue		# nothing to return
-            if version == 2:
-                # for v2 we return data in a dictionary, so we
-                # can expand it more easily. We also add the group
-                # that was allocated
-                result[allocid] = dict(
-                    state = r['state'],
-                    group_allocated_name = r['group_allocated']
-                )
+    with audit("allocation/keepalive",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request) as ao:
+        try:
+            data = flask.request.get_json()
+            if data == None:
+                # get from from encoding
+                data = dict()
+                for key in flask.request.form.keys():
+                    #logging.error("DEBUG args key %s value %s", key, value)
+                    data[key] = ttbl.tt_interface.arg_get(flask.request.form,
+                                                          key, None)
+            assert isinstance(data, dict), \
+                "need a dictionary of data parameters to make a request;" \
+                " got %s (%s)" % (data, type(data))
+            if 'pressure' in data:
+                pressure = json.loads(data.pop('pressure'))
+                assert isinstance(pressure, numbers.Integral), \
+                    "pressure needs to be an number" # FIXME: range?
             else:
-                result[allocid] = r['state']
-    except Exception as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    return flask.jsonify(dict(result))
+                pressure = 0
+            result = dict()
+            # FIXME: parallelize
+            ao.kws['args'] = data
+            for allocid, expected_state in data.items():
+                r = ttbl.allocation.keepalive(
+                    allocid, expected_state, pressure,
+                    flask_login.current_user._get_current_object())
+                if r['state'] == expected_state:
+                    continue		# nothing to return
+                if version == 2:
+                    # for v2 we return data in a dictionary, so we
+                    # can expand it more easily. We also add the group
+                    # that was allocated
+                    result[allocid] = dict(
+                        state = r['state'],
+                        group_allocated_name = r['group_allocated']
+                    )
+                else:
+                    result[allocid] = r['state']
+            ao.kws['result'] = result
+        except Exception as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        return flask.jsonify(dict(result))
 
 
 @app.route(API_PREFIX + 'allocation/<string:allocid>/<string:guestname>',
            methods = [ 'PATCH' ])
 @flask_login.login_required
 def _patch_guest(allocid, guestname):
-    try:
-        user = flask_login.current_user._get_current_object()
-        result = ttbl.allocation.guest_add(allocid, user, guestname)
-    except Exception as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    return flask.jsonify(result)
+    with audit("guest/patch",
+               calling_user = flask_login.current_user._get_current_object(),
+               allocid = allocid, guestname = guestname,
+               request = flask.request) as ao:
+        try:
+            user = flask_login.current_user._get_current_object()
+            result = ttbl.allocation.guest_add(allocid, user, guestname)
+        except Exception as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        return flask.jsonify(result)
 
 @app.route(API_PREFIX + 'allocation/<string:allocid>/<string:guestname>',
            methods = [ 'DELETE' ])
 @flask_login.login_required
 def _delete_guest(allocid, guestname):
-    try:
-        user = flask_login.current_user._get_current_object()
-        result = ttbl.allocation.guest_remove(allocid, user, guestname)
-    except Exception as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    return flask.jsonify(result)
+    with audit("guest/delete",
+               calling_user = flask_login.current_user._get_current_object(),
+               allocid = allocid, guestname = guestname,
+               request = flask.request) as ao:
+        try:
+            user = flask_login.current_user._get_current_object()
+            result = ttbl.allocation.guest_remove(allocid, user, guestname)
+        except Exception as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
+        return flask.jsonify(result)
 
 
 
@@ -1115,87 +1199,94 @@ def _target_interface(target_id, interface, call):
     ticket = ttbl.tt_interface.arg_get(
         flask.request.form, 'ticket', str, True, "")
     iostr = io.StringIO()
-    try:
-        if not interface in target.tags['interfaces']:
-            flask_logi_abort(400, "%s: unavailable interface" % interface)
-        iface = getattr(target, interface, None)
-        if iface == None:
-            flask_logi_abort(400, "%s: interface broken" % interface)
-        assert isinstance(iface, ttbl.tt_interface)
-        username = flask_login.current_user.get_id()
-        user_path = os.path.join(ttbl.test_target.files_path, username)
-        # make sure the directory exists
-        commonl.makedirs_p(user_path)
-        with log_to_str_too(target.log, iostr):
-            method_name = flask.request.method.lower() + "_" + call
-            method = getattr(iface, method_name, None)
-            component = flask.request.form.get('component', None)
-            if method:
-                result = method(
-                    target, who_make(ticket),
-                    # https://flask.palletsprojects.com/en/1.1.x/patterns/fileuploads/
-                    flask.request.form, flask.request.files,
-                    user_path)
-                iface.assert_return_type(
-                    result, dict, target,
-                    ttbl.tt_interface.arg_get(
-                        flask.request.form, 'component', str, True, None),
-                    method_name, none_ok = False)
-            else:
-                result = iface.request_process(
-                    target, who_make(ticket),
-                    flask.request.method,
-                    call,
-                    # https://flask.palletsprojects.com/en/1.1.x/patterns/fileuploads/
-                    flask.request.form, flask.request.files,
-                    user_path)
-        assert isinstance(result, dict), \
-            "BUG: %s: request_process() did not return a dictionary" \
-            " but a %s" \
-            % (interface, type(result).__name__)
-        if '_diagnostics' in result:
-            target.log.error("BUG: %s: request_process() added a "
-                             "'_diagnostics' field that will be overriden"
-                             % interface)
-
-        if calling_user.is_admin():
-            # only admins get diagnostics, since this might include
-            # stuff we don't want you to know because of internals of
-            # the server.
-            # FIXME: maybe add a 'diagnostics' role?
-            result['_diagnostics'] = iostr.getvalue()
-    except ttbl.test_target_e as e:
-        flask_logi_abort(400, "%s" % e, exc_info = True)
-    except Exception as e:
-        flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
-    if 'stream_file' in result:
-        filepath = result['stream_file']
-        generation = result.get('stream_generation', 0)
-        offset = result.get('stream_offset', 0)
+    with audit(f"{interface}/{call}",
+               calling_user = calling_user,
+               target = target,
+               request = flask.request) as audit_record:
         try:
-            fd = open(filepath, 'rb')	# flask.Response closes it
-            s = os.fstat(fd.fileno())
-            if offset >= s.st_size:	# cap offset to max size so when...
-                offset = s.st_size	# ...we report it it goes right
-            if offset >= 0:
-                fd.seek(offset)
-            else:
-                fd.seek(offset, os.SEEK_END)
-            response = flask.Response(fd, direct_passthrough = True)
-            # attach a header indicating the offset; this allows the
-            # client to calculate how big the stream is at precisely
-            # the time the last byte was sent, by adding the
-            # Content-Length. This is used for example, by the console
-            # code, to know the offset at which to read the next time.
-            # stream-size = X-stream-offset + Content-length
-            response.headers['X-stream-gen-offset'] = \
-                str(generation) + " " + str(offset)
-            return response
+            if not interface in target.tags['interfaces']:
+                flask_logi_abort(400, "%s: unavailable interface" % interface)
+            iface = getattr(target, interface, None)
+            if iface == None:
+                flask_logi_abort(400, "%s: interface broken" % interface)
+            assert isinstance(iface, ttbl.tt_interface)
+            username = flask_login.current_user.get_id()
+            user_path = os.path.join(ttbl.test_target.files_path, username)
+            # make sure the directory exists
+            commonl.makedirs_p(user_path)
+            with log_to_str_too(target.log, iostr):
+                method_name = flask.request.method.lower() + "_" + call
+                method = getattr(iface, method_name, None)
+                component = flask.request.form.get('component', None)
+                audit_record.kws.update(flask.request.form)
+                audit_record.kws['files'] = [ i for i in flask.request.files.keys() ]
+                if method:
+                    result = method(
+                        target, who_make(ticket),
+                        # https://flask.palletsprojects.com/en/1.1.x/patterns/fileuploads/
+                        flask.request.form, flask.request.files,
+                        user_path)
+                    iface.assert_return_type(
+                        result, dict, target,
+                        ttbl.tt_interface.arg_get(
+                            flask.request.form, 'component', str, True, None),
+                        method_name, none_ok = False)
+                else:
+                    result = iface.request_process(
+                        target, who_make(ticket),
+                        flask.request.method,
+                        call,
+                        # https://flask.palletsprojects.com/en/1.1.x/patterns/fileuploads/
+                        flask.request.form, flask.request.files,
+                        user_path)
+            assert isinstance(result, dict), \
+                "BUG: %s: request_process() did not return a dictionary" \
+                " but a %s" \
+                % (interface, type(result).__name__)
+            if '_diagnostics' in result:
+                target.log.error("BUG: %s: request_process() added a "
+                                 "'_diagnostics' field that will be overriden"
+                                 % interface)
+
+            if calling_user.is_admin():
+                # only admins get diagnostics, since this might include
+                # stuff we don't want you to know because of internals of
+                # the server.
+                # FIXME: maybe add a 'diagnostics' role?
+                result['_diagnostics'] = iostr.getvalue()
+        except ttbl.test_target_e as e:
+            flask_logi_abort(400, "%s" % e, exc_info = True)
         except Exception as e:
-            flask_logi_abort(400, "%s: can't stream file: %s" % (filepath, e),
-                             exc_info = True)
-    else:
-        return flask.jsonify(result)
+            flask_logi_abort(400, "%s: %s" % (target_id, e), exc_info = True)
+        if 'stream_file' in result:
+            filepath = result['stream_file']
+            generation = result.get('stream_generation', 0)
+            offset = result.get('stream_offset', 0)
+            try:
+                fd = open(filepath, 'rb')	# flask.Response closes it
+                s = os.fstat(fd.fileno())
+                if offset >= s.st_size:	# cap offset to max size so when...
+                    offset = s.st_size	# ...we report it it goes right
+                if offset >= 0:
+                    fd.seek(offset)
+                else:
+                    fd.seek(offset, os.SEEK_END)
+                response = flask.Response(fd, direct_passthrough = True)
+                # attach a header indicating the offset; this allows the
+                # client to calculate how big the stream is at precisely
+                # the time the last byte was sent, by adding the
+                # Content-Length. This is used for example, by the console
+                # code, to know the offset at which to read the next time.
+                # stream-size = X-stream-offset + Content-length
+                response.headers['X-stream-gen-offset'] = \
+                    str(generation) + " " + str(offset)
+                return response
+            except Exception as e:
+                flask_logi_abort(400, "%s: can't stream file: %s" % (filepath, e),
+                                 exc_info = True)
+        else:
+            audit_record.kws['result'] = result
+            return flask.jsonify(result)
 
 
 def cleanup_files():
