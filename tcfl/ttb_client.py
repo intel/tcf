@@ -148,8 +148,11 @@ class _rest_target_broker_mc(type):
         tp.close()
         tp.join()
         cls._rts_cache = {}
-        for thread in list(threads.values()):
-            cls._rts_cache.update(thread.get())
+        for rtb, thread in threads.items():
+            try:
+                cls._rts_cache.update(thread.get())
+            except RuntimeError as e:
+                logging.warning(f"{rtb}: skipping reading targets: {e}")
         return cls._rts_cache
 
 
