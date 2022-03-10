@@ -942,7 +942,7 @@ def _target_release(target_id):
     with audit("target/release",
                calling_user = flask_login.current_user._get_current_object(),
                request = flask.request,
-               allocid = allocid) as ao:
+               target_id = target_id) as ao:
         calling_user = flask_login.current_user._get_current_object()
         target = ttbl.test_target.get_for_user(target_id, calling_user)
         if target == None:
