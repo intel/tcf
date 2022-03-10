@@ -1170,9 +1170,12 @@ def process_alive(pidfile, path = None):
     else:
         return None
 
+
+log_pt = logging.getLogger("process_terminate")
+
 def process_terminate(pid, pidfile = None, tag = None,
                       use_signal = signal.SIGTERM,
-                      path = None, wait_to_kill = 0.25):
+                      path = None, wait_to_kill = 0.25, log = log_pt):
     """Terminate a process (TERM and KILL after 0.25s)
 
     :param pid: PID of the process to kill; this can be an
@@ -1196,6 +1199,8 @@ def process_terminate(pid, pidfile = None, tag = None,
     else:
         _tag = tag + ": "
     _pid, _pidfile = _pid_grok(pid)
+    log.error("%s: killing %s (%s/%s) with %s (path %s)",
+              tag, _pid, pid, pidfile, use_signal, path)
     if _pid == None:
         # Nothing to kill
         return
@@ -1203,17 +1208,25 @@ def process_terminate(pid, pidfile = None, tag = None,
         # Thing is running, let's see what it is
         try:
             _path = os.readlink("/proc/%d/exe" % _pid)
+            log.error("%s: killing %s: path resolved to %s",
+                      tag, _pid, _path)
         except OSError as e:
             # Usually this means it has died while we checked
+            log.error("%s: killing %s: reading PID's exe: exception %s",
+                      tag, _pid, e)
             return None
         if os.path.abspath(_path) != os.path.abspath(path):
+            log.error("%s: killing %s: got exception %s",
+                      tag, _pid, e)
             return None	            # Not our binary
     try:
         signal_name = str(use_signal)
         os.kill(_pid, use_signal)
+        log.error("%s: signal %s with %s", tag, _pid, signal_name)
         time.sleep(wait_to_kill)
         signal_name = "SIGKILL"
         os.kill(_pid, signal.SIGKILL)
+        log.error("%s: killed %s with %s", tag, _pid, signal_name)
     except OSError as e:
         if e.errno == errno.ESRCH:	# killed already
             return
@@ -1225,6 +1238,7 @@ def process_terminate(pid, pidfile = None, tag = None,
             rm_f(_pidfile)
         if pidfile:	# Extra pidfile to remove, kinda deprecated
             rm_f(pidfile)
+
 
 def process_started(pidfile, path,
                     tag = None, log = None,
