@@ -383,6 +383,8 @@ class jtagd_c(ttbl.power.daemon_c):
         ttbl.power.daemon_c.__init__(
             self, cmdline, precheck_wait = 0.5, mkpidfile = True,
             name = "jtagd", explicit = explicit,
+            # ...linux64/jtagd renames itself to jtagd and it makes it hard to kill
+            path = "jtagd",
             check_path = "/opt/quartus/qprogrammer/linux64/jtagd",
             **kwargs)
 
