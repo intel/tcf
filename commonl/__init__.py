@@ -1016,6 +1016,7 @@ def kill_procs_using_device(device: str, with_signal = signal.SIGTERM,
         pids.add(pid)
     return pids
 
+_pids_regex = re.compile("[0-9]+")
 
 def kill_by_cmdline(cmdline):
     """
@@ -1033,10 +1034,18 @@ def kill_by_cmdline(cmdline):
             #     exact command line and none should be there
             #     running the same line
             # --signal 9: kill hard
-            "pkill", "-fx", "--signal", "9", cmdline
+            "pkill", "-efx", "--signal", "9", cmdline
         ],
         shell = False, check = False, capture_output = True, text = True)
-    return [ int(i) for i in p.stdout.replace("\n", " ").split() ]
+    # parse the output, which looks like
+    #
+    ## processname1 killed (pid 30528)
+    ## processname2 killed (pid 30530)
+    ## ...
+    #
+    # just extracts the PIDs and return'em
+    l = re.findall(_pids_regex, p.stdout)
+    return [ int(i) for i in l ]
 
 
 def _pid_grok(pid):
