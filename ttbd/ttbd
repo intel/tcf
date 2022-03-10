@@ -1034,7 +1034,8 @@ def _put_allocation():
                 queue = queue,
                 reason = reason,
             )
-            ao.kws['allocid'] = result['allocid']
+            if 'allocid' in result:
+                ao.kws['allocid'] = result['allocid']
             ao.kws['result'] = result
         except Exception as e:
             flask_logi_abort(400, "%s" % e, exc_info = True)
