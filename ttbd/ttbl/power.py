@@ -1382,19 +1382,22 @@ class daemon_c(impl_c):
         stderrf = open(stderrf_name, "w+")
 
         if self.kill_before_on:
-            # some daemons will set a different process as name, so we
-            # can't use the commandline we got for checking
-            check_path = _cmdline[0]
-            if self.path:
-                check_path = self.path
-            if self.check_path and self.check_path != self.path:
-                check_path = self.check_path
-            cmdline_check = [ check_path ] + _cmdline[1:]
-            pids = commonl.kill_by_cmdline(" ".join(cmdline_check))
-            if pids:
-                target.log.error(
-                    f"BUG? {component}/on: killed PIDs '{' '.join(pids)}'"
-                    f" with the same command line: {_cmdline}")
+            def _go_for_the_kill(cmdline_check):
+                pids = commonl.kill_by_cmdline(" ".join(cmdline_check))
+                if pids:
+                    target.log.error(
+                        f"BUG? {component}/on: killed PIDs '{pids}'"
+                        f" with the same command line: {_cmdline}")
+            # some daemons will set a different process as name and
+            # some depending on the color of the moon, will use either
+            # depdending on what state of stuckness they are so...do both
+            _go_for_the_kill(_cmdline)
+            if self.path and self.path != _cmdline[0]:
+                _go_for_the_kill([ self.path ] + _cmdline[1:])
+            if self.check_path \
+               and self.check_path != self.path \
+               and self.check_path != _cmdline[0]:
+                _go_for_the_kill([ self.check_path ] + _cmdline[1:])
 
         try:
             p = subprocess.Popen(_cmdline, env = env, cwd = target.state_dir,
