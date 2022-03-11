@@ -11,7 +11,7 @@ imutils
 packaging           # package: python3-packaging
 ply                 # package: python3-ply
 pykwalify           # package: python3-pykwalify
-pyte	            # pacakge: python3-pyte
+pyte		    # package: python3-pyte
 pytz                # package: python3-pytz
 pyserial            # package: python3-pyserial ubuntu=python3-serial
 # This has to build, so in windows take one that is built, otherwise
