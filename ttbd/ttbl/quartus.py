@@ -15,11 +15,11 @@ import ttbl.images
 import ttbl.power
 
 class pgm_c(ttbl.images.flash_shell_cmd_c):
-    """
-    Flash using Intel's Quartus PGM tool
+    """Flash using Intel's Quartus PGM tool
 
     This allows to flash images to an Altera MAX10, using the Quartus
-    tools, freely downloadable from http://dl.altera.com.
+    tools, freely downloadable from
+    https://www.intel.com/content/www/us/en/collections/products/fpga/software/downloads.html?s=Newest
 
     Exports the following interfaces:
 
@@ -159,6 +159,61 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
       FIXME: move the --bgp and --mode=JTAG switches to the args (vs
       hardcoded) so a recovery target can be implemented as
       NAME-nobgp
+
+    *Using Quartus tool with a remote jtagd*
+
+    The service port for *jtagd* can be tunneled in and used by the
+    Quartus toolsuite::
+
+      $ tcf property-get r013s001 interfaces.power.jtagd.tcp_port
+      5337
+      $ tcf power-on -c jtagd TARGET
+      $ tcf tunnel-add TARGET 5337 tcp 127.0.01
+      SERVERNAME:1234
+
+    Now the Quartus Qprogrammer tools need to be told which server to
+    add::
+
+      $ jtagdconfig --addserver SERVERNAME:1234 ""
+
+    (second entry is an empty password); this adds an entry to
+    *~/.jtagd.conf*::
+
+      # /home/USERNAME/.jtag.conf
+      Remote1 {
+	    Host = "SERVERNAME:1234";
+	    Password = "";
+      }
+
+    Note the port number changes with each tunnel, you will have to
+    *jtagconfig --addserver* and delete the old one (you can edit the
+    file by hand too).
+
+    Now list remote targets::
+
+      $ jtagconfig
+      1) USB-BlasterII on SERVERNAME:1234 [3-1.4.1]
+        031050DD   10M50DA(.|ES)/10M50DC
+        031040DD   10M25D(A|C)
+
+    Note this connection is open to anyone until the tunnel is removed
+    or the allocation is released with *tcf alloc-rm* or
+    equivalent. *PENDING* use SSL to secure access.
+
+    [ see also for the Quartus GUI, follow
+    https://www.intel.com/content/www/us/en/programmable/quartushelp/13.0/mergedProjects/program/pgm/pgm_pro_add_server.htm ]
+
+
+    *Troubleshooting*
+
+    - can't connect to port::
+
+        $ ./jtagconfig
+        1) Remote server SERVERNAME:1234: Unable to connect
+
+      - ensure jtagd in the target is on
+
+      - ensure the tunnel is on
 
     """
 
@@ -317,7 +372,7 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
 class jtagd_c(ttbl.power.daemon_c):
     """Driver for the jtag daemon
 
-    This driver starts the jtag daemon on the server for a specific 
+    This driver starts the jtag daemon on the server for a specific
     USB Blaster II
 
     Does not override any of the default methods except for verify
@@ -326,7 +381,7 @@ class jtagd_c(ttbl.power.daemon_c):
 
     :param str usb_serial_number: serial number of the USB Blaster II
 
-    :param int tcp_port: (1024 - 65536) Number of the TCP port on 
+    :param int tcp_port: (1024 - 65536) Number of the TCP port on
       localhost where the daemon will listen
 
     :param str jtagd_path: (optional) orverride :data:`jtagd_path`;
@@ -406,6 +461,6 @@ class jtagd_c(ttbl.power.daemon_c):
         pidfile = os.path.join(target.state_dir, component + "-jtagd.pid")
         return commonl.process_alive(pidfile, self.check_path) \
             and commonl.tcp_port_busy(self.tcp_port)
-    
+
     def on(self, target, component):
         return ttbl.power.daemon_c.on(self, target, component)
