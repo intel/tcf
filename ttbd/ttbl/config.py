@@ -100,9 +100,8 @@ def _nested_list_flatten(l):
         else:
             yield e
 
-# implementation of the tunneling interface; since it contains no
+# implementation of common interfaces that contain no
 # state, only one instance is needed that all target can share
-_iface_tunnel = ttbl.tunnel.interface()
 _iface_store = ttbl.store.interface()
 _iface_certs = ttbl.certs.interface()
 
@@ -171,7 +170,7 @@ def target_add(target, _id = None, tags = None, target_type = None,
     # target has an IP or not...and it is very cheap.
     global _iface_tunnel
     if not hasattr(target, "tunnel"):
-        target.interface_add("tunnel", _iface_tunnel)
+        target.interface_add("tunnel", ttbl.tunnel.interface())
     if not hasattr(target, "store"):
         # dirty trick--some interfaces (eg: capture interfce needs the
         # store defined before adding it, so they might add it
