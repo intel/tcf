@@ -182,6 +182,20 @@ class User(object):
         """
         return self.fsdb.get('roles.admin', False) == True
 
+    def role_list(self):
+        """
+        Return a list of roles the user has
+
+        :returns dict: dict listing all roles and their state
+        """
+        # note we need to remove from each key the leading
+        # roles. string to get the actual roles
+        d = {}
+        for role_key in self.fsdb.keys('roles.*'):
+            d[role_key[len("roles."):]] = self.fsdb.get(role_key, False)
+        return d
+
+
     @staticmethod
     def load_user(userid):
         return User(userid)

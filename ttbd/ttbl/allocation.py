@@ -702,6 +702,20 @@ def _run(targets, preempt):
         _run_target(target, preempt)
 
 
+def _allocation_policy_check(
+        calling_user: ttbl.user_control.User, obo_user: str, guests: list,
+        priority: int, preempt: bool, queue: bool, shared: bool):
+    calling_user_roles = calling_user.role_list()
+
+    # This is a quick fix -- a proper policy implementation is still
+    # in the works
+    if preempt:
+        if calling_user_roles.get('admin', False) != True:
+            return f"user {calling_user.get_id()} cannot request preemption," \
+                f" need 'admin' role"
+
+    return None
+
 
 def request(groups, calling_user, obo_user, guests,
             priority = None, preempt = False,
@@ -802,6 +816,15 @@ def request(groups, calling_user, obo_user, guests,
     assert isinstance(preempt, bool)
     assert isinstance(queue, bool)
     assert reason == None or isinstance(reason, str)
+
+
+    message = _allocation_policy_check(calling_user, obo_user, guests,
+                                       priority, preempt, queue, shared)
+    if message:
+        return {
+            "state": "rejected",
+            "_message": message,
+        }
 
     # Create an allocation record and from there, get the ID -- we
     # abuse python's tempdir making abilities for it
