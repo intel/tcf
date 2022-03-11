@@ -89,6 +89,10 @@ class interface(ttbl.tt_interface):
         'tcp6', 'udp6', 'sctp6'
     )
 
+    # Each entry contains local_address, protocol, port
+    # Tunnels should only allow the set of local ports
+    # whose destination is local host
+    allowed_local_ports = set()
 
     def _check_args(self, ip_addr, port, protocol):
         # check the ip address, port and protocol arguments, converting
@@ -129,7 +133,15 @@ class interface(ttbl.tt_interface):
             self.arg_get(args, 'port', int),
             self.arg_get(args, 'protocol', str),
         )
-        self._ip_addr_validate(target, ip_addr)
+        # if destination address is in the list of local allowed ports
+        if (ip_addr, port, protocol) in self.allowed_local_ports:
+            # Valid local port redirection, probably to a service
+            # running on the CAPI server
+            pass
+        else:
+            # remote IP redirection, validate it works (will raise if invalid)
+            self._ip_addr_validate(target, ip_addr)
+
         with target.target_owned_and_locked(who):
             for tunnel_id in target.fsdb.keys("interfaces.tunnel.*.protocol"):
                 prefix = tunnel_id[:-len(".protocol")]

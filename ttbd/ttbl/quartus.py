@@ -397,6 +397,10 @@ class jtagd_c(ttbl.power.daemon_c):
     def target_setup(self, target, iface_name, component):
         target.fsdb.set(f"interfaces.{iface_name}.{component}.tcp_port",
                         self.tcp_port)
+        #Set the local ports that is able to be reached via tunneling
+        target.tunnel.allowed_local_ports.add(("127.0.0.1", "tcp",
+                                               self.tcp_port))
+        ttbl.power.daemon_c.target_setup(self, target, iface_name, component)
 
     def verify(self, target, component, cmdline_expanded):
         pidfile = os.path.join(target.state_dir, component + "-jtagd.pid")
