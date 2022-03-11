@@ -220,7 +220,8 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None):
             target.shell.run("ifopen " + ifname)
 
         if sanboot_url == "skip":
-            target.report_info("not booting", level = 0)
+            target.report_skip(
+                "not sanbooting since 'skip' was given as sanboot_url")
         else:
             target.send("sanboot %s" % sanboot_url)
     finally:
