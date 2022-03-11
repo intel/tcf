@@ -9,6 +9,7 @@
 # package: ipmitool
 # package: libcap-devel ubuntu=libcap-dev
 # package: fedora=livecd-tools
+# package: lsof
 # package: fedora,ubuntu=openocd
 # package: centos,fedora=openssh-clients
 # package: parted
