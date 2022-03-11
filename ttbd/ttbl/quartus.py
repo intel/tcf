@@ -204,7 +204,36 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
     https://www.intel.com/content/www/us/en/programmable/quartushelp/13.0/mergedProjects/program/pgm/pgm_pro_add_server.htm ]
 
 
-    *Troubleshooting*
+    **Quartus Lite**
+
+    Download from https://www.intel.com/content/www/us/en/software-kit/684215/intel-quartus-prime-lite-edition-design-software-version-21-1-for-linux.html?
+
+    Install with::
+
+      $ tar xf Quartus-lite-21.1.0.842-linux.tar
+      $ cd components
+      $ chmod a+x ./Quartus-lite-21.1.0.842-linux.tar
+      $ ./Quartus-lite-21.1.0.842-linux.tar
+
+    Quartus will use the same *~/.jtagd.conf* if you have used
+    *jtagconfig* to configure as above
+
+    1. Start Quartus::
+
+      $ INSTALLPATH/intelFPGA_lite/21.1/quartus/bin/quartus
+
+    2. Go to Programmer > Edit > Hardware Setup
+
+    3. Click on *Add Hardware*
+
+    4. Enter as *Server Name* and *Server Port* the name of the server
+       that is doing the tunnel (as printed by *tcf tunnel-add*
+       above); leave the password blank.
+
+    5. Click *OK*
+
+
+    **Troubleshooting**
 
     - can't connect to port::
 
