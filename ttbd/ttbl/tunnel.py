@@ -37,6 +37,10 @@ class interface(ttbl.tt_interface):
 
     def __init__(self):
         ttbl.tt_interface.__init__(self)
+        # Each entry contains local_address, protocol, port
+        # Tunnels should only allow the set of local ports
+        # whose destination is local host
+        self.allowed_local_ports = set()
 
     def _target_setup(self, target, iface_name):
         # wipe all leftover tunnels info, when we start there shall be none
@@ -89,10 +93,6 @@ class interface(ttbl.tt_interface):
         'tcp6', 'udp6', 'sctp6'
     )
 
-    # Each entry contains local_address, protocol, port
-    # Tunnels should only allow the set of local ports
-    # whose destination is local host
-    allowed_local_ports = set()
 
     def _check_args(self, ip_addr, port, protocol):
         # check the ip address, port and protocol arguments, converting
@@ -134,7 +134,7 @@ class interface(ttbl.tt_interface):
             self.arg_get(args, 'protocol', str),
         )
         # if destination address is in the list of local allowed ports
-        if (ip_addr, port, protocol) in self.allowed_local_ports:
+        if ( ip_addr, protocol, port ) in self.allowed_local_ports:
             # Valid local port redirection, probably to a service
             # running on the CAPI server
             pass
