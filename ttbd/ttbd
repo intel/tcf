@@ -1740,6 +1740,7 @@ if __name__ == "__main__":
 
     if ttbl.config.upload_max_size != args.upload_max_size:
         args.upload_max_size = ttbl.config.upload_max_size
+    # note the Tornado server also needs this setting (below)
     app.config['MAX_CONTENT_LENGTH'] = args.upload_max_size
     app.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(4)
     # ensure that when we JSON encode sorted dictionaries, the encode
@@ -1890,7 +1891,9 @@ if __name__ == "__main__":
         from tornado.httpserver import HTTPServer
         from tornado.ioloop import IOLoop
 
-        http_server = HTTPServer(WSGIContainer(app), ssl_options = ssl_context)
+        http_server = HTTPServer(
+            WSGIContainer(app), ssl_options = ssl_context,
+            max_buffer_size = app.config['MAX_CONTENT_LENGTH'])
         http_server.bind(port, address = host)
         # This might not be the real good way to do this, but our APIs
         # might block for a long time, so we start a crapload of
