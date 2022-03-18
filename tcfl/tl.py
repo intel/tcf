@@ -296,6 +296,7 @@ def console_dump_on_failure(testcase, alevel = 0):
             attachments["console"] = target.console.generator_factory(None)
         else:
             for console in console_list:
+                target.console.capture_complete(console)
                 attachments['console[' + console + ']'] = \
                     target.console.generator_factory(console)
         if testcase.result_eval.failed:
@@ -1430,19 +1431,19 @@ def linux_package_add(ic, target, *packages,
     elif distro == 'centos':
         _packages = packages + kws.get("any", []) + kws.get("centos", [])
         if _packages:
-            target.shell.run("dnf install -qy " +  " ".join(_packages),
+            target.shell.run("dnf install -y " +  " ".join(_packages),
             timeout = timeout)
     elif distro == 'fedora':
         _packages = packages + kws.get("any", []) + kws.get("fedora", [])
         if _packages:
             target.shell.run(
-                "dnf install --releasever %s -qy " % distro_version
+                "dnf install --releasever %s -y " % distro_version
                 +  " ".join(_packages),
                 timeout = timeout)
     elif distro == 'rhel':
         _packages = packages + kws.get("any", []) + kws.get("rhel", [])
         if _packages:
-            target.shell.run("dnf install -qy " +  " ".join(_packages),
+            target.shell.run("dnf install -y " +  " ".join(_packages),
                              timeout = timeout)
     elif distro == 'ubuntu':
         _packages = packages + kws.get("any", []) + kws.get("ubuntu", [])
