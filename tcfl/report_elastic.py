@@ -113,7 +113,7 @@ class driver(tcfl.tc.report_driver_c):
 
         doc['tc_name'] = testcase.name
         doc['runid'] = testcase.runid
-        doc['hashid'] = testcase.ticket
+        doc['hashid'] = testcase.hashid
         doc['ident'] = testcase.ident()
 
         if testcase.target_group:

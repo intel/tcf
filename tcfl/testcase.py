@@ -673,7 +673,6 @@ def mkhashid(tc: tcfl.tc_c, hashid: str = None):
 
     tc.kw_set("tc_hash", tc.hashid)	# COMPAT
     tc.kw_set("hashid", tc.hashid)
-    tc.ticket = tc.hashid		# COMPAT/FIXME reporter_c
     if tc.runid:
         tc.runid_hashid = f"{tc.runid}{tcfl.report_runid_hashid_separator}{tc.hashid}"
     else:

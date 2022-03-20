@@ -2440,7 +2440,6 @@ class reporter_c(object):
             assert isinstance(self, tc_c)
             self.testcase = self
 
-        self._ticket = None
         # this will actually come from the testcase/target definition
         # and be initialized in the testcase/target constructions
         self.kws = {}
@@ -2787,19 +2786,6 @@ class reporter_c(object):
                      attachments, subcase = subcase)
         return r
 
-    # Deprecated APIs
-    @property
-    def ticket(self):
-        warnings.warn("reporter_c.ticket", DeprecationWarning)
-        return self._ticket
-
-
-    @ticket.setter
-    def ticket(self, value):
-        warnings.warn("reporter_c.ticket", DeprecationWarning)
-        self._ticket = value
-        return self._ticket
-
 
 class target_c(reporter_c):
 
@@ -3052,8 +3038,6 @@ class target_c(reporter_c):
         """
         self.report_info("reading property '%s'" % property_name, dlevel = 3)
         data = { "projection": json.dumps([ property_name ]) }
-        if self.ticket:
-            data['ticket'] = self.ticket
         r = self.server.send_request("GET", "targets/" + self.id, data = data)
         # unfold a.b.c.d which returns { a: { b: { c: { d: value } } } }
         propertyl = property_name.split(".")
@@ -3083,8 +3067,6 @@ class target_c(reporter_c):
         self.report_info("setting property '%s' to '%s'"
                          % (property_name, value), dlevel = 4)
         data = { property_name: value }
-        if self.ticket:
-            data['ticket'] = self.ticket
         self.server.send_request("PATCH", "targets/" + self.id, json = data)
         self.report_info("set property '%s' to '%s'" % (property_name, value),
                          dlevel = 2)
@@ -3098,8 +3080,6 @@ class target_c(reporter_c):
         """
         assert isinstance(d, dict)
         self.report_info("setting %d properties" % (len(d)), dlevel = 3)
-        if self.ticket:
-            d['ticket'] = self.ticket
         self.server.send_request("PATCH", "targets/" + self.id,
                                  json = d)
         self.report_info("set %d properties" % (len(d)), dlevel = 2)

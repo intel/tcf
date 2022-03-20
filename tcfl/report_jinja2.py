@@ -618,11 +618,11 @@ class driver(tcfl.report_driver_c):
         # can generate final reports
         if message.startswith("COMPLETION "):
             of.flush()
-            self._mkreport(tag, testcase.ticket, testcase, message)
+            self._mkreport(tag, testcase.hashid, testcase, message)
             # Wipe the file, it might have errors--it might be not
             # a file, so wipe hard
             #commonl.rm_f(self.fs[reporter.ticket])
-            del self.fs[testcase.ticket]
+            del self.fs[testcase.hashid]
             # can't remove from the _get_fd() cache, but it will be
             # removed once it's unused
             of.close()
