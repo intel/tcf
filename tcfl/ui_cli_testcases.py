@@ -32,7 +32,7 @@ def _cmdline_find(args):
     tcfl.testcase.discovery_setup(
         log_dir = args.log_dir,
         tmpdir = args.tmpdir,
-        remove_tmpdir = args.remove_tmpdir)
+        remove_tmpdir = args.remove_tmpdir, hashid = "cmdline")
     _cmdline_report_init(args)
 
     tcs_filtered = {}

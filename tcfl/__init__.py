@@ -559,7 +559,7 @@ valid_results = dict(
 )
 
 
-
+# FIXME: rename to context
 class msgid_c(object):
     """
     Accumulate data local to the current running thread.

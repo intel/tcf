@@ -681,10 +681,10 @@ def mkhashid(tc: tcfl.tc_c, hashid: str = None):
     tc.kw_set("runid_hashid", tc.runid_hashid)
 
 
-def discovery_init(tc: tcfl.tc_c):
+def discovery_init(tc: tcfl.tc_c, hashid: str = None):
     tc.log.debug(f"discovery_init() STARTING")
     # init a testcase to be able to do basic discovery
-    mkhashid(tc)
+    mkhashid(tc, hashid = hashid)
     tc.tmpdir = os.path.join(tcfl.tc_c.tmpdir, tc.hashid)
     commonl.makedirs_p(tc.tmpdir, reason = "testcase's tmpdir")
 
@@ -786,7 +786,14 @@ def driver_add(cls: tcfl.tc_c, *args, origin: str = None, **kwargs):
 
 
 def discovery_setup(log_dir = None, tmpdir = None,
-                    remove_tmpdir = True, runid = ""):
+                    remove_tmpdir = True,
+                    runid = "", hashid: str = "global"):
+    """
+    :param str hashid: (optional; default *global*)  hashid to use for
+      the :data:`tcfl.tc_global` object that is used for common
+      progress messages. When invoked via commandline, the UI
+      commandline code uses *cmdline*.
+    """
     #
     # Minimum initialization of the testcase discovery system
     #
@@ -830,7 +837,8 @@ def discovery_setup(log_dir = None, tmpdir = None,
             sys.stderr.write,
             "I: %s: not removing temporary directory\n" % tcfl.tc_c.tmpdir)
 
-    discovery_init(tcfl.tc_global)
+    # this one is a wee special, so we alter a few things
+    discovery_init(tcfl.tc_global, hashid = hashid)
 
 # Add the core test driver class which recognizes TCF testcases
 driver_add(tcfl.tc_c)
