@@ -473,7 +473,8 @@ tcf-jobserver-run:
 
     if 'func' in args:
         try:
-            retval = args.func(args)
+            with tcfl.msgid_c(""):
+                retval = args.func(args)
         except Exception as e:
             if args.traces:
                 logging.exception(e)
