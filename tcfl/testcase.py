@@ -41,7 +41,9 @@ testcase_patchers = []
 
 
 # temporary class to fork() using multiprocessing (works in Windows
-# and Linux)
+# and Linux) -- this builds on multiprocessing.Process ot take the
+# return value from calling the target function and passing it via a
+# Pipe to the parent process.
 class Process(multiprocessing.Process):
     def __init__(self, *args, **kwargs):
         multiprocessing.Process.__init__(self, *args, **kwargs)
@@ -50,19 +52,21 @@ class Process(multiprocessing.Process):
     def run(self):
         try:
             r = self._target(*self._args, **self._kwargs)
-            self._child_connection.send(r)
+            self._child_connection.send(( r, None, None ))
         except Exception as e:
             tb = traceback.format_exc()
-            self._child_connection.send((e, tb))
+            self._child_connection.send(( None, e, tb))
 
     def exception(self):
         if self._parent_connection.poll():
-            return self._parent_connection.recv()
-        return None
+            _r, e, tb = self._parent_connection.recv()
+            return ( e, tb )
+        return ( None, None )
 
     def retval(self):
         if self._parent_connection.poll():
-            return self._parent_connection.recv()
+            r, _e, _tb = self._parent_connection.recv()
+            return r
         return None
 
 
