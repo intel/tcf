@@ -641,6 +641,7 @@ def discover(tcs_filtered, sources, manifests = None, filter_spec = None,
                    ", ".join(list(tcs_filtered.keys())))
     return result
 
+
 def mkhashid(tc: tcfl.tc_c, hashid: str = None):
     """
     Set a testcases' :term:hashid
@@ -719,6 +720,8 @@ def discovery_init(tc: tcfl.tc_c):
                                          f"report-{tc.runid_hashid}.")
     tc.kws['report_file_prefix'] = tc.report_file_prefix
     tc.log.debug(f"discovery_init() DONE")
+    tc._report_prefix = tc.name
+    # FIXME: is there a target group? Add it to the _report_prefix
 
 
 def run_cleanup(tc):
