@@ -620,11 +620,8 @@ def discover(tcs_filtered, sources, manifests = None, filter_spec = None,
             # Anything with a skip tag shall be skipped
             skip_value, skip_origin = tc.tag_get('skip', False)
             if skip_value != False:
-                if isinstance(skip_value, str):
-                    raise skip_e("because of 'skip' tag @%s: %s"
-                                 % (skip_origin, skip_value))
-                else:
-                    raise skip_e("because of 'skip' tag @%s" % skip_origin)
+                raise skip_e(
+                    f"because of skip '{skip_value}' tag @{skip_origin}")
             # Fill in any arguments from the command line
             # We will consider this testcase
             tcs_filtered[tc_path] = tc
