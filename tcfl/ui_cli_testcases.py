@@ -29,7 +29,7 @@ def _cmdline_find(args):
 
     import tcfl.testcase		# lazy import, only if needed
 
-    tcfl.testcase.discovery_setup(
+    tcfl.testcase.discovery_subsystem_setup(
         log_dir = args.log_dir,
         tmpdir = args.tmpdir,
         remove_tmpdir = args.remove_tmpdir, hashid = "cmdline")
@@ -149,7 +149,7 @@ def _cmdline_info(args):
 
     import tcfl.testcase		# lazy imports
 
-    tcfl.testcase.discovery_setup(
+    tcfl.testcase.discovery_subsystem_setup(
         log_dir = args.log_dir,
         tmpdir = args.tmpdir,
         remove_tmpdir = args.remove_tmpdir)

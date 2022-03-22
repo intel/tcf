@@ -3427,7 +3427,7 @@ class tc_c(reporter_c):
     #: FIXME: add a registry to warn of used ids
     hashid_len = 6
 
-    # initialized by tcfl.testcase.discovery_setup()
+    # initialized by tcfl.testcase.discovery_subsystem_setup()
     #: Identification of this execution
     runid = ""
 

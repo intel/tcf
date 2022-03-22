@@ -784,9 +784,9 @@ def driver_add(cls: tcfl.tc_c, *args, origin: str = None, **kwargs):
     _drivers.append(cls)
 
 
-def discovery_setup(log_dir = None, tmpdir = None,
-                    remove_tmpdir = True,
-                    runid = "", hashid: str = "global"):
+def discovery_subsystem_setup(log_dir = None, tmpdir = None,
+                              remove_tmpdir = True,
+                              runid = "", hashid: str = "global"):
     """
     :param str hashid: (optional; default *global*)  hashid to use for
       the :data:`tcfl.tc_global` object that is used for common
