@@ -477,60 +477,16 @@ def _match_tags(tc, tags_spec, origin = None):
         assert isinstance(tags_spec, str)
     if origin == None:
         origin = "[builtin]"
-    kws = dict()
-    for name, (value, _vorigin) in tc._tags.items():
-        kws[name] = value
 
-    if not commonl.conditional_eval("testcase tag match", kws, tags_spec,
+    if not commonl.conditional_eval("testcase tag match", tc._tags, tags_spec,
                                     origin, kind = "specification"):
-        raise skip_e("because of tag specification '%s' @ %s" %
-                     (tags_spec, origin), dict(dlevel = 4))
+        raise tcfl.skip_e("because of tag specification '%s' @ %s" %
+                          (tags_spec, origin), dict(dlevel = 4))
     tc.report_info("selected by tag specification '%s' @ %s" %
                    (tags_spec, origin), dlevel = 4)
 
-#
-# Keep this away from tcfl.tc_c, they are side internals that need not
-# clutter that API that's already too dense
-#
 
-def discover(tcs_filtered, sources, manifests = None, filter_spec = None,
-             testcase_name = None):
-    """Discover testcases in given locations
-
-    :param str testcase_name: (optional) used for unit testing
-
-    :returns tcfl.
-
-    PENDING/FIXME:
-
-    - discover using a multiprocess Pool external program to avoid
-      loading into the current address space (Pool is platform
-      agnostic)
-
-    This process works by loading the list of paths and testcase files
-    to discover (provided as a list in *sources* or in manifest files).
-
-    For each, the *_find_in_path()* function is called, which scans
-    each file for signs of it being a testcase (querying the different
-    drivers).
-
-    """
-    if manifests != None:
-        commonl.assert_list_of_strings(manifests, "list of manifests",
-                                       "manifest filename")
-    else:
-        manifests = []
-    result = tcfl.result_c(0, 0, 0, 0, 0)
-
-    # discover test cases
-    tcs_filtered.clear()
-    if len(sources) == 0 and len(manifests) == 0:
-        logger.warning("No testcases specified, searching in "
-                       "current directory, %s", os.getcwd())
-        sources = [ '.' ]
-    tcs = {}
-    tcfl.tc_global.report_info("scanning for test cases", dlevel = 2)
-
+def _manifest_expand(sources, result, manifests):
     # Read all manifest files provided; this is just reading lines
     # that are not empty; later we'll check if we can read them or
     # not, using the testcase drivers
@@ -560,36 +516,9 @@ def discover(tcs_filtered, sources, manifests = None, filter_spec = None,
                 f"{manifest_file}: can't read manifes file: {e}", dlevel = 3)
             result.blocked += 1
 
-    for tc_path in sources:
-        if ',' in tc_path:
-            parts = tc_path.split(',')
-            tc_path = parts[0]
-            subcases_cmdline = parts[1:]
-            logger.info("commandline '%s' requests subcases: %s",
-                        tc_path, " ".join(subcases_cmdline))
-        elif '#' in tc_path:
-            parts = tc_path.split('#')
-            tc_path = parts[0]
-            subcases_cmdline = parts[1:]
-            logger.info("commandline '%s' requests subcases: %s",
-                        tc_path, " ".join(subcases_cmdline))
-        else:
-            subcases_cmdline = []
-            logger.info("commandline '%s' requests no subcases", tc_path)
-        if not os.path.exists(tc_path):
-            logger.error("%s: does not exist; ignoring", tc_path)
-            continue
-        # this is only finding files (in the path) that might be
-        # testcases, not necessary loading them for operation
-        result += _find_in_path(tcs, tc_path, subcases_cmdline)
-        for driver in _drivers:
-            if driver == tcfl.tc_c:
-                continue	# skip, core searching done above
-            driver.find_testcases(tcs, tc_path, subcases_cmdline)
 
-    if len(tcs) == 0:
-        logger.error("WARNING! No testcases found")
-        return result
+def _tcs_filter(tcs_filtered, result, tcs, filter_spec,
+                testcase_name = None):
 
     # Now that we have them testcases, filter them based on the
     # tag filters specified in the command line with '-s'. Multiple's
@@ -633,9 +562,97 @@ def discover(tcs_filtered, sources, manifests = None, filter_spec = None,
     if not tcs_filtered:
         logger.error("All testcases skipped or filtered out by command "
                      "line -s options")
+    else:
+        logger.warning("Testcases filtered by command line to: %s",
+                       ", ".join(list(tcs_filtered.keys())))
+
+
+#
+# Keep this away from tcfl.tc_c, they are side internals that need not
+# clutter that API that's already too dense
+#
+
+def discover(tcs_filtered, sources, manifests = None, filter_spec = None,
+             testcase_name = None):
+    """Discover testcases in given locations
+
+    :param list(str) sources: list of paths to files or directories
+      where to look for testcases
+
+    :param str testcase_name: (optional) used for unit testing
+
+    :returns tcfl.
+
+    PENDING/FIXME:
+
+    - discover using a multiprocess Pool external program to avoid
+      loading into the current address space (Pool is platform
+      agnostic)
+
+    This process works by loading the list of paths and testcase files
+    to discover (provided as a list in *sources* or in manifest files).
+
+    For each, the *_find_in_path()* function is called, which scans
+    each file for signs of it being a testcase (querying the different
+    drivers).
+
+    """
+    # make a local copy we'll modify
+    sources = list(sources)
+
+    if manifests != None:
+        commonl.assert_list_of_strings(manifests, "list of manifests",
+                                       "manifest filename")
+    else:
+        manifests = []
+    result = tcfl.result_c(0, 0, 0, 0, 0)
+
+    # discover test cases
+    tcs_filtered.clear()
+    if len(sources) == 0 and len(manifests) == 0:
+        logger.warning("No testcases specified, searching in "
+                       "current directory, %s", os.getcwd())
+        sources = [ '.' ]
+    tcs = {}
+    tcfl.tc_global.report_info("scanning for test cases", dlevel = 2)
+
+    _manifest_expand(sources, result, manifests)
+
+    # For each path to a file/directory we have found, peel off
+    # subcase specifications and give it to drivers to see what we find
+    for tc_path in sources:
+        if ',' in tc_path:
+            parts = tc_path.split(',')
+            tc_path = parts[0]
+            subcases_cmdline = parts[1:]
+            logger.info("commandline '%s' requests subcases: %s",
+                        tc_path, " ".join(subcases_cmdline))
+        elif '#' in tc_path:
+            parts = tc_path.split('#')
+            tc_path = parts[0]
+            subcases_cmdline = parts[1:]
+            logger.info("commandline '%s' requests subcases: %s",
+                        tc_path, " ".join(subcases_cmdline))
+        else:
+            subcases_cmdline = []
+            logger.info("commandline '%s' requests no subcases", tc_path)
+        if not os.path.exists(tc_path):
+            logger.error("%s: does not exist; ignoring", tc_path)
+            continue
+        # this is only finding files (in the path) that might be
+        # testcases, not necessary loading them for operation
+        result += _find_in_path(tcs, tc_path, subcases_cmdline)
+        for driver in _drivers:
+            if driver == tcfl.tc_c:
+                continue   # skip, core searching done above in _find_in_path
+            driver.find_testcases(tcs, tc_path, subcases_cmdline)
+
+    if len(tcs) == 0:
+        logger.error("WARNING! No testcases found")
         return result
-    logger.warning("Testcases filtered by command line to: %s",
-                   ", ".join(list(tcs_filtered.keys())))
+
+    _tcs_filter(tcs_filtered, result, tcs, filter_spec,
+                testcase_name = testcase_name)
     return result
 
 
