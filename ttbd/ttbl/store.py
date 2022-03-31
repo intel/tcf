@@ -234,7 +234,7 @@ class interface(ttbl.tt_interface):
     def get_list(self, target, who, args, _files, user_path):
         if target.target_is_owned_and_locked(who):
             target.timestamp()
-        r = self._get_list(target, _who, args, _files, user_path,
+        r = self._get_list(target, who, args, _files, user_path,
                            version = 1)
         r['result'] = dict(r)	# COMPAT
         return r
@@ -243,7 +243,7 @@ class interface(ttbl.tt_interface):
     def get_list2(self, target, who, args, _files, user_path):
         if target.target_is_owned_and_locked(who):
             target.timestamp()
-        r = self._get_list(target, _who, args, _files, user_path,
+        r = self._get_list(target, who, args, _files, user_path,
                            version = 2)
         return r
 
