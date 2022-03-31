@@ -249,6 +249,7 @@ class interface(ttbl.tt_interface):
                 f"{name}: invalid certificate name, only [-_a-zA-Z0-9] allowed")
 
         with target.target_owned_and_locked(who):
+            target.timestamp()
 
             cert_path = os.path.join(target.state_dir, "certificates")
             cert_client_path = os.path.join(target.state_dir, "certificates_client")
@@ -312,6 +313,7 @@ class interface(ttbl.tt_interface):
             if not commonl.verify_str_safe(name, do_raise = False):
                 raise ValueError(
                     "invalid certificate name, only [-_a-zA-Z0-9] allowed")
+            target.timestamp()
             cert_client_path = os.path.join(target.state_dir, "certificates_client")
             self._client_wipe(name, cert_client_path)
             return dict({ })
@@ -319,6 +321,7 @@ class interface(ttbl.tt_interface):
 
     def get_certificate(self, target, who, _args, _files, _user_path):
         with target.target_owned_and_locked(who):
+            target.timestamp()
             client_certificates = set()
             cert_client_path = os.path.join(target.state_dir, "certificates_client")
             if os.path.isdir(cert_client_path):

@@ -143,6 +143,7 @@ class interface(ttbl.tt_interface):
             self._ip_addr_validate(target, ip_addr)
 
         with target.target_owned_and_locked(who):
+            target.timestamp()
             for tunnel_id in target.fsdb.keys("interfaces.tunnel.*.protocol"):
                 prefix = tunnel_id[:-len(".protocol")]
                 _ip_addr = target.fsdb.get(prefix + ".ip_addr")
@@ -233,6 +234,7 @@ class interface(ttbl.tt_interface):
             self.arg_get(args, 'protocol', str),
         )
         with target.target_owned_and_locked(who):
+            target.timestamp()
             for tunnel_id in target.fsdb.keys("interfaces.tunnel.*.protocol"):
                 prefix = tunnel_id[:-len(".protocol")]
                 _ip_addr = target.fsdb.get(prefix + ".ip_addr")
@@ -258,6 +260,7 @@ class interface(ttbl.tt_interface):
             (protocol, target-ip-address, port, port-in-server)
         """
         with target.target_owned_and_locked(who):
+            target.timestamp()
             tunnels = []
             for tunnel_id in target.fsdb.keys("interfaces.tunnel.*.protocol"):
                 local_port = tunnel_id[len("interfaces.tunnel."):-len(".protocol")]

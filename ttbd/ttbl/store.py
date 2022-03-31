@@ -231,20 +231,26 @@ class interface(ttbl.tt_interface):
         return file_data
 
 
-    def get_list(self, target, _who, args, _files, user_path):
+    def get_list(self, target, who, args, _files, user_path):
+        if target.target_is_owned_and_locked(who):
+            target.timestamp()
         r = self._get_list(target, _who, args, _files, user_path,
                            version = 1)
         r['result'] = dict(r)	# COMPAT
         return r
 
 
-    def get_list2(self, target, _who, args, _files, user_path):
+    def get_list2(self, target, who, args, _files, user_path):
+        if target.target_is_owned_and_locked(who):
+            target.timestamp()
         r = self._get_list(target, _who, args, _files, user_path,
                            version = 2)
         return r
 
 
-    def post_file(self, target, _who, args, files, user_path):
+    def post_file(self, target, who, args, files, user_path):
+        if target.target_is_owned_and_locked(who):
+            target.timestamp()
         # we can only upload to the user's storage path, never to
         # paths_allowed -> hence why we alway prefix it.
         file_path = self.arg_get(args, 'file_path', str)
@@ -257,7 +263,9 @@ class interface(ttbl.tt_interface):
         target.log.debug("%s: saved" % file_path_final)
         return dict()
 
-    def get_file(self, target, _who, args, _files, user_path):
+    def get_file(self, target, who, args, _files, user_path):
+        if target.target_is_owned_and_locked(who):
+            target.timestamp()
         # we can get files from the user's path or from paths_allowed;
         # an absolute path is assumed to come from paths_allowed,
         # otherwise from the user's storage area.
@@ -280,7 +288,9 @@ class interface(ttbl.tt_interface):
             stream_offset = offset,
         )
 
-    def delete_file(self, target, _who, args, _files, user_path):
+    def delete_file(self, target, who, args, _files, user_path):
+        if target.target_is_owned_and_locked(who):
+            target.timestamp()
         file_path = self.arg_get(args, 'file_path', str)
         file_path_final, rw = self._validate_file_path(target, file_path, user_path)
         if not rw:
