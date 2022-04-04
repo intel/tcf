@@ -1431,6 +1431,8 @@ def load_user_from_request(request):
     for authenticator in ttbl.config._authenticators:
         try:
             user = authenticator.auth_with_headers(headers)
+            if user:
+                break
         except ttbl.authenticator_c.invalid_credentials_e as e:
             logi("user cannot validate with header credentials")
             pass
