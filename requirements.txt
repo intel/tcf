@@ -3,6 +3,7 @@
 # package: fedora=gvnc-tools
 # package: dosfstools
 
+argcomplete3        # package: python3-argcomplete
 filelock
 # Ubuntu 20.4 -- issue installing 3.x
 Jinja2==2.11.3      # package: python3-jinja2
