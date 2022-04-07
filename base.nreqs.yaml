@@ -4,6 +4,9 @@
 #   $ tcf.git/nreqs.py install base.nreqs.yaml
 #
 
+argcomplete3: python3-argcomplete
+ reason: for basic tab complete for tcf
+
 bzip2:
   reason: for de/compressing logfiles and others
   skip_platform: win32

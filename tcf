@@ -14,6 +14,7 @@
 
 
 import argparse
+import argcomplete
 import collections
 import getpass
 import inspect
@@ -531,6 +532,7 @@ if __name__ == "__main__":
                     default = None, help = "Target's name or URL")
     ap.set_defaults(func = healthcheck)
 
+    argcomplete.autocomplete(arg_parser)
     global args
     args = arg_parser.parse_args()
     log_format = "%(levelname)s: %(name)s"
