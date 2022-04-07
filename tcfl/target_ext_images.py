@@ -467,7 +467,7 @@ def _cmdline_setup(arg_subparser):
                     " the name of an image (eg: ~/place/bios-433 would"
                     " be flashed into 'bios' if the target exposes the"
                     " 'bios' flash destination)."
-                    " Note filenames can contain %(FIELD)s strings"
+                    " Note filenames can contain %%(FIELD)s strings"
                     " that will be expanded from the inventory.")
     ap.add_argument("-u", "--upload",
                     action = "store_true", default = False,
