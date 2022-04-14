@@ -167,10 +167,17 @@ EOF
 sudo systemctl --root $IMAGEDIR enable rootrw-overlay.service
 
 # things we definitely do not need
-sudo systemctl --root $IMAGEDIR disable firewalld.service
-sudo systemctl --root $IMAGEDIR disable cups.service
-sudo systemctl --root $IMAGEDIR disable ModemManager.service
-sudo systemctl --root $IMAGEDIR disable flatpak-add-fedora-repos.service
+sudo systemctl --root $IMAGEDIR mask cups
+sudo systemctl --root $IMAGEDIR mask firewalld
+sudo systemctl --root $IMAGEDIR mask flatpak-add-fedora-repos
+sudo systemctl --root=$IMAGEDIR mask gssproxy
+sudo systemctl --root $IMAGEDIR mask ModemManager.service
+sudo systemctl --root=$IMAGEDIR mask systemd-zram-setup
+sudo systemctl --root=$IMAGEDIR mask system-oomd
+sudo systemctl --root=$IMAGEDIR mask system-update
+sudo systemctl --root=$IMAGEDIR mask system-update-done
+sudo systemctl --root=$IMAGEDIR mask zram-generator-defaults
+
 
 # We don't need graphical, so boot only text mode, it is way faster
 info "configure text-mode boot only"
