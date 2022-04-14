@@ -50,6 +50,42 @@ Server side modules used actively by this system:
 
 Note installation in the server side is needed, as described in
 :ref:`POS setup <pos_setup>`.
+
+**Debugging**
+
+POS failing to boot can happen, with multiple sources:
+
+- bootloader is not able to fetch the kernel
+
+- kernel not working on the target
+
+- NFS not working
+
+- kernel version / initrd / modules in NFS image mismatch
+
+Things that can be done:
+
+- Set more Linux kernel commandline options by setting
+
+   - environment POS_KERNEL_CMDLINE_EXTRA::
+
+       $ tcf -e POS_KERNEL_CMDLINE_EXTRA="<OPTIONS>" run ... etc
+
+   - setting flags in the inventory (riskier)::
+
+       $ tcf property-set TARGETNAME pos.kernel_cmdline_extra "<OPTIONS>"
+       $ tcf run ...
+
+   for what options can be set, see:
+
+   - Systemd options: https://freedesktop.org/wiki/Software/systemd/Debugging/
+
+     - *systemd.journald.forward_to_console=1*
+
+   - kernel options: https://www.kernel.org/doc/html/v4.14/admin-guide/kernel-parameters.html
+
+     - *loglevel=5*
+
 """
 
 import collections
@@ -2347,6 +2383,7 @@ def ipxe_seize_and_boot(target, dhcp = None, pos_image = None, url = None):
             target.shell.run(
                 "set cmdline2 %(pos_cmdline_opts2)s" % kws)
             pos_kernel_cmdline_extra = target.kws.get('pos.kernel_cmdline_extra', "")
+            pos_kernel_cmdline_extra += " " + os.environ.get("POS_KERNEL_CMDLINE_EXTRA", "")
             chunk_size = 80
             # FIXME FIXME: this eaither has to use quotes or break at
             # spaces, otherwise if it falls in a space it munge them
