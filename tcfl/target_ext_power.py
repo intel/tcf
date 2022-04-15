@@ -99,8 +99,9 @@ class extension(tc.target_extension_c):
         self.target.report_info("listing", dlevel = 2)
         r = self.target.ttbd_iface_call(
             "power", "list", method = "GET",
-            # extra time, since power ops can take long
-            timeout = 60)
+            # extra time, since power ops can take long when having
+            # complex power rails
+            timeout = 90)
         if 'power' in r:
             data = collections.OrderedDict()
             # backwards compat
@@ -174,7 +175,9 @@ class extension(tc.target_extension_c):
         assert isinstance(explicit, bool)
         target = self.target
         target.report_info("powering off" + component_s, dlevel = 1)
-        timeout = 60 + self._compute_duration(target, component, "off")
+        # extra base time, since power ops can take long when having
+        # complex power rails
+        timeout = 90 + self._compute_duration(target, component, "off")
         if timeout > 120:            
             target.report_info(
                 "WARNING: long power-off--estimated duration %s seconds"
@@ -200,7 +203,9 @@ class extension(tc.target_extension_c):
         assert isinstance(explicit, bool)
         target = self.target
         target.report_info("powering on" + component_s, dlevel = 1)
-        timeout = 60 + self._compute_duration(target, component, "on")
+        # extra base time, since power ops can take long when having
+        # complex power rails
+        timeout = 90 + self._compute_duration(target, component, "on")
         if timeout > 120:            
             target.report_info(
                 "WARNING: long power-on--estimated duration %s seconds"
@@ -232,7 +237,9 @@ class extension(tc.target_extension_c):
         assert isinstance(explicit, bool)
         target = self.target
         target.report_info("power cycling" + component_s, dlevel = 1)
-        timeout = 60 \
+        # extra base time, since power ops can take long when having
+        # complex power rails
+        timeout = 90 \
             + self._compute_duration(target, component, "on") \
             + self._compute_duration(target, component, "off")
         if timeout > 120:            
