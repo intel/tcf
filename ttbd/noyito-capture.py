@@ -55,9 +55,15 @@
 #
 #     - onoff: print on/off when voltage is under/over cutoff
 #
+#   ARGs:
+#
 #     - cutoff: (float) voltage cutoff for bool|boolean|onoff
 #
-# If no mode is specified, the voltage is reported
+# If no mode is specified, the voltage is reported; if no name is
+# specifed, that channel is omitted:
+#
+#  $ noyito-capture.py /dev/ttyUSB0 kk.json 0:mode=bool:name=CH0:cutoff=2.3
+#  $ noyito-capture.py /dev/ttyUSB0 kk.json 1:name=CH1 0:mode=bool:name=CH0:cutoff=2.3
 #
 import contextlib
 import re
@@ -186,7 +192,10 @@ def sample(inf):
             return chunk_data, {}
 
         # hmm, not enouth? keep reading
-        data_read += inf.recv(172)
+        if hasattr(inf, "recv"):
+            data_read += inf.recv(172)
+        else:
+            data_read += inf.read()
         bytes_read = len(data_read)
         print("INFO: read %sB" % bytes_read)
 
@@ -213,10 +222,23 @@ def xlat(d, data):
 first = True
 period_s = 0.5	# wait at least one sec between reads
 
+import serial
+import fcntl
+import stat
+import os
 
-with \
-     contextlib.closing(socket.socket(socket.AF_UNIX,
-                                      socket.SOCK_STREAM)) as inf:
-    inf.connect(sys.argv[2])
-    ttbl.capture_cli.main(sys.argv[1], sample, xlat, inf,
-                          period_s = 0.5)
+s = os.stat(sys.argv[1])
+if stat.S_ISSOCK(s[stat.ST_MODE]):
+    with \
+         contextlib.closing(socket.socket(socket.AF_UNIX,
+                                          socket.SOCK_STREAM)) as inf:
+        inf.connect(sys.argv[2])
+        ttbl.capture_cli.main(sys.argv[2], sample, xlat, inf,
+                              period_s = 0.5)
+else:
+    with serial.Serial(sys.argv[1], 115200) as inf:
+        flag = fcntl.fcntl(inf.fileno(), fcntl.F_GETFD)
+        fcntl.fcntl(inf, fcntl.F_SETFD, flag | os.O_NONBLOCK)
+        flag = fcntl.fcntl(inf, fcntl.F_GETFD)
+        ttbl.capture_cli.main(sys.argv[2], sample, xlat, inf,
+                              period_s = 0.5)
