@@ -7,7 +7,7 @@
 argcomplete:
  reason: for basic tab complete for tcf
  dnf: python3-argcomplete
- apt: python-argcomplete3
+ apt: python3-argcomplete
 
 bzip2:
   reason: for de/compressing logfiles and others
@@ -49,7 +49,9 @@ pymongo:
 
 pyte: python3-pyte
 
-pytz: python3-pytz
+pytz:
+  dnf: python3-pytz
+  apt: python3-tz
 
 pyserial:
   dnf:
