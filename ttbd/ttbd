@@ -415,7 +415,7 @@ class audit:
     def __exit__(self, ex_type, ex_value, tb):
         ts = time.time()
         ts_dt = datetime.datetime.fromtimestamp(
-            self.ts0, pytz.timezone("UTC")).strftime('%y-%m-%d %H:%M:%S')
+            ts, pytz.timezone("UTC")).strftime('%y-%m-%d %H:%M:%S')
         delta = math.trunc((ts - self.ts0) * 1000) / 1000
         if ex_type:
             self.record(
