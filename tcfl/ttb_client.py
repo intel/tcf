@@ -113,6 +113,12 @@ def tls_var(name, factory, *args, **kwargs):
 global rest_target_brokers
 rest_target_brokers = {}
 
+# Export all SSL keys to a file, so we can analyze traffic on wireshark & friends
+if 'SSLKEYLOGFILE' in os.environ:
+    import sslkeylog
+    sslkeylog.set_keylog(os.environ['SSLKEYLOGFILE'])
+
+
 class _rest_target_broker_mc(type):
     """
     This metaclass is used to create the methods that are needed on
