@@ -79,7 +79,7 @@ def _cmdline_user_list(args):
         for rtb, r in result.items():
             for userid, data in r.items():
                 rolel = []
-                for role, state in data['roles'].items():
+                for role, state in data.get('roles', {}).items():
                     if state == False:
                         rolel.append(role + " (dropped)")
                     else:
