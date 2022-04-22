@@ -3166,6 +3166,24 @@ def target(spec = None, name = None, count = 1, **kwargs):
     return decorate_class
 
 
+def _interconnect_want_add(obj, cls_name, name, spec, origin, count = 1, **kwargs):
+    ic_want_name = _target_want_decorate_class(
+        obj, cls_name,
+        name, "interconnect", "ic", obj._ic_count, **kwargs)
+    obj._targets[ic_want_name]['spec'] = spec
+    obj._targets[ic_want_name]['origin'] = origin
+    obj._interconnects.add(ic_want_name)
+    for key, val in kwargs.items():
+        valid = _target_want_add_check_key(
+            obj, cls_name, ic_want_name,
+            key, val)
+        if not valid:
+            raise blocked_e("%s: unknown key @%s" % (key, origin))
+    # By default, interconnects are explored all
+    obj._targets[ic_want_name]['kws'].setdefault('unlimited', True)
+    obj._ic_count += 1
+
+
 def interconnect(spec = None, name = None, **kwargs):
     """\
     Add a requirement for an interconnect to a testcase instance
@@ -3210,27 +3228,41 @@ def interconnect(spec = None, name = None, **kwargs):
         if id(super(cls, cls)._targets) == id(cls._targets):
             cls._targets = copy.deepcopy(super(cls, cls)._targets)
 
-        origin = commonl.origin_get(2)
-        ic_want_name = _target_want_decorate_class(
-            cls, cls.__name__,
-            name, "interconnect", "ic", cls._ic_count, **kwargs)
-        if id(super(cls, cls)._interconnects) == id(cls._interconnects):
-            cls._interconnects = copy.deepcopy(super(cls, cls)._interconnects)
-        cls._targets[ic_want_name]['spec'] = spec
-        cls._targets[ic_want_name]['origin'] = origin
-        cls._interconnects.add(ic_want_name)
-        for key, val in kwargs.items():
-            valid = _target_want_add_check_key(
-                cls, cls.__name__, ic_want_name,
-                key, val)
-            if not valid:
-                raise blocked_e("%s: unknown key @%s" % (key, origin))
-        # By default, interconnects are explored all
-        cls._targets[ic_want_name]['kws'].setdefault('unlimited', True)
-        cls._ic_count += 1
+        _interconnect_want_add(cls, cls.__name__,
+                               name, spec, commonl.origin_get(2),
+                               **kwargs)
         return cls
 
     return decorate_class
+
+
+def interconnect_want_add(_tc, ic_want_name, spec, origin,
+                          count = 1, **kwargs):
+    """\
+    Add a requirement for an interconnect to a testcase instance
+
+    Given a testcase instance, add a requirement for it to need an
+    interconnect, filtered with the given specification (*spec*, which
+    defaults to any), a name and optional arguments in the form of
+    keywords.
+
+    This is equivalent to the :func:`tcfl.tc.interconnect` decorator, which
+    adds the requirement to the class, not to the instance. Please
+    refer to it for the arguments.
+    """
+    assert isinstance(_tc, tc_c)
+    cls = type(_tc)
+    if id(_tc._targets) == id(cls._targets):
+        # this means that this testcase instance does not have a list
+        # of targets specific to it. Because now we are adding one, we
+        # make a private copy of all that information *for* the
+        # testcase, separated from the type
+        _tc._targets = copy.deepcopy(cls._targets)
+        _tc._target_count = cls._target_count
+        _tc._interconnects = copy.deepcopy(cls._interconnects)
+    _interconnect_want_add(_tc, cls.__name__, ic_want_name,
+                           spec, origin, count = count, **kwargs)
+
 
 class expectation_c(object):
     '''Expectations are something we expect to find in the data polled
