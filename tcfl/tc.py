@@ -986,7 +986,6 @@ class reporter_c:
         return r
 
 
-
 class target_c(reporter_c):
     """A remote target that can be manipulated
 
@@ -7009,10 +7008,11 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                         continue
                     rts_not_taken.add((rt_full_id, bsp_model))
                 if len(rts_not_taken) == 0:
+                    spec = target_want.get('spec', "")
                     self.report_skip(
                         "%s group %s: no remote targets (or group of) "
-                        "can satisfy the conditions for wanted target '%s'" %
-                        (tag, name_prefix, target_want_name),
+                        "can satisfy the conditions [%s] for wanted target '%s'" %
+                        (tag, name_prefix, spec, target_want_name),
                         attachments = { "length_perm": len(perm), "perm": perm },
                         alevel = 1)
                     perm.clear()
