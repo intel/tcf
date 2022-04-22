@@ -39,7 +39,7 @@ more information).
 Execute :download:`the testcase <../examples/test_efi_ipxe_sanboot.py>`
 with::
 
-  $ SANBOOR_URL=http://someserver.com/Fedora-Workstation-Live-x86_64-31-1.9.iso tcf run -v /usr/share/tcf/examples/test_efi_ipxe_sanboot.py
+  $ SANBOOT_URL=http://someserver.com/Fedora-Workstation-Live-x86_64-31-1.9.iso tcf run -v /usr/share/tcf/examples/test_efi_ipxe_sanboot.py
   INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+438.5s]: power cycled
   INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+438.9s]: BIOS: waiting for main menu after power on
   ...
@@ -69,11 +69,17 @@ with::
   INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+639.4s]: serial0: wrote 31B (set net0/netmask 255.255.252.0\\r) to console
   INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+640.1s]: serial0: wrote 7B (ifopen\\r) to console
   INFO2/x74ds3E#1  .../test_efi_ipxe_sanboot.py @huty-ehnc|localhost/qu06b [+642.4s]: serial0: wrote 48B (sanboot http://someserver.com/Fedora-Workstation-Live-x86_64-31-1.9.iso\\r) to console
-  PASS1/x74ds3  .../test_efi_ipxe_sanboot.py @huty-ehnc [+644.0s]: evaluation passed 
-  PASS0/	toplevel @local [+648.6s]: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:10:44.397730) - passed 
+  PASS1/x74ds3  .../test_efi_ipxe_sanboot.py @huty-ehnc [+644.0s]: evaluation passed
+  PASS0/	toplevel @local [+648.6s]: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:10:44.397730) - passed
 
 If SANBOOT_URL is "skip*, then no sanboot is executed and the iPXE
 command line is left available for use.
+
+Optionally you can environment set *IMAGES_FLASH* to have the script
+flash something first (see :meth:`target.images.flash_spec_parse
+<tcfl.target_ext_images.extension.flash_spec_parse>`)::
+
+  $ tcf -e IMAGES_FLASH="bios:SOMEBIOSFILE nic:SOMEFIRMWAREFILE run ...
 
 (depending on your installation method, location might be
 *~/.local/share/tcf/examples*)
@@ -95,6 +101,19 @@ class _test(tcfl.pos.tc_pos_base):
 
     # tcfl.pos.tc_pos_base.deploy_10_flash(self, target) does the BIOS
     # flashing for us
+
+
+    @tcfl.tc.serially()			# make sure it executes in order
+    def deploy_10_flash(self, target):
+        self.image_flash, upload, soft = target.images.flash_spec_parse(
+            self.testcase.image_flash_requested)
+
+        if self.image_flash:
+            if upload:
+                target.report_info("uploading files to server and flashing")
+            else:
+                target.report_info("flashing")
+            target.images.flash(self.image_flash, upload = upload, soft = soft)
 
     # ignore tcfl.pos.tc_pos_base template actions
     def deploy_50(self, ic, target):
