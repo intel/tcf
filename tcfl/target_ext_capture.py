@@ -972,6 +972,13 @@ def _cmdline_capture(args):
             target.capture.stop(args.capturer)
             print(f"{capturer}: downloading capture")
             r = target.capture.get(capturer, prefix = prefix)
+        elif streaming == True:
+            print(f"{capturer}: capturing for {args.wait} seconds")
+            time.sleep(args.wait)
+            print(f"{capturer}: stopping capture")
+            target.capture.stop(args.capturer)
+            print(f"{capturer}: downloading capture")
+            r = target.capture.get(capturer, prefix = prefix)
         for stream_name, file_name in r.items():
             print(f"{capturer}: downloaded stream {stream_name} -> {file_name}")
 
