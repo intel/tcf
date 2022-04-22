@@ -2230,10 +2230,16 @@ class target_c(reporter_c):
         while True:
             retry_count += 1
             try:
+                # we allow inserting extra timeouts from the environment
+                timeout_extra = int(os.environ.get("TCFL_TIMEOUT_EXTRA", 0))
+                assert timeout_extra >= 0, \
+                    "TCFL_TIMEOUT_EXTRA: (from environment) must be positive" \
+                    " number of seconds;  got {timeout_extra}"
                 return self.rtb.send_request(
                     method,
                     f"targets/{self.id}/{interface}/{call}",
-                    stream = stream, raw = raw, files = files, timeout = timeout,
+                    stream = stream, raw = raw, files = files,
+                    timeout = timeout + timeout_extra,
                     data = kwargs if kwargs else None)
 
             except (

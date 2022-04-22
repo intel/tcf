@@ -102,3 +102,17 @@ Other configuration settings
      tcfl.tc.tc_dir_ignore_add_regex("^doc.*$")
 
   will tell the scanner to ignore any directory called *docANYTHING*
+
+
+- Environment variables:
+
+  these can be set on the environment or added to TCF with::
+
+    $ tcf -e VAR=VALUE
+
+  - *TCFL_TIMEOUT_EXTRA=SECONDS*: any call to the TTBD daemon for target
+    control will be added an extra timeout of the given number of
+    seconds.
+
+    This is useful in certain network or execution environments where
+    they might be lags due to load that don't occur at individual level.
