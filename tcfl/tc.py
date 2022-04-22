@@ -562,8 +562,66 @@ class report_driver_c(object):
         assert isinstance(obj, cls)
         cls._drivers.remove(obj)
 
+class reporting_logging_handler_c(logging.Handler):
 
-class reporter_c(object):
+    def __init__(self, reporter):
+        self.reporter = reporter
+        logging.Handler.__init__(self, level = 1)
+
+
+    # logging.Handler interface
+    #
+    # Adaptor that allows using this as a logging handler that can be
+    # used to interface Python's logging mechanism
+    def emit(self, record):
+        """
+
+        >>> tc = XYZ
+        >>> log = logging.getLogger("somename")
+        >>> log.addHandler(target)
+        >>> log.addHandler(target.testcase)
+
+        """
+        # logging levels: maximum (CRITICAL) is 50, minimum (DEBUG is
+        # 10), verbosity goes from 0 (least to N) most, so reverse
+        # moves from 50, 40, 30 ... 10 to 5, 4, 3, 2,
+
+        attachments = {
+            "origin": record.pathname + ":" + record.funcName + ":" + str(record.lineno),
+            "level": record.levelno,
+            "logger_name": record.name,
+            "process": record.process,
+            "processName": record.processName,
+            "thread": record.thread,
+            "threadName": record.threadName,
+        }
+        if record.exc_info:
+            attachments['exc_info'] = record.exc_info
+        if record.exc_text:
+            attachments['exc_text'] = record.exc_text
+        if record.levelno >= logging.ERROR:  # includes logging.CRITICAL
+            self.reporter.report_error(record.getMessage(),
+                                       attachments = attachments,
+                                       level = 0, alevel = 3)
+        elif record.levelno >= logging.WARNING:
+            level = int((record.levelno - logging.DEBUG) / 10)
+            self.reporter.report_info(record.getMessage(),
+                                      attachments = attachments,
+                                      level = 1 + level, alevel = level + 2)
+        elif record.levelno >= logging.DEBUG and record.levelno < logging.WARNING:
+            # incs INFO
+            level = int((record.levelno - logging.DEBUG) / 10)
+            self.reporter.report_info(record.getMessage(),
+                                      attachments = attachments,
+                                      level = 2 + level, alevel = level + 2)
+        if record.levelno < logging.DEBUG:
+            level = record.levelno + 3
+            self.reporter.report_info(record.getMessage(),
+                                      attachments = attachments,
+                                      level = level, alevel = level + 2)
+
+
+class reporter_c:
     """
     High level reporting API
 
@@ -591,6 +649,7 @@ class reporter_c(object):
             self.ts_start = time.time()
             assert isinstance(self, tc_c)
             self.testcase = self
+        self.logging_handler = reporting_logging_handler_c(self)
 
 
     #: Ignore messages with verbosity about this level
