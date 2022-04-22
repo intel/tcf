@@ -1531,22 +1531,13 @@ class target_c(reporter_c):
     # Actions that operate on the target
     #
 
-    def acquire(self):
-        """
-        Acquire a target
-        """
-        # This one is annoying, so debuglevel it up
-        self.report_info("acquiring", dlevel = 3)
-        self.rtb.rest_tb_target_acquire(self.rt, ticket = self.ticket)
-        self.report_info("acquired", dlevel = 2)
-
     def release(self):
         """
         Release a target
         """
         # This one is annoying, so debuglevel it up
         self.report_info("releasing", dlevel = 3)
-        self.rtb.rest_tb_target_release(self.rt, ticket = self.ticket)
+        self.rtb.rest_tb_target_release(self.rt)
         self.report_info("released", dlevel = 2)
 
     def active(self):
@@ -1558,7 +1549,7 @@ class target_c(reporter_c):
         """
         # This one is annoying, so debuglevel it up
         self.report_info("marking as active", dlevel = 3)
-        self.rtb.rest_tb_target_active(self.rt, ticket = self.ticket)
+        self.rtb.rest_tb_target_active(self.rt)
         self.report_info("marked as active", dlevel = 2)
 
     def property_get(self, property_name, default = None):
@@ -1574,8 +1565,6 @@ class target_c(reporter_c):
         """
         self.report_info("reading property '%s'" % property_name, dlevel = 3)
         data = { "projection": json.dumps([ property_name ]) }
-        if self.ticket:
-            data['ticket'] = self.ticket
         r = self.rtb.send_request("GET", "targets/" + self.id, data = data)
         # unfold a.b.c.d which returns { a: { b: { c: { d: value } } } }
         propertyl = property_name.split(".")
@@ -1604,8 +1593,6 @@ class target_c(reporter_c):
         self.report_info("setting property '%s' to '%s'"
                          % (property_name, value), dlevel = 4)
         data = { property_name: value }
-        if self.ticket:
-            data['ticket'] = self.ticket
         self.rtb.send_request("PATCH", "targets/" + self.id,
                               json = data)
         self.report_info("set property '%s' to '%s'" % (property_name, value),
@@ -1619,8 +1606,6 @@ class target_c(reporter_c):
         """
         assert isinstance(d, dict)
         self.report_info("setting %d properties" % (len(d)), dlevel = 3)
-        if self.ticket:
-            d['ticket'] = self.ticket
         self.rtb.send_request("PATCH", "targets/" + self.id,
                               json = d)
         self.report_info("set %d properties" % (len(d)), dlevel = 2)
@@ -1687,7 +1672,7 @@ class target_c(reporter_c):
             thing = thing.id
         assert isinstance(thing, str)
         self.report_info("plugging thing '%s'" % thing, dlevel = 3)
-        self.rtb.rest_tb_thing_plug(self.rt, thing, ticket = self.ticket)
+        self.rtb.rest_tb_thing_plug(self.rt, thing)
         self.report_info("plugged thing '%s'" % thing, dlevel = 2)
 
     def thing_unplug(self, thing):
@@ -1701,7 +1686,7 @@ class target_c(reporter_c):
             thing = thing.id
         assert isinstance(thing, str)
         self.report_info("unplugging thing '%s'" % thing, dlevel = 3)
-        self.rtb.rest_tb_thing_unplug(self.rt, thing, ticket = self.ticket)
+        self.rtb.rest_tb_thing_unplug(self.rt, thing)
         self.report_info("unplugged thing '%s'" % thing, dlevel = 2)
 
     def thing_list(self):
@@ -1709,7 +1694,7 @@ class target_c(reporter_c):
         Return a list of connected things
         """
         self.report_info("listing things", dlevel = 3)
-        r = self.rtb.rest_tb_thing_list(self.rt, ticket = self.ticket)
+        r = self.rtb.rest_tb_thing_list(self.rt)
         self.report_info("listed things", dlevel = 2)
         return r
 
@@ -2225,8 +2210,14 @@ class target_c(reporter_c):
             else:
                 kwargs['component'] = component
 
-        if self.ticket:		# almost deprecated
-            kwargs['ticket'] = self.ticket
+        if self.ticket:
+	    # not used as it was before, but we used to pass testcase
+            # information that might help debugging who did what when
+            s = self.ticket + self.testcase.ident()
+            subcase_s = msgid_c.subcase()
+            if subcase_s:
+                s += "-" + subcase_s
+            kwargs['ticket'] = s
 
         # This looks really complex, but it is just the
         # rtb.send_request() below call
