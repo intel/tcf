@@ -168,6 +168,20 @@ class ssh(tc.target_extension_c):
         """
         return self._ssh_host != None and self._ssh_port != None
 
+
+    def tunnel_refresh(self):
+        """
+        Wipe the tunnel (if any) and reconstruct it
+
+        This assumes the user has previously setup and started the SSH
+        daemon and authentication in the target.
+        """
+        if self._ssh_port:
+            self.target.tunnel.remove(self._ssh_port)
+            self._ssh_port = None
+        return self._tunnel()
+
+
     def _returncode_eval(self, returncode):
         if returncode == 0:
             return
