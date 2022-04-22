@@ -605,7 +605,11 @@ class driver(tc.report_driver_c):
                 d = datetime.datetime.fromtimestamp(ts)
             # e.g. 22-02-28.12:56:00
             d = d.strftime('%y-%m-%d.%H:%M:%S')
-            of.write(f"[{d} +{delta:.1f}s] " + message)
+            try:
+                of.write(f"[{d} +{delta:.1f}s] " + message)
+            except ValueError as e:
+                testcase.log.error(f"can't write to dump file fd {of.name}/{of.fileno()}")
+                return
 
         if attachments != None:
             # FIXME: \x01\x01 hack to denote an attachment, will
