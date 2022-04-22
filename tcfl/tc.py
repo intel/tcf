@@ -4382,7 +4382,8 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         :param tcfl.tc.tc_c _cls: testcase driver
         :param str origin: (optional) origin of this call
         """
-        assert issubclass(_cls, tc_c)
+        assert issubclass(_cls, tc_c), \
+            f"{_cls}: shall be a type, got {type(_cls)}"
         if origin == None:
             o = inspect.stack()[1]
             origin = "%s:%s" % (o[1], o[2])
