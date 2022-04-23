@@ -3224,8 +3224,8 @@ def interconnect(spec = None, name = None, **kwargs):
         # _targets dictionary from our base class to modify it specific
         # to this class
         # FIXME: replace target_want_name with targettarget_want_name
-        if id(super(cls, cls)._targets) == id(cls._targets):
-            cls._targets = copy.deepcopy(super(cls, cls)._targets)
+        if id(super(cls, cls)._interconnects) == id(cls._interconnects):
+            cls._interconnects = copy.deepcopy(super(cls, cls)._interconnects)
 
         _interconnect_want_add(cls, cls.__name__,
                                name, spec, commonl.origin_get(2),
@@ -3251,13 +3251,12 @@ def interconnect_want_add(_tc, ic_want_name, spec, origin,
     """
     assert isinstance(_tc, tc_c)
     cls = type(_tc)
-    if id(_tc._targets) == id(cls._targets):
+    if id(_tc._interconnects) == id(cls._interconnects):
         # this means that this testcase instance does not have a list
         # of targets specific to it. Because now we are adding one, we
         # make a private copy of all that information *for* the
         # testcase, separated from the type
-        _tc._targets = copy.deepcopy(cls._targets)
-        _tc._target_count = cls._target_count
+        _tc._ic_count = cls._ic_count
         _tc._interconnects = copy.deepcopy(cls._interconnects)
     _interconnect_want_add(_tc, cls.__name__, ic_want_name,
                            spec, origin, count = count, **kwargs)
