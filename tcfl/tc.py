@@ -562,26 +562,30 @@ class report_driver_c(object):
         assert isinstance(obj, cls)
         cls._drivers.remove(obj)
 
+
 class reporting_logging_handler_c(logging.Handler):
+    """
+    logging.Handler interface: allows using this as a logging handler
+    that can be used to interface Python's logging mechanism
+    
+    Given a :class:`tcfl.tc.tc_c` object, create a logger:
+
+    >>> log = logging.getLogger("somename")
+
+    then add a handler to it from the testcase or a target:
+
+    >>> log.addHandler(testcase.logging_handler)
+    >>> log.addHandler(target.testcase.logging_handler)
+
+    tadah!
+    """
 
     def __init__(self, reporter):
         self.reporter = reporter
         logging.Handler.__init__(self, level = 1)
 
 
-    # logging.Handler interface
-    #
-    # Adaptor that allows using this as a logging handler that can be
-    # used to interface Python's logging mechanism
     def emit(self, record):
-        """
-
-        >>> tc = XYZ
-        >>> log = logging.getLogger("somename")
-        >>> log.addHandler(target)
-        >>> log.addHandler(target.testcase)
-
-        """
         # logging levels: maximum (CRITICAL) is 50, minimum (DEBUG is
         # 10), verbosity goes from 0 (least to N) most, so reverse
         # moves from 50, 40, 30 ... 10 to 5, 4, 3, 2,
@@ -985,6 +989,47 @@ class reporter_c:
                      attachments, subcase = subcase)
         return r
 
+    # logging.Handler interface
+    #
+    # Adaptor that allows using this as a logging handler that can be
+    # used to interface Python's logging mechanism
+    def emit(self, record):
+        """
+
+        >>> tc = XYZ
+        >>> log = logging.getLogger("somename")
+        >>> log.addHandler(target)
+        >>> log.addHandler(target.testcase)
+
+        """
+        # logging levels: maximum (CRITICAL) is 50, minimum (DEBUG is
+        # 10), verbosity goes from 0 (least to N) most, so reverse
+        # moves from 50, 40, 30 ... 10 to 5, 4, 3, 2,
+
+        attachments = {
+            "origin": record.pathname + ":" + report.funcName + ":" + str(report.lineno),
+            "level": record.level,
+            "logger_name": record.name,
+            "process": record.process,
+            "processName": record.processName,
+            "thread": record.thread,
+            "threadName": record.threadName,
+        }
+        if record.exc_info:
+            attachments['exc_info'] = record.exc_info
+        if record.exc_text:
+            attachments['exc_text'] = record.exc_text
+        if record.level >= logging.ERROR:  # includes logging.CRITICAL
+            self.error(record.getMessage(), attachments, level = 0)
+        elif record.level >= logging.WARNING:
+            level = (record.level - logging.DEBUG) / 10
+            self.info(record.getMessage(), attachments, level = 1 + level)
+        elif record.level >= logging.DEBUG and record.level < logging.WARNING:
+            # incs INFO
+            level = (record.level - logging.DEBUG) / 10
+            self.info(record.getMessage(), attachments, level = 2 + level)
+        if record.level < logging.DEBUG:
+            self.info(record.getMessage(), attachments, level = 3 + level)
 
 class target_c(reporter_c):
     """A remote target that can be manipulated
