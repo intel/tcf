@@ -600,7 +600,9 @@ class reporting_logging_handler_c(logging.Handler):
             "threadName": record.threadName,
         }
         if record.exc_info:
-            attachments['exc_info'] = record.exc_info
+            attachments['exc_info.type'] = record.exc_info[0]
+            attachments['exc_info.message'] = record.exc_info[1]
+            attachments['exc_info.traceback'] = traceback.format_tb(record.exc_info[2])
         if record.exc_text:
             attachments['exc_text'] = record.exc_text
         if record.levelno >= logging.ERROR:  # includes logging.CRITICAL
