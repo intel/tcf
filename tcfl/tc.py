@@ -1699,7 +1699,7 @@ class target_c(reporter_c):
                          % (property_name, value), dlevel = 4)
         data = { property_name: value }
         self.rtb.send_request("PATCH", "targets/" + self.id,
-                              json = data)
+                              json = data, timeout_extra = None)
         self.report_info("set property '%s' to '%s'" % (property_name, value),
                          dlevel = 2)
 
@@ -1712,7 +1712,7 @@ class target_c(reporter_c):
         assert isinstance(d, dict)
         self.report_info("setting %d properties" % (len(d)), dlevel = 3)
         self.rtb.send_request("PATCH", "targets/" + self.id,
-                              json = d)
+                              json = d, timeout_extra = None)
         self.report_info("set %d properties" % (len(d)), dlevel = 2)
 
     def properties_get(self, *projections):
@@ -2335,16 +2335,11 @@ class target_c(reporter_c):
         while True:
             retry_count += 1
             try:
-                # we allow inserting extra timeouts from the environment
-                timeout_extra = int(os.environ.get("TCFL_TIMEOUT_EXTRA", 0))
-                assert timeout_extra >= 0, \
-                    "TCFL_TIMEOUT_EXTRA: (from environment) must be positive" \
-                    " number of seconds;  got {timeout_extra}"
                 return self.rtb.send_request(
                     method,
                     f"targets/{self.id}/{interface}/{call}",
                     stream = stream, raw = raw, files = files,
-                    timeout = timeout + timeout_extra,
+                    timeout = timeout, timeout_extra = None,
                     data = kwargs if kwargs else None)
 
             except (

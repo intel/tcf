@@ -392,7 +392,8 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
     # for the target to flash, which we know from the tags
     def send_request(self, method, url,
                      data = None, json = None, files = None,
-                     stream = False, raw = False, timeout = 160,
+                     stream = False, raw = False,
+                     timeout = 160, timeout_extra = 0,
                      retry_timeout = 0, retry_backoff = 0.5,
                      skip_prefix = False):
         """
@@ -406,6 +407,13 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
           PUT. Defaults to PUT.
         :param bool raise_error: if true, raise an error if something goes
            wrong in the request. default True
+
+        :param int timeout_extra: extra timeout on top of the
+          *timeout* variable; this is meant to add extra timeouts from
+          environment.
+
+          If *None*, take the extra timeout from the environment
+          variable *TCFL_TIMEOUT_EXTRA*.
 
         :param float retry_timeout: (optional, default 0--disabled)
           how long (in seconds) to retry connections in case of failure
@@ -431,6 +439,12 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
             assert retry_backoff < retry_timeout, \
                 f"retry_backoff {retry_backoff} has to be" \
                 f" smaller than retry_timeout {retry_timeout}"
+
+        if timeout_extra == None:
+            timeout_extra = int(os.environ.get("TCFL_TIMEOUT_EXTRA", 0))
+        assert timeout_extra >= 0, \
+            "TCFL_TIMEOUT_EXTRA: (from environment) must be positive" \
+            " number of seconds;  got {timeout_extra}"
 
         # create the url to send request based on API version
         if url.startswith("/"):
