@@ -393,7 +393,7 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
     def send_request(self, method, url,
                      data = None, json = None, files = None,
                      stream = False, raw = False,
-                     timeout = 160, timeout_extra = 0,
+                     timeout = 160, timeout_extra = None,
                      retry_timeout = 0, retry_backoff = 0.5,
                      skip_prefix = False):
         """
@@ -411,7 +411,7 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
         :param int timeout_extra: extra timeout on top of the
           *timeout* variable; this is meant to add extra timeouts from
           environment.
-
+-
           If *None*, take the extra timeout from the environment
           variable *TCFL_TIMEOUT_EXTRA*.
 
