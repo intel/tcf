@@ -105,6 +105,20 @@ function cleanup() {
         info unmounting $mounted_dir
         sudo umount -l $mounted_dir
     done
+    # remove possible LVM devices hanging off NBD
+    if [ -n "$nbd_dev" -o -n "$loop_dev" ]; then
+        lsblk --raw  --noheadings ${nbd_dev:-} ${loop_dev:-} -o NAME,TYPE | while read device type; do
+            ## nbd0 disk
+            ## nbd0p1 part
+            ## nbd0p2 part
+            ## nbd0p3 part
+            ## cs-swap lvm
+            ## cs-root lvm
+            [ "$type" != "kvm" ] && continue
+            sudo dmsetup remove $device
+        done
+
+    fi
     if ! [ -z "$loop_dev" ]; then
         sudo losetup -d $loop_dev
     fi
