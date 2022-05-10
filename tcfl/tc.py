@@ -192,16 +192,6 @@ from . import msgid_c
 # discovered by the importer
 version = None
 
-# For debugging, levels are D2: 9, D3: 8, D4:7 ...
-logging.addLevelName(50, "C")
-logging.addLevelName(40, "E")
-logging.addLevelName(30, "W")
-logging.addLevelName(20, "I")
-logging.addLevelName(10, "D")
-logging.addLevelName(9, "D2")
-logging.addLevelName(8, "D3")
-logging.addLevelName(7, "D4")
-logging.addLevelName(6, "D5")
 
 #
 # FIXME: COMPAT moved to tcfl to start cleaning up import hell

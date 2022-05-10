@@ -72,15 +72,6 @@ else:
 
 from . import expr_parser
 
-logging.addLevelName(50, "C")
-logging.addLevelName(40, "E")
-logging.addLevelName(30, "W")
-logging.addLevelName(20, "I")
-logging.addLevelName(10, "D")
-logging.addLevelName(9, "D2")
-logging.addLevelName(8, "D3")
-logging.addLevelName(7, "D4")
-logging.addLevelName(6, "D5")
 
 # Ensure compatibility with python versions before 3.7 since older
 # versions use re._pattern_type instead of re.Pattern
@@ -201,6 +192,21 @@ def logging_verbosity_inc(level):
     else:
         delta = 1
     return level - delta
+
+
+def logging_short_level_names():
+    """
+    Set short one/two letter names for logging levels
+    """
+    logging.addLevelName(50, "C")
+    logging.addLevelName(40, "E")
+    logging.addLevelName(30, "W")
+    logging.addLevelName(20, "I")
+    logging.addLevelName(10, "D")
+    logging.addLevelName(9, "D2")
+    logging.addLevelName(8, "D3")
+    logging.addLevelName(7, "D4")
+    logging.addLevelName(6, "D5")
 
 
 def logfile_open(tag, cls = None, delete = True, bufsize = 0,
