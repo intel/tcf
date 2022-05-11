@@ -2308,8 +2308,7 @@ class target_c(reporter_c):
         if self.ticket:
 	    # not used as it was before, but we used to pass testcase
             # information that might help debugging who did what when
-            # FIXME: self.testcase.ident() throwing NoneType error
-            s = self.ticket #+ self.testcase.ident()
+            s = self.ticket +  (self.testcase.ident() or '')
             subcase_s = msgid_c.subcase()
             if subcase_s:
                 s += "-" + subcase_s
