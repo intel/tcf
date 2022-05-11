@@ -569,6 +569,12 @@ class msgid_c(object):
     def cls_init(cls):
         cls.tls.msgid_lifo = []
 
+    # Run cls_init_maybe() if cls_init() has not been initialized
+    @classmethod
+    def cls_init_maybe(cls):
+        if not hasattr(cls.tls, "msgid_lifo"):
+            cls.tls.msgid_lifo = []
+
     def __init__(self, s = None,
                  phase = None, depth = None, parent = None,
                  depth_relative = None,
@@ -576,6 +582,7 @@ class msgid_c(object):
         cls = type(self)
         if not hasattr(cls.tls, "msgid_lifo"):
             cls.cls_init()
+        cls.cls_init_maybe()
 
         if depth_relative == None:
             # if a subcase is given but no relative depth, mostly this
@@ -641,6 +648,7 @@ class msgid_c(object):
 
     def __enter__(self):
         cls = type(self)
+        cls.cls_init_maybe()
         cls.tls.msgid_lifo.append(self)
         return self
 
@@ -681,6 +689,7 @@ class msgid_c(object):
 
     @classmethod
     def depth(cls):
+        cls.cls_init_maybe()
         if cls.tls.msgid_lifo:
             f = cls.tls.msgid_lifo[-1]
             return f._depth
@@ -689,6 +698,7 @@ class msgid_c(object):
 
     @classmethod
     def phase(cls):
+        cls.cls_init_maybe()
         if cls.tls.msgid_lifo:
             f = cls.tls.msgid_lifo[-1]
             return f._phase
@@ -697,6 +707,7 @@ class msgid_c(object):
 
     @classmethod
     def ident(cls):
+        cls.cls_init_maybe()
         if cls.tls.msgid_lifo:
             f = cls.tls.msgid_lifo[-1]
             return f._ident
@@ -705,6 +716,7 @@ class msgid_c(object):
 
     @classmethod
     def subcase(cls):
+        cls.cls_init_maybe()
         if cls.tls.msgid_lifo:
             f = cls.tls.msgid_lifo[-1]
             return f._subcase
@@ -713,6 +725,7 @@ class msgid_c(object):
 
     @classmethod
     def current(cls):
+        cls.cls_init_maybe()
         if cls.tls.msgid_lifo:
             return cls.tls.msgid_lifo[-1]
         else:
@@ -720,6 +733,7 @@ class msgid_c(object):
 
     @classmethod
     def parent(cls):
+        cls.cls_init_maybe()
         if len(cls.tls.msgid_lifo) > 1:
             return cls.tls.msgid_lifo[-2]
         return None
