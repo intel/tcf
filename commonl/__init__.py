@@ -1222,8 +1222,9 @@ def process_terminate(pid, pidfile = None, tag = None,
                       tag, _pid, e)
             return None
         if os.path.abspath(_path) != os.path.abspath(path):
-            log.error("%s: killing %s: got exception %s",
-                      tag, _pid, e)
+            log.error("%s: killing %s: path to binary for process (%s) does "
+                      "not match path specified (%s)",
+                      tag, _pid, _path, path)
             return None	            # Not our binary
     try:
         signal_name = str(use_signal)
