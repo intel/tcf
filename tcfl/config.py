@@ -138,7 +138,7 @@ def load(config_path = None, config_files = None,
             "  tcfl.config.url_add('https://URL:PORT', ssl_ignore = True)\n"
             "\n" % ":".join(config_path))
 
-    tcfl.msgid_c.cls_init()
+    tcfl.msgid_c.cls_init_maybe()
 
 
 def setup(*args,
