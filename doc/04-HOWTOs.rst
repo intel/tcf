@@ -52,6 +52,7 @@ evertything:
 .. automodule:: examples.test_deploy_files
 .. automodule:: examples.test_linux_kernel
 .. automodule:: examples.test_sysbench
+.. automodule:: examples.test_linux_kernel_regression
 .. automodule:: examples.test_kickstart_network_install
 
 Booting off images on the network
