@@ -445,6 +445,7 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
         assert timeout_extra >= 0, \
             "TCFL_TIMEOUT_EXTRA: (from environment) must be positive" \
             " number of seconds;  got {timeout_extra}"
+        timeout += timeout_extra
 
         # create the url to send request based on API version
         if url.startswith("/"):
