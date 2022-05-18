@@ -600,7 +600,13 @@ class driver(tcfl.pos.tc_pos0_base):
             "export PS1='JTREG-PROMPT% '  # a simple prompt is "
             "harder to confuse with general output")
 
-        path_jdk_remote = os.path.join("/opt", os.path.basename(self.path_jdk))
+        path_jdk_remote = os.path.join(
+            "/opt",
+            # deploy rsyncs to /opt/DIR/DIR instead of /opt/DIR--while
+            # that is likely a bug due to rsync's qwirks with dir
+            # naming, working around is easier.
+            os.path.basename(self.path_jdk),
+            os.path.basename(self.path_jdk))
         if self.native_bindir:
             # if we have bindirs with native code built, we have put
             # them in /opt/SOMETHING; do the string so we can run
@@ -654,7 +660,10 @@ class driver(tcfl.pos.tc_pos0_base):
             # /time.html
             # STDERR section
             "time -p"
-            " %(java_cmd)s -jar /opt/%(jtreg_dirname)s/lib/jtreg.jar"
+            # deploy rsyncs to /opt/DIR/DIR instead of /opt/DIR--while
+            # that is likely a bug due to rsync's qwirks with dir
+            # naming, working around is easier.
+            " %(java_cmd)s -jar /opt/%(jtreg_dirname)s/%(jtreg_dirname)s/lib/jtreg.jar"
             " -a -ea -esa -avm -v1 -retain"
             # FIXME: hardcoded
             " -k:'!headful&!printer'"
