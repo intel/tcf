@@ -10,7 +10,11 @@
 #
 # Long:
 #
-# jdk11u.git/test/hotspot/jtreg/vmTestbase/gc/ArrayJuggle/Juggle14
+#   jdk11u.git/test/hotspot/jtreg/vmTestbase/gc/ArrayJuggle/Juggle14
+#
+# Around 503 TCs:
+#
+#   jdk8u.git/jdk/test/java/lang/
 #
 # Individual:
 #
@@ -655,13 +659,28 @@ class driver(tcfl.pos.tc_pos0_base):
             output = True, timeout = timeout)
         self.targets_active()
 
-        # For example:
+        # Anything starting with Error: before
+        #
+        ## Directory "JTwork" not found: creating\r
+        ## Directory "JTreport" not found: creating\r
+        #
+        # like:
+        #
         ## Error: cannot determine version for JDK: /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.272.b10-0.fc31.x86_64
-        general_error_regex = re.compile("^Error: (?P<message>.*)$", re.MULTILINE)
-        m = general_error_regex.search(output)
-        if m:
-            raise tcfl.tc.error_e(f"java errored? {m.groupdict()['message']}",
-                                  dict(output = output))
+        #
+        # we need to catch ... careful because
+        #
+        ## Error: TESTCASENAME
+        #
+        # is something diferent, is a subcase failing...grr
+        #
+        until = output.find('Directory "JTwork" not found')
+        if until:
+            general_error_regex = re.compile("^Error: (?P<message>.*)$", re.MULTILINE)
+            m = general_error_regex.search(output[:until])
+            if m:
+                raise tcfl.tc.error_e(f"java errored? {m.groupdict()['message']}",
+                                      dict(output = output))
 
         # see above on time -p
         kpi_regex = re.compile(r"^real[ \t]+(?P<seconds>[\.0-9]+)$",
