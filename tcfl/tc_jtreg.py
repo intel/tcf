@@ -499,6 +499,16 @@ class driver(tcfl.pos.tc_pos0_base):
             self.pkb_packages_required['rhel'] = [ 'java-%s-openjdk-devel' % self.java_version ]
         if target.kws.get("linux.distro", None) in ( "ubuntu", "debian" ):
             self.java_cmd_versioned = False
+
+        # HACK: somehow if we don't set this symlink (bin -> jre/bin), jtreg is failing to execute with
+        #
+        # $ time -p java -jar /opt/jtreg/lib/jtreg.jar -a -ea -esa -avm -v1 -retain -k:'!headful&!printer'  -conc:auto -timeout:1 /opt/jdk8u.git/langtools/test/com/sun/
+        # Error getting java.specification.version for /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.322.b06-11.el8.x86_64: java.io.IOException: Cannot run program "/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.322.b06-11.el8.x86_64/bin/java": error=2, No such file or directory
+        # Error: cannot determine version for JDK: /usr/lib/jvm/java-1.8.0-openjdk-1.8.0.322.b06-11.el8.x86_64
+        target.shell.run(
+            "test -d /etc/alternatives/java_sdk/bin"
+            " || ln -sf jre/bin /etc/alternatives/java_sdk")
+
         tcfl.tl.linux_package_add(ic, target, timeout = 4 * 60,
                                   **self.pkb_packages_required)
 
