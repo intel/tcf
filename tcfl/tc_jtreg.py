@@ -90,11 +90,14 @@ For each version you want to run, export the location of Java (eg for v11)::
 
   $ export JAVA11_HOME=/usr/lib/jvm/java-11
 
-Install a built JTReg in a directory called *jtreg*::
+Clone and build JTReg in a directory called *jtreg*::
 
-  $ wget https://ci.adoptopenjdk.net/view/all/job/jtreg/lastSuccessfulBuild/artifact/jtreg-4.2-b14.tar.gz
-  $ tar xf jtreg-4.2-b14.tar.gz
-  $ export JTREG_DIR=$HOME/jtreg
+  $ sudo dnf install -y java-1.8.0-openjdk-devel		# install a JDK
+  $ sudo dnf install -y java-{11,17...}-openjdk-devel		# install a JDK
+  $ git clone https://github.com/openjdk/jtreg.git jtreg.dir
+  $ (cd jtreg.dir; sh make/build.sh --jdk /usr/lib/jvm/java-1.8.0 )
+
+  $ export JTREG_DIR=$HOME/jtreg.git/build/images/jtreg
 
 (optional) If native testcases are to be executed, ensure you have the
 native builds and export their paths in *JDK<VERSION>_BINDIR* (eg:
@@ -484,16 +487,16 @@ class driver(tcfl.pos.tc_pos0_base):
             # yeah, exception...8 had weird naming conventions, I
             # guess then they went from v1.X.0 to just vX
             self.pkb_packages_required['clear'] = [ 'java-basic' ]
-            self.pkb_packages_required['fedora'] = [ 'java-1.8.0-openjdk' ]
-            self.pkb_packages_required['centos'] = [ 'java-1.8.0-openjdk' ]
-            self.pkb_packages_required['rhel'] = [ 'java-1.8.0-openjdk' ]
+            self.pkb_packages_required['fedora'] = [ 'java-1.8.0-openjdk-devel' ]
+            self.pkb_packages_required['centos'] = [ 'java-1.8.0-openjdk-devel' ]
+            self.pkb_packages_required['rhel'] = [ 'java-1.8.0-openjdk-devel' ]
         else:
             # default-jre provides v5 to v10 (according to apt show)
             self.pkb_packages_required['ubuntu'] = [ 'openjdk-%s-jdk' % self.java_version ]
             self.pkb_packages_required['clear'] =  [ "java%s-basic" % self.java_version ]
-            self.pkb_packages_required['fedora'] = [ 'java-%s-openjdk' % self.java_version ]
-            self.pkb_packages_required['centos'] = [ 'java-%s-openjdk' % self.java_version ]
-            self.pkb_packages_required['rhel'] = [ 'java-%s-openjdk' % self.java_version ]
+            self.pkb_packages_required['fedora'] = [ 'java-%s-openjdk-devel' % self.java_version ]
+            self.pkb_packages_required['centos'] = [ 'java-%s-openjdk-devel' % self.java_version ]
+            self.pkb_packages_required['rhel'] = [ 'java-%s-openjdk-devel' % self.java_version ]
         if target.kws.get("linux.distro", None) in ( "ubuntu", "debian" ):
             self.java_cmd_versioned = False
         tcfl.tl.linux_package_add(ic, target, timeout = 4 * 60,
