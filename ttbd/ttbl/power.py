@@ -1883,14 +1883,9 @@ RUN \
 
         # remove leftovers--the power subsystem will only call this if
         # we really have to power on, so if there is something half
-        # way there, *we want it dead first*.
-        subprocess.run([ "podman", "kill", "--signal", "KILL",
-                         f"{target.id}_{component}" ],
-                       timeout = 5, check = False,
-                       capture_output = True)
-        subprocess.run([ "podman", "rm", "--ignore", "--force",
-                         f"{target.id}_{component}" ],
-                       timeout = 5, check = False)
+        # way there, *we want it dead first* -- and sometimes it does
+        # happen.
+        self.off(target, component)
         self._cmdline_run(target, component, cmdline)
 
         if self.precheck_wait:
@@ -1906,10 +1901,32 @@ RUN \
 
 
     def off(self, target, component):
+        # kill the container
         subprocess.run([ "podman", "kill", "--signal", "KILL",
                          f"{target.id}_{component}" ],
-                       # don't chec -- if it fails, prolly off already
+                       # don't check -- if it fails, prolly off already
                        timeout = 5, check = False)
+        # really really kill it
+        #
+        # force removal of the container until there is nothing left
+        # and try multiple times, since sometimes things get left
+        # lingering even when we know they should not but yeah it
+        # happens
+        top = 5
+        for _cnt in range(1, top + 1):
+            # call repeatedly until it reports empty, meaning the
+            # container is fully dead
+            r = subprocess.run(
+                [ "podman", "rm", "--ignore", "--force", f"{target.id}_{component}" ],
+                timeout = 5, check = False, capture_output = True, text = True)
+            if not r.stdout.strip():
+                # if podman rm -fi doesn't return anything, it means
+                # the container is solid dead and we are good to go
+                break
+        else:
+            raise RuntimeError(
+                f"{target.id}_{component}: timed out forcibly killing"
+                f" container after {top} tries")
 
 
     def get(self, target, component):
