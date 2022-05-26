@@ -267,7 +267,12 @@ class allocation_c(commonl.fsdb_symlink_c):
             logging.info(
                 "ALLOC: allocation %s timedout (idle %s/%s), deleting",
                 self.allocid, seconds_idle, ttbl.config.target_max_idle)
-            audit.record("allocation/timeout", allocid = self.allocid)
+            if audit:
+                # FIXME: this is really messy -- audit.record needs to be better
+                _auditor = audit("unused")
+                _auditor.record("allocation/timeout",
+                                calling_user = self.get("user"),
+                                allocid = self.allocid)
             self.delete('timedout')
             return
 
