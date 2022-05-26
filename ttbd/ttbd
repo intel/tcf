@@ -1668,7 +1668,6 @@ if __name__ == "__main__":
     ttbl.test_target.state_path = os.path.join(args.var_state_path, "targets")
     ttbl.test_target.files_path = args.files_path
     ttbl.user_control.User.state_dir = os.path.join(args.var_state_path, "users")
-    ttbl.policy_c.state_path = os.path.join(args.var_state_path, "policy")
 
 
     os.umask(0o007)		# daemon gives no permissions to others
