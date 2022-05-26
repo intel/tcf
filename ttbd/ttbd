@@ -434,6 +434,10 @@ class audit:
                 request = self.request,
                 **self.kws)
 
+# this is a hack to allow the allocation module to access the audit
+# module, see ttbl.allocation.audit
+ttbl.allocation = audit
+
 
 #
 # Audit driver with the logging library

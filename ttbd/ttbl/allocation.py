@@ -112,6 +112,11 @@ states = {
 import collections
 import time
 
+# HACK: allow the allocation module to access the audit module, see
+# ttbl.allocation.audit; proper fix is to move the audit layer to its
+# own module. pending
+audit = None
+
 class lru_aged_c(object):
     # very basic, different types not considered, neither kwargs
     
