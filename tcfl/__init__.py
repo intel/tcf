@@ -307,7 +307,8 @@ class result_c:
             result_e = error_e
         return result_c.report_from_exception(
             tc, e, attachments = {
-                "output": e.output,
+                "stdout": e.stdout,
+                "stderr": e.stderr,
                 "return": e.returncode,
                 "cmd": e.cmd
             },
