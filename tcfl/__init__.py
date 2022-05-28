@@ -1575,7 +1575,7 @@ class server_c:
                         f"ignoring already loaded cached server AKA {aka}"
                         f" [{cls.servers[url].origin}]")
                     continue
-                cls.servers[url] = cls(url, ssl_verify = ssl_verify,
+                cls.servers[url] = cls(url, ssl_verify = ssl_verify, aka = aka,
                                        origin = origin, ca_path = ca_path)
             except ValueError as e:
                 log_sd.debug(f"{key}: wiping invalid cache entry ({e})")
