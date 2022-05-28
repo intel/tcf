@@ -206,6 +206,17 @@ class allocation_c(commonl.fsdb_symlink_c):
                     for target_name in self.get("group_allocated").split(","):
                         target = ttbl.test_target.get(target_name)
                         targets[target_name] = target
+                        target_allocid_current = target.allocid_get_bare()
+                        if self.allocid != target_allocid_current:
+                            # this target was originally in this
+                            # allocation but has been moved to
+                            # another, so do not release it
+                            # TEST: test_allocation_removal_keeps_new_owner
+                            target.log.info(
+                                f"deleting {self.allocid}: won't release"
+                                f" target since it is now part of allocation"
+                                f" {target_allocid_current}")
+                            continue
                         # cleanup each of the involved targets when
                         # active; this is a sum up of
                         # ttbl.test_target._deallocate()+
