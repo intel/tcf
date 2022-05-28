@@ -1115,6 +1115,15 @@ class server_c:
         # the subfields (NAME. and NAME.*)
         return self.fsdb.set(self.aka, None)
 
+    def cache_wipe(self):
+        """
+        Delete this server's cache entry, database and lockfiles
+        """
+        with filelock.FileLock(self.cache_lockfile):
+            r = self.fsdb.set(self.aka, None)
+            commonl.rm_f(self.cache_lockfile)
+            return r
+
     def _cache_setup(self):
         # don't call from initialization, only once we start using it
         # in earnest
