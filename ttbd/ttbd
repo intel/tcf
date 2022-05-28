@@ -1437,7 +1437,7 @@ def load_user_from_request(request):
         try:
             user = authenticator.auth_with_headers(headers)
             if user:
-                break
+                return user
         except ttbl.authenticator_c.invalid_credentials_e as e:
             logi("user cannot validate with header credentials")
             pass
@@ -1449,8 +1449,8 @@ def load_user_from_request(request):
             logx(e)
             pass
         # try next auth
+    return None
 
-    return user # this will be either None or a User
 
 @login_manager.unauthorized_handler
 def unauthorized():
