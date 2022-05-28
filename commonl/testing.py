@@ -542,6 +542,7 @@ class test_ttbd(object):
         # If no aka is defined, we make one out of the place when this
         # object is being created, so it is always the same *and* thus
         # the report hashes are always identical with each run
+
         if aka == None:
             self.aka = "ttbd-" + commonl.mkid(commonl.origin_get(2), 4)
         else:
@@ -669,21 +670,22 @@ host = '127.0.0.1'
                 rtb = tcfl.ttb_client.rest_init(self.state_dir,
                                                 self.url, not self.use_ssl,
                                                 self.aka)
-                # let's see if we get a
-                #
-                ## 404: missing user ID 'username' field
+                # FIXME: these are still being unified
+                self.server = tcfl.server_c(
+                    url = self.url, aka = self.aka,
+                    ssl_verify = self.use_ssl,
+                    origin = "unit test run")
+                tcfl.server_c.servers[self.server.url] = self.server
+                self.server.setup()
+                # let's see if we get the basic ttb endpoint working
                 #
                 # meaning the server is up and running
                 try:
-                    r = rtb.send_request("PUT", "login")
+                    r = rtb.send_request("GET", "ttb", skip_prefix = True)
+                    break
                 except requests.HTTPError as e:
-                    if 'missing user ID' in str(e):
-                        # expecting something like
-                        ## {"message":"missing user ID 'username' ## field"}
-                        # if the server is running
-                        break
-                    else:
-                        raise
+                    raise RuntimeError(
+                        f"server {self.url} does not respond to /ttb") from e
                 break
             except (requests.ConnectionError, ValueError) as e:
                 # FIXME: need to use logger, but it is still not initialized?
