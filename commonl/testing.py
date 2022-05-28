@@ -831,7 +831,8 @@ host = '127.0.0.1'
         else:
             logging.warning("keeping TTBD #%s temporary directory @ %s\n",
                             self.port, self.tmpdir)
-
+        # remove cache entry for this temporary server
+        self.server.cache_wipe()
 
 
 class shell_client_base(tcfl.tc.tc_c):
