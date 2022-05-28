@@ -7235,7 +7235,9 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             try:
                 with self._targets_assign():
                     if self.allocid:
-                        self.report_info(f"allocation ID: {self.allocid}")
+                        self.report_info(f"allocation ID: {self.allocid}",
+                                         # report this verbose on top levels
+                                         dlevel = 2 if self.parent else 0)
                     if not deploy_skip:
                         with msgid_c("D", phase = "deploy"):
                             retval = self._methods_call("deploy")
