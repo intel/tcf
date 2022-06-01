@@ -1869,8 +1869,7 @@ def _cmdline_console_setup(args):
                     value = True
                 parameters[key] = value
             r = target.console.setup(args.console, **parameters)
-        result = r.get('result', {})
-        for key, value in result.items():
+        for key, value in r.items():
             print("%s: %s" % (key, value))
 
 def _cmdline_console_enable(args):
