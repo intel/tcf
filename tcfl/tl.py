@@ -1607,12 +1607,10 @@ def tap_parse_output(output_itr):
     return tcs
 
 
-# FIXME: this should declare target is tcfl.tc.target_c but it can't
-# yet because we have an import hell that will be fixed in v0.16
-# - add to target: tcfl.tc.target_c, component: str
 def rpyc_connect(target, component: str,
                  cert_name: str = "default",
-                 iface_name = "power", sync_timeout = 60):
+                 iface_name = "power", sync_timeout = 60,
+                 retries_max: int = 10, retry_wait: float = 1):
     """Connect to an RPYC component exposed by the target
 
     :param tcfl.tc.target_c target: target which exposes the RPYC
@@ -1642,7 +1640,6 @@ def rpyc_connect(target, component: str,
       interface which exposes the component. In most cases it is the
       power interface, but it could be associated to any.
 
-
     :param int sync_timeout: (optional; default *60* seconds) timeout
       for calls to remote functions to return. Increase when running
       longer functions, although this will incur a longter time to
@@ -1658,6 +1655,13 @@ def rpyc_connect(target, component: str,
       >>>     ... run long remote operation...
       >>> finally:
       >>>     remote._config['sync_request_timeout'] = timeout_orig
+
+    :param int retries_max: (optional; default 10) positive maximum
+      number of times to retry connections
+
+    :param float 1: (optional; default 1s) seconds to wait before
+      retrying a connection
+
     """
     # FIXME: assert isinstance(target, tcfl.tc.target_c)
     assert isinstance(component, str)
@@ -1689,30 +1693,45 @@ def rpyc_connect(target, component: str,
                 certf.write(r['cert'])
 
         target.report_info(
-            f"rpyc: SSL-connecting (cert '{cert_name}') to '{component}' on"
+            f"rpyc: {component}: will use SSL cert '{cert_name}' for"
             f" {target.rtb.parsed_url.hostname}:{rpyc_port}", dlevel = 3)
-        target.report_info(
-            f"rpyc: using key/cert path {client_key_path}'", dlevel = 4)
-        remote = rpyc.utils.classic.ssl_connect(
-            target.rtb.parsed_url.hostname,
-            port = rpyc_port,
+
+        ssl_args = dict(
             keyfile = client_key_path,
             certfile =  client_cert_path,
             ssl_version = ssl.PROTOCOL_TLS
         )
-        target.report_info(
-            f"rpyc: SSL-connected (cert '{cert_name}') to '{component}' on"
-            f" {target.rtb.parsed_url.hostname}:{rpyc_port}", dlevel = 2)
+
     else:
-        target.report_info(
-            f"rpyc: connecting to '{component}' on"
-            f" {target.rtb.parsed_url.hostname}:{rpyc_port}", dlevel = 3)
-        remote = rpyc.utils.classic.ssl_connect(
-            target.rtb.parsed_url.hostname,
-            port = rpyc_port)
-        target.report_info(
-            f"rpyc: connected to '{component}' on"
-            f" {target.rtb.parsed_url.hostname}:{rpyc_port}", dlevel = 2)
+        ssl_args = {}
+
+    target.report_info(
+        f"rpyc: connecting to '{component}' on"
+        f" {target.rtb.parsed_url.hostname}:{rpyc_port}", dlevel = 3)
+
+    # When we connect right after powering on a remote container,
+    # sometimes it takes the container some time to spin up, so we
+    # give by default 10s
+    e = None
+    for cnt in range(1, retries_max + 1):
+        try:
+            remote = rpyc.utils.classic.ssl_connect(
+                target.rtb.parsed_url.hostname,
+                port = rpyc_port, **ssl_args)
+            break
+        except ( ConnectionResetError ) as _e:
+            e = _e
+            if cnt == retries_max:
+                message = f"rpyc: {component}: failure connecting to" \
+                    f" {target.rtb.parsed_url.hostname}:{rpyc_port}: {e}"
+                raise tcfl.blocked_e(message) from e
+            target.report_info(f"rpyc: {component}: soft failure connecting,"
+                               f" retrying {cnt}/{retries_max}: {e}")
+            time.sleep(retry_wait)
+
+    target.report_info(
+        f"rpyc: connected to '{component}' on"
+        f" {target.rtb.parsed_url.hostname}:{rpyc_port}", dlevel = 2)
 
     if sync_timeout:
         assert isinstance(sync_timeout, int) and sync_timeout > 0, \
