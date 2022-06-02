@@ -206,7 +206,13 @@ def _alloc_hold(rtb, allocid, state, ts0, max_hold_time, keep_alive_period):
         new_data = r.get(allocid, None)
         if new_data == None:
             continue			# no new info
-        new_state = new_data['state']
+
+        if 'state' not in r[allocid]:
+            logging.error(f"WARNING: {allocid}: CORRECTING: invalid server response? no 'state' in: {r}")
+            new_state = r[allocid]
+        else:
+            new_state = r[allocid]['state']
+
         if new_state not in ( 'active', 'queued', 'restart-needed' ):
             print()	# to get a newline in
             break
