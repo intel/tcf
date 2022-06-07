@@ -148,9 +148,10 @@ def _target_property_set(args):
             if val.lower() == "true":
                 value = True
             elif val.lower() == "false":
-                return False
-            raise ValueError("value %s: bad boolean '%s' (true or false)"
-                             % (value, val))
+                value = False
+            else:
+                raise ValueError("value %s: bad boolean '%s' (true or false)"
+                                 % (value, val))
         elif value.startswith("s:"):
             # string that might start with s: or empty
             return value.split(":", 1)[1]
