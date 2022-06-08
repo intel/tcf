@@ -90,6 +90,7 @@ import ast
 import atexit
 import collections
 import contextlib
+import concurrent.futures
 import copy
 import datetime
 import errno
@@ -6435,6 +6436,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         # _allocids we have to remove if we Ctrl-C
         _allocids.setdefault(rtb, set())
         # FIXME: use commonl.progress("")
+        register_allocids = set()
         allocid, state, targetids = target_ext_alloc._alloc_targets(
             rtb,
             { "group": [ target.id for target in pending ] },
@@ -6443,11 +6445,14 @@ class tc_c(reporter_c, metaclass=_tc_mc):
             priority = self.priority,
             queue_timeout = timeout,
             reason = self.reason % commonl.dict_missing_c(self.kws),
-            register_at = _allocids[rtb])
+            register_at = register_allocids)
         if state != 'active':
             # FIXME: this need sto carry more data, we've lost a lot
             # on the way here
             raise blocked_e("allocation failed, state %s" % state)
+        if register_allocids:
+            with _allocids_mutex:
+                _allocids[rtb].update(register_allocids)
         self.allocid = allocid
         self.report_info(
             "acquired %s" % allocid,
@@ -6459,14 +6464,21 @@ class tc_c(reporter_c, metaclass=_tc_mc):
 
         self._prefix_update()
         try:
-            yield
+            # ensure we have a thread running that is, every ten
+            # seconds, refreshing all the allocation IDs held by this
+            # process and then yield to the executor part (remember
+            # this function is a decorator).
+            with commonl.thread_periodical_runner_c(_allocids_keepalive_once,
+                                                    period = 10):
+                yield
         finally:
             self._prefix_update()
             if tc_c.release:
-                if allocid in _allocids[rtb]:
-                    # remove from the Ctrl-C list? it might have been
-                    # removed already
-                    _allocids[rtb].remove(allocid)
+                with _allocids_mutex:
+                    if allocid in _allocids[rtb]:
+                        # remove from the Ctrl-C list? it might have been
+                        # removed already
+                        _allocids[rtb].remove(allocid)
                 # but just in case do it in the server too
                 target_ext_alloc._delete(rtb, allocid)
                 self.report_info(
@@ -8562,6 +8574,34 @@ from . import report_data_json
 # local to each thread so when we interrupt it with a signal, we can
 # ask the server to drop those reservations
 _allocids = {}
+_allocids_mutex = threading.Lock()
+
+def _allocid_rtb_keepalive(rtb, allocids):
+    # send a keepalive to a single server for a list of ALLOCIds
+    logging.info(f"keepalive: {rtb.aka}: allocids {' '.join(allocids)}")
+    data = {}
+    for allocid in allocids:
+        data[allocid] = "active"
+    try:
+        _r = rtb.send_request("PUT", "keepalive", json = data)
+    except requests.HTTPError as e:
+        logging.error(f"keepalive: {rtb.aka}: error (ignoring): {e}")
+
+
+def _allocids_keepalive_once():
+    # send keepalives for all current ALLOCIds
+    # paralellizes per server
+    #
+    # This is used by _targets_assign to start a keepalive thread that
+    # keeps the allocationa live. It's a hack.
+    with _allocids_mutex:	# make a local copy of the current list
+        allocids_local = dict(_allocids)
+
+    with concurrent.futures.ThreadPoolExecutor(len(allocids_local)) as executor:
+        _rs = executor.map(lambda i: _allocid_rtb_keepalive(i[0], i[1]),
+                          allocids_local.items())
+        # with waits for all the executors to finish
+
 
 def _run(args):
     """
@@ -8806,14 +8846,19 @@ def _run(args):
                 # if the user has given --no-release, then we leave
                 # them in whatever state they are, since we might have
                 # an user just wanting to cancel to take manual control
-                for rtb in list(_allocids.keys()):
+                with _allocids_mutex:
+                    allocids_local = dict(_allocids)
+                for rtb in list(allocids_local.keys()):
                     # FIXME: this has to be done so we can submit a list
-                    #        of allocids to remove
-                    for allocid in _allocids[rtb]:
+                    #        of allocids to remove IN parallel
+                    for allocid in allocids_local[rtb]:
                         logging.error("removing allocation %s on %s",
                                       allocid, rtb)
                         target_ext_alloc._delete(rtb, allocid)
-                    _allocids[rtb].clear()
+                    with _allocids_mutex:
+                        # another thread might have cleared it, so
+                        if rtb in _allocids:
+                            _allocids[rtb].clear()
             if tp:
                 tp.terminate()
             time.sleep(1)
