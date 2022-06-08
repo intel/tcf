@@ -111,6 +111,54 @@ def config_import_file(filename, namespace = "__main__",
         if raise_on_fail:
             raise
 
+
+
+class thread_periodical_runner_c(threading.Thread):
+    """
+    A simple class to run a function periodically
+
+    Extends the threading class interface and also works as a context:
+
+    >>> def myfunc(arg1, arg2, kw1 = True, kw2 = 3):
+    >>>     ....
+    >>>
+    >>> with thread_periodical_runner_c(myfunc, 4, 5, kw1 = False):
+    >>>     ....
+    >>>     # while this is working, myfunc() is being run every 10 secs
+    >>>     ...
+    >>> # no more periodic running
+    """
+    def __init__(self, function, *args, period = 10, **kwargs):
+        self.function = function
+        self.terminate_event = threading.Event()
+        self.terminated_event = threading.Event()
+        self.period = period
+        self.args = args
+        self.kwargs = kwargs
+        threading.Thread.__init__(self)
+
+
+    def run(self):
+        while not self.terminate_event.is_set():
+            self.function(*self.args, **self.kwargs)
+            time.sleep(self.period)
+        self.terminated_event.set()
+
+
+    def stop(self):
+        self.terminate_event.set()
+        self.terminated_event.wait()
+
+
+    def __enter__(self):
+        self.start()
+        return self
+
+
+    def __exit__(self, *args, **kwargs):
+        self.stop()
+
+
 def path_expand(path_list):
     # Compose the path list
     _list = []
