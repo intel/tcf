@@ -2214,6 +2214,21 @@ class target_c(reporter_c):
         target._kws_update()
         return target
 
+    def mkticket_for_call(self):
+        """
+        Generate a ticket useful for debugging interactions with the server
+
+        **internal**
+
+        This usually contains the testcase's ticket and the subcase, if any
+        """
+        # information that might help debugging who did what when
+        s = (self.ticket or '') + (self.testcase.ident() or '')
+        subcase_s = msgid_c.subcase()
+        if subcase_s:
+            s += "-" + subcase_s
+        return s
+
 
     def ttbd_iface_call(self, interface, call, method = "PUT",
                         component = None, stream = False, raw = False,
@@ -2305,14 +2320,7 @@ class target_c(reporter_c):
             else:
                 kwargs['component'] = component
 
-        if self.ticket:
-	    # not used as it was before, but we used to pass testcase
-            # information that might help debugging who did what when
-            s = self.ticket + (self.testcase.ident() or '')
-            subcase_s = msgid_c.subcase()
-            if subcase_s:
-                s += "-" + subcase_s
-            kwargs['ticket'] = s
+        kwargs['ticket'] = self.mkticket_for_call()
 
         # This looks really complex, but it is just the
         # rtb.send_request() below call
