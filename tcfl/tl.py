@@ -1610,7 +1610,8 @@ def tap_parse_output(output_itr):
 def rpyc_connect(target, component: str,
                  cert_name: str = "default",
                  iface_name = "power", sync_timeout = 60,
-                 retries_max: int = 10, retry_wait: float = 1):
+                 retries_max: int = 10, retry_wait: float = 1,
+                 console_check_timeout = 60):
     """Connect to an RPYC component exposed by the target
 
     :param tcfl.tc.target_c target: target which exposes the RPYC
@@ -1661,6 +1662,20 @@ def rpyc_connect(target, component: str,
 
     :param float 1: (optional; default 1s) seconds to wait before
       retrying a connection
+
+    :param float console_check_timeout: (optional; default *60*)
+      number of seconds to wait on the log console output of the RPYC
+      container for a message denoting the connection has been fully
+      established [console is usually called *log-COMPONENT*].
+
+      In some circumstances of higher load in the server, when
+      rpyc_connect() establishes the connection it takes it a while to
+      spin up a new server that can actually serve; this functionality
+      waits for the server to print the message indicating the listener
+      daemon is up before continuing.
+
+      0 to disable; automatically disabled if there is no console
+      support or log console.
 
     """
     # FIXME: assert isinstance(target, tcfl.tc.target_c)
@@ -1713,11 +1728,38 @@ def rpyc_connect(target, component: str,
     # sometimes it takes the container some time to spin up, so we
     # give by default 10s
     e = None
+
+    log_console_name = "log-" + component
+    if console_check_timeout \
+       and hasattr(target, "console") \
+       and log_console_name in target.console.console_list:
+        # reset console expectation to current end-of-console
+        target.expect("", console = log_console_name)
+    else:
+        console_check_timeout = 0
+
     for cnt in range(1, retries_max + 1):
         try:
             remote = rpyc.utils.classic.ssl_connect(
                 target.rtb.parsed_url.hostname,
                 port = rpyc_port, **ssl_args)
+
+            if console_check_timeout > 0:
+                # workaround that sometimes the server takes a LONG
+                # time to start; basically wait for the remote RPYC
+                # process to print
+                #
+                ## INFO:SLAVE/PORTNUMBER:accepted ('<CLIENTIP>', CLIENTPORT) with fd NNN
+                #
+                # FIXME: we should extract CLIENTIP, CLIENTPORT and
+                # verify it against the socket inside the remote
+                # object and possibly check more matches in case we
+                # have multiple clients (rare)
+                #
+                target.expect(re.compile("INFO:SLAVE/.*:accepted .* with fd"),
+                              timeout = console_check_timeout,
+                              console = log_console_name)
+
             break
         except ( ConnectionResetError ) as _e:
             e = _e
