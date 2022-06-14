@@ -1610,8 +1610,8 @@ def tap_parse_output(output_itr):
 def rpyc_connect(target, component: str,
                  cert_name: str = "default",
                  iface_name = "power", sync_timeout = 60,
-                 retries_max: int = 10, retry_wait: float = 1,
-                 console_check_timeout = 60):
+                 retries_max: int = 10, retry_wait: float = 3,
+                 console_check_timeout: float = 60):
     """Connect to an RPYC component exposed by the target
 
     :param tcfl.tc.target_c target: target which exposes the RPYC
@@ -1660,7 +1660,7 @@ def rpyc_connect(target, component: str,
     :param int retries_max: (optional; default 10) positive maximum
       number of times to retry connections
 
-    :param float 1: (optional; default 1s) seconds to wait before
+    :param float retry_wait: (optional; default 3s) seconds to wait before
       retrying a connection
 
     :param float console_check_timeout: (optional; default *60*)
@@ -1681,6 +1681,10 @@ def rpyc_connect(target, component: str,
     # FIXME: assert isinstance(target, tcfl.tc.target_c)
     assert isinstance(component, str)
     assert isinstance(cert_name, str)
+    assert isinstance(console_check_timeout, (int, float) ) \
+        and console_check_timeout >= 0, \
+        "console_check_timeout: expected positive number of" \
+        f" seconds; got {type(console_check_timeout)}"
 
     try:
         import rpyc	# pylint: disable=import-outside-toplevel
@@ -1738,6 +1742,7 @@ def rpyc_connect(target, component: str,
     else:
         console_check_timeout = 0
 
+    wait_time = retry_wait
     for cnt in range(1, retries_max + 1):
         try:
             remote = rpyc.utils.classic.ssl_connect(
@@ -1769,7 +1774,8 @@ def rpyc_connect(target, component: str,
                 raise tcfl.blocked_e(message) from e
             target.report_info(f"rpyc: {component}: soft failure connecting,"
                                f" retrying {cnt}/{retries_max}: {e}")
-            time.sleep(retry_wait)
+            wait_time *= 1.5
+            time.sleep(wait_time)
 
     target.report_info(
         f"rpyc: connected to '{component}' on"
