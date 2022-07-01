@@ -3,16 +3,17 @@
 # package: fedora=gvnc-tools
 # package: dosfstools
 
-argcomplete3        # package: python3-argcomplete
+argcomplete         # package: python3-argcomplete
 filelock
 # Ubuntu 20.4 -- issue installing 3.x
 Jinja2==2.11.3      # package: python3-jinja2
 PyYAML              # package: centos,fedora=python3-pyyaml 
 imutils
+markupsafe==2.0.1   # package: python3-markupsafe
 packaging           # package: python3-packaging
 ply                 # package: python3-ply
 pykwalify           # package: python3-pykwalify
-pyte		    # package: python3-pyte
+pyte                # package: python3-pyte
 pytz                # package: python3-pytz
 pyserial            # package: python3-pyserial ubuntu=python3-serial
 # This has to build, so in windows take one that is built, otherwise
@@ -20,7 +21,7 @@ pyserial            # package: python3-pyserial ubuntu=python3-serial
 python-Levenshtein-wheels; sys_platform == "win32"
 python-Levenshtein; sys_platform != "win32"  # package: python3-Levenshtein ubuntu=python3-levenshtein
 requests            # package: python3-requests
-rpyc	            # package: python3-rpyc
+rpyc                # package: python3-rpyc
 setuptools          # package: python3-setuptools
 tabulate            # package: python3-tabulate
 termcolor; sys_platform != "win32"           # package: python3-termcolor
