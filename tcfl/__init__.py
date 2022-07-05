@@ -1714,6 +1714,68 @@ class server_c:
             del cls.servers[bad_url]
 
 
+
+class tc_info_c:
+    """
+    Information about a testcase
+
+    This class contains the most basic data about a testcase,
+    such as its name, tags, in which targets it can run.
+
+    It is extracted by each test case driver and allows the
+    orchestrator to decide how and where a testcase has to be run.
+
+    If the process of discovering the testcase produces an error or
+    exception condition, or skipped, it is reported as such by setting
+    values in :data:`result`, :data:`exception` and :data:`output`.
+    """
+    # This shall be pickable so we can send it over a queue
+    def __init__(self, name, file_path,
+                 origin = None,
+                 subcase_spec = None,
+                 axes = None,
+                 target_roles = None, driver_name = None, tags = None,
+                 result = None, output = "",
+                 exception = None, formatted_traceback = None):
+        #: Name of this testcase
+        #:
+        #: in most cases, it is going to contain :data:`file_path` in
+        #: the form *FILEPATH[#SUBCASE]*
+        self.name = name
+        #: path of file where this testcase was found
+        self.file_path = file_path
+        #: line number or location inside :data:`file_path` where this
+        #: test was found
+        self.origin = origin
+        #: list of subcases by name that the runner is supposed to execute
+        self.subcase_spec = subcase_spec
+        self.axes = axes
+        self.target_roles = target_roles
+        self.tags = tags
+        self.driver_name =  driver_name
+        self.result = result
+        assert isinstance(output, str), \
+            f"output: expected str, got '{type(output)}'"
+        #: If the testcase has produced any high level summary output, said
+        #: output in string form
+        self.output = output
+        #: Exception or completion message information
+        #:
+        #: This is an object that describes an issue with the testcase
+        #: execution or the summary of if
+        self.exception = exception
+        #: Formated traceback that applies to :data:`exception`
+        #:
+        #: Needs to be formatted so it is just a list of strings that
+        #: can be easily pickable when sending this object via a
+        #: queue.
+        #:
+        #: >>> formatted_traceback = traceback.format_exc()
+        #: >>> formatted_traceback = traceback.format_tb(sys.exc_info()[2])
+        self.formatted_traceback = formatted_traceback
+
+
+
 # we don't need too much logging level from this
 logging.getLogger("filelock").setLevel(logging.CRITICAL)
 

@@ -3666,6 +3666,7 @@ class _tc_mc(type):
 #
 # The core testcase object
 #
+# FIXME: make it inherit tcinfo_c when we cleanup
 class tc_c(reporter_c, metaclass=_tc_mc):
     r"""
     A testcase, with instructions for configuring, building, deploying,
