@@ -43,6 +43,23 @@ class result_c:
         self.blocked = blocked
         self.skipped = skipped
 
+
+    def __bool__(self):
+        """
+        If we have no results to speak of, this eavluates as *False*,
+        otherwise it is considered *True*
+        """
+        if (
+            self.passed == 0
+            and self.errors == 0
+            and self.failed == 0
+            and self.blocked == 0
+            and self.skipped == 0
+        ):
+            return False
+        return True
+
+
     def __iadd__(self, b):
         self.passed += b.passed
         self.errors += b.errors
