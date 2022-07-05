@@ -33,6 +33,7 @@ import io
 import inspect
 import json
 import logging
+import multiprocessing
 import numbers
 import os
 import pickle
@@ -111,6 +112,97 @@ def config_import_file(filename, namespace = "__main__",
         if raise_on_fail:
             raise
 
+
+class fork_c(multiprocessing.Process):
+    """
+    Run a function forking using multiprocessing (works in Windows and Linux)
+
+    Builds on multiprocessing.Process to call a function with the
+    given arguments. Return value/exceptions are ignored.
+
+    Usage:
+
+    >>> o = fork_c(my_func, arg1, arg2, kwarg1 = 3, kwarg2 = 4)
+    >>> o.start()
+
+    """
+    def __init__(self, func, *args, **kwargs):
+
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+        multiprocessing.Process.__init__(self)
+
+
+    def run(self):
+        self.func(*self.args, **self.kwargs)
+
+
+class fork_function_c(multiprocessing.Process):
+    """
+    Run a function forking using multiprocessing (works in Windows and
+    Linux) returnin its return value or exception.
+
+    Builds on multiprocessing.Process to call a function with the
+    given arguments and passing the return value / exception to the
+    parent it via a Pipe.
+
+    This is different than :class:`fork_c` in that it consumes less
+    resources, since two pipes are not created.
+
+    Usage:
+
+    >>> o = fork_c(my_func, arg1, arg2, kwarg1 = 3, kwarg2 = 4)
+    >>> o.start()
+    >>> o.join()
+    >>> r, e, tb = o.result()
+
+    """
+    def __init__(self, func, *args, **kwargs):
+
+        self.target = func
+        self.args = args
+        self.kwargs = kwargs
+        self._parent_connection, self._child_connection = multiprocessing.Pipe()
+        multiprocessing.Process.__init__(self)
+
+
+    def run(self):
+        try:
+            r = self.target(*self.args, **self.kwargs)
+            # done, return the retval -- limits what we can send to
+            # pickable stuff
+            self._child_connection.send(( r, None, None ))
+        except Exception as e:
+            # exception, send no return value but the exception information
+            tb = traceback.format_exc()
+            self._child_connection.send(( None, e, tb))
+
+
+    def result(self):
+        # FIXME we need a way to raise exceptions keeping the info around
+        if self._parent_connection.poll():
+            r, e, tb = self._parent_connection.recv()
+            return ( r, e, tb )
+        return None, None, None
+
+
+    def exception(self):
+        if self._parent_connection.poll():
+            _r, e, tb = self._parent_connection.recv()
+            return ( e, tb )
+        return ( None, None )
+
+
+    def retval(self):
+        if self._parent_connection.poll():
+            r, _e, _tb = self._parent_connection.recv()
+            return r
+        return None
+
+
+class Process(fork_c):	# COMPAT
+    pass
 
 
 class thread_periodical_runner_c(threading.Thread):
