@@ -517,6 +517,9 @@ if __name__ == "__main__":
     import tcfl.target_ext_alloc_ui
     tcfl.target_ext_alloc_ui._cmdline_setup(arg_subparsers)
 
+    import tcfl.ui_cli_testcases
+    tcfl.ui_cli_testcases._cmdline_setup(arg_subparsers)
+
     ap = arg_subparsers.add_parser("healthcheck",
                                    help = "Do a very basic health check")
     ap.set_defaults(level = logging.ERROR)
