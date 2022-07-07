@@ -1902,10 +1902,17 @@ RUN \
 
     def off(self, target, component):
         # kill the container
-        subprocess.run([ "podman", "kill", "--signal", "KILL",
-                         f"{target.id}_{component}" ],
-                       # don't check -- if it fails, prolly off already
-                       timeout = 5, check = False)
+        try:
+            subprocess.run([ "podman", "kill", "--signal", "KILL",
+                            f"{target.id}_{component}" ],
+                        # don't check -- if it fails, prolly off already
+                        timeout = 5, check = False)
+        except subprocess.TimeoutExpired:
+            # If killing the container fails and times out,
+            # try stopping the container as an alternative
+            subprocess.run(["podman", "stop", f"{target.id}_{component}"],
+                           timeout = 5, check = False)
+
         # really really kill it
         #
         # force removal of the container until there is nothing left
