@@ -32,7 +32,7 @@ Quick usage:
 >>> print(discovery_agent.tcis)
 
 """
-
+import atexit
 import collections
 import io
 import inspect
@@ -45,8 +45,9 @@ import re
 import shutil
 import subprocess
 import sys
-import traceback
+import tempfile
 import time
+import traceback
 
 import commonl
 import tcfl
@@ -516,7 +517,8 @@ class agent_c:
                     # discover process
                     if tci.output:
                         tci.output += "\n\n"
-                    tci.output += "Discovery Process output:\n" + output
+                    if output:
+                        tci.output += "Discovery Process output:\n" + output
         except Exception as e:
             # FIXME: send error code
             if hasattr(e, "origin"):
