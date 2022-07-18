@@ -1715,6 +1715,31 @@ class server_c:
 
 
 
+def assert_axes_valid(axes):
+    """
+    Verify an axes definition as specified in argument *axes* to
+    :class:`target_role_c`.
+
+    :param None,dict axes: axes to verify (or *None* if none)
+
+    :raises: AssertionError on invalid specification
+    """
+    if axes == None:
+        return
+    assert isinstance(axes, dict), \
+        f"axes: expected dictionary, got {type(axes)}"
+    # first is list of args, first arg is 'axes'
+    axes_name = inspect.getfullargspec(assert_axes_valid)[0][0]
+    for k, v in axes.items():
+        assert isinstance(k, str), \
+            f"'{axes_name}' needs to be a dict keyed by string;" \
+            " got a key type '{type(k}}'; expected string"
+        assert v == None or isinstance(v, ( list, set, tuple )), \
+            f"'{axes_name}' axis {k} value shall be " \
+            " None or a list to spin on; got a key type '{type(k}}'"
+
+
+
 class target_role_c:
     """
     Describe a target that is needed for a testcase
@@ -1805,7 +1830,7 @@ class target_role_c:
                  interconnect: bool = False):
         assert isinstance(role, str)
         assert origin == None or isinstance(origin, str)
-        assert axes == None or isinstance(axes, dict)
+        assert_axes_valid(axes)
         # FIXME: properly verify this
         assert spec == None or isinstance(spec, str) or callable(spec)
         assert spec_args == None or isinstance(spec_args, dict)
@@ -1864,6 +1889,7 @@ class tc_info_c:
         self.origin = origin
         #: list of subcases by name that the runner is supposed to execute
         self.subcase_spec = subcase_spec
+        assert_axes_valid(axes)
         self.axes = axes
         if target_roles != None:
             commonl.assert_dict_of_types(target_roles, "target_roles",

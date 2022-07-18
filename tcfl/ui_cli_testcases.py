@@ -88,6 +88,19 @@ def _cmdline_find(args):
 
 
 
+def _axes_info_print(axes, prefix):
+    if not axes:
+        print(f"{prefix}Declares no axes to spin on")
+        return
+    print(f"{prefix}Declares {len(axes)} axes to spin on:")
+    for axis, values in axes.items():
+        if values:
+            print(f"{prefix}   - {axis}: {values}")
+        else:
+            print(f"{prefix}   - {axis}: (will spin over all values in inventory)")
+
+
+
 def _testcase_info_print(testcase):
     assert isinstance(testcase, tcfl.tc_info_c)
     # Print information about a testcase
@@ -107,6 +120,8 @@ def _testcase_info_print(testcase):
     if testcase.result:
         print(f"  result: {testcase.result}")
 
+    _axes_info_print(testcase.axes, "  ")
+
     if not testcase.target_roles:
         print("  static: requires no targets")
     else:
@@ -120,16 +135,7 @@ def _testcase_info_print(testcase):
             if role.ic_spec:
                 print(f"      interconnect spec: '{role.ic_spec}'"
                       f" {'args: ' + str(role.ic_spec_args) if role.ic_spec_args else '(no extra args)'}")
-
-            if role.axes:
-                print(f"      declares {len(role.axes)} axes to spin on:")
-                for axis, values in role.axes.items():
-                    if values:
-                        print(f"        - {axis}: {values}")
-                    else:
-                        print(f"        - {axis}")
-            else:
-                print(f"      declares no axes to spin on")
+            _axes_info_print(role.axes, "      ")
 
     if False and testcase.axes:
         # FIXME: this needs more data digging from the permutation,
