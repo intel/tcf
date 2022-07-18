@@ -167,37 +167,6 @@ def _testcase_info_print(testcase):
             print("    - axes permutation randomization: <unknown>"
                   f" {testcase._axes_randomizer_original}")
 
-    if testcase.target_roles:
-        print("\n  Target group permutations")
-        if testcase._target_group_permutations == 0:
-            print("    - will spin all possible target group permutations"
-                  " for each axes permutation")
-            if len(testcase.target_roles) > 2:
-                print("      WARNING! this might result in way more"
-                      " executions than expected\n"
-                      "               Recommend setting"
-                      " knob *target_group_permutations* to"
-                      " N < 5")
-        else:
-            print("    - will spin a maximum of"
-                  f" {testcase._target_group_permutations} target group"
-                  " permutations for each axes permutation")
-        if testcase._target_group_randomizer_original == "sequential":
-            print("    - target group randomization: sequential by"
-                  " order of enumeration")
-        elif testcase._target_group_randomizer_original == "random":
-            print("    - target group randomization: pseudo-random"
-                  " with random seed")
-        elif isinstance(testcase._target_group_randomizer_original, str):
-            print("    - target group randomization: pseudo-random with seed"
-                  f" '{testcase._target_group_randomizer_original}'")
-        elif isinstance(testcase._target_group_randomizer_original, random.Random):
-            print("    - target group randomization: provided-pseudo"
-                  " random random.Ramdom object")
-        else:
-            print("    - target group randomization: <unknown>"
-                  f" {testcase._target_group_randomizer_original}")
-        print()
 
     if testcase.output:
         print("  current output:")
