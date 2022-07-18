@@ -299,12 +299,15 @@ def _is_testcase_call(tc_driver, tc_name, file_name,
 def _tc_info_from_tc_c(testcase):
     target_roles = dict()
     for target_want_name, tw in testcase._targets.items():
-        target_roles[target_want_name] = tcfl.target_role_c(
+        target_role = tcfl.target_role_c(
             target_want_name,
             origin = tw['origin'],
             spec = tw['spec'],
             interconnect = False,
         )
+        # v1 tc_c can only spin type
+        target_role.axes = { "type": None }
+        target_roles[target_want_name] = target_role
     for ic_want_name in testcase._interconnects:
         ic = testcase._targets[ic_want_name]
         target_roles[ic_want_name] = tcfl.target_role_c(
