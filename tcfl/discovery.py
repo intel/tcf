@@ -296,6 +296,38 @@ def _is_testcase_call(tc_driver, tc_name, file_name,
 
 
 
+def _tc_info_from_tc_c(testcase):
+    target_roles = dict()
+    for target_want_name, tw in testcase._targets.items():
+        target_roles[target_want_name] = tcfl.target_role_c(
+            target_want_name,
+            origin = tw['origin'],
+            spec = tw['spec'],
+            interconnect = False,
+        )
+    for ic_want_name in testcase._interconnects:
+        ic = testcase._targets[ic_want_name]
+        target_roles[ic_want_name] = tcfl.target_role_c(
+            ic_want_name,
+            origin = ic['origin'],
+            spec = ic['spec'],
+            interconnect = True,
+        )
+    if not target_roles:
+        target_roles = None
+    tc_info = tcfl.tc_info_c(
+        testcase.name, testcase.kws['thisfile'],
+        origin = testcase.origin,
+        target_roles = target_roles,
+        subcase_spec = testcase.subcases,
+        driver_name = str(testcase),
+        tags = testcase._tags,
+        result = tcfl.result_c(),
+    )
+    return tc_info
+
+
+
 def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
                            logger = logging):
     """
@@ -332,15 +364,7 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
                         # FIXME: warn once for each driver
                         logger.warning(
                             f"fix driver '{_tc_driver.__name__}' to return tcfl.tc_info_c")
-                        tcis[file_name].append(tcfl.tc_info_c(
-                            testcase.name, testcase.kws['thisfile'],
-                            origin = testcase.origin,
-                            subcase_spec = testcase.subcases,
-                            axes = { "type" : None },
-                            driver_name = str(testcase),
-                            tags = testcase._tags,
-                            result = tcfl.result_c(),
-                        ))
+                        tcis[file_name].append(_tc_info_from_tc_c(testcase))
                     elif isinstance(testcase, tcfl.tc_info_c):
                         logger.info("testcase found @ %s by %s",
                                      testcase.origin, _tc_driver)
