@@ -1888,8 +1888,15 @@ class tc_info_c:
         #: can be easily pickable when sending this object via a
         #: queue.
         #:
-        #: >>> formatted_traceback = traceback.format_exc()
         #: >>> formatted_traceback = traceback.format_tb(sys.exc_info()[2])
+        #: >>> formatted_traceback = traceback.format_stack()
+        #
+        #: Do not use
+        #:
+        #: >>> formatted_traceback = traceback.format_exc()
+        #:
+        #: somehow it just returns a string and messes everything up.
+        #:
         self.formatted_traceback = formatted_traceback
 
 

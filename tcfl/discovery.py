@@ -196,8 +196,10 @@ def is_tcf_testcase(path, from_path, tc_name, subcases_cmdline,
                 path, path,
                 subcase_spec = subcases_cmdline,
                 result = tcfl.result_c(blocked = 1),
-                exception = RuntimeError(f"cannot import as python"),
-                formatted_traceback = traceback.format_exc()
+                # we don't use the original exception, as it might
+                # have things we can't pickle
+                exception = RuntimeError(f"cannot import as python: {e}"),
+                formatted_traceback = traceback.format_tb(sys.exc_info()[2]),
             )
         ]
 
