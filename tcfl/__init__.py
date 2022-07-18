@@ -1715,6 +1715,121 @@ class server_c:
 
 
 
+class target_role_c:
+    """
+    Describe a target that is needed for a testcase
+
+    :param str role: name of this target's role (eg: *server*,
+      *client*); for most simple cases that only need one target it is
+      *target*. If it is a network, then *network* or *ic* (interconnect).
+
+    :param str origin: (optional) where is this the need for this
+      target role declared (normally as a *FILENAME[:LINENUMBER]*).
+
+    :param dict axes: (optional) dictionary keyed by string of the
+      axes on which to spin this target role (see :ref:`testcase
+      pairing testcase_pairing`).
+
+      >>> dict(
+      >>>     AXISNAME = [ VALUE0, VALUE 1... ],
+      >>>     AXISNAME = None,
+      >>> ...)
+
+      The key name is the axis name, which as to be a valid Python
+      identifier and the values are *None* (to get all the values
+      from a field named as the axis in the inventory) or a list of
+      values valid axis values (which an be *bool*, *int*, *float* or
+      *str*).
+
+      Note that when getting the values from the inventory, only
+      values that apply to a target that matches the *spec* will
+      be considered [*ic_spec* is ignored for this].
+
+      See :ref:'axis specification <axis_specification>` for more
+      information
+
+    :param str,callable spec: (optional) target specification
+      filter--used to filter which targets are acceptable for this
+      role.
+
+      This can be a string describing a logical expression or a
+      function that does the filtering; the function *MUST* be
+      not depend on global data other than the target inventory
+      and be estable over calls, since its results will be cached.
+
+      See :ref:'target filtering <target_filtering>` for more
+      information
+
+      FIXME: the function needs to be available on the core TCFL
+      image, not on the testcase definition, otherwise it needs to be
+      pickled?
+
+    :param dict spec_args: (optional) dictionary of arguments to
+      the *spec* call (if used)
+
+    :param str,callable ic_spec: (optional) target specification
+      filter for interconnectivity--used to filter which targets
+      meet the connectivity needs of the testcase (eg: is target *A*
+      is connected to networks *E* and *F*?).
+
+      This is separate from the *spec* filter above for
+      performance reasons. To calculate connectivity maps the
+      permutations are heavily reduced if we have been able to
+      first reduce and cache the valid targets and then cache by
+      connectivity.
+
+      For example, to request a target that is connected to
+      another two targets (declared as interconnects)
+
+      >>> ic_spec = pairer._spec_filter_target_in_interconnect,
+      >>> ic_spec_args = { 'interconnects': [ 'ctl', 'nut' ] }
+
+      See :ref:'target filtering and interconnectivity
+      <target_filtering_ic>` for more information
+
+    :param dict ic_spec_args: (optional) dictionary of arguments to
+      the *ic_spec* call (if used)
+
+    :param bool interconnects: if *True* consider, consider this
+      role as an interconnect, a target that interconnects other
+      targets (eg: a network).
+
+    """
+    def __init__(self, role: str,
+                 origin: str = None,
+                 axes: dict = None,
+                 spec = None,			# FIXME: spec str|callable
+                 spec_args = None,
+                 ic_spec = None,                # FIXME: spec str|callable
+                 ic_spec_args: dict = None,
+                 interconnect: bool = False):
+        assert isinstance(role, str)
+        assert origin == None or isinstance(origin, str)
+        assert axes == None or isinstance(axes, dict)
+        # FIXME: properly verify this
+        assert spec == None or isinstance(spec, str) or callable(spec)
+        assert spec_args == None or isinstance(spec_args, dict)
+        assert ic_spec == None or callable(ic_spec)
+        assert ic_spec_args == None or isinstance(ic_spec_args, dict)
+        assert isinstance(interconnect, bool), \
+            f"interconnect: expected boolean, got {type(interconnect)}"
+
+        self.role = role
+        self.origin = origin
+        self.axes = axes
+        # FIXME: pre-compile if text?
+        self.spec = spec
+        self.spec_args = spec_args
+        self.ic_spec = ic_spec
+        self.ic_spec_args = ic_spec_args
+        self.interconnect = interconnect
+
+
+    def __repr__(self):
+        return self.role
+
+
+
 class tc_info_c:
     """
     Information about a testcase
@@ -1750,6 +1865,9 @@ class tc_info_c:
         #: list of subcases by name that the runner is supposed to execute
         self.subcase_spec = subcase_spec
         self.axes = axes
+        if target_roles != None:
+            commonl.assert_dict_of_types(target_roles, "target_roles",
+                                         target_role_c)
         self.target_roles = target_roles
         self.tags = tags
         self.driver_name =  driver_name
