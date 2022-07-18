@@ -2789,6 +2789,36 @@ def assert_dict_of_ints(d, d_name):
             "'%s' needs to be a dict of ints keyed by string;" \
             " for key '%s' got a value type '%s'" % (d_name, k, type(v))
 
+
+def assert_dict_of_types(d: dict, d_name: str, t: type):
+    """
+    Assert an object is a dictionary of values of a given type keyed by strings
+
+    :param dict d: dictionary to verify; all keys have to be strings
+      and all values of type *t*
+
+    :param str d_name: name of the *d* object
+
+    :param type t: type the values must meet
+
+    :raises: AssertionError if any requirement is not met
+    """
+    assert isinstance(t, type), \
+        f"t: expected type, got {type(t)}"
+    assert isinstance(d_name, str), \
+        f"d_name: expected str, got {type(d_name)}"
+    t_name = t.__name__
+    assert isinstance(d, dict), \
+        f"{d_name}: expect a dict of {t_name} keyed by string, got {type(d)}"
+    for k, v in d.items():
+        assert isinstance(k, str), \
+            "'%s' needs to be a dict of %s keyed by string;" \
+            " got a key type '%s'; expected string" % (d_name, t_name, type(k))
+        assert isinstance(v, t), \
+            "'%s' needs to be a dict of %s keyed by string;" \
+            " for key '%s' got a value type '%s'" % (d_name, t_name, k, type(v))
+
+
 macaddr_regex = re.compile(
     "(?P<n0>[0-9a-fA-F][0-9a-fA-F])"
     ":(?P<n1>[0-9a-fA-F][0-9a-fA-F])"
