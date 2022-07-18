@@ -173,6 +173,14 @@ def _testcase_info_print(testcase):
         for line in testcase.output.splitlines():
             print("    " + line)
 
+    if testcase.exception:
+        print(f"  exception: {testcase.exception}")
+
+    if testcase.formatted_traceback:
+        print(f"  traceback:\n    {'    '.join(testcase.formatted_traceback)}")
+
+    print()
+
 
 
 def _cmdline_info(args):
