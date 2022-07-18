@@ -350,16 +350,16 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
     if subcases_cmdline:
         tc_name += "#" + "#".join(subcases_cmdline)
     for _tc_driver in tcfl.tc.tc_c._tc_drivers:
-        tc_instances = []
-        with tcfl.msgid_c(depth = 1) as _msgid:
+        testcases = []
+        with tcfl.msgid_c(depth = 1) as _msgid:	# FIXME: remove, unneeded here
             try:
-                tc_instances += _is_testcase_call(
+                testcases += _is_testcase_call(
                     _tc_driver, tc_name,
                     file_name, from_path,
                     subcases_cmdline,
                     logger = logger.getChild(f"[{type(_tc_driver).__name__}]"))
                 # a single file might contain more than one testcase
-                for testcase in tc_instances:
+                for testcase in testcases:
                     if isinstance(testcase, tcfl.tc_c):
                         # FIXME: warn once for each driver
                         logger.warning(
