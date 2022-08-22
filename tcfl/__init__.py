@@ -546,6 +546,15 @@ valid_results = dict(
 )
 
 
+tls = threading.local()
+
+def tls_var(name, factory, *args, **kwargs):
+    value = getattr(tls, name, None)
+    if value == None:
+        value = factory(*args, **kwargs)
+        setattr(tls, name, value)
+    return value
+
 
 class msgid_c(object):
     """
@@ -581,6 +590,7 @@ class msgid_c(object):
         msgid_c.depth()
     """
 
+    # FIXME: merge with tcfl.tls
     tls = threading.local()
 
     @classmethod
