@@ -15,6 +15,7 @@ import logging
 import os
 import shutil
 import socket
+import time
 import urllib
 
 import base64
@@ -23,8 +24,8 @@ import random
 import requests
 import subprocess
 import sys
-import traceback
 import threading
+import traceback
 
 import filelock
 
@@ -1011,6 +1012,12 @@ class server_c:
         else:
             self.origin = commonl.origin_get()
         self.reason = None
+        # FIXME: self.lock() is at this point only used for the
+        # cookies...which are in self.cookies and we should be
+        # updating to the file all the time anyway after calling
+        # send_request()
+        self.lock = threading.Lock()
+        self.cookies = {}
         self.cache_lockfile = None
         self.fsdb = None
 
@@ -1722,6 +1729,230 @@ class server_c:
                 log_sd.info(f"{bad_url}: skipping, listed as"
                             f" bad [{bad_server.origin}]")
             del cls.servers[bad_url]
+
+
+    API_VERSION = 2
+    API_PREFIX = "/ttb-v" + str(API_VERSION)
+
+    # FIXME: this timeout has to be proportional to how long it takes
+    # for the target to flash, which we know from the tags
+    def send_request(self, method, url,
+                     data = None, json = None, files = None,
+                     stream = False, raw = False,
+                     timeout = 160, timeout_extra = None,
+                     retry_timeout = 0, retry_backoff = 0.5,
+                     skip_prefix = False):
+        """
+        Send a request to the server
+
+        Using url and data and current loging cookies, save the
+        cookies generated from the request, search for issues on
+        connection and raise and exception or return the response
+        object.
+
+        :param str url: url to request
+        :param dict data: args to send in the request. default None
+        :param str method: method used to request GET, POST and
+          PUT. Defaults to PUT.
+        :param bool raise_error: if true, raise an error if something goes
+           wrong in the request. default True
+
+        :param int timeout_extra: extra timeout on top of the
+          *timeout* variable; this is meant to add extra timeouts from
+          environment.
+-
+          If *None*, take the extra timeout from the environment
+          variable *TCFL_TIMEOUT_EXTRA*.
+
+        :param float retry_timeout: (optional, default 0--disabled)
+          how long (in seconds) to retry connections in case of failure
+          (:class:`requests.exceptions.ConnectionError`,
+          :class:`requests.exceptions.ReadTimeout`)
+
+          Note a retry can have side effects if the request is not
+          idempotent (eg: writing to a console); retries shall only be
+          enabled for GET calls. Support for non-idempotent calls has
+          to be added to the protocol.
+
+          See also :meth:`tcfl.tc.target_c.ttbd_iface_call`
+
+        :returns requests.Response: response object
+
+        """
+        assert not (data and json), \
+            "can't specify data and json at the same time"
+        assert isinstance(retry_timeout, (int, float)) and retry_timeout >= 0, \
+            f"retry_timeout: {retry_timeout} has to be an int/float >= 0"
+        assert isinstance(retry_backoff, (int, float)) and retry_backoff > 0
+        if retry_timeout > 0:
+            assert retry_backoff < retry_timeout, \
+                f"retry_backoff {retry_backoff} has to be" \
+                f" smaller than retry_timeout {retry_timeout}"
+
+        if timeout_extra == None:
+            timeout_extra = int(os.environ.get("TCFL_TIMEOUT_EXTRA", 0))
+        assert timeout_extra >= 0, \
+            "TCFL_TIMEOUT_EXTRA: (from environment) must be positive" \
+            " number of seconds;  got {timeout_extra}"
+        timeout += timeout_extra
+
+        # create the url to send request based on API version
+        if url.startswith("/"):		# url is always relative, but for
+            url = url[1:]		# ...join() to work, leading / removed
+
+        # note: urljoin() takes only the HOSTNAME:PORT, skipping any
+        # PATH, so, do it by hand
+        url_base = self.parsed_url.geturl()
+        if not skip_prefix:
+            url_base += self.API_PREFIX
+        url_request = url_base + "/" + url
+        print(f"DEBUG base_url {self.parsed_url.geturl()} url {url} url_request {url_base} {url_request}")
+        logger.debug("send_request: %s %s", method, url_request)
+        with self.lock:
+            cookies = self.cookies
+        session = tls_var("session", requests.Session)
+        retry_count = -1
+        retry_ts = None
+        r = None
+        while True:
+            retry_count += 1
+            try:
+                if method == 'GET':
+                    r = session.get(url_request, cookies = cookies, json = json,
+                                    data = data, verify = self.ssl_verify,
+                                    stream = stream, timeout = (timeout, timeout))
+                elif method == 'PATCH':
+                    r = session.patch(url_request, cookies = cookies, json = json,
+                                      data = data, verify = self.ssl_verify,
+                                      stream = stream, timeout = ( timeout, timeout ))
+                elif method == 'POST':
+                    r = session.post(url_request, cookies = cookies, json = json,
+                                     data = data, files = files,
+                                     verify = self.ssl_verify,
+                                     stream = stream, timeout = ( timeout, timeout ))
+                elif method == 'PUT':
+                    r = session.put(url_request, cookies = cookies, json = json,
+                                    data = data, verify = self.ssl_verify,
+                                    stream = stream, timeout = ( timeout, timeout ))
+                elif method == 'DELETE':
+                    r = session.delete(url_request, cookies = cookies, json = json,
+                                       data = data, verify = self.ssl_verify,
+                                       stream = stream, timeout = ( timeout, timeout ))
+                else:
+                    raise AssertionError("{method}: unknown HTTP method" )
+                break
+            except (
+                    requests.exceptions.ConnectionError,
+                    requests.exceptions.ReadTimeout,
+            ) as e:
+                # Retry only these; note these cannot report
+                # Report how many retries we have done, wait a backoff
+                # and then loop it.
+                if retry_timeout == 0:
+                    raise
+                ts = time.time()
+                if retry_ts == None:
+                    retry_ts = ts	# first one
+                else:
+                    if ts - retry_ts > retry_timeout:
+                        raise RuntimeError(
+                            f"{url_request}: giving up after {retry_timeout}s"
+                            f" retrying {retry_count} connection errors") from e
+                time.sleep(retry_backoff)
+                # increase the backoff to avoid pestering too much,
+                # but make sure it doesn't get too big so we at least
+                # get 10 tries in the timeout period
+                if retry_backoff < retry_timeout / 10:
+                    retry_backoff *= 1.2
+                continue
+
+
+        #update cookies
+        if len(r.cookies) > 0:
+            with self.lock:
+                # Need to update like this because r.cookies is not
+                # really a dict, but supports items() -- overwrite
+                # existing cookies (session cookie) and keep old, as
+                # it will have the stuff we need to auth with the
+                # server (like the remember_token)
+                # FIXME: maybe filter to those two only?
+                for cookie, value in r.cookies.items():
+                    self.cookies[cookie] = value
+        commonl.request_response_maybe_raise(r)
+        if raw:
+            return r
+        rdata = r.json(object_pairs_hook = collections.OrderedDict)
+        if '_diagnostics' in rdata:
+            diagnostics = rdata.pop('_diagnostics')
+            # this is not very...memory efficient
+            for line in diagnostics.split("\n"):
+                logger.warning("diagnostics: " + line)
+        return rdata
+
+
+    def targets_get(self, target_id = None, projections = None):
+        commonl.assert_none_or_list_of_strings(projections, "projections",
+                                               "field name")
+        log_sd.error(f"DEBUG {self.url}: projecting {projections}")
+
+        # load the raw description from the server and then do some
+        # minimal manipulation for the cache:
+        #
+        # - add fullid, server, server_aka
+        # - add TARGETNAME=True
+        # - return both nested and flat dictionary
+        #
+        # if a given target is given, load only that one
+        try:
+            server_rts = dict()
+            server_rts_flat = dict()
+
+            def _rt_handle(target_id, rt):
+                rt[target_id] = True
+                fullid = self.aka + "/" + target_id
+                rt[fullid] = True
+                rt['fullid'] = fullid
+                # these are needed to later one be able to go from an
+                # rt straight to the server
+                rt['server'] = self.url
+                rt['server_aka'] = self.aka
+                # DO NOT publish rt['rtb'], it is an internal object
+                server_rts[fullid] = rt
+                server_rts_flat[fullid] = dict(rt)
+                # Note the empty_dict!! it's important; we want to
+                # keep empty nested dictionaries, because even if
+                # empty, the presence of the key might be used by
+                # clients to tell things about the remote target
+                server_rts_flat[fullid].update(
+                    commonl.dict_to_flat(rt, empty_dict = True))
+
+            if projections:
+                data = { 'projections': json.dumps(projections) }
+            else:
+                data = None
+            # we do a short timeout here, so dead servers don't hold
+            # us too long
+            if target_id:
+                r = self.send_request("GET", "targets/" + target_id,
+                                      data = data, raw = True, timeout = 10)
+                # Keep the order -- even if json spec doesn't contemplate it, we
+                # use it so the client can tell (if they want) the order in which
+                # for example, power rail components are defined in interfaces.power
+                rt = json.loads(r.text, object_pairs_hook = collections.OrderedDict)
+                _rt_handle(target_id, rt)
+            else:
+                r = self.send_request("GET", "targets/",
+                                      data = data, raw = True, timeout = 10)
+                # Keep the order -- even if json spec doesn't contemplate it, we
+                # use it so the client can tell (if they want) the order in which
+                # for example, power rail components are defined in interfaces.power
+                r = json.loads(r.text, object_pairs_hook = collections.OrderedDict)
+                for target_id, rt in r.items():
+                    _rt_handle(target_id, rt)
+            return server_rts, server_rts_flat
+        except requests.exceptions.RequestException as e:
+            log_sd.error("%s: can't use: %s", self.url, e)
+            return {}, {}
 
 
 
