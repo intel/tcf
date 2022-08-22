@@ -18,6 +18,7 @@ import re
 import urllib.parse
 
 import commonl
+import tcfl.servers
 import tcfl.tc
 from . import ttb_client
 from . import _install
@@ -68,10 +69,17 @@ def url_add(url, ssl_ignore = False, aka = None, ca_path = None,
     urls_data[url]['origin'] = origin
 
 
-def load(config_path = None, config_files = None,
-         state_dir = None, ignore_ssl = True):
+
+_subsystem_setup = False
+
+def subsystem_setup(config_path = None, config_files = None,
+                    state_dir = None):
     """
-    Load the TCF Library configuration
+    Load the global TCF Library configuration and setup state
+
+    This does not discover servers, target or testcases, just loads
+    the configuration. Use :func:`tcfl.servers.subsystem_setup` or
+    :func:`tcfl.targets.subsystem_setup` for that.
 
     :param config_path: list of strings containing UNIX-style paths
         (DIR:DIR), DIR;DIR on Windows, to look for config files
@@ -80,10 +88,19 @@ def load(config_path = None, config_files = None,
 
     :param config_files: list of extra config files to load
     :param str state_path: (optional) path where to store state
-    :param bool ignore_ssl: (optional) wether to ignore SSL
-        verification or not (useful for self-signed certs)
 
     """
+    # ensure server subsystem is setup
+    # FIXME: eventually all the state should be contained in a single
+    # object tied to a state dir, config dir and cache location, with
+    # its own servers and such. -- final goal is it should be possible
+    # to have two full instances loaded that can operate in
+    # parallel. Default, however, would be all transparent in tcfl.
+    global _subsystem_setup
+    if _subsystem_setup:
+        return
+
+    logger.info("loading configuration files")
     if config_path == None:
         config_path = [
             ".tcf", os.path.join(os.path.expanduser("~"), ".tcf"),
@@ -116,29 +133,31 @@ def load(config_path = None, config_files = None,
         commonl.config_import_file(config_file, "__main__")
         loaded_files.append(config_file)
 
-    # this takes stuff in added by config files to tcfl.config.urls to
-    # seed, stuff we saved on disk from previous runs or defaults to
-    # hostname "ttbd" that is resovled
-    tcfl.server_c.discover()
+    _subsystem_setup = True
 
-    for _, server in tcfl.server_c.servers.items():		# create target server objects
-        # COMPAT: old style ttb_client.rest_target_broker -> being
-        # moved to tcfl.server_c
-        rtb = ttb_client.rest_target_broker(
-            os.path.expanduser(state_path), server.url,
-            ignore_ssl = not server.ssl_verify,
-            aka = server.aka, origin = server.origin)
-        ttb_client.rest_target_brokers[server.parsed_url.geturl()] = rtb
 
-    if not tcfl.ttb_client.rest_target_brokers:
-        logger.warning(
-            "No servers available; please use --url or "
-            "add to a file called conf_ANYTHING.py in any of %s with:\n"
-            "\n"
-            "  tcfl.config.url_add('https://URL:PORT', ssl_ignore = True)\n"
-            "\n" % ":".join(config_path))
 
+def load(config_path = None, config_files = None,
+         state_dir = None, ignore_ssl = True):
+    """
+    Load the TCF Library configuration
+
+    :param config_path: list of strings containing UNIX-style paths
+        (DIR:DIR), DIR;DIR on Windows, to look for config files
+        (conf_*.py) that will be loaded in alphabetical order. An
+        empty path clears the current list.
+
+    :param config_files: list of extra config files to load
+    :param str state_path: (optional) path where to store state
+    :param bool ignore_ssl: (optional) wether to ignore SSL
+        verification or not (useful for self-signed certs)
+
+    """
+    # FIXME: being deprecated
+    subsystem_setup(config_path, config_files, state_dir)
+    tcfl.servers._discover_bare(ssl_ignore = ignore_ssl)
     tcfl.msgid_c.cls_init_maybe()
+
 
 
 def setup(*args,
