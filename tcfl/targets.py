@@ -101,7 +101,7 @@ class discovery_agent_c:
         self.rts_fullid_disabled = set()
         self.rts_fullid_enabled = set()
 
-        self.projections = None
+        self.projections = projections
 
         self.executor = None
         self.rs = {}
@@ -175,20 +175,46 @@ class discovery_agent_c:
             tcfl.rts_fullid_enabled = self.rts_fullid_enabled
 
 
+#: Global targets discovery agent, containing the list of discovered targets
+#:
+#: The list of target full names (*SERVER/TARGETID*):
+#:
+#: >>> tcfl.targets.discovery_agent.rts_fullid_sorted
+#: >>> tcfl.targets.discovery_agent.rts_fullid_disabled
+#: >>> tcfl.targets.discovery_agent.rts_fullid_enabled
+#:
+#: For example, the target data for each target in dictionary format:
+#:
+#: >>> tcfl.targets.discovery_agent.rts
+#:
+#: For example, the target data for each target in dictionary format,
+#: but also flattened (*a[b]* would look like *a.b*):
+#
+#: >>> tcfl.targets.discovery_agent.rts_flat
+#:
+#: Note this gets initializd by tcfl.targets.subsystem_setup()
+discovery_agent = None
 
-discovery_agent = discovery_agent_c()
 
 _subsystem_setup = False
 
 
 
-def subsystem_setup(*args, **kwargs):
+def subsystem_setup(*args, projections = None, **kwargs):
     """
     Initialize the target discovery subsystem in a synchronous way
 
     Check the module documentation for an asynchronous one.
 
-    Same arguments as :func:`tcfl.config.subsystem_setup`
+    Same arguments as:
+
+    - :class:`tcfl.targets.discovery_agent_c`
+
+      Note using *projections* for anything else than just listing
+      will limit the amount of information that is loaded from servers
+      during the instance lifecycle.
+
+    - :func:`tcfl.config.subsystem_setup`
 
     Note this initialize all the required dependencies
     (:mod:`tcfl.config` and :mod:`tcfl.servers )` if not already
@@ -207,6 +233,7 @@ def subsystem_setup(*args, **kwargs):
 
     # discover targets
     global discovery_agent
+    discovery_agent = discovery_agent_c(*args, projections = projections, **kwargs)
     discovery_agent.update_start()
     discovery_agent.update_complete(update_globals = True)
 
