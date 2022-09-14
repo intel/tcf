@@ -289,7 +289,14 @@ def ast_expr(ast, env):
                 return ast_sym(val, env)
             else:
                 return val
-        return _val_get(ast[1]) in _val_get(ast[2])
+        symbol_left = ast[1]
+        val_left = _val_get(ast[1])
+        val_right = _val_get(ast[2])
+        if isinstance(val_right, ( dict, list, set, tuple )):
+            # FIELD in ANOTHERFILED
+            return symbol_left in val_right
+        # SUBSTRING in FIELD
+        return val_left in val_right
     elif ast[0] == "exists":
         return True if ast_sym(ast[1], env) else False
     elif ast[0] == ":":
