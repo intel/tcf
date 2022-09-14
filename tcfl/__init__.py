@@ -1934,6 +1934,8 @@ class server_c:
                     commonl.dict_to_flat(rt, empty_dict = True))
 
             if projections:
+                if isinstance(projections, set):
+                    projections = list(projections)
                 data = { 'projections': json.dumps(projections) }
             else:
                 data = None
