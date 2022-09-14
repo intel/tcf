@@ -105,12 +105,14 @@ def subsystem_setup(config_path = None, config_files = None,
         config_path = [
             ".tcf", os.path.join(os.path.expanduser("~"), ".tcf"),
         ] + _install.sysconfig_paths
+    tcfl.config_path = config_path
 
     global state_path
     if state_dir:
         state_path = state_dir
     else:
         state_path = os.path.join(os.path.expanduser("~"), ".tcf")
+    tcfl.server_c.state_path = state_path
 
     if not config_files:
         config_files = []

@@ -50,7 +50,7 @@ def _discover_bare(ssl_ignore = True):
             "add to a file called conf_ANYTHING.py in any of %s with:\n"
             "\n"
             "  tcfl.config.url_add('https://URL:PORT', ssl_ignore = True)\n"
-            "\n" % ":".join(config_path))
+            "\n" % ":".join(tcfl.config_path))
 
 
 

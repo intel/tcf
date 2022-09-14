@@ -35,6 +35,10 @@ import tcfl.ttb_client # ...ugh
 logger = logging.getLogger("tcfl")
 log_sd = logging.getLogger("server-discovery")
 
+#: List of paths which we use to look for configuration files;
+#: initialized by tcfl.config.subsystem_setup()
+config_path = []
+
 class result_c:
     def __init__(self, passed = 0, errors = 0, failed = 0,
                  blocked = 0, skipped = 0):
@@ -1021,6 +1025,9 @@ class server_c:
         self.cache_lockfile = None
         self.fsdb = None
 
+    #: where to store state path (login info, etc); updated by
+    #: tcfl.config.subsystem_setup()
+    state_path = None
 
     def setup(self):
         """
