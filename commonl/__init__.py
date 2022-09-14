@@ -2734,7 +2734,7 @@ def file_iterator(filename, chunk_size = 4096):
 
 
 def assert_list_of_strings(l, list_name, item_name):
-    assert isinstance(l, ( tuple, list )), \
+    assert isinstance(l, ( tuple, list, set )), \
         "'%s' needs to be None or a list of strings (%s); got %s" % (
             list_name, item_name, type(l))
     count = -1
