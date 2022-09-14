@@ -78,6 +78,8 @@ import threading
 import ply.lex as lex
 import ply.yacc as yacc
 
+import commonl
+
 reserved = {
     'and' : 'AND',
     'or' : 'OR',
@@ -302,21 +304,85 @@ def ast_expr(ast, env):
     elif ast[0] == ":":
         return True if re.compile(ast[2]).search(ast_sym(ast[1], env)) else False
 
-mutex = threading.Lock()
 
-def parse(expr_text, env):
-    """Given a text representation of an expression in our language,
+_mutex = threading.Lock()
+
+
+
+def precompile(expr_text: str):
+    """
+    Compile a parser expression and return an AST object for it
+
+    :param str expr_text: string with the expression text, eg:
+
+      >>> ast = commonl.expr_parser.compile('symbol1 == "ef34" and symbol2 < 3')
+
+    :returns: AST object for the given expression
+    """
+    with _mutex:		# the parser is not reentrant
+        return parser.parse(expr_text)
+
+
+
+def symbol_list(ast: tuple, _l = None):
+    """
+    Given a compiled AST expression, return the list of symbols it contains
+
+    :param tuple ast: ast expression returned by :func:`compile`
+
+    >>> ast = commonl.expr_parser.parse("(( var1 )  and ( var2 or level > 3 ) )")
+    >>> print(ast)
+    ('and', ('exists', 'var1'), ('or', ('exists', 'var2'), ('>', 'level', 3)))
+    >>> symbols = commonl.expr_parser.symbol_list(ast)
+    >>> print(symbols)
+    [ 'var1', 'var2', 'level' ]
+    """
+    assert isinstance(ast, tuple)
+    if _l == None:
+        _l = []
+
+    if len(ast) == 1:
+        return _l
+    operator = ast[0]
+    count = 1
+    for symbol in ast[1:]:
+        if isinstance(symbol, str):
+            # in is slightly special FIELD in DICTFIELD
+            if operator == "in":
+                _l.append(symbol)
+            elif count == 1:
+                # other operators only the first field is a symbol
+                _l.append(symbol)
+        if isinstance(symbol, tuple):
+            symbol_list(symbol, _l)
+        count += 1
+
+    return _l
+
+
+
+def parse(expr_text: str, env: dict, ast: tuple = None):
+    """
+    Given a text representation of an expression in our language,
     use the provided environment to determine whether the expression
-    is true or false"""
+    is true or false
 
+    :param str expr_text: string with the expression text, eg:
+
+      >>> ast = commonl.expr_parser.compile('symbol1 == "ef34" and symbol2 < 3')
+
+    :param dict env: dictionary keyed by string of symbols and their
+      values, eg
+
+      >>> env = { "symbol1": "ef34", "symbol2": 3 }
+    """
+    commonl.assert_dict_key_strings(env, env)
     # Like it's C counterpart, state machine is not thread-safe
-    mutex.acquire()
-    try:
-        ast = parser.parse(expr_text)
-    finally:
-        mutex.release()
-
+    if ast == None:
+        ast = precompile(expr_text)
     return ast_expr(ast, env)
+
+
 
 # Just some test code
 if __name__ == "__main__":
