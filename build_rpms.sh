@@ -20,7 +20,7 @@ while getopts ":d:v:t:p:i:" o; do
     esac
 done
 
-VERSION=${VERSION:-$(git describe | sed 's/^v\([0-9]\+\)/\1/' | sed 's/-/./g')}
+VERSION=${VERSION:-$(git describe | sed 's/-/./g' | sed 's/^v\([0-9]\+.[0-9]\+.[0-9]\+\).[a-z0-9]\+/\1/')}
 
 # Use docker if a container is specified, otherwise just run locally
 if [ "${CONTAINER}" == "None" ]; then
