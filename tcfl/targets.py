@@ -49,6 +49,7 @@ import collections
 import concurrent.futures
 import logging
 
+import commonl.expr_parser
 import tcfl
 import tcfl.servers
 
@@ -140,12 +141,11 @@ class discovery_agent_c:
             return
         if self.executor or self.rs:	# already started
             return
-        logger.info("")
         self.executor = concurrent.futures.ThreadPoolExecutor(len(tcfl.server_c.servers))
         self.rs = self.executor.map(
             lambda server: server.targets_get(projections = self.projections),
             tcfl.server_c.servers.values())
-        logger.error("server inventory update started")
+        logger.info("server inventory update started")
 
 
 
@@ -173,6 +173,51 @@ class discovery_agent_c:
             tcfl.rts_fullid_sorted = self.rts_fullid_sorted
             tcfl.rts_fullid_disabled = self.rts_fullid_disabled
             tcfl.rts_fullid_enabled = self.rts_fullid_enabled
+
+
+def select_by_ast(rt_flat: dict,
+                  expr_ast: tuple, include_disabled: bool):
+    """
+    Given a conditional AST expression, return if a target matches it or not.
+
+    :param dict rt_flat: remote target descriptor in flat format (as
+       from :data:`tcfl.targets.discovery_agent.rts_flat`), eg:
+
+       >>> tcfl.targets.discovery_agent.rts_flat['SERVER/TARGETNAME']
+
+    :param tuple expr_ast: compiled AST expression
+
+       >>> expr_ast = commonl.expr_parser.precompile("ram.size_gib > 2")
+
+       The fields in the expression are inventory fields; the expression
+       is compiled with :func:`commonl.expr_parser.precompile`. FIXME:
+       further doc link for language.
+
+    :param bool include_disabled: consider disabled targets or not
+       (disabled targets are those that have a *disabled* field set to
+       anything)
+
+    :returns bool: *True* if the target matches the conditional
+      expression, *False* otherwise
+
+    For example, to use Python's :class:`filter`:
+
+    >>> tcfl.targets.subsystem_setup()
+    >>> expr_ast = commonl.expr_parser.precompile("ram.size_gib > 2")
+    >>> for rtfullid in filter(
+    >>>         lambda rtfullid: tcfl.targets.select_by_ast(
+    >>>             tcfl.targets.discovery_agent.rts_flat[rtfullid],
+    >>>             expr_ast, False),
+    >>>         tcfl.targets.discovery_agent.rts_fullid_sorted:
+    >>>     print(f"{rtfullid} matches")
+
+    """
+    if not include_disabled and rt_flat.get('disabled', False):
+        return False
+    if expr_ast and not commonl.expr_parser.parse("", rt_flat, expr_ast):
+        return False
+    return True
+
 
 
 #: Global targets discovery agent, containing the list of discovered targets
