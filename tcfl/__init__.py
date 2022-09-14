@@ -8,13 +8,16 @@
 import collections
 import concurrent.futures
 import datetime
+import errno
 import inspect
 import itertools
 import json
 import logging
 import os
+import pickle
 import shutil
 import socket
+import tempfile
 import time
 import urllib
 
@@ -1003,6 +1006,7 @@ class server_c:
         if self.parsed_url.scheme == "" or self.parsed_url.netloc == "":
             raise ValueError(f"{url}: malformed URL? missing hostname/schema")
         self.url = url
+        self.url_safe = commonl.file_name_make_safe(self.parsed_url.geturl())
         self.ssl_verify = ssl_verify
         self.aka = aka
         self.ca_path = ca_path
@@ -1813,10 +1817,10 @@ class server_c:
         if not skip_prefix:
             url_base += self.API_PREFIX
         url_request = url_base + "/" + url
-        print(f"DEBUG base_url {self.parsed_url.geturl()} url {url} url_request {url_base} {url_request}")
         logger.debug("send_request: %s %s", method, url_request)
+        cookies = self.state_load()	# keep' em on self for reference
         with self.lock:
-            cookies = self.cookies
+            self.cookies = dict(cookies)     # to access out of the lock
         session = tls_var("session", requests.Session)
         retry_count = -1
         retry_ts = None
@@ -1874,17 +1878,21 @@ class server_c:
                 continue
 
 
-        #update cookies
+        # update cookies; save to the file so other instances can get
+        # the updated cookies
         if len(r.cookies) > 0:
+            cookies = {}
+            # Need to update like this because r.cookies is not
+            # really a dict, but supports items() -- overwrite
+            # existing cookies (session cookie) and keep old, as
+            # it will have the stuff we need to auth with the
+            # server (like the remember_token)
+            # FIXME: maybe filter to those two only?
+            for cookie, value in r.cookies.items():
+                cookies[cookie] = value
+            self.state_save(cookies)
             with self.lock:
-                # Need to update like this because r.cookies is not
-                # really a dict, but supports items() -- overwrite
-                # existing cookies (session cookie) and keep old, as
-                # it will have the stuff we need to auth with the
-                # server (like the remember_token)
-                # FIXME: maybe filter to those two only?
-                for cookie, value in r.cookies.items():
-                    self.cookies[cookie] = value
+                self.cookies = cookies
         commonl.request_response_maybe_raise(r)
         if raw:
             return r
@@ -1897,10 +1905,54 @@ class server_c:
         return rdata
 
 
+
+    def state_load(self):
+        """
+        Load saved state
+        """
+        file_name = os.path.join(self.state_path,
+                                 f"cookies-{self.url_safe}.pickle")
+        try:
+            with open(file_name, "rb") as f:
+                cookies = pickle.load(f)
+            logger.info("%s: loaded state", file_name)
+            return cookies
+        except pickle.UnpicklingError as e: #invalid state, clean file
+            os.remove(file_name)
+            return {}
+        except IOError as e:
+            if e.errno != errno.ENOENT:
+                raise e
+            logger.debug("%s: no state-file, will not load", file_name)
+            return {}
+
+
+    def state_save(self, cookies):
+        """
+        Save state information (login, etc), so it can be loaded with
+        :meth:`state_load`.
+
+        """
+        commonl.makedirs_p(self.state_path, reason = "server state directory")
+        file_name = os.path.join(self.state_path,
+                                 f"cookies-{self.url_safe}.pickle")
+        if cookies == {}:
+            logger.debug("%s: state deleted (no cookies)", self.url)
+            commonl.rm_f(file_name)
+            return
+        with tempfile.NamedTemporaryFile(dir = self.state_path) as f:
+            # create a temporary file and replace, so the operation is
+            # atomic--other proceses might have done this in
+            # parallel--there would be no conflict
+            pickle.dump(self.cookies, f, protocol = 2)
+            os.replace(file_name, f.name)
+            logger.debug("%s: state saved", self.url)
+
+
+
     def targets_get(self, target_id = None, projections = None):
         commonl.assert_none_or_list_of_strings(projections, "projections",
                                                "field name")
-        log_sd.error(f"DEBUG {self.url}: projecting {projections}")
 
         # load the raw description from the server and then do some
         # minimal manipulation for the cache:
