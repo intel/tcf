@@ -136,7 +136,7 @@ class interface(ttbl.tt_interface):
         # if destination address is in the list of local allowed ports
         if ( ip_addr, protocol, port ) in self.allowed_local_ports:
             # Valid local port redirection, probably to a service
-            # running on the CAPI server
+            # running on the ttbd server
             pass
         else:
             # remote IP redirection, validate it works (will raise if invalid)
