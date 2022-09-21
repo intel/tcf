@@ -54,7 +54,8 @@ class _build_py(distutils.command.build_py.build_py):
 
 
 setup(
-    name = 'test-case-framework',
+    # package name 'tcf' was already taken
+    name = 'tcf-client',
     description = "TCF client",
     long_description = """\
 This is the client and meta-testcase runner for the TCF test case framework.
