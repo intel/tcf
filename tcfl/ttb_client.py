@@ -918,6 +918,12 @@ def rest_target_list_table(targetl):
     # where suffix will be *! (* if powered, ! if owned)
 
     l = []
+    # this is a weird hack to only print short IDs when the target
+    # name is not duplicated, since otherwise it can get too long if
+    # both the server and the target are long and the target name has
+    # enough info--needs something much more generic and centralized
+    # in general for any user-facing ID reporting.
+    targetl_counts = collections.Counter(rt['id'] for rt in targetl)
     for rt in targetl:
         suffix = ""
         if rt.get('owner', None):	# target might declare no owner
@@ -926,7 +932,11 @@ def rest_target_list_table(targetl):
             # having that attribute means the target is powered;
             # otherwise it is either off or has no power control
             suffix += "!"
-        l.append(( rt['fullid'], suffix ))
+        if targetl_counts[rt['id']] > 1:
+            target_id = rt['fullid']
+        else:
+            target_id = rt['id']
+        l.append(( target_id, suffix ))
     if not l:
         return
 
