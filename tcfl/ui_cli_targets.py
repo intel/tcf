@@ -201,16 +201,19 @@ def _cmdline_ls(args):
     # - any field we are testing ("ram.size == 32")
     fields = args.project
     if expr_symbols:		# bring anything from fields we are testing
-        logger.info(f"fields from filter expression: {', '.join(fields)}")
         if fields == None:
             fields = set()
+        logger.info(f"fields from filter expression: {', '.join(fields)}")
         fields.update(expr_symbols)
 
     # so now we are actually querying the servers; this will
     # initialize the servers, discover them and them query them for
     # the target list and the minimum amount of inventory needed to
     # filter and display
-    logger.info(f"querying inventories with fields: {', '.join(fields)}")
+    if fields:
+        logger.info(f"querying inventories with fields: {', '.join(fields)}")
+    else:
+        logger.info("querying inventories with all fields")
     tcfl.targets.subsystem_setup(projections = fields)
 
     # filter targets: because this discovery agent is created just for
