@@ -149,7 +149,7 @@ class discovery_agent_c:
 
 
 
-    def update_complete(self, update_globals = False):
+    def update_complete(self, update_globals = False, shorten_names = True):
         """
         Waits for the target update process to finish
         """
@@ -165,6 +165,35 @@ class discovery_agent_c:
                     f" from {len(tcfl.server_c.servers)} servers found")
         self.executor = None
         self.rs = {}
+
+        # shall we flatten IDs? normally all the names are
+        # SERVERSHORTNAME/TARGETNAME, so if two servers have the same
+        # TARGETNAME, it is easy to determine which one to
+        # use. However, sometimes this yields very long names and is
+        # not desirable. So unique names, we can refer to them just
+        # with the TARGETNAME
+        if shorten_names:
+            # for each TARGETNAME, count how many times it happens in
+            # different servers
+            targetid_counts = collections.Counter(rt['id'] for rt in self.rts.values())
+            for rtfullid, rt in list(self.rts.items()):
+                rtid = rt['id']
+                if targetid_counts[rtid] != 1:	# this target appears
+                    continue			# more than once, skip
+                # rename SERVERSHORTNAME/TARGETNAME -> TARGETNAME
+                disabled = rt.get('disabled', False)
+                self.rts[rtid] = self.rts[rtfullid]
+                del self.rts[rtfullid]
+                self.rts_flat[rtid] = self.rts_flat[rtfullid]
+                del self.rts_flat[rtfullid]
+                self.rts_fullid_sorted.remove(rtfullid)
+                bisect.insort(self.rts_fullid_sorted, rtid)
+                if disabled:
+                    self.rts_fullid_disabled.remove(rtfullid)
+                    self.rts_fullid_disabled.add(rtid)
+                else:
+                    self.rts_fullid_enabled.remove(rtfullid)
+                    self.rts_fullid_enabled.add(rtid)
 
         if update_globals:
             tcfl.rts = self.rts
