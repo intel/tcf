@@ -685,6 +685,7 @@ class extension(tc.target_extension_c):
         else:
             self._default = self.console_list[0]
 
+
     def _console_get(self, console):
         #
         # Given a console name or None, return which console to use;
@@ -1773,13 +1774,15 @@ def _cmdline_console_write(args):
                 args.offset = 0
         if args.console == None:
             args.console = target.console.default
+        # _console_get() translates aliases into a real console name
+        console = target.console._console_get(args.console)
         if args.crlf == None:
             # get the CRLF the server says, otherwise default to \n,
             # which seems to work best for most
             args.crlf = target.rt['interfaces']['console']\
-                [args.console].get('crlf', "\n")
+                [console].get('crlf', "\n")
         if args.interactive:
-            _cmdline_console_write_interactive(target, args.console,
+            _cmdline_console_write_interactive(target, console,
                                                args.crlf, args.offset,
                                                args.max_backoff_wait)
         elif args.data == []:	# no data given, so get from stdin
@@ -1788,17 +1791,18 @@ def _cmdline_console_write(args):
                 if line:
                     target.console.write(line.strip() + args.crlf,
                                          crlf = args.crlf,
-                                         console = args.console)
+                                         console = console)
         else:
             for line in args.data:
                 target.console.write(line + args.crlf,
-                                     console = args.console)
+                                     console = console)
 
 
 def _cmdline_console_read(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args)
-        console = args.console
+        # _console_get() translates aliases into a real console name
+        console = target.console._console_get(args.console)
         offset = target.console.offset_calc(target, args.console, int(args.offset))
         if args.output == None:
             fd = sys.stdout.buffer
