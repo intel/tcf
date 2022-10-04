@@ -230,10 +230,16 @@ else:
         version = subprocess.check_output(
             "git describe --tags --always --abbrev=7 --dirty".split(),
             cwd = _srcdir, stderr = subprocess.PIPE, encoding = "utf-8")
-        # RPM versions can't have dash (-), so use underscores (_)
+        # RPM versions can't have dash (-), so use (.)
         version = version.strip().replace("-", ".")
-        if re.match("^v[0-9]+.[0-9]+", version):
-            version = version[1:]
+        # version should match the standard format for python packages
+        # https://peps.python.org/pep-0440/
+        version_match = re.match(
+            "^v([0-9]+.[0-9]+.[0-9]+).[a-z0-9]+(.dirty)?", version)
+        version = version_match[1]
+        # If dirty tag is present add .dev0 to version
+        if version_match[2]:
+            version += '.dev0'
     except subprocess.CalledProcessError as _e:
         print("Unable to determine %s (%s) version: %s"
               % ("tcf", _srcdir, _e.output), file = sys.stderr)
