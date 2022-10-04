@@ -20,12 +20,10 @@ while getopts ":d:v:t:p:i:" o; do
     esac
 done
 
-VERSION=${VERSION:-$(git describe | sed 's/-/./g' | sed 's/^v\([0-9]\+.[0-9]\+.[0-9]\+\).[a-z0-9]\+/\1/')}
-
 # Use docker if a container is specified, otherwise just run locally
 if [ "${CONTAINER}" == "None" ]; then
     BDIST_OPTS="--dist-dir=${RPM_DIR}/ --bdist-base=${PWD}/dist/"
-    cd ${PWD}/${TARGET_DIR} && VERSION=${VERSION} python3 ./setup.py bdist_rpm ${BDIST_OPTS}
+    cd ${PWD}/${TARGET_DIR} && python3 ./setup.py bdist_rpm ${BDIST_OPTS}
 elif [ "${CONTAINER}" == "True" ]; then
     BUILD_DEPS="dnf install -y python3 rpm-build"
 
@@ -46,7 +44,7 @@ elif [ "${CONTAINER}" == "True" ]; then
     fi
 
     BDIST_OPTS="--dist-dir=/home/rpms/ --bdist-base=/home/tcf/dist/"
-    RUN_SETUP="VERSION=${VERSION} python3 ./setup.py bdist_rpm ${BDIST_OPTS}"
+    RUN_SETUP="python3 ./setup.py bdist_rpm ${BDIST_OPTS}"
 
     docker run -i --rm \
             -v ${PWD}:/home/tcf -v ${RPM_DIR}:/home/rpms \
@@ -61,7 +59,7 @@ elif [ "${CONTAINER}" == "True" ]; then
             cd /home/tcf/${TARGET_DIR} && ${RUN_SETUP}'"
 else
     BDIST_OPTS="--dist-dir=/home/rpms/ --bdist-base=/home/tcf/dist/"
-    RUN_SETUP="VERSION=${VERSION} python3 ./setup.py bdist_rpm ${BDIST_OPTS}"
+    RUN_SETUP="python3 ./setup.py bdist_rpm ${BDIST_OPTS}"
 
     docker run -i --rm --user=${USER}\
             -v ${PWD}:/home/tcf -v ${RPM_DIR}:/home/rpms \
