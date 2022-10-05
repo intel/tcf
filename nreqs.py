@@ -356,7 +356,20 @@ class method_pip_c(method_abc):
         # sys.executable is the current python interpreter; this way
         # if we run with different versions we get it installed for
         # that version
-        cmdline = [ sys.executable, "-m", "pip", "install" ]
+        # FIXME: There is currently a bug that exists which causes
+        # sys.executable to be blank when running the install command as
+        # part of the nreqs.Dockerfile build, can use os.readlink on
+        # linux to find the path, and the python launcher on windows
+        if sys.executable:
+            executable = sys.executable
+        elif sys.platform == 'linux':
+            executable = os.readlink("/proc/self/exe")
+        elif sys.platform == 'win32':
+            executable = f'py -${sys.version_info[0]}.${sys.version_info[1]}'
+        else:
+            raise RuntimeError("Failed to determine current python executable")
+
+        cmdline = [ executable, "-m", "pip", "install" ]
         admin = self.is_admin()
         # To deps or --no-deps, this is the question.
         # We can't tell ahead of time if we are able to install
