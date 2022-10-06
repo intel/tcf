@@ -1568,6 +1568,27 @@ def ps_zombies_list(pids):
             # If the PID doesn't exist, ignore it
     return zombies
 
+# FIXME: There is currently a bug that exists which causes sys.executable to be
+# blank when running the nreqs install command in certian container
+# environments (eg: kaniko), so we try falling back to different default
+# values: os.readlink on linux and the python launcher on windows
+def get_python_executable():
+    """
+    Retrieves the path to the current python executable using sys.executable or
+    other fallback methods depending on platform.
+
+    :return: the path to the current python executable
+    :rtype: str
+    """
+    if sys.executable:
+        return sys.executable
+    elif sys.platform == 'linux':
+        return os.readlink("/proc/self/exe")
+    elif sys.platform == 'win32':
+        return f'py -${sys.version_info[0]}.${sys.version_info[1]}'
+    else:
+        raise RuntimeError("Failed to determine current python executable")
+
 def version_get(module, name):
     try:
         # Try version module created during installation by
