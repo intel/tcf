@@ -3281,9 +3281,22 @@ PUT /targets/TARGETID/console/write component=CONSOLENAME data=DATA -> DICT
 
 Write data to a console
 
-Data is JSON encoded (to be able to send binary). In practice, any
-size is allowed, but it is recommended to chunk the data in requests
-no larger than 1KiB to improve latency response.
+Data is a JSON encoded string. To be able to send any binary, the
+transport plane takes UTF-8 and accepts *surrogateencoding* for bytes
+over 128 (U+DC80 - U+DCFF) see Python's PEP383, so we can pipe binary
+over the "text" based HTTP JSON interface.
+
+*Example*: byte 0xf0 would be transmitted as the JSON string '"\udcf0"'.
+
+In practice, any size is allowed. In interactive sessions, it is
+recommended to:
+
+- chunk the data in small requests no larger than 1KiB
+
+- timing out waiting for more input after 0.25s
+
+this improves the response of someone who is typing input into a
+serial console.
 
 **Access control:** the user, creator or guests of an allocation that
 has this target allocated.

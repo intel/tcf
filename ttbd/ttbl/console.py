@@ -759,7 +759,11 @@ class generic_c(impl_c):
 
         # os.write expects a byestring, so convert data to bytes
         if not isinstance(data, bytes):
-            data = data.encode('utf-8')
+            # the transport plane takes UTF-8 and accepts
+            # surrogateencoding for bytes > 128 (U+DC80 - U+DCFF) see
+            # Python's PEP383, so we can pipe binary over the "text"
+            # based HTTP JSON interface.
+            data = data.encode('utf-8', errors = 'surrogateescape')
         if self.escape_chars:	# if we have to escape, escape
             data = self._escape(data)
         if self.chunk_size:
