@@ -2018,10 +2018,11 @@ def _cmdline_console_write(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args)
         if args.offset == None:
-            # if interactive, default the offset to the last that
-            # comes up; otherwise it gets confusing
+            # if interactive, give us just a little bit of the
+            # previous output; all of it becomes really confusing;
+            # none also...so just a little.
             if args.interactive:
-                args.offset = -1
+                args.offset = -300
             else:
                 args.offset = 0
         if args.console == None:
