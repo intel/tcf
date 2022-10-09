@@ -12,7 +12,11 @@ argcomplete:
 bzip2:
   reason: for de/compressing logfiles and others
   skip_platform: win32
-  
+
+colorama:
+  reason: for initializing ANSI terminals in Windows
+  require_platform: win32
+
 dosfstools:
   skip_platform: win32
 
