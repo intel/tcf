@@ -1689,22 +1689,184 @@ def _console_read_thread_fn(target, console, fd, offset, backoff_wait_max,
 
 
 def _cmdline_console_write_interactive(target, console, crlf,
-                                       offset, max_backoff_wait):
+                                       offset, max_backoff_wait,
+                                       windows_use_msvcrt = False):
 
     #
     # Poor mans interactive console
     #
     # spawn a background reader thread to print the console output,
     # capture user's keyboard input and send it to the target.
-    print("""\
+    #
+    # This is harder than it seems
+    #
+    # - the read thread just reads in a loop and prints to standard
+    #   output; however
+    #
+    #   - the standard output needs to be set to unbuffered mode, so
+    #     nothing waits for a CR/LF or both to print a whole string
+    #
+    #   - for anything supporting enhanced console (cursor moving,
+    #     clear screen, position text, colors...) the standard output
+    #     must be hanled by a virtual terminal (a descendant of vt100)
+    #     This code doesn't do the terminal emulation bit.
+    #
+    #     Most Unix/Linux/MAC(?) terminal windows do it, interpreting
+    #     ANSI sequences (eg: <ESC>[J clears the screen.
+    #
+    #     Windows didn't until ~10? and still it has to be
+    #     enabled [see colorama.init() below].
+    #
+    # - input is tricky:
+    #
+    #   - In Linux/Unix/Mac it is easy; just read from standard input,
+    #     pass it to the other end and let it handle it.
+    #
+    #     When both ends are Unixy, ANSI sequences (ASCII) are passed
+    #     to the other side, which correctly interprets them and magic
+    #     happens.
+    #
+    #   - In Windows, the default Windows command prompt and everybody
+    #     else doesn't work like that.
+    #
+    #     - if reading from sys.stdin, there is a window-specific
+    #       (windows command prompt, PS window, Windows Terminal) semi
+    #       half baked attempt at line editing that seems to work when
+    #       you are doing command line, but it is all illusion. If you
+    #       try to use a visual editor, the cursor keys won't work and
+    #       it tries to do line editing of what you typed. A mess
+    #
+    #     - the thing is to use the MSVCRT functions to get key
+    #       presses, which gives you...scan codes. And scan codes need
+    #       to be converted to ANSI sequences if you want the other
+    #       side to understand them. Which we do because lingua
+    #       franca.
+    #
+    #       Not sure what virtual terminal rendering standard happens
+    #       when you SSH into windows anyway.
+    #
+    #
+    # - newlines: are (not) fun; each system has their own standard;
+    #   lines are ended with
+    #
+    #   - CR 0x0d \r: carriage return (most Unixish, Windows with msvcrt)
+    #
+    #   - NL 0x0a \n: new line
+    #
+    #   - CR+NL (windows with sys.stdin)
+    #
+    # So when we read from the input device, we need to recognize the
+    # input convention for the local system (newline_input), convert
+    # it to the remote (crlf, which comes from the inventory or
+    # command line)--if we want it transparent, well specify no crlf.
+
+    # We do all data collection in bytes
+    if isinstance(crlf, str):
+        crlf = crlf.encode('utf-8', errors = 'surrogateescape')
+    else:
+        assert isinstance(crlf, bytes), "crlf: must be bytes or str, got {type(str)}"
+
+    # ok, depending on where this is running, what kind of terminal
+    # emulator, we are going to get input on one way or another, so
+    # here is to those settings
+
+    if 'INSIDE_EMACS' in os.environ:
+	# running inside an emacs shell
+        #
+        # I've given up -- I can't figure out how to ask stty to
+        # tell me emacs does \n
+        windows = False
+        if sys.platform.startswith("win"):
+            newline_input = b'\r\n'
+        else:
+            newline_input = b'\n'
+        quit_sequence = "C-q ESC C-q ESC ENTER in rapid sequence"
+
+    elif sys.platform.startswith("win"):
+
+        # Using a windows terminal prompt / powershell window
+        if windows_use_msvcrt:
+            # using msvcrt.getwch()
+            #
+            #   - arrows don't work (not VT translated?) -> FIXME need
+            #     xlation to ANSI sequences
+            #
+            #   - getch() unicode chars (accented a, eg) don't come
+            #     in, so we use getwch()
+            newline_input = b"\r"		# Windows, when reading with msvcrt
+            import msvcrt
+
+        else:
+            # Using sys.stdin to read in Windows:
+            #
+            #   - Ctrl-C, ESC ESC works meh
+            #
+            #   - arrows work, but it is because the terminal app is
+            #     doing the editing, so the arrows won't work on
+            #     editors like vi; the line editing behaviour is
+            #     happening in Windows and then it doesn't work properly.
+            newline_input = b"\r\n"		# Windows, when reading with sys.stdin
+
+        windows = True
+        quit_sequence = "ESC ESC or Control-C four times in rapid sequence"
+
+        # Initialize virtual terminal functionality in Windows (10) --
+        # this is needed so that ANSI escape sequences are recognized
+        # in the windows prompt
+        import colorama
+        colorama.init()
+        # This hack seems to be working way better at enbling VT mode
+        # than colorama.init() for cmd window, PS window, terminal
+        # I am sure there is a better way, but they seem to require a lot of work
+        # https://stackoverflow.com/questions/51091680/activating-vt100-via-os-system
+        os.system('')
+        # Clear the screen -- needed because in Windows the
+        # "terminals" don't auto-scroll like in Linux and...then
+        # things look weird if we are at the bottom of the screen
+        print(colorama.ansi.clear_screen())
+
+
+    else:
+        # most Unix platforms
+
+        newline_input = b"\r"
+        windows = False
+        windows_use_msvcrt = False
+        quit_sequence = "ESC twice in rapid sequence"
+
+
+    # Print a warning banner
+    if not windows:
+        _ = input("""
 WARNING: This is a very limited interactive console
-         Escape character twice ^[^[ to exit; using console '%s' with CRLF %s
-""" % (console, repr(crlf)))
-    time.sleep(1)
+
+    To exit: %s.
+    [console '%s', CRLF input %s output %s]
+
+Press [enter] to continue <<<<<<"""
+                  % (quit_sequence, console, repr(newline_input), repr(crlf)))
+
+    else:
+
+        _ = input("""
+WARNING: Running 'console-write -i' under MS Windows
+
+   MS Windows terminals lack features needed to properly emulate consoles.
+   Cursor control, escape sequences, function keys, etc might not work.
+   It is recommended to run on a Linux terminal (WSL or native)
+
+   To exit: %s.
+   [console '%s', CRLF input %s output %s]
+
+Press [enter] to continue <<<<<<"""
+                  % (quit_sequence, console, repr(newline_input), repr(crlf)))
+
     class _done_c(Exception):
         pass
 
-    # ask the terminal what does it consider a line feed and current flags
+    # ask the terminal what does it consider a line feed and current
+    # flags; save them so we can restore them on the way out (linux
+    # only)
     nl, _flags_old = term_flags_get()
     if sys.stdin.isatty():
         _flags_set = True
@@ -1714,11 +1876,8 @@ WARNING: This is a very limited interactive console
         one_escape = False
         if _flags_set:
             term_raw_set()
-        if 'INSIDE_EMACS' in os.environ:
-            # I've given up -- I can't figure out how to ask stty to
-            # tell me emacs does \n
-            nl = '\n'
 
+        # let the read thread loose
         fd = os.fdopen(sys.stdout.fileno(), "wb")
         console_read_thread = threading.Thread(
             target = _console_read_thread_fn,
@@ -1729,37 +1888,130 @@ WARNING: This is a very limited interactive console
         console_read_thread.daemon = True
         console_read_thread.start()
 
-        while True and console_read_thread.is_alive():
-            try:
-                chars = os.read(sys.stdin.fileno(), 4096).decode('utf-8')
-                if not chars:
-                    continue
-                _chars = ''
-                for char in chars:
-                    # if the terminal sends a \r (user hit enter),
-                    # translate to crlf
-                    if crlf and char == nl:
+        newline_sequence = b""  # track a newline sequence being received
+        chars = b""             # what characters have been received so far
+        cancel_chars = 0	# How many Ctrl-Cs in sequence have been received
+
+        def _translate(chars):
+            # translates the chars sequence
+            # - replace input newline [newline_input] sequence with output's [crlf]
+            # - detect double escape (and abort)
+            # - convert to UTF-8 string
+            nonlocal crlf
+            nonlocal newline_input
+            nonlocal newline_sequence
+            nonlocal one_escape
+            #print(f"DEBUG translating {chars}", file = sys.stderr)
+            _chars = b""
+            for char_int in chars:
+                char = bytes([ char_int ])   # why iteration is converting it to an int, unknown
+                #print(f"DEBUG for loop checking {type(char)} {char}", file = sys.stderr)
+                if char == b'\x1b':
+                    if one_escape:
+                        raise _done_c()
+                    one_escape = True
+                else:
+                    one_escape = False
+                # newline detection logic (conver input newline convention to output; disable with crlf == None)
+                if crlf and char_int == newline_input[len(newline_sequence)]:
+                    # this char matches the sequence of input newline
+                    # characters, accumulate and move on--unless we
+                    # complete the sequence, then translate it, reset
+                    # and move on
+                    newline_sequence += char
+                    #print(f"DEBUG newline detecting at {newline_sequence}", file = sys.stderr)
+                    if newline_sequence == newline_input:
                         _chars += crlf
-                    else:
-                        _chars += char
-                    if char == '\x1b':
-                        if one_escape:
-                            raise _done_c()
-                        one_escape = True
-                    else:
-                        one_escape = False
-                # force no crlf, we already translated it
-                target.console.write(_chars, console = console)
-            except _done_c:
+                        newline_sequence = b""
+                    continue
+		# we don't match the newline detector, accumulate and reset the detector
+                _chars += char
+                newline_sequence = b""
+
+            #print(f"DEBUG translated {_chars}", file = sys.stderr)
+            return _chars.decode('utf-8', errors = "surrogateescape")
+
+        # our basic loop -- note we get user input as long as we are
+        # reading, so if the read thread dies, we stop too.
+        #
+        # we'll get input depending on the platform (windows w/ msvcrt
+        # or sys.stdin, linux with stdin), which will give us scan
+        # codes or ANSI escape sequences when dealing with civilized
+        # systems. If it is scan codes, we need to translate. We also
+        # translate newline conventions from the input system (where
+        # we run) to the destination system [crlf argument].
+        #
+        # Tricky: Ctrl-C -- each system does it in a slightly
+        # different way; so in general we catch KeyboardInterrupt
+        # exceptions mostly everywhere, conver them to \x03 and if
+        # four in a row are recevied, we re-raise. Whenever we see one
+        # of those, BTW, we need to transmit right away to flush the
+        # pipeline. Mind you, outer KeyboardInterrupt excepts might be
+        # catching the inner one
+        #
+        # Note before sending the input, it has to be _translate()d
+        while console_read_thread.is_alive():
+            # the transport plane takes UTF-8 and accepts
+            # surrogateencoding for bytes > 128 (U+DC80 - U+DCFF) see
+            # Python's PEP383.
+            try:
+                # Take some user input.
+
+                # In general, read no more than 30 chars -- this is
+                # meant mostly for interactive use; rarely someone
+                # types more than 30chars that fast
+                if windows_use_msvcrt:
+                    try:
+                        # keep reading until we don't -- getch() is
+                        # blocking and it is more responsive to block
+                        # and check than to check and read
+                        while len(chars) < 30:
+                            c = msvcrt.getwch()
+                            # xlate https://gist.github.com/mpratt14/e732c474205b317af053a9b14df211bc
+                            #print(f"DEBUG getch got c {type(c)} {c}", file = sys.stderr)
+                            chars += c.encode('utf-8')
+                            if not msvcrt.kbhit():
+                                break
+                    except KeyboardInterrupt as e:
+                        chars += b'\x03'
+                else:
+                    chars += os.read(sys.stdin.fileno(), 30)
+                #print(f'DEBUG sending standard {chars}', file = sys.stderr)
+                target.console.write(_translate(chars), console = console)
+                chars = b""
+                cancel_chars = 0
+            except _done_c:			# thrown by _translate on ESC-ESC
                 break
+            except KeyboardInterrupt as e:
+                chars += b'\x03'
+                cancel_chars += 1
+                #print(f'DEBUG sending top level interrupt {chars}', file = sys.stderr)
+                if cancel_chars > 4:
+                    raise
+                target.console.write(_translate(chars), console = console)
+                chars = b""
+                cancel_chars = 0
             except IOError as e:
                 if e.errno != errno.EAGAIN:
                     raise
-                # If no data ready, wait a wee, try again
-                time.sleep(0.25)
+            # If no data ready, wait a wee, try again
+            if not windows_use_msvcrt:
+                try:
+                    time.sleep(0.1)
+                except KeyboardInterrupt as e:
+                    #print(f"DEBUG on sleep interrupt")
+                    chars += b'\x03'
+                    cancel_chars += 1
+                    if cancel_chars > 4:
+                        raise
+                    #print(f'DEBUG sending sleep interrupt {chars}', file = sys.stderr)
+                    target.console.write(_translate(chars), console = console)
+                    chars = b""
+                    cancel_chars = 0
     finally:
         if _flags_set:
             term_flags_reset(_flags_old)
+
 
 
 def _cmdline_console_write(args):
@@ -1784,7 +2036,8 @@ def _cmdline_console_write(args):
         if args.interactive:
             _cmdline_console_write_interactive(target, console,
                                                args.crlf, args.offset,
-                                               args.max_backoff_wait)
+                                               args.max_backoff_wait,
+                                               windows_use_msvcrt = args.msvcrt)
         elif args.data == []:	# no data given, so get from stdin
             while True:
                 line = getpass.getpass("")
@@ -2088,6 +2341,12 @@ def _cmdline_setup(arg_subparser):
     ap.add_argument("--interactive", "-i",
                     action = "store_true", default = False,
                     help = "Print back responses")
+    ap.add_argument("--msvcrt",
+                    action = "store_true", default = False,
+                    help = "On Windows, use MSVCRT's getch()"
+                    " function for key input; this makes somethings"
+                    " better, others not--check source code for details"
+                    )
     ap.add_argument("--local-echo", "-e",
                     action = "store_true", default = True,
                     help = "Do local echo (%(default)s)")
