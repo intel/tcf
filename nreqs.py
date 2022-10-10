@@ -133,9 +133,10 @@ import pprint
 import re
 import subprocess
 import sys
-import yaml
 
-import commonl
+# We want to minimize the amount of dependencies for this script, so
+# avoid adding any additional packages unless absolutely necessary
+import yaml
 
 class method_abc:
 
@@ -355,14 +356,22 @@ class method_pip_c(method_abc):
         method_abc.__init__(self, "pip")	# empty means "generic"
 
     def install(self, package, package_alternate, package_data, method_details):
-        # get_python_executable() retrieves the path to the current python
-        # interpreter; this way if we run with different versions we get it
-        # installed for that version
+        # sys.executable is the current python interpreter; this way
+        # if we run with different versions we get it installed for
+        # that version
         # FIXME: Issue with retrieving valid executable path when running
         # in certian container environments (eg. kaniko) using the default
         # method sys.executable. Currently using fallback methods depending
-        # on platform in get_python_executable()
-        cmdline = [ commonl.get_python_executable(), "-m", "pip", "install" ]
+        # on platform: os.readlink on linux and the python launcher on windows
+        if sys.executable:
+            executable = sys.executable
+        elif sys.platform == 'linux':
+            executable = os.readlink("/proc/self/exe")
+        elif sys.platform == 'win32':
+            executable = f'py -${sys.version_info[0]}.${sys.version_info[1]}'
+        else:
+            raise RuntimeError("Failed to determine current python executable")
+        cmdline = [ executable, "-m", "pip", "install" ]
         admin = self.is_admin()
         # To deps or --no-deps, this is the question.
         # We can't tell ahead of time if we are able to install
