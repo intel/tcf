@@ -9,6 +9,7 @@ Flash the target with JTAGs and other mechanism
 ------------------------------------------------
 
 """
+import ast
 import commonl
 import hashlib
 import json
@@ -419,6 +420,40 @@ class extension(tc.target_extension_c):
 
         return image_flash, upload, soft
 
+    def write(self, image, values):
+        """Write data to a specified offset in a flash target
+
+        :param str image: name of the image type in the target to write data to
+
+        :param dict values: dictionary of data to write, keyed by offset
+
+          >>> values = {
+          >>>    "0x34": b'\x00\x31\x34\x00',
+          >>>    "0x300": [ 42, 0x45 ],
+          >>>    "0x53": b"some string",
+          >>> }
+
+        """
+        assert isinstance(image, str)
+        assert isinstance(values, dict)
+        for offset, value in values.items():
+            assert isinstance(offset, str)
+            assert re.match("^(0x)?[a-fA-F0-9]+$", offset), \
+                f"offset \"{offset}\" needs to be in hexidecimal"
+            assert isinstance(value, bytes)
+            # convert to hex strings since ttbd_iface_call uses
+            # json and bytes are not JSON serilizable
+            values[offset] = bytes(value).hex()
+
+        target = self.target
+
+        self.target.ttbd_iface_call(
+            "images", "write", image = image, values = values)
+
+        target.report_info(f"{image}: data successfully written")
+
+
+
 def _cmdline_images_read(args):
     tc.tc_global = tc.tc_c("cmdline", "", "builtin")
     tc.report_driver_c.add(		# FIXME: hack console driver
@@ -442,6 +477,34 @@ def _cmdline_images_flash(args):
         target.images.flash(images, upload = args.upload, timeout = args.timeout,
                             soft = args.soft)
 
+def _cmdline_images_write(args):
+    tc.tc_global = tc.tc_c("cmdline", "", "builtin")
+    tc.report_driver_c.add(		# FIXME: hack console driver
+        tc.report_console.driver(4, None))
+    with msgid_c("cmdline"):
+        target = tc.target_c.create_from_cmdline_args(args, iface = "images")
+        values = {}
+        for item in args.data:
+            offset, data = item.split(":")
+            try:
+                # list of bytes
+                if re.match('^\[.*\]$', data):
+                    data = bytes(ast.literal_eval(data))
+                # hex value
+                elif re.match('^(0x)?[a-fA-F0-9]+$', data):
+                    if data.startswith("0x"):
+                        data = data[2:]
+                    data = bytes.fromhex(data)
+                # bytes string
+                elif re.match('^b[\'\"].+[\'\"]$', data):
+                    data = data[2:-1].encode('utf-8')
+                # normal string
+                else:
+                    data = data.encode('utf-8')
+                values[offset] = data
+            except (TypeError, ValueError) as e:
+                raise type(e)(f"value \"{data}\" must be valid bytes")
+        target.images.write(args.image, values)
 
 def _cmdline_setup(arg_subparser):
     ap = arg_subparser.add_parser(
@@ -503,3 +566,16 @@ def _cmdline_setup(arg_subparser):
                     help = "Bytes to read from the image"
                     " (Defaults to reading the whole image)")
     ap.set_defaults(func = _cmdline_images_read)
+
+    ap = arg_subparser.add_parser(
+        "images-write",
+        help = "Write data to specified offset in image")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target's name")
+    ap.add_argument("image", metavar = "TYPE",
+                    action = "store", default = None,
+                    help = "Image we are writing to (eg. bios)")
+    ap.add_argument("data", metavar = "OFFSET:DATA", nargs = '+',
+                    action = "store", default = None,
+                    help = "Values to write to the specified offsets")
+    ap.set_defaults(func = _cmdline_images_write)
