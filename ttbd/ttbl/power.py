@@ -1348,7 +1348,8 @@ class daemon_c(impl_c):
                                     component + "-" + self.name + ".stderr")
 
         kws = dict(target.kws)
-        kws.update(self.kws)
+        if self.kws:
+            kws.update(self.kws)
         kws.update(self.upid)
         kws.setdefault('name', self.name)
         # bring in runtime properties (override the rest)
@@ -1447,7 +1448,8 @@ class daemon_c(impl_c):
 
     def off(self, target, component):
         kws = dict(target.kws)
-        kws.update(self.kws)
+        if self.kws:
+            kws.update(self.kws)
         kws.update(self.upid)
         kws.setdefault('name', self.name)
         # bring in runtime properties (override the rest)
@@ -1464,7 +1466,8 @@ class daemon_c(impl_c):
 
     def get(self, target, component):		# power interface
         kws = dict(target.kws)
-        kws.update(self.kws)
+        if self.kws:
+            kws.update(self.kws)
         kws.update(self.upid)
         kws.setdefault('name', self.name)
         # bring in runtime properties (override the rest)
@@ -1841,7 +1844,7 @@ RUN \
         #
         # FIXME: this kws setting shall match daemon_c.on's prefix
         kws = dict(target.kws)
-        if self.kws != None:
+        if self.kws:
             kws.update(self.kws)
         kws.update(self.upid)
         # bring in runtime properties (override the rest)
