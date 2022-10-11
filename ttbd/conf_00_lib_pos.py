@@ -1047,6 +1047,8 @@ def target_qemu_pos_add(target_name,
         ( "preferred",  "ssh0" ),
     ]
     target.interface_add("console", ttbl.console.interface(*consolel))
+    # store interface needed for adding the capture interface
+    target.interface_add("store", ttbl.config._iface_store)
     target.interface_add("capture", ttbl.capture.interface(
         vnc0_screenshot = capture_screenshot_vnc,
         screen = "vnc0_screenshot",
