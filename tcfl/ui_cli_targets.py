@@ -170,11 +170,15 @@ def _cmdline_ls(args):
     # if we are only doing "tcf ls" to list target NAMEs, then
     # we don't care whatsoever by the rest of the fields, so
     # don't get them, except for disabled, to filter on it.
+    logger.info(f"original projection list: {args.project}")
     if args.project != None:
         args.project.update({ 'id', 'disabled' })
-        if verbosity >= 0:
-            args.project.add('interfaces.power.state')
-            args.project.add('owner')
+    else:
+        args.project = { 'id', 'disabled' }
+    if verbosity >= 0:
+        args.project.add('interfaces.power.state')
+        args.project.add('owner')
+    logger.info(f"updated projection list: {args.project}")
 
     # parse TARGETSPEC, if any -- because this will ask for extra
     # fields from the inventory, so we'll have to add those to what we
@@ -185,9 +189,17 @@ def _cmdline_ls(args):
         expressionl = [ ]
         for spec in args.target:
             expressionl.append("( " + spec + " ) ")
-        expression = "(" + " and ".join(expressionl) + ")"
+        # combine expressions in the command line with OR, so
+        # something such as
+        #
+        #   $ tcf ls TARGET1 TARGET2
+        #
+        # lists both targets
+        expression = "(" + " or ".join(expressionl) + ")"
+        logger.info(f"filter expression: {expression}")
         expr_ast = commonl.expr_parser.precompile(expression)
         expr_symbols = commonl.expr_parser.symbol_list(expr_ast)
+        logger.info(f"symbols from target filters: {', '.join(expr_symbols)}")
     else:
         expr_ast = None
         expr_symbols = []
@@ -203,8 +215,8 @@ def _cmdline_ls(args):
     if expr_symbols:		# bring anything from fields we are testing
         if fields == None:
             fields = set()
-        logger.info(f"fields from filter expression: {', '.join(fields)}")
         fields.update(expr_symbols)
+        logger.info(f"fields from filter expression: {', '.join(fields)}")
 
     # so now we are actually querying the servers; this will
     # initialize the servers, discover them and them query them for
