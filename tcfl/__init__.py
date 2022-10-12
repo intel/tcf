@@ -1974,6 +1974,7 @@ class server_c:
                 # these are needed to later one be able to go from an
                 # rt straight to the server
                 rt['server'] = self.url
+                rt['rtb'] = self.url			# backwards compat
                 rt['server_aka'] = self.aka
                 # DO NOT publish rt['rtb'], it is an internal object
                 server_rts[fullid] = rt
