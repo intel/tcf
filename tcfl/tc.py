@@ -864,7 +864,7 @@ class reporter_c:
                      attachments, subcase = subcase)
 
     def report_data(self, domain, name, value, expand = True,
-                    level = 2, dlevel = 0, subcase = None):
+                    level = 1, dlevel = 0, subcase = None):
         """Report measurable data
 
         When running a testcase, if data is collected that has to be
@@ -3623,8 +3623,8 @@ class expectation_c(object):
           method returned that made this expectation be considered as
           found.
         """
-        if not self.raise_on_found:
-            return
+        if self.raise_on_found == None:
+            # compare like this, since some exceptions will bool to False
         self.raise_on_found.attachments = {
             'origin': self.origin,
             'match_data': match_data,
