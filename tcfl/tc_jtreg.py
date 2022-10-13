@@ -605,7 +605,6 @@ class driver(tcfl.pos.tc_pos0_base):
             # deploy rsyncs to /opt/DIR/DIR instead of /opt/DIR--while
             # that is likely a bug due to rsync's qwirks with dir
             # naming, working around is easier.
-            os.path.basename(self.path_jdk),
             os.path.basename(self.path_jdk))
         if self.native_bindir:
             # if we have bindirs with native code built, we have put
@@ -660,10 +659,10 @@ class driver(tcfl.pos.tc_pos0_base):
             # /time.html
             # STDERR section
             "time -p"
-            # deploy rsyncs to /opt/DIR/DIR instead of /opt/DIR--while
+            # deploy rsyncs to /opt/DIR instead of /opt/DIR--while
             # that is likely a bug due to rsync's qwirks with dir
             # naming, working around is easier.
-            " %(java_cmd)s -jar /opt/%(jtreg_dirname)s/%(jtreg_dirname)s/lib/jtreg.jar"
+            " %(java_cmd)s -jar /opt/%(jtreg_dirname)s/lib/jtreg.jar"
             " -a -ea -esa -avm -v1 -retain"
             # FIXME: hardcoded
             " -k:'!headful&!printer'"

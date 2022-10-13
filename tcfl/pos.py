@@ -1172,6 +1172,7 @@ EOF""")
         target = self.target
         target.shell.run("mkdir -p /mnt/%s" % persistent_dir)
         # upload the directory to the persistent area
+        source_is_dir = os.path.isdir(src)
         if persistent_name == None:
             assert src != None, \
                 "no `src` parameter is given, `persistent_name` must " \
@@ -1194,14 +1195,35 @@ EOF""")
             target.report_info(
                 "POS: rsyncing %s to target's persistent area /mnt%s/%s"
                 % (src, persistent_dir, _persistent_name), dlevel = -1)
-            target.shcmd_local(
-                # don't be verbose, makes it too slow and timesout when
-                # sending a lot of files
-                "rsync -cHaAX %s --force --numeric-ids --delete"
-                " --port %%(rsync_port)s "
-                " %s%s %%(rsync_server)s::rootfs/%s/%s"
-                % (rsync_extra, src, path_append, persistent_dir,
-                   _persistent_name))
+            # RSYNC it!
+            #
+            # If the source is a dir, no need to name it at the
+            # end, so SOURCEDIR ->
+            # SERVER::rootfs/persistent.tcf.d/ puts it in
+            # persistent.tcf.d/SOURCEDIR
+            #
+            # But if it is not, let's name it just to be pedantic. If
+            # we name it, it'd create
+            # /persistent.tcf.d/SOURCEDIR/SOURCEDIR, because rsync is
+            # like that--and if the destination exists and is a
+            # directory, we want it to fail
+            if source_is_dir:
+                target.shcmd_local(
+                    # don't be verbose, makes it too slow and timesout when
+                    # sending a lot of files
+                    "rsync -cHaAX %s --force --numeric-ids --delete"
+                    " --port %%(rsync_port)s "
+                    " %s%s %%(rsync_server)s::rootfs/%s/"
+                    % (rsync_extra, src, path_append, persistent_dir))
+            else:
+                target.shcmd_local(
+                    # don't be verbose, makes it too slow and timesout when
+                    # sending a lot of files
+                    "rsync -cHaAX %s --force --numeric-ids --delete"
+                    " --port %%(rsync_port)s "
+                    " %s%s %%(rsync_server)s::rootfs/%s/%s"
+                    % (rsync_extra, src, path_append, persistent_dir,
+                       _persistent_name))
         target.testcase._targets_active()
         if dst != None:
             # There is a final destination specified, so now, in the
