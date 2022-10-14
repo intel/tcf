@@ -3625,6 +3625,7 @@ class expectation_c(object):
         """
         if self.raise_on_found == None:
             # compare like this, since some exceptions will bool to False
+            return
         self.raise_on_found.attachments = {
             'origin': self.origin,
             'match_data': match_data,
