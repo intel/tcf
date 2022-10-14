@@ -5,6 +5,7 @@ Power control module to start a rsync daemon when a network is powered-on
 """
 import os
 import subprocess
+import logging
 
 import prctl
 
@@ -94,6 +95,7 @@ class pci(ttbl.power.impl_c):
 path = {0.share_path}
 read only = {0.read_only}
 timeout = 300
+use chroot = no
 """.format(self))
             if self.uid:
                 conff.write("uid = %s" % self.uid)
@@ -129,10 +131,14 @@ timeout = 300
             # want to share them with the same bits--even if we mapped
             # user to something else, some attributes and different
             # user bits would force us to do something like this)
-            prctl.cap_effective.dac_read_search = True
-            # rsync chroots for safety
-            prctl.cap_effective.sys_chroot = True
+            try:
+                prctl.cap_effective.dac_read_search = True
+            except Exception as e:
+                logging.error(f"_preexec_fn exception: {e}\n")
+                raise
             return
+
+        _preexec_fn()
 
         cmdline = [
             "rsync",
