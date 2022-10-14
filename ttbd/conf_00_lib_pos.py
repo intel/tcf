@@ -926,6 +926,39 @@ def target_qemu_pos_add(target_name,
       It is still possible to force a re-partitioning of the backend
       by setting POS property :ref:`pos_reinitialize <pos_reinitialize>`.
 
+    **Booting and Provisionining**
+
+    This machine is configured for provisioning with the TCF POS system.
+
+    Components involved:
+
+    - network (interconnect target) with a private dhcp and tftp server
+
+    For this, when booted in POS mode (eg: to the Provisioning OS),
+    the *pos_mode* inventory variable is set to *pxe*.
+
+    In the server, this target has been configured by this function
+    to, on target POWER ON, call
+    :func:`ttbl.pxe.power_on_pre_pos_setup`. This looks at *pos_mode*
+    and sees it in *pxe* and generates a *syslinux* configuration file
+    that directs the machine to boot the Provisioning OS over the
+    network. The configuration file is named after the QEMU's machine
+    mac address and placed in the TFTP directory
+    *STATEDIR/targets/ICNAME/tftp.root/pxelinux.cfg/*.
+
+    When QEMU/UEFI boots and it gets DHCP, it gets a syslinux.efi
+    bootloader from the interconnect's tftp server and it tries by
+    default to load a list of config files, one being
+    pxelinux.cfg/MACADDR, which loads the config file just generated
+    before starting.
+
+    .. warning:: Fedora's syslinux 6.04 hangs when booted from QEMU;
+                 use 6.03::
+
+                   $ wget https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux/6.xx/syslinux-6.03.tar.xz
+                   $ tar xf syslinux-6.03.tar.xz
+                   $ sudo install -o root -g root -m 0644 syslinux-6.03/efi64/efi/syslinux.efi /usr/share/syslinux/efi64/syslinux.efi
+
     """
     assert isinstance(target_name, str)
     if consoles == None or consoles == []:

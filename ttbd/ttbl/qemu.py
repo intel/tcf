@@ -362,6 +362,9 @@ class pc(ttbl.power.daemon_c,
 
     **Booting and Provisionining**
 
+    Look at :func:`conf_00_lib_pos.target_qemu_pos_add` for details on
+    a way to have a QEMU based target provision over the network
+
     .. warning:: Fedora's syslinux 6.04 hangs when booted from QEMU;
                  use 6.03::
 
