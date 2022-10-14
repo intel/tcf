@@ -1751,6 +1751,19 @@ EOF""")
         :returns str: name of the image that was deployed (in case it was
           guessed)
 
+
+        The RSYNC server source is in the form *HOSTNAME::PATH* and is
+        sourced from the following locations in this order (until the
+        first found):
+
+        - environment variable *POS_RSYNC_SERVER* in the client machine
+          running (meant for debugging)
+
+        - the value of inventory variable *pos.rsync_server* in the target
+
+        - the value of inventory varirable *pos.rsync_server* in the
+          interconnect
+
         FIXME:
          - increase in property bd.stats.client.sos_boot_failures and
            bd.stats.client.sos_boot_count (to get a baseline)
@@ -1792,10 +1805,15 @@ EOF""")
                 target.console.select_preferred(user = 'root')
 
                 testcase.targets_active()
-                kws = dict(
-                    rsync_server = target.ic_key_get(
+                rsync_server = os.environ.get(
+                    "POS_RSYNC_SERVER",
+                    target.ic_key_get(
                         ic, 'pos.rsync_server',
-                        target.ic_key_get(ic, 'pos_rsync_server', None)),
+                        target.ic_key_get(ic, 'pos_rsync_server', None)
+                    )
+                )
+                kws = dict(
+                    rsync_server = rsync_server,
                     image = image,
                     boot_dev = boot_dev,
                 )
@@ -2098,9 +2116,13 @@ def deploy_path(ic, target, _kws, cache = True):
                     "# trying to seed %s from the server's cache"
                     % (cache_name, cache_name))
 
-        rsync_server = target.ic_key_get(
-            ic, 'pos.rsync_server',
-            target.ic_key_get(ic, 'pos_rsync_server', None))
+        rsync_server = os.environ.get(
+            "POS_RSYNC_SERVER",
+            target.ic_key_get(
+                ic, 'pos.rsync_server',
+                target.ic_key_get(ic, 'pos_rsync_server', None)
+            )
+        )
         target.report_info("POS: rsyncing %s from %s "
                            "to /mnt/persistent.tcf.git/%s"
                            % (cache_name, rsync_server, cache_name),
