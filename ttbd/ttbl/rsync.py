@@ -86,11 +86,15 @@ class pci(ttbl.power.impl_c):
         file_prefix = os.path.join(
             target.state_dir, "rsync-%s:%d" % (self.address, self.port))
         pidfile = file_prefix + ".pid"
+        # note we disable chroot because:
+        # - it's quite hard to pass CAP_SYS_CHROOT
+        # - rsync is already quite good at keeping itself below the
+        #   path so even if ...
+        # - ..we run the daemon with CAP_DAC_READ_SEARCH or similar so
+        #   it can access files with any permission to serve them to the
+        #   other side
         with open(file_prefix + ".conf", "w+") as conff:
             conff.write("""\
-# We run the daemon as root and need to run as root so we can access
-# folders that have root-only weird permissions
-# FIXME: we could also CAP_DAC_READ_SEARCH or similar
 [images]
 path = {0.share_path}
 read only = {0.read_only}
@@ -108,6 +112,7 @@ use chroot = no
 path = {data['path']}
 read only = true
 timeout = 300
+use chroot = no
 """)
                 if 'uid' in data:
                     conff.write(f"uid = {data['uid']}")
