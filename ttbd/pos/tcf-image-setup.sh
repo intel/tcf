@@ -106,7 +106,7 @@ function cleanup() {
         sudo umount -l $mounted_dir
     done
     # remove possible LVM devices hanging off NBD
-    if [ -n "$nbd_dev" -o -n "$loop_dev" ]; then
+    if [ -n "${nbd_dev:-}" -o -n "${loop_dev:-}" ]; then
         lsblk --raw  --noheadings ${nbd_dev:-} ${loop_dev:-} -o NAME,TYPE | while read device type; do
             ## nbd0 disk
             ## nbd0p1 part
