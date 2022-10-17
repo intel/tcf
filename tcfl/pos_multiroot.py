@@ -74,6 +74,7 @@ import re
 import Levenshtein
 
 import commonl
+import tcfl
 from . import pos
 from . import tc
 
