@@ -50,15 +50,34 @@ class authenticator_ldap_c(ttbl.authenticator_c):
     don't have to be part of any group. This allows to permit the role
     to anyone that can authenticate with LDAP.
     """
-    def __init__(self, url, roles = None):
+    def __init__(self, url, roles = None, group_ou = None, user_ou = None):
         """
         :param str url: URL of the LDAP server
         :param dict roles: map of roles to users and groups
+        :param str group_ou: ldap org unit name for group
+            e.g. 'Groups', 'Teams'
+        :param str user_ou: ldap org unit name for users
+            e.g. 'Employees', 'Workers'
+
+        example class instance:
+        >>> authenticator_ldap_c("ldap://somehost:31312", roles = [etc etc],
+        >>>                 group_ou = "Groups", users_ou = "Emplyees")
         """
         if not roles:
             roles = {}
         assert isinstance(url, str)
         assert isinstance(roles, dict)
+
+        self.group_ou = None
+        self.user_ou = None
+
+        if group_ou:
+            assert isinstance(group_ou, str)
+            self.group_ou = group_ou
+
+        if user_ou:
+            assert isinstance(user_ou, str)
+            self.user_ou = user_ou
 
         u = urllib.parse.urlparse(url)
         if u.scheme == "" or u.netloc == "":
@@ -251,16 +270,65 @@ class authenticator_ldap_c(ttbl.authenticator_c):
                     groups.append(group_name)
                     break
         groups = set(groups)
+
+        # get the user name
+        try:
+            # validate that ldap has return a list of lists, and get the first
+            # element
+            name = record[0][0]
+        except IndexError as e:
+            logging.exception(e)
+            raise self.error_e(
+                "%s: generic error in LDAP %s: %s" % (email, self, e))
+            raise e
+
+        if name:
+            # in this case we wont split by commas, because sometimes the names
+            # have commas to split the last names. So we will go the other way
+            # around, split by equal sign and then remove the comma:
+            # 'CN=perez\, jose,OU=ORG UNIT,DC=SUBDOMAIN1,DC=SUBDOMAIN2,DC=c...
+            name = record[0][0]
+            # items[1] = perez\, jose,OU
+            name = name.split("=")
+            # name = 'perez\, jose'
+            name = name[1].replace(',OU', '')
+            # name = 'perez, jose'
+            name = name.replace('\\', '')
+
         # Given the group list @groups, check which more roles we
         # need to add based on group membership
         for role_name, role in self.roles.items():
             role_groups = role.get('groups', [])
-            if role_groups == None:
+
+            if role_groups is None:
                 # any valid user can take this role
                 token_roles.add(role_name)
-            elif set(role_groups) & groups:
-                # the LDAP records describes groups that are also in
-                # the list of acceptable groups for this role
+                continue
+
+            users = set()
+            for group in role_groups:
+                try:
+                    u = get_group(
+                            group, self.group_ou, self.user_ou, self.url,
+                            email, password
+                        )
+                    if not u:
+                        continue
+                    users.update(u)
+                except ldap.INVALID_CREDENTIALS as e:
+                    raise self.invalid_credentials_e(
+                        "%s: invalid credentials for LDAP %s: %s"
+                        % (email, self, e))
+                except Exception as e:
+                    logging.exception(e)
+                    raise self.error_e(
+                        "%s: generic error in LDAP %s: %s"
+                        % (email, self, e))
+
+            if not users:
+                continue
+            if name in users:
+                logging.info(f"user '{name}' found in {role_name}")
                 token_roles.add(role_name)
 
         data = self.ldap_login_hook(record)
@@ -273,6 +341,122 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         data['roles'] = token_roles
         return data
 
+users = []
+def get_group(group, group_ou, user_ou, ldap_url, ldap_email, ldap_password):
+    '''
+    get_group:
+    basically you send this function a group name, and it queries ldap to get
+    all the members of that group. the members will be both users and groups.
+    if a member is group then call this function again until there are
+    nothing more than users.
+
+    going into more detail, it first make a bind to ldap and query by the
+    group name you sent. if the query is not empty it breaks down the response
+    to get a list of the members. Searches for groups in the list and call
+    function again. If user add it to a set.
+
+    PLEASE NOTE that you will have to declare group_ou, and user_ou, when
+    creating the instance of the class.
+
+    :param str group: group name you want to get the users and subgroups.
+    :param str group_ou: ldap org unit name for group
+        e.g. 'Groups', 'Teams'
+    :param str user_ou: ldap org unit name for users
+        e.g. 'Employees', 'Workers'
+    :param str ldap_url: ldap url to make the bind and queries
+    :param str ldap_email: ldap email with access to make queries
+    :param str ldap_password: ldap password with access to make queries
+
+    :return set: users in group
+    '''
+
+    if not group_ou or not user_ou:
+        logging.warning(
+            'lacking context getting subgroups, bailing out. This means it'
+            ' will just auth the user with the top level groups. if you want'
+            ' to fix this, please set a group_ou and user_ou when creating the'
+            ' class instance. Read class constructor for more context.'
+        )
+        return
+
+    # create the connection with ldap
+    conn = ldap.initialize(ldap_url)
+    conn.set_option(ldap.OPT_REFERRALS, 0)
+    conn.set_option(ldap.OPT_NETWORK_TIMEOUT, 5)
+
+    record = None
+    try:
+        # we will query ldap for the member of the group, so we only need the
+        # query to return these
+        ldap_fields = set(['member'])
+        # do the binding with users credentials
+        conn.simple_bind_s(ldap_email, ldap_password.encode('utf8'))
+        record = conn.search_s(
+            "", ldap.SCOPE_SUBTREE, 'cn=%s' % group, list(ldap_fields))
+        conn.unbind_s()
+    except ldap.INVALID_CREDENTIALS as e:
+        raise e
+    except Exception as e:
+        raise e
+
+    # record will have all the members of the group, its structure looks smth
+    # like this
+    # [
+    # ('CN=<group>, OU=ORG UNIT,OU=ORG UNIT,DC=SUBDOMAIN1,DC=SUBDOMAIN2,
+    # {'member': [
+    #   b'CN=<user>,OU=ORG UNIT,DC=SUBDOMAIN1,DC=SUBDOMAIN2,DC=SUBDOMAIN3',
+    #   b'CN=<group>,OU=ORG UNIT,OU=ORG UNIT,DC=SUBDOMAIN1,DC=SUBDOMAIN2',
+    #   b'CN=<group>,OU=ORG UNIT,OU=ORG UNIT,DC=SUBDOMAIN1,DC=SUBDOMAIN2']}
+    # )
+    # ]
+
+    # so we have to check: first record is not none, then record[0]
+    # (meaning the top list) exists, and then if the `member` dict exists
+    # if not then smth went wrong with the query, or that group does not
+    # exists
+    if not (record and record[0] and record[0][1]):
+        return
+
+    # get members part of the query, for reference see comment above for the
+    # structure
+    members = record[0][1].get('member', [])
+
+    # now, for each member need to check if it has `Groups` in its name
+    # if it does, this means we have to call this function again to search for
+    # all the members of that group. If it has `Workers` in the name, it means
+    # we reached with a user. So we add it to the list of users, and keep
+    # looking
+    for member in members:
+        member = member.decode('utf-8')
+
+        # 'CN=<group>,OU=ORG UNIT,OU=ORG UNIT,DC=SUBDOMAIN1,DC=SUBDOMAIN2',
+        if group_ou in member:
+            items = member.split(",")
+            for item in items:
+                if item.startswith('CN='):
+                    group_name = item.replace('CN=', '')
+                    get_group(
+                        group_name,
+                        group_ou,
+                        user_ou,
+                        ldap_url,
+                        ldap_email,
+                        ldap_password,
+                    )
+                    break
+
+        # 'CN=<user>,OU=ORG UNIT,DC=SUBDOMAIN1,DC=SUBDOMAIN2',
+        if user_ou in member:
+            # the user sometimes has `,` in their name so we can not split
+            # using that
+            items = member.split("=")
+            # items[1] = <user>,OU
+            name = items[1].replace(',OU', '')
+            # name = 'perez\, jose'
+            name = name.replace('\\', '')
+            users.append(name.replace('\\', ''))
+
+    return set(users)
 
 class ldap_map_c(object):
     """General LDAP mapper
