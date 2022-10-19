@@ -3284,7 +3284,16 @@ class fsdb_symlink_c(fsdb_c):
         return os.readlink(location.encode())
 
     def _raw_write(self, location, value):
-        os.symlink(value, location)
+        try:
+            os.symlink(value, location)
+        except OSError as e:
+            # symlinks have a size limit
+            if e.errno == errno.ENAMETOOLONG:
+                raise AssertionError(
+                    f"{location}: can't store too large value of" \
+                    f" size {len(value)}") \
+                    from e
+            raise
 
     def _raw_unlink(self, location):
         os.unlink(location)
@@ -3391,7 +3400,6 @@ class fsdb_symlink_c(fsdb_c):
                 value = b"x:" + value
             else:
                 raise ValueError("can't store value of type %s" % type(value))
-            assert len(value) < 4096
         if value == None:
             # note that we are setting None (aka: removing the value)
             # we also need to remove any "subfield" -- KEY.a, KEY.b
