@@ -7,7 +7,7 @@ packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
 # parted/dosfstools/grub2*/util-linux: for setup-efi-grub2-elf / ttbl.grub2elf
 # The grub thing? So it works in fedora27 or fedora 25
 requires = {{requirements}}
-    tcf == %%{version}-%%{release}
+    tcf-client == %%{version}-%%{release}
 
 build_requires =
     gcc

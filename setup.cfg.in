@@ -6,5 +6,6 @@ install_data = /
 release = 1
 packager = Inaky Perez-Gonzalez <inaky.perez-gonzalez@intel.com>
 requires = {{requirements}}
+provides = tcf
 
 doc_files = *.rst doc/* _doc/html/*
