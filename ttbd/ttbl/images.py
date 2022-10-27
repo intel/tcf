@@ -3,6 +3,9 @@
 # Copyright (c) 2017 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
+#
+# pylint: disable = missing-docstring
+
 """Flash binaries/images into the target
 -------------------------------------
 
@@ -210,6 +213,7 @@ import hashlib
 import json
 import numbers
 import os
+import re
 import subprocess
 import time
 
@@ -345,6 +349,30 @@ class impl_c(ttbl.tt_interface_impl_c):
         assert isinstance(image, str)
         raise NotImplementedError("reading not implemented")
 
+    def flash_write(self, target, image, data, _user_path):
+        """
+        Write data to specific offsets in a flash image
+
+        :param ttbl.test_target target: target where to write
+
+        :param str image: name of image to write to
+
+        :param dict data: dictionary of data to write to the image using the
+          format { OFFSET:DATA, OFFSET:DATA ... }where both offset and data are
+          hexidecimal values
+
+        :param str user_path: path to the users directory which is used to
+          store temporary image files reading the image first is required in
+          some cases in order to no lose any data
+
+        If the implementation does not support writing to specific addresses,
+        it can raise a NotImplementedError.
+        """
+
+        assert isinstance(target, ttbl.test_target)
+        assert isinstance(image, str)
+        assert isinstance(data, dict)
+        raise NotImplementedError
 
 class impl2_c(impl_c):
     """
@@ -801,6 +829,29 @@ class interface(ttbl.tt_interface):
             aliases = self.aliases,
             result = list(self.aliases.keys()) + list(self.impls.keys()))
 
+    def put_write(self, target, who, args, _files, user_path):
+        img_type = self.arg_get(args, 'image', str)
+        values = self.arg_get(args, 'values', dict)
+
+        for key, value in values.items():
+            assert isinstance(key, str)
+            assert isinstance(value, str)
+            assert re.match("^(0x)?[a-fA-F0-9]+$", value), \
+                f"data \"{value}\" needs to be in hexidecimal"
+
+        with target.target_owned_and_locked(who):
+            impl, img_type_real = self.impl_get_by_name(img_type,
+                                                        "image type")
+
+            if self.power_sequence_pre:
+                target.power.sequence(target, self.power_sequence_pre)
+
+            impl.flash_write(target, img_type_real, values, user_path)
+
+            if self.power_sequence_post:
+                target.power.sequence(target, self.power_sequence_post)
+
+            return {}
 
 class arduino_cli_c(impl_c):
     """Flash with the `Arduino CLI <https://www.arduino.cc/pro/cli>`

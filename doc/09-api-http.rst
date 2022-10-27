@@ -2890,6 +2890,59 @@ LOCALFILENAME* command.
 
 
 
+PUT /targets/TARGETID/images/write VALUES
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Write data to specified offset(s) in a flash target
+
+**Access control:** the user, creator or guests of an
+allocation that has this target allocated.
+
+**Arguments:**
+
+- *image*: the name of the image to read. A list of valid images can
+  be found using the command in :ref:`listing possible flashing
+  targets <http_listing_possible_flashing_targets>`
+
+  Type: string
+
+  Disposition: mandatory
+
+- *values*: a dictionary of data to write, keyed by offset. Offset and data
+are both hexidecimal strings
+
+  Type: dictionary
+
+  Disposition: mandatory::
+
+    {
+        "0x34": "0x313400",
+        "0x300": "4245",
+        "0x4321": "deadbeef",
+    }
+
+**Returns:**
+
+- on success, a 200 HTTP code and a JSON dictionary, or optionally
+  with diagnostics fields.
+
+- on error, a non 200 error code and a JSON dictionary with details,
+  which will vary.
+
+**Example**
+
+::
+
+   $ curl -sk -b cookies.txt -X PUT \
+     https://SERVERNAME:5000/ttb-v2/targets/TARGETNAME/images/write \
+     -d image="bios" -d values='{"0x34":"0x313400", "0x300":"4245", \
+     "0x4321":"deadbeef"}'
+
+With the TCF client, use the *tcf images-write TARGETNAME IMAGENAME
+OFFSET:DATA [OFFSET:DATA ...]* command.
+
+
+
 GET /targets/TARGETID/images/list
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
