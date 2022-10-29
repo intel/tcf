@@ -94,6 +94,10 @@ class discovery_agent_c:
         #: Remote target inventory in deep and flat format
         self.rts_flat = dict()
 
+        #: All the keys that have been found in all the targets (flat
+        #: key) and all the values collected
+        self.inventory_keys = collections.defaultdict(set)
+
         #: Sorted list of remote target full IDs (SERVER/NAME)
         #:
         #: This is used for iteration algorithms so we can reproduce the
@@ -135,6 +139,7 @@ class discovery_agent_c:
         self.rts.clear()
         self.rts_flat.clear()
         self.rts_fullid_sorted.clear()
+        self.inventory_keys.clear()
         # load all the servers at the same time using a thread pool
         if not tcfl.server_c.servers:
             logger.info("found no servers, will find no targets")
@@ -153,7 +158,7 @@ class discovery_agent_c:
         """
         Waits for the target update process to finish
         """
-        for server_rts, server_rts_flat in self.rs:
+        for server_rts, server_rts_flat, server_inventory_keys in self.rs:
             #server_rts, server_rts_flat = self.rs.get()
             # do this here to avoid multithreading issues; only one
             # thread updating the sorted list
@@ -161,6 +166,7 @@ class discovery_agent_c:
                 self._cache_rt_handle(fullid, rt)
             self.rts.update(server_rts)
             self.rts_flat.update(server_rts_flat)
+            self.inventory_keys.update(server_inventory_keys)
         logger.info(f"read {len(self.rts)} targets"
                     f" from {len(tcfl.server_c.servers)} servers found")
         self.executor = None
@@ -198,6 +204,7 @@ class discovery_agent_c:
         if update_globals:
             tcfl.rts = self.rts
             tcfl.rts_flat = self.rts_flat
+            tcfl.inventory_keys = self.inventory_keys
 
             tcfl.rts_fullid_sorted = self.rts_fullid_sorted
             tcfl.rts_fullid_disabled = self.rts_fullid_disabled

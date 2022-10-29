@@ -1967,6 +1967,40 @@ class server_c:
         try:
             server_rts = dict()
             server_rts_flat = dict()
+            server_inventory_keys = collections.defaultdict(set)
+
+            def _inventory_keys_update(key, value):
+                # we collect all the different keys we know in the
+                # whole inventory (easier for the orchestrator) and
+                # collect them in a unified list, with all the values
+                # seen
+                #
+                # We only do this with the flat keys to avoid conflicts
+                try:
+                    # FIXME: filter out _alloc.id, _alloc.queue.*
+                    #   bsps.x86_64.lcpu-N? .cpu-N?
+                    #   instrumentation.*.*?
+                    #   interconnects.XYZ. mhmmm
+                    #   *.instrument
+                    #   path
+                    if isinstance(value, dict):
+                        # dictionaries are stored as a boolean,
+                        # meaning the dictionary is present; subfields
+                        # will be listed as field.subfield.subsubfield...
+                        server_inventory_keys[key].add(True)
+                    elif isinstance(value, ( list, set, tuple )):
+                        # lists are just updated -- FIXME not sure if
+                        # this is the best idea
+                        server_inventory_keys[key].update(value)
+                    else:
+                        server_inventory_keys[key].add(value)
+                except Exception as e:
+                    # shrug
+                    self.log.warning("can't collect inventory key '%s'"
+                                     " value (%s) '%s': %s",
+                                     key, type(value), value, e)
+
+
 
             def _rt_handle(target_id, rt):
                 rt[target_id] = True
@@ -2013,10 +2047,14 @@ class server_c:
                 r = json.loads(r.text, object_pairs_hook = collections.OrderedDict)
                 for target_id, rt in r.items():
                     _rt_handle(target_id, rt)
-            return server_rts, server_rts_flat
+            # for this server, collect how many different keys and
+            # values we have
+            for key, value in server_rts_flat.items():
+                _inventory_keys_update(key, value)
+            return server_rts, server_rts_flat, server_inventory_keys
         except requests.exceptions.RequestException as e:
             log_sd.error("%s: can't use: %s", self.url, e)
-            return {}, {}
+            return {}, {}, {}
 
 
 
