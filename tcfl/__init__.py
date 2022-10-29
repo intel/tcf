@@ -1028,6 +1028,7 @@ class server_c:
         self.cookies = {}
         self.cache_lockfile = None
         self.fsdb = None
+        self.log = logger.getChild(self.url_safe)
 
     #: where to store state path (login info, etc); updated by
     #: tcfl.config.subsystem_setup()
@@ -1039,6 +1040,7 @@ class server_c:
         needed until operating seconday parts of the API (eg: file paths)
         """
         self.aka_make()
+        self.log = logger.getChild(self.aka)
         self._cache_setup()
 
     #: only initialized once we start commiting to disk
