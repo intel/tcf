@@ -25,6 +25,7 @@ learn more about them):
 
 import logging
 import random
+import sys
 import time
 
 import tcfl
@@ -197,6 +198,71 @@ def _cmdline_info(args):
 
 
 
+def _cmdline_run(args):
+
+    _cmdline_report_init(args)
+
+    log = logger.getChild("run")
+    import tcfl.orchestrate		# lazy imports on demand
+
+    log.warning(f"looking servers, targets and testcases")
+    tcfl.orchestrate.subsystem_setup()
+
+    # FIXME: chicken and egg problem--axis discovery when value None needs
+    # inventory; it is being resolved upon construction :/
+    # So need to call that before instantiating tests
+    #_targets_discover()
+
+    with tcfl.orchestrate.executor_c(
+            logdir = args.log_dir,
+            tmpdir = args.tmpdir,
+            remove_tmpdir = args.remove_tmpdir,
+            testcase_paths = args.testcase,
+            testcase_manifests = args.manifest,
+            testcase_filter_spec = args.tc_filter_spec,
+    ) as executor:
+
+        # the executor object has at this point has
+        #
+        # - initialized all subsystems needed (server discovery,
+        #   target discovery, testcase discovery on the given paths and
+        #   manifests)
+        #
+        # - discovered all available servers
+        #
+        # - discovered all available targets and read their inventory
+        #   FIXME: filter targets to select
+        #
+        # - discovered all suitable testcases and filtered thembased
+        #   on specification
+        #
+        #   FIXME: sharding not implemented
+        #
+        # So it's ready for the button to be pressed to run them
+
+        log.warning(
+            f"found %s servers, %s targets and %s testcases",
+            len(tcfl.server_c.servers),
+            len(executor.target_discovery_agent.rts_fullid_sorted),
+            len(executor.testcase_discovery_agent.tcis)
+        )
+
+        for _filename, tcis in executor.testcases.items():
+            for testcase in tcis:
+                print(f"DEBUG found {testcase.name}", file = sys.stderr)
+
+        executor.start()
+
+        print("DEBUG: scheduled, waiting 60")
+        time.sleep(60)
+
+        executor.wait_for_done()
+
+
+
+
+
+
 def _common_args_add(ap):
     ap.add_argument(
         "-v", dest = "verbosity", action = "count", default = 0,
@@ -246,3 +312,8 @@ def _cmdline_setup(arg_subparsers):
         "info", help = "Print information testcases")
     _common_args_add(ap)
     ap.set_defaults(func = _cmdline_info)
+
+    ap = arg_subparsers.add_parser(
+        "run2", help = "Run testcases on targets")
+    _common_args_add(ap)
+    ap.set_defaults(func = _cmdline_run)

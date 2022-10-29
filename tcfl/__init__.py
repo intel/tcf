@@ -2402,6 +2402,14 @@ class tc_info_c:
         self._axes_permutation_filter = f
         return self._axes_permutation_filter
 
+
+
+
+    def report_info(self, msg, **kwargs):
+        # HACK
+        self.log.info(msg + str(kwargs))
+
+
 # we don't need too much logging level from this
 logging.getLogger("filelock").setLevel(logging.CRITICAL)
 
