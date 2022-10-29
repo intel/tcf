@@ -2173,7 +2173,6 @@ class target_role_c:
                  interconnect: bool = False):
         assert isinstance(role, str)
         assert origin == None or isinstance(origin, str)
-        assert_axes_valid(axes)
         # FIXME: properly verify this
         assert spec == None or isinstance(spec, str) or callable(spec)
         assert spec_args == None or isinstance(spec_args, dict)
@@ -2184,7 +2183,11 @@ class target_role_c:
 
         self.role = role
         self.origin = origin
-        self.axes = axes
+        if axes == None:
+            self.axes = {}	# so iterators need no extra checks
+        else:
+            assert_axes_valid(axes)
+            self.axes = axes
         # FIXME: pre-compile if text?
         self.spec = spec
         self.spec_args = spec_args
@@ -2213,6 +2216,7 @@ class tc_info_c:
     values in :data:`result`, :data:`exception` and :data:`output`.
     """
     # This shall be pickable so we can send it over a queue
+    # thus, keep it very simple
     def __init__(self, name, file_path,
                  origin = None,
                  subcase_spec = None,
@@ -2232,12 +2236,29 @@ class tc_info_c:
         self.origin = origin
         #: list of subcases by name that the runner is supposed to execute
         self.subcase_spec = subcase_spec
-        assert_axes_valid(axes)
-        self.axes = axes
+        if axes == None:
+            self.axes = {}	# so iterators need no extra checks
+        else:
+            assert_axes_valid(axes)
+            self.axes = axes
+
+        # see tcfl.orchestrate.executor_c._axes_expand_testcase();
+        #
+        # these are all the axes (from the testcase and the testcase
+        # roles) and they are always sorted the same so we can
+        # reproduce the pseudo-random sequences.
+        #
+        # FIXME: move all .axes to ._axes; move to orchestrator, as
+        #        this is orchestrator internal
+        self._axes_all = collections.OrderedDict()
+        self._axes_all_mr = None
+
         if target_roles != None:
             commonl.assert_dict_of_types(target_roles, "target_roles",
                                          target_role_c)
-        self.target_roles = target_roles
+            self.target_roles = target_roles
+        else:
+            self.target_roles = {}
         self.tags = tags
         self.driver_name =  driver_name
         self.result = result
