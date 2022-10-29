@@ -2290,6 +2290,117 @@ class tc_info_c:
         self.formatted_traceback = formatted_traceback
 
 
+        # How many axes permutations are to be considered (doc in
+        # axes_permutations)
+        self._axes_permutations = 0
+
+        #: How are we randomizing the axes permutations (str: *random*,
+        #: *sequential*; any other string is a seed to a randomizer).
+        self._axes_randomizer = "random"
+
+
+        # method to filter axes permutations
+        self._axes_permutation_filter = None
+
+
+        #
+        # Orchestrator specific area
+        #
+        # The data in this area is initialized / used by the
+        # orchestrator (eg: tcfl/orchestrate.py or others); it is
+        # initiailized by the orchestrator.
+        #
+        # By default is kept uninitialized so this object can be
+        # pickled to pass it from the testcase discovery process to
+        # the orchestrating engine.
+        #
+
+        self.log = None
+
+        # initialized by the orchestrator based on self._axes_randomizer
+        self._axes_randomizer_impl = None
+
+
+
+    @property
+    def axes_permutations(self):
+        """
+        How many axes permutations are to be considered
+
+        See :ref:`execution modes <execution_modes>` for more information.
+
+        :getter: return the number of axes permutations
+        :setter: sets the number of axes permutations
+        :type: int
+        """
+        return self._axes_permutations
+
+    @axes_permutations.setter
+    def axes_permutations(self, n):
+        assert isinstance(n, int) and n >= 0, \
+            f"axes_permutations: expected >= integer, got {type(n)}"
+        self._axes_permutations = n
+        return self._axes_permutations
+
+
+    @property
+    def axes_randomizer(self):
+        """
+        What kind of randomization is to be done to sequence axes values?
+
+        See :ref:`execution modes <execution_modes>` for more information.
+
+        :getter: return the current randomizer
+          (:class:`random.Random` or *None* for sequential execution).
+
+        :setter: sets the randomizer:
+
+          - *None* or (str) *sequential* for sequential execution
+
+          - *random* (str) constructs a default random device
+            :class:`random.Random`.
+
+          - *SEED* (str) any random string which will used as seed to
+            construct a :class:`random.Random` object
+
+        :type: :class:`random.Random`
+        """
+        return self._axes_randomizer
+
+
+    @axes_randomizer.setter
+    def axes_randomizer(self, r = "random"):
+        assert isinstance(r, str)
+        self._axes_randomizer = r
+        return self._axes_randomizer
+
+
+    @property
+    def axes_permutation_filter(self):
+        """Set an axes permutation filter
+
+        By default, no filtering is done (this is *None*); otherwise,
+        set to the name of a filter registerd with
+        :meth:`tcfl.orchestrate.axes_permutation_filter_register` in
+        any :ref:`TCF configuration file <tcf_client_configuration>`
+
+        See :meth:`tcfl.orchestrate.axes_permutation_filter_register`
+        for how to implement filters.
+
+        FIXME: not clarified Setting mechanisms (needed except when
+        creating the method called *axes_permutation_filter*):
+
+        - :func:`tcfl.tc.execution_mode` decorator, argument *axes_permutation_filter*
+
+        """
+        return self._axes_permutation_filter
+
+
+    @axes_permutation_filter.setter
+    def axes_permutation_filter(self, f):
+        assert isinstance(f, str)
+        self._axes_permutation_filter = f
+        return self._axes_permutation_filter
 
 # we don't need too much logging level from this
 logging.getLogger("filelock").setLevel(logging.CRITICAL)
