@@ -640,7 +640,18 @@ class reporter_c:
         #: we assign it to a target group to run.
         if testcase:
             self.ts_start = testcase.ts_start
-            assert isinstance(testcase, tc_c)
+            # FIXME: HORRIBLE HACK
+            #
+            # Can't use isinstance(tclf.tc_info_c) because we still
+            # have import hell (tcfl.config gets imported by
+            # tcfl.__init__) -- once that gets solved, this can be
+            # done properly; it causes:
+            #
+            # Can't use AttributeError: partially initialized module 'tcfl' has no attribute 'tc_info_c' (most likely due to a circular import)
+
+            horrible_hack_type = str(type(testcase))
+            assert isinstance(testcase, tc_c) or \
+                "tc_info_c" in horrible_hack_type
             self.testcase = testcase	# record who our testcase is
         else:
             self.ts_start = time.time()
