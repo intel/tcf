@@ -1812,7 +1812,8 @@ if sys.platform.startswith("win"):
 
 def _cmdline_console_write_interactive(target, console, crlf,
                                        offset, max_backoff_wait,
-                                       windows_use_msvcrt = False):
+                                       windows_use_msvcrt = False,
+                                       press_enter = True):
 
     #
     # Poor mans interactive console
@@ -1959,18 +1960,18 @@ def _cmdline_console_write_interactive(target, console, crlf,
 
     # Print a warning banner
     if not windows:
-        _ = input("""
+        print("""
 WARNING: This is a very limited interactive console
 
     To exit: %s.
     [console '%s', CRLF input %s output %s]
 
-Press [enter] to continue <<<<<<"""
+"""
                   % (quit_sequence, console, repr(newline_input), repr(crlf)))
 
     else:
 
-        _ = input("""
+        print("""
 WARNING: Running 'console-write -i' under MS Windows
 
    MS Windows terminals lack features needed to properly emulate consoles.
@@ -1980,8 +1981,12 @@ WARNING: Running 'console-write -i' under MS Windows
    To exit: %s.
    [console '%s', CRLF input %s output %s]
 
-Press [enter] to continue <<<<<<"""
+"""
                   % (quit_sequence, console, repr(newline_input), repr(crlf)))
+
+    # wait for user to acknowledge
+    if press_enter:
+        return input("Press [enter] to continue <<<<<<")
 
     class _done_c(Exception):
         pass
@@ -2175,7 +2180,8 @@ def _cmdline_console_write(args):
             _cmdline_console_write_interactive(target, console,
                                                args.crlf, args.offset,
                                                args.max_backoff_wait,
-                                               windows_use_msvcrt = args.msvcrt)
+                                               windows_use_msvcrt = args.msvcrt,
+                                               press_enter = args.press_enter)
         elif args.data == []:	# no data given, so get from stdin
             while True:
                 line = getpass.getpass("")
@@ -2395,7 +2401,8 @@ def _cmdline_console_wall(args):
                     else:
                         subcommand = "console-read --follow"
                     cf.write(
-                        'screen -c %s %s %s --max-backoff-wait %f -c %s\n'
+                        'screen -c %s %s %s --disable-press-enter'
+                        ' --max-backoff-wait %f -c %s\n'
                         'title %s\n\n' % (
                             sys.argv[0], subcommand,
                             descr.target.fullid, args.max_backoff_wait, descr.console, item
@@ -2479,6 +2486,11 @@ def _cmdline_setup(arg_subparser):
     ap.add_argument("--interactive", "-i",
                     action = "store_true", default = False,
                     help = "Print back responses")
+    ap.add_argument("--disable-press-enter",
+                    dest = "press_enter",
+                    action = "store_false", default = True,
+                    help = "Require pressing enter before starting"
+                    " (to force reading the informational message)")
     ap.add_argument("--msvcrt",
                     action = "store_true", default = True,
                     help = "On Windows, use MSVCRT's getch()"
