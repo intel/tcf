@@ -162,7 +162,7 @@ def _cmdline_ls(args):
             # only prints ID, owner
             args.project = None
         else:
-            args.project = set()
+            args.project = { 'id', 'disabled' }
     else:
         args.project = set(args.project)   # to help avoid dups
 
@@ -173,11 +173,9 @@ def _cmdline_ls(args):
     logger.info(f"original projection list: {args.project}")
     if args.project != None:
         args.project.update({ 'id', 'disabled' })
-    else:
-        args.project = { 'id', 'disabled' }
-    if verbosity >= 0:
-        args.project.add('interfaces.power.state')
-        args.project.add('owner')
+        if verbosity >= 0:
+            args.project.add('interfaces.power.state')
+            args.project.add('owner')
     logger.info(f"updated projection list: {args.project}")
 
     # parse TARGETSPEC, if any -- because this will ask for extra
@@ -214,9 +212,12 @@ def _cmdline_ls(args):
     fields = args.project
     if expr_symbols:		# bring anything from fields we are testing
         if fields == None:
-            fields = set()
-        fields.update(expr_symbols)
-        logger.info(f"fields from filter expression: {', '.join(fields)}")
+            # if fields is None, keep it as None as it will pull ALL the fi
+            logger.info(f"querying all fields, so not upating from filter"
+                        f" expression ({', '.join(expr_symbols)})")
+        else:
+            fields.update(expr_symbols)
+            logger.info(f"fields from filter expression: {', '.join(fields)}")
 
     # so now we are actually querying the servers; this will
     # initialize the servers, discover them and them query them for
