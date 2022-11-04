@@ -1986,7 +1986,7 @@ WARNING: Running 'console-write -i' under MS Windows
 
     # wait for user to acknowledge
     if press_enter:
-        return input("Press [enter] to continue <<<<<<")
+        input("Press [enter] to continue <<<<<<")
 
     class _done_c(Exception):
         pass
