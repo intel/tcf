@@ -1358,6 +1358,11 @@ def linux_package_add(ic, target, *packages,
       are proxies defined, wait for them to be pingable before
       accessing the network.
 
+    Anything that uses DNF can be modified by setting keyword
+    *linux.dnf.install.options* in the target's keywords:
+
+    >>> target.kws['linux.dnf.install.options'] = "--nobest -v"
+
     FIXME:
 
      - missing support for older distros and to specify packages
@@ -1366,6 +1371,7 @@ def linux_package_add(ic, target, *packages,
      - most of the goodes in swupd_bundle_add have to be moved here,
        like su/sudo support, ability to setup proxy, fix date and pass
        distro-specific setups (like URLs, etc)
+
     """
     assert isinstance(ic, tcfl.tc.target_c)
     assert isinstance(target, tcfl.tc.target_c)
@@ -1431,20 +1437,27 @@ def linux_package_add(ic, target, *packages,
     elif distro == 'centos':
         _packages = packages + kws.get("any", []) + kws.get("centos", [])
         if _packages:
-            target.shell.run("dnf install -y " +  " ".join(_packages),
+            target.shell.run(
+                "dnf install"
+                f" {target.kws.get('linux.dnf.install.options', '')}"
+                " -y " +  " ".join(_packages),
             timeout = timeout)
     elif distro == 'fedora':
         _packages = packages + kws.get("any", []) + kws.get("fedora", [])
         if _packages:
             target.shell.run(
-                "dnf install --releasever %s -y " % distro_version
+                f"dnf install --releasever {distro_version}"
+                f" {target.kws.get('linux.dnf.install.options', '')} -y "
                 +  " ".join(_packages),
                 timeout = timeout)
     elif distro == 'rhel':
         _packages = packages + kws.get("any", []) + kws.get("rhel", [])
         if _packages:
-            target.shell.run("dnf install -y " +  " ".join(_packages),
-                             timeout = timeout)
+            target.shell.run(
+                "dnf install"
+                f" {target.kws.get('linux.dnf.install.options', '')} "
+                " -y " + " ".join(_packages),
+                timeout = timeout)
     elif distro == 'ubuntu':
         _packages = packages + kws.get("any", []) + kws.get("ubuntu", [])
         if _packages:
