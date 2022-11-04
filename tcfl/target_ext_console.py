@@ -2397,11 +2397,11 @@ def _cmdline_console_wall(args):
                         done = True
                     descr = consolel[item]
                     if args.interactive:
-                        subcommand = "console-write -i"
+                        subcommand = "console-write -i --disable-press-enter"
                     else:
                         subcommand = "console-read --follow"
                     cf.write(
-                        'screen -c %s %s %s --disable-press-enter'
+                        'screen -c %s %s %s'
                         ' --max-backoff-wait %f -c %s\n'
                         'title %s\n\n' % (
                             sys.argv[0], subcommand,
