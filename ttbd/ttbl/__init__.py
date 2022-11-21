@@ -723,7 +723,7 @@ class tt_interface(object):
         all forms can be combined; as well, if the implementation is
         the name of an existing component, then it becomes an alias.
         """
-        assert isinstance(impls, collections.Iterable)
+        assert isinstance(impls, collections.abc.Iterable)
         assert isinstance(kwimpls, dict), \
             "impls must be a dictionary keyed by console name; got %s" \
             % type(impls).__name__

@@ -2080,7 +2080,7 @@ def deploy_path(ic, target, _kws, cache = True):
 
     if isinstance(source_path, str):
         source_path = [ source_path ]
-    elif isinstance(source_path, collections.Iterable):
+    elif isinstance(source_path, collections.abc.Iterable):
         pass
     else:
         raise AssertionError(
@@ -2157,7 +2157,7 @@ def deploy_path(ic, target, _kws, cache = True):
 
     if isinstance(source_path, str):
         _rsync_path(source_path, dst_path)
-    elif isinstance(source_path, collections.Iterable):
+    elif isinstance(source_path, collections.abc.Iterable):
         for _source_path in source_path:
             _rsync_path(_source_path, dst_path)
     else:
