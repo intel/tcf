@@ -957,7 +957,7 @@ class shell(tc.target_extension_c):
         """
         Remove a multiple remote files (if the target supports it)
         """
-        assert isinstance(remote_filenames, collections.Iterable)
+        assert isinstance(remote_filenames, collections.abc.Iterable)
 
         self.run("rm -f " + " ".join(remote_filenames))
 

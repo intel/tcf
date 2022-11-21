@@ -171,7 +171,7 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
         assert isinstance(target, tc.target_c)
         assert isinstance(capturer, str)
         assert in_area == None \
-            or isinstance(in_area, collections.Iterable) \
+            or isinstance(in_area, collections.abc.Iterable) \
             and len(in_area) == 4 \
             and all(i >= 0 and i <= 1 for i in in_area), \
             'in_area parameter must be a tuple of four numbers ' \

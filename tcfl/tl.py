@@ -1400,7 +1400,7 @@ def swupd_bundle_add(ic, target, bundle_list,
     if isinstance(bundle_list, str):
         bundle_list = [ bundle_list ]
     else:
-        assert isinstance(bundle_list, collections.Iterable) \
+        assert isinstance(bundle_list, collections.abc.Iterable) \
             and all(isinstance(item, str) for item in bundle_list), \
             "bundle_list must be a string (bundle name) or list " \
             "of bundle names, got a %s" % type(bundle_list).__name__
