@@ -437,6 +437,235 @@ def tcpdump_collect(ic, filename = None):
 
 _os_release_regex = re.compile("^[_A-Z]+=.*$")
 
+
+
+def linux_ifname_by_mac(target, mac_addr: str) -> str:
+    """
+    Return the name of the network interface with the given MAC
+    address using Linux shell commands.
+
+    This uses the *ip* command to list current interfaces
+
+    :param tcfl.target_c target: target where to operate
+
+    :param str mac_addr: MAC address to look for
+
+       >> mac_addr = "00:11:22:33:44:55"
+
+    :return str: interface's name if MAC address found
+
+    :raises tcfl.error_e: if MAC address not found
+    """
+    # ip -o link
+    ##1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000\    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    ##2: enp1s0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc mq state DOWN mode DEFAULT group default qlen 1000\    link/ether 98:4f:ee:00:68:51 brd ff:ff:ff:ff:ff:ff
+    ##3: bootnet: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000\    link/ether 40:a6:b7:66:38:a0 brd ff:ff:ff:ff:ff:ff\    altname enp129s0\    altname ens5
+    ##4: ens11: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000\    link/ether 40:a6:b7:8d:92:60 brd ff:ff:ff:ff:ff:ff\    altname enp56s0
+    output = target.shell.run("ip -o link", output = True)
+    mac_addr = mac_addr.lower()
+    for line in output.splitlines():
+        line = line.strip().lower()
+        if mac_addr in line:
+            # the ifname ends in colon, which we need to remove
+            ifname = line.split()[1].rstrip(":")
+            return ifname
+
+    raise tcfl.tc.error_e(f"{target.id}: can't find interface"
+                          f" with MAC {mac_addr}",
+                          { 'interfaces': output })
+
+
+
+def linux_if_configure_static(target, ifname,
+                              network = None,
+                              ipv4_addr = None, ipv4_prefix_len = None,
+                              ipv6_addr = None, ipv6_prefix_len = None):
+    """
+    Configure a Linux network interface using ip commands
+
+    :param tcfl.target_c target: target whose interface is to be configured
+
+    :param str ifname: name of the network interface to configure
+
+    :param tcfl.target_c network: (optional) network to which the target is
+      connected; the target's inventory describes a connection to a
+      network in the *interconnects.NWNAME* section. From there, the MAC
+      address for the network connection can be obtained and different
+      methods for configuring can be selected/implemented.
+
+      If not specified, *ipv4_addr*, *ipv4_prefix_len* and/or
+      *ipv6_addr*, *ipv6_prefix_len*  have to be specified.
+
+    :param str ipv4_addr: IPv4 address of the server in the VLAN;
+      normally we use .1 for the server and the second nibble (4
+      in the example) matches the VLAN:
+
+      >>> ipv4_addr = "192.4.0.1"
+
+    :param int ipv4_prefix_len: IPv4 address prefix; (0-32) used to
+      determine the network mask; most common: 8, 16, 24.
+
+      Building on the previous example:
+
+      >>> ipv4_prefix_len = 16
+
+      Would assing to this VLAN an IPv4 range of 65k IP addresses,
+      with a server/router 192.4.0.1, a network address 192.4.0.0
+      and a broadcast 192.4.255.255.
+
+    :param str ipv4_addr: same as ipv4_addr, but for IPv6 addresses:
+
+      >>> ipv6_addr = "fd:99:4::1"
+
+    :param int ipv6_prefix_len: same as ipv4_prefix_len, but for
+      IPv6 addresses.
+
+      Building on the previous example:
+
+      >>> ipv6_prefix_len = 104
+
+    """
+    assert isinstance(target, tcfl.tc.target_c), \
+        f"target: expected tcfl.tc.target_c; got {type(target)}"
+    if network == None:
+        assert ( ipv4_addr and ipv4_prefix_len ) \
+            or ( ipv6_addr and ipv6_prefix_len ), \
+            "no network specified, IPv4 and/or IPv6 addresses" \
+            " need to be provided"
+    else:
+        assert isinstance(target, tcfl.tc.target_c), \
+            f"network: expected tcfl.tc.target_c; got {type(network)}"
+        ipv4_addr = target.addr_get(network, "ipv4")
+        ipv4_prefix_len = target.ic_field_get(network, "ipv4_prefix_len", "(prefix_len)")
+        ipv6_addr = target.addr_get(network, "ipv6")
+        ipv6_prefix_len = target.ic_field_get(network, "ipv6_prefix_len", "(prefix_len)")
+
+    target.shell.run(
+        f"ip link set dev {ifname} up")
+    target.shell.run(
+        f"ip addr flush dev {ifname}	# clean previous config")
+    if ipv6_addr and ipv6_prefix_len:
+        target.shell.run(
+            f"ip addr add {ipv6_addr}/{ipv6_prefix_len} dev {ifname}")
+    if ipv4_addr and ipv4_prefix_len:
+        target.shell.run(
+            f"ip addr add {ipv4_addr}/{ipv4_prefix_len} dev {ifname}")
+
+
+
+def linux_if_configure_dhclient(target, ifname: str):
+    """
+    Configure a Linux network interface using dhclient
+
+    :param tcfl.target_c target: target whose interface is to be configured
+
+    :param str ifname: name of the network interface to configure
+    """
+    assert isinstance(target, tcfl.tc.target_c), \
+        f"target: expected tcfl.tc.target_c; got {type(target)}"
+    # Configure using dhclient
+    target.shell.run(
+        f"dhclient -x {ifname}   # kill maybe running instance first")
+    target.shell.run(
+        f"dhclient {ifname}    # blocks until address acquired")
+
+
+
+def linux_if_configure(target, network, method: str = "static"):
+    """
+    Configure the network interface connected to a given network
+    address using Linux shell commands.
+
+    :param tcfl.target_c target: target whose interface is to be configured
+
+    :param tcfl.target_c network: network to which the target is
+      connected; the target's inventory describes a connection to a
+      network in the *interconnects.NWNAME* section. From there, the MAC
+      address for the network connection can be obtained and different
+      methods for configuring can be selected/implemented.
+
+    :param str method: (optional; default *static*) method to
+      configure the network interface:
+
+      - *static*: use the IP information in the inventory fields
+        *ipv4_addr*, *ipv4_prefix_len*, *ipv6_addr*,
+        *ipv6_prefix_len*.
+
+      - *dhcp*, *dhclient*: configure the interface using DHCP and
+        *dhclient*
+
+    """
+    assert isinstance(target, tcfl.tc.target_c), \
+        f"target: expected tcfl.tc.target_c; got {type(target)}"
+    assert isinstance(network, tcfl.tc.target_c), \
+        f"network: expected tcfl.tc.target_c; got {type(network)}"
+    methods = { 'static', 'dhcp', 'dhclient' }
+    assert method in methods, \
+        f"method: expected one of {','.join(methods)}; got '{method}'"
+    if method == 'dhcp':
+        method = "dhclient"
+
+    mac_addr = target.addr_get(network, "mac")
+    base_ifname = tcfl.tl.linux_ifname_by_mac(target, mac_addr)
+
+    vlan_id = target.kws.get(f'interconnects.{network.id}.vlan_id', None)
+    # allow doing untagged by not setting vlan_id in the target's inventory
+    #if vlan_id == None:
+    #    vlan_id = network.kws.get('vlan_id', None)
+    #if vlan_id == None:
+    #    vlan_id = network.kws.get('vlan', None)
+    if vlan_id != None:
+        ifname = network.id
+        target.shell.run(		# flush
+            f"ip link delete {network.id} || true")
+        target.shell.run(
+            "ip link add"
+            f" link {base_ifname} name {network.id}"
+            f" type vlan id {vlan_id}")
+        target.shell.run(
+            f"ip link set dev {base_ifname} up")
+    else:
+        ifname = base_ifname
+
+    if method == "static":
+        linux_if_configure_static(target, ifname, network = network)
+    elif method == "dhclient":
+        linux_if_configure_dhclient(target, ifname)
+
+
+
+def linux_if_add(target, new_ifname: str, ifname: str, mac_addr: str):
+    """
+    Adds a new virtual network interface associated with an existing one
+
+    :param tcfl.target_c target: target where to execute commands
+
+    :param str new_ifname: name of the new interface (must be less
+      than 16 characters)
+
+      >> new_ifname = "eth_fake"
+
+    :param str ifname: name of the existing interface the new
+      interface will be associated with.
+
+      >> new_ifname = "ens28"
+
+    :param str mac_addr: MAC address for the new interface (six hex bytes
+      separated by colons).
+
+      >> mac_addr = "00:11:22:33:44:55"
+
+    """
+    target.shell.run(
+        f"ip link delete {new_ifname} || true   # flush existing?")
+    target.shell.run(
+        f"ip link add  link {ifname} name {new_ifname}"
+        f" address {mac_addr} type macvlan")
+    target.shell.run(
+        f"ip link dev {new_ifname} set up")
+
+
+
 def linux_os_release_get(target, prefix = ""):
     """
     Get the os-release file from a Linux target and return its
