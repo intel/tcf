@@ -43,6 +43,11 @@ class pc(ttbl.power.daemon_c):
     """Start / stop a dnsmasq daemon to resolve DNS requests to a given
     network interface
 
+    :param str ifname: (optional; default target's name) name of the
+      network interface to attach dnsmasq to.
+
+    :param bool tftp: (optional; default *True*) enable TFTP
+
     This is meant to be used in the power rail of an interconnect
     target that represents a network to which the server is physically
     connected.
@@ -114,7 +119,23 @@ class pc(ttbl.power.daemon_c):
        automatically from the IP address
 
     """
-    def __init__(self, path = "/usr/sbin/dnsmasq"):
+    def __init__(self, path = "/usr/sbin/dnsmasq", ifname = None,
+                 allow_other_macs: bool = False,
+                 tftp: bool = True):
+        assert isinstance(allow_other_macs, bool), \
+            f"allow_other_macs: expected bool; got {type(allow_other_macs)}"
+
+        if ifname != None:
+            assert isinstance(ifname, str) \
+                and len(ifname) <= self.IFNAMSIZ, \
+                "ifname: expected string of at most" \
+                f" {self.IFNAMSIZ} characters; got {type(ifname)}" \
+                f" {ifname}"
+            commonl.verify_str_safe(ifname,
+                                    name = "network interface name")
+        self.ifname = ifname
+        self.allow_other_macs = allow_other_macs
+
         cmdline = [
             path,
             "--auth-server",
@@ -126,6 +147,7 @@ class pc(ttbl.power.daemon_c):
         ttbl.power.daemon_c.__init__(self, cmdline, precheck_wait =
                                      0.5, mkpidfile = False,
                                      pidfile = "%(path)s/dnsmasq.pid")
+        self.tftp = tftp
         self.upid_set(
             "dnsmasq daemon",
             # if multiple virtual machines are created associated to a
@@ -133,6 +155,10 @@ class pc(ttbl.power.daemon_c):
             #   each...in most cases
             serial_number = commonl.mkid(" ".join(cmdline))
         )
+
+
+    # linux/include/if.h
+    IFNAMSIZ = 16
 
     def verify(self, target, component, _cmdline_expanded):
         return os.path.exists(os.path.join(target.state_dir, "dnsmasq.pid"))
@@ -189,6 +215,10 @@ class pc(ttbl.power.daemon_c):
         # expand later.
         with open(os.path.join(ic.state_dir, "dnsmasq.conf"), "w+") as f:
 
+            if self.ifname:
+                ifname = self.ifname
+            else:
+                ifname = "b" + target.id
             configl = [
                 "no-hosts",				# only files in...
                 "hostsdir=%(path)s/dnsmasq.hosts",	# ..this dir
@@ -201,7 +231,7 @@ class pc(ttbl.power.daemon_c):
                 # only work anyway
                 # FIXME: hardcoded to knowing the network interface
                 #        name is called bTARGET
-                "interface=b%(id)s",
+                f"interface={ifname}",
                 # need to use this so we only bind to our
                 # interface and we can run multiple dnsmasqa and coexists
                 # with whichever are in the system
@@ -214,18 +244,22 @@ class pc(ttbl.power.daemon_c):
                 # DISABLED: unknown why, this messes up resolution of
                 # plain names
                 # auth-server=%(id)s,b%(id)s",
-                "auth-zone=%(id)s,b%(id)s",
+                f"auth-zone=%(id)s,{ifname}",
                 "dhcp-authoritative",
-                # Enable TFTP server to STATEDIR/tftp.root
-                "enable-tftp",
-                "tftp-root=%(path)s/tftp.root",
-                # all files TFTP is to send have to be owned by the
-                # user running it (the same one running this daemon)
-                "tftp-secure",
                 # logging -- can be accessed with a console, see class doc
                 "log-dhcp",
                 "log-facility=%(path)s/dnsmasq.log",
             ]
+
+            if self.tftp:
+                configl += [
+                    # Enable TFTP server to STATEDIR/tftp.root
+                    "enable-tftp",
+                    "tftp-root=%(path)s/tftp.root",
+                    # all files TFTP is to send have to be owned by the
+                    # user running it (the same one running this daemon)
+                    "tftp-secure"
+                ]
 
             # Add stuff based on having ipv4/6 support
             #
@@ -239,10 +273,18 @@ class pc(ttbl.power.daemon_c):
                 addrs.append(ic_ipv4_addr)
                 # IPv4 server address so we can do auth-server
                 configl.append("host-record=%(id)s,%(ipv4_addr)s")
+                ipv4_prefix_len = ic.kws['ipv4_prefix_len']
+                network = ipaddress.IPv4Network(str(
+                    ic_ipv4_addr + "/" + str(ipv4_prefix_len)), strict = False)
                 # we let DNSMASQ figure out the range from the
                 # configuration of the network interface and we only
                 # allow (static) the ones set below with dhcp-host
-                configl.append("dhcp-range=%(ipv4_addr)s,static")
+                if self.allow_other_macs:
+                    configl.append(
+                        f"dhcp-range={ipv4_addr},{network.broadcast_address},"
+                        f"{ipv4_prefix_len}")
+                else:
+                    configl.append("dhcp-range=%(ipv4_addr)s,static")
 
             ic_ipv6_addr = ic.kws.get('ipv6_addr', None)
             if ic_ipv6_addr:
@@ -339,7 +381,7 @@ class pc(ttbl.power.daemon_c):
                     if ic_ipv6_addr:
                         f.write(
                             "dhcp-option=tag:%(id)s," % kws
-                            + "option:tftp-server," + ic_ipv4_addr + "\n")
+                            + "option:tftp-server," + ic_ipv6_addr + "\n")
                     else:
                         raise RuntimeError(
                             "%s: TFTP/PXE boot mode selected, but no boot"
