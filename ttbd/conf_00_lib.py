@@ -20,14 +20,10 @@ import netifaces
 
 import commonl
 import ttbl
-import ttbl.dhcp
-import ttbl.pc
-import ttbl.pc_ykush
-import ttbl.rsync
-import ttbl.socat
-import ttbl.usbrly08b
+import ttbl.router
 
 
+# FIXME: this should be in ttbl
 class vlan_pci(ttbl.power.impl_c):
     """Power controller to implement networks on the server side.
 
@@ -456,6 +452,342 @@ class vlan_pci(ttbl.power.impl_c):
         return True
 
 
-# FIXME: replace tcpdump with a interconnect capture interface
-# declare the property we normal users to be able to set
-ttbl.test_target.properties_user.add('tcpdump')
+
+def target_vlan_add(nw_name: str,
+                    switch_target: ttbl.test_target ,
+                    mac_addr: str, vlan_id: int,
+                    ipv4_addr: str, ipv4_prefix_len: int,
+                    ipv6_addr: str, ipv6_prefix_len: int,
+                    switch_class: ttbl.router.router_c = ttbl.router.cisco_c,
+                    bridge_ifname: str = None,
+                    tftp: bool = True):
+    """
+    Creates a target that implements an interconnect/network using 802.1Q VLAN
+
+    It is recommended to use low VLAN ids (eg: 2-9) since:
+
+    - they are the same in hexadecimal, decimal (so both IPv4 and
+      IPv6 look the same)
+
+    - under 256 (so they can be used straight in IPv6 and IPv4
+      addreses
+
+    - So they work on most switches (0 is reserved by the spec, 1
+      is reserved in Cisco)
+
+    Thus, VLAN X yields 192.X.0.0/16 and fd:99:X::1/104.
+
+    :param str nw_name: name for the target representing this network
+
+    :param ttbl.test_target switch_target: target which represents
+      the switch on which we'll be creating the VLAN
+
+    :param ttbl.router.router_c switch_class: class (derivative of
+      router_c) that implements the details of each router
+      model/make
+
+      >>> switch_class = ttbl.router.cisco_c
+
+    :param str mac_addr: MAC address of the interface in the
+      server that is connected to the switch. (six hex bytes
+      separated by colons)
+
+      >> mac_addr = "00:11:22:33:44:55"
+
+    :param int vlan_id: integer representing the 802.1Q VLAN ID;
+      valid numbers depend on the switch; the standard allows
+      1-4096; it is recommended to use 2-254 to be able to use the
+      same in IP ranges.
+
+      >> vlan_id = 4
+
+    :param str ipv4_addr: IPv4 address of the server in the VLAN;
+      normally we use .1 for the server and the second nibble (4
+      in the example) matches the VLAN:
+
+      >>> ipv4_addr = f"192.4.0.1"
+
+
+    :param int ipv4_prefix_len: IPv4 address prefix; (0-32) used to
+      determine the network mask; most common: 8, 16, 24.
+
+      Building on the previous example:
+
+      >>> ipv4_prefix_len = 16
+
+      Would assing to this VLAN an IPv4 range of 65k IP addresses,
+      with a server/router 192.4.0.1, a network address 192.4.0.0
+      and a broadcast 192.4.255.255.
+
+    :param str ipv4_addr: same as ipv4_addr, but for IPv6 addresses:
+
+      >>> ipv6_addr = f"fd:99:4::1"
+
+    :param int ipv6_prefix_len: same as ipv4_prefix_len, but for
+      IPv6 addresses.
+
+      Building on the previous example:
+
+      >>> ipv6_prefix_len = 104
+
+    :param str bridge_ifname: Name for the network interface in
+      the server that will represent a connection to the VLAN.
+
+      This is normally set to the target name, but if it is too
+      long (more than 16 characters), it will fail. This allows to
+      set it to anything else.
+
+      >>> bridge_ifname = "nw30"
+
+    :param bool tftp: (optional; default *True*) enable TFTP
+      services in the VLAN
+
+    **Example**
+
+    Create six VLANs
+
+    >>> vlan_ids = [ 2, 3, 4, 5, 6, 7 ]
+
+    >>> for vlan_id in vlan_ids:
+    >>>     target_vlan_add(
+    >>>         f"nw{vlan_id}",
+    >>>         switch_target,
+    >>>         mac_addr = "78:ac:44:6d:0b:19",  # server's NIC connected to switch
+    >>>         vlan_id = vlan_id,
+    >>>         ipv4_addr = f"192.{vlan_id}.0.1", ipv4_prefix_len = 16,
+    >>>         ipv6_addr = f'fd:99:{vlan_id:02x}::1', ipv6_prefix_len = 104)
+
+
+    **Requirements**
+
+    - *ttbd* server must be able to connect to the switch to configure it
+
+    - *ttbd* server must have a network connection to the switch
+      to be able to serve DHCP, DNS, TFTP and others and to
+      capture network traffic
+
+    **Implementation Details**
+
+    There are a set of top level inventory field in the inventory
+    that are used by the different components:
+
+    - mac_addr: MAC address of the interface that is connected to the switch
+
+    - vlan: the ID of the 802.1Q VLAN
+
+    - ipv4_addr, ipv4_prefix_len: IPv4 address of the server host in that
+      network; off the network mask it generates the network address +
+      bcast
+
+    - ipv6_addr,ipv6_prefix_len: Same, for IPv6
+
+    This network target, when powered on:
+
+    - configures the switch to enable the VLAN and allow only the
+      targets in the allocation to access it
+      (:class:`ttbl.router.vlan_manager_c`).
+
+      Refer to the this class' documentation to understand the
+      flow.
+
+    - configures a network interface in the server that can
+      connect to the now created VLAN in the switch
+      (:class:`conf_00_lib.vlan_pci`).
+
+    - starts DHCP, DNS and TFTP services on said interface
+      (:class:`ttbl.dnsmasq.pc`).
+
+    """
+    assert isinstance(nw_name, str)
+    assert isinstance(switch_target, ttbl.test_target), \
+        "switch_target: expected ttbl.test_target describing the" \
+        " switch, got {type(switch_target)}"
+    assert issubclass(switch_class, ttbl.router.router_c), \
+        "switch_class: expected subclass of ttbl.router.router_c; " \
+        f" got {switch_class}"
+
+
+    assert isinstance(mac_addr, str), \
+        "mac_addr: expected string with six hex bytes as HH:HH:HH:HH:HH:HH; got: %s %s" \
+        % (type(mac_addr), mac_addr)
+    assert isinstance(vlan_id, int) and 1 < vlan_id < 4096, \
+        "vlan_id: expected integer between 1 and 4096;" \
+        f" got {type(vlan_id)} {vlan_id}"
+
+    assert isinstance(ipv4_addr, str), \
+        "ipv4_addr: expected IPv4 address A.B.C.D; " \
+        f" got {type(ipv4_addr)} {ipv4_addr}"
+    assert isinstance(ipv4_prefix_len, int) \
+        and 0 < ipv4_prefix_len < 32, \
+        "ipv4_prefix_len: expected integer between 1 and 31;" \
+        f" got {type(ipv4_prefix_len)} {ipv4_prefix_len}"
+
+    assert isinstance(ipv6_addr, str), \
+        "ipv6_addr: expected IPv6 address A:B:...:1; " \
+        f" got {type(ipv6_addr)} {ipv6_addr}"
+    assert isinstance(ipv6_prefix_len, int) \
+        and 1 < ipv6_prefix_len < 128, \
+        "ipv6_prefix_len: expected integer between 1 and 128;" \
+        f" got {type(ipv6_prefix_len)} {ipv6_prefix_len}"
+
+    assert isinstance(tftp, bool), \
+        f"tftp: expected bool; got {type(tftp)} {tftp}"
+
+    # create vlans on power-on
+    # destroy vlans on power-off, release -> power interface powers off on
+    # release if off_on_release is defined
+    ic = ttbl.interconnect_c(
+        nw_name,
+        _type = "eth_network_vlan",
+        _tags = {
+            # FIXME: add bitrate info
+            "mac_addr": mac_addr,
+            "vlan": vlan_id,
+            "ipv4_addr": ipv4_addr,
+            "ipv4_prefix_len": ipv4_prefix_len,
+            'ipv6_addr': ipv6_addr,
+            'ipv6_prefix_len': ipv6_prefix_len,
+        }
+    )
+
+    ic.interface_add("power", ttbl.power.interface(
+        # when powered on, tells the switch to create vlan vlan_id
+        switch_vlan_setup = ttbl.router.vlan_manager_c(
+            switch_target = switch_target,
+            switch_class = switch_class),
+        # configure a network interface to the vlan on mac_addr
+        netif = vlan_pci(bridge_ifname = bridge_ifname),
+        # setup a DHCP/DNS server on the network interface we just
+        # setup; it finds it by the ipv4_addr; uses it's network
+        # parameters to attach.
+        dhcp = ttbl.dnsmasq.pc(ifname = bridge_ifname,
+                               allow_other_macs = True,
+                               tftp = True),
+    ))
+
+    ic.interface_add("console", ttbl.console.interface(
+        **{ "log-dnsmasq": ttbl.console.logfile_c("dnsmasq.log") }))
+
+    ttbl.config.interconnect_add(ic)
+
+    return ic
+
+
+
+def target_add_to_vlan_interconnects(
+        target: ttbl.test_target,
+        vlan_targets: list[ttbl.test_target],
+        mac_addr: str,
+        switch_port_spec: str,
+        nibble: int = None,
+        vlan_id_set: bool = False):
+    """
+    Add a target to a list of VLAN networks
+
+    Given a target, update its interconnect information to ensure that
+    it lists the ability to connect to a list of VLAN networks.
+
+    :param ttbl.test_target target: target on which to operate
+
+    :param list[ttbl.interconnect_c] vlan_targets: list of targets,
+      each describing a VLAN-based interconnect.
+
+      >>> vlan_targets = []
+      >>> for vlan_id in vlan_ids:
+      >>>     vlan_target = target_vlan_add(
+      >>>         f"nw{vlan_id}",
+      >>>         switch_target,
+      >>>         mac_addr = "87:ca:44:d6:0b:91",
+      >>>         vlan_id = vlan_id,
+      >>>         ipv4_addr = f"192.{vlan_id}.0.1", ipv4_prefix_len = 16,
+      >>>         ipv6_addr = f'fd:99:{vlan_id:02x}::1', ipv6_prefix_len = 104)
+      >>>     vlan_targets.append(vlan_target)
+
+    :param str mac_addr: MAC address of the interface in the target
+      that connects to the switch where the VLAN network is
+      implemented (six hex bytes separated by colons):
+
+      >> mac_addr = "00:11:22:33:44:55"
+
+    :param str switch_port_spec: specification of the port (in switch
+      specific format) in which the cable for the interface with MAC
+      address given in *mac_addr* argument is connectde into the switch.
+
+      This is used to allow those ports to access the VLAN when
+      created.
+
+      E.g.: for a Cisco switch
+
+      >> switch_port_spec = "Eth1/43"
+
+    :param int nibble: what number to give this machine in the IP
+      address allocation for each VLAN.
+
+      The allocation of IP numbers is automated by looking at the IP
+      range from the VLAN network target (eg: 192.30.0.1/16 for VLAN
+      #30); the last nibble .1 is replaced with the nibble argument,
+      which has to be between 2 and 254.
+
+      >>> nibble = 3
+
+    :param bool vlan_id_set: (optional, default *False*) set the
+       *interconnects.NETWORK.vlan_id* property with the 801.1Q VLAN
+       id.
+
+       This means that the target needs to configure the network
+       interface with VLAN tagging and it has to be done by the client
+       scripting.
+
+       If the switch is configured to allow untagged traffic, this can
+       be left unset, as the traffic will be routed without tagging.
+    """
+    assert isinstance(target, ttbl.test_target), \
+        f"target: expected ttbl.test_target; got {type(target)} {target}"
+
+    assert all(isinstance(i, ttbl.interconnect_c) for i in vlan_targets), \
+        "vlan_targets: all items need to be ttbl.interconnect_c"
+
+    assert isinstance(nibble, int) and 1 < nibble < 255, \
+        "nibble: expected an integer > 1 and < 255 for the last part" \
+        f" of the IP address; got {type(nibble)} {nibble}"
+
+    # FIXME: verify vlan_ids (1, 254)
+    # FIXME: this needs to be made more generic--since we need to be
+    # able to link against the name of an existing vlan target which
+    # might be in another server anwyay
+
+    for vlan_target in vlan_targets:
+        vlan_id = vlan_target.property_get(
+            "vlan_id",
+            vlan_target.property_get("vlan"))
+        # get the IP address prefixes -- kinda hack it
+        #
+        # 192.{vlan_id}.0.1 -> prefix 192.{vlan_id}.0.
+        # fd:99:{vlan_id:02x}::{nibble:02x} -> fd:99:{vlan_id:02x}::
+        #
+        #
+        ipv4_prefix = ".".join(vlan_target.property_get('ipv4_addr').split('.')[:-1])
+        # IPv6 addresses might have consecutive :, so use re.split()
+        ipv6_prefix = ":".join(re.split(":+", vlan_target.property_get('ipv6_addr'))[:-1])
+        tags = dict(
+            # this is the SUT's MAC addr of the card that is connected to
+            # the high speed switch -- we found it with 'ip l', who
+            # has LOWER_UP and no IP address
+            mac_addr = mac_addr,
+            switch_port = switch_port_spec,
+            # We take the network parameters from the vlan_target
+            #
+            # The IP address is the same, but replace the .1 -> COUNT
+            # (or ::1 with ::COUNT in hex)
+            # The prefix len is the same as the network's
+            ipv4_addr = f"{ipv4_prefix}.{nibble}",
+            ipv4_prefix_len = vlan_target.property_get('ipv4_prefix_len'),
+            ipv6_addr = f'{ipv6_prefix}::{nibble:02x}',
+            ipv6_prefix_len = vlan_target.property_get('ipv6_prefix_len'),
+        )
+        if vlan_id_set:
+            # depending on how we decide to configure the switch, if
+            # it needs tagging or not, we add the vlan_id field
+            tags['vlan_id'] = vlan_id
+
+        target.add_to_interconnect(vlan_target.id, tags)
