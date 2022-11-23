@@ -46,30 +46,16 @@ class vlan_pci(ttbl.power.impl_c):
 
     - off: stops all the network devices, making communication impossible.
 
+    :param str bridge_ifname: Name for the network interface in
+       the server that will represent a connection to the VLAN.
 
-    **Capturing with tcpdump**
+       This is normally set to the target name, but if it is too
+       long (more than 16 characters), it will fail. This allows to
+       set it to anything else.
 
-    FIXME: deprecate and replace with capture interface
+       >>> bridge_ifname = "nw30"
 
-    Can be enabled setting the target's property *tcpdump*::
-
-      $ tcf property-set TARGETNAME tcpdump FILENAME
-
-    this will have the target dump all traffic capture to a file
-    called *FILENAME* in the daemon file storage area for the user who
-    owns the target. The file can then be recovered with::
-
-      $ tcf store-download FILENAME
-
-    *FILENAME* must be a valid file name, with no directory
-    components.
-
-    .. note:: Note this requires the property *tcpdump* being
-              registered in the configuration with
-    
-              >>> ttbl.test_target.properties_user.add('tcpdump')
-
-              so normal users can set/unset it.
+    **Configuration**
 
     Example configuration (see :ref:`naming networks <bp_naming_networks>`):
 
@@ -117,7 +103,7 @@ class vlan_pci(ttbl.power.impl_c):
 
                  Follow :ref:`these steps <howto_nm_disable_control>`
 
-    System setup:
+    **System setup**
 
     - *ttbd* must be ran with CAP_NET_ADMIN so it can create network
        interfaces. For that, either add to systemd's
@@ -229,11 +215,29 @@ class vlan_pci(ttbl.power.impl_c):
     kept separated <separated_networks>`.
 
     """
-    def __init__(self):
+    def __init__(self, bridge_ifname = None):
+        if bridge_ifname != None:
+            assert isinstance(bridge_ifname, str) \
+                and len(bridge_ifname) <= self.IFNAMSIZ, \
+                "bridge_ifname: expected string of at most" \
+                f" {self.IFNAMSIZ} characters; got {type(bridge_ifname)}" \
+                f" {bridge_ifname}"
+            commonl.verify_str_safe(bridge_ifname,
+                                    name = "network interface name")
+        self.bridge_ifname = bridge_ifname
         ttbl.power.impl_c.__init__(self)
 
-    @staticmethod
-    def _if_rename(target):
+
+    # linux/include/if.h
+    IFNAMSIZ = 16
+
+
+    def _if_rename(self, target):
+        if self.bridge_ifname:
+            bridge_ifname = self.bridge_ifname
+        else:
+            bridge_ifname = target.id
+
         if 'mac_addr' in target.tags:
             # We do have a physical device, so we are going to first,
             # rename it to match the IC's name (so it allows targets
@@ -242,11 +246,13 @@ class vlan_pci(ttbl.power.impl_c):
             if ifname == None:
                 raise ValueError("Cannot find network interface with MAC '%s'"
                                  % target.tags['mac_addr'])
-            if ifname != target.id:
+            if ifname != bridge_ifname:
                 subprocess.check_call("ip link set %s down" % ifname,
                                       shell = True)
                 subprocess.check_call("ip link set %s name b%s"
-                                      % (ifname, target.id), shell = True)
+                                      % (ifname, bridge_ifname), shell = True)
+
+
 
     @staticmethod
     def _get_mode(target):
@@ -263,140 +269,93 @@ class vlan_pci(ttbl.power.impl_c):
             return 'virtual'
 
 
+
     def on(self, target, _component):
+        if self.bridge_ifname != None:
+            bridge_ifname = self.bridge_ifname
+        else:
+            bridge_ifname = "b" + target.id
         # Bring up the lower network interface; lower is called
         # whatever (if it is a physical device) or _bNAME; bring it
         # up, make it promiscuous
         mode = self._get_mode(target)
         if mode == 'vlan':
+            vlan_id = target.property_get(
+                "vlan_id",
+                target.property_get("vlan"))
+
             # our lower is a physical device, our upper is a device
             # which till tag for eth vlan %(vlan)
             ifname = commonl.if_find_by_mac(target.tags['mac_addr'],
                                             physical = True)
-            if not commonl.if_present("b%(id)s" % target.kws):
+            if not commonl.if_present(bridge_ifname):
                 # Do create the new interface only if not already
                 # created, otherwise daemons that are already running
                 # will stop operating
                 # This function might be being called to restablish a
                 # half baked operating state.
-                kws = dict(target.kws)
-                kws['ifname'] = ifname
                 subprocess.check_call(
                     "/usr/sbin/ip link add"
-                    " link %(ifname)s name b%(id)s"
-                    " type vlan id %(vlan)s"
+                    f" link {ifname} name {bridge_ifname}"
+                    f" type vlan id {vlan_id}",
                     #" protocol VLAN_PROTO"
                     #" reorder_hdr on|off"
                     #" gvrp on|off mvrp on|off loose_binding on|off"
-                    % kws, shell = True)
+                    shell = True)
                 subprocess.check_call(	# bring lower up
-                    "/usr/sbin/ip link set dev %s up promisc on" % ifname,
+                    f"/usr/sbin/ip link set dev {ifname} up promisc on",
                     shell = True)
         elif mode == 'physical':
             ifname = commonl.if_find_by_mac(target.tags['mac_addr'])
             subprocess.check_call(	# bring lower up
-                "/usr/sbin/ip link set dev %s up promisc on" % ifname,
+                f"/usr/sbin/ip link set dev {ifname} up promisc on",
                 shell = True)
             self._if_rename(target)
         elif mode == 'virtual':
             # We create a bridge, to serve as lower
-            if not commonl.if_present("b%(id)s" % target.kws):
+            if not commonl.if_present(bridge_ifname):
                 # Do create the new interface only if not already
                 # created, otherwise daemons that are already running
                 # will stop operating
                 # This function might be being called to restablish a
                 # half baced operating state.
-                commonl.if_remove_maybe("b%(id)s" % target.kws)
+                commonl.if_remove_maybe(bridge_ifname)
                 subprocess.check_call(
-                    "/usr/sbin/ip link add"
-                    "  name b%(id)s"
-                    "  type bridge"
-                    % target.kws, shell = True)
+                    f"/usr/sbin/ip link add name {bridge_ifname} type bridge",
+                    shell = True)
                 subprocess.check_call(	# bring lower up
-                    "/usr/sbin/ip link set"
-                    "  dev b%(id)s"
-                    "  up promisc on"
-                    % target.kws, shell = True)
+                    f"/usr/sbin/ip link set dev {bridge_ifname} up promisc on",
+                    shell = True)
         else:
             raise AssertionError("Unknown mode %s" % mode)
 
         # Configure the IP addresses for the top interface
         subprocess.check_call(		# clean up existing address
-            "/usr/sbin/ip add flush dev b%(id)s "
-            % target.kws, shell = True)
+            f"/usr/sbin/ip add flush dev {bridge_ifname}", shell = True)
         subprocess.check_call(		# add IPv6
             # if this fails, check Network Manager hasn't disabled ipv6
             # sysctl -a | grep disable_ipv6 must show all to 0
             "/usr/sbin/ip addr add"
-            "  %(ipv6_addr)s/%(ipv6_prefix_len)s dev b%(id)s "
-            % target.kws, shell = True)
+            f"  {target.kws['ipv6_addr']}/{target.kws['ipv6_prefix_len']}"
+            f" dev {bridge_ifname}",
+            shell = True)
         subprocess.check_call(		# add IPv4
             "/usr/sbin/ip addr add"
-            "  %(ipv4_addr)s/%(ipv4_prefix_len)d"
-            "  dev b%(id)s" % target.kws, shell = True)
+            f"  {target.kws['ipv4_addr']}/{target.kws['ipv4_prefix_len']}"
+            f"  dev {bridge_ifname}", shell = True)
 
         # Bring up the top interface, which sets up ther outing
         subprocess.check_call(
-            "/usr/sbin/ip link set dev b%(id)s up promisc on"
-            % target.kws, shell = True)
+            f"/usr/sbin/ip link set dev {bridge_ifname} up promisc on",
+            shell = True)
 
-        target.fsdb.set('power_state', 'on')
-
-        # Start tcpdump on the network?
-        #
-        # The value of the tcpdump property, if not None, is the
-        # filename we'll capture to.
-        tcpdump = target.fsdb.get('tcpdump')
-        if tcpdump:
-            assert not os.path.sep in tcpdump \
-                and tcpdump != "" \
-                and tcpdump != os.path.pardir \
-                and tcpdump != os.path.curdir, \
-                "Bad filename for TCP dump capture '%s' specified as " \
-                " value to property *tcpdump*: must not include" % tcpdump
-            # per ttbd:make_ticket(), colon splits the real username
-            # from the ticket
-            owner = target.owner_get().split(":")[0]
-            assert owner, "BUG? target not owned on power on?"
-            capfile = os.path.join(target.files_path, owner, tcpdump)
-            # Because it is in the user's area,
-            # we assume the user knows what he is doing to overwrite it,
-            # so we'll remove any first
-            commonl.rm_f(capfile)
-            pidfile = os.path.join(target.state_dir, "tcpdump.pid")
-            logfile = os.path.join(target.state_dir, "tcpdump.log")
-            cmdline = [
-                "/usr/sbin/tcpdump", "-U",
-                "-i", "b%(id)s" % target.kws,
-                "-w", capfile
-            ]
-            try:
-                logf = open(logfile, "a")
-                target.log.info("Starting tcpdump with: %s", " ".join(cmdline))
-                p = subprocess.Popen(
-                    cmdline, shell = False, cwd = target.state_dir,
-                    close_fds = True, stdout = logf,
-                    stderr = subprocess.STDOUT)
-            except OSError as e:
-                raise RuntimeError("tcpdump failed to start: %s" % e)
-            ttbl.daemon_pid_add(p.pid)	# FIXME: race condition if it died?
-            with open(pidfile, "w") as pidfilef:
-                pidfilef.write("%d" % p.pid)
-
-            pid = commonl.process_started(		# Verify it started
-                pidfile, "/usr/sbin/tcpdump",
-                verification_f = os.path.exists,
-                verification_f_args = ( capfile, ),
-                timeout = 20, tag = "tcpdump", log = target.log)
-            if pid == None:
-                raise RuntimeError("tcpdump failed to start after 5s")
 
 
     def off(self, target, component):
-        # Kill tcpdump, if it was started
-        pidfile = os.path.join(target.state_dir, "tcpdump.pid")
-        commonl.process_terminate(pidfile, tag = "tcpdump",
-                                  path = "/usr/sbin/tcpdump")
+        if self.bridge_ifname != None:
+            bridge_ifname = self.bridge_ifname
+        else:
+            bridge_ifname = "b" + target.id
         # remove the top level device
         mode = self._get_mode(target)
         if mode == 'physical':
@@ -404,21 +363,22 @@ class vlan_pci(ttbl.power.impl_c):
             ifname = commonl.if_find_by_mac(target.tags['mac_addr'])
             subprocess.check_call(
                 # flush the IP addresses, bring it down
-                "/usr/sbin/ip add flush dev %s; "
-                "/usr/sbin/ip link set dev %s down promisc off"
-                % (ifname, ifname),
+                f"/usr/sbin/ip add flush dev {ifname}; "
+                f"/usr/sbin/ip link set dev {ifname} down promisc off",
                 shell = True)
         elif mode == 'vlan':
-            commonl.if_remove_maybe("b%(id)s" % target.kws)
+            commonl.if_remove_maybe(bridge_ifname)
             # nothing; we killed the upper and on the lwoer, a
             # physical device we do nothing, as others might be using it
             pass
         elif mode == 'virtual':
-            commonl.if_remove_maybe("b%(id)s" % target.kws)
+            commonl.if_remove_maybe(bridge_ifname)
         else:
             raise AssertionError("Unknown mode %s" % mode)
 
-        target.fsdb.set('power_state', 'off')
+        target.fsdb.set('power_state', 'off')	# FIXME: COMPAT/remove
+
+
 
     @staticmethod
     def _find_addr(addrs, addr):
@@ -427,10 +387,16 @@ class vlan_pci(ttbl.power.impl_c):
                 return i
         return None
 
+
+
     def get(self, target, _component):
+        if self.bridge_ifname != None:
+            bridge_ifname = self.bridge_ifname
+        else:
+            bridge_ifname = "b" + target.id
         # we know we have created an interface named bNWNAME, so let's
         # check it is there
-        if not os.path.isdir("/sys/class/net/b" + target.id):
+        if not os.path.isdir("/sys/class/net/" + bridge_ifname):
             return False
 
         mode = self._get_mode(target)
@@ -445,27 +411,26 @@ class vlan_pci(ttbl.power.impl_c):
             raise AssertionError("Unknown mode %s" % mode)
 
         # Verify IP addresses are properly assigned
-        iface_name = "b" + target.id
-        addrs = netifaces.ifaddresses(iface_name)
+        addrs = netifaces.ifaddresses(bridge_ifname)
         if 'ipv4_addr' in target.kws:
             addrs_ipv4 = addrs.get(netifaces.AF_INET, None)
             if addrs_ipv4 == None:
                 target.log.info(
                     "vlan_pci/%s: off because no ipv4 addresses are assigned"
-                    % iface_name)
+                    % bridge_ifname)
                 return False	                # IPv4 address not set
             addr = self._find_addr(addrs_ipv4, target.kws['ipv4_addr'])
             if addr == None:
                 target.log.info(
                     "vlan_pci/%s: off because ipv4 address %s not assigned"
-                    % (iface_name, target.kws['ipv4_addr']))
+                    % (bridge_ifname, target.kws['ipv4_addr']))
                 return False	                # IPv4 address mismatch
             prefixlen = ipaddress.IPv4Network(
                 str('0.0.0.0/' + addr['netmask'])).prefixlen
             if prefixlen != target.kws['ipv4_prefix_len']:
                 target.log.info(
                     "vlan_pci/%s: off because ipv4 prefix is %s; expected %s"
-                    % (iface_name, prefixlen, target.kws['ipv4_prefix_len']))
+                    % (bridge_ifname, prefixlen, target.kws['ipv4_prefix_len']))
                 return False	                # IPv4 prefix mismatch
 
         if 'ipv6_addr' in target.kws:
@@ -473,19 +438,19 @@ class vlan_pci(ttbl.power.impl_c):
             if addrs_ipv6 == None:
                 target.log.info(
                     "vlan_pci/%s: off because no ipv6 address is assigned"
-                    % iface_name)
+                    % bridge_ifname)
                 return False	                # IPv6 address not set
             addr = self._find_addr(addrs_ipv6, target.kws['ipv6_addr'])
             if addr == None:
                 target.log.info(
                     "vlan_pci/%s: off because ipv6 address %s not assigned"
-                    % (iface_name, target.kws['ipv6_addr']))
+                    % (bridge_ifname, target.kws['ipv6_addr']))
                 return False	                # IPv6 address mismatch
             prefixlen = ipaddress.IPv6Network(str(addr['netmask'])).prefixlen
             if prefixlen != target.kws['ipv6_prefix_len']:
                 target.log.info(
                     "vlan_pci/%s: off because ipv6 prefix is %s; expected %s"
-                    % (iface_name, prefixlen, target.kws['ipv6_prefix_len']))
+                    % (bridge_ifname, prefixlen, target.kws['ipv6_prefix_len']))
                 return False	                # IPv6 prefix mismatch
 
         return True
