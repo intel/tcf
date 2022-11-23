@@ -562,6 +562,7 @@ Power Control Interface
 .. automodule:: ttbl.raritan_emx
 .. automodule:: ttbl.apc
 .. automodule:: ttbl.pc_ykush
+.. automodule:: ttbl.router
 .. automodule:: ttbl.usbrly08b
 
 Daemons that can be started in the server as part of a power rail:
