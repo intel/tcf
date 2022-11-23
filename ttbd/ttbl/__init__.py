@@ -796,7 +796,7 @@ class tt_interface(object):
             raise RuntimeError("missing '%s' argument" % arg_name)
         try:
             # support direct calling inside the daemon; if it is a
-            # str, we consider it might be JSON and decode it 
+            # str, we consider it might be JSON and decode it
             arg = args[arg_name]
             if isinstance(arg, str):
                 arg = json.loads(arg)
@@ -1223,7 +1223,7 @@ class test_target(object):
 
         :return ttbl.test_target: if target exists and the user is
           allowed to see and use it, descriptor to it, *None*
-          otherwise.        
+          otherwise.
         """
         assert isinstance(target_name, str)
         assert isinstance(calling_user, ttbl.user_control.User)
@@ -1785,21 +1785,61 @@ class test_target(object):
         with self.target_owned_and_locked(who):
             self.property_set(prop, value)
 
+
     def property_get(self, prop, default = None):
         """
         Get a target's property
 
         :param str who: User that is claiming the target
         :param str prop: Property name
+
+        This function gets properties from multiple locations, in the
+        following order, returning the first hit:
+
+        - from the FSDB (properties set in realtime in the
+          target's database)
+
+        - tags (as tag[PROP.SUBPROP.SUBSUBPROP])
+
+        - deep tags (as tag[PROP][SUBPROP][SUBSUBPROP]
+
+        - default
+
+        How we control fsdb properties shading tags is because
+        we don't allow setting certain properties that could
+        shadow tags.
         """
-        # See ttbl.test_target.to_dict(): these properties are
-        # generated, not allowed to set them
-        if prop in ( 'timestamp', prop == '_alloc.timestamp' ):
+        if prop in ( 'timestamp', '_alloc.timestamp' ):
             return self.timestamp_get()
         r = self.fsdb.get(prop)
-        if r == None and default != None:
-            return default
-        return r
+        if r:
+            return r
+        # try flat key tags[field.subfield.subfield]
+        r = self.tags.get(prop, None)
+        if r:
+            return r
+        # try non-flat key tags[field.subfield.subfield]
+        if '.' in prop:
+            subfields = prop.split(".")
+            d = self.tags
+            fields_left = len(subfields)
+            for field in subfields:
+                fields_left -= 1
+                try:
+                    v = d[field]
+                    if fields_left == 0:	# found it!
+                        return v
+                except TypeError:	# d is not a dictionary
+                    if fields_left == 0:
+                        return v
+                    break
+                except KeyError:	# d is a dict but that key doesn't exist
+                    break
+                if not isinstance(v, dict):
+                    break
+                d = v
+        return default
+
 
     def property_get_locked(self, who, prop, default = None):
         """
@@ -1810,10 +1850,8 @@ class test_target(object):
         """
         assert isinstance(who, str)
         with self.target_owned_and_locked(who):
-            r = self.fsdb.get(prop)
-        if r == None and default != None:
-            return default
-        return r
+            return self.property_get(prop, default = default)
+
 
     def property_is_user(self, name):
         """
