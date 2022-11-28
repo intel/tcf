@@ -6290,7 +6290,12 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         for role, thread in threads.items():
             result, exception = thread.get()
             if exception and re_raise_exceptions:
-                raise ( exception[0], exception[1], exception[2] )
+                # we get `exception` from sys.exc_info(), which returns the
+                # old-style representation of the handled exception,
+                # looks something like `(type(e), e, e.__traceback__)`.
+                # we only care on raising `e` -- the exception value -- because
+                # it has all needed info. So we take #1.
+                raise exception[1]
             results[role] = ( result, exception )
         return results
 
