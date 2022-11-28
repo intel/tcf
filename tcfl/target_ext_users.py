@@ -120,6 +120,8 @@ def _cmdline_role_gain(args):
         rs = executor.map(
             lambda rtb: _user_role(rtb, args.username, "gain", args.role),
             rtbs)
+    for r in rs:	# wait until complete by reading the values
+        _ = r
 
 
 def _cmdline_role_drop(args):
@@ -128,6 +130,8 @@ def _cmdline_role_drop(args):
         rs = executor.map(
             lambda rtb: _user_role(rtb, args.username, "drop", args.role),
             rtbs)
+    for r in rs:	# wait until complete by reading the values
+        _ = r
 
 
 
