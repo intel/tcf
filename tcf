@@ -16,6 +16,7 @@
 import argparse
 import argcomplete
 import collections
+import copy
 import getpass
 import inspect
 import json
@@ -288,6 +289,10 @@ if __name__ == "__main__":
         default = [ ],
         help = "Files to parse as configuration (this is used for testing, "
         "along with --config-path \"\"")
+    arg_parser.add_argument(
+        "--as-admin",
+        action = "store_true", default = False,
+        help = "run command gaining admin role first, then dropping it")
     arg_parser.add_argument(
         "-p", "--config-path",
         action = "append", dest = "config_path",
@@ -643,7 +648,19 @@ tcf-jobserver-run:
     logi("state path: %s" % tcfl.config.state_path)
     logi("share path: %s" % tcfl.config.share_path)
 
+
     if 'func' in args:
+        if args.as_admin:
+            _args = copy.copy(args)
+            _args.username = "self"
+            _args.role = "admin"
+            try:
+                logi("gaining admin role per --as-admin")
+                tcfl.tc.target_ext_users._cmdline_role_gain(_args)
+                logi("gained admin role per --as-admin")
+            except Exception as e:
+                logx("can't get admin role per --as-admin")
+                raise
         try:
             retval = args.func(args)
         except Exception as e:
@@ -659,6 +676,13 @@ tcf-jobserver-run:
                 else:
                     logging.error(e)
             retval = 1
+        finally:
+            if args.as_admin:
+                _args = copy.copy(args)
+                _args.username = "self"
+                _args.role = "admin"
+                logi("dropping admin role per --as-admin")
+                tcfl.tc.target_ext_users._cmdline_role_drop(_args)
     else:
         logx("No command specified")
         retval = 1
