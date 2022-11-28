@@ -642,7 +642,7 @@ class vlan_manager_c(ttbl.power.impl_c):
         self.switch_console = switch_console
         ttbl.power.impl_c.__init__(self, off_on_release = True, **kwargs)
         self.name = "vlan-manager"
-        self.upid_set("VLAN Manager for switch {switch_target.id}",
+        self.upid_set(f"VLAN Manager for switch {switch_target.id}",
                       id = switch_target.id)
 
 
