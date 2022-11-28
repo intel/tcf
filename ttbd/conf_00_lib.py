@@ -633,6 +633,18 @@ def target_vlan_add(nw_name: str,
     assert isinstance(tftp, bool), \
         f"tftp: expected bool; got {type(tftp)} {tftp}"
 
+
+    # Port is a global variable in the server that indicates what
+    # is the port the server is listening on; note is far from
+    # good (FIXME) since if we modify via cmdlineargs, it gets
+    # updated after the config files are parsed :/
+    if args.ssl:		# FIXME: this is very fugly
+        server_url = f"https://{ipv4_addr}:{port}"
+        server_url6 = f"https://{ipv6_addr}:{port}"
+    else:
+        server_url = f"http://{ipv4_addr}:{port}"
+        server_url6 = f"http://{ipv6_addr}:{port}"
+
     # create vlans on power-on
     # destroy vlans on power-off, release -> power interface powers off on
     # release if off_on_release is defined
@@ -647,6 +659,10 @@ def target_vlan_add(nw_name: str,
             "ipv4_prefix_len": ipv4_prefix_len,
             'ipv6_addr': ipv6_addr,
             'ipv6_prefix_len': ipv6_prefix_len,
+            'server': {
+                "url": server_url,
+                "url6": server_url6,
+            }
         }
     )
 
