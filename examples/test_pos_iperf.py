@@ -38,13 +38,15 @@ Execute :download:`the testcase <../examples/test_pos_iperf.py>` with::
 *~/.local/share/tcf/examples*)
 
 """
+import os
 import re
 import tcfl.tc
 
 
 @tcfl.tc.target("pos_capable", name = "client")
 @tcfl.tc.target("pos_capable", name = "server")
-@tcfl.tc.interconnect("ipv4_addr", name = "network")
+@tcfl.tc.interconnect("ipv4_addr", name = "network",
+                      mode = os.environ.get('MODE_IC', 'one-per-type'))
 class _test(tcfl.tc.tc_c):
     
     def deploy_00_maybe_flash(self, client, server, network):
