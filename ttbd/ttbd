@@ -754,11 +754,12 @@ def _user_role(userid, action, role):
 @flask_login.login_required
 def _targets_gets():
     # no audit: no side effects and very frequent
-    args = flask.request.get_json()	# passed as JSON body?
+    args = flask.request.get_json(silent = True)	# passed as JSON body?
     if args == None:
         args = flask.request.form	# as form?
     projections = ttbl.tt_interface.arg_get(
         args, 'projections', list, True, list())
+
     result = dict()
     calling_user = flask_login.current_user._get_current_object()
     for target in ttbl.test_target.known_targets():
@@ -785,11 +786,12 @@ def _targets_gets():
 @flask_login.login_required
 def _target_get(target_id):
     # no audit: no side effects and very frequent
-    args = flask.request.get_json()	# passed as JSON body?
+    args = flask.request.get_json(silent = True)	# passed as JSON body?
     if args == None:
         args = flask.request.form	# as form?
     projections = ttbl.tt_interface.arg_get(
         args, 'projections', list, True, list())
+
     calling_user = flask_login.current_user._get_current_object()
     target = ttbl.test_target.get_for_user(target_id, calling_user)
     if target == None:
