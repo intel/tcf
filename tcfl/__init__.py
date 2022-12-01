@@ -690,7 +690,11 @@ class msgid_c(object):
 
     def __exit__(self, exct_type, exce_value, traceback):
         cls = type(self)
-        if exce_value:
+        # Check the exception against None; that's what says we had no
+        # exception. Don't do a bool(exce_value) because if
+        # they type does it's on bool'ing, then we'll miss things that
+        # bool to False for any reason.
+        if exce_value != None:
             # set this for tcfl.tc.result_c.from_exception()--when we
             # raise any exception from inside a msgid_c context, we
             # want it to be reported with the right subcase
