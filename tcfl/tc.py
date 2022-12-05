@@ -1521,6 +1521,8 @@ class target_c(reporter_c):
         A target might be a member of one or more interconnects, as
         described by its tags (*interconnects* section).
 
+        See similar :meth:`ic_key_get`
+
         :param tcfl.tc.target_c ic: target describing the interconnect
           of which this target is a member (as defined in a
           @ :func:`tcfl.tc.interconnect` decorator to the testcase
@@ -6246,6 +6248,8 @@ class tc_c(reporter_c, metaclass=_tc_mc):
           being a target role (old *target want name*), the names
           assigned to the targets on the *@tcfl.tc.interconnect* or
           *@tcfl.tc.target* decorators.
+
+          # FIXME: this should take the target object too, now it is quite weird
 
         :param int processes: (optional, default as many as targets)
           how many threads to run in parallel
