@@ -3218,24 +3218,28 @@ def target(spec = None, name = None, count = 1, **kwargs):
 
 
 def _interconnect_want_add(obj, cls_name, name, spec, origin, count = 1, **kwargs):
-    ic_want_name = _target_want_decorate_class(
-        obj, cls_name,
-        name, "interconnect", "ic", obj._ic_count, **kwargs)
-    obj._targets[ic_want_name]['spec'] = spec
-    obj._targets[ic_want_name]['origin'] = origin
-    obj._interconnects.add(ic_want_name)
-    for key, val in kwargs.items():
-        valid = _target_want_add_check_key(
-            obj, cls_name, ic_want_name,
-            key, val)
-        if not valid:
-            raise blocked_e("%s: unknown key @%s" % (key, origin))
-    # By default, interconnects are explored all
-    obj._targets[ic_want_name]['kws'].setdefault('unlimited', True)
-    obj._ic_count += 1
+    if count > 1 and name != None:
+        # later a default will be given
+        name = name + "%d"
+    for _cnt in range(count):
+        ic_want_name = _target_want_decorate_class(
+            obj, cls_name,
+            name, "interconnect", "ic", obj._ic_count, **kwargs)
+        obj._targets[ic_want_name]['spec'] = spec
+        obj._targets[ic_want_name]['origin'] = origin
+        obj._interconnects.add(ic_want_name)
+        for key, val in kwargs.items():
+            valid = _target_want_add_check_key(
+                obj, cls_name, ic_want_name,
+                key, val)
+            if not valid:
+                raise blocked_e("%s: unknown key @%s" % (key, origin))
+        # By default, interconnects are explored all
+        obj._targets[ic_want_name]['kws'].setdefault('unlimited', True)
+        obj._ic_count += 1
 
 
-def interconnect(spec = None, name = None, **kwargs):
+def interconnect(spec = None, name = None, count = 1, **kwargs):
     """\
     Add a requirement for an interconnect to a testcase instance
 
@@ -3281,6 +3285,7 @@ def interconnect(spec = None, name = None, **kwargs):
 
         _interconnect_want_add(cls, cls.__name__,
                                name, spec, commonl.origin_get(2),
+                               count = count,
                                **kwargs)
         return cls
 
