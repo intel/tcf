@@ -121,8 +121,12 @@ class _test(tcfl.tc.tc_c):
 
         # Run the iperf client, which prints
         server_ipv4_addr = server.addr_get(network, "ipv4")
+        duration_s = int(os.environ.get('IPERF_DURATION_S', 10))
         output = client.shell.run(
-            f"iperf --format m -c {server_ipv4_addr}",
+            # we do -i2 so we see some progress info; makes it a wee
+            # harder to parse later, but it is worth seeing progress
+            f"iperf --format m -t {duration_s} -c {server_ipv4_addr} -i2",
+            timeout = 10 + duration_s,
             output = True)
         self.report_info("iperf ran successfully", dlevel = -1)
 
@@ -135,7 +139,15 @@ class _test(tcfl.tc.tc_c):
         ## ------------------------------------------------------------
         ## [  1] local 192.30.0.24 port 39586 connected with 192.30.0.20 port 5001 (icwnd/mss/irtt=14/1448/444)
         ## [ ID] Interval       Transfer     Bandwidth
+        ## ...
+        ## [  1] 2.00-4.00 sec  7436 MBytes  31188 Mbits/sec
+        ## [  1] 4.00-6.00 sec  7995 MBytes  33533 Mbits/sec
+        ## [  1] 6.00-8.00 sec  7729 MBytes  32418 Mbits/sec
+        ## [  1] 8.00-10.00 sec  8114 MBytes  34034 Mbits/sec
         ## [  1] 0.00-10.01 sec  32502 MBytes  27245 Mbits/sec
+        #
+        # We need to ignore each line but the last, so we do a
+        # regex.findall() and get the last match, which is the summary
         #
         # We use --format m so we report performance always in
         # megabits and transfer will be reported in MBytes
@@ -144,14 +156,16 @@ class _test(tcfl.tc.tc_c):
             "-(?P<duration>[\.0-9]+) sec"
             "\s+(?P<size>[\.0-9]+) MBytes"
             "\s+(?P<bandwidth>[\.0-9]+) Mbits/sec")
-        m = regex.search(output)
-        if not m:
+        lm = regex.findall(output)
+        if not lm:
             raise tcfl.error_e(
                 "can't parse iperf client output", { 'output': output })
-        gd = m.groupdict()
-        duration = float(gd['duration'])
-        size = float(gd['size'])
-        bandwidth = float(gd['bandwidth'])
+        # lm is a list of match tupples, each with a value matched
+        # that we have to convert to numeric
+        duration, size, bandwidth = lm[-1]
+        duration = float(duration)
+        size = float(size)
+        bandwidth = float(bandwidth)
 
         # Report the KPIs
         # FIXME: add vectors (fw version, HW type, etc) to
