@@ -281,6 +281,9 @@ class allocation_c(commonl.fsdb_symlink_c):
             if audit:
                 # FIXME: this is really messy -- audit.record needs to be better
                 _auditor = audit("unused")
+                # it is possible there will be no user if this is
+                # timing out, in which case, calling_user will be None
+                # and the audit layer needs to handle it appropiatedly
                 _auditor.record("allocation/timeout",
                                 calling_user = self.get("user"),
                                 allocid = self.allocid)
