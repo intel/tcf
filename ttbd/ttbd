@@ -254,7 +254,9 @@ class audit:
             self.calling_user = calling_user
         elif isinstance(calling_user, flask_login.mixins.AnonymousUserMixin):
             self.calling_user = "anonymous"
-        elif calling_user != None:
+        elif calling_user == None:
+            self.calling_user = None
+        else:
             raise TypeError(f"calling_user: expected None, str or"
                             f" ttbl.user_control.User; got {type(calling_user)}")
         if isinstance(target, ttbl.test_target):
