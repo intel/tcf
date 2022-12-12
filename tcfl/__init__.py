@@ -316,12 +316,19 @@ class result_c:
             trace_alevel = 0
         _attachments = { "trace": traceback.format_exc() }
         _attachments.update(attachments)
-        reporter._report(
-            level + dlevel, level + dlevel + alevel + trace_alevel, msg_tag,
-            "%s%s: %s" % (phase, tag, _e),
-            _attachments,
-            subcase = subcase, subcase_base = subcase_base,
-        )
+        if isinstance(reporter, tcfl.tc.reporter_c):
+            reporter._report(
+                level + dlevel, level + dlevel + alevel + trace_alevel, msg_tag,
+                "%s%s: %s" % (phase, tag, _e),
+                _attachments,
+                subcase = subcase, subcase_base = subcase_base,
+            )
+        else:
+            logging.error(
+                f"BUG! report_from_exception() reporter is {type(reporter)}/{reporter};"
+                f" expected tcfl.tc.reporter_c. _tc is {type(_tc)} "
+                f" target attachment is {type(attachments.get('target', None))}: "
+                + ''.join(traceback.format_stack()))
         return result
 
     @staticmethod
