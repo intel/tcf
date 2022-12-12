@@ -1899,6 +1899,7 @@ def _cmdline_console_write_interactive(target, console, crlf,
         # I've given up -- I can't figure out how to ask stty to
         # tell me emacs does \n
         windows = False
+        windows_use_msvcrt = False
         if sys.platform.startswith("win"):
             newline_input = b'\r\n'
         else:
