@@ -8541,13 +8541,36 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
         % tc_global._selected_str(ic_selected_all), dlevel = 4)
 
     # Now filter based on the -t specs given in the command line
-    # later each test case might filter more
-    if not args.target:
-        rt_selected.update(rt_selected_all)
-        ic_selected.update(ic_selected_all)
-    else:
-        spec = "(" + ") or (".join(args.target) +  ")"
+    # later each test case might filter more--note we support two
+    # modes for the time being if -I was given (othrwise, we go to old
+    # methodology)
+    if args.target:
 
+        if args.ic_spec:
+            raise RuntimeError("ERROR! can't specify -t and -I")
+        if args.rt_spec:
+            raise RuntimeError("ERROR! can't specify -t and -T")
+
+        if args.target:
+            rt_spec = "(" + ") or (".join(args.target) +  ")"
+            ic_spec = rt_spec
+        else:
+            rt_spec = None
+            ic_spec = None
+
+    else:
+
+        if args.ic_spec:
+            ic_spec = "(" + ") or (".join(args.ic_spec) +  ")"
+        else:
+            ic_spec = None
+
+        if args.rt_spec:
+            rt_spec = "(" + ") or (".join(args.rt_spec) +  ")"
+        else:
+            rt_spec = None
+
+    if ic_spec != None:
         # Select interconnects
         for rt_fullid, bsp_models in ic_selected_all.items():
             rt = rt_all[rt_fullid]
@@ -8557,13 +8580,19 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
             rt[rt['id']] = True
             for bsp_model in bsp_models:
                 if tc_global._targets_select_by_spec(
-                        "command line", rt, bsp_model, spec, "command line"):
+                        "command line", rt, bsp_model, ic_spec, "command line"):
                     ic_selected.setdefault(rt_fullid, set()).add(bsp_model)
                     break
             else:
                 if tc_global._targets_select_by_spec(
-                        "command line", rt, None, spec, "command line"):
+                        "command line", rt, None, ic_spec, "command line"):
                     ic_selected.setdefault(rt_fullid, set())
+    else:
+        ic_selected.update(ic_selected_all)
+
+    # Now filter based on the -t specs given in the command line
+    # later each test case might filter more
+    if rt_spec != None:
 
         # Select targets
         for rt_fullid, bsp_models in rt_selected_all.items():
@@ -8574,12 +8603,14 @@ def _targets_discover(args, rt_all, rt_selected, ic_selected):
             rt[rt['id']] = True
             for bsp_model in bsp_models:
                 if tc_global._targets_select_by_spec(
-                        "command line", rt, bsp_model, spec, "command line"):
+                        "command line", rt, bsp_model, rt_spec, "command line"):
                     rt_selected.setdefault(rt_fullid, set()).add(bsp_model)
             if not bsp_models:
                 if tc_global._targets_select_by_spec(
-                        "command line", rt, None, spec, "command line"):
+                        "command line", rt, None, rt_spec, "command line"):
                     rt_selected.setdefault(rt_fullid, set())
+    else:
+        rt_selected.update(rt_selected_all)
 
 
     tc_global.report_info(
@@ -9036,15 +9067,34 @@ def argp_setup(arg_subparsers):
         help = "Store extra ID specific variables; these are usually that"
         " that are associated to a full blown execution, like a URL,"
         " information about a build, etc")
-    ap.add_argument("-t", "--target", metavar = "TARGETSPECs",
+    ap.add_argument("-t", "--target", metavar = "SPEC",
                     action = "append", default = [],
-                    help = "Test target in which to run the test case; "
-                    "can be NAME, NAME:BSP-MODEL or TAG:PYTHONREGEX, where "
-                    "all the target/bsp-models that match said TAG and regex "
-                    "will be used--please note that each test case may "
-                    "specify extra filtering that will be applied to these. "
-                    "Multiple TARGETSPECs in a single string are ANDed "
-                    "together; multiple -t TARGETSPECs are ORed together.")
+                    help =
+                    "Filter which targets and interconncets can be used. "
+                    "This is a boolean expression where any inventory"
+                    " value can be tested for with"
+                    " and, or, not, ==, !=, <, >, >=, <=, in , : (regex) and"
+                    " parenthesis to group tests."
+                    " Multiple -t SPEC specifications are ORed together"
+                    " (can't be used with -T or -I; use those to filter"
+                    " separatedly)"
+                    )
+    ap.add_argument("-T", metavar = "SPEC",
+                    action = "append", dest = "rt_spec", default = [],
+                    help = "Filter which targets can be used. "
+                    "This is a boolean expression where any inventory"
+                    " value can be tested for with"
+                    " and, or, not, ==, !=, <, >, >=, <=, in , : (regex) and"
+                    " parenthesis to group tests."
+                    " Multiple -T SPEC specifications are ORed together"
+                    " (to be used with -I, can't be used with -t)"
+                    )
+    ap.add_argument("-I", "--interconnect", metavar = "TARGETSPECs",
+                    action = "append", dest = "ic_spec", default = [],
+                    help = "Filter which interconnects can be used"
+                    " Multiple -T SPEC specifications are ORed together"
+                    " (to be used with -I, can't be used with -t)"
+                    )
     ap.add_argument(
         "--configure", "-c", action = "append_const",
         dest = 'phases', const = "configure",
