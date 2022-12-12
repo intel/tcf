@@ -2683,7 +2683,17 @@ class generator_factory_c(object):
     >>>     do_something(data)
 
     generators once created cannot be reset to the beginning, so this
-    can be used to simulate that behavior.
+    can be used to simulate that behavior. It will also behave as an
+    iterator by self-instantiating in the local thread context if used
+    as an iterator:
+
+    >>> import commonl
+    >>> def s():
+    >>>     return "hello, how are you?"
+    >>> factory = commonl.generator_factory_c(s)
+    >>> for data in factory:
+    >>>     print(f"char {data}")
+
 
     :param fn: generator function
     :param args: arguments to the generator function
@@ -2693,6 +2703,7 @@ class generator_factory_c(object):
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
+        self.tls = threading.local()
 
     def __call__(self):
         """
@@ -2705,6 +2716,15 @@ class generator_factory_c(object):
         Create and return a generator
         """
         return self.fn(*self.args, **self.kwargs)
+
+    def __iter__(self):
+        # If we treat the factory as a generator, for simplicity in
+        # some code, well, just create one in the local threading
+        # context and return it
+        if self.tls.generator == None:
+            self.tls.generator = self.make_generator()
+        return self.tls.generator.__iter__()
+
 
 def file_iterator(filename, chunk_size = 4096):
     """
