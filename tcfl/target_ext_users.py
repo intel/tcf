@@ -121,7 +121,10 @@ def _cmdline_role_gain(args):
             lambda rtb: _user_role(rtb, args.username, "gain", args.role),
             rtbs)
     for r in rs:	# wait until complete by reading the values
-        _ = r
+        try:
+            _ = r
+        except Exception as e:
+            logging.warning("ignoring error {e}")
 
 
 def _cmdline_role_drop(args):
@@ -131,7 +134,10 @@ def _cmdline_role_drop(args):
             lambda rtb: _user_role(rtb, args.username, "drop", args.role),
             rtbs)
     for r in rs:	# wait until complete by reading the values
-        _ = r
+        try:
+            _ = r
+        except Exception as e:
+            logging.warning("ignoring error {e}")
 
 
 
