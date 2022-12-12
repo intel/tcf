@@ -206,6 +206,14 @@ class cisco_c(router_c):
 
         show interface status | ex notconnected
 
+    - Show the current time configuration::
+
+        sh clock
+
+    - Show logs::
+
+        sh logging log | last 100
+
 
     Configuration for the TTBD server
     ---------------------------------
