@@ -27,15 +27,18 @@ tftp_dir = "/var/lib/tftpboot"
 
 # FIXME: move to commonl?
 def tag_get_from_ic_target(kws, tag, ic, target, default = ""):
+    assert isinstance(ic, ttbl.interconnect_c), \
+        f"ic: expected ttbl.interconnect_c; got {type(ic)}"
+    assert isinstance(ic, ttbl.test_target), \
+        f"ic: expected ttbl.interconnect_c; got {type(ic)}"
     # get 'tag' from the target; if missing, from the interconnect, if
     # missing, do the default
-    if tag in target.tags:
-        value = target.tags[tag]
-    elif tag in ic.tags:
-        value = ic.tags[tag]
-    else:
-        value = default
-    kws[tag] = value % kws
+    value = target.property_get(tag, ic.property_get(tag, default))
+    if isinstance(value, str):
+        value = commonl.kws_expand(value, kws)
+    kws[tag] = value	# ugh, what were we thinking...
+    return value
+
 
 # FIXME: move to commonl
 def template_rexpand(text, kws):
