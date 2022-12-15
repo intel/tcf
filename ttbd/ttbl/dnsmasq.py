@@ -6,7 +6,7 @@ Power control module to start a dnsmasq daemon
 A DNSMASQ daemon is created that can be attached to a network
 interface to:
 
-- resolve DNS requests for all the targets attached to a test network 
+- resolve DNS requests for all the targets attached to a test network
 - serves DHCP requests to hosts in the interconnect's network
 - serves TFTP files from TARGETDIR/tftp.root
 
@@ -112,6 +112,27 @@ class pc(ttbl.power.daemon_c):
 
     wipes the log file
 
+
+    **Inventory fields**
+
+    These will be taken in the following order:
+
+    - *TARGET.interconnects.ICNAME.FIELD*
+    - *IC.FIELD*
+
+    The following are recognized:
+
+    - *default_route*: bool, string: (optional; default *True*)
+
+      - *True*: a default route will be sent by the DHCP server with
+        .1 being the gateway
+
+      - *False*: no default route will be sent by the DHCP server
+
+      - *value*: a default route will be set and the gateway will be
+        *value*, which shall be an IP address in the right range.
+
+    - *default_route6*: same as *default_route*, but for IPv6.
 
     FIXME/PENDING:
      - ipv6 address binding.
@@ -369,7 +390,33 @@ class pc(ttbl.power.daemon_c):
                     elif "efi-" + bsp in ttbl.pxe.architectures:
                         arch_name = "efi-" + bsp
                         arch = ttbl.pxe.architectures[arch_name]
-                        boot_filename = arch_name + "/" + arch.get('boot_filename', None)                        
+                        boot_filename = arch_name + "/" + arch.get('boot_filename', None)
+
+                    # Control default routes
+                    default_route = ttbl.pxe.tag_get_from_ic_target(
+                        kws, 'default_route', ic, target, True)
+                    if default_route == False:
+                        # this means NO default route
+                        f.write("dhcp-option=tag:%(id)s," % kws
+                                + "option:router\n")
+                    elif default_route == True:
+                        pass		# default router behaviour
+                    else:
+                        f.write("dhcp-option=tag:%(id)s," % kws
+                                + f"option:router,{default_route}\n")
+
+                    default_route6 = ttbl.pxe.tag_get_from_ic_target(
+                        kws, 'default_route6', ic, target, True)
+                    if default_route6 == False:
+                        # this means NO default route
+                        f.write("dhcp-option=tag:%(id)s," % kws
+                                + "option6:router\n")
+                    elif default_route6 == True:
+                        pass		# default router behaviour
+                    else:
+                        f.write("dhcp-option=tag:%(id)s," % kws
+                                + f"option:router6,{default_route6}\n")
+
                     if boot_filename:
                         f.write(
                             "dhcp-option=tag:%(id)s," % kws
