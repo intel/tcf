@@ -696,7 +696,8 @@ def target_add_to_vlan_interconnects(
         mac_addr: str,
         switch_port_spec: str,
         nibble: int = None,
-        vlan_id_set: bool = False):
+        vlan_id_set: bool = False,
+        tags_extra = None):
     """
     Add a target to a list of VLAN networks
 
@@ -756,6 +757,11 @@ def target_add_to_vlan_interconnects(
 
        If the switch is configured to allow untagged traffic, this can
        be left unset, as the traffic will be routed without tagging.
+
+    :param dict tags_extra: (optional, default *None*) dictionary of
+       extra key/values to add to the tags for this interconnect
+
+       >>> tags_extra = { "default_router": False, nibble = "%(nibble)s" }
     """
     assert isinstance(target, ttbl.test_target), \
         f"target: expected ttbl.test_target; got {type(target)} {target}"
@@ -805,5 +811,17 @@ def target_add_to_vlan_interconnects(
             # depending on how we decide to configure the switch, if
             # it needs tagging or not, we add the vlan_id field
             tags['vlan_id'] = vlan_id
+        if tags_extra != None:
+            commonl.assert_dict_key_strings(tags_extra, "tags_extra")
+            # yep, format with tags, we have most of th einfo there
+            kws = dict(tags).update({
+                "nibble": nibble,
+                "id": target.id,
+            })
+            for k, v in tags_extra.items():
+                if isinstance(v, str):
+                    tags[k] = v % kws
+                else:
+                    tags[k] = v
 
         target.add_to_interconnect(vlan_target.id, tags)
