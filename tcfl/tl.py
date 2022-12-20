@@ -2003,7 +2003,10 @@ def rpyc_connect(target, component: str,
                 # object and possibly check more matches in case we
                 # have multiple clients (rare)
                 #
-                target.expect(re.compile("INFO:SLAVE/.*:accepted .* with fd"),
+                # INFO.*SLAVE because different verions print
+                # INFO:SLAVE or INFO SLAVE...#$#@$@3
+                #
+                target.expect(re.compile("INFO.*SLAVE/.*accepted .* with fd"),
                               timeout = console_check_timeout,
                               console = log_console_name)
 
