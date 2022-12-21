@@ -919,7 +919,7 @@ class extension(tc.target_extension_c):
                     # above or someone found signs of boot so we check
                     if pos_boot_found != True:
                         target.report_error(
-                            "POS: did not boot, retrying")
+                            "POS: did not boot, retrying", soft = True)
                         retry_data['POS boot'] += 1
                         target.report_data(
                             "Recovered conditions [%(type)s]",
@@ -946,7 +946,7 @@ class extension(tc.target_extension_c):
                     # if we are here, we got no console output because
                     # it wasn't caught in the inner loopsq
                     target.report_error(
-                            "POS: no console output? retrying")
+                            "POS: no console output? retrying", soft = True)
                     retry_data['POS boot'] += 1
                     target.report_data(
                         "Recovered conditions [%(type)s]",
@@ -2894,7 +2894,7 @@ def edkii_pxe_ipxe_target_power_cycle_to_pos(target):
             target.report_fail(
                 f"boot failure: retrying {retry}/{retries_max} "
                 f" due to failed EFI PXE boot",
-                dict(exception = e))
+                dict(exception = e), soft = True)
             retry_data['failed EFI PXE boot'] += 1
             target.report_data(
                 "Recovered conditions [%(type)s]",
@@ -2926,7 +2926,8 @@ def edkii_pxe_ipxe_target_power_cycle_to_pos(target):
                     f" failed network boot / iPXE", dict(recoverable = False))
             target.report_fail(
                 f"boot failure: retry {retry}/{retries_max}:"
-                f" due to failed network boot / iPXE", dict(exception = e), alevel = 1)
+                f" due to failed network boot / iPXE", dict(exception = e),
+                alevel = 1, soft = True)
             retry_data["boot: retries due to network boot / iPXE failure"] += 1
             target.report_data(
                 "Recovered conditions [%(type)s]",
@@ -2996,7 +2997,7 @@ def target_power_cycle_to_normal_edkii(target):
             target.report_fail(
                 f"boot failure: retrying {retry}/{retries_max} "
                 f" due to missing BIOS boot message: '{boot_message}'",
-                dict(exception = e))
+                dict(exception = e), soft = True)
             retry_data[boot_message] += 1
             target.report_data(
                 "Recovered conditions [%(type)s]",
@@ -3095,7 +3096,7 @@ def target_power_cycle_pos_serial_f12_ipxe(target):
             target.report_fail(
                 f"boot failure: retrying {retry}/{retries_max} "
                 f" due to missing BIOS boot message: '{boot_message}'",
-                dict(exception = e))
+                dict(exception = e), soft = True)
             retry_data[boot_message] += 1
             target.report_data(
                 "Recovered conditions [%(type)s]",
@@ -3122,7 +3123,8 @@ def target_power_cycle_pos_serial_f12_ipxe(target):
                     dict(recoverable = False))
             target.report_fail(
                 f"boot failure: retry {retry}/{retries_max}:"
-                f" due to failed network boot / iPXE'", dict(exception = e))
+                f" due to failed network boot / iPXE'", dict(exception = e),
+                soft = True)
             retry_data["boot: retries due to network boot / iPXE failure"] += 1
             target.report_data(
                 "Recovered conditions [%(type)s]",
@@ -3214,7 +3216,7 @@ def target_power_cycle_to_pos_uefi_http_boot_ipxe(target):
             target.report_fail(
                 f"boot failure: retrying {retry}/{retries_max} "
                 f" due to failed EFI HTTP boot",
-                dict(exception = e))
+                dict(exception = e), soft = True)
             retry_data['failed EFI HTTP boot'] += 1
             target.report_data(
                 "Recovered conditions [%(type)s]",
@@ -3250,7 +3252,8 @@ def target_power_cycle_to_pos_uefi_http_boot_ipxe(target):
                     f" failed network boot / iPXE", dict(recoverable = False))
             target.report_fail(
                 f"boot failure: retry {retry}/{retries_max}:"
-                f" due to failed network boot / iPXE'", dict(exception = e))
+                f" due to failed network boot / iPXE'", dict(exception = e),
+                soft = True)
             retry_data["boot: retries due to network boot / iPXE failure"] += 1
             target.report_data(
                 "Recovered conditions [%(type)s]",
