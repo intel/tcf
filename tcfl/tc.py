@@ -689,9 +689,12 @@ class reporter_c:
         assert alevel >= 0 or alevel < 0
 
     def _report(self, level, alevel, tag, message,
-                attachments, subcase = None, subcase_base = None):
+                attachments, subcase = None, subcase_base = None,
+                soft = False):
         assert subcase == None or isinstance(subcase, str), \
             f"subcase: expected short string; got {type(subcase)}"
+        assert isinstance(soft, bool), \
+            f"soft: expected bool; got {type(soft)}"
         if self.report_level_max != None and level >= self.report_level_max:
             return
         ts = time.time()
@@ -713,18 +716,20 @@ class reporter_c:
 
         if subcase:
             subtc = testcase._subcase_get(subcase)
-            if tag == "PASS":
-                subtc.result.passed += 1
-            elif tag == "FAIL":
-                subtc.result.failed += 1
-            elif tag == "ERRR":
-                subtc.result.errors += 1
-            elif tag == "BLCK":
-                subtc.result.blocked += 1
-            elif tag == "SKIP":
-                subtc.result.skipped += 1
+            if not soft:
+                if tag == "PASS":
+                    subtc.result.passed += 1
+                elif tag == "FAIL":
+                    subtc.result.failed += 1
+                elif tag == "ERRR":
+                    subtc.result.errors += 1
+                elif tag == "BLCK":
+                    subtc.result.blocked += 1
+                elif tag == "SKIP":
+                    subtc.result.skipped += 1
             report_on = subtc
         else:
+            # FIXME: this should also set testcase.result.WHATEVER += 1
             report_on = testcase
 
         for driver in report_driver_c._drivers:
@@ -742,7 +747,8 @@ class reporter_c:
 
 
     def report_pass(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, subcase = None):
+                    level = None, dlevel = 0, alevel = 2, subcase = None,
+                    soft = False):
         """Report a check has passed (a positive condition we were
         looking for was found).
 
@@ -791,16 +797,27 @@ class reporter_c:
           some cases is not necessary unless more verbosity is
           declared.
 
+        :param bool soft: (optional; default *False*) consider this a
+          *soft* condition (which will not update the testcase's
+          pass/failure/error/block counts)
+
+          When reporting a condition that can be recovered, it is
+          customary to set this field to *True* and when the condition
+          is confirmed to call it with *soft* set to *False*.
+
+          Eg: when retrying soft failures
+
         """
         if level == None:		# default args are computed upon def'on
             level = msgid_c.depth()
         self._argcheck(message, attachments, level, dlevel, alevel)
         level += dlevel
         self._report(level, level + alevel, "PASS", message,
-                     attachments, subcase = subcase)
+                     attachments, subcase = subcase, soft = soft)
 
     def report_fail(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, subcase = None):
+                    level = None, dlevel = 0, alevel = 2, subcase = None,
+                    soft = False):
         """
         Report a check that has failed (an negative condition we were
         looking for was found).
@@ -812,10 +829,11 @@ class reporter_c:
         self._argcheck(message, attachments, level, dlevel, alevel)
         level += dlevel
         self._report(level, level + alevel, "FAIL", message,
-                     attachments, subcase = subcase)
+                     attachments, subcase = subcase, soft = soft)
 
     def report_error(self, message, attachments = None,
-                     level = None, dlevel = 0, alevel = 2, subcase = None):
+                     level = None, dlevel = 0, alevel = 2, subcase = None,
+                     soft = False):
         """
         Report a check that has errored (a negative condition we were
         not looking for was found).
@@ -827,10 +845,11 @@ class reporter_c:
         self._argcheck(message, attachments, level, dlevel, alevel)
         level += dlevel
         self._report(level, level + alevel, "ERRR", message,
-                     attachments, subcase = subcase)
+                     attachments, subcase = subcase, soft = soft)
 
     def report_blck(self, message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, subcase = None):
+                    level = None, dlevel = 0, alevel = 2, subcase = None,
+                    soft = False):
         """
         Report a check that has blocked (something has happened most
         likely in infrastructure that disallows us for checking
@@ -843,10 +862,11 @@ class reporter_c:
         self._argcheck(message, attachments, level, dlevel, alevel)
         level += dlevel
         self._report(level, level + alevel, "BLCK", message,
-                     attachments, subcase = subcase)
+                     attachments, subcase = subcase, soft = soft)
 
     def report_skip(self,  message, attachments = None,
-                    level = None, dlevel = 0, alevel = 2, subcase = None):
+                    level = None, dlevel = 0, alevel = 2, subcase = None,
+                    soft = False):
         """
         Report a check that has skipped (the conditions needed to test
         are not met).
@@ -858,7 +878,7 @@ class reporter_c:
         self._argcheck(message, attachments, level, dlevel, alevel)
         level += dlevel
         self._report(level, level + alevel, "SKIP", message,
-                     attachments, subcase = subcase)
+                     attachments, subcase = subcase, soft = soft)
 
     def report_info(self, message, attachments = None,
                     level = None, dlevel = 0, alevel = 2, subcase = None):
