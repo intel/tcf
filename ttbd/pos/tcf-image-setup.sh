@@ -114,7 +114,7 @@ function cleanup() {
             ## nbd0p3 part
             ## cs-swap lvm
             ## cs-root lvm
-            [ "$type" != "kvm" ] && continue
+            [ "$type" != "lvm" ] && continue
             sudo dmsetup remove $device
         done
 
