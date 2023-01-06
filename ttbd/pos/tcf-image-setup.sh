@@ -137,10 +137,9 @@ function cleanup() {
     if ! [ -z "$loop_dev" ]; then
         sudo losetup -d $loop_dev
     fi
-    if ! [ -z "${qemu_nbd_pid:-}" ]; then
-        sudo kill $qemu_nbd_pid
-        sleep 1s
-        sudo kill -9 $qemu_nbd_pid 2> /dev/null || :
+    if ! [ -z "${nbd_dev:-}" ]; then
+        info QCOW2: disconnecting source $nbd_dev
+        sudo qemu-nbd -d $nbd_dev || true
     fi
     if [ "$tmpdir" != "${TMPDIR:-}" ]; then
         # we made it, we wipe it
@@ -242,17 +241,12 @@ esac
 if [ $image_type = qcow2 ]; then
     sudo modprobe nbd
     # can't really use -P, it fails on some when doing -P2
-    sudo qemu-nbd -c $nbd_dev -r $image_file &
-    # Get the PID of the process run by sudo by detecting who is using
-    # the lock file. Might take a while to start -- yeh, this is kinda
-    # race condition
-    sleep 3s
-    qemu_nbd_pid=$(sudo lsof -t /var/lock/qemu-nbd-$(basename $nbd_dev))
+    nbd_dev=$(sudo $progdir/qemu-nbd-dynamic.sh -r --fork "$image_file")
     root_part=${nbd_dev}$root_part
     if ! [ -z "${boot_part:-}" ]; then
         boot_part=${nbd_dev}$boot_part
     fi
-    info QEMU NBD at $qemu_nbd_pid
+    info source image at QCOW2 $nbd_dev
 else
     loop_dev=$(sudo losetup --show -fP $image_file)
     info loop device $loop_dev
