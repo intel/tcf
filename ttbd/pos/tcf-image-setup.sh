@@ -62,6 +62,7 @@ EOF
 }
 
 progname=$(basename $0)
+progdir=$(dirname $(readlink -e $0))
 
 if [ $# -lt 2 -o $# -gt 3 ]; then
     help 1>&2
@@ -70,7 +71,10 @@ fi
 
 setupl=${SETUPL:-}
 
+trap cleanup EXIT
+
 destdir=$1
+tmpdir=${TMPDIR:-`mktemp -d $progname-XXXXXX`}
 if echo $destdir | grep -q ".tar.xz"; then
     tarname=$destdir
     if ! [ -z "${TARDIR:-}" ]; then
@@ -78,12 +82,16 @@ if echo $destdir | grep -q ".tar.xz"; then
         tarname=$TARDIR/$(basename $tarname)
     fi
     destdir=${destdir%%.tar.xz}
+    dest_type=tar
+elif echo $destdir | grep -q ".qcow2"; then
+    dest_type=qcow2
+    # will be handled further down
+else
+    dest_type=dir
 fi
 image_file=$2
 image_type=${3:-}
-tmpdir=${TMPDIR:-`mktemp -d $progname-XXXXXX`}
 
-trap cleanup EXIT
 
 function info {
     echo I: "$@" 1>&2
@@ -118,6 +126,13 @@ function cleanup() {
             sudo dmsetup remove $device
         done
 
+    fi
+    if [ "${dest_type}" = qcow2 ]; then
+        info unmounting $tmpdir/destdir
+        sudo umount -l $tmpdir/destdir || true
+        if ! [ -z "${nbd2_dev:-}" ]; then
+            sudo qemu-nbd -d $nbd2_dev || true
+        fi
     fi
     if ! [ -z "$loop_dev" ]; then
         sudo losetup -d $loop_dev
@@ -243,6 +258,28 @@ else
     info loop device $loop_dev
     lsblk $loop_dev
 fi
+
+
+assume_there=yes
+case $dest_type in
+    qcow2)
+        # QCOW2 mode for destination container We'll create a QCOW2 image
+        # file, NBD export it, create a SINGLE partition on it, mount it
+        # and use that to write
+        qcow2name=$destdir
+        qemu-img create -f qcow2 "$qcow2name".src 20G
+        qemu-img convert -O qcow2 -c "$qcow2name".src "$qcow2name"
+        rm -f "$qcow2name".src
+        # all this is undone in cleanup()
+        nbd2_dev=$(sudo $progdir/qemu-nbd-dynamic.sh --fork "$qcow2name")
+        sudo parted --align optimal --script --fix $nbd2_dev mklabel gpt mkpart primary ext4 0 100%
+        sudo mkfs.ext4 -qF ${nbd2_dev}p1
+        mkdir -p $tmpdir/destdir
+        sudo mount ${nbd2_dev}p1 $tmpdir/destdir
+        destdir=$tmpdir/destdir
+        assume_there=no
+        ;;
+esac
 
 info current block devices
 lsblk
@@ -442,7 +479,7 @@ options quiet root=/dev/ram0 androidboot.selinux=permissive vmalloc=192M buildva
 EOF
     info android: faked Linux-like /boot environment
 
-elif ! [ -d $destdir ]; then
+elif [ $assume_there = no ] || ! [ -d $destdir ]; then
 
     # *Linux; copy $tmpdir/root to $destdir; be careful with extended
     # labels and ACLs -- rsync has been seen to hang, so use tar and untar
@@ -929,19 +966,34 @@ for setup in ${setupl}; do
 done
     
 # If we said we wanted it in a tar file, pack it up and remove the directory
-if ! [ -z "${tarname:-}" ]; then
-    cd $(dirname $destdir)
-    basename=$(basename $destdir)
-    # --numeric-owner: so when we extract we keep exactly what we
-    #                  packed in stead of trying to map to destination
-    #                  system
-    # --force-local: if name has :, it is still local
-    # --selinux --acls --xattrs: keep all those attributes identical
-    info $tarname: packing up
-    # pack it with a name that is not final, so another process
-    # doesn't try to pick it up until it is fully baked
-    sudo XZ_OPT="--threads=0 -9e" \
-         tar cJf $tarname.tmp --numeric-owner --force-local --selinux --acls --xattrs $basename
-    mv -f $tarname.tmp $tarname
-    sudo rm -rf $destdir
-fi
+case $dest_type in
+    tar)
+        cd $(dirname $destdir)
+        basename=$(basename $destdir)
+        # --numeric-owner: so when we extract we keep exactly what we
+        #                  packed in stead of trying to map to destination
+        #                  system
+        # --force-local: if name has :, it is still local
+        # --selinux --acls --xattrs: keep all those attributes identical
+        info $tarname: packing up
+        # pack it with a name that is not final, so another process
+        # doesn't try to pick it up until it is fully baked
+        sudo XZ_OPT="--threads=0 -9e" \
+             tar cJf $tarname.tmp --numeric-owner --force-local --selinux --acls --xattrs $basename
+        mv -f $tarname.tmp $tarname
+        sudo rm -rf $destdir
+        ;;
+    
+    qcow2)
+        # well, we're done, umount and compress the image
+        info unmounting $tmpdir/destdir
+        sudo umount -l $tmpdir/destdir
+        sudo qemu-nbd -d $nbd2_dev
+        dest_type=qcow2-no-longer   # for cleanup() not to try to cleanup
+        info compressing "$qcow2name"
+        # this might halve the QCOW2 image name, which is a good trade
+        # for CPU when moving around network distances
+        qemu-img convert -O qcow2 -c "$qcow2name" "$qcow2name".compressed
+        mv -f "$qcow2name".compressed  "$qcow2name"
+esac
+
