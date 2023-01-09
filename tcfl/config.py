@@ -161,6 +161,9 @@ def load(config_path = None, config_files = None,
     tcfl.msgid_c.cls_init_maybe()
 
 
+#: lame idempotency to avoid double initialization
+_setup_done = False
+
 
 def setup(*args,
           report_drivers = None, verbosity = 2, logfile_name = "run.log",
@@ -188,6 +191,9 @@ def setup(*args,
     Other arguments as :func:`load`.
 
     """
+    if _setup_done != False:
+        return
+
     assert runid == None or isinstance(runid, str)
     assert hashid == None or isinstance(hashid, str)
     assert isinstance(skip_reports, bool)
@@ -223,3 +229,4 @@ def setup(*args,
             tcfl.tc.report_driver_c.add(report_driver)
     load(*args, **kwargs)
     tcfl.msgid_c.tls.msgid_lifo.append(tcfl.msgid_c(""))
+    _setup_done = True
