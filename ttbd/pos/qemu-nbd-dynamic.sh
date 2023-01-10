@@ -27,8 +27,9 @@ nbds=$(ls -1 /dev/nbd* | grep "nbd[0-9]\+$")
 tried_nbds=""
 for dev in $nbds; do
     size=$(lsblk --nodeps --noheading --bytes --output size $dev)
-    # if used (size != 0) or already tried, skip it
-    if [ $size != 0 ] || echo "$tried_nbds" | grep -qw $dev; then
+    # if used (size != 0) or already tried, skip it; if zero or empty
+    # (deps on kernel version), it's available
+    if [ ${size:-0} != 0 ] || echo "$tried_nbds" | grep -qw $dev; then
         continue		# if size != 0, it is being used
     fi
     echo "I: trying NBD device $dev" 1>&2
