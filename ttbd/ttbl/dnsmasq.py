@@ -239,7 +239,7 @@ class pc(ttbl.power.daemon_c):
             if self.ifname:
                 ifname = self.ifname
             else:
-                ifname = "b" + target.id
+                ifname = "b" + ic.id
             configl = [
                 "no-hosts",				# only files in...
                 "hostsdir=%(path)s/dnsmasq.hosts",	# ..this dir
