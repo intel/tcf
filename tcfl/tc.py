@@ -1299,6 +1299,8 @@ class target_c(reporter_c):
             name = ext_cls.__name__
         del cls.__extensions[name]
 
+
+
     #
     # Actions that don't affect the target
     #
@@ -2247,6 +2249,31 @@ class target_c(reporter_c):
         target.testcase.__thread_init__(None)
         target._kws_update()
         return target
+
+
+    @staticmethod
+    def get_by_name(testcase, target_name):
+        """
+        Return a :class:`tcfl.tc.tc_c` instance of a target the
+        testcase is running on given its remote name.
+
+        :param tcfl.tc.tc_c testcase: testcase on which we are looking
+          for the target
+
+        :param str target_name: is the name of a remote target that
+          *testcase* has allocated to execute (i.e.: is part of the
+          testcase's target group).
+
+        >>> t = tcfl.tc.target_c.get_by_name(self, "machine16")
+
+        """
+        for _role_name, target in testcase.target_group.targets.items():
+            if target.id == target_name:
+                return target
+        raise LookupError(
+            f"cannot find target '{target_name}' in the list of "
+            f"targets {testcase.name}/{testcase.hashid} is running on")
+
 
     def mkticket_for_call(self):
         """
