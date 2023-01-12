@@ -1349,7 +1349,8 @@ EOF""")
         target.kw_unset('rsync_server')
 
     def _metadata_load(self, target, kws):
-        # copy and parse image metadata
+        # copy and parse image metadata -- the rsync image URL
+        # (HOST::PATH) is in kws['rsync_image']
         target.shell.run(
             # ensure we remove any possibly existing one
             "rm -f /tmp/tcf.metadata.yaml;"
@@ -1362,7 +1363,7 @@ EOF""")
             " time -p rsync -cHa --numeric-ids --delete --inplace -L -vv"
             # don't really complain if there is none
             " --ignore-missing-args"
-            " %(rsync_server)s/%(image)s/.tcf.metadata.yaml"
+            " %(rsync_image)s/.tcf.metadata.yaml"
             " /tmp/tcf.metadata.yaml" % kws)
         # if there was one, cat it
         self.metadata = {}
@@ -1723,6 +1724,11 @@ EOF""")
           for *fedora* would auto select *fedora:workstation:28::x86_64*
           assuming the target supports the *x86_64* target.
 
+          Alternatively, if the image name contains an slash ('/'), then it
+          is considered a path (eg: HOST::PATH/DIR) and the image will
+          be considered to be in *HOST::PATH/DIR/*. No matching will
+          be done.
+
         :param str boot_dev: (optional) which is the boot device to use,
           where the boot loader needs to be installed in a boot
           partition. e.g.: ``sda`` for */dev/sda* or ``mmcblk01`` for
@@ -1833,22 +1839,39 @@ EOF""")
                 # wait until the rsync server is up; sometimes it
                 # takes the target time to setup networking
                 tl.linux_wait_online(ic, target)
-                tl.linux_wait_host_online(
-                    target, kws['rsync_server'].split("::", 1)[0])
+                if '::' in image:
+                    rsync_host, rsync_path = image.split("::")
+                else:
+                    rsync_host, rsync_path = rsync_server.split("::")
+                tl.linux_wait_host_online(target, rsync_host)
 
-                # List the available images and decide if we have the
-                # one we are asked to install, autocomplete missing
-                # fields and get us a good match if there is any.
-                output = target.shell.run(
-                    "rsync %(rsync_server)s/" % kws, output = True)
-                images = image_list_from_rsync_output(output)
-                image_final_tuple = image_select_best(image, images, target)
-                image_final = ":".join(image_final_tuple)
-                kws['image'] = image_final
+                # Soooo, if image is in the form
+                # OS:SPIN:VERSION:SUBVERSION:ARCH, it can have no /;
+                # if it does, we consider it a path to a directory and
+                # we don't do any selection. If it doesn't, then we
+                # look for an image in the defined image repository.
+                if '/' in image:
+                    kws['rsync_image'] = rsync_host + "::" + image
+                    kws['image'] = image
+                    # this serves as an approx for the standarized
+                    # image naming scheme OS:SPIN:VERSION:SUBVERSION:ARCH
+                    image_final = os.path.basename(image)
+                    image_final_tuple = ( image_final )
+                else:
+                    # List the available images and decide if we have the
+                    # one we are asked to install, autocomplete missing
+                    # fields and get us a good match if there is any.
+                    output = target.shell.run(
+                        f"rsync {rsync_host}::{rsync_path}", output = True)
+                    images = image_list_from_rsync_output(output)
+                    image_final_tuple = image_select_best(image, images, target)
+                    image_final = ":".join(image_final_tuple)
+                    kws['image'] = image_final
+                    kws['rsync_image'] = rsync_server + "/" + image_final
 
                 self._metadata_load(target, kws)
                 testcase.targets_active()
-                root_part_dev = self.mount_fs(image_final, boot_dev)
+                root_part_dev = self.mount_fs(kws['image'], boot_dev)
                 kws['root_part_dev'] = root_part_dev
 
                 # Keep a lid on how big is the cached content
@@ -1868,8 +1891,8 @@ EOF""")
                 self._rootfs_cache_manage(target, root_part_dev,
                                           cache_locations_mnt)
                 self._rootfs_make_room(target, cache_locations_mnt, 150)
-                target.report_info("POS: rsyncing %(image)s from "
-                                   "%(rsync_server)s to %(root_part_dev)s"
+                target.report_info("POS: rsyncing %(rsync_image)s "
+                                   "to %(root_part_dev)s"
                                    % kws,
                                    dlevel = -2)
 
@@ -1906,7 +1929,7 @@ cat > /tmp/deploy.ex
                 output = target.shell.run(
                     "time -p rsync -acHAX --numeric-ids --delete "
                     " --exclude-from=/tmp/deploy.ex"
-                    " %(rsync_server)s/%(image)s/. /mnt/." % kws,
+                    " %(rsync_image)s/. /mnt/." % kws,
                     # 500s bc rsync takes a long time, but FIXME, we need
                     # to break this up and just increase timeout on the
                     # rsyncs -- and maybe guesstimate from the image size?
@@ -1922,9 +1945,8 @@ cat > /tmp/deploy.ex
                 target.report_data("Deployment stats image %(image)s" % kws,
                                    "image rsync to %s (s)" % target.fullid,
                                    float(m.groupdict()['seconds']))
-                target.report_info("POS: rsynced %(image)s from "
-                                   "%(rsync_server)s to %(root_part_dev)s"
-                                   % kws)
+                target.report_info("POS: rsynced %(rsync_image)s"
+                                   " to %(root_part_dev)s" % kws)
 
                 self._post_flash_setup(ic, target, root_part_dev, image_final)
 
