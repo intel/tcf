@@ -191,6 +191,7 @@ def setup(*args,
     Other arguments as :func:`load`.
 
     """
+    global _setup_done
     if _setup_done != False:
         return
 
