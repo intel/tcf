@@ -2500,17 +2500,19 @@ def ipxe_seize_and_boot(target, boot_ic, dhcp = None, pos_image = None, url = No
                 count += 1
             kws['pos_cmdline_extra_chunked'] = chunk_str
             target.shell.run(
-                "kernel"
-                " ${base}vmlinuz-%(pos_kernel_image)s"
-                " initrd=initramfs-%(pos_kernel_image)s"
-                " console=tty0 console=%(linux_serial_console_default)s,115200"
-                " ${cmdline1} ${cmdline2} %(pos_cmdline_extra_chunked)s"
-                % kws,
+                commonl.kws_expand(
+                    "kernel"
+                    " ${base}vmlinuz-%(pos_kernel_image)s"
+                    " initrd=initramfs-%(pos_kernel_image)s"
+                    " console=tty0 console=%(linux_serial_console_default)s,115200"
+                    " ${cmdline1} ${cmdline2} %(pos_cmdline_extra_chunked)s",
+                    kws),
                 # .*because there are a lot of ANSIs that can come
                 re.compile(r"\.\.\..* ok"))
             target.shell.run(
-                "initrd ${base}initramfs-%(pos_kernel_image)s"
-                % kws,
+                commonl.kws_expand(
+                    "initrd ${base}initramfs-%(pos_kernel_image)s",
+                    kws),
                 # .*because there are a lot of ANSIs that can come
                 re.compile(r"\.\.\..* ok"))
             target.send("boot")
