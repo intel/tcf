@@ -1488,9 +1488,18 @@ class target_c(reporter_c):
         they are seeked in the interconnect's inventory (top level),
         thus the resolution order for key *KEY* is:
 
-         - TARGET.interconnects.INTERCONNECTNAME.KEY
-         - INTERCONNECTNAME.KEY
+         - TARGET:interconnects.INTERCONNECTNAME.KEY
+         - INTERCONNECTNAME:KEY
+         - TARGET:KEY
          - <default>
+
+        **Note:** this order is such since the main goal of this is to
+        obtain values of things that are specific to an
+        interconnect. A value off TARGET's inventory will be
+        general to all the interconnects, so more specific values for
+        that interconnect are sure to be found in
+        *TARGET:interconnects.INTERCONNECT.KEY* or *INTERCONNECT:KEY*,
+        hence they are tried first.
 
         :param tcfl.tc.target_c ic: target describing the interconnect
           of which this target is a member
@@ -1534,6 +1543,8 @@ class target_c(reporter_c):
             return interconnect_data[ic.id][key]
         if key in ic.kws:
             return ic.kws[key]
+        if key in self.kws:
+            return self.kws[key]
         return default
 
 
