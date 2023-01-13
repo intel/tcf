@@ -773,6 +773,22 @@ class extension(tc.target_extension_c):
             attachments = dict(output = output))
         return False
 
+
+    def _boot_to_pos_fn_call(self, boot_to_pos_fn, target, boot_ic):
+        # Call boot to POS, adapting for older versions of the
+        # function
+        signature = inspect.signature(boot_to_pos_fn)
+        if len(signature.parameters) == 2:
+            boot_to_pos_fn(target, boot_ic)
+        else:
+            source = commonl.origin_get_object(boot_to_pos_fn)
+            target.report_info(
+                f"WARNING! Boot-to-POS function {boot_to_pos_fn.__name__}()"
+                f" @{source}"
+                " needs updating (to have target and boot_ic parameters)")
+            boot_to_pos_fn(target)
+
+
     def boot_to_pos(self,
                     # plenty to boot to an nfsroot, hopefully
                     timeout = 60,
@@ -781,6 +797,16 @@ class extension(tc.target_extension_c):
         if boot_to_pos_fn == None:
             # None specified, let's take from the target config
             boot_to_pos_fn = self.cap_fn_get('boot_to_pos', 'pxe')
+
+        # is there a boot interconnect?
+        boot_ic_name = target.kws.get(
+            'pos.boot_interconnect',
+            target.kws.get('pos_boot_interconnect', None))
+        if boot_ic_name != None:
+            # we have an interconnect for booting--now let's see if
+            boot_ic = tc.target_c.get_by_name(target.testcase, boot_ic_name)
+        else:
+            boot_ic = None
 
         bios_boot_time = int(target.kws.get(
             "bios.boot_time",
@@ -814,7 +840,7 @@ class extension(tc.target_extension_c):
                     # reset the default console to whatever the
                     # default configuration makes it be
                     target.console.default = None
-                    boot_to_pos_fn(target)	# now power cycle to POS
+                    self._boot_to_pos_fn_call(boot_to_pos_fn, target, boot_ic)	# now power cycle to POS
                     pos_boot_found = False
                     ts0 = time.time()
                     # Try a few times to enable the console and expect
@@ -2290,7 +2316,7 @@ def ipxe_seize(target):
                        "iPXE prompt time (s)", ts_prompt - ts_init)
 
 
-def ipxe_seize_and_boot(target, dhcp = None, pos_image = None, url = None):
+def ipxe_seize_and_boot(target, boot_ic, dhcp = None, pos_image = None, url = None):
     """Wait for iPXE to boot on a serial console, seize control and
     direct boot to a given TCF POS image
 
@@ -2353,14 +2379,25 @@ def ipxe_seize_and_boot(target, dhcp = None, pos_image = None, url = None):
             # exiting the context restores this to what it was before
             target.shell.prompt_regex = "iPXE>"
             kws = dict(target.kws)
-            boot_ic = target.kws['pos_boot_interconnect']
-            mac_addr = target.kws['interconnects'][boot_ic]['mac_addr']
-            ipv4_addr = target.kws['interconnects'][boot_ic]['ipv4_addr']
-            ipv4_prefix_len = target.kws['interconnects'][boot_ic]['ipv4_prefix_len']
+            mac_addr = target.addr_get(boot_ic, "mac")
+            ipv4_addr = target.addr_get(boot_ic, "ipv4")
+            ipv4_prefix_len = target.ic_field_get(boot_ic, "ipv4_prefix_len",
+                                                  "ipv4 field length")
             kws['mac_addr'] = mac_addr
             kws['ipv4_addr'] = ipv4_addr
             kws['ipv4_netmask'] = commonl.ipv4_len_to_netmask_ascii(ipv4_prefix_len)
-
+            # fill out other variables that might be in the target or
+            # boot_ic's inventorie
+            kws['pos_nfs_server'] = target.ic_key_get(
+                boot_ic, 'pos.nfs_server',
+                target.ic_key_get(boot_ic, 'pos_nfs_server', None))
+            # FIXME: modify ic_key_get to also add top level target
+            # before going to IC, control toggling it off
+            kws['pos_nfs_path'] = target.ic_key_get(
+                boot_ic, 'pos.nfs_path',
+                target.kws.get(
+                    "pos.nfs_path",
+                    boot_ic.kws.get('pos.nfs_path', None)))
             # Find what network interface our MAC address is; the
             # output of ifstat looks like:
             #
@@ -2427,27 +2464,25 @@ def ipxe_seize_and_boot(target, dhcp = None, pos_image = None, url = None):
                 kws['pos_kernel_image'] = pos_kernel_image
             if not 'pos_nfs_ip' in kws:
                 kws['pos_nfs_ip'] = socket.gethostbyname(kws["pos_nfs_server"])
+            if url == None:
+                url = target.ic_key_get(
+                    boot_ic, 'pos.http_url_prefix',
+                    target.ic_key_get(boot_ic, 'pos_http_url_prefix', None))
+            target.shell.run("set base " + commonl.kws_expand(url, kws))
             # split cmdline in two chunks, sometimes it is too long
             cmdline = pos_cmdline_opts[pos_image]
             cmdline_len = len(cmdline)
-            cmdline1 = cmdline[ 0 : int(cmdline_len/2) ]
-            cmdline2 = cmdline[ int(cmdline_len/2) : ]
-            kws['pos_cmdline_opts1'] = " ".join(cmdline1) % kws
-            kws['pos_cmdline_opts2'] = " ".join(cmdline2) % kws
-            if url == None:
-                url = target.kws.get('pos.http_url_prefix',
-                                     target.kws.get('pos_http_url_prefix', None))
-
-            target.shell.run("set base %s" % url)
             # command line options in a variable so later the command line
             # doesn't get too long and maybe overfill some buffer (has
             # happened before)
             # FIXME: all these command line generation stuff needs to be
             # shared with dhcp.py / dnsmasq.py
+            cmdline1 = cmdline[ 0 : int(cmdline_len/2) ]
             target.shell.run(
-                "set cmdline1 %(pos_cmdline_opts1)s" % kws)
+                "set cmdline1 " + commonl.kws_expand(" ".join(cmdline1), kws))
+            cmdline2 = cmdline[ int(cmdline_len/2) : ]
             target.shell.run(
-                "set cmdline2 %(pos_cmdline_opts2)s" % kws)
+                "set cmdline2 " + commonl.kws_expand(" ".join(cmdline2), kws))
             pos_kernel_cmdline_extra = target.kws.get('pos.kernel_cmdline_extra', "")
             pos_kernel_cmdline_extra += " " + os.environ.get("POS_KERNEL_CMDLINE_EXTRA", "")
             chunk_size = 80
@@ -2825,7 +2860,7 @@ capability_register('boot_config', 'uefi', pos_uefi.boot_config_multiroot)
 capability_register('boot_config_fix', 'uefi', pos_uefi.boot_config_fix)
 
 
-def edkii_pxe_ipxe_target_power_cycle_to_pos(target):
+def edkii_pxe_ipxe_target_power_cycle_to_pos(target, boot_ic):
     """
     Boot an EDKII based system to Provisioning OS using PXE into an iPXE loader
 
@@ -2873,16 +2908,17 @@ def edkii_pxe_ipxe_target_power_cycle_to_pos(target):
 
     # resolve locally, since the iPXE environment has a harder time
     # resolving
-    url = urllib.parse.urlparse(target.kws['pos_http_url_prefix'])
+    _url = target.ic_key_get(
+        boot_ic, 'pos.http_url_prefix',
+        target.ic_key_get(boot_ic, 'pos_http_url_prefix', None))
+    url = urllib.parse.urlparse(_url)
     url_resolved = url._replace(
         netloc = url.hostname.replace(url.hostname,
                                       socket.gethostbyname(url.hostname)))
-    boot_ic = target.kws['pos_boot_interconnect']
-    mac_addr = target.rt.get('interconnects', {})\
-                        .get(boot_ic, {}).get('mac_addr', None)
+    mac_addr = target.addr_get(boot_ic, "mac")
     if mac_addr == None:
         raise tc.blocked_e(
-            "can't find MAC address for interconnect %s" % boot_ic)
+            "can't find MAC address for interconnect %s" % boot_ic.id)
 
     # add a detector for a shell error, make sure to name it
     # after the target and console it will monitor so it
@@ -2936,7 +2972,7 @@ def edkii_pxe_ipxe_target_power_cycle_to_pos(target):
             # this will make it boot the iPXE bootloader and then we seize it
             # and direct it to our POS provide
             target.report_info("POS: seizing iPXE boot", )
-            ipxe_seize_and_boot(target,
+            ipxe_seize_and_boot(target, boot_ic,
                                 url = url_resolved.geturl())
             break	# exit the retry loop
         except tc.exception as e:
@@ -3042,7 +3078,7 @@ capability_register('boot_to_normal', 'edkii',
                     target_power_cycle_to_normal_edkii)
 
 
-def target_power_cycle_pos_serial_f12_ipxe(target):
+def target_power_cycle_pos_serial_f12_ipxe(target, boot_ic):
     """
     Direct a target that is preconfigured to boot off the network with
     iPXE to boot in Provisioning mode
@@ -3133,7 +3169,7 @@ def target_power_cycle_pos_serial_f12_ipxe(target):
 
         try:
             target.console.write(biosl.ansi_key_code("F12", "vt100"))
-            ipxe_seize_and_boot(target)
+            ipxe_seize_and_boot(target, boot_ic)
             break	# exit the retry tloop
         except tc.exception as e:
             # catches anything infrastructure/failure related and puts it
@@ -3160,7 +3196,7 @@ capability_register('boot_to_pos', 'serial_f12_ipxe',
                     target_power_cycle_pos_serial_f12_ipxe)
 
 
-def target_power_cycle_to_pos_uefi_http_boot_ipxe(target):
+def target_power_cycle_to_pos_uefi_http_boot_ipxe(target, boot_ic):
     """
     Boot to provisioning OS using HTTP Boot to an iPXE x86_64 EFI
     loader
@@ -3209,7 +3245,10 @@ def target_power_cycle_to_pos_uefi_http_boot_ipxe(target):
     # While the BIOS and iPXE can resolve DNS, sometimes they are not
     # as robust, so let's have it resolved here, since we have better
     # caps.
-    url = urlparse.urlparse(target.kws['pos_http_url_prefix'])
+    _url = target.ic_key_get(
+        boot_ic, 'pos.http_url_prefix',
+        target.ic_key_get(boot_ic, 'pos_http_url_prefix', None))
+    url = urllib.parse.urlparse(_url)
     url_resolved = url._replace(
         netloc = url.hostname.replace(url.hostname,
                                       socket.gethostbyname(url.hostname)))
@@ -3263,7 +3302,7 @@ def target_power_cycle_to_pos_uefi_http_boot_ipxe(target):
             # ipxe_seize_and_boot() to not use DHCP (we know the IP
             # assignment; dhcp is slower).
             target.report_info("POS: seizing iPXE boot")
-            ipxe_seize_and_boot(target, url = url_resolved.geturl())
+            ipxe_seize_and_boot(target, boot_ic, url = url_resolved.geturl())
             break	# exit the retry loop
         except tc.exception as e:
             # catches anything infrastructure/failure related and puts it
