@@ -2396,9 +2396,10 @@ def ipxe_seize_and_boot(target, boot_ic, dhcp = None, pos_image = None, url = No
                                    "ERROR-missing-pos.nfs_server property")))
             kws['pos_nfs_path'] = target.ic_key_get(
                 boot_ic, 'pos.nfs_path',
-                target.kws.get(
-                    "pos.nfs_path",
-                    boot_ic.kws.get('pos.nfs_path', None)))
+                target.ic_key_get(
+                    boot_ic, 'pos_nfs_path',
+                    os.environ.get("POS_NFS_PATH",
+                                   "ERROR-missing-pos.nfs_path property")))
             # Find what network interface our MAC address is; the
             # output of ifstat looks like:
             #
