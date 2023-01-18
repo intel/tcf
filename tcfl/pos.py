@@ -2387,12 +2387,13 @@ def ipxe_seize_and_boot(target, boot_ic, dhcp = None, pos_image = None, url = No
             kws['ipv4_addr'] = ipv4_addr
             kws['ipv4_netmask'] = commonl.ipv4_len_to_netmask_ascii(ipv4_prefix_len)
             # fill out other variables that might be in the target or
-            # boot_ic's inventorie
+            # boot_ic's inventory
             kws['pos_nfs_server'] = target.ic_key_get(
                 boot_ic, 'pos.nfs_server',
-                target.ic_key_get(boot_ic, 'pos_nfs_server', None))
-            # FIXME: modify ic_key_get to also add top level target
-            # before going to IC, control toggling it off
+                target.ic_key_get(
+                    boot_ic, 'pos_nfs_server',
+                    os.environ.get("POS_NFS_SEVER",
+                                   "ERROR-missing-pos.nfs_server property")))
             kws['pos_nfs_path'] = target.ic_key_get(
                 boot_ic, 'pos.nfs_path',
                 target.kws.get(
