@@ -25,6 +25,22 @@ or call the HTTP interface:
 - PUT PREFIX/ttb-v1/targets/TARGETNAME/tunnel/add
 - DELETE PREFIX/ttb-v1/targets/TARGETNAME/tunnel/remove
 
+If the target's properties include the boolean *allow_lan* set to
+*True*, then the tunnel can be created to any IP address that is in
+the local area network defined by the IP address and prefix length:
+
+>>> target = target_add_...("somename",
+>>>                         ipv4_addr = "192.168.1.3",
+>>>                         ipv4_prefix_len = 24)
+>>> target.property_set('interfaces.tunnel.allow_lan') = True
+
+clients can create tunnels in the 192.168.1.3/24 network freely via
+target *somename*::
+
+  $ tcf tunnel-add somename 22 tcp 192.168.1.42/24
+  SERVERNAME:1234
+  $
+
 """
 
 import ipaddress
@@ -58,13 +74,32 @@ class interface(ttbl.tt_interface):
             local_port = tunnel_id[len("interfaces.tunnel."):-len(".protocol")]
             self._delete_tunnel(target, local_port)
 
+    def _ip_addr_validate_lan(self, target, ip_addr, name, ic_data,
+                              key, itr_ip_addr):
+        tech = key.removesuffix("_addr")
+        # if there is no prefix len, assume it is one to restrict
+        try:
+            itr_ip_prefix_len = ic_data[f"{tech}_prefix_len"]
+        except KeyError:
+            target.log.warning(
+                f"tunneling can't validate {itr_ip_addr} for"
+                f" allow_lan access: no {tech}_prefix_len defined"
+                f" in interconnect {name}")
+            return False
+        itr_ip_network = ipaddress.ip_network(
+            f"{itr_ip_addr}/{itr_ip_prefix_len}", strict = False)
+        if ip_addr in itr_ip_network:
+            return True
+        return False
+
 
     def _ip_addr_validate(self, target, _ip_addr):
         # validate ip_addr is a valid IP address to create a tunnel
         # to, it is properly written, the server can actually reach
         # it, etc
         ip_addr = ipaddress.ip_address(str(_ip_addr))
-        for ic_data in target.tags.get('interconnects', {}).values():
+        allow_lan = target.property_get("interfaces.tunnel.allow_lan", False)
+        for ic_name, ic_data in target.tags.get('interconnects', {}).items():
             if not ic_data:
                 continue
             for key, value in ic_data.items():
@@ -76,15 +111,33 @@ class interface(ttbl.tt_interface):
                 itr_ip_addr = ipaddress.ip_address(str(value))
                 if ip_addr == itr_ip_addr:
                     return
+                if allow_lan \
+                   and self._ip_addr_validate_lan(
+                       target, ip_addr,
+                       f"{target.id}:interconnects.{ic_name}", ic_data,
+                       key, itr_ip_addr):
+                    return
         # if this is an interconnect, the IP addresses are at the top level
         for key, value in target.tags.items():
             if not key.endswith("_addr"):
                 continue
+            if not key.startswith("ip"):
+                # this has to be an IP address...
+                continue
             itr_ip_addr = ipaddress.ip_address(str(value))
             if ip_addr == itr_ip_addr:
                 return
-        raise ValueError('Cannot setup tunnel to IP "%s" which is '
-                         'not owned by this target' % ip_addr)
+            if allow_lan \
+               and self._ip_addr_validate_lan(
+                   target, ip_addr,
+                   target.id, target.tags,
+                   key, itr_ip_addr):
+                return
+        if allow_lan:
+            raise ValueError(f'Cannot setup tunnel to IP {ip_addr}:'
+                             ' not in the same LAN as this target')
+        raise ValueError(f'Cannot setup tunnel to IP {ip_addr}: '
+                         'not owned by this target')
 
     valid_protocols = (
         # valid protocols we can tunnel to (at the target's end)
