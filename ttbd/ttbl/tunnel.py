@@ -25,14 +25,43 @@ or call the HTTP interface:
 - PUT PREFIX/ttb-v1/targets/TARGETNAME/tunnel/add
 - DELETE PREFIX/ttb-v1/targets/TARGETNAME/tunnel/remove
 
-If the target's properties include the boolean *allow_lan* set to
-*True*, then the tunnel can be created to any IP address that is in
-the local area network defined by the IP address and prefix length:
+The administrator can control if clients can tunnel to other IPs in
+the local area network than that of the target by setting properties:
 
 >>> target = target_add_...("somename",
 >>>                         ipv4_addr = "192.168.1.3",
 >>>                         ipv4_prefix_len = 24)
 >>> target.property_set('interfaces.tunnel.allow_lan') = True
+
+
+- Normal targets:
+
+  - *interconnects.ICNAME.tunnel_allow_lan*: (boolean) if *True* allow
+    the client to tunnel into any IP network defined by interconnect
+    *ICNAME* in target; if *False* disallow any tunnels to this LAN except
+    for the target's IP addresses.
+
+- Interconnect targets:
+
+  - *tunnel_allow_lan*: (boolean) if *True* allow
+    the client to tunnel into any IP network defined by this
+    interconnect; if *False* disallow any tunnels to this LAN except
+    for the target's IP addresses.
+
+- *interfaces.tunnel.allow_lan*: (boolean) if *True* allow the client
+  to tunnel into any IP network defined by any interconnect this
+  target is connected to. Note the
+  *interconnects.ICNAME.tunnel_allow_lan* or *tunnel_allow_lan*
+  settings have priority and only if not specified this one takes
+  effect.
+
+Examples:
+
+>>> target = target_add_...("somename",
+>>>                         ipv4_addr = "192.168.1.3",
+>>>                         ipv4_prefix_len = 24)
+>>> target.property_set('interfaces.tunnel.allow_lan', True)
+>>> target.property_set('interconnects.SOMENETWORK.tunnel_allow_lan', True)
 
 clients can create tunnels in the 192.168.1.3/24 network freely via
 target *somename*::
@@ -98,10 +127,21 @@ class interface(ttbl.tt_interface):
         # to, it is properly written, the server can actually reach
         # it, etc
         ip_addr = ipaddress.ip_address(str(_ip_addr))
-        allow_lan = target.property_get("interfaces.tunnel.allow_lan", False)
+        # Allow LAN setting is obtained from
+        #
+        # - normal target: from the interconnect section
+        #   *interconnects.ICNAME.tunnel_allow_lan*
+        # - interconnect target: from the toplevel *tunnel_allow_lan*
+        # - tunneling interface: *interfaces.tunnel.allow_lan*
+        # - False
+        allow_lan_interface = target.property_get(
+            "interfaces.tunnel.allow_lan", False)
         for ic_name, ic_data in target.tags.get('interconnects', {}).items():
             if not ic_data:
                 continue
+            allow_lan = target.property_get(
+                f"interconnects.{ic_name}.tunnel_allow_lan",
+                allow_lan_interface)
             for key, value in ic_data.items():
                 if not key.endswith("_addr"):
                     continue
@@ -118,6 +158,8 @@ class interface(ttbl.tt_interface):
                        key, itr_ip_addr):
                     return
         # if this is an interconnect, the IP addresses are at the top level
+        allow_lan = target.property_get("tunnel_allow_lan",
+                                        allow_lan_interface)
         for key, value in target.tags.items():
             if not key.endswith("_addr"):
                 continue
