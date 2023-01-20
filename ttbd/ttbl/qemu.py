@@ -79,6 +79,18 @@ Known issues
   unix socket or the PTY; adds another process, but removes on QEMU
   quirkiness to the well tested socat implementation.
 
+- If wanting to use KVM, the BIOS needs to allow it; if when
+  modprobing, eg, kvm_intel it prints::
+
+    [3765190.723964] kvm: support for 'kvm_intel' disabled by bios
+
+  ensure KVM is enabled in the BIOS; setting names depend on the CPU
+  and BIOS, but look for htings such as:
+
+    - Processor Setting > Virtualization Technology
+    - Integrated Devices > I/OAT DMA Engine
+
+
 """
 import errno
 import json
