@@ -1529,19 +1529,19 @@ class target_c(reporter_c):
         - *http_proxy* / *https_proxy* / *ftp_proxy*: URLs of the
           HTTP/S/FTP proxy
         """
-        assert isinstance(ic, target_c)
+        assert ic == None or isinstance(ic, target_c)
         assert isinstance(key, str)
 
         interconnect_data = self.kws.get('interconnects', {})
-        if not ic.id in interconnect_data:
+        if ic != None and not ic.id in interconnect_data:
             raise tcfl.error_e(
                 f"tried to request interconnect key '{key}'"
                 f" from interconnect '{ic.id}';"
                 f" but target is not connected to it",
                 dict(target = target))
-        if key in interconnect_data[ic.id]:
+        if ic != None and key in interconnect_data[ic.id]:
             return interconnect_data[ic.id][key]
-        if key in ic.kws:
+        if ic != None and key in ic.kws:
             return ic.kws[key]
         if key in self.kws:
             return self.kws[key]
