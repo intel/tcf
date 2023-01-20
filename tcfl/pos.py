@@ -1888,7 +1888,9 @@ EOF""")
                     # one we are asked to install, autocomplete missing
                     # fields and get us a good match if there is any.
                     output = target.shell.run(
-                        f"rsync {rsync_host}::{rsync_path}", output = True)
+                        # note the trailing slash -- it is needed so
+                        # rsync lists the contents of the directory
+                        f"rsync {rsync_host}::{rsync_path}/", output = True)
                     images = image_list_from_rsync_output(output)
                     image_final_tuple = image_select_best(image, images, target)
                     image_final = ":".join(image_final_tuple)
