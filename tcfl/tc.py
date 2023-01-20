@@ -2283,7 +2283,7 @@ class target_c(reporter_c):
                 return target
         raise LookupError(
             f"cannot find target '{target_name}' in the list of "
-            f"targets {testcase.name}/{testcase.hashid} is running on")
+            f"targets {testcase.name}/{testcase.runid_hashid} is running on")
 
 
     def mkticket_for_call(self):
