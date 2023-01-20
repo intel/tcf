@@ -823,7 +823,8 @@ def target_qemu_pos_add(target_name,
                         # generic kernels
                         sd_iftype = 'ide',
                         extra_cmdline = "",
-                        ram_megs = 3072):
+                        ram_megs = 3072,
+                        kwargs_pos_setup = None):
     """Add a QEMU virtual machine capable of booting over Provisioning OS.
 
     This target supports one or more serial consoles, a graphics
@@ -917,6 +918,14 @@ def target_qemu_pos_add(target_name,
 
     :param str extra_cmdline: a string with extra command line to add;
       %(FIELD)s supported (target tags).
+
+    :param dict kwargs_pos_setup: (optional; default *None*) arguments
+      for setting up the POS characteristics of the target, which are
+      passed directly to :func:`target_pos_setup`.
+
+      >>> target_qemu_pos_add(
+      >>>     ...,
+      >>>     kwargs_pos_setup = { "boot_to_pos": "ipxe" })
 
     **Notes**
 
@@ -1111,14 +1120,18 @@ def target_qemu_pos_add(target_name,
         )
     )
 
-    target_pos_setup(target, nw_name,	# POS setup
-                     pos_boot_dev, consoles[0],
-                     boot_config = 'uefi',
-                     boot_config_fix = None,
-                     boot_to_normal = 'normal',
-                     boot_to_pos = 'pxe',
-                     mount_fs = 'multiroot',
-                     pos_partsizes = mr_partsizes)
+    # Setup the POS parameters
+    # we can override the defaults when calling this function
+    if kwargs_pos_setup == None:
+        kwargs_pos_setup = dict()
+    kwargs_pos_setup.setdefault("boot_config", 'uefi')
+    kwargs_pos_setup.setdefault("boot_config_fix", None)
+    kwargs_pos_setup.setdefault("boot_to_normal", 'normal')
+    kwargs_pos_setup.setdefault("boot_to_pos", 'pxe')
+    kwargs_pos_setup.setdefault("mount_fs", 'multiroot')
+    kwargs_pos_setup.setdefault("pos_partsizes", mr_partsizes)
+    target_pos_setup(target, nw_name, pos_boot_dev, consoles[0],
+                     **kwargs_pos_setup)
     # make TFTP force PXE boot when pos_mode == pxe
     target.power_on_pre_fns.append(ttbl.dhcp.power_on_pre_pos_setup)
     return target
