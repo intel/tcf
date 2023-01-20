@@ -255,12 +255,12 @@ class driver(tc.report_driver_c):
                 _taglevel = termcolor.colored(f"{tag}{level}", *args, attrs = [ 'bold' ])
                 _prefix = _taglevel + \
                     f"/{termcolor.colored(testcase.runid_hashid, attrs = [ 'bold' ])}{testcase.ident()}" \
-                    f" {termcolor.colored(reporter._report_prefix, *args)}" \
+                    f" {termcolor.colored(testcase._report_prefix, *args)}" \
                     f" [+{delta:0.1f}s]: "
             else:
                 _prefix = \
                     f"{tag}{level}/{testcase.runid_hashid}{testcase.ident()}" \
-                    f" {reporter._report_prefix} [+{delta:0.1f}s]: "
+                    f" {testcase._report_prefix} [+{delta:0.1f}s]: "
             with commonl.tls_prefix_c(self.tls, _prefix):
                 message += "\n"
                 self.consolef.write(message)
