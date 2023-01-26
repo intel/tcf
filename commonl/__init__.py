@@ -3321,7 +3321,7 @@ class fsdb_c(object):
         """
         raise NotImplementedError
 
-    def set(self, key, value, force = True):
+    def set(self, key, value, force = True, clean_subkeys = True):
         """
         Set a value for a key in the database unless *key* already exists
 
@@ -3330,8 +3330,18 @@ class fsdb_c(object):
         :param str value: value to store; *None* to remove the field;
           only *string*, *integer*, *float* and *boolean* types
 
-        :parm bool force: (optional; default *True*) if *key* exists,
+        :param bool force: (optional; default *True*) if *key* exists,
           force the new value
+
+        :param bool clean_subkeys: (optional; default *True*) when
+          setting key *X*, wipe keys *X.\**.
+
+          This is so because we use the period to denote a
+          subdictionary; if *X.s* and *X.p* were set and now *X* is
+          set to *3*, the subfields *X.s* and *X.p* no longer can
+          exist because of *X* being now an integer.
+
+          This is normally not used.
 
         :return bool: *True* if the new value was set correctly;
           *False* if *key* already exists and *force* is *False*.
@@ -3507,7 +3517,7 @@ class fsdb_symlink_c(fsdb_c):
                     d[filename] = self._get_raw(filename_raw)
         return d
 
-    def set(self, key, value, force = True):
+    def set(self, key, value, force = True, clean_subkeys = True):
         # escape out slashes and other unsavory characters in a non
         # destructive way that won't work as a filename
         key_orig = key
@@ -3550,17 +3560,21 @@ class fsdb_symlink_c(fsdb_c):
             except OSError as e:
                 if e.errno != errno.ENOENT:
                     raise
-            # FIXME: this can be optimized a lot, now it is redoing a
-            # lot of work
-            for key_itr in self.keys(key_orig + ".*"):
-                key_itr_raw = urllib.parse.quote(
-                    key_itr, safe = '-_ ' + string.ascii_letters + string.digits)
-                location = os.path.join(self.location, key_itr_raw)
-                try:
-                    self._raw_unlink(location)
-                except OSError as e:
-                    if e.errno != errno.ENOENT:
-                        raise
+            if clean_subkeys:
+                # FIXME: this can be optimized a lot, now it is
+                # redoing a lot of work--eg, sort the keys by length,
+                # start with the sortest, keep a list of what was run,
+                # before running, check if something that is a
+                # substring has been run already.
+                for key_itr in self.keys(key_orig + ".*"):
+                    key_itr_raw = urllib.parse.quote(
+                        key_itr, safe = '-_ ' + string.ascii_letters + string.digits)
+                    location = os.path.join(self.location, key_itr_raw)
+                    try:
+                        self._raw_unlink(location)
+                    except OSError as e:
+                        if e.errno != errno.ENOENT:
+                            raise
             return True	# already wiped by someone else
         if force == False:
             try:
