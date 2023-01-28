@@ -188,7 +188,7 @@ def nw_pos_add(nw_name, power_rail = None,
     nw_name = "nw" + nw_name
 
     # Create the network target
-    interconnect = ttbl.test_target(nw_name)
+    interconnect = ttbl.interconnect_c(nw_name)
 
     interconnect.interface_add(
         "power",
