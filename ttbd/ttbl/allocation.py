@@ -1072,14 +1072,14 @@ def _maintain_released_target(target, calling_user):
         return
 
     # configured to be left on? okie
-    skip_cleanup = target.tags.get('skip_cleanup', False)
+    skip_cleanup = target.property_get('skip_cleanup', False)
     if skip_cleanup:
         target.log.debug("ALLOC: skiping powering off, skip_cleanup defined")
         return
 
-    idle_poweroff = target.tags.get('idle_poweroff',
-                                    ttbl.config.target_max_idle)
-    idle_power_fully_off = target.tags.get(
+    idle_poweroff = target.property_get('idle_poweroff',
+                                        ttbl.config.target_max_idle)
+    idle_power_fully_off = target.property_get(
         'idle_power_fully_off',
         ttbl.config.target_max_idle_power_fully_off)
     if idle_poweroff > 0 or idle_power_fully_off > 0:
