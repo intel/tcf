@@ -867,6 +867,23 @@ def _target_property_set(target, prop, value, user_is_admin, ticket):
         target.property_set_locked(who_make(ticket), prop, value)
 
 
+def _target_properties_flat_set(target, props, user_is_admin, ticket):
+    for prop, value in props:
+        if value != None \
+           and not isinstance(value, ( str, int, float, bool)):
+            flask_logi_abort(
+                400, "property %s: invalid data type %s;"
+                " only null/string/number/boolean allowed"
+                % (prop, type(value).__name__))
+    # FIXME: this needs to fix if the user is not an admin that the
+    # user is not overiding properties they should not
+    if user_is_admin:
+        target.properties_flat_set(props)
+    else:
+        # A non-admin must own the target before setting anything
+        target.properties_flat_set_locked(who_make(ticket), props)
+
+
 @app.route(API_PREFIX + 'targets/<string:target_id>',
            methods = [ 'PATCH', 'PUT' ])
 @flask_login.login_required
@@ -900,7 +917,8 @@ def _target_patch(target_id):
                     target, [ x[0] for x in data_flat ],
                     user_is_admin)
 
-            # Set parameter via form parameters -- just the keys, it can be long
+            # Set parameter via form parameters -- just the keys, --
+            # since it might not be many, we can do individual
             audit_record.kws['form_keys'] = [ i for i in flask.request.form.keys() ]
             for prop in list(flask.request.form.keys()):
                 # we pop 'ticket' because we don't want to allow it as a
@@ -912,8 +930,8 @@ def _target_patch(target_id):
                 _target_property_set(target, prop, value, user_is_admin, ticket)
 
             if data:			# Set parameter via JSON data body
-                for prop, val in data_flat:	# convert to our interal flat key space
-                    _target_property_set(target, prop, val, user_is_admin, ticket)
+                _target_properties_flat_set(target, data_flat,
+                                            user_is_admin, ticket)
         except ttbl.test_target_e as e:
             flask_logi_abort(400, "%s" % e, exc_info = True)
         except Exception as e:
