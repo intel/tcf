@@ -824,7 +824,8 @@ def target_qemu_pos_add(target_name,
                         sd_iftype = 'ide',
                         extra_cmdline = "",
                         ram_megs = 3072,
-                        kwargs_pos_setup = None):
+                        kwargs_pos_setup = None,
+                        tags_extra = None):
     """Add a QEMU virtual machine capable of booting over Provisioning OS.
 
     This target supports one or more serial consoles, a graphics
@@ -926,6 +927,11 @@ def target_qemu_pos_add(target_name,
       >>> target_qemu_pos_add(
       >>>     ...,
       >>>     kwargs_pos_setup = { "boot_to_pos": "ipxe" })
+
+    :param dict tags_extra: (optional; default *None*) extra tags to
+      add to the target.
+
+      FIXME: link to tags spec
 
     **Notes**
 
@@ -1100,15 +1106,20 @@ def target_qemu_pos_add(target_name,
         ( "x86_64", qemu_pc )
     ))
 
+    tags = dict(
+        bsp_models = { 'x86_64': None },
+        bsps = dict(
+            x86_64 = dict(linux = True),
+        ),
+    )
+    if tags_extra:
+        assert isinstance(tags_extra, dict), \
+            "tags_extra: expected dict, got {type(tags_extra)}"
+        tags.update(tags_extra)
     ttbl.config.target_add(		# add the trget
         target,
         target_type = "qemu-uefi-x86_64",
-        tags = dict(
-            bsp_models = { 'x86_64': None },
-            bsps = dict(
-                x86_64 = dict(linux = True),
-            ),
-        )
+        tags = tags
     )
 
     target.add_to_interconnect(		# Network support
