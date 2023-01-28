@@ -1115,13 +1115,20 @@ def maintenance(ts_now, calling_user, keepalive_fn = None):
     # targets: starvation control, check overtimes
     for target in ttbl.test_target.known_targets():
         # FIXME: paralellize
-        owner = target.owner_get()
-        if owner:
-            _target_starvation_recalculate(None, target, 0)
-        else:
-            _maintain_released_target(target, calling_user)
+        # Always keepalive first in case someting crashes and we need to skip
         if keepalive_fn:   	# run keepalives in between targets..
             keepalive_fn()	# ... some targets might take a long time
+        try:
+            owner = target.owner_get()
+            if owner:
+                _target_starvation_recalculate(None, target, 0)
+            else:
+                _maintain_released_target(target, calling_user)
+        except Exception as e:
+            logging.exception("%s: exception in cleanup: %s\n"
+                              % (target.id, e))
+            # fallthrough, continue running other targets
+
     # Finally, do an schedule run on all the targets, see what has to move
     _run(ttbl.test_target.known_targets(), False)
 
