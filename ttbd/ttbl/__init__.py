@@ -1752,6 +1752,11 @@ class test_target(object):
         """
         self.fsdb.set('disabled', "True")
 
+
+    #: List of properties that can't be set
+    properties_forbidden =  ( 'timestamp', '_alloc.timestamp' )
+
+
     def property_set(self, prop, value):
         """
         Set a target's property
@@ -1765,12 +1770,13 @@ class test_target(object):
         """
         # See ttbl.test_target.to_dict(): these properties are
         # generated, not allowed to set them
-        if prop in ( 'timestamp', '_alloc.timestamp' ):
+        if prop in self.properties_forbidden:
             raise RuntimeError("property '%s' cannot be set" % prop)
 
         self.fsdb.set(prop, value)
         for key in self.fsdb.keys(prop + ".*"):
             self.fsdb.set(key, None)
+
 
     def property_set_locked(self, who, prop, value):
         """
@@ -1784,6 +1790,46 @@ class test_target(object):
         assert isinstance(prop, str)
         with self.target_owned_and_locked(who):
             self.property_set(prop, value)
+
+
+
+    def properties_flat_set(self, props_and_values):
+        """
+        Set a list of target's properties
+
+        :param str props_and_values: list of *(key, value)* tupples in
+          flat format
+
+        Due to the hierarchical aspect of the key property namespace,
+        if a property *a.b* is set, any property called *a.b.NAME*
+        will be cleared out.
+
+        """
+        # See ttbl.test_target.to_dict(): these properties are
+        # generated, not allowed to set them
+
+        for prop, value in props_and_values:
+            if prop in self.properties_forbidden:
+                raise RuntimeError("property '%s' cannot be set" % prop)
+        self.fsdb.set_keys(props_and_values)
+
+
+
+    def properties_flat_set_locked(self, who, props_and_values):
+        """
+        Set a list of target's properties (must be locked by the user)
+
+        :param str who: User that is claiming the target
+
+        Rest of parameters as of :meth:`properties_flat_set`
+        """
+        assert isinstance(who, str)
+        with self.target_owned_and_locked(who):
+            for prop, value in props_and_values:
+                if prop in self.properties_forbidden:
+                    raise RuntimeError("property '%s' cannot be set" % prop)
+            self.fsdb.set_keys(props_and_values)
+
 
 
     def property_get(self, prop, default = None):
