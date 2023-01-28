@@ -3261,8 +3261,16 @@ class fsdb_c(object):
     - value are limited in size to 1K
     - if a field does not exist, its value is *None*
 
-    The key space is flat, but with a convention of periods dividing
-    fields, so that:
+    The key space is flat, but with a convention to support mapping a
+    nested dictionary, see *nested flat keyspace*.
+
+    This will be used to store data for each target; for implemntation
+    examples, look at :class:`commonl.fsdb_symlink_c`.
+
+    **Nested flat keyspace**
+
+    This is a key naming convention that uses periods dividing
+    fields (referred to as *nested flat keyspace*), so that:
 
       l['a.b.c'] = 3
 
@@ -3270,13 +3278,29 @@ class fsdb_c(object):
 
       l['a']['b']['c'] = 3
 
-    it also makes it way faster and easier to filter for fields.
+    this is useful to support easily extracting values in both ways
+    (flat and nested) while not having to deal with subfields in the
+    implementation of the database storage.
 
-    This will be used to store data for each target; for implemntation
-    examples, look at :class:`commonl.fsdb_symlink_c`.
+    When using *nested flat* keyspace (by default enabled), every set
+    operation will check for keyspace consistency:
+
+    - setting field a.b.c will ensure a and a.b are not scalars and
+      unset them if so, so a is a dictionary that contains b that
+      contains c
+
+    - setting field a.b.c will ensure any field a.b.c.* is removed,
+      since now a.b.c is an scalar and thus can't have subfields
+
+    This can be time consuming depending on the number of fields being
+    set (felt at the thousands), so use :meth:`set_keys` to set in bulk.
 
     FIXME:
+
     - introduce an official method set_last_mtime()
+
+    - move most of the frontend implementation details in class fsdb_c
+      (eg the ones handling nested_flat_keyspace) here
     """
     class exception(Exception):
         pass
@@ -3321,7 +3345,9 @@ class fsdb_c(object):
         """
         raise NotImplementedError
 
-    def set(self, key, value, force = True, clean_subkeys = True):
+    def set(self, key, value, force = True,
+            nested_flat_keyspace: bool = True,
+            _keys_index: dict = None):
         """
         Set a value for a key in the database unless *key* already exists
 
@@ -3333,15 +3359,8 @@ class fsdb_c(object):
         :param bool force: (optional; default *True*) if *key* exists,
           force the new value
 
-        :param bool clean_subkeys: (optional; default *True*) when
-          setting key *X*, wipe keys *X.\**.
-
-          This is so because we use the period to denote a
-          subdictionary; if *X.s* and *X.p* were set and now *X* is
-          set to *3*, the subfields *X.s* and *X.p* no longer can
-          exist because of *X* being now an integer.
-
-          This is normally not used.
+        :param bool nested_flat_keyspace: (optional; default *True*)
+          enable nested flat keyspace (see :class:`fsdb_c`).
 
         :return bool: *True* if the new value was set correctly;
           *False* if *key* already exists and *force* is *False*.
@@ -3517,7 +3536,10 @@ class fsdb_symlink_c(fsdb_c):
                     d[filename] = self._get_raw(filename_raw)
         return d
 
-    def set(self, key, value, force = True, clean_subkeys = True):
+
+    def set(self, key, value, force = True,
+            nested_flat_keyspace: bool = True,
+            _keys_index: dict = None):
         # escape out slashes and other unsavory characters in a non
         # destructive way that won't work as a filename
         key_orig = key
@@ -3560,21 +3582,8 @@ class fsdb_symlink_c(fsdb_c):
             except OSError as e:
                 if e.errno != errno.ENOENT:
                     raise
-            if clean_subkeys:
-                # FIXME: this can be optimized a lot, now it is
-                # redoing a lot of work--eg, sort the keys by length,
-                # start with the sortest, keep a list of what was run,
-                # before running, check if something that is a
-                # substring has been run already.
-                for key_itr in self.keys(key_orig + ".*"):
-                    key_itr_raw = urllib.parse.quote(
-                        key_itr, safe = '-_ ' + string.ascii_letters + string.digits)
-                    location = os.path.join(self.location, key_itr_raw)
-                    try:
-                        self._raw_unlink(location)
-                    except OSError as e:
-                        if e.errno != errno.ENOENT:
-                            raise
+            if nested_flat_keyspace:
+                self._keys_cleanup(key, all_keys_index = _keys_index)
             return True	# already wiped by someone else
         if force == False:
             try:
@@ -3584,17 +3593,200 @@ class fsdb_symlink_c(fsdb_c):
                     raise
                 # ignore if it already exists
                 return False
+            if nested_flat_keyspace:
+                self._keys_cleanup(key, all_keys_index = _keys_index)
             return True
 
         # New location, add a unique thing to it so there is no
         # collision if more than one process is trying to modify
         # at the same time; they can override each other, that's
         # ok--the last one wins.
+        # now, this is not that atomic, but it works for what we need
+        if nested_flat_keyspace:
+            self._keys_cleanup(key, all_keys_index = _keys_index)
         location_new = location + "-" + str(os.getpid()) + "-" + str(threading.get_ident())
         rm_f(location_new)
         self._raw_write(location_new, value)
         self._raw_rename(location_new, location)
         return True
+
+
+
+    def _mkindex(self, all_keys):
+        # takes a list of keys and generates a multi-level index using
+        # a dictionary; note the leafs have a {} to mark them as an
+        # scalar; the rest of the code uses this
+        #
+        # a.b.c, a.c, a.c.d, c.d.e, g.e.w, a.b
+        #
+        # ->
+        # a {
+        #     b {
+        #          c {}
+        #     }
+        #     c {
+        #         d {}
+        #     }
+        # }
+        # c {
+        #     d {
+        #         e {
+        #     }
+        # }
+        # g {
+        #     e {
+        #          w {}
+        #     }
+        # }
+        #
+        d = dict()
+        for key in all_keys:
+            parts = key.split(".")
+            d_itr = d
+            for part in parts:
+                d_itr = d_itr.setdefault(part, {})
+        return d
+
+
+
+    def _superkey_cleanup_recurse(self, key_partl, keys_index, acc):
+        # cleanup the space superkey space recursively
+        #
+        # see _keys_cleanup()
+        #
+        # key: field subfield subsubfield subsubsubfield subsubsubsubfield
+        #
+        # - key_partl: list of key parts still missing to clean up
+        #              [ subsubfield,  subsubsubfield ]
+        # - key_index: part of the key index that applies to acc
+        #              { 'subsubfield': { 'subsubfield': {} } }
+        # - acc: list of key parts we have already recursed on
+        #              [ 'field', 'subfield' ]
+        #
+        # So this ensures field.subfield is a scalar, but only if it
+        # turns out is in the index, because that means we have
+        # subfield for it.
+        if not key_partl:
+            return
+
+        part = key_partl[0]
+        keyl = acc + [ part ]
+        if part in keys_index.keys():
+            key = ".".join(keyl)
+            # False -> clean only field.subfield
+            self.set(key, None, nested_flat_keyspace = False)
+            self._superkey_cleanup_recurse(
+                key_partl[1:], keys_index.get(part, {}), keyl)
+
+
+
+    def _keys_cleanup(self, key, all_keys_index = None):
+        #
+        # Clean up the key space around *key* for it to be congruent
+        # with the nested flat keyspace.
+        #
+        #
+        # when we set (to a scalar or None) key some.field.subfield,
+        # we need to:
+        #
+        # - ensure some and some.field are not escalars (so we set
+        #   them to None)
+        #
+        # - remove some.field.subfield.*, since now some.field.subfield
+        #   is an scalar, so it can't have values under it
+        #
+        # Now, when setting multiple keys, this might be a constly
+        # operation, since it's O(N*M), where M is how many
+        # some.field.subfield*s are there.
+        #
+        # Ef: disks.disk0.bus.lola
+        #
+        # Delete
+        # disks
+        # disks.disk0
+        # disks.disk0.bus
+        # disks.disk0.bus.lola.*
+        #
+        # We use the key index, which is a generated by _mkindex as a
+        # dictionary of fields; eg; for some.field.subfield it'd be
+        #
+        # { 'some': { 'field': { 'subfield': {} } } }
+        #
+        # but for all the fields in the database; this we use to
+        # optimize where to look instead of scanning the whole list of
+        # fields. Note the empty {} for a scalar field
+        # (some.field.subfield is an scalar vs a container of other
+        # fields).
+
+        # If we are passed no index, we build our own; otherwise we
+        # take the shared ones (this is used by set_keys() to optimize
+        if all_keys_index == None:
+            all_keys_index = self._mkindex(self.keys())
+
+        partl = key.split('.')
+        # first ensure all the super keys (disks, disks.disk0,
+        # disks.disk0.bus) are escalars --
+        # skip the last part (eg: .lola), since this is the one we are setting
+        self._superkey_cleanup_recurse(partl[:-1], all_keys_index, [])
+
+        # now  ensure all the subkeys (disks.disk0.bus.lola.*) are wiped
+        # because if yo set disks.disk0.bus.lola to scalar, there
+        # can't be subdictionaries
+        key_index = all_keys_index
+        keyl = []
+        for part in partl:
+            keyl.append(part)
+            key_index = key_index.get(part, None)
+            if key_index == None:
+                return
+
+        def _subkey_space_remove(subkeyl, key_index):
+            for subkey_part, _subkey_index in key_index.items():
+                _subkeyl = subkeyl + [ subkey_part ]
+                _subkey = ".".join(_subkeyl)
+                self.set(_subkey, None, nested_flat_keyspace = False)
+                if _subkey_index:
+                    _subkey_space_remove(_subkeyl, _subkey_index)
+            key_index.clear()
+
+        _subkey_space_remove(partl, key_index)
+
+
+
+    def set_keys(self, key_list, force = True,
+                 nested_flat_keyspace: bool = True):
+        """
+        Set multiple keys/values
+
+        :param list key_list: list of tuples *(key, value)*
+
+        :param bool force: see :meth:`set`
+
+        :param bool nested_key_space: (optional; default *True*) keep
+          the keys organized in a flat nested key space.
+
+          This ensures some cleanup in the key space is done that
+          allows mapping nested dictionaries to flat key/values
+
+        Note this version optimizes the cleaning up of key space
+        """
+
+        if nested_flat_keyspace:
+            # because we'll set multiple fields, generate this index
+            # only on the first run and use it for them all--this cuts
+            # a lot of time
+            all_keys_index = self._mkindex(set(self.keys()))
+        else:
+            all_keys_index = None
+
+        # We could paralellize, but some environments *flask* cough
+        # when we use concurrent, etc...
+        for key, value in sorted(key_list, key = lambda t: t[0]):
+            self.set(key, value, force = force,
+                     nested_flat_keyspace = nested_flat_keyspace,
+                     _keys_index = all_keys_index)
+
+
 
     def _get_raw(self, key, default = None):
         location = self._location_get_raw(key)
