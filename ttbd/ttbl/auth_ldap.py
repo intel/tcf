@@ -50,7 +50,7 @@ class authenticator_ldap_c(ttbl.authenticator_c):
     don't have to be part of any group. This allows to permit the role
     to anyone that can authenticate with LDAP.
     """
-    def __init__(self, url, roles = None, group_ou = None, user_ou = None):
+    def __init__(self, url, roles = None, group_ou = None):
         """
         :param str url: URL of the LDAP server
         :param dict roles: map of roles to users and groups
@@ -69,15 +69,10 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         assert isinstance(roles, dict)
 
         self.group_ou = None
-        self.user_ou = None
 
         if group_ou:
             assert isinstance(group_ou, str)
             self.group_ou = group_ou
-
-        if user_ou:
-            assert isinstance(user_ou, str)
-            self.user_ou = user_ou
 
         u = urllib.parse.urlparse(url)
         if u.scheme == "" or u.netloc == "":
@@ -230,6 +225,23 @@ class authenticator_ldap_c(ttbl.authenticator_c):
                 "%s: generic error in LDAP %s: %s"
                 % (email, self, e))
 
+        # the org unit does not need to be static, we can get the org unit for
+        # every user that tries to log in, this comes handy when trying to log
+        # in users with different org units, (like faceless accounts)
+
+        # basically the flow is the following:
+        # from the first request we make we get an string with the necessary
+        # info:
+        # 'CN=perez\, jose,OU=ORG UNIT,DC=SUBDOMAIN1,DC=SUBDOMAIN2,DC=c...
+        user_info = record[0][0]
+        # ['CN', 'perez\\, jose,OU', 'ORG UNIT,DC', 'SUBDOMAIN1,DC', ...]
+        user_info = user_info.split('=')
+        # 'ORG UNIT,DC' -> 'ORG UNIT'
+        user_ou = user_info[2].split(',')[0]
+        # at the end we get the org unit and we can send it to the `get_groups`
+        # function further down the line. (when trying to get all the roles
+        # recursively)
+
         token_roles = set()
         # So the token/password combination exists and is valid, so
         # now let's see what roles we need to assign the user
@@ -309,7 +321,7 @@ class authenticator_ldap_c(ttbl.authenticator_c):
             for group in role_groups:
                 try:
                     u = get_group(
-                            group, self.group_ou, self.user_ou, self.url,
+                            group, self.group_ou, user_ou, self.url,
                             email, password
                         )
                     if not u:
