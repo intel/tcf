@@ -86,6 +86,9 @@ if echo $destdir | grep -q ".tar.xz"; then
 elif echo $destdir | grep -q ".qcow2"; then
     dest_type=qcow2
     # will be handled further down
+elif echo $destdir | grep -q ".squashfs"; then
+    dest_type=squashfs
+    # will be handled further down
 else
     dest_type=dir
 fi
@@ -270,6 +273,15 @@ case $dest_type in
         sudo mkfs.ext4 -qF ${nbd2_dev}p1
         mkdir -p $tmpdir/destdir
         sudo mount ${nbd2_dev}p1 $tmpdir/destdir
+        destdir=$tmpdir/destdir
+        assume_there=no
+        ;;
+    squashfs)
+        # We'll pack the output when done in a squashfs image, which
+        # maintains all Unix attrs (extended and SELabels too)
+        squashfs_name=$destdir
+        rm -f "$squashfs_name"
+        mkdir -p $tmpdir/destdir
         destdir=$tmpdir/destdir
         assume_there=no
         ;;
@@ -989,5 +1001,11 @@ case $dest_type in
         # for CPU when moving around network distances
         qemu-img convert -O qcow2 -c "$qcow2name" "$qcow2name".compressed
         mv -f "$qcow2name".compressed  "$qcow2name"
+        ;;
+
+    squashfs)
+        info packing '$tmpdir/destdir' to $squashfs_name
+        sudo mksquashfs $tmpdir/destdir/ $squashfs_name \
+             -comp xz ${MKSQUASHFS_FLAGS:-}
 esac
 
