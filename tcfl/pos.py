@@ -405,6 +405,91 @@ def target_power_cycle_to_pos_pxe(target):
     target.property_set("pos_mode", "local")
 
 
+
+def target_power_cycle_to_pos_ipxe(target, boot_ic, kws_pos = None):
+    """Boot a target to provisioning mode using iPXE
+
+    This is different to
+    :func:`edkii_pxe_ipxe_target_power_cycle_to_pos` below in that in
+    that case, the machine navigates EDIIK menus to boot to iPXE and
+    in this one, the machine is pre-configured to boot off to iPXE.
+
+    The network's DHCP configuration for the machine will direct the
+    machine to boot off a TFTP server an iPXE bootloader. The iPXE
+    bootloader must have Ctrl-B enabled to jump into the console
+    (as described :ref:`here <howto_fog_ipxe>`).
+
+    However:
+
+    - the BIOS shall be configured to try to boot first off the network
+
+    - the iPXE bootloader configuration for the machine shall not do
+      anything but offer to jump into the console (as described above)
+      or just default to boot off the local disk.
+
+    When the machine boots, this function waits for the iPXE boot
+    prompt, requests the iPXE console and then uses that to direct the
+    machine to boot to POS mode.
+
+    """
+    target.report_info("POS: setting target to PXE boot Provisioning OS")
+    # for some targets, this is needed so the server can direct them
+    # to PXE boot (eg: QEMU)
+    target.property_set("pos_mode", "pxe")
+    target.power.cycle()
+    # Now setup the local boot loader to boot off that
+    target.property_set("pos_mode", "local")
+
+    # add a detector for a shell error, make sure to name it
+    # after the target and console it will monitor so it
+    # doesn't override other targets/consoles we might be
+    # touching in parallel
+    error_pxe_N = target.console.text(
+        re.compile(r"PXE-E[0-9]+:[ \w]+"),
+        name = f"{target.want_name}: UEFI PXE boot error",
+        timeout = 0, poll_period = 1,
+        raise_on_found = tc.error_e("UEFI PXE boot error detected")
+    )
+    if kws_pos == None:
+        kws = target.pos.kws_vars_load(boot_ic = boot_ic)
+    else:
+        kws = kws_pos
+    ipxe_kws_vars_load(target, boot_ic, kws)
+
+    retries_max = 6
+    retry_data = target.testcase.buffers.setdefault(
+        f"{target.fullid}-retries", collections.defaultdict(int))
+    for retry in range(1, retries_max):
+        target.testcase.expect_tls_append(error_pxe_N)
+        try:
+            # this will make it boot the iPXE bootloader and then we seize it
+            # and direct it to our POS provide
+            target.report_info("POS: seizing iPXE boot", )
+            ipxe_seize_and_boot(target, boot_ic, kws = kws)
+            break	# exit the retry loop
+        except tc.exception as e:
+            # catches anything infrastructure/failure related and puts it
+            # in the same ball of retries
+            if retry == retries_max - 1:
+                raise tc.failed_e(
+                    f"boot failure: retried {retries_max - 1} times"
+                    f" failed network boot / iPXE", dict(recoverable = False))
+            target.report_fail(
+                f"boot failure: retry {retry}/{retries_max}:"
+                f" due to failed network boot / iPXE", dict(exception = e),
+                alevel = 1, soft = True)
+            retry_data["boot: retries due to network boot / iPXE failure"] += 1
+            target.report_data(
+                "Recovered conditions [%(type)s]",
+                "boot: retries due to network boot / iPXE failure",
+                retry_data["boot: retries due to network boot / iPXE failure"]
+            )
+            continue
+        finally:
+            target.testcase.expect_tls_remove(error_pxe_N)
+
+
+
 def target_power_cycle_to_normal(target):
     """
     Boot a target normally, not to the Provisioning OS
@@ -3051,6 +3136,7 @@ from . import pos_multiroot	# pylint: disable = wrong-import-order,wrong-import-
 from . import pos_uefi		# pylint: disable = wrong-import-order,wrong-import-position,relative-import
 capability_register('mount_fs', 'multiroot', pos_multiroot.mount_fs)
 capability_register('boot_to_pos', 'pxe', target_power_cycle_to_pos_pxe)
+capability_register('boot_to_pos', 'ipxe', target_power_cycle_to_pos_ipxe)
 capability_register('boot_to_normal', 'pxe', target_power_cycle_to_normal)
 capability_register('boot_to_normal', 'normal', target_power_cycle_to_normal)
 capability_register('boot_config', 'uefi', pos_uefi.boot_config_multiroot)
