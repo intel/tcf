@@ -1190,8 +1190,18 @@ class extension(tc.target_extension_c):
                                 pos_boot_found = True
                                 break
                             elif 'POS boot issue' in r:
-                                # found the issue and the login banner; good to go!
-                                # need to login!
+                                # found the POS; the POS OS auto-logs
+                                # in, so we just need the prompt
+                                target.report_info(
+                                    "POS: boot issue found,"
+                                    " waiting for auto-loged-in prompt")
+                                # some machines get really stuck
+                                # printing the login prompt after
+                                # issue; this is usually a bug in the
+                                # machine
+                                target.expect(
+                                    target.shell.prompt_regex,
+                                    name = "auto-logged-in-shell-prompt")
                                 pos_boot_found = True
                                 break
                             elif 'login prompt' in r:
