@@ -3603,3 +3603,91 @@ uefi_http_boot_ipxe_target_power_cycle_to_pos = \
 
 capability_register('boot_to_pos', 'edkii+http+ipxe',
                     target_power_cycle_to_pos_uefi_http_boot_ipxe)
+
+
+
+#: Location in the server's drive where the POS kernel is available
+pos_qemu_direct_base = "/home/ttbd/public_html/%(bsp)s/"
+
+def target_power_cycle_to_pos_qemu_direct(target, boot_ic, kws_pos = None):
+    """
+    Boot a QEMU virtual machine to POS mode using direct kernel/initrd boot
+
+    This method uses the QEMU -kernel, -initrd and -append command
+    line options to have QEMU boot the POS OS directly, which makes it
+    quite fast (machine up and running after a power cycle in about 20
+    seconds, depening on the host).
+
+    Enable by setting the pos capability *boot_to_pos* to
+    *qemu_direct* in any server configuration file:
+
+    >>> target.property_set("pos_capable.boot_to_pos", "qemu_direct")
+
+    or via the client::
+
+      $ tcf property-set TARGETNAME pos_capable.boot_to_pos qemu_direct
+
+    **Details**
+
+    When booting in POS mode, we need to direct the target to boot an
+    special Linux OS which is rooted over NFS, as given by the
+    variables in the POS hierarchy of the inventory.
+
+    When :meth:`target.pos.boot_to_pos
+    <tcfl.pos.extension.boot_to_pos>` is called on a target that says
+    in its inventory that *qemu_direct* is its *boot_to_pos*, this
+    function called (as the name registered to this function). This
+    function will set the target's properties on which it tells QEMU
+    how to directly boot the POS environment. Then, when the target is
+    powered on, QEMU is executed with said variables.
+
+    FIXME:
+
+    - works BUT! when booting with this method, the root device (sda)
+      doesn't get enumerated; unknown why (*ata_piix* driver misses it)
+
+    - qemu driver: rename the properties to be in
+      interfaces.power.COMPONENT.qemu.{initrd,kernel,kcmdline,bios};
+      this will allow multiple components again. Default to one called AC
+
+      Hardcode this one to work only on component interfaces.power.AC
+      or take it from a list pos.qemu_component.
+    """
+    if kws_pos == None:
+        kws = target.pos.kws_vars_load(boot_ic = boot_ic)
+    else:
+        kws = kws_pos
+    ipxe_kws_vars_load(target, boot_ic, kws)
+
+    global pos_qemu_direct_base
+    kws['base'] = pos_qemu_direct_base
+    kws['cmdline'] = commonl.kws_expand(
+        " ".join(tcfl.pos.pos_cmdline_opts[kws['pos_kernel_image']]
+                 + [ kws['pos_kernel_cmdline_extra'] ]),
+        kws)
+
+    kernel = target.property_get("qemu-image-kernel", None)
+    initrd = target.property_get("qemu-image-initrd", None)
+    cmdline = target.property_get("qemu-image-kernel-args", None)
+    try:
+        kws['base'] = "/home/ttbd/public_html/x86_64/" # FIXME hack
+        target.property_set(
+            "qemu-image-kernel",
+            commonl.kws_expand("%(base)svmlinuz-%(pos_kernel_image)s", kws))
+        target.property_set(
+            "qemu-image-initrd",
+            commonl.kws_expand("%(base)sinitramfs-%(pos_kernel_image)s", kws))
+        target.property_set(
+            "qemu-image-kernel-args",
+            commonl.kws_expand(
+                "console=tty0 console=%(linux_serial_console_default)s,115200"
+                " %(cmdline)s",
+                kws))
+        target.power.cycle()
+    finally:		# undo the property setting, no longer needed
+        target.property_set("qemu-image-kernel", kernel)
+        target.property_set("qemu-image-initrd", initrd)
+        target.property_set("qemu-image-kernel-args", cmdline)
+
+capability_register('boot_to_pos', 'qemu_direct',
+                    target_power_cycle_to_pos_qemu_direct)
