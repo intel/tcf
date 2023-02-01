@@ -394,7 +394,10 @@ elif [ $image_type == fedoralive -o $image_type == tcflive ]; then
     mounted_dirs="$tmpdir/root ${mounted_dirs:-}"
 
 elif [ $image_type == qcow2 ]; then
-
+    # this is needed because sometimes we see no filesystem info in
+    # the partitions; 4s seems to be enough
+    info "waiting 4s for ${nbd_dev} to be scaned for ${root_part}'s file system type"
+    sleep 4s
     root_fstype=$(lsblk -n -o fstype ${root_part})
     if [ -z ${ROOT_MOUNTOPTS:-} ]; then
         # we are mounting readonly, guess how to so it doesn't complain
@@ -406,7 +409,7 @@ elif [ $image_type == qcow2 ]; then
             btrfs)
                 ROOT_MOUNTOPTS=noload;;
             *)
-                warning "can't guess best options for read-only rootfs $root_fstype"
+                warning "can't guess best options for read-only rootfs '$root_fstype'"
                 warning "please export BOOT|ROOT_PARTITION"
                 warning "please export BOOT|ROOT_MOUNTOPTS"
                 ROOT_MOUNTOPTS=""
