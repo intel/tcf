@@ -955,14 +955,15 @@ class tt_interface(object):
             instrument_name, index = \
                 self.instrument_mkindex(instrument_name, upid)
         prefix = "instrumentation." + index
-        target.property_set(prefix + ".name", instrument_name)
+        properties_flat = []
+        properties_flat.append(( prefix + ".name", instrument_name ))
         for key, val in upid.items():
             if val:
                 # there might be empty values, as defaults, so we ignore them
                 if isinstance(val, str):
                     # if it is a string, it is a template
                     try:
-                        target.property_set(prefix + "." + key, val)
+                        properties_flat.append(( prefix + "." + key, val ))
                     except ( ValueError, TypeError ) as e:
                         # don't use target.log --> not fully
                         # initialized yet
@@ -970,17 +971,21 @@ class tt_interface(object):
                             f"{target.id}: possible formatting error for val '{val}': {e}")
                         raise
                 else:
-                    target.property_set(prefix + "." + key, val)
+                    properties_flat.append(( prefix + "." + key, val ))
         if components:
-            target.property_set(prefix + ".functions." + iface_name,
-                                ":".join(components))
+            properties_flat.append((
+                prefix + ".functions." + iface_name, ":".join(components) ))
             # declare the index for the component
             for component in components:
-                target.property_set(f"interfaces.{iface_name}.{component}.instrument",
-                                    index)
+                properties_flat.append((
+                    f"interfaces.{iface_name}.{component}.instrument", index ))
         else:
-            target.property_set(prefix + ".functions." + iface_name,
-                                "true")
+            properties_flat.append((
+                prefix + ".functions." + iface_name, True ))
+        # setting properties 1:1 can be less eficient than bulk upload
+        target.properties_flat_set(properties_flat)
+
+
 
     def instrumentation_publish(self, target, iface_name):
         """
