@@ -380,6 +380,7 @@ def mount_root_part(target, root_part_dev, repartition):
         dict(target = target))
 
 
+
 def target_power_cycle_to_pos_pxe(target):
     """
     Boot a target to provisioning mode using by booting BIOS to PXE
@@ -2425,6 +2426,8 @@ pos_cmdline_opts = {
         "ip=bootnet:dhcp",
         "ro",				# we are read only
         "quiet",			# don't print much of the boot process
+#        "debug",
+#        "systemd.journald.forward_to_console=1",
         "loglevel=2",                   # kernel, be quiet to avoid
                                         # your messages polluting the
                                         # serial terminal
@@ -2539,9 +2542,6 @@ def ipxe_seize_and_boot(target, boot_ic, dhcp = None, kws = None):
 
       By default, this is taken from the target's keywords
       (*pos.http_url_prefix*) or from the boot interconnect.
-
-    :param str pos_image: (optional; default *tcf-live*) name of the
-      POS image to load.
 
     """
     ipxe_seize(target)
@@ -2701,6 +2701,7 @@ def ipxe_seize_and_boot(target, boot_ic, dhcp = None, kws = None):
             kws['pos_cmdline_extra_chunked'] = chunk_str
             target.shell.run(
                 commonl.kws_expand(
+                    # these ${variables} are expanded by iPXE's language
                     "kernel"
                     " ${base}vmlinuz-%(pos_kernel_image)s"
                     " initrd=initramfs-%(pos_kernel_image)s"
@@ -2724,6 +2725,8 @@ def ipxe_seize_and_boot(target, boot_ic, dhcp = None, kws = None):
                 # in case we excepted before installing the handler,
                 # we are ok with it
                 pass
+
+
 
 # FIXME: when tc.py's import hell is fixed, this shall move to tl.py?
 
