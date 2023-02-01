@@ -2156,7 +2156,7 @@ EOF""")
                 # we don't do any selection. If it doesn't, then we
                 # look for an image in the defined image repository.
                 if '/' in image:
-                    kws['rsync_image'] = rsync_host + "::" + image
+                    kws['rsync_image'] = image
                     kws['image'] = image
                     # this serves as an approx for the standarized
                     # image naming scheme OS:SPIN:VERSION:SUBVERSION:ARCH
