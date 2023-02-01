@@ -757,6 +757,178 @@ class extension(tc.target_extension_c):
         return capability_fn
 
 
+    def kws_vars_load(self, boot_ic = None, kws = None):
+        """
+        Load POS variables from the inventories and
+        environment into a dictionary
+
+        Note this loads from the following sources:
+
+        - environment (so we can easily override for testing or
+          whichever reason)
+
+        - the target's inventory (using
+          :meth:`tcfl.tc.target_c.ic_key_get`)
+
+          - TARGET:interconnects.INTERCONNECTNAME.KEY
+          - INTERCONNECTNAME:KEY
+          - TARGET:KEY
+
+        In some keys, a default value is provided, otherwise an
+        exception will be raised, depending on the caller which
+        might need the value or not.
+
+        The following keys are set:
+
+         - server
+         - pos_boot_interconnect
+         - pos_boot_dev
+         - pos_image
+         - pos_kernel_image
+         - pos_kernel_cmdline_extra
+         - pos_http_url_prefix
+         - pos_http_url_prefix_resolved
+         - pos_nfs_server
+         - pos_nfs_ip
+         - pos_nfs_path
+         - pos_rsync_server
+         - pos_deploy_timeout_base
+         - pos_deploy_timeout_per_gib
+
+        Not handled by this:
+
+        - pos_partsizes: this is specific to the POS multiroot method
+
+        FIXME: still not done by this
+
+        - pos_capable: boot_config, boot_config_fix, boot_to_normal,
+          boot_to_pos, mount_fs
+          -> pos.*, replace pos_capable with just "pos".
+        """
+        target = self.target
+        if kws == None:
+            kws = dict()
+        else:
+            assert isinstance(kws, dict)
+
+        kws['server'] = target.rtb.parsed_url.hostname
+
+        kws['pos_boot_interconnect'] = os.environ.get(
+            "POS_BOOT_INTERCONNECT",
+            target.ic_key_get(
+                boot_ic, 'pos.boot_interconnect',
+                target.ic_key_get(
+                    boot_ic, 'pos_boot_interconnect',
+                    "ERROR:missing-pos.boot_interconnect property")))
+
+        kws['pos_boot_dev'] = os.environ.get(
+            "POS_BOOT_DEV",
+            target.ic_key_get(
+                boot_ic, 'pos.boot_dev',
+                target.ic_key_get(
+                    boot_ic, 'pos_boot_dev',
+                    "ERROR:missing-pos.boot_dev property")))
+
+        pos_image = kws['pos_image'] = os.environ.get(
+            "POS_IMAGE",
+            target.ic_key_get(
+                boot_ic, 'pos.image',
+                target.ic_key_get(
+                    boot_ic, 'pos_image',
+                    "ERROR:missing-pos.image property")))
+
+        # this one is optional and defaults to *pos.image; it allows
+        # us to set a different kernel for an specific piece of HW
+        kws['pos_kernel_image'] = os.environ.get(
+            "POS_KERNEL_IMAGE",
+            target.ic_key_get(
+                boot_ic, 'pos.kernel_image',
+                target.ic_key_get(boot_ic, 'pos_kernel_image', pos_image)))
+
+        kws['pos_kernel_cmdline_extra'] = os.environ.get(
+            "POS_KERNEL_CMDLINE_EXTRA",
+            target.ic_key_get(
+                boot_ic, 'pos.kernel_cmdline_extra',
+                target.ic_key_get(boot_ic, 'pos_kernel_cmdline_extra', "")))
+
+        kws['pos_http_url_prefix'] = os.environ.get(
+            "POS_HTTP_URL_PREFIX",
+            target.ic_key_get(
+                boot_ic, 'pos.http_url_prefix',
+                target.ic_key_get(
+                    boot_ic, 'pos_http_url_prefix',
+                    "ERROR:missing-pos.http_url_prefix property")))
+        if kws['pos_http_url_prefix'].startswith("ERROR:"):
+            url_resolved = kws['pos_http_url_prefix']
+        else:
+            url = urllib.parse.urlparse(kws['pos_http_url_prefix'])
+            try:
+                url_resolved = url._replace(
+                    netloc = url.hostname.replace(
+                        url.hostname, socket.gethostbyname(url.hostname)))
+                url_resolved = url.geturl()
+            except socket.gaierror as e:
+                target.report_info(
+                    f"WARNING! Can't resolve '{url.hostname}' from"
+                    " pos.http_url_prefix; assuming internal,"
+                    " to be resolved by target: {e}",
+                    dlevel = -2)
+                url_resolved = url.geturl()
+
+        kws['pos_http_url_prefix_resolved'] = url_resolved
+
+        kws['pos_nfs_server'] = os.environ.get(
+            "POS_NFS_SERVER",
+            target.ic_key_get(
+                boot_ic, 'pos.nfs_server',
+                target.ic_key_get(
+                    boot_ic, 'pos_nfs_server',
+                    "ERROR:missing-pos.nfs_server property")))
+        try:
+            kws['pos_nfs_ip'] = socket.gethostbyname(kws["pos_nfs_server"])
+        except socket.gaierror as e:
+            target.report_info(
+                f"WARNING! Can't resolve '{kws['pos_nfs_server']}' from"
+                " pos.nfs_server; assuming internal,"
+                " to be resolved by target: {e}",
+                dlevel = -2)
+            url_resolved = url.geturl()
+
+        kws['pos_nfs_path'] = target.ic_key_get(
+            boot_ic, 'pos.nfs_path',
+            target.ic_key_get(
+                boot_ic, 'pos_nfs_path',
+                os.environ.get("POS_NFS_PATH",
+                               "ERROR-missing-pos.nfs_path property")))
+
+        kws['pos_rsync_server'] = os.environ.get(
+            "POS_RSYNC_SERVER",
+            target.ic_key_get(
+                boot_ic, 'pos.rsync_server',
+                target.ic_key_get(
+                    boot_ic, 'pos_rsync_server',
+                    "ERROR:missing-pos.rsync_server property")))
+
+        kws['pos_deploy_timeout_base'] = int(os.environ.get(
+            "POS_DEPLOY_TIMEOUT_BASE",
+            target.ic_key_get(
+                boot_ic, 'pos.deploy_timeout_base',
+                target.ic_key_get(
+                    boot_ic, 'pos_deploy_timeout_base',
+                    500))))
+
+        kws['pos_deploy_timeout_per_gib'] = int(os.environ.get(
+            "POS_DEPLOY_TIMEOUT_PER_GIB",
+            target.ic_key_get(
+                boot_ic, 'pos.deploy_timeout_per_gib',
+                target.ic_key_get(
+                    boot_ic, 'pos_deploy_timeout_per_gib',
+                    30))))
+
+        return kws
+
+
+
     def _unexpected_console_output_try_fix(self, output, target):
         boot_config_fix_fn = target.pos.cap_fn_get('boot_config_fix',
                                                    'uefi')
@@ -2318,7 +2490,31 @@ def ipxe_seize(target):
                        "iPXE prompt time (s)", ts_prompt - ts_init)
 
 
-def ipxe_seize_and_boot(target, boot_ic, dhcp = None, pos_image = None, url = None):
+
+def ipxe_kws_vars_load(target, boot_ic, kws):
+    """
+    Load into *kws* variables needed from the inventory to boot iPXE into POS
+
+    Note these are on top of what is loaded by
+    :meth:`target.pos.kws_vars_load
+    <tcfl.pos.extension.kws_vars_load>`.
+    """
+    kws.setdefault('bsp', target.bsp)
+    kws.setdefault('mac_addr', target.addr_get(boot_ic, 'mac'))
+    kws.setdefault('ipv4_addr', target.addr_get(boot_ic, "ipv4"))
+    kws.setdefault('ipv4_prefix_len',
+                   target.ic_field_get(boot_ic, "ipv4_prefix_len",
+                                       "ipv4 field length"))
+    kws.setdefault('ipv4_netmask',
+                   commonl.ipv4_len_to_netmask_ascii(kws['ipv4_prefix_len']))
+
+    kws.setdefault('linux_serial_console_default', target.kws.get(
+        'linux.serial_console_default',
+        target.kws.get('linux_serial_console_default', None)))
+
+
+
+def ipxe_seize_and_boot(target, boot_ic, dhcp = None, kws = None):
     """Wait for iPXE to boot on a serial console, seize control and
     direct boot to a given TCF POS image
 
