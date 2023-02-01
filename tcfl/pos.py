@@ -1237,6 +1237,7 @@ class extension(tc.target_extension_c):
           the target is connected.
         """
         target = self.target
+        target.shell.run("pkill -9 -f /tmp/rsync.conf || true")
         target.shell.run("""\
 cat > /tmp/rsync.conf <<EOF
 [rootfs]
