@@ -21,6 +21,7 @@ that just got an image deployed to it using the multiroot methodology.
 """
 
 import os
+import packaging.version
 import pprint
 import re
 
@@ -75,13 +76,24 @@ def _linux_boot_guess_from_lecs(target, _image):
             continue
         lecl.append(lec)
         target.report_info("Loader Entry found: %s" % lec, dlevel = 1)
-    if len(lecl) > 1:
-        raise tc.blocked_e(
-            "multiple loader entries in /boot, do not "
-            "know which one to use: " + " ".join(lecl),
-            dict(target = target))
+    if len(lecl) == 1:
+        lec = lecl[0]
     elif len(lecl) == 0:
         return None, None, None
+    elif 'POS_KERNEL' in os.environ:
+        lec = os.environ['POS_KERNEL']
+        target.report_info(
+            "WARNING: multiple loader entries found,"
+            " will pick {lec} from environment POS_KERNEL",
+            { "entries": lecl }, dlevel = -1)
+    else:      # len(lecl) > 1:
+        sorted_lecl = lecl.sort(key = packaging.version.parse)
+        lec = lecl[-1]
+        target.report_info(
+            "WARNING: multiple loader entries found,"
+            " will pick what seems most recent per"
+            f" packaging.version.Version sort {lec}",
+            { "entries": sorted_lecl }, dlevel = -1)
     # fallthrough, only one entry
     lec = lecl[0]
     output = target.shell.run('cat %s' % lec, output = True)
@@ -288,18 +300,29 @@ def _linux_boot_guess_from_grub_cfg(target, _image):
                               grub_cfg_path.replace("/mnt", "")):
             del target._grub_entries[entry_id]
 
-    if len(target._grub_entries) > 1:
-        entries = pprint.pformat([ i.__dict__
-                                   for i in list(target._grub_entries.values()) ])
-        raise tc.blocked_e(
-            "more than one Linux kernel entry; I don't know "
-            "which one to use",
-            dict(target = target, entries = entries))
 
     if not target._grub_entries:		# can't find?
         del target._grub_entries		# need no more
         return None, None, None
-    entry = list(target._grub_entries.values())[0]
+    elif len(target._grub_entries) == 1:
+        entry = list(target._grub_entries.keys())[0]
+    elif 'POS_KERNEL' in os.environ:
+        entry = target._grub_entries[os.environ['POS_KERNEL']]
+        target.report_info(
+            "WARNING: multiple loader entries found,"
+            " will pick {entry} from environment POS_KERNEL",
+            { "entries": target._grub_entries.values() },
+            dlevel = -1)
+    else:      # len(lecl) > 1:
+        sorted_entries = list(target._grub_entries.keys())
+        sorted_entries.sort(key = packaging.version.parse)
+        entry = target._grub_entries[sorted_entries[-1]]
+        target.report_info(
+            "WARNING: multiple grub entries found,"
+            " will pick what seems most recent per"
+            f" packaging.version.Version sort {entry}",
+            { "entries": sorted_entries }, dlevel = -1)
+
     del target._grub_entries			# need no more
     # note we assume the grub.cfg entries are in [/mnt]/boot because
     # grub.cfg is in /boot and there is usually a filesystem just for
