@@ -57,6 +57,19 @@ BOOT_CONF_ENTRY  if defined, this is the full file name of a file under
                  the rootfs boot/loader/entries; any file in there that
                  is not this one will be removed
 
+SETUPL           Space separated list of paths to of scripts that are
+                 sourced and run before wrapping up the image creation.
+
+                   $ SETUPL="path/to/file1.sh path/to/file2.sh" tcf-image-setup.sh ...args...
+
+                 Environment
+
+                 - $destdir: location where the image is expanded
+
+                 - $selinux_relable: tag files modified that need relabeling; eg:
+
+                   selinux_relabel["etc/passwd"]=1
+
 See more at https://inakypg.github.io/tcf/doc/04-HOWTOs.html#pos_image_creation
 EOF
 }
@@ -939,6 +952,39 @@ EOF
     selinux_relabel["etc/inittab"]=1
 fi
 
+# extra setup functions
+#
+# Define a file something.sh, pass it in the SETUPL env var::
+#
+#    $ SETUPL="path/to/file1.sh path/to/file2.sh" tcf-image-setup.sh ...args...
+#
+# Arguments:
+#
+#   $1 is $destdir
+#
+# Environment:
+#
+#  selinux_relable: tag files modified that need relabeling; eg:
+#
+#    selinux_relabel["RELTOPDIR/FILENAME"]=1
+#
+# xars -n1 -> makes one word per line so we can sort
+workingdir=`pwd`
+for setup in $(echo $setupl | xargs -n1 | sort -u); do
+    info setup: running extra script $setup
+    source $setup $destdir
+    # in case the script made a mess
+    cd $workingdir
+done
+
+#
+# NO MORE CHANGES FROM HERE ON!!!
+# -------------------------------
+#
+# We Need To Do Things (tm) that if they change, we make a mess and go
+# out of sync.
+#
+
 if [ -f $destdir/etc/selinux/config ]; then
     # If this distro sports some sort of SELinux, ensure we relabel by
     # hand all files we modified--why by hand? because restorecon
@@ -968,11 +1014,6 @@ echo "size_gib: $size_gib" >> $tmpdir/.tcf.metadata.yaml
 
 # move yaml to final location
 sudo mv $tmpdir/.tcf.metadata.yaml $destdir
-
-# extra setup functions
-for setup in ${setupl}; do
-    $setup $destdir
-done
     
 # If we said we wanted it in a tar file, pack it up and remove the directory
 case $dest_type in
