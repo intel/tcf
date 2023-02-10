@@ -97,7 +97,8 @@ def nw_indexes(nw_name):
 def nw_pos_add(nw_name, power_rail = None,
                mac_addr = None, vlan = None,
                ipv4_prefix_len = 24,
-               ipv6_prefix_len = 104):
+               ipv6_prefix_len = 104,
+               rsync_enabled: bool = True):
     """Adds configuration for a network with :ref:`Provisioning OS
     <provisioning_os>` support.
 
@@ -174,6 +175,10 @@ def nw_pos_add(nw_name, power_rail = None,
       >>>                    'proxy-host.domain', 443),
       >>> ]
 
+    :param bool rsync_enabled: (optional; default *True*) enable rsync
+      services on the network; an isolated rsync daemon will listen on
+      the interface on the server side exposing */home/ttbd/images*.
+
     :returns: the interconect object added
     """
     assert vlan == None or vlan >= 0
@@ -190,20 +195,23 @@ def nw_pos_add(nw_name, power_rail = None,
     # Create the network target
     interconnect = ttbl.interconnect_c(nw_name)
 
+    # vlan_pci is in conf_00_lib.py
+    _power_rail = [ ( "vlan setup", vlan_pci() ) ]
+    # Power rails passed by the user, to power on switches or whatever
+    _power_rail += power_rail
+    # the rest of the components we need
+    if rsync_enabled:
+        _power_rail.append((
+            "rsync",
+            ttbl.rsync.pci("192.%d.%d.1" % (x, y), 'images',
+                           '/home/ttbd/images')
+        ))
+    _power_rail.append(( "dnsmasq", ttbl.dnsmasq.pc() ))
+
     interconnect.interface_add(
         "power",
-        ttbl.power.interface(
-            *		# yeah, asterisk, so this is converted to *args...
-            # Virtual networking inside the server, for the VMs
-            [ ( "vlan setup", vlan_pci() ) ]
-            # Power rails passed by the user, to power on switches or whatever
-            + power_rail
-            # the rest of the components we need
-            + [
-                ( "rsync", ttbl.rsync.pci("192.%d.%d.1" % (x, y), 'images',
-                                          '/home/ttbd/images') ),
-                ( "dnsmasq", ttbl.dnsmasq.pc() ),
-            ]))
+        # yeah, asterisk, so this is converted to *args...
+        ttbl.power.interface(*_power_rail))
 
     # Consoles to read misc log files
     interconnect.interface_add(
