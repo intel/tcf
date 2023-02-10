@@ -764,6 +764,24 @@ def boot_config_multiroot(target, boot_dev, image):
             else:
                 linux_options += " " + option + "=" + value
 
+
+        # ugk, we might have to correct boot options
+        #
+        ## POS: guessed kernel from systemd-boot config: kernel /boot/vmlinuz-6.0.7-301.fc37.x86_64 initrd /boot/initramfs-6.0.7-301.fc37.x86_64.img options root=UUID=a2e4f20c-6dc5-4edd-b43d-7cbce673d660 ro rootflags=subvol=root net.ifnames=0 console=ttyS0
+        #
+        # but, eg, in Fedora 37 the live OS is an ext4 FS, while these bootoptions with
+        #
+        ## rootflags=subvol=root
+        #
+        # assume a btrfs FS. Can't work.
+        fstype = target.pos.metadata.get('filesystems', {})\
+                                    .get('/', {}).get('fstype', 'ext4')
+        if 'rootflags=subvol' in linux_options and fstype != 'btrfs':
+            linux_options = re.sub("rootflags=subvol=\w+", "", linux_options)
+            target.report_info(
+                "linux cmdline options: removed rootflags for BTRFS"
+                f" since rootfs is '{fstype}': {linux_options}")
+
         kws['linux_options'] = linux_options
         target.report_info("linux cmdline options (modified): %s"
                            % linux_options)
