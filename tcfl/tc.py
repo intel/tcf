@@ -3940,6 +3940,9 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     #: limitations until the improved orchestrator is ready.
     max_runs_per_tc = 0
 
+    #: reporting hooks on exception keyed by callable, value origin
+    _report_exception_hooks = {}
+
     def __init__(self, name, tc_file_path, origin, hashid = None):
         #
         # need this before calling reporter_c.__init__
@@ -4325,6 +4328,54 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         execute), *False* otherwise.
         """
         return not self._targets
+
+
+    @classmethod
+    def report_exception_hook_add(cls, fn, origin = None):
+        """Add a report exception hook
+
+        When the reporting system catches an exception to
+        automatically report on, these hooks can be called to look for
+        known issues and specialize the reporting.
+
+        A hook is defined as:
+
+        >>> def _known_issues_report_exception_hook(
+        >>>    reporter: tcfl.tc.reporter_c,
+        >>>    testcase: tcfl.tc.tc_c,
+        >>>    target: tcfl.tc.target_c,
+        >>>    e: exception,
+        >>>    level: int,
+        >>>    alevel: int,
+        >>>    msg_tag: str,
+        >>>    attachments: dict,
+        >>>    subcase: str = None, subcase_base: str = None):
+        >>>        # actions
+        >>>
+        >>> tcfl.tc.tc_c.report_exception_hook_add(
+        >>>     _known_issues_report_exception_hook)
+
+        The reporter will be either the testcase or the target; the
+        target sometimes can't be found and will be *None*. *reporter*
+        is always something that can be used to call *report_fail* or
+        *report_pass*, etc
+
+        *e* is the exception that was caught; *level* and *alevel* are
+        the levels the handler computed for verbosity; *msg_tag* is
+        PASS, FAIL, ERRR, BLCK or SKIP, based on what the handler
+        computed from the exception in
+        :meth:`result_c.report_from_exception`. *attachments* are any
+        extra data passed with the exception. *subcase* and
+        *subcase_base* describe the names of the subcases that were
+        reported, if any.
+
+        """
+        assert callable(fn), \
+            f"{fn}: expected callable, got {type(fn)}"
+        if origin == None:
+            origin = commonl.origin_get(2)
+        cls._report_exception_hooks[fn] = origin
+
 
 
     #: Number of characters in the testcase's :term:`hash`
