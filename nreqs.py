@@ -231,7 +231,7 @@ class method_apt_c(method_abc):
         method_abc.__init__(self, "apt", [ 'debian', 'ubuntu' ])
 
     def install(self, package, package_alternate, package_data, method_details):
-        apt_command = os.environ.get("APT_COMMAND", "apt")
+        apt_command = os.environ.get("APT_COMMAND", "apt-get")
         cmdline = f"{self.sudo}{apt_command} install -y".split()
         # Force default locale, so we can parse messages
         os.environ["LC_ALL"] = "C"
