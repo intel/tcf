@@ -280,9 +280,11 @@ class result_c:
         from . import tc
         if isinstance(_tc, tc.target_c):
             tc = _tc.testcase
+            target = _tc
         else:
             assert isinstance(_tc, tc.tc_c)
             tc = _tc
+            target = None
 
         trace_alevel = 1
         if force_result == None:
@@ -317,6 +319,18 @@ class result_c:
         _attachments = { "trace": traceback.format_exc() }
         _attachments.update(attachments)
         if isinstance(reporter, tcfl.tc.reporter_c):
+            for report_exception_hook, origin in tc._report_exception_hooks.items():
+                try:
+                    report_exception_hook(
+                        reporter, tc, target, e,
+                        level + dlevel, level + dlevel + alevel + trace_alevel, msg_tag,
+                        _attachments,
+                        subcase = subcase, subcase_base = subcase_base)
+                except Exception as e:
+                    logging.error(
+                        "BUG! report_from_exception() report exception hook"
+                        f" {report_exception_hook}[@{origin}]"
+                        f" raised exception: {e} ")
             reporter._report(
                 level + dlevel, level + dlevel + alevel + trace_alevel, msg_tag,
                 "%s%s: %s" % (phase, tag, _e),
