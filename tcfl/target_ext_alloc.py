@@ -231,13 +231,15 @@ def _cmdline_alloc_targets(args):
         rtbs = set()
 
         # to use fullid, need to tweak the refresh code to add the aka part
+        tl = []
         for rt in sorted(targetl, key = lambda x: x['fullid']):
             targets.add(rt['id'])
             rtbs.add(rt['rtb'])
-
+            tl.append(f"{rt['rtb'].aka}/{rt['id']}")
         if len(rtbs) > 1:
-            logging.error("Targets span more than one server: %s", rtbs)
-            sys.exit(1)
+            raise tcfl.error_e(
+                f"Targets span more than one server: {' '.join(tl)}",
+                { "targets": tl })
         rtb = list(rtbs)[0]
         allocid = args.allocid
         try:
