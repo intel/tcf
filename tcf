@@ -664,8 +664,10 @@ tcf-jobserver-run:
         try:
             retval = args.func(args)
         except Exception as e:
+            # note Exception always have a list of args and the first
+            # one is commonly the message, the rest are details
             if args.traces:
-                logging.exception(e)
+                logging.exception(e.args[0])
             else:
                 rep = str(e)
                 if rep == "":
@@ -674,7 +676,7 @@ tcf-jobserver-run:
                         "(run with `--traces` for more info)"
                         % type(e).__name__)
                 else:
-                    logging.error(e)
+                    logging.error(e.args[0])
             retval = 1
         finally:
             if args.as_admin:
