@@ -558,7 +558,7 @@ class reporting_logging_handler_c(logging.Handler):
     """
     logging.Handler interface: allows using this as a logging handler
     that can be used to interface Python's logging mechanism
-    
+
     Given a :class:`tcfl.tc.tc_c` object, create a logger:
 
     >>> log = logging.getLogger("somename")
@@ -675,7 +675,7 @@ class reporter_c:
     #: >>>     }
     #:
     report_level_driver_max = {}
-    
+
     @staticmethod
     def _argcheck(message, attachments, level, dlevel, alevel):
         assert isinstance(message, str), \
@@ -2026,7 +2026,7 @@ class target_c(reporter_c):
             msg = "found (in console '%s') %s" % (console, regex_or_str.pattern)
         else:
             msg = "found (in console '%s') %s" % (console, regex_or_str)
-        
+
         self.testcase.expect_global_append(
             self.console.text(
                 regex_or_str,
@@ -3924,7 +3924,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     #: List of places where we declared this testcase is build only
     build_only = []
 
-    
+
     #: Allocation ID this testcase is using
     #:
     allocid = None
@@ -5772,7 +5772,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     def expect_global_remove(self, exp):
         """
         Remove an expectation from the testcase global expectation list
-        
+
         :param str exp: expectation's name
         :param tcfl.tc.expectation_c exp: expectation's instance
 
@@ -5808,7 +5808,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
     def expect_tls_remove(self, exp):
         """
         Remove an expectation from the testcase global expectation list
-        
+
         :param str exp: expectation's name
         :param tcfl.tc.expectation_c exp: expectation's instance
 
@@ -7269,7 +7269,7 @@ class tc_c(reporter_c, metaclass=_tc_mc):
         # FIXME: this needs to differentiate skipping a whole TC
         #        if we raise from the main TC, skip and stop executing
         #        if we skip from a subtc, keep going
-        
+
         # Note dlevel_passed; we don't want the PASS messages for
         # level-0 verbosity, only when things FAIL or are BLOCKed
         result = result_c(0, 0, 0, 0, 0)
@@ -8871,7 +8871,7 @@ def _run(args):
     tc_c.reason = args.reason
     tc_c.obo = args.obo
 
-    if args.allocid:			# Meaning I have them allocated ... 
+    if args.allocid:			# Meaning I have them allocated ...
         tc_c.allocid = args.allocid	# ... use this allocid
     tc_c.release = args.release
     tc_c._dry_run = args.dry_run
