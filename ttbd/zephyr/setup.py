@@ -34,6 +34,9 @@ This is the TCF's TTBD for running Zephyr OS in targets
     cmdclass = dict(
         install_data = setupl._install_data,
     ),
+    # Workaround for error that started showing up and is described in
+    # https://github.com/pypa/setuptools/issues/3197#issuecomment-1078770109
+    py_modules = [],
     data_files = [
         ('@sysconfigdir@/ttbd-production/', [ 'conf_06_zephyr.py' ]),
         # do not @prefix@ this, it always has to be in var/lib/ttbd
