@@ -1194,7 +1194,7 @@ class extension(tc.target_extension_c):
                                 # in, so we just need the prompt
                                 target.report_info(
                                     "POS: boot issue found,"
-                                    " waiting for auto-loged-in prompt")
+                                    " waiting for auto-logged-in prompt")
                                 # some machines get really stuck
                                 # printing the login prompt after
                                 # issue; this is usually a bug in the
@@ -1229,8 +1229,7 @@ class extension(tc.target_extension_c):
                             target.report_info(
                                 "POS: no signs of prompt after +%.1fs"
                                 % (ts - ts0),
-                                dict(target = target, exception = e),
-                                dlevel = 2)
+                                dict(target = target, exception = e))
                             # no wait here, since expect did for us already
                             continue
 
