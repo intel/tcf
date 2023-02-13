@@ -1193,8 +1193,9 @@ class extension(tc.target_extension_c):
                                 # found the POS; the POS OS auto-logs
                                 # in, so we just need the prompt
                                 target.report_info(
-                                    "POS: boot issue found,"
-                                    " waiting for auto-logged-in prompt")
+                                    "POS: boot issue found, waiting for"
+                                    " auto-logged-in shell prompt (pattern: "
+                                    f" {target.shell.prompt_regex.pattern})")
                                 # some machines get really stuck
                                 # printing the login prompt after
                                 # issue; this is usually a bug in the
