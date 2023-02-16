@@ -1055,7 +1055,7 @@ def sh_proxy_environment(ic, target, prefix = "/"):
     return proxy_hosts
 
 
-def linux_wait_online(ic, target, loops = 20, wait_s = 0.5):
+def linux_wait_online(ic, target, loops = 60, wait_s = 0.5):
     """
     Wait on the serial console until the system is assigned an IP
 
