@@ -41,11 +41,25 @@ class pci(ttbl.power.impl_c):
     :param int ipmi_retries: times to retry the IPMI operation (will be
       passed to *ipmitool*'s *-R* option.
 
+    :param bool lenient: (optional, default *False*) if the IPMI
+      commands fail when power on, pretend nothing happened.
+
+      This is important when we have a combination of AC and DC power
+      blocks in a SUT, one attached to the AC power, one to the
+      BMC. If the AC power is off, the BMC is off and IPMI won't work
+      and just fail. Setting *lenient* to *True* ignores these
+      failures.
+
+      Leniency can be overriden in the inventory with
+      interfaces.console.COMPONENT.ipmi_lenient.
+
     Other parameters as to :class:ttbl.power.impl_c.
     """
     def __init__(self, bmc_hostname, ipmi_timeout = 10, ipmi_retries = 3,
                  extra_ipmitool_cmdline = None,
+                 lenient: bool = False,
                  **kwargs):
+        assert isinstance(lenient, bool)
         ttbl.power.impl_c.__init__(self, paranoid = True, **kwargs)
         user, password, hostname \
             = commonl.split_user_pwd_hostname(bmc_hostname)
@@ -74,6 +88,8 @@ class pci(ttbl.power.impl_c):
         self.paranoid_get_samples = 3
         self.timeout = 30
         self.wait = 2
+        self.lenient = lenient
+        self.lenient_runtime = None
 
         # We don't use the username because it doesn't uniquely
         # identify the physical instrument
@@ -87,20 +103,40 @@ class pci(ttbl.power.impl_c):
                 self.cmdline + command, env = self.env, shell = False,
                 stderr = subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
-            msg = "ipmitool %s failed: %s" % (
-                " ".join(command), e.output)
+            if self.lenient_runtime:
+                target.log.exception(
+                    f"WARNING: ignoring '{' '.join(self.cmdline + command)}'"
+                    f" failure due to lenient setting: {e.output}")
+                return b""
+            msg = \
+                f"IPMI failed: '{' '.join(self.cmdline + command)}': " \
+                + e.output
             target.log.error(msg)
             raise self.error_e(msg)
         return result.rstrip()	# remove trailing NLs
 
 
-    def on(self, target, _component):
+
+    def on(self, target, component):
+        self.lenient_runtime = target.property_get(
+            f"interfaces.power.{component}.ipmi_lenient",
+            self.lenient)
         self._run(target, [ "chassis", "power", "on" ])
 
-    def off(self, target, _component):
+
+
+    def off(self, target, component):
+        self.lenient_runtime = target.property_get(
+            f"interfaces.power.{component}.ipmi_lenient",
+            self.lenient)
         self._run(target, [ "chassis", "power", "off" ])
 
+
+
     def get(self, target, component):
+        self.lenient_runtime = target.property_get(
+            f"interfaces.power.{component}.ipmi_lenient",
+            self.lenient)
         result = self._run(target, [ "chassis", "power", "status" ])
         if b'Chassis Power is on' in result:
             return True
@@ -239,8 +275,7 @@ class pos_mode_c(ttbl.power.impl_c):
 
 
 class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
-    """
-    Implement a serial port over IPMI's Serial-Over-Lan protocol
+    """Implement a serial port over IPMI's Serial-Over-Lan protocol
 
     This class implements two interfaces:
 
@@ -302,15 +337,29 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
       passed to *ipmitool*'s *-N* option
     :param int ipmi_retries: times to retry the IPMI operation (will be
       passed to *ipmitool*'s *-R* option.
+
+    :param bool lenient: (optional, default *False*) if the IPMI
+      commands fail when power on, pretend nothing happened.
+
+      This is important when we have a combination of AC and DC power
+      blocks in a SUT, one attached to the AC power, one to the
+      BMC. If the AC power is off, the BMC is off and IPMI won't work
+      and just fail. Setting *lenient* to *True* ignores these
+      failures.
+
+      Leniency can be overriden in the inventory with
+      interfaces.console.COMPONENT.ipmi_lenient.
     """
     def __init__(self, hostname,
                  precheck_wait = 0.5,
                  chunk_size = 5, interchunk_wait = 0.1,
                  ipmi_timeout = 10, ipmi_retries = 3,
+                 lenient: bool = False,
                  **kwargs):
         assert isinstance(hostname, str)
         assert isinstance(ipmi_timeout, numbers.Real)
         assert isinstance(ipmi_retries, int)
+        assert isinstance(lenient, bool)
         ttbl.console.generic_c.__init__(self, chunk_size = chunk_size,
                                         interchunk_wait = interchunk_wait,
                                         **kwargs)
@@ -332,6 +381,8 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
         self.kws['ipmi_retries'] = ipmi_retries
         self.ipmi_timeout = ipmi_timeout
         self.ipmi_retries = ipmi_retries
+        self.lenient = lenient
+        self.lenient_runtime = None
         if password:
             self.env_add['IPMITOOL_PASSWORD'] = password
         self.re_enable = True
@@ -345,6 +396,9 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
     def on(self, target, component):
         # if there is someone leftover reading, kick them out, there can
         # be only one
+        self.lenient_runtime = target.property_get(
+            f"interfaces.console.{component}.ipmi_lenient",
+            self.lenient)
         env = dict(os.environ)
         env.update(self.env_add)
         subprocess.call(	# don't check, we don't really care
@@ -363,9 +417,18 @@ class sol_console_pc(ttbl.power.socat_pc, ttbl.console.generic_c):
             universal_newlines = False,
             env = env,
         )
-        ttbl.power.socat_pc.on(self, target, component)
-        ttbl.console.generation_set(target, component)
-        ttbl.console.generic_c.enable(self, target, component)
+        try:
+            ttbl.power.socat_pc.on(self, target, component)
+            ttbl.console.generation_set(target, component)
+            ttbl.console.generic_c.enable(self, target, component)
+        except ttbl.power.impl_c.power_on_e as e:
+            if self.lenient_runtime:
+                target.log.exception("WARNING: ignoring error starting"
+                                     f" console due to lenient setting: {e}")
+            else:
+                raise
+
+
 
     def off(self, target, component):
         ttbl.console.generic_c.disable(self, target, component)
@@ -411,13 +474,27 @@ class sol_ssh_console_pc(ttbl.console.ssh_pc):
       passed to *ipmitool*'s *-N* option
     :param int ipmi_retries: times to retry the IPMI operation (will be
       passed to *ipmitool*'s *-R* option.
+
+    :param bool lenient: (optional, default *False*) if the IPMI
+      commands fail when power on, pretend nothing happened.
+
+      This is important when we have a combination of AC and DC power
+      blocks in a SUT, one attached to the AC power, one to the
+      BMC. If the AC power is off, the BMC is off and IPMI won't work
+      and just fail. Setting *lenient* to *True* ignores these
+      failures.
+
+      Leniency can be overriden in the inventory with
+      interfaces.console.COMPONENT.ipmi_lenient.
     """
     def __init__(self, hostname, ssh_port = 22,
                  chunk_size = 5, interchunk_wait = 0.1,
                  ipmi_timeout = 10, ipmi_retries = 3,
+                 lenient: bool = False,
                  **kwargs):
         assert isinstance(ipmi_timeout, numbers.Real)
         assert isinstance(ipmi_retries, int)
+        assert isinstance(lenient, bool)
         ttbl.console.ssh_pc.__init__(
             self, hostname, port = ssh_port,
             chunk_size = chunk_size, interchunk_wait = interchunk_wait,
@@ -429,6 +506,8 @@ class sol_ssh_console_pc(ttbl.console.ssh_pc):
             self.env_add['IPMITOOL_PASSWORD'] = password
         self.paranoid_get_samples = 1
         self.re_enable = True
+        self.lenient = lenient
+        self.lenient_runtime = None
 
         # We don't use the username because it doesn't uniquely
         # identify the physical instrument
@@ -437,20 +516,29 @@ class sol_ssh_console_pc(ttbl.console.ssh_pc):
                       hostname = _hostname)
 
     def on(self, target, component):
+        self.lenient_runtime = target.property_get(
+            f"interfaces.console.{component}.ipmi_lenient",
+            self.lenient)
         # if there is someone leftover reading, kick them out, there can
         # be only one
         env = dict(os.environ)
         env.update(self.env_add)
-        subprocess.call(	# don't check, we don't really care
-            [
-                "/usr/bin/ipmitool",
-                "-N", str(self.ipmi_timeout),
-                "-R", str(self.ipmi_retries),
-                "-H", self.kws['hostname'],
-                "-U", self.kws['username'], "-E",
-                "-I", "lanplus", "sol", "deactivate",
-            ],
-            stderr = subprocess.STDOUT,
-            env = env,
-        )
-        ttbl.console.ssh_pc.on(self, target, component)
+        try:
+            subprocess.call(	# don't check, we don't really care
+                [
+                    "/usr/bin/ipmitool",
+                    "-N", str(self.ipmi_timeout),
+                    "-R", str(self.ipmi_retries),
+                    "-H", self.kws['hostname'],
+                    "-U", self.kws['username'], "-E",
+                    "-I", "lanplus", "sol", "deactivate",
+                ],
+                stderr = subprocess.STDOUT,
+                env = env,
+            )
+            ttbl.console.ssh_pc.on(self, target, component)
+        except ( subprocess.CalledProcessError, ttbl.power.impl_c.power_on_e ) as e:
+            if self.lenient_runtime:
+                raise
+            target.log.exception("WARNING: ignoring error starting"
+                                 f" console due to lenient setting: {e}")
