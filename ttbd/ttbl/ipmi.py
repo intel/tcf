@@ -110,7 +110,7 @@ class pci(ttbl.power.impl_c):
                 return b""
             msg = \
                 f"IPMI failed: '{' '.join(self.cmdline + command)}': " \
-                + e.output
+                + e.output.decode('utf-8', errors = 'backslashreplace')
             target.log.error(msg)
             raise self.error_e(msg)
         return result.rstrip()	# remove trailing NLs
