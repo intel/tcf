@@ -1967,13 +1967,18 @@ class server_c:
             logger.debug("%s: state deleted (no cookies)", self.url)
             commonl.rm_f(file_name)
             return
-        with tempfile.NamedTemporaryFile(dir = self.state_path) as f:
+        # do not delete the "not-so-temp" file with the new cookies,
+        # as we are going to use it to write the new permanent one
+        # with replace later on.
+        with tempfile.NamedTemporaryFile(dir = self.state_path,
+                                         delete = False) as f:
             # create a temporary file and replace, so the operation is
             # atomic--other proceses might have done this in
             # parallel--there would be no conflict
             pickle.dump(self.cookies, f, protocol = 2)
-            os.replace(file_name, f.name)
-            logger.debug("%s: state saved", self.url)
+            f.flush()
+        os.replace(f.name, file_name)
+        logger.debug("%s: state saved", self.url)
 
 
 
