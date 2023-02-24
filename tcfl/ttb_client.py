@@ -439,7 +439,12 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
             assert retry_backoff < retry_timeout, \
                 f"retry_backoff {retry_backoff} has to be" \
                 f" smaller than retry_timeout {retry_timeout}"
-
+        if timeout == None:
+            timeout = 160
+        else:
+            assert timeout >= 0, \
+                "timeout: expected must be positive" \
+                " number of seconds;  got {timeout}"
         if timeout_extra == None:
             timeout_extra = int(os.environ.get("TCFL_TIMEOUT_EXTRA", 0))
         assert timeout_extra >= 0, \
