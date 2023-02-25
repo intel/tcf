@@ -327,7 +327,8 @@ class result_c:
                         _attachments,
                         subcase = subcase, subcase_base = subcase_base)
                 except Exception as e:
-                    logging.error(
+                    # this is a bug, so log with traces
+                    logging.exception(
                         "BUG! report_from_exception() report exception hook"
                         f" {report_exception_hook}[@{origin}]"
                         f" raised exception: {e} ")
