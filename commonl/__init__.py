@@ -744,7 +744,7 @@ class fs_cache_c():
 
 
 
-def lru_cache_disk(path, max_age_s, max_entries):
+def lru_cache_disk(path, max_age_s, max_entries, key_maker = None):
     """
     Decorator to implement an aged LRU memoize pattern (like
     :python:`functools.lru_cache`) in disk to cache value of functions.
@@ -752,13 +752,25 @@ def lru_cache_disk(path, max_age_s, max_entries):
     >>> @commonl.lru_cache_disk(
     >>>      os.path.join(os.path.expanduser("~"),
     >>>                   ".cache", "tcf", "socket_gethostbyname_ex"),
-    >>>      10 * 60)	# age this cache after 10min
+    >>>      10 * 60,	# age this cache after 10min
+    >>>      200)       # 200 entries max
     >>> def socket_gethostbyname_ex_cached(*args, **kwargs):
     >>>     return socket.gethostbyname_ex(*args, **kwargs)
 
     This will cache the value returned by *socket.gethostbyname_ex()*
     (value or exception) for 10minutes across different python
     invocations.
+
+    :param callable key_maker: (optional; default *None*) a function
+      used to create the key which will be used for caching.
+
+      >>> def my_key_maker(*args, **kwargs):
+      >>>    ...
+      >>>    return "KEY"  # str, integer, float
+
+      *KEY* ideally is a string and has to be something that is always
+      the same for an object uniquely identifed by *args* and *kwargs*
+      over multiple executions in different processes.
 
     """
 
@@ -769,7 +781,12 @@ def lru_cache_disk(path, max_age_s, max_entries):
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
             # can't use hash() because it is not stable across runs, so use mkid()
-            key = mkid(json.dumps(( args, kwargs ), sort_keys = True), 20)
+            if key_maker == None:
+                key = mkid(json.dumps(( args, kwargs ), sort_keys = True), 20)
+            else:
+                assert callable(key_maker), \
+                    "key_maker: expected callable, got {callable}"
+                key = key_maker(*args, **kwargs)
             value = fn.cache.get(key, __file__, max_age = max_age_s)
             if value == __file__:
                 # miss! get the return value and set the cache
