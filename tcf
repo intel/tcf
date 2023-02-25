@@ -251,6 +251,13 @@ def healthcheck(args):
             if allocid:
                 tcfl.target_ext_alloc._delete(target.rtb, allocid)
 
+def _cache_flush(_args):
+    cache_path = os.path.join(os.path.expanduser("~"), ".cache", "tcf")
+    print(f"I: wiping {cache_path}")
+    shutil.rmtree(cache_path, ignore_errors = True)
+
+
+
 def _cookies(args):
     if '/' in args.target:
         # cache is by full id
@@ -545,6 +552,10 @@ if __name__ == "__main__":
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target's name or URL")
     ap.set_defaults(func = healthcheck)
+
+    ap = arg_subparsers.add_parser("cache-flush",
+                                   help = "wipe all caches")
+    ap.set_defaults(func = _cache_flush)
 
     argcomplete.autocomplete(arg_parser)
     global args
