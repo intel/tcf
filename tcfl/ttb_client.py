@@ -119,6 +119,33 @@ if 'SSLKEYLOGFILE' in os.environ:
     sslkeylog.set_keylog(os.environ['SSLKEYLOGFILE'])
 
 
+@commonl.lru_cache_disk(
+    os.path.join(os.path.expanduser("~"), ".cache", "tcf", "_rts_get"),
+    3 * 60,	# refresh every three minutes? why? because until we
+                # all move to the second ls implementation, this
+                # contains power and ownership info that can change
+                # frequently...
+    500,	# keep max 500 entries (one per server)
+    key_maker = lambda rtb: rtb._url)
+def _rts_get_cached(rtb):
+    ts0 = time.time()
+    try:
+        rt_list = rtb.rest_tb_target_list(all_targets = True)
+        for rt in rt_list:
+            # remove 'rtb' because this (a) was a bad idea but now it
+            # is everywhere and needs cleanup, which the new code
+            # handles alreday; (b) we can't cache it, so we add it
+            # after reading it from the cache for the benefir of the
+            # code that needs it; see code that calls _rts_get_cached
+            del rt['rtb']
+    except requests.exceptions.RequestException as e:
+        logger.error("%s: can't use: %s", rtb._url, e)
+        return {}
+    ts = time.time()
+    logging.warning(f"{rtb}: refreshing inventory took {ts-ts0:.02f}s")
+    return rtb._rt_list_to_dict(rt_list)
+
+
 class _rest_target_broker_mc(type):
     """
     This metaclass is used to create the methods that are needed on
@@ -150,13 +177,17 @@ class _rest_target_broker_mc(type):
         tp = _multiprocessing_pool_c(processes = len(rest_target_brokers))
         threads = {}
         for rtb in sorted(rest_target_brokers.keys()):
-            threads[rtb] = tp.apply_async(cls._rts_get, (rest_target_brokers[rtb],))
+            threads[rtb] = tp.apply_async(_rts_get_cached, (rest_target_brokers[rtb],))
         tp.close()
         tp.join()
         cls._rts_cache = {}
         for rtb, thread in threads.items():
+            # add back rtb bc it can't be cached, see _rts-get_cached
             try:
-                cls._rts_cache.update(thread.get())
+                rts = thread.get()
+                for rt in rts.values():
+                    rt['rtb'] = rtb
+                cls._rts_cache.update(rts)
             except RuntimeError as e:
                 logging.warning(f"{rtb}: skipping reading targets: {e}")
         return cls._rts_cache
@@ -345,12 +376,22 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
             tp = _multiprocessing_pool_c(processes = len(rest_target_brokers))
             threads = {}
             for rtb in sorted(list(rest_target_brokers.values())):
-                threads[rtb] = tp.apply_async(cls._rts_get, (rtb,))
+                threads[rtb] = tp.apply_async(_rts_get_cached, (rtb,))
             tp.close()
             tp.join()
             cls._rts_cache = {}
-            for thread in threads.values():
-                cls._rts_cache.update(thread.get())
+            for rtb, thread in threads.items():
+                # add back rtb bc it can't be cached, see
+                # _rts_get_cached
+                # there is code in rest_target_broker_mc which is a
+                # dup of this and needs to be purgedo
+                try:
+                    rts = thread.get()
+                    for rt in rts.values():
+                        rt['rtb'] = rtb
+                        cls._rts_cache.update(rts)
+                except RuntimeError as e:
+                    logging.warning(f"{rtb}: skipping reading targets: {e}")
             return cls._rts_cache
 
     @classmethod
