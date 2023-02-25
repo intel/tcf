@@ -1702,6 +1702,8 @@ def version_get(module, name):
         # https://peps.python.org/pep-0440/
         version_match = re.match(
             "^v([0-9]+.[0-9]+.[0-9]+).[a-z0-9]+(.dirty)?", version)
+        if not version_match:
+            return "vNA"
         version = version_match[1]
         # If dirty tag is present add .dev0 to version
         if version_match[2]:
