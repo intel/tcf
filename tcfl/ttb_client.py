@@ -186,7 +186,7 @@ class _rest_target_broker_mc(type):
             try:
                 rts = thread.get()
                 for rt in rts.values():
-                    rt['rtb'] = rtb
+                    rt['rtb'] = rest_target_brokers[rtb]
                 cls._rts_cache.update(rts)
             except RuntimeError as e:
                 logging.warning(f"{rtb}: skipping reading targets: {e}")
@@ -388,7 +388,7 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
                 try:
                     rts = thread.get()
                     for rt in rts.values():
-                        rt['rtb'] = rtb
+                        rt['rtb'] = rest_target_brokers[rtb]
                         cls._rts_cache.update(rts)
                 except RuntimeError as e:
                     logging.warning(f"{rtb}: skipping reading targets: {e}")
