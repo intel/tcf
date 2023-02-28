@@ -50,7 +50,7 @@ class authenticator_ldap_c(ttbl.authenticator_c):
     don't have to be part of any group. This allows to permit the role
     to anyone that can authenticate with LDAP.
     """
-    def __init__(self, url, roles = None, group_ou = None):
+    def __init__(self, url, roles = None, group_ou = None, user_ou = None):
         """
         :param str url: URL of the LDAP server
         :param dict roles: map of roles to users and groups
@@ -68,6 +68,12 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         assert isinstance(url, str)
         assert isinstance(roles, dict)
 
+        if user_ou:
+            logging.warning(
+                "user_ou %s: specified, but it is ignored since starting"
+                " https://github.com/intel/tcf/commit/a182d8f1cf768ee25b2e93681d103b995ef9a009"
+                " it is guessed dynamically" % user_ou,
+                stack_info = True)
         self.group_ou = None
 
         if group_ou:
