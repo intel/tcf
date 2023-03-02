@@ -220,10 +220,12 @@ class channel_c(ttbl.capture.impl_c):
             name = data.get('name', str(channel))
             assert isinstance(name, str), \
                 "name: expected a string; got %s" % type(name)
+            # now we tranform it for a command line to noyito-capture.py
             l = [ "%s" % channel ]
-            for name, val in data.items():
-                l.append("%s=%s" % (name, val))
+            for k, v in data.items():
+                l.append("%s=%s" % (k, v))
             self.channell.append(":".join(l))
+
 
     def start(self, target, capturer, path):
         # power on the serial port capturer
