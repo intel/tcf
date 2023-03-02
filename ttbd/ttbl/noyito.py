@@ -25,7 +25,7 @@ import ttbl._install
 import ttbl.capture
 import ttbl.power
 
-class reader_pc(ttbl.power.daemon_c):
+class mux_pc(ttbl.power.daemon_c):
     """
     Implement a multiplexor to read Noyitos' serial port to multiple users
 
@@ -54,7 +54,7 @@ class reader_pc(ttbl.power.daemon_c):
     >>> target.interface_impl_add(
     >>>     "power",
     >>>     "data_acquisition_1",
-    >>>     ttbl.noyito.reader_pc(
+    >>>     ttbl.noyito.mux_pc(
     >>>         "/dev/serial/by-path/pci-0000:00:14.0-usb-0:3.1.6:1.0-port0",
     >>>         explicit = "off"
     >>>     )
@@ -109,7 +109,7 @@ class reader_pc(ttbl.power.daemon_c):
 
 class channel_c(ttbl.capture.impl_c):
 
-    def __init__(self, noyito_component, noyito_obj, channels, **kwargs):
+    def __init__(self, mux_component, mux_obj, channels, **kwargs):
         """Data capturer for NOYITO USB 10-Channel 12-Bit AD Data Acquisition
         Module AKA (STM32 UART Communication USB to Serial Chip CH340
         ADC Module)
@@ -119,7 +119,7 @@ class channel_c(ttbl.capture.impl_c):
 
         The full driver sollution consists of:
 
-        - (optional) a power-rail component :class:`reader_pc` that
+        - (optional) a power-rail component :class:`mux_pc` that
           starts a multiplexor so multiple readers can get the serial
           output--this is needed when multiple capturers will sample
           from the same device
@@ -136,10 +136,10 @@ class channel_c(ttbl.capture.impl_c):
           the data format).
 
 
-        :param str noyito_component: power component we need to start
+        :param str mux_component: power component we need to start
           to get the multiplexor working
 
-        :param str noyito_component: multiplexor object
+        :param str mux_component: multiplexor object
 
         :param dict channels: dictionary keyed by channel number (0-9)
           describing the parameters for each channel; the values are
@@ -194,15 +194,15 @@ class channel_c(ttbl.capture.impl_c):
         This device packs an stm32 MPU, can be reprogrammed, firmware at http://files.banggood.com/2018/06/SKU836210.zip
 
         """
-        assert isinstance(noyito_component, str)
+        assert isinstance(mux_component, str)
         assert isinstance(channels, dict), \
             "channels: expected a dictionary, got %s" % type(channels)
 
         ttbl.capture.impl_c.__init__(
             self, False, mimetype = "application/json",
             **kwargs)
-        self.noyito_component = noyito_component
-        self.upid = noyito_obj.upid
+        self.mux_component = mux_component
+        self.upid = mux_obj.upid
         self.capture_program = commonl.ttbd_locate_helper(
             "noyito-capture.py", ttbl._install.share_path,
             log = logging, relsrcpath = ".")
@@ -230,7 +230,7 @@ class channel_c(ttbl.capture.impl_c):
     def start(self, target, capturer, path):
         # power on the serial port capturer
         target.power.put_on(target, ttbl.who_daemon(),
-                            { "component":  self.noyito_component },
+                            { "component":  self.mux_component },
                             None, None )
 
         stream_filename = capturer + ".data.json"
@@ -242,7 +242,7 @@ class channel_c(ttbl.capture.impl_c):
             [
                 "stdbuf", "-e0", "-o0",
                 self.capture_program,
-                "%s/%s-ncat.socket" % (target.state_dir, self.noyito_component),
+                "%s/%s-ncat.socket" % (target.state_dir, self.mux_component),
                 os.path.join(path, stream_filename),
             ] + self.channell,
             bufsize = -1,
