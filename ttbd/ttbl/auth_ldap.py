@@ -323,12 +323,12 @@ class authenticator_ldap_c(ttbl.authenticator_c):
                 token_roles.add(role_name)
                 continue
 
-            users = set()
             for group in role_groups:
+                users = set()
                 try:
                     u = get_group(
                             group, self.group_ou, user_ou, self.url,
-                            email, password
+                            email, password, users,
                         )
                     if not u:
                         continue
@@ -359,8 +359,7 @@ class authenticator_ldap_c(ttbl.authenticator_c):
         data['roles'] = token_roles
         return data
 
-users = []
-def get_group(group, group_ou, user_ou, ldap_url, ldap_email, ldap_password):
+def get_group(group, group_ou, user_ou, ldap_url, ldap_email, ldap_password, users):
     '''
     get_group:
     basically you send this function a group name, and it queries ldap to get
@@ -460,6 +459,7 @@ def get_group(group, group_ou, user_ou, ldap_url, ldap_email, ldap_password):
                         ldap_url,
                         ldap_email,
                         ldap_password,
+                        users,
                     )
                     break
 
@@ -472,7 +472,7 @@ def get_group(group, group_ou, user_ou, ldap_url, ldap_email, ldap_password):
             name = items[1].replace(',OU', '')
             # name = 'perez\, jose'
             name = name.replace('\\', '')
-            users.append(name.replace('\\', ''))
+            users.add(name.replace('\\', ''))
 
     return set(users)
 
