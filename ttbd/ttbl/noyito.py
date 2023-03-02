@@ -101,6 +101,7 @@ class reader_pc(ttbl.power.daemon_c):
         kws.update(self.kws)
         # bring in runtime properties (override the rest)
         kws.update(target.fsdb.get_as_dict())
+        kws['name'] = 'ncat'
         kws['component'] = component
         return commonl.process_alive(self.pidfile % kws, self.check_path) != None
 
