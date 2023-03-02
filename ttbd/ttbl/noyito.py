@@ -242,8 +242,8 @@ class channel_c(ttbl.capture.impl_c):
             [
                 "stdbuf", "-e0", "-o0",
                 self.capture_program,
+                "%s/%s-ncat.socket" % (target.state_dir, self.noyito_component),
                 os.path.join(path, stream_filename),
-                "%s/%s-ncat.socket" % (target.state_dir, capturer),
             ] + self.channell,
             bufsize = -1,
             close_fds = True,
