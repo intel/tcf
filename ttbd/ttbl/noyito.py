@@ -212,8 +212,9 @@ class channel_c(ttbl.capture.impl_c):
                 "channel: channel descriptor has to be an integer 0-10," \
                 " got %s" % type(channel)
             # matches ttbd/noyito-capture.py.transform.mode
+            # verify mode and name
             mode = data.get('mode', None)
-            assert mode in ( None, 'mode', 'bool', 'onoff' ), \
+            assert mode in ( None, 'mode', 'bool', 'onoff', 'voltages' ), \
                 "channel mode has to be one of: None, mode, bool, onoff; " \
                 " got %s" % mode
             name = data.get('mode', str(channel))
