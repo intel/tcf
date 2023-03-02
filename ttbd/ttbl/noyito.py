@@ -217,7 +217,7 @@ class channel_c(ttbl.capture.impl_c):
             assert mode in ( None, 'mode', 'bool', 'onoff', 'voltages' ), \
                 "channel mode has to be one of: None, mode, bool, onoff; " \
                 " got %s" % mode
-            name = data.get('mode', str(channel))
+            name = data.get('name', str(channel))
             assert isinstance(name, str), \
                 "name: expected a string; got %s" % type(name)
             l = [ "%s" % channel ]
