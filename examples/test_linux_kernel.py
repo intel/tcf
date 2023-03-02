@@ -54,12 +54,21 @@ Execute :download:`the testcase <../examples/test_linux_kernel.py>`
 with (where *IMAGE* is the name of a Linux OS image :ref:`installed in
 the server <pos_list_images>`)::
 
-  $ mkdir -p build
-  $ cp CONFIGFILE build/.config
-  $ make -C PATH/TO/SRC/linux O=build oldconfig
-  $ make -C build -j all
+  $ export LK_SRCDIR=PATH/TO/SRC/linux
+  $ export LK_BUILDDIR=$PWD/build
+  $ export LK_ROOTDIR=$LK_BUILDDIR/root
+  $ mkdir -p $LK_ROOTDIR
+  $ cp CONFIGFILE $LK_BUILDDIR/.config
+
+preconfigure the tree::
+
+  $ yes "" | make -C $LK_SRCDIR O=$LK_BUILDDIR oldconfig
+  $ make -C $LK_BUILDDIR -j 10 all
   
-  $ LK_ROOTDIR=$PWD/build IMAGE=clear tcf run -v /usr/share/tcf/examples/test_linux_kernel.py
+this script needs LK_BUILDDIR; LK_ROOTDIR is optional; it will rebuild for you
+unless you specify -B (skip build)::
+
+  $ tcf -e IMAGE=fedora run -v /usr/share/tcf/examples/test_linux_kernel.py
   INFO1/ormorh	  ..../test_linux_kernel.py#_test @3hyt-uo3g: will run on target group 'ic=localhost/nwa target=localhost/qu04a:x86_64'
   PASS1/ormorhB	  ..../test_linux_kernel.py#_test @3hyt-uo3g|localhost/qu04a: re/building kernel in /home/inaky/t/gp/build-linux
   PASS0/ormorhB	  ..../test_linux_kernel.py#_test @3hyt-uo3g|localhost/qu04a: re/built kernel in /home/inaky/t/gp/build-linux
@@ -90,6 +99,17 @@ the server <pos_list_images>`)::
   PASS1/ormorh	  ..../test_linux_kernel.py#_test @3hyt-uo3g: evaluation passed 
   INFO0/ormorh	  ..../test_linux_kernel.py#_test @3hyt-uo3g: WARNING!! not releasing targets
   PASS0/            toplevel @local: 1 tests (1 passed, 0 error, 0 failed, 0 blocked, 0 skipped, in 0:03:18.911685) - passed 
+
+
+Other variables you can set:
+
+ - *MAKE*: make command line (eg: -e MAKE="make -j 30")
+
+ - *REBOOT_DISABLED*: if you know the machine is alive, don't reboot
+   it (useful with LK_INSTALL and -D)
+
+ - *LK_INSTALL*: when not deploying, install the kernel, assuming the
+   machne is alive, has network connection, etc
 
 (depending on your installation method, location might be
 *~/.local/share/tcf/examples*)
@@ -123,22 +143,28 @@ class _test(tcfl.pos.tc_pos_base):
         ## $ make -C BUILDDIR all
         ## ...
         #
-        target.report_pass("re/building kernel in %s" % builddir, dlevel = -1)
-        output = subprocess.check_output(
-            "${MAKE:-make} -C %s all" % builddir,
-            shell = True, stderr = subprocess.STDOUT)
-        target.report_pass("re/built kernel in %s" % builddir,
-                           dict(output = output),
-                           alevel = 0, dlevel = -2)
+        if 'LK_BUILD_SKIP' not in os.environ:
+            target.report_pass("re/building kernel in %s" % builddir, dlevel = -1)
+            output = subprocess.check_output(
+                "${MAKE:-make} -C %s all" % builddir,
+                shell = True, text = True, stderr = subprocess.STDOUT)
+            target.report_pass("re/built kernel in %s" % builddir,
+                               dict(output = output),
+                               alevel = 0, dlevel = -2)
+        else:
+            target.report_skip("not re/building kernel, LK_BUILD_SKIP defined",
+                               dlevel = -1)
 
-        target.report_pass("installing kernel to %s" % rootdir, dlevel = -1)
+    def _lk_install_to_local_root(self, target, ic, builddir, rootdir):
+        target.report_pass("local installing kernel to %s" % rootdir,
+                           dlevel = -1)
         # will run to install the kernel to our fake root dir
         #
         ## $ make INSTALLKERNEL=/dev/null \
         ##       INSTALL_PATH=ROOTDIR/boot INSTALL_MOD_PATH=ROOTDIR \
         ##       install modules_install
         ## sh PATH/linux.git/arch/x86/boot/install.sh 4.19.5 arch/x86/boot/bzImage \
-	##    System.map "../root-linux/boot"
+        ##    System.map "../root-linux/boot"
         ## Cannot find LILO.
         ## INSTALL arch/x86/crypto/blowfish-x86_64.ko
         ## INSTALL arch/x86/crypto/cast5-avx-x86_64.ko
@@ -159,27 +185,96 @@ class _test(tcfl.pos.tc_pos_base):
             "${MAKE:-make} -C %s INSTALLKERNEL=ignoreme"
             " INSTALL_PATH=%s/boot INSTALL_MOD_PATH=%s"
             " install modules_install" % (builddir, rootdir, rootdir),
-            shell = True, stderr = subprocess.STDOUT)
+            shell = True, text = True, stderr = subprocess.STDOUT)
         target.report_pass("installed kernel to %s" % rootdir,
-                           dict(output = output), dlevel = -2)
+                           dict(output = output), dlevel = -1)
 
         target.report_pass("stripping debugging info")
         subprocess.check_output(
             "find %s -iname \*.ko | xargs strip --strip-debug" % rootdir,
             shell = True, stderr = subprocess.STDOUT)
         target.report_pass("stripped debugging info", dlevel = -1)
-    
+
+
+
     def deploy_00(self, ic, target):
+        if not 'LK_BUILDDIR' in os.environ:
+            raise tcfl.tc.skip_e(
+                "please export env LK_BUILDDIR pointing to path of "
+                "configured, built or ready-to-build linux kernel tree",
+                dict(level = 0))
+        builddir = os.environ["LK_BUILDDIR"]
+        rootdir = os.environ.get("LK_ROOTDIR", self.tmpdir + "/root")
+        self._lk_install_to_local_root(target, ic, builddir, rootdir)
         # tell the deployment code to rsync our fake rootdir over the
         # /boot and /lib/modules/VERSION dirs in the target
-        rootdir = os.environ.get("LK_ROOTDIR", self.tmpdir + "/root")
         target.deploy_linux_kernel_tree = rootdir
         self.deploy_image_args = dict(extra_deploy_fns = [
             tcfl.pos.deploy_linux_kernel ])
-    
-    def eval(self, ic, target):
-        # power cycle to the new kernel
+
+
+    def eval_10_boot_checks(self, ic, target):
         target.shell.run("echo I booted", "I booted")
         output = target.shell.run("uname -a", output = True, trim = True)
         target.report_pass("uname -a: %s" % output.strip())
+
+
+    # hack to reinstall the kernel from the running OS; set
+    # environment LK_INSTALL and skip deployment (-D)
+    #
+    # tcf run -e LK_INSTALL ... run -D ...
+    def eval_20_maybe_install_kernel(self, ic, target):
+        if not self._phase_skip("deploy"):
+            # we only do this if we skipped deployment
+            return
+        if 'LK_INSTALL' not in os.environ:
+            return
+
+        if not 'LK_BUILDDIR' in os.environ:
+            raise tcfl.tc.skip_e(
+                "please export env LK_BUILDDIR pointing to path of "
+                "configured, built or ready-to-build linux kernel tree",
+                dict(level = 0))
+        builddir = os.environ["LK_BUILDDIR"]
+        rootdir = os.environ.get("LK_ROOTDIR", self.tmpdir + "/root")
+
+        kernelrelease = subprocess.check_output(
+            [ "make", "-C", builddir, "-s", "kernelversion" ],
+            text = True).strip()
         
+        self._lk_install_to_local_root(target, ic, builddir, rootdir)
+        tcfl.tl.linux_ssh_root_nopwd(target)
+        target.ssh.tunnel_refresh()
+        target.shell.run("umount -l /dev/disk/by-label/TCF-BOOT || true")
+        target.shell.run("mount /dev/disk/by-label/TCF-BOOT /boot")
+        try:
+            # rsync: don't use -a, destination folder /boot might not
+            # have attribute capability and rsync will error out
+            cmdline = [
+                "rsync", "-rv", "-e", f"ssh -p {target.ssh._ssh_port}",
+                os.path.join(rootdir, "boot") + "/.",
+                f"root@{target.ssh._ssh_host}:/boot/."
+            ]
+            target.report_info(f"running {' '.join(cmdline)}")
+            p = subprocess.run(cmdline, text = True, capture_output = True, check = True)
+            cmdline = [
+                "rsync", "-av", "-e", f"ssh -p {target.ssh._ssh_port}",
+                os.path.join(rootdir, "lib", "modules") + "/.",
+                f"root@{target.ssh._ssh_host}:/lib/modules/."
+            ]
+            target.report_info(f"running {' '.join(cmdline)}")
+            p = subprocess.run(cmdline, text = True, capture_output = True, check = True)
+            target.shell.run(
+                f"installkernel {kernelrelease} /boot/vmlinuz /boot/System.map",
+                timeout = 60)
+        except subprocess.CalledProcessError as e:
+            raise tcfl.error_e("command failed",
+                               {
+                                   "cmd": e.cmd,
+                                   "returncode": e.returncode,
+                                   "stdout": e.stdout,
+                                   "stderr": e.stderr,
+                                   "output": e.output
+                               }) from e
+        finally:
+            target.shell.run("umount -l /dev/disk/by-label/TCF-BOOT")
