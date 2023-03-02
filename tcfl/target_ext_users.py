@@ -122,9 +122,9 @@ def _cmdline_role_gain(args):
             rtbs)
     for r in rs:	# wait until complete by reading the values
         try:
-            _ = r
+            _ = rs[r]
         except Exception as e:
-            logging.warning("ignoring error {e}")
+            logging.warning(f"ignoring error {e}")
 
 
 def _cmdline_role_drop(args):
@@ -135,9 +135,9 @@ def _cmdline_role_drop(args):
             rtbs)
     for r in rs:	# wait until complete by reading the values
         try:
-            _ = r
+            _ = rs[r]
         except Exception as e:
-            logging.warning("ignoring error {e}")
+            logging.warning(f"ignoring error {e}")
 
 
 
