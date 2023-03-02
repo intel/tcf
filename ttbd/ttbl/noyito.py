@@ -8,47 +8,9 @@
 """Drivers for Noyito hardware
 ---------------------------
 
-This drivers support:
+Noyito is just a brand name for stuff manufactured by
+http://www.chinalctech.com/cpzx/Programmer/AD_DA_Module/68.html.
 
-- NOYITO USB 10-Channel 12-Bit AD Data Acquisition Module
-  (STM32 UART Communication USB to Serial Chip CH340 ADC Module)
-
-  This device outputs continuousy on the serial port att 115200n81 a
-  stream of ASCII like::
-
-    CH0:2016        1.622V
-    CH1:2191        1.764V
-    CH2:2014        1.624V
-    CH3:2193        1.766V
-    CH4:2018        1.626V
-    CH5:2195        1.769V
-    CH6:2018        1.625V
-    CH7:2195        1.768V
-    CH8:2014        1.622V
-    CH9:2194        1.766V
-
-  *formally*::
-
-    CH0:<NNNN><TAB><FLOAT>V\r\n
-    ...
-    CH8:<NNNN><TAB><FLOAT>V\r\n
-    CH9:<NNNN>	<FLOAT>V\r\n
-    \r\n
-
-  NNNN being 0000-4095 (12-bit raw sample) and FLOAT (only four bytes)
-  0 to 3.3V. Note that when floating disconnected, it always reports
-  about 1.7V (because both ground and pins are in the air).
-
-  There is one ground for each bank of five sampling channels.
-
-  The driver for this consists in a power-rail component
-  :class:`reader_pc` that starts a multiplexor so multiple readers can
-  get the serial output
-. For each capture that wants to be
-  done, a class:`channel_c` caputer
-
-
-  This device packs an stm32 MPU, can be reprogrammed, firmware at http://files.banggood.com/2018/06/SKU836210.zip
 
 """
 
@@ -147,12 +109,88 @@ class reader_pc(ttbl.power.daemon_c):
 class channel_c(ttbl.capture.impl_c):
 
     def __init__(self, noyito_component, noyito_obj, channels, **kwargs):
-        """
+        """Data capturer for NOYITO USB 10-Channel 12-Bit AD Data Acquisition
+        Module AKA (STM32 UART Communication USB to Serial Chip CH340
+        ADC Module)
 
-        :param str channel_mode: passed straight to :mod:`ttbl.noyito-capture`.
+        - http://www.chinalctech.com/cpzx/Programmer/AD_DA_Module/68.html
 
-           - *boolean:cutoff=1.3* or *onoff:cutoff=1.3*: interpret
-             signal like a boolean value, cutting off at 1.3 Volts
+
+        The full driver sollution consists of:
+
+        - (optional) a power-rail component :class:`reader_pc` that
+          starts a multiplexor so multiple readers can get the serial
+          output--this is needed when multiple capturers will sample
+          from the same device
+
+        - for each group of signals that wants to be captured, a
+          class:`channel_c` capturer has to be instantiated and added
+          to the capture inteface.
+
+          If more than one is going to refer to the same device, it
+          has to use the multiplexor.
+
+        - the :file:`../noyito-capture.py` script, which actuall talks
+          to the device to capture the data (see below for details on
+          the data format).
+
+
+        :param str noyito_component: power component we need to start
+          to get the multiplexor working
+
+        :param str noyito_component: multiplexor object
+
+        :param dict channels: dictionary keyed by channel number (0-9)
+          describing the parameters for each channel; the values are
+          another dictionary with the following fields:
+
+          - *name*: string describing a name for this channel
+            (optional, defaults to the channel number))
+
+          - *mode*: string describing the operation mode (bool, onoff,
+            voltages)
+
+          - *cutoff*: (for bool, onoff) under what voltage it is
+            considered *false* or *off*
+
+          >>>  {
+          >>>      3: { "mode": "bool", "cutoff": 1.2, },
+          >>>      4: { "mode": "onoff", "name": "flip", "cutoff": 2.2, },
+          >>>      5: { "mode": "voltages", "name": "level", },
+          >>>  },
+
+        **Tech details**
+
+        This device outputs continuousy on the serial port att 115200n81 a
+        stream of ASCII like::
+
+          CH0:2016        1.622V
+          CH1:2191        1.764V
+          CH2:2014        1.624V
+          CH3:2193        1.766V
+          CH4:2018        1.626V
+          CH5:2195        1.769V
+          CH6:2018        1.625V
+          CH7:2195        1.768V
+          CH8:2014        1.622V
+          CH9:2194        1.766V
+
+        *formally*::
+
+          CH0:<NNNN><TAB><FLOAT>V\r\n
+          ...
+          CH8:<NNNN><TAB><FLOAT>V\r\n
+          CH9:<NNNN>	<FLOAT>V\r\n
+          \r\n
+
+        NNNN being 0000-4095 (12-bit raw sample) and FLOAT (only four
+        bytes) 0 to 3.3V. Note that when floating disconnected, it
+        always reports about 1.7V (because both ground and pins are in
+        the air).
+
+        There is one ground for each bank of five sampling channels.
+
+        This device packs an stm32 MPU, can be reprogrammed, firmware at http://files.banggood.com/2018/06/SKU836210.zip
 
         """
         assert isinstance(noyito_component, str)

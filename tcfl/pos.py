@@ -3017,7 +3017,33 @@ class tc_pos0_base(tc.tc_c):
             target.report_info(
                 "not rebooting (REBOOT_DISABLED defined in environment)")
             # used for debugging or tight development cycles
-            target.console.select_preferred()
+            return
+
+            # Prepares the SUT from the TCF side -- ensure SSH is up and
+            # running, which also will setup proxies in the console
+
+            # FIXME: we need a utility function for this
+            if target.console.default.startswith("ssh"):
+                # if the default console is on SSH, SSH on the SUT is already setup
+                target.report_info("SSH already setup on SUT (on SSH console)")
+                return
+            try:
+                target.console.select_preferred(user = 'root')  # switch to using ssh
+                target.report_info("SSH: SUT already setup, SSH console enabled")
+                if target.console.default.startswith("ssh"):
+                    # if SSH works, it means SSH is setup in the SUT
+                    return
+            except Exception as e:
+                target.report_info(
+                    f"SSH: can't enable preferred console, retrying: {e}")
+
+            # seems a preferred SSH console hasn't been set, this means
+            # SSH is not setup in the SUT, so set it up and try to switch
+            # to a preferred SSH as a console (if there is one, otherwise
+            # it'll do nothing)
+            tcfl.tl.linux_network_ssh_setup(ic, target, proxy_wait_online = True)
+            target.console.select_preferred(user = 'root')  # switch to using ssh
+
             # select_preferred enables and calls shell.setup()
             return
 
