@@ -232,13 +232,13 @@ if stat.S_ISSOCK(s[stat.ST_MODE]):
     with \
          contextlib.closing(socket.socket(socket.AF_UNIX,
                                           socket.SOCK_STREAM)) as inf:
-        inf.connect(sys.argv[2])
-        ttbl.capture_cli.main(sys.argv[2], sample, xlat, inf,
+        inf.connect(unix_domain_socket)
+        ttbl.capture_cli.main(outputfilename, sample, xlat, inf,
                               period_s = 0.5)
 else:
-    with serial.Serial(sys.argv[1], 115200) as inf:
+    with serial.Serial(unix_domain_socket, 115200) as inf:
         flag = fcntl.fcntl(inf.fileno(), fcntl.F_GETFD)
         fcntl.fcntl(inf, fcntl.F_SETFD, flag | os.O_NONBLOCK)
         flag = fcntl.fcntl(inf, fcntl.F_GETFD)
-        ttbl.capture_cli.main(sys.argv[2], sample, xlat, inf,
+        ttbl.capture_cli.main(outputfilename, sample, xlat, inf,
                               period_s = 0.5)
