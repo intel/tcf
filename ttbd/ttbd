@@ -512,7 +512,10 @@ def _login(audit_record):
        and user.get_id() == username \
        and user.is_authenticated():
         logi("user %s: authenticated, has a valid session" % user_id)
-        return True
+        return flask.jsonify({
+            '_message': "user %s: authenticated with roles: %s" \
+            % (username, " ".join(user.role_list()))
+        })
 
     # Go over all the configured authentication mechanisms and try to
     # obtain roles that this combination of username/password allows us
