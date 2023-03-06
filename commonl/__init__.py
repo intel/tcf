@@ -73,6 +73,14 @@ else:
 
 from . import expr_parser
 
+# filelock is very chatty
+#
+# Mar 05 13:00:01 ... ttbd[2438170]: INFO[2438170] filelock.acquire():274: Lock 140152041517312 acquired on /var/lib/ttbd/production/cache/socket_gethostbyaddr/lockfile
+# Mar 05 13:00:01 ... ttbd[2438170]: INFO[2438170] filelock.release():318: Lock 140152041517312 released on /var/lib/ttbd/production/cache/socket_gethostbyaddr/lockfile
+#
+# for no good use, so disable that
+logging.getLogger("filelock").setLevel(logging.ERROR)
+
 
 # Ensure compatibility with python versions before 3.7 since older
 # versions use re._pattern_type instead of re.Pattern
