@@ -1863,11 +1863,11 @@ class test_target(object):
         if prop in ( 'timestamp', '_alloc.timestamp' ):
             return self.timestamp_get()
         r = self.fsdb.get(prop)
-        if r:
+        if r != None:
             return r
         # try flat key tags[field.subfield.subfield]
         r = self.tags.get(prop, None)
-        if r:
+        if r != None:
             return r
         # try non-flat key tags[field.subfield.subfield]
         if '.' in prop:
