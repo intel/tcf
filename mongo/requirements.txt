@@ -1,0 +1,4 @@
+# 1.5 issues
+google-api-python-client==1.11.0
+oauth2client
+httplib2
