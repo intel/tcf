@@ -1,0 +1,8 @@
+
+google-api-python-client: python3-google-api-client
+
+oauth2client: python3-oauth2client
+
+httplib2: python3-httplib2
+
+pymongo: python3-pymongo
