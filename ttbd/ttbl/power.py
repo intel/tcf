@@ -2757,18 +2757,19 @@ class buttons_released_pc(impl_c):
     def __init__(self, *buttons, **kwargs):
         commonl.assert_list_of_strings(buttons, "buttons", "button")
         impl_c.__init__(self, **kwargs)
-        self.sequence = [
-            ( 'off', button )
-            for button in buttons
-        ]
+        self.buttons = buttons
         self.upid_set(
-            "Button %s releaser" % "/".join(buttons),
+            "Button setter to default state (%s)" % "/".join(buttons),
             buttons = " ".join(buttons)
         )
 
     def on(self, target, _component):
+        sequence = [
+            ( 'off', button )
+            for button in self.buttons
+        ]
         _check_has_iface_buttons(target)
-        target.buttons.sequence(target, self.sequence)
+        target.buttons.sequence(target, sequence)
 
     def off(self, target, _component):
         pass
