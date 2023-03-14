@@ -956,18 +956,18 @@ class interface(ttbl.tt_interface):
                 impls, _all = self.args_impls_get(dict(component = component))
             # and now act
             if action in ( 'on', 'press', 'close' ):
-                self._on(target, impls, " (because sequenced '%s')" % action,
+                self._on(target, impls, f" (because sequenced '{s}')",
                          _all, explicit)
             elif action in ( 'off', 'release', 'open' ):
-                self._off(target, impls, " (because sequenced '%s')" % action,
+                self._off(target, impls, f" (because sequenced '{s}')",
                           _all, explicit)
             elif action == 'cycle':
                 wait = float(target.tags.get('power_cycle_wait', 2))
-                self._off(target, impls, " (because sequenced cycle)",
+                self._off(target, impls, f" (because sequenced '{s}')",
                           _all, explicit)
                 if wait:
                     time.sleep(wait)
-                self._on(target, impls, " (because sequenced cycle)",
+                self._on(target, impls, f" (because sequenced '{s}')",
                          _all, explicit)
             else:
                 raise RuntimeError(
