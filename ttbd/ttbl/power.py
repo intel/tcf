@@ -209,6 +209,7 @@ import errno
 import json
 import numbers
 import os
+import re
 import time
 import traceback
 import types
@@ -2740,6 +2741,12 @@ class button_sequence_pc(impl_c):
         # no real press status, so can't tell
         return None
 
+# register the button's default state property so it is not wiped
+# across allocations
+ttbl.test_target.properties_keep_on_release.add(
+    # FIXME: need a central regex to validate target name; now it is
+    # hardcoded in ttbl.config.target_add()
+    re.compile("^interfaces\.buttons\.[_a-z0-9A-Z]+\.default_state"))
 
 class buttons_released_pc(impl_c):
     """
@@ -2749,25 +2756,101 @@ class buttons_released_pc(impl_c):
     :param str buttons: names of buttons that must be released upon
       power on
 
+    :param dict overrideable_states: dictionary keyed by button name
+      of the buttons whose default state can be overriden and what
+      shall be their default state (*False* means
+      released/off, which is the same as listing it in *buttons*;
+      *True* means pressed/on).
+
+      >>> { "power": False, "reset": False, "security": True }
+
+      to override the defult sete, set property
+      *interface.buttons.BUTTONNAME.default_state* to boolean *True*
+      or *False* (for on/pressed, off/released).
+
     >>> ttbl.power.buttons_released_pc("reset", "test", "overdrive")
 
     Other parameters as to :class:ttbl.power.impl_c.
 
     """
-    def __init__(self, *buttons, **kwargs):
+    def __init__(self, *buttons, overrideable_states: dict = None, **kwargs):
         commonl.assert_list_of_strings(buttons, "buttons", "button")
         impl_c.__init__(self, **kwargs)
-        self.buttons = buttons
+        self.overrideable_states = {}
+        for button in buttons:
+            # note this is the "original" behaviour, which sets
+            # default state to off/released and doesn't allow
+            # overriding and only allows OFF
+            self.overrideable_states[button] = None
+        if overrideable_states:
+            # new behavior, allows you to override
+            commonl.assert_dict_of_types(overrideable_states,
+                                         "overrideable_states", bool)
+            for button, default_state in overrideable_states.items():
+                self.overrideable_states[button] = default_state
         self.upid_set(
             "Button setter to default state (%s)" % "/".join(buttons),
             buttons = " ".join(buttons)
         )
 
-    def on(self, target, _component):
-        sequence = [
-            ( 'off', button )
-            for button in self.buttons
-        ]
+
+    def target_setup(self, target, _iface_name, _name):
+        # register the default state property so it can be set by the
+        # current user
+        for button, default_state in self.overrideable_states.items():
+            if default_state == None:
+                # non overrideable setting, clear any past one and
+                # move on
+                target.property_set(
+                    f"interfaces.buttons.{button}.default_state", None)
+                continue
+            target.properties_user.add(
+                f"interfaces.buttons.{button}.default_state")
+            # publish the current default state if there was none;
+            # this helps keep the setting between daemon restarts
+            # FIXME: this might not really work if the
+            # interfaces. hierarchy is wiped upon start and re-generated
+            current_default_state = target.property_get(
+                f"interfaces.buttons.{button}.default_state")
+            if current_default_state == None:
+                current_default_state = default_state
+            target.property_set(
+                f"interfaces.buttons.{button}.default_state",
+                current_default_state)
+
+
+    def on(self, target, component):
+
+        sequence = []
+        for button, default_state in self.overrideable_states.items():
+            # Get the default state for this button
+            #
+            # We get from the inventory first, for realtime settings
+            # and default to what was configured.
+            runtime_default_state = target.property_get(
+                f"interfaces.buttons.{button}.default_state",
+                None)
+            if default_state == None and runtime_default_state != None:
+                raise impl_c.error_e(
+                    f"{target.id} trying to override button {button} with"
+                    f" property 'interfaces.buttons.{button}.default_state'"
+                    " is not allowed per configuration; reset property"
+                    " to clear condition")
+            # ok, now that we have certified the default state can be
+            # overriden, override it if a runtime one is specicified
+            if runtime_default_state != None:
+                default_state = runtime_default_state
+            if default_state == True:
+                sequence.append(( 'on', button ))
+            elif default_state in ( False, None ):
+                sequence.append(( 'off', button ))
+            else:
+                raise impl_c.error_e(
+                    f"invalid default value for button {button} in property"
+                    f" 'interfaces.buttons.{button}.default_state'; expected "
+                    f" nothing, boolean True or False; got '{default_state}'"
+                    f" ({type(default_state)})")
+
         _check_has_iface_buttons(target)
         target.buttons.sequence(target, sequence)
 
