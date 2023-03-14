@@ -649,7 +649,7 @@ class interface(ttbl.tt_interface):
                 continue            	# it says it is off, so we skip it
 
             target.log.debug("%s: powering off%s" % (component, why))
-            try:			# we retry power off twice
+            try:		        # we retry power off twice
                 self._impl_off(impl, target, component_real)
                 continue
             except Exception as e:	# pylint: disable = broad-except
@@ -740,7 +740,7 @@ class interface(ttbl.tt_interface):
             target.log.debug("%s: powering on%s" % (component, why))
             try:
                 self._impl_on(impl, target, component_real)	# ok, power ir on
-                continue		# fallthrough is error recovery
+                continue	        # fallthrough is error recovery
 
             except impl_c.retry_all_e as e:
                 # This power component has errored when powering on.
@@ -762,12 +762,12 @@ class interface(ttbl.tt_interface):
                     self._off(target, impls,
                               " (retrying because %s failed)" % component,
                               False)
-                except:			# pylint: disable = bare-except
-                    pass		# yeah, we ignore errors here
-                index = 0		# start again
+                except:		        # pylint: disable = bare-except
+                    pass	        # yeah, we ignore errors here
+                index = 0	        # start again
                 if e.wait:
                     time.sleep(e.wait)
-                continue		# fallthrough is error recovery!
+                continue	        # fallthrough is error recovery!
 
             except Exception as e:	# pylint: disable = broad-except
                 # This power component has errored when powering on.
@@ -791,14 +791,14 @@ class interface(ttbl.tt_interface):
                                      "failed (ignoring): %s"
                                      % (component, why, e))
                 time.sleep(recovery_wait)
-                try:			# Let's retry
+                try:		        # Let's retry
                     self._impl_on(impl, target, component_real)
-                    continue		# good, it worked
+                    continue	        # good, it worked
                 except Exception as e:
                     target.log.error(
                         "%s: power-on%s failed (again): aborting: %s"
                         % (component, why, e))
-                    try:		# ok, not good, giving up
+                    try:	        # ok, not good, giving up
 		        # power off just in case, to avoid electrical
                         # issues, etc.
                         self._impl_off(impl, target, component_real)
@@ -1741,7 +1741,7 @@ class daemon_podman_container_c(daemon_c):
         self.cmdline = cmdline
 
         self.name = name
-        self.kws = None			# on() defines as a dict
+        self.kws = None		        # on() defines as a dict
         self.upid_set(
             f"Podman container #{name}",
             name = name,
@@ -2268,7 +2268,7 @@ class rpyc_c(daemon_podman_container_c):
             "--volume", "%(path)s/%(component)s.etc:/etc/ttbd:ro,Z",
             image_name,
             "/bin/bash", "-xeuc",
-            "ls -lR /etc/ttbd; "	# DEBUG info on the console
+            "ls -lR /etc/ttbd; "        # DEBUG info on the console
             # for PIP: "rpyc_classic.py",
             "run-parts /etc/ttbd/run; "
             "cd $HOME;"
@@ -2434,7 +2434,7 @@ class rpyc_aardvark_c(rpyc_c):
     Client:
 
       $ sudo dnf install -y python3-rpyc
-      $ pip3 install --user rpyc		# if not available
+      $ pip3 install --user rpyc        	# if not available
 
     """
     def __init__(self, usb_serial_number: str, rpyc_port: int,
@@ -2630,8 +2630,8 @@ class socat_pc(daemon_c):
                 "-d",		# THIRD -d is very important to get
                                 # timestamp/offset information in the
                                 # log file which we'll use
-                address1,		# will be formatted against kws
-                address2,		# will be formatted against kws
+                address1,	        # will be formatted against kws
+                address2,	        # will be formatted against kws
             ],
             precheck_wait = precheck_wait,
             env_add = _env_add,
