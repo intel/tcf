@@ -329,7 +329,7 @@ fi
 # We have $loop_dev, $root_part and others to determine what
 
 root_fstype=ext4
-mkdir $tmpdir/root
+mkdir -p $tmpdir/root
 set -e
 if [ $image_type = debian ]; then
 
@@ -1014,7 +1014,15 @@ echo "size_gib: $size_gib" >> $tmpdir/.tcf.metadata.yaml
 
 # move yaml to final location
 sudo mv $tmpdir/.tcf.metadata.yaml $destdir
-    
+
+function fix_sudo_perms() {
+    # did we create files under sudo we want to restore to the caller's UID?
+    if [ -z "${SUDO_UID:-}" ]; then
+        return
+    fi
+    chown $SUDO_UID:$SUDO_GID "$@"
+}
+
 # If we said we wanted it in a tar file, pack it up and remove the directory
 case $dest_type in
     tar)
@@ -1032,6 +1040,7 @@ case $dest_type in
              tar cJf $tarname.tmp --numeric-owner --force-local --selinux --acls --xattrs $basename
         mv -f $tarname.tmp $tarname
         sudo rm -rf $destdir
+        fix_sudo_perms $tarname
         ;;
     
     qcow2)
@@ -1045,11 +1054,13 @@ case $dest_type in
         # for CPU when moving around network distances
         qemu-img convert -O qcow2 -c "$qcow2name" "$qcow2name".compressed
         mv -f "$qcow2name".compressed  "$qcow2name"
+        fix_sudo_perms "$qcow2name"
         ;;
 
     squashfs)
         info packing '$tmpdir/destdir' to $squashfs_name
         sudo mksquashfs $tmpdir/destdir/ $squashfs_name \
              -comp xz ${MKSQUASHFS_FLAGS:-}
+        fix_sudo_perms "$squashfs_name"
 esac
 
