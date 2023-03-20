@@ -1,6 +1,6 @@
 #! /bin/bash -eu
 #
-# Copyright (c) 2018 Intel Corporation
+# Copyright (c) 2018-23 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -416,11 +416,11 @@ elif [ $image_type == qcow2 ]; then
         # we are mounting readonly, guess how to so it doesn't complain
         case $root_fstype in 
             xfs)
-                ROOT_MOUNTOPTS=norecovery;;
+                ROOT_MOUNTOPTS="-o norecovery";;
             ext4)
-                ROOT_MOUNTOPTS=norecovery;;
+                ROOT_MOUNTOPTS="-o norecovery";;
             btrfs)
-                ROOT_MOUNTOPTS=noload;;
+                ROOT_MOUNTOPTS="-o noload";;
             *)
                 warning "can't guess best options for read-only rootfs '$root_fstype'"
                 warning "please export BOOT|ROOT_PARTITION"
@@ -428,7 +428,7 @@ elif [ $image_type == qcow2 ]; then
                 ROOT_MOUNTOPTS=""
         esac
     fi
-    sudo mount -r -o ${ROOT_MOUNTOPTS:-} ${root_part} $tmpdir/root
+    sudo mount -r ${ROOT_MOUNTOPTS:-} ${root_part} $tmpdir/root
     info mounted ${root_part} in $tmpdir/root
     # do this after mounting works better, sometimes fails otherwise
     root_fstype=$(lsblk -n -o fstype ${root_part})
