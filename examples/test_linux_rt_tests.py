@@ -151,6 +151,7 @@ class _test(tcfl.pos.tc_pos_base):
             # We only do one CPU (no --smp)
             " --unbuffered -q"
             " --mlockall --priority=80 --interval=200 --distance=0"
+            " --nsecs"		# many machines hit the 1us mark
             f" -D {cyclictest_duration}"
             f" {cyclictest_options}"
             ")",
@@ -161,11 +162,11 @@ class _test(tcfl.pos.tc_pos_base):
             r"P:\s*[0-9]+\s+"
             r"I:\s*[0-9]+\s+"
             r"C:\s*[0-9]+\s+"
-            r"Min:\s*(?P<min_us>[-0-9]+)\s+"
+            r"Min:\s*(?P<min_ns>[-0-9]+)\s+"
             # we ignore actual, because it is just the last measurement
-            r"Act:\s*(?P<actual_us>[-0-9]+)\s+"
-            r"Avg:\s*(?P<average_us>[-0-9]+)\s+"
-            r"Max:\s*(?P<max_us>[-0-9]+)",
+            r"Act:\s*(?P<actual_ns>[-0-9]+)\s+"
+            r"Avg:\s*(?P<average_ns>[-0-9]+)\s+"
+            r"Max:\s*(?P<max_ns>[-0-9]+)",
             re.MULTILINE)
 
         m = regex.search(output)
@@ -174,12 +175,12 @@ class _test(tcfl.pos.tc_pos_base):
                                { "output": output, "regex": regex.pattern })
         gd = m.groupdict()
         # extract latencies
-        min_us = int(gd['min_us'])
-        average_us = int(gd['average_us'])
-        max_us = int(gd['max_us'])
+        min_ns = int(gd['min_ns'])
+        average_ns = int(gd['average_ns'])
+        max_ns = int(gd['max_ns'])
         target.report_data("Realtime Tests %(type)s",
-                           "cyclictest latency minimum (us)", min_us)
+                           "cyclictest latency minimum (ns)", min_ns)
         target.report_data("Realtime Tests %(type)s",
-                           "cyclictest latency maximum (us)", max_us)
+                           "cyclictest latency maximum (ns)", max_ns)
         target.report_data("Realtime Tests %(type)s",
-                           "cyclictest average (us)", average_us)
+                           "cyclictest average (ns)", average_ns)
