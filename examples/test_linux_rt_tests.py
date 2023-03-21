@@ -116,7 +116,7 @@ class _test(tcfl.pos.tc_pos_base):
 
 
     @tcfl.tc.subcase()
-    def eval_15_build(self, target):
+    def eval_20_build(self, target):
         #
         # Build in SUT
         #
@@ -129,7 +129,7 @@ class _test(tcfl.pos.tc_pos_base):
 
 
     @tcfl.tc.subcase()
-    def eval_20_cyclictest(self, target):
+    def eval_30_cyclictest(self, target):
         cyclictest_duration = int(os.environ.get(
             "TEST_LINUX_RT_TEST_CYCLICTEST_DURATION_S",
             2 * 60))
