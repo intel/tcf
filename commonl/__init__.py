@@ -2847,14 +2847,18 @@ def assert_dict_of_types(d: dict, d_name: str, t: type):
     :param str d_name: name of the *d* object
 
     :param type t: type the values must meet
+    :param tuple[type] t: list of valid types
 
     :raises: AssertionError if any requirement is not met
     """
-    assert isinstance(t, type), \
+    assert isinstance(t, type) or isinstance(t, tuple), \
         f"t: expected type, got {type(t)}"
     assert isinstance(d_name, str), \
         f"d_name: expected str, got {type(d_name)}"
-    t_name = t.__name__
+    if isinstance(t, tuple):
+        t_name = ','.join([ type(i).__name__ for i in t ])
+    else:
+        t_name = t.__name__
     assert isinstance(d, dict), \
         f"{d_name}: expect a dict of {t_name} keyed by string, got {type(d)}"
     for k, v in d.items():
