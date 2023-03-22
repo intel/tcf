@@ -275,6 +275,7 @@ class allocation_c(commonl.fsdb_symlink_c):
         # ts_last_keepalive > ts_now -> in this case, we are good, it
         # is fresh
         if ts_idle.days >= 0 and seconds_idle > ttbl.config.target_max_idle:
+            # FIXME: make this per allocation?
             logging.info(
                 "ALLOC: allocation %s timedout (idle %s/%s), deleting",
                 self.allocid, seconds_idle, ttbl.config.target_max_idle)
@@ -459,6 +460,9 @@ class allocation_c(commonl.fsdb_symlink_c):
         for group_name, group in self.groups.items():
             d['target_group'][group_name] = list(group)
         d['timestamp'] = self.get("timestamp")
+        for key in self.keys("extra_data.*"):
+            d[key] = self.get(key)
+
         return d
     
 lru_aged_cache_allocation_c = lru_aged_c(
@@ -479,8 +483,18 @@ def get_from_cache(allocid):
     return lru_aged_cache_allocation_c(allocid)
 
 
-def init():
-    commonl.makedirs_p(path)
+def init(state_path):
+    """
+    Initialize the allocation subsytem
+    """
+    # These are initialization that need the ttbl.allocation.path set
+    allocid_uuid_db_path = os.path.join(state_path, "cache", "allocid_uuid_db")
+    commonl.makedirs_p(path)	# FIXME: move from ../ttbd
+    global allocid_uuid_db
+    commonl.makedirs_p(allocid_uuid_db_path)
+    allocid_uuid_db = commonl.fs_cache_c(allocid_uuid_db_path)
+
+
 
 def _waiter_validate(target, waiter_string, value):
     # waiter_string: _alloc.queue.PRIO-TIMESTAMP-FLAGS
@@ -742,14 +756,117 @@ def _allocation_policy_check(
     return None
 
 
+#
+# Allocation UUIDs
+#
+# Allocation UUIDs are a unique identifier for an allocation provided
+# by the client; they are meant to be unique across multiple
+# allocations across multiple servers for machines that are meant to
+# work together in an execution.
+#
+# Example: a cluster of 100 machines itnerconnected by private networks
+#
+#  - each server has 10 machines, so we'd do 10 machine allocations
+#    plus the network to 10 separate servers
+#
+#  - the client generates a UUID and includes it on all the allocation
+#    requests
+#
+#  - the server drivers that configure the network, for example, use
+#    the UUID to derive a tunnel ID and program all switches to
+#    interconnect all the private networks with each other using the
+#    tunnel ID.
+#
+#
+# Allocation UUIDs can't be reused for a while, to avoid things
+# lagging behind in the infrastrucvture that may not have been
+# properly cleaned up. So we keep a DB of recently used UUIDs
+#
+# The database UUID<->timestamp records when was that we saw a UUID,
+# so we can avoid it being reused too soon.
+#
+# initialized in init(), when we have a path already
+allocid_uuid_db = None
+
+#: Maximum allowed age for UUID's allocids before we allow them being
+#: reused if we still know about them. About two days.
+allocid_uuid_max_age_s = 2 * 24 * 60 * 60
+
+#: Maximum number of entries in the UUID database
+#:
+#: Say we can do a practical max of 1 alloc / minute and we'd want to
+#: keep info for about two days it'd be 2 * 24 * 60 per target, and
+#: assuming a 30 number of targets in a server, this'd be ~86400
+#: entries...
+allocid_uuid_max_entries = 30 * 2 * 24 * 60
+
+
+def _request_extra_data_verify_uuid(uuid_str):
+    # verify this a a valid uuid
+    try:
+        uuid_validated = uuid.UUID(uuid_str, version = 4)
+    except Exception as e:
+        raise ValueError("invalid RCF4122 v4 UUID supplied: {e}") from e
+
+    ts_now = time.strftime("%Y%m%d%H%M%S")
+    # has it been used in the 'recent' past? check the cache
+    ts_uuid = allocid_uuid_db.get(str(uuid_validated),
+                                  default = None,
+                                  max_age = allocid_uuid_max_age_s)
+    if ts_uuid == None:
+        # Not in the cache, means it is not known
+        return
+
+    ts_delta = int(ts_now) - int(ts_uuid)
+    if ts_delta < 0:
+        # this timestamp is in the future? WT?
+        raise ValueError(
+            f"{uuid_str}: UUID has been used already"
+            " (caveat: timestamp in the future discrepancy)")
+    if ts_delta < allocid_uuid_max_age_s:
+        raise ValueError(
+            f"{uuid_str}: UUID has been used already with"
+            f" timestamp {ts_uuid}, {ts_delta}s ago")
+    # valid UUID, get going
+    return
+
+
+
+def _request_extra_data_verify(extra):
+    commonl.assert_dict_key_strings(extra, "extra data")
+    for k, v in extra.items():
+        assert isinstance(v, ( bool, int, str, float ) ), \
+            f"allocation extra_data {k}: must be bool, int, str or float;" \
+            f" got {type(v)}"
+        if k == "uuid":
+            _request_extra_data_verify_uuid(v)
+
+
+
 def request(groups, calling_user, obo_user, guests,
             priority = None, preempt = False,
             queue = False, shared = False,
+            extra_data = None,
             reason = None):
-    """
-    :params list(str) groups: list of groups of targets
+    """:params list(str) groups: list of groups of targets
+
+    :param dict extra_data: dict of scalars with extra data, for
+      implementation use; this extra data is client specifc, the
+      server will record it in the allocation and some drivers might
+      use it.
+
+      - *uuid*: an RFC4122 v4 UUID for this allocation, used to
+        coordinate across-server resources (eg: network tunneling)
+
+        >>> import uuid
+        >>> alloc_uuid = str(uuid.uuid4())
+        >>> alloc_uuid = "a5e000a8-25ed-42a2-96c2-d9e361465367"
 
     """
+
+    # FIXME: add other extra data
+    #
+    # - *timeout*: a maximum timeout (0 to disable, ACLed)
 
     #
     # Verify the groups argument
@@ -842,6 +959,10 @@ def request(groups, calling_user, obo_user, guests,
     assert isinstance(queue, bool)
     assert reason == None or isinstance(reason, str)
 
+    if extra_data == None:
+        extra_data = {}		# simply other paths
+    else:
+        _request_extra_data_verify(extra_data)
 
     message = _allocation_policy_check(calling_user, obo_user, guests,
                                        priority, preempt, queue, shared)
@@ -870,8 +991,16 @@ def request(groups, calling_user, obo_user, guests,
         allocdb.set("reason", reason)
     for guest in guests:
         allocdb.guest_add(guest)
-
     ts = allocdb.timestamp()
+    # The extra data is just recorded, that's it-- some drivers might
+    # use it, some not
+    for k, v in extra_data.items():
+        allocdb.set(f"extra_data.{k}", v)
+        if k == "uuid":
+            with allocid_uuid_db.lock():
+                allocid_uuid_db.set_unlocked(v, ts)
+                allocid_uuid_db.lru_cleanup_unlocked(allocid_uuid_max_entries)
+
     allocdb.state_set('queued')
     # FIXME: these is severly limited in size, we need a normal file to
     # set this info with one target per file
