@@ -17,6 +17,7 @@ import pprint
 import sys
 import socket
 import time
+import uuid
 
 import requests
 import requests.exceptions
@@ -51,14 +52,28 @@ def _delete(rtb, allocid):
 def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
                    queue_timeout = None, priority = 700, preempt = False,
                    queue = True, reason = None, wait_in_queue = True,
-                   register_at = None):
-    """
-    :param set register_at: (optional) if given, this is a set where
+                   register_at = None, extra_data = None):
+    """:param set register_at: (optional) if given, this is a set where
       we will add the allocation ID created only if ACTIVE or QUEUED
       inmediately as we get it before doing any waiting.
 
       This is used for being able to cleanup on the exit path if the
       client is cancelled.
+
+    :param dict extra_data: dict of scalars with extra data, for
+      implementation use; this extra data is client specifc, the
+      server will record it in the allocation and some drivers might
+      use it.
+
+      Known fields:
+
+      - *uuid*: an RFC4122 v4 UUID for this allocation, used to
+        coordinate across-server resources (eg: network tunneling)
+
+        >>> import uuid
+        >>> alloc_uuid = str(uuid.uuid4())
+        >>> alloc_uuid = "a5e000a8-25ed-42a2-96c2-d9e361465367"
+
     """
     assert isinstance(groups, dict)
     assert register_at == None or isinstance(register_at, set)
@@ -72,6 +87,10 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
     )
     if obo:
         data['obo_user'] = obo
+    if extra_data != None:
+        commonl.assert_dict_of_types(extra_data, "extra_data",
+                                     (bool, int, float, str))
+        data['extra_data'] = extra_data
     data['groups'] = groups
     r = rtb.send_request("PUT", "allocation", json = data)
 
@@ -138,7 +157,7 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
         if 'result' in r:
             result = r.pop('result')
             r.update(result)
-        # COMPAT: end        
+        # COMPAT: end
         commonl.progress(
             "allocation ID %s: [+%.1fs] alloc/keeping alive during state '%s': %s"
             % (allocid, ts - ts0, state, r))
@@ -196,7 +215,7 @@ def _alloc_hold(rtb, allocid, state, ts0, max_hold_time, keep_alive_period):
         if 'result' in r:
             result = r.pop('result')
             r.update(result)
-        # COMPAT: end        
+        # COMPAT: end
         commonl.progress(
             "allocation ID %s: [+%.1fs] hold/keeping alive during state '%s': %s"
             % (allocid, ts - ts0, state, r))
@@ -246,11 +265,22 @@ def _cmdline_alloc_targets(args):
             groups = { "group": list(targets) }
             ts0 = time.time()
             if allocid == None:
+                extra_data = dict()
+                if args.uuid:
+                    extra_data['uuid'] = str(uuid.uuid4())
+                for extra_spec in args.extra_data:
+                    # specified as FIELD:VALUE, with VALUE encoded as
+                    # i:NN f:FF s:STR..
+                    key, value = extra_spec.split(":", 1)
+                    extra_data[key] = commonl.cmdline_str_to_value(value)
+                if not extra_data:
+                    extra_data = None
                 allocid, state, group_allocated = \
                     _alloc_targets(rtb, groups, obo = args.obo,
                                    preempt = args.preempt,
                                    queue = args.queue, priority = args.priority,
                                    reason = args.reason,
+                                   extra_data = extra_data,
                                    wait_in_queue = args.wait_in_queue)
                 ts = time.time()
                 if args.wait_in_queue:
@@ -635,6 +665,12 @@ def _cmdline_setup(arg_subparsers):
     ap.add_argument(
         "--preempt", action = "store_true", default = False,
         help = "Enable preemption (disabled by default)")
+    ap.add_argument("--extra-data", metavar = "FIELD:VALUE", action = "append",
+                    default = [],
+                    help = "add extra data values to the allocation; VALUE "
+                    "can be casted with i:NUMBER f:FLOAT s:STRING b:BOOL")
+    ap.add_argument("--uuid", action = "store_true", default = False,
+                    help = "set a UUID in the allocation")
     ap.add_argument(
         "target", metavar = "TARGETSPEC", nargs = "+",
         action = "store", default = None,

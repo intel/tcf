@@ -1040,6 +1040,7 @@ def _put_allocation():
     preempt = data.get('preempt', False)
     queue = data.get('queue', False)
     reason = data.get('reason', None)
+    extra_data = data.get('extra_data', None)
 
     with audit(
             "allocation/create",
@@ -1051,6 +1052,7 @@ def _put_allocation():
             queue = queue,
             reason = reason,
             groups = data['groups'],
+            extra_data = extra_data,
             request = flask.request) as ao:
         try:
 
@@ -1063,6 +1065,7 @@ def _put_allocation():
                 preempt = preempt,
                 queue = queue,
                 reason = reason,
+                extra_data = extra_data,
             )
             if 'allocid' in result:
                 ao.kws['allocid'] = result['allocid']
@@ -1689,6 +1692,7 @@ if __name__ == "__main__":
     args.config_path = os.path.expanduser(args.config_path)
     args.files_path = os.path.expanduser(args.files_path)
     args.var_state_path = os.path.expanduser(args.var_state_path)
+    # FIXME: move this to ttbl.allocations.init()
     ttbl.allocation.path = os.path.join(args.var_state_path, "allocations")
     ttbl.test_target.state_path = os.path.join(args.var_state_path, "targets")
     ttbl.test_target.files_path = args.files_path
@@ -1840,7 +1844,7 @@ if __name__ == "__main__":
     else:
         raise RuntimeError("can't give --no-ssl and --ssl* options")
 
-    ttbl.allocation.init()
+    ttbl.allocation.init(args.var_state_path)
     for target in ttbl.test_target.known_targets():
         target.fsdb_cleanup()
 
