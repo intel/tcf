@@ -1,6 +1,6 @@
-#! /usr/bin/python3
+#! /usr/bin/env python3
 #
-# Copyright (c) 2017 Intel Corporation
+# Copyright (c) 2017-23 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -478,33 +478,52 @@ def _entry_matched(entry, bus_name, driver_name, devname, actions, origin):
 #                            UUID('dc527a86-fa21-4085-bac2-ed4eccf83d0b')),
 #  '__REALTIME_TIMESTAMP': datetime.datetime(2018, 5, 19, 0, 0, 28, 780492)}
 #
+
+# Regex to extract DRIVERNAME from message DRIVER DEV: SOMETHING
+#
+# usb 3-2-port1: cannot reset (err = -110)
+# cp210x 19-1.4.1:1.0: failed to get vendor val 0x370b size 1: -110
+#
+# devname: some weird chars are used for device paths, including -_:. ...
+regex_driver = re.compile(r"(?P<driver>\w+) (?P<devname>[^\s]+): ")
+
+
 def _check_entry(entry):
     msg = entry['MESSAGE']
     _device_name = entry.get('_UDEV_SYSNAME', None)
     _kernel_name = entry.get('_KERNEL_DEVICE', None)
+    _driver_name = None
     bus_name = None
     driver_name = None
     device_name = None
     actions = None
     origin = None
     while not _device_name and not _kernel_name:
+        logging.log(8, "guessing device/kernel name %s/%s",
+                    _device_name, _kernel_name)
         # If the entry has no device message, then let's try to
         # extract it from the message, things like:
         #
-        # usb 3-2-port1: cannot reset (err = -110)',
-        regex_usb = re.compile("usb (?P<devname>[0-9]+-[0-9]+)-.*:")
-        m = regex_usb.match(msg)
+        m = regex_driver.match(msg)
         if m:
             _device_name = m.groupdict()['devname']
+            _driver_name = m.groupdict()['driver']
             if _device_name:
                 logging.warning("guessed USB device %s from message (had "
                                 "no entry for it)", _device_name)
-                break
+                break	# fallthrough to for loop
+            # fallthrough
         logging.debug("ignored deviceless entry: %s",
                       pprint.pformat(entry))
         return
+    logging.log(8, "entry does device %s kernel %s",
+                _device_name, _kernel_name)
+    matches = 0
+    # FIXME: this should use the same ruling patterna s device_resolver_c
     for bus_name, driver_name, device_name, actions, origin \
         in _watch_rules:
+        logging.log(8, "trying rule for bus %s driver %s device %s @%s",
+                    bus_name, driver_name, device_name, origin)
         if device_name and _device_name:
             if isinstance(device_name, str) \
                and device_name == _device_name:
@@ -513,6 +532,7 @@ def _check_entry(entry):
                 devname = _device_name
                 _entry_matched(entry, bus_name, driver_name,
                                devname, actions, origin)
+                matches += 1
                 continue
             elif isinstance(device_name, re.Pattern) \
                  and device_name.match(_device_name):
@@ -521,6 +541,7 @@ def _check_entry(entry):
                 devname = _device_name
                 _entry_matched(entry, bus_name, driver_name,
                                devname, actions, origin)
+                matches += 1
                 continue
         if device_name and _kernel_name:
             # lookup by kernel device name (for example, for USB
@@ -532,6 +553,7 @@ def _check_entry(entry):
                 devname = _kernel_name
                 _entry_matched(entry, bus_name, driver_name,
                                devname, actions, origin)
+                matches += 1
                 continue
             elif isinstance(device_name, re.Pattern) \
                  and device_name.match(_kernel_name):
@@ -540,7 +562,30 @@ def _check_entry(entry):
                 devname = _kernel_name
                 _entry_matched(entry, bus_name, driver_name,
                                devname, actions, origin)
+                matches += 1
                 continue
+
+        # let's try to match on bus name
+        _kernel_subsystem = entry.get("_KERNEL_SUBSYSTEM")
+        if bus_name == _kernel_subsystem:
+            logging.log(8, "entry matches on bus_name %s", bus_name)
+            m = regex_driver.match(msg)
+            if not m:
+                logging.log(8, "can't extract drivername/device name from message")
+                continue
+            _device_name = m.groupdict()['devname']
+            _driver_name = m.groupdict()['driver']
+            if _driver_name == driver_name:
+                # let's try to match on bus name
+                logging.debug("%s: match on bus name, driver name @%s",
+                              _kernel_name, origin)
+                devname = _kernel_name
+                _entry_matched(entry, bus_name, driver_name,
+                               devname, actions, origin)
+            continue
+
+    logging.log(8, "entry matched %s times", matches)
+
 
 
 # Support for -v option to increase verbosity
@@ -572,6 +617,9 @@ logging.addLevelName(40, "E")
 logging.addLevelName(30, "W")
 logging.addLevelName(20, "I")
 logging.addLevelName(10, "D")
+logging.addLevelName(9, "D9")
+logging.addLevelName(8, "D8")
+logging.addLevelName(7, "D7")
 
 # Initialize command line argument parser
 arg_parser = argparse.ArgumentParser(
