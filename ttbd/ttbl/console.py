@@ -573,7 +573,10 @@ class interface(ttbl.tt_interface):
         # restart it if it reports disabled (because the link is dead)
         # but we recorded it shall be enabled (because the property
         # console-COMPONENT.state is True)
-        if impl.re_enable_if_dead == False:
+        re_enable_if_dead = target.property_get(
+            "interfaces.console." + component + ".re_enable_if_dead",
+            impl.re_enable_if_dead)
+        if not re_enable_if_dead:
             return False
         shall_be_enabled = target.property_get("interfaces.console." + component + ".state", None)
         is_enabled = impl.state(target, component)
