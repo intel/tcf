@@ -17,6 +17,8 @@ This has to be configured via config files in
 import argparse
 import bisect
 import collections
+import errno
+import fcntl
 import logging
 import os
 import pprint
@@ -75,6 +77,29 @@ def _usb_special_case(path):
         return None
     gd = match.groupdict()
     return _find("usb" + gd['bus'] + "-port" + gd['port'])
+
+
+
+def _sysfs_read(filename):
+    try:
+        with open(filename) as fr:
+            return fr.read().strip()
+    except IOError as e:
+        if e.errno != errno.ENOENT:
+            raise
+        return None
+
+
+
+def usb_device_reset(dev_path):
+    # /usr/include/linux/usbdevice_fs.h
+    USBDEVFS_RESET = 21780
+    try:
+        with open(dev_path, 'w', os.O_WRONLY) as f:
+            fcntl.ioctl(f, USBDEVFS_RESET, 0)
+    except Exception as e:
+        raise RuntimeError(f"{dev_path}: reset device failed: {e}") from e
+
 
 
 def _driver_rebind(bus_name, driver_name, device_name, strip_generations):
@@ -299,6 +324,57 @@ def action_driver_rebind_threshold_kernel_device(
     # and let the other function do it for us
     action_driver_rebind_threshold(_bus_name, _driver_name, _device_name,
                                    condition, entry, max_hits, period)
+
+
+
+def action_usb_device_reset(
+        bus_name, driver_name, device_name,
+        condition, entry, strip_generations = 0):
+    """
+    Reset a USB device
+
+    A device that is in a hosed state will be reset
+
+    :param str bus_name: name of bus in */sys/bus*
+    :param str driver_name: name of driver in
+      */sys/bus/BUS_NAME/drivers*
+    :param str device_name: name of the device in
+      */sys/bus/BUS_NAME/drivers/DRIVER_NAME*
+
+    :param str condition: condition in the configuration given to
+      :func:`config_watch_add` that caused this call
+    :param dict entry: Systemd journal entry that caused this call
+    """
+    if bus_name != "usb":
+        logging.error(
+            "ACTION: action_usb_device_reset: called for non-USB device:"
+            " bus %s driver %s device %s condition %s",
+            bus_name, driver_name, device_name, condition)
+        return
+
+    logging.error(
+        "ACTION: action_usb_device_reset: reset"
+        " bus %s driver %s device %s due to '%s'",
+        bus_name, driver_name, device_name, condition)
+
+    # so we get device_name +usb:19-1.4.1:1.0; we need
+    # /dev/bus/usb/BUSNUM/DEVNUM to do a reset ioctl...
+    #
+    # Ok, take the USB BUS PATH (19-1.4.1), we'll use it to get
+    # /sys/bus/usb/devices/USBBUSPATH/{devnum,busnum}
+    try:
+        _, usb_bus_path, _ = device_name.split(":", 3)
+        busnum = int(_sysfs_read(f"/sys/bus/usb/devices/{usb_bus_path}/busnum"))
+        devnum = int(_sysfs_read(f"/sys/bus/usb/devices/{usb_bus_path}/devnum"))
+        # /dev/bus/usb paths are three digits, zero prefixed
+        usb_device_reset(f"/dev/bus/usb/{busnum:03d}/{devnum:03d}")
+    except Exception as e:
+        # yeah, very generic handling, like if any of this fails,
+        # there was something like the the device dissapeared or sth
+        # like that
+        logging.error(
+            f"can't reset USB device {device_name}: {e}",
+            exc_info = True)
 
 
 _watch_rules = []
