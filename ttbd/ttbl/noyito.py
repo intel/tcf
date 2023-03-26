@@ -25,6 +25,8 @@ import ttbl._install
 import ttbl.capture
 import ttbl.power
 
+
+
 class mux_pc(ttbl.power.daemon_c):
     """
     Implement a multiplexor to read Noyitos' serial port to multiple users
@@ -66,7 +68,16 @@ class mux_pc(ttbl.power.daemon_c):
     """
 
     def __init__(self, serial_device, **kwargs):
-        assert isinstance(serial_device, str)
+        assert isinstance(serial_device, str) or callable(serial_device.__str__)
+        instrument_kws = {}
+        s = str(serial_device) if serial_device
+        if s != "":
+            instrument_kws['serial_device'] = s
+        if hasattr(serial_device, "usb_serial_number"):
+            instrument_kws['usb_serial_number'] = str(serial_device.usb_serial_number)
+        if hasattr(serial_device, "usb_sibling"):
+            instrument_kws['usb_sibling'] = str(serial_device.usb_sibling)
+
         ttbl.power.daemon_c.__init__(
             self,
             cmdline = [
@@ -78,15 +89,15 @@ class mux_pc(ttbl.power.daemon_c):
             **kwargs)
         self.serial_device = serial_device
         self.stdin = None
-        self.upid_set(f"Noyito 12-bit 10 channel ADC @{serial_device}",
-                      serial_device = serial_device)
+        self.upid_set(f"Noyito 12-bit 10 channel ADC",
+                      **instrument_kws)
 
 
     def on(self, target, component):
         # open serial port to set the baud rate, then ncat gets
         # started and it keeps the setting; default is 9600 8n1 no
         # flow control, so we explicitly set what the device needs 115200.
-        with serial.Serial(self.serial_device, 115200) as f:
+        with serial.Serial(str(self.serial_device), 115200) as f:
             self.stdin = f
             kws = dict(target.kws)
             kws['name'] = 'ncat'
