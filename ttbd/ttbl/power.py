@@ -1384,7 +1384,7 @@ class daemon_c(impl_c):
         try:
             for i in self.cmdline + self.cmdline_extra:
                 # some older Linux distros complain if this string is unicode
-                _cmdline.append(str(i % kws))
+                _cmdline.append(str(commonl.kws_expand(i, kws)))
             count += 1
         except KeyError as e:
             message = "configuration error? can't template command line #%d," \
