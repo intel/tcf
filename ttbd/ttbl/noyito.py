@@ -17,6 +17,7 @@ http://www.chinalctech.com/cpzx/Programmer/AD_DA_Module/68.html.
 import logging
 import os
 import subprocess
+import sys
 
 import serial
 
@@ -28,8 +29,7 @@ import ttbl.power
 
 
 class mux_pc(ttbl.power.daemon_c):
-    """
-    Implement a multiplexor to read Noyitos' serial port to multiple users
+    """Implement a multiplexor to read Noyitos' serial port to multiple users
 
     Noyito reports at 2 Hz the value of all the channels on the serial
     port; we will have multiple capturers, belonging to different
@@ -62,18 +62,27 @@ class mux_pc(ttbl.power.daemon_c):
     >>>     )
     >>> )
 
-    Unfortunately, it lacks a serial number to ease up multiple
-    devices. See :class:`ttbl.device_resolver_c` to map
-    based on other devices with a USB serial #, eg:
+    :param str device_spec: device to attach to; see
+      :class:`ttbl.device_resolver_c`
 
-    >>> "usb,#200443183011BA51985F,##_1:1.0"
+      Unfortunately, it lacks a serial number to ease up multiple
+      devices. See :class:`ttbl.device_resolver_c` to map
+      based on other devices with a USB serial #, eg:
 
-    meaning: use a device with USB serial number
-    *200443183011BA51985F* as reference; go one level up (_) in it's
-    BUS device path (eg: from 13-1.4.3.2 to 13-1.4.3) and add *.1:1.0*
-    to it (13-1.4.3.1:1.0) -- this works when we don't move devices
-    in the hubs and basically says "use the Noyito that is in port 1
-    of the hub where this other device is".
+      >>> "usb,#200443183011BA51985F,##_1:1.0"
+
+      meaning: use a device with USB serial number
+      *200443183011BA51985F* as reference; go one level up (_) in it's
+      BUS device path (eg: from 13-1.4.3.2 to 13-1.4.3) and add *.1:1.0*
+      to it (13-1.4.3.1:1.0) -- this works when we don't move devices
+      in the hubs and basically says "use the Noyito that is in port 1
+      of the hub where this other device is".
+
+      Note the USB Vendor and Product IDs are 1a86:7523, thus to match any:
+
+      >>> "usb,idVendor=1a86,idProduct=7523,##:1.0"
+
+      note we need to specify the interface (:1.0)
 
     """
 
@@ -102,8 +111,8 @@ class mux_pc(ttbl.power.daemon_c):
         device_resolver = ttbl.device_resolver_c(
             target, self.device_spec,
             f"instrumentation.{self.upid_index}.device_spec")
-        port = device_resolver.tty_find_by_spec()
-        with serial.Serial(port.device, 115200) as f:
+        tty_dev = device_resolver.tty_find_by_spec()
+        with serial.Serial(tty_dev, 115200) as f:
             self.stdin = f
             kws = dict()
             kws['name'] = 'ncat'
@@ -123,10 +132,11 @@ class mux_pc(ttbl.power.daemon_c):
 
 
 
-class channel_c(ttbl.capture.impl_c):
+class channel_c(ttbl.power.daemon_c, ttbl.capture.impl_c):
 
     def __init__(self, channels: dict,
-                 mux_component: str, mux_obj: mux_pc, **kwargs):
+                 mux_component: str, mux_obj: mux_pc,
+                 power_kwargs: dict = None, **kwargs):
         """Data capturer for NOYITO USB 10-Channel 12-Bit AD Data Acquisition
         Module AKA (STM32 UART Communication USB to Serial Chip CH340
         ADC Module)
@@ -215,9 +225,11 @@ class channel_c(ttbl.capture.impl_c):
         assert isinstance(mux_component, str)
         assert isinstance(mux_obj, mux_pc)
 
-        ttbl.capture.impl_c.__init__(
-            self, False, mimetype = "application/json",
-            **kwargs)
+        # the capture program is a python executable we run with this
+        # interpreter so later we can choose -- if we let the system
+        # choose, then we won't be able to test things starting
+        python_bin = os.path.realpath(sys.executable)
+
         self.mux_component = mux_component
         self.upid = mux_obj.upid
         self.capture_program = commonl.ttbd_locate_helper(
@@ -243,8 +255,36 @@ class channel_c(ttbl.capture.impl_c):
                 l.append("%s=%s" % (k, v))
             self.channell.append(":".join(l))
 
+        ttbl.capture.impl_c.__init__(
+            self, False, mimetype = "application/json",
+            **kwargs)
 
-    def start(self, target, capturer, path):
+        if power_kwargs == None:
+            power_kwargs = {}
+
+        # we use a deamon_c to start/stop the capture program;
+        # template the command line and set the params for it in
+        # self.kws before calling on() from start()
+        ttbl.power.daemon_c.__init__(
+            self,
+            cmdline = [
+                "stdbuf", "-e0", "-o0",
+                python_bin,
+                self.capture_program,
+                "%(path)s/%(mux_component)s-ncat.socket",
+                "%(capture_path)s/%(stream_filename)s"
+            ] + self.channell,
+            # the capture program is a python executable we run
+            check_path = python_bin,
+            **power_kwargs)
+
+        # these are to resolve the command line set in __init__ and
+        # for ttbl.power.daemon_c.on() to use
+        self.kws['name'] = 'noyito-capture'
+        self.kws['mux_component'] = self.mux_component
+
+
+    def start(self, target, capturer, capture_path):
         # power on the serial port capturer
         target.power.put_on(target, ttbl.who_daemon(),
                             { "component":  self.mux_component },
@@ -252,25 +292,20 @@ class channel_c(ttbl.capture.impl_c):
 
         stream_filename = capturer + ".data.json"
         log_filename = capturer + ".capture.log"
-        pidfile = "%s/capture-%s.pid" % (target.state_dir, capturer)
 
-        logf = open(os.path.join(path, log_filename), "w+")
-        p = subprocess.Popen(
-            [
-                "stdbuf", "-e0", "-o0",
-                self.capture_program,
-                "%s/%s-ncat.socket" % (target.state_dir, self.mux_component),
-                os.path.join(path, stream_filename),
-            ] + self.channell,
-            bufsize = -1,
-            close_fds = True,
-            shell = False,
-            stderr = subprocess.STDOUT, stdout = logf.buffer,
-        )
+        # these are to resolve the command line set in __init__ and
+        # for ttbl.power.daemon_c.on() to use
+        self.kws['stream_filename'] = stream_filename
+        # yesh, confusing: path vs capture_path -- a long legacy; path
+        # is the target's state dir; capture_path is where we are
+        # dumping the capture
+        self.kws['capture_path'] = capture_path
+        self.kws['path'] = target.state_dir
+        self.stderr_name = f"{capture_path}/{capturer}.capture.log"
 
-        with open(pidfile, "w+") as pidf:
-            pidf.write("%s" % p.pid)
-        ttbl.daemon_pid_add(p.pid)
+        self.kws['component'] = capturer
+        pidfile = commonl.kws_expand(self.pidfile, self.kws)
+        ttbl.power.daemon_c.on(self, target, capturer)
 
         return True, {
             "default": stream_filename,
@@ -278,7 +313,12 @@ class channel_c(ttbl.capture.impl_c):
         }
 
 
-    def stop(self, target, capturer, path):
-        pidfile = "%s/capture-%s.pid" % (target.state_dir, capturer)
-        commonl.process_terminate(pidfile, tag = "capture:" + capturer,
-                                  wait_to_kill = 2)
+    def verify(self, target, component, cmdline_expanded):
+        self.kws['component'] = component
+        return commonl.process_alive(
+            commonl.kws_expand(self.pidfile, self.kws), self.check_path) \
+            != None
+
+
+    def stop(self, target, capturer, _capture_path):
+        ttbl.power.daemon_c.off(self, target, capturer)
