@@ -125,7 +125,8 @@ class mux_pc(ttbl.power.daemon_c):
 
 class channel_c(ttbl.capture.impl_c):
 
-    def __init__(self, mux_component, mux_obj, channels, **kwargs):
+    def __init__(self, channels: dict,
+                 mux_component: str, mux_obj: mux_pc, **kwargs):
         """Data capturer for NOYITO USB 10-Channel 12-Bit AD Data Acquisition
         Module AKA (STM32 UART Communication USB to Serial Chip CH340
         ADC Module)
@@ -151,12 +152,6 @@ class channel_c(ttbl.capture.impl_c):
           to the device to capture the data (see below for details on
           the data format).
 
-
-        :param str mux_component: power component we need to start
-          to get the multiplexor working
-
-        :param str mux_component: multiplexor object
-
         :param dict channels: dictionary keyed by channel number (0-9)
           describing the parameters for each channel; the values are
           another dictionary with the following fields:
@@ -170,11 +165,16 @@ class channel_c(ttbl.capture.impl_c):
           - *cutoff*: (for bool, onoff) under what voltage it is
             considered *false* or *off*
 
-          >>>  {
-          >>>      3: { "mode": "bool", "cutoff": 1.2, },
-          >>>      4: { "mode": "onoff", "name": "flip", "cutoff": 2.2, },
-          >>>      5: { "mode": "voltages", "name": "level", },
-          >>>  },
+            >>>  {
+            >>>      3: { "mode": "bool", "cutoff": 1.2, },
+            >>>      4: { "mode": "onoff", "name": "flip", "cutoff": 2.2, },
+            >>>      5: { "mode": "voltages", "name": "level", },
+            >>>  },
+
+        :param str mux_component: power component we need to start
+          to get the multiplexor working
+
+        :param str mux_component: multiplexor object
 
         **Tech details**
 
@@ -210,9 +210,10 @@ class channel_c(ttbl.capture.impl_c):
         This device packs an stm32 MPU, can be reprogrammed, firmware at http://files.banggood.com/2018/06/SKU836210.zip
 
         """
-        assert isinstance(mux_component, str)
         assert isinstance(channels, dict), \
             "channels: expected a dictionary, got %s" % type(channels)
+        assert isinstance(mux_component, str)
+        assert isinstance(mux_obj, mux_pc)
 
         ttbl.capture.impl_c.__init__(
             self, False, mimetype = "application/json",
