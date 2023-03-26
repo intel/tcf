@@ -45,6 +45,7 @@ import warnings
 import __main__
 import requests
 import serial
+import serial.tools.list_ports
 import usb.util
 
 import commonl
@@ -2470,6 +2471,9 @@ def usb_serial_to_path(arg_serial, sibling_port = None):
     """
     Given a USB serial number, return it's USB path
 
+    DEPRECATED: use ttbl.device_resolver_c()
+
+
     Given, eg the serial number *4cb7b886a6b0*, it would return *1-9*,
     as what *lsusb.py* would report::
 
@@ -2518,6 +2522,8 @@ def usb_serial_to_path(arg_serial, sibling_port = None):
 def usb_device_by_serial(arg_serial, sibling_port = None, *fields):
     """Given a device with a given USB serial number, the sysfs path to
     it and maybe the contents of a list of its sysfs fields
+
+    DEPRECATED: use ttbl.device_resolver_c()
 
     Optionally, do it for one of its siblings (devices connected in
     another port of the same hub); this is mainly use to be able to
@@ -2606,6 +2612,10 @@ def usb_device_by_serial(arg_serial, sibling_port = None, *fields):
 
 
 def tty_by_usb_serial_number(usb_serial_number):
+    """
+    DEPRECATED: use ttbl.device_resolver_c()
+    """
+
     ports = serial.tools.list_ports.comports()
     f = filter(lambda port: port.serial_number == usb_serial_number, ports)
     try:
@@ -2619,6 +2629,8 @@ class late_resolve_tty_by_usb_serial_number(str):
     """
     Given a USB serial number, resolve it to a TTY device only when we
     are trying to use it.
+
+    DEPRECATED: use ttbl.device_resolver_c()
 
     :param str serial_number: USB Serial Number
 
@@ -2645,3 +2657,442 @@ def console_generation_set(target, console):
     target.fsdb.set("interfaces.console." + console + ".generation",
                     # trunc the time and make it a string
                     str(int(time.time())))
+
+
+class device_resolver_c:
+
+    def __init__(self, target: ttbl.test_target,
+                 spec: str, property_name: str = None):
+        """Resolve a device specification to a list of sysfs device paths,
+        TTY names, etc
+
+        To use, in any function that requires a device instantate
+        right before needing to use (eg: on :meth:`ttbl.power.impl_c.on`)
+
+        >>> dr = ttbl.device_resolver_c(target, "pnp,id:PNP0501")
+        >>> dr = ttbl.device_resolver_c(target, "usb,#8220814000,##:1.0",
+        >>>                             f"instrumentation.{self.upid_index}.device_spec")
+        >>> dr = ttbl.device_resolver_c(target, "usb,#203183BA85F,##__.2.3")
+        >>> dr = ttbl.device_resolver_c(target, "usb,idVendor=1a86,idProduct=7523,##:1.0")
+
+        Note how for most USB devices you might need to also specify
+        the interface (with *##1.0*), since drivers attach to
+        interfaces and devices might have multiple.
+
+        Them you can query a list of devices that match the spec:
+
+        >>> devicel = dr.devices_find_by_spec()
+        >>> ttyl = dr.ttys_find_by_spec()
+        >>> tty = dr.tty_find_by_spec()
+
+        Eventually the device specification would come from some
+        initial configuraiton directive and optionally a property can
+        be specified to runtime override it. It is highly
+        recommendable to add a property to override, so if there is a
+        need to replace the instrument, it can't be done without
+        having to restart the daemon.
+
+        :param ttbl.test_target target: target which will use this
+          device resolver.
+
+        :param str spec: always a str so it can be easily specified in
+          config files; it's general form is::
+
+            BUS,FIELD=VALUE,...FIELD:VALUE,..FIELD=VALUE
+
+          - *BUS* is a bus in */sys/bus*
+
+          - *usb,#SERIAL[,##USBRELATIVEPATH][,FIELD[=VALUE]][,FIELD[=VALUE]]*
+
+
+            if instead of = it is :, VALUE it is considered a regex.
+
+            - *#SERIAL* is short for *serial=SERIAL*
+
+              This is meant to match /sys/bus/*/devices/*/serial
+
+            - *##USBRELATIVEPATH* is short for *relative=PATH*
+
+              *relative* can be used to:
+
+              - address a device that has multiple interfaces::
+
+                   usb,#A5195F,##:4.0
+
+                means add interface denomination *:4.0* to the USB
+                device with serial number *A5195F*
+
+              - address a USB device that has no serial number but is
+                in a fixed positon to one that has.
+
+                For example, is in 13-4.5.2.3 and it has no serial
+                number, but on 13-4.5.1.1 there is a device with
+                serial number *203183BA85F*. So we can say that our
+                device is two levels up, and then on 2.3 from there::
+
+                  usb,#203183BA85F,##__.2.3"
+
+                Each underscore (_) at the beginning of the relative
+                path means *remove one path level from the end*
+                (*13-4.5.1.1* becomes *13-4.5*) and then add *.2.3* to
+                *13-4.5.2.3*.
+
+            A missing *VALUE* is interpreted as *True*
+
+            Keys and values can be URL encoded to include weird chars
+            or comma (,), = and :.
+
+            >>> val = urllib.parse.quote("key=:,=")
+
+          - */dev/SOMEDEV*
+
+        :param str property_name: (optional, default *None*) if
+          defined, try to get the value by scanning *property* in the
+          target.
+
+          The recommended property  name is
+
+          >>> "instrumentation.xxxx.device_spec"
+
+          where *xxxx* is a four alphanumeric characters (see
+          :class:`tt_interface_impl_c`), which can be obtained from any
+          interface implementation driver on
+          :data:`tt_interface_impl_c`.
+
+          >>> f"instrumentation.{self.upid_index}.device_spec")
+
+        **PENDING**
+
+        - expand target' kws in device spec when present
+
+        - support URL form device_spec (for network based devices)
+
+        - consider, for USB devices, automatically adding :1.0 if
+          nothing is specified since drivers attach to interfaces --
+          at least for TTY?
+        """
+
+        assert isinstance(spec, str), \
+            f"spec: expecting string, got {type(spec)}"
+        assert isinstance(target, ttbl.test_target), \
+            f"target: expecting ttbl.test_target, got {type(target)}"
+        assert isinstance(property_name, str), \
+            f"property_name: expecting string, got {type(spec)}"
+        self.spec = spec
+        self.target = target
+        self.property_name = property_name
+
+
+
+    def spec_get(self):
+        """
+        Return a resolved device specification and where it is
+        resolved from (builtin or from the current property)
+
+        This allows us to override the spec in a property, when needed
+
+        :returns: ( spec, origin )
+        """
+        # Get the value of the spec, overriding with a property (if specified)
+        if self.property_name:
+            spec = self.target.property_get(self.property_name, None)
+            if spec != None:
+                return spec, f"from property {self.property_name}"
+        return self.spec, "builtin"
+
+
+
+    def _match_value(self, match_value, value):
+        #
+        # See if match_value matches value
+        #
+        # match_value might be a regex or a string
+        if isinstance(match_value, re.Pattern):
+            m = match_value.search(value)
+            if not m:
+                return False
+            return True
+        if value != match_value:
+            return False
+        return True
+
+
+
+    def _match_fields_to_files(self, fields, path):
+        # matches dict of fields against files with the same name in
+        # path
+        #
+        # Mostly used against sysfs directories to find devices
+        match = False
+        for match_field, match_value in fields.items():
+            try:
+                with open(path + "/" + match_field) as f:
+                    # need rstrip() to remove trailing newline
+                    value = f.read().rstrip()
+                match = self._match_value(match_value, value)
+                if not match:
+                    return False
+            except IOError as e:
+                if e.errno == errno.ENOENT:
+                    return False	# file does not exist, no match
+        return True
+
+
+
+    def _match_fields_make(self, spec: str):
+        #
+        # Create a dictionary of match fields from a string
+        #
+        # :param str spec: comma separated list of fields (see class doc)
+        #
+        # :return dict: keyed by field name, value being regex or
+        #   string to match against
+        fieldl = spec.split(",")
+        fields = { }
+        for field in fieldl:
+            # we unquote with urllib, so we can put in there
+            # values which have = or :
+            if field.startswith("##"):
+                # shorthand ##SIBLING -> relative=SIBLING
+                key = 'relative'
+                val = urllib.parse.unquote(field[2:])
+            elif field.startswith("#"):
+                # shorthand #SERIAL -> serial=SERIAL
+                key = 'serial'
+                val = urllib.parse.unquote(field[1:])
+            elif '=' in field:
+                key, val = field.split('=', 1)
+                val = urllib.parse.unquote(val)
+            elif ':' in field:
+                key, val = field.split(':', 1)
+                val = re.compile(urllib.parse.unquote(val))
+            else:
+                key = field
+                val = True
+            key = urllib.parse.unquote(key)
+            fields[key] = val
+        return fields
+
+
+
+    def _device_relative_apply(self, devbuspath, relative):
+        # Given a USB device path (1-3.2) and a relative path from
+        # there (up two levels, add 4.2.4), calculate the new absolute
+        # USB path.
+        #
+        # In the relative path _ at the beginning of the string means
+        # one level up, __ two, etc. Then we append the rest:
+        #
+        # 1-3.2   __4.2.4 -> 1-4.2.4
+        # 1-4.3.2 _.5     -> 1-4.3.5
+        #
+
+        # most bus paths use the chars -.: to separate components
+        def _split_incl_splitter(s: str, splitters = "-.:"):
+            # Splits a string along any char in splitters, including the
+            # splitter char at the end; I'm sure there is a Python func for
+            # it, but I can't find it
+            #
+            # eg: 1-3.4.1 -> 1- 3. 4. 1
+            l = []
+            last = 0
+            index = 0
+            for c in s:
+                index += 1
+                if c in splitters:
+                    l.append(s[last:index])
+                    last = index
+            l.append(s[last:])
+            return l
+
+        levels_up = 0
+        downstream = ""
+        # calculate how many levels we have to remove from
+        # 1-3.2; each leading _ removes one level (eg: __ means 1-, _
+        # means 1-3.) Downstream is what we have to append after removing
+        for c in relative:
+            if c != "_":
+                downstream = relative[levels_up:]
+                break
+            levels_up += 1
+
+        # split 1-3.2 in 1-, 3. 2 (note we keep the split character)
+        devbuspathl = _split_incl_splitter(devbuspath)
+
+        if levels_up >= len(devbuspathl):
+            # if removing too many levels up, well nothing
+            return None
+        # so now get the top level -> 1-
+        if levels_up == 0:
+            # I guess I lernt [:0] wipes it...
+            top_l = devbuspathl
+        else:
+            top_l = devbuspathl[:-levels_up]
+
+        # Now recompose with the final object
+        # /sys/bus/usb/devices/1-4.2.4
+        return "".join(top_l) + downstream
+
+
+
+    def devices_find_by_spec(self, spec: str = None, origin: str = None):
+        """
+        Return list of devices that match the specificatoin
+
+        Params are the same as for the class and in most cases, not
+        needed, just for internal use.
+
+        :returns list[str]: syfs paths to */sys/bus/BUSNAME/devices/DEVICE*,
+          since those we can match with multiple things
+        """
+        if spec == None:
+            spec, origin = self.spec_get()
+        else:
+            assert isinstance(spec, str)
+            assert isinstance(origin, str)
+
+        # let's get the bus type; spec is BUS
+        bus, spec_bus = spec.split(",", 1)
+
+        busdir = f"/sys/bus/{bus}/devices"
+        if not os.path.isdir(busdir):
+            raise RuntimeError(
+                f"{spec} [@{origin}]: can't resolve;"
+                f" bus directory {busdir} does not exist")
+
+        # convert spec_bus into a dict keyed by field name, value is
+        # either a string or a regex to match againt
+        fields = self._match_fields_make(spec_bus)
+        # the relative field is handled separately, so remove it
+        # because it won't match against anything in the device
+        relative = fields.get('relative', None)
+        if relative != None:
+            del fields['relative']
+
+        # now iterate over busdir; eg, for USB, /sys/bus/usb/devices/*:
+        #
+        ## lrwxrwxrwx. 1 root root 0 Mar 25 01:18 1-0:1.0 -> ../../../devices/pci0000:00/0000:00:14.0/usb1/1-0:1.0
+        ## lrwxrwxrwx. 1 root root 0 Mar 25 01:18 1-10 -> ../../../devices/pci0000:00/0000:00:14.0/usb1/1-10
+        ## lrwxrwxrwx. 1 root root 0 Mar 25 01:18 1-10:1.0 -> ../../../devices/pci0000:00/0000:00:14.0/usb1/1-10/1-10:1.0
+        ## ...
+        #
+        # for each entry, there are files in that dir; for each field
+        # in fields, find a file with that name, read it, match on our
+        # value; if missing file or mismatch, that's a miss
+        #
+        # Filter allt he devices that match, because we might have to
+        # do extra filtering later
+        devicel = []
+        for device_path in glob.glob(busdir + "/*"):
+            match = self._match_fields_to_files(fields, device_path)
+            if not match:
+                continue
+            # ok, device_patch was a match -- do we have to apply relative?
+            device = os.path.basename(device_path)
+            if relative:
+                # we have a relative path to what was found, so let's
+                # transform it -- a relative path __.3.4
+                device_modified = self._device_relative_apply(
+                    device, relative)
+                if device_modified:
+                    devicel.append(busdir + "/" + device_modified)
+
+            else:
+                devicel.append(device_path)
+
+        self.target.log.info("device paths resolved from %s @%s: %s",
+                             spec, origin, " ".join(devicel))
+        return devicel
+
+
+    def ttys_find_by_spec(self):
+        """
+        Return a list of TTY device nodes (eg: /dev/ttyUSB3) that
+        match the device specification.
+
+        :returns list[str]: list of device nodes that match the
+          specification at the current time
+
+        Note this might change with time based on:
+
+        - what devices are connected to the system
+
+        - the value of the spec set in the property
+        """
+        spec, origin = self.spec_get()
+        if spec.startswith("/dev/"):	# a plain device node? just pull it
+            self.target.log.info("TTY resolved to device path %s @%s",
+                                 spec, origin)
+            return [ spec ]
+
+        # Ok, list all devices that match the spec
+        matching_portl = []
+        devicel = self.devices_find_by_spec(spec, origin)
+        if not devicel:
+            self.target.log.info("No TTYs can be resolved to %s @%s",
+                                 spec, origin)
+            return matching_portl
+
+        # Now get the list of ttys/comports and see which of them have
+        # the same device path as the ones we got in devicel
+        portl = serial.tools.list_ports.comports()
+        for busdevpath in devicel:
+            # convert the BUS relative devie patch to an absikute
+            # device path
+            #
+            # /sys/bus/BUS/device/BUSDEVPATH -> device_path
+            # '/sys/devices/pci0000:00/0000:00:14.0/usb1/1-3/1-3.1/1-3.1.7/1-3.1.7.3/1-3.1.7.3:1.0/
+            devpath = os.path.realpath(busdevpath)
+
+            for port in portl:
+                # now, for each comport in @portl, see if they match
+                # by looking at the device_path. each port has a bunch
+                # of fields, @port.__dict__ might look like:
+                #
+                ## {
+                ##     'device': '/dev/ttyUSB0',
+                ##     'name': 'ttyUSB0',
+                ##     '...
+                ##     'device_path': '/sys/devices/pci0000:00/0000:00:14.0/usb1/1-3/1-3.1/1-3.1.7/1-3.1.7.3/1-3.1.7.3:1.0/ttyUSB0',
+                ##     'subsystem': 'usb-serial',
+                ##     'usb_interface_path':
+                ##     '/sys/devices/pci0000:00/0000:00:14.0/usb1/1-3/1-3.1/1-3.1.7/1-3.1.7.3/1-3.1.7.3:1.0'
+                ## }
+                #
+                # @device_path, the most generic, includes ttyUSB or
+                # device node at the end. If we remove that, we we can
+                # match with the devpath we got from
+                # devices_find_by_spec()
+                port_devpath = os.path.dirname(port.device_path)
+                if devpath == port_devpath:
+                    matching_portl.append(port)
+
+        # yeah, not using filter or any of those. Why? not that many
+        # devices, so optimizatio is not such a huge deal (yet). Alo
+        # open coding is easier to maintain for some people.
+        self.target.log.info("TTYs resolved from %s @%s: %s",
+                             spec, origin,
+                             " ".join(port.device for port in matching_portl))
+        return matching_portl
+
+
+    def tty_find_by_spec(self):
+        """
+        Find a single device, complain if it is none or more than one
+
+        Otherwise, same as :meth:`ttys_find_by_spec`
+        """
+        portl = self.ttys_find_by_spec()
+        if not portl:
+            spec, origin = self.spec_get()
+            raise RuntimeError(
+                f"{self.target.id}: "
+                f"found no TTYs matching device spec {spec} @{origin}")
+        portn = len(portl)
+        if portn > 1:
+            spec, origin = self.spec_get()
+            raise RuntimeError(
+                f"{self.target.id}: "
+                f"found {portn} (more than one!) TTYs matching device spec"
+                " {spec} @{origin}")
+        return portl[0]
