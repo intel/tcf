@@ -135,18 +135,30 @@ class mux_pc(ttbl.power.daemon_c):
 class channel_c(ttbl.power.daemon_c, ttbl.capture.impl_c):
 
     def __init__(self, channels: dict,
-                 mux_component: str, mux_obj: mux_pc,
+                 mux_component: str = None, mux_obj: mux_pc = None,
+                 device_spec: str = None,
                  power_kwargs: dict = None, **kwargs):
-        """Data capturer for NOYITO USB 10-Channel 12-Bit AD Data Acquisition
+        """
+        Data capturer for NOYITO USB 10-Channel 12-Bit AD Data Acquisition
         Module AKA (STM32 UART Communication USB to Serial Chip CH340
         ADC Module)
 
         - http://www.chinalctech.com/cpzx/Programmer/AD_DA_Module/68.html
 
+        Two operating models:
+
+        - non-multiplexed: only one capturer will access the device;
+          specify only *device_spec*
+
+        - multiplexed: multiple capturers will use the device
+
+          Instantiate a multiplexor, add it to the power rail and pass
+          arguments *mux_component* and *mux_obj* to this class.
+
 
         The full driver sollution consists of:
 
-        - (optional) a power-rail component :class:`mux_pc` that
+        - a power-rail component :class:`mux_pc` that
           starts a multiplexor so multiple readers can get the serial
           output--this is needed when multiple capturers will sample
           from the same device
@@ -154,9 +166,6 @@ class channel_c(ttbl.power.daemon_c, ttbl.capture.impl_c):
         - for each group of signals that wants to be captured, a
           class:`channel_c` capturer has to be instantiated and added
           to the capture inteface.
-
-          If more than one is going to refer to the same device, it
-          has to use the multiplexor.
 
         - the :file:`../noyito-capture.py` script, which actuall talks
           to the device to capture the data (see below for details on
@@ -185,6 +194,81 @@ class channel_c(ttbl.power.daemon_c, ttbl.capture.impl_c):
           to get the multiplexor working
 
         :param str mux_component: multiplexor object
+
+        :param str device_spec: device to attach to; see
+          :class:`ttbl.device_resolver_c`
+
+          Unfortunately, it lacks a serial number to ease up multiple
+          devices. See :class:`ttbl.device_resolver_c` to map
+          based on other devices with a USB serial #, eg:
+
+          >>> "usb,#200443183011BA51985F,##_1:1.0"
+
+          meaning: use a device with USB serial number
+          *200443183011BA51985F* as reference; go one level up (_) in it's
+          BUS device path (eg: from 13-1.4.3.2 to 13-1.4.3) and add *.1:1.0*
+          to it (13-1.4.3.1:1.0) -- this works when we don't move devices
+          in the hubs and basically says "use the Noyito that is in port 1
+          of the hub where this other device is".
+
+          Note the USB Vendor and Product IDs are 1a86:7523, thus to match any:
+
+          >>> "usb,idVendor=1a86,idProduct=7523,##:1.0"
+
+          note we need to specify the interface (:1.0)
+
+        **Examples**
+
+        Multiplexed mode:
+
+        >>> ttbl.config.target_add(target, target_type = "example", tags = {})
+        >>>
+        >>> data_mux_1 = ttbl.noyito.mux_pc("usb,#200443183011BA51985F,##_2:1.0",
+        >>>                                 explicit = "off")
+        >>>
+        >>> target.interface_add("power",
+        >>>                      ttbl.power.interface(data_mux_1 = data_mux_1))
+        >>>
+        >>> target.interface_add("store", ttbl.config._iface_store)
+        >>>
+        >>> target.interface_add(
+        >>>     "capture",
+        >>>     ttbl.capture.interface(
+        >>>         ad = ttbl.noyito.channel_c(
+        >>>             {
+        >>>                 3: { "mode": "bool", "name": "redled", "cutoff": 1, },
+        >>>                 4: { "mode": "onoff", "name": "switch-A", "cutoff": 2, },
+        >>>                 5: { "mode": "voltages", "name": "sensor", },
+        >>>             },
+        >>>             mux_component = data_mux_1,
+        >>>             mux_obj = "data_mux_1",
+        >>>         ),
+        >>>     ),
+        >>> )
+        >>>
+        >>> ttbl.config.target_add(target)
+
+        Non-multiplexed mode::
+
+        >>> ttbl.config.target_add(target, target_type = "example", tags = {})
+        >>>
+        >>> target.interface_add("store", ttbl.config._iface_store)
+        >>>
+        >>> target.interface_add(
+        >>>     "capture",
+        >>>     ttbl.capture.interface(
+        >>>         ad = ttbl.noyito.channel_c(
+        >>>             {
+        >>>                 3: { "mode": "bool", "name": "redled", "cutoff": 1, },
+        >>>                 4: { "mode": "onoff", "name": "switch-A", "cutoff": 2, },
+        >>>                 5: { "mode": "voltages", "name": "sensor", },
+        >>>             },
+        >>>             device_spec = "usb,#200443183011BA51985F,##_2:1.0",
+        >>>         ),
+        >>>     ),
+        >>> )
+        >>>
+        >>> ttbl.config.target_add(target)
 
         **Tech details**
 
@@ -222,19 +306,32 @@ class channel_c(ttbl.power.daemon_c, ttbl.capture.impl_c):
         """
         assert isinstance(channels, dict), \
             "channels: expected a dictionary, got %s" % type(channels)
-        assert isinstance(mux_component, str)
-        assert isinstance(mux_obj, mux_pc)
+
+        if device_spec != None:
+            assert mux_component == None, \
+                "mux_component: expected None, device_spec is set"
+            assert mux_obj == None, \
+                "mux_obj: expected None, device_spec is set"
+            assert isinstance(device_spec, str), \
+                "device_spec: expected str; got {type(device_spec)}"
+        else:
+            assert isinstance(mux_component, str), \
+                "mux_component: expected str; got {type(mux_component)}"
+            assert isinstance(mux_obj, mux_pc), \
+                "mux_obj: expected ttbl.noyito.mux_pc; got {type(mux_obj)}"
 
         # the capture program is a python executable we run with this
         # interpreter so later we can choose -- if we let the system
         # choose, then we won't be able to test things starting
         python_bin = os.path.realpath(sys.executable)
-
-        self.mux_component = mux_component
-        self.upid = mux_obj.upid
         self.capture_program = commonl.ttbd_locate_helper(
             "noyito-capture.py", ttbl._install.share_path,
             log = logging, relsrcpath = ".")
+
+        self.mux_component = mux_component
+        self.mux_obj = mux_obj
+        self.device_spec = device_spec
+
         self.channell = []
         for channel, data in channels.items():
             assert isinstance(channel, int) and channel > 0 and channel <= 10, \
@@ -262,6 +359,11 @@ class channel_c(ttbl.power.daemon_c, ttbl.capture.impl_c):
         if power_kwargs == None:
             power_kwargs = {}
 
+        if self.device_spec:	# non-mux mode, capture from device straight
+            source = "%(capture_device)s"	# we'll resolve in start()
+        else:
+            source = "%(path)s/%(mux_component)s-ncat.socket"
+
         # we use a deamon_c to start/stop the capture program;
         # template the command line and set the params for it in
         # self.kws before calling on() from start()
@@ -271,7 +373,7 @@ class channel_c(ttbl.power.daemon_c, ttbl.capture.impl_c):
                 "stdbuf", "-e0", "-o0",
                 python_bin,
                 self.capture_program,
-                "%(path)s/%(mux_component)s-ncat.socket",
+                source,
                 "%(capture_path)s/%(stream_filename)s"
             ] + self.channell,
             # the capture program is a python executable we run
@@ -283,12 +385,15 @@ class channel_c(ttbl.power.daemon_c, ttbl.capture.impl_c):
         self.kws['name'] = 'noyito-capture'
         self.kws['mux_component'] = self.mux_component
 
+        if self.device_spec:	# non-mux mode, fill UPID
+            self.upid_set("Noyito 12-bit 10 channel ADC",
+                          device_spec = device_spec)
+        else:			# use mux's UPID, we are virtual
+            self.upid = mux_obj.upid
+
+
 
     def start(self, target, capturer, capture_path):
-        # power on the serial port capturer
-        target.power.put_on(target, ttbl.who_daemon(),
-                            { "component":  self.mux_component },
-                            None, None )
 
         stream_filename = capturer + ".data.json"
         log_filename = capturer + ".capture.log"
@@ -299,11 +404,22 @@ class channel_c(ttbl.power.daemon_c, ttbl.capture.impl_c):
         # yesh, confusing: path vs capture_path -- a long legacy; path
         # is the target's state dir; capture_path is where we are
         # dumping the capture
+        self.kws['component'] = capturer
         self.kws['capture_path'] = capture_path
         self.kws['path'] = target.state_dir
         self.stderr_name = f"{capture_path}/{capturer}.capture.log"
 
-        self.kws['component'] = capturer
+        if self.device_spec:	# non-mux mode, resolve %(capture_device)s
+            device_resolver = ttbl.device_resolver_c(
+                target, self.device_spec,
+                f"instrumentation.{self.upid_index}.device_spec")
+            tty_dev = device_resolver.tty_find_by_spec()
+            self.kws['capture_device'] = tty_dev
+        else:			# mux mode, ensure multiplexor is on
+            target.power.put_on(target, ttbl.who_daemon(),
+                                { "component":  self.mux_component },
+                                None, None )
+
         pidfile = commonl.kws_expand(self.pidfile, self.kws)
         ttbl.power.daemon_c.on(self, target, capturer)
 
