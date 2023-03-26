@@ -1204,8 +1204,20 @@ class daemon_c(impl_c):
       with the same command line and if any, report it as a possible
       bug.
 
+    :param str stderr_name: (optional) set a template for the name of
+      the file that will contain the stderr for the daemon.
+
+      Defaults to TARGETSTATEDIR/COMPONENT-NAME.stderr
+
+      Can be set before calling :meth:`on`
+
     Other parameters as to :class:ttbl.power.impl_c.
 
+    The *kws* member are keywords that can be used to expand the
+    command line; before calling :meth:`on`, they'll be expanded with
+    the target's keywords. This process is currently a wee messy,
+    since it just brings the whole inventory and in most cases there
+    is no need for all of it.
     """
     #: KEY=VALUE to add to the environment
     #: Keywords to add for templating the arguments
@@ -1215,6 +1227,7 @@ class daemon_c(impl_c):
                  pidfile = "%(path)s/%(component)s-%(name)s.pid",
                  mkpidfile = True, paranoid = False,
                  close_fds = True, kill_before_on: bool = True,
+                 stderr_name: str = None,
                  **kwargs):
         assert isinstance(cmdline, list), \
             "cmdline has to be a list of strings; got %s" \
@@ -1274,6 +1287,11 @@ class daemon_c(impl_c):
         self.close_fds = close_fds
         self.stdin = None
         self.kill_before_on = kill_before_on
+        #: Name template for the file to use to dump the process's
+        #: stderr; can be set before calling on(); can be templated
+        #: with kws
+        self.stderr_name = stderr_name
+
 
 
     def verify(self, target, component, cmdline_expanded):
@@ -1345,8 +1363,6 @@ class daemon_c(impl_c):
 
 
     def on(self, target, component):
-        stderrf_name = os.path.join(target.state_dir,
-                                    component + "-" + self.name + ".stderr")
 
         kws = dict(target.kws)
         if self.kws:
@@ -1356,6 +1372,12 @@ class daemon_c(impl_c):
         # bring in runtime properties (override the rest)
         kws.update(target.fsdb.get_as_dict())
         kws['component'] = component
+
+        # render the stderr file name, so a using class can override it
+        if self.stderr_name == None:
+            self.stderr_name = os.path.join(
+                target.state_dir, component + "-" + self.name + ".stderr")
+
         # render the real commandline against kws
         _cmdline = []
         count = 0
@@ -1381,7 +1403,7 @@ class daemon_c(impl_c):
             commonl.rm_f(pidfile)
         else:
             pidfile = None
-        stderrf = open(stderrf_name, "w+")
+        stderrf = open(commonl.kws_expand(self.stderr_name, kws), "w+")
 
         if self.kill_before_on:
             def _go_for_the_kill(cmdline_check):
