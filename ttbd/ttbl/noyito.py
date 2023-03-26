@@ -31,11 +31,11 @@ class mux_pc(ttbl.power.daemon_c):
     """
     Implement a multiplexor to read Noyitos' serial port to multiple users
 
-    Noyito reports at 2HZ the value of all the channels on the serial
+    Noyito reports at 2 Hz the value of all the channels on the serial
     port; we will have multiple capturers, belonging to different
     users, taking its output.
 
-    This multiplexor with ncat takes the serial port output and pipes
+    This multiplexor with *ncat* takes the serial port output and pipes
     it to a Unix domain socket.
 
     - use ncat because if there is no readers in the domain socket, it
@@ -62,21 +62,23 @@ class mux_pc(ttbl.power.daemon_c):
     >>>     )
     >>> )
 
-    (unfortunately, it lacks a serial number to ease up multiple
-    devices), see :class:`commonl.usb_path_by_sibling_late_resolve`
-    and similar to map based on other devices with a USB serial #.
+    Unfortunately, it lacks a serial number to ease up multiple
+    devices. See :class:`ttbl.device_resolver_c` to map
+    based on other devices with a USB serial #, eg:
+
+    >>> "usb,#200443183011BA51985F,##_1:1.0"
+
+    meaning: use a device with USB serial number
+    *200443183011BA51985F* as reference; go one level up (_) in it's
+    BUS device path (eg: from 13-1.4.3.2 to 13-1.4.3) and add *.1:1.0*
+    to it (13-1.4.3.1:1.0) -- this works when we don't move devices
+    in the hubs and basically says "use the Noyito that is in port 1
+    of the hub where this other device is".
+
     """
 
-    def __init__(self, serial_device, **kwargs):
-        assert isinstance(serial_device, str) or callable(serial_device.__str__)
-        instrument_kws = {}
-        s = str(serial_device) if serial_device
-        if s != "":
-            instrument_kws['serial_device'] = s
-        if hasattr(serial_device, "usb_serial_number"):
-            instrument_kws['usb_serial_number'] = str(serial_device.usb_serial_number)
-        if hasattr(serial_device, "usb_sibling"):
-            instrument_kws['usb_sibling'] = str(serial_device.usb_sibling)
+    def __init__(self, device_spec, **kwargs):
+        assert isinstance(device_spec, str)
 
         ttbl.power.daemon_c.__init__(
             self,
@@ -87,33 +89,36 @@ class mux_pc(ttbl.power.daemon_c):
             ],
             check_path = "/usr/bin/ncat",
             **kwargs)
-        self.serial_device = serial_device
         self.stdin = None
-        self.upid_set(f"Noyito 12-bit 10 channel ADC",
-                      **instrument_kws)
+        self.device_spec = device_spec
+        self.upid_set("Noyito 12-bit 10 channel ADC",
+                      device_spec = device_spec)
 
 
     def on(self, target, component):
         # open serial port to set the baud rate, then ncat gets
         # started and it keeps the setting; default is 9600 8n1 no
         # flow control, so we explicitly set what the device needs 115200.
-        with serial.Serial(str(self.serial_device), 115200) as f:
+        device_resolver = ttbl.device_resolver_c(
+            target, self.device_spec,
+            f"instrumentation.{self.upid_index}.device_spec")
+        port = device_resolver.tty_find_by_spec()
+        with serial.Serial(port.device, 115200) as f:
             self.stdin = f
-            kws = dict(target.kws)
+            kws = dict()
             kws['name'] = 'ncat'
             kws['component'] = component
+            kws['path'] = target.kws['path']
             commonl.rm_f(os.path.join(target.state_dir,
                                       f"{component}-ncat.socket"))
             ttbl.power.daemon_c.on(self, target, component)
 
 
     def verify(self, target, component, cmdline_expanded):
-        kws = dict(target.kws)
-        kws.update(self.kws)
-        # bring in runtime properties (override the rest)
-        kws.update(target.fsdb.get_as_dict())
+        kws = dict()
         kws['name'] = 'ncat'
         kws['component'] = component
+        kws['path'] = target.kws['path']
         return commonl.process_alive(self.pidfile % kws, self.check_path) != None
 
 
