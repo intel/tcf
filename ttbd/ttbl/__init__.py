@@ -2770,6 +2770,9 @@ class device_resolver_c:
         - consider, for USB devices, automatically adding :1.0 if
           nothing is specified since drivers attach to interfaces --
           at least for TTY?
+
+        - consider taking strings that are not in the URL form or
+          BUSNAME, as a serial number as a form of backwards compat
         """
 
         assert isinstance(spec, str), \
@@ -3004,6 +3007,7 @@ class device_resolver_c:
                              spec, origin, " ".join(devicel))
         return devicel
 
+    sysfs_tty_globs = [ "tty*", "tty/tty*" ]
 
     def ttys_find_by_spec(self):
         """
@@ -3033,9 +3037,25 @@ class device_resolver_c:
                                  spec, origin)
             return matching_portl
 
+        # While we could try to map directly instead of using
+        # comports(), we'd have to re-do a lot of that logic since
+        #
+        ## $ readlink -e /sys/class/tty/ttyACM12
+        ## /sys/devices/pci0000:3a/0000:3a:00.0/0000:3b:00.0/0000:3c:09.0/0000:40:00.0/usb9/9-1/9-1.1/9-1.1.1/9-1.1.1.1/9-1.1.1.1:1.0/tty/ttyACM12
+        ## $ readlink -e /sys/class/tty/ttyUSB2
+        ## /sys/devices/pci0000:5d/0000:5d:00.0/0000:5e:00.0/0000:5f:09.0/0000:63:00.0/usb17/17-1/17-1.2/17-1.2.2/17-1.2.2:1.0/ttyUSB2/tty/ttyUSB2
+        ## $ readlink -e 17-1.2.2:1.0
+        ## /sys/devices/pci0000:5d/0000:5d:00.0/0000:5e:00.0/0000:5f:09.0/0000:63:00.0/usb17/17-1/17-1.2/17-1.2.2/17-1.2.2:1.0
+        ##  readlink -e /sys/class/tty/ttyS0
+        ## /sys/devices/pnp0/00:04/tty/ttyS0
+        #
+        # so looking in the realpath of busdevpath for a tty name
+        # (tty/ttyACM*, or ttyUSB*) would get us there--and then just
+        # adding /dev--would save a lot of trashing.
+
+
         # Now get the list of ttys/comports and see which of them have
         # the same device path as the ones we got in devicel
-        portl = serial.tools.list_ports.comports()
         for busdevpath in devicel:
             # convert the BUS relative devie patch to an absikute
             # device path
@@ -3044,35 +3064,25 @@ class device_resolver_c:
             # '/sys/devices/pci0000:00/0000:00:14.0/usb1/1-3/1-3.1/1-3.1.7/1-3.1.7.3/1-3.1.7.3:1.0/
             devpath = os.path.realpath(busdevpath)
 
-            for port in portl:
-                # now, for each comport in @portl, see if they match
-                # by looking at the device_path. each port has a bunch
-                # of fields, @port.__dict__ might look like:
-                #
-                ## {
-                ##     'device': '/dev/ttyUSB0',
-                ##     'name': 'ttyUSB0',
-                ##     '...
-                ##     'device_path': '/sys/devices/pci0000:00/0000:00:14.0/usb1/1-3/1-3.1/1-3.1.7/1-3.1.7.3/1-3.1.7.3:1.0/ttyUSB0',
-                ##     'subsystem': 'usb-serial',
-                ##     'usb_interface_path':
-                ##     '/sys/devices/pci0000:00/0000:00:14.0/usb1/1-3/1-3.1/1-3.1.7/1-3.1.7.3/1-3.1.7.3:1.0'
-                ## }
-                #
-                # @device_path, the most generic, includes ttyUSB or
-                # device node at the end. If we remove that, we we can
-                # match with the devpath we got from
-                # devices_find_by_spec()
-                port_devpath = os.path.dirname(port.device_path)
-                if devpath == port_devpath:
-                    matching_portl.append(port)
+            # Ok, under devpath, find the tty device nodes, which are
+            # called tty something under tty* or tty/tty*
+            #
+            # /sys/devices/pci0000:5d/.../13-1.4.1/13-1.4.1.3/13-1.4.1.3:1.0/ttyUSB3
+            # /sys/devices/pci0000:5d/.../13-1.4.1/13-1.4.1.3/13-1.4.1.3:1.0/tty/ttyACM2
+            # /sys/devices/pnp0/00:03/tty/ttyS0
+            for tty_glob in self.sysfs_tty_globs:
+                for i in glob.glob(devpath + "/" + tty_glob):
+                    basename = os.path.basename(i)
+                    if basename == "tty":
+                        continue
+                    matching_portl.append("/dev/" + basename)
 
         # yeah, not using filter or any of those. Why? not that many
         # devices, so optimizatio is not such a huge deal (yet). Alo
         # open coding is easier to maintain for some people.
         self.target.log.info("TTYs resolved from %s @%s: %s",
                              spec, origin,
-                             " ".join(port.device for port in matching_portl))
+                             " ".join(matching_portl))
         return matching_portl
 
 
