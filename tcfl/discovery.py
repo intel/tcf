@@ -176,7 +176,7 @@ def is_tcf_testcase(path, from_path, tc_name, subcases_cmdline,
         # note we don't report this as an skipped testcase because it
         # is not a testcase, it is an skipped file that doesn't match
         # the patttern for a testcase
-        logger.info(f"skipping, filename doesn't match {tcf_file_regex.pattern}")
+        logger.info(f"tcfl.tc_c: skipping, filename doesn't match {tcf_file_regex.pattern}")
         return []
     # try to load the module.
     # note we are running this in a separate process, so we are not
@@ -187,8 +187,10 @@ def is_tcf_testcase(path, from_path, tc_name, subcases_cmdline,
             module_path.replace("/", "."), path)
         spec = importlib.util.spec_from_loader(loader.name, loader)
         module = importlib.util.module_from_spec(spec)
+        logger.info("loading module %s", path)
         loader.exec_module(module)
     except Exception as e:
+        logger.error("loading module %s failed: %s", path, e, exc_info = True)
         # we are trying to load as Python something that might not be,
         # so catch it all and return an error entry for it
         return [
@@ -207,8 +209,9 @@ def is_tcf_testcase(path, from_path, tc_name, subcases_cmdline,
     # Find all classes in the module
     try:
         classes = _classes_enumerate(path, module, logger = logger)
+        logger.info("enumerated %d classes: %s", len(classes), classes)
     except Exception as e:
-        logger.exception(e)
+        logger.error("exception enumerating classes: %s", e, exc_info = True)
         raise
     # Get instances of subclassess of tc_c class as testcases
     if classes == []:
@@ -218,11 +221,14 @@ def is_tcf_testcase(path, from_path, tc_name, subcases_cmdline,
         # did, it doesn't end up in sys.modules
         del module
         return []
+    logger.info("%s: found %d classes (%s)",
+                path, len(classes), ",".join(classes))
 
     # We found stuff
     tcs = []
     for _cls in classes:
         subcase_name = _cls.__name__
+        logger.info("%s: exploring testcase class %s", path, subcase_name)
         if subcase_name != "_driver" \
            and subcase_name != "_test" \
            and subcases_cmdline and subcase_name not in subcases_cmdline:
@@ -354,23 +360,27 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
         tc_name += "#" + "#".join(subcases_cmdline)
     for _tc_driver in tcfl.tc.tc_c._tc_drivers:
         testcases = []
+        logger.info("scanning with driver %s", _tc_driver)
         with tcfl.msgid_c(depth = 1) as _msgid:	# FIXME: remove, unneeded here
             try:
+                logger_driver = logger.getChild(f"[{_tc_driver}]")
+                logger_driver.info("scanning")
                 testcases += _is_testcase_call(
                     _tc_driver, tc_name,
                     file_name, from_path,
                     subcases_cmdline,
-                    logger = logger.getChild(f"[{type(_tc_driver).__name__}]"))
+                    logger = logger_driver)
+                logger_driver.info("found %d new testcases", len(testcases))
                 # a single file might contain more than one testcase
                 for testcase in testcases:
                     if isinstance(testcase, tcfl.tc_c):
                         # FIXME: warn once for each driver
-                        logger.warning(
+                        logger_driver.warning(
                             f"fix driver '{_tc_driver.__name__}' to return tcfl.tc_info_c")
                         tcis[file_name].append(_tc_info_from_tc_c(testcase))
                     elif isinstance(testcase, tcfl.tc_info_c):
-                        logger.info("testcase found @ %s by %s",
-                                     testcase.origin, _tc_driver)
+                        logger_driver.info("testcase found @ %s by %s",
+                                           testcase.origin, _tc_driver)
                         tcis[file_name].append(testcase)
                     else:
                         tcis[file_name].append(tcfl.tc_info_c(
@@ -384,6 +394,7 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
 
             # this is so ugly, need to merge better with result_c's handling
             except subprocess.CalledProcessError as e:
+                logger_driver.info("scanning exception: subprocess %s", e)
                 tcis[file_name].append(tcfl.tc_info_c(
                     tc_name, file_name,
                     subcase_spec = subcases_cmdline,
@@ -393,6 +404,7 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
                 ))
                 continue
             except OSError as e:
+                logger_driver.info("scanning exception: oserror %s", e)
                 attachments = dict(
                     errno = e.errno,
                     strerror = e.strerror
@@ -408,6 +420,7 @@ def _create_from_file_name(tcis, file_name, from_path, subcases_cmdline,
                 ))
                 continue
             except Exception as e:
+                logger_driver.info("scanning exception: %s", e)
                 tcis[file_name].append(tcfl.tc_info_c(
                     tc_name, file_name,
                     subcase_spec = subcases_cmdline,
@@ -536,6 +549,7 @@ class agent_c:
 
         logger = log_sub.getChild(path)
         tcis = collections.defaultdict(list)
+        logger.info("scanning for subcases %s", subcase_spec)
         try:
             _create_from_file_name(tcis, path, path, subcase_spec,
                                    logger = logger)
@@ -549,6 +563,7 @@ class agent_c:
                     if output:
                         tci.output += "Discovery Process output:\n" + output
         except Exception as e:
+            logger.error("scanning exception: %s", e, exc_info = True)
             # FIXME: send error code
             if hasattr(e, "origin"):
                 origin = getattr(e, "origin")
@@ -566,6 +581,7 @@ class agent_c:
                     formatted_traceback = traceback.format_tb(sys.exc_info()[2])
                 )
             ]
+        logger.info("scanning found %d testcases", len(tcis))
         self.queue.put({ "discovery_result": tcis })
 
 
