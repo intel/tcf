@@ -7207,7 +7207,9 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                     break
                 # From available candidates, pick one at random and
                 # mark it taken
-                (rt_fullid, bsp_model) = random.sample(rts_not_taken, 1)[0]
+                # need the sorted since in newer pythons,
+                # random.sample() requires it.
+                (rt_fullid, bsp_model) = random.sample(sorted(rts_not_taken), 1)[0]
                 rts_taken.add(rt_fullid)
                 perm[target_want_name] = (rt_fullid, bsp_model)
                 rt_type = self.rt_all[rt_fullid]['type']
