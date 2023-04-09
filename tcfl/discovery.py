@@ -260,18 +260,18 @@ def is_tcf_testcase(path, from_path, tc_name, subcases_cmdline,
 def _style_get(_tc_driver):
     # Backwards compat: determine which vesion type a testcase driver
     # is; is_testcase() signature that have evolved over the years
-    argspec = inspect.getargspec(_tc_driver.is_testcase)
-    if len(argspec.args) == 2:
+    signature = inspect.signature(_tc_driver.is_testcase)
+    if len(signature.parameters) == 1:
         return 2
     # v2: added from_path
-    if len(argspec.args) == 3:
+    if len(signature.parameters) == 2:
         return 3
     # v3; added tc_name, subcases
-    if len(argspec.args) == 5:
+    if len(signature.parameters) == 4:
         return 4
     raise AssertionError(
         "%s: unknown # of arguments %d to is_testcase()"
-        % (_tc_driver, len(argspec.args)))
+        % (_tc_driver, len(signature.parameters)))
 
 
 

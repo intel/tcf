@@ -523,12 +523,12 @@ class report_driver_c(object):
             origin = commonl.origin_get(2)
         setattr(obj, "origin", origin)
 
-        argspec = inspect.getfullargspec(cls.report)
-        if len(argspec.args) != 10:
+        signature = inspect.signature(cls.report)
+        if len(signature.parameters) != 10:
             # old style, bail out
             raise RuntimeError(
                 f"WARNING! Driver {cls} (@{origin}) is old style,"
-                f" please update to new report_driver_c.report() [{len(argspec.args)}]")
+                f" please update to new report_driver_c.report() [{len(signature.parameters)}]")
 
         obj.name = name
         cls._drivers.append(obj)
@@ -8216,19 +8216,19 @@ class tc_c(reporter_c, metaclass=_tc_mc):
                 return result
 
         def _style_get(_tc_driver):
-            argspec = inspect.getargspec(_tc_driver.is_testcase)
-            if len(argspec.args) == 2:
+            signature = inspect.signature(_tc_driver.is_testcase)
+            if len(signature.parameters) == 1:
                 return 2
             # v2: added from_path
-            elif len(argspec.args) == 3:
+            elif len(signature.parameters) == 2:
                 return 3
             # v3; added tc_name, subcases
-            elif len(argspec.args) == 5:
+            elif len(signature.parameters) == 4:
                 return 4
             else:
                 raise AssertionError(
                     "%s: unknown # of arguments %d to is_testcase()"
-                    % (_tc_driver, len(argspec.args)))
+                    % (_tc_driver, len(signature.parameters)))
 
         def _is_testcase_call(tc_driver, tc_name, file_name,
                               from_path, subcases_cmdline):
