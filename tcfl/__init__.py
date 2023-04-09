@@ -2102,8 +2102,10 @@ def assert_axes_valid(axes):
         return
     assert isinstance(axes, dict), \
         f"axes: expected dictionary, got {type(axes)}"
-    # first is list of args, first arg is 'axes'
-    axes_name = inspect.getfullargspec(assert_axes_valid)[0][0]
+    signature = inspect.signature(assert_axes_valid)
+    for axes_name in signature.parameters:
+        # get the first argument variable name, kinda tricky
+        break
     for k, v in axes.items():
         assert isinstance(k, str), \
             f"'{axes_name}' needs to be a dict keyed by string;" \
