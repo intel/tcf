@@ -2202,8 +2202,11 @@ class target_c(reporter_c):
 
 
     @classmethod
-    def create_from_cmdline_args(cls, args, target_name = None, iface = None,
-                                 extensions_only = None):
+    def create_from_cmdline_args(
+            cls, args, target_name = None, iface = None,
+            extensions_only = None,
+            # FIXME: add tcfl.targets.discovery_agent_c once import hell is fixed
+            target_discovery_agent = None):
         """
         Create a :class:`tcfl.tc.target_c` object from command line
           arguments
@@ -2211,12 +2214,9 @@ class target_c(reporter_c):
         :param argparse.Namespace args: arguments from argparse
         :param str target_name: (optional) name of the target, by
           default is taken from *args.target*.
-        :param str iface: (optional) target must support the given
-          interface, otherwise an exception is raised.
-        :param list extensions_only: (optional) list of extensions to
-          load; if *[]*, load no extensions, if *None* load all
-          extensions available/needed; otherwise, load only the
-          extensions listed by name.
+
+        Other parameters as of :meth:`create`.
+
         :returns: instance of :class:`tcfl.tc.target_c` representing
           said target, if it is available.
         """
@@ -2225,7 +2225,8 @@ class target_c(reporter_c):
                 raise RuntimeError("missing 'target' argument")
             target_name = getattr(args, 'target', None)
         target = cls.create(target_name,
-                            iface = iface, extensions_only = extensions_only)
+                            iface = iface, extensions_only = extensions_only,
+                            target_discovery_agent = target_discovery_agent)
         if args.ticket:
             target.ticket = args.ticket
             target.testcase.ticket = args.ticket
@@ -2233,24 +2234,50 @@ class target_c(reporter_c):
 
 
     @staticmethod
-    def create(target_name, iface = None, extensions_only = None):
+    def create(target_name, iface = None, extensions_only = None,
+               # FIXME: add tcfl.targets.discovery_agent_c once import hell is fixed
+               target_discovery_agent = None):
         """
         Create a :class:`tcfl.tc.target_c` object for a direct test
 
         :param str target_name: name of the target; this can be just
           an ID or a fullid (SERVER/ID).
+
         :param str iface: (optional) target must support the given
           interface, otherwise an exception is raised.
+
         :param list extensions_only: (optional) list of extensions to
           load; if *[]*, load no extensions, if *None* load all
           extensions available/needed; otherwise, load only the
           extensions listed by name.
+
+        :param tcfl.targets.discovery_agent_c target_discovery_agent:
+          (optional; default *None*) use new target discovery
+          API. This can be used as:
+
+          >>> import tcfl.config
+          >>> import tcfl.targets
+          >>> tcfl.config.setup()
+          >>> tcfl.targets.subsystem_setup()
+          >>> tcfl.tc.target_c.create("NAME", target_discovery_agent = tcfl.targets.discovery_agent)
+
+          this will evolve in the future to be less cumbersome as we
+          move everything to the new API by default.
+
         :returns: instance of :class:`tcfl.tc.target_c` representing
           said target, if it is available.
         """
-        _rtb, rt = ttb_client._rest_target_find_by_id(target_name)
-        target = target_c(rt, tc_global, None, "target",
-                          extensions_only = extensions_only)
+        if target_discovery_agent == None:	# COMPAT
+            _rtb, rt = ttb_client._rest_target_find_by_id(target_name)
+            target = target_c(rt, tc_global, None, "target",
+                              extensions_only = extensions_only)
+        else:
+            rt = target_discovery_agent.rts_flat[target_name]
+            rt = dict(rt)	# clone, don't modify original
+            rt['rtb'] = tcfl.ttb_client.rest_target_brokers[rt['rtb']]
+            target = target_c(rt, tc_global, None, "target",
+                              extensions_only = extensions_only)
+
         if iface != None and not iface in target.rt.get('interfaces', []):
             raise RuntimeError("%s: target does not support the %s interface"
                                % (target_name, iface))
