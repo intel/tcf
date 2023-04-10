@@ -56,7 +56,7 @@ Other target interfaces
 
 See :ref:`report reference <tcf_guide_report_driver>`.
 
-                
+
 *TCF* client configuration
 ==========================
 
@@ -72,7 +72,7 @@ See :ref:`report reference <tcf_guide_report_driver>`.
 .. automodule:: tcfl.tc_clear_bbt
 .. automodule:: tcfl.tc_jtreg
 
-                
+
 Target metadata
 ===============
 
@@ -396,7 +396,7 @@ Provisioning OS specific metadata
 
   This is used in :func:`tcfl.pos.fsinfo_read
   <tcfl.pos.extension.fsinfo_read>`.
-  
+
 .. _pos_reinitialize:
 
 - *pos_reinitialize*: when set to any value, the client provisioning
@@ -421,7 +421,7 @@ Provisioning OS specific metadata
   In order to be able to see or use this targer, a user must have
   *not* been granted one of the roles in the list. See :ref:`access
   control <target_access_control>`.
-  
+
 .. _uefi_boot_manager_ipv4_regex:
 
 - *uefi_boot_manager_ipv4_regex*: allows specifying a Python regular
@@ -461,7 +461,7 @@ iPXE specific metadata
 .. include:: 09-api-http.rst
 
 .. _ttbd_conf_api:
-             
+
 *ttbd* Configuration API for targets
 ====================================
 
