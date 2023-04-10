@@ -116,3 +116,9 @@ Other configuration settings
 
     This is useful in certain network or execution environments where
     they might be lags due to load that don't occur at individual level.
+
+
+Command line interface
+======================
+
+.. automodule:: tcfl.ui_cli_targets
