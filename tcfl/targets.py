@@ -414,12 +414,22 @@ def setup_by_spec(targetspecs: list[str], verbosity: int = 0,
     # us, we can directly modify its lists, deleting any target that
     # doesn't match the critera
 
-    for rtfullid in filter(
-            lambda rtfullid: not tcfl.targets.select_by_ast(
+    # the filter() function is fed a filtering agent
+    # `tcfl.targets.select_by_ast()`; we use an adaptor function
+    # instead of a lambda for clarity, since select_by_ast() function
+    # needs the ast expression and targets_all.
+
+    def _filter_rtfullid_by_ast(rtfullid):
+        if tcfl.targets.select_by_ast(
                 tcfl.targets.discovery_agent.rts_flat[rtfullid],
-                expr_ast, targets_all
-            ),
-            list(tcfl.targets.discovery_agent.rts_fullid_sorted)):
+                expr_ast, targets_all):
+            return False
+        return True
+
+    for rtfullid in filter(_filter_rtfullid_by_ast,
+                           # note we create another list since we are
+                           # going to modify it
+                           list(tcfl.targets.discovery_agent.rts_fullid_sorted)):
         tcfl.targets.discovery_agent.rts_fullid_sorted.remove(rtfullid)
         del tcfl.targets.discovery_agent.rts[rtfullid]
         del tcfl.targets.discovery_agent.rts_flat[rtfullid]
