@@ -37,6 +37,34 @@ An asynchronous way to initialize this module:
 
    >>> discovery_agent.update_complete(update_globals = True)
 
+
+Target selecttion specification, *targetspecs*
+----------------------------------------------
+
+.._ targetspecs:
+
+A target specification is a boolean expression that allows to
+specificy what target/s are to be selected.
+
+It uses values from the target's inventory to decide if a target is a
+match or not with the operators are: and, or, not, (, ), ==, !=, <,
+<=, >, >= , in and : (regular expression match) (see
+:mod:`commonl.expr_parser` for more details).
+
+Each value from the inventory is a symbol (eg:
+interfaces.power.AC.instrument); a missing symbol evaluates as
+*False*. Thus examples can be:
+
+ - *owner*: evaluates to true on any target that is currently
+   allocated to anyone
+
+ - *ram.size_gib > 2 and disks.count > 1*: evaluates to true on any
+   target that has any RAM more than 2 GiB and two installed disks.
+
+
+See also :func:`tcfl.targets.select_by_ast` :mod:`commonl.expr_parser`
+for implementation details.
+
 """
 # FIXME:
 #
@@ -221,13 +249,13 @@ def select_by_ast(rt_flat: dict,
 
        >>> tcfl.targets.discovery_agent.rts_flat['SERVER/TARGETNAME']
 
-    :param tuple expr_ast: compiled AST expression
+    :param tuple expr_ast: compiled targetspec AST expression
 
        >>> expr_ast = commonl.expr_parser.precompile("ram.size_gib > 2")
 
        The fields in the expression are inventory fields; the expression
-       is compiled with :func:`commonl.expr_parser.precompile`. FIXME:
-       further doc link for language.
+       is compiled with :func:`commonl.expr_parser.precompile`. See
+       more information on :ref:`targetspecs <targetspecs>`.
 
     :param bool include_disabled: consider disabled targets or not
        (disabled targets are those that have a *disabled* field set to
@@ -253,6 +281,148 @@ def select_by_ast(rt_flat: dict,
     if expr_ast and not commonl.expr_parser.parse("", rt_flat, expr_ast):
         return False
     return True
+
+
+
+def setup_by_spec(targetspecs: list[str], verbosity: int = 0,
+                  project: set[str] = None, targets_all: bool = False):
+    """
+    Setup the target system and discover just targets that match a
+    condition.
+
+    This can be way faster when only a few fields are needed, since
+    full inventories don't have to be downloaded. It is useful for
+    command line tools that don't need the whole inventory.
+
+    In most conditions, the most basic fields needed are:
+
+    - *id*
+    - *disabled*
+    - *type*
+
+    which is enough for most operations; f a :ref:`target spec
+    <targetspec>` is provided , then the fields needed for evaluating
+    it are also pulled.
+
+    Upon return, *tcfl.targets.discovery_agent* is initialized with
+    possibly a limited amount of targets and fields as per the
+    specifications.
+
+    :param list[str] targetspecs: list of target specifications to use
+      to filter (all the target specificatons are ORed together; in
+      most cases, a single one is all that is needed)
+
+      See more information on :ref:`targetspecs <targetspecs>`.
+
+    :param int verbosity: (optional; default 0) verbosity the system
+      will implement; this is needed so we can calculate which fields
+      are to be pulled from the inventories.
+
+      A verbosity higher than 0 needs all the fields from the
+      inventory (because it will report on them). A verbosity of zero
+      needs only the most basic fields plus those needed to evaluate
+      the filter expression.
+
+    :param set[str] project: (optional; default guess) set of fields
+      from the inventory to load.
+
+    :param bool targets_all: (optional; default *False*) consider also
+      *disabled* targets (ignored by default).
+
+    """
+    # let's do some voodoo (for speed) -- we want to load (project)
+    # only the minimum amount of fields we need for doing what we need
+    # so, guess those.
+    if project == None:
+        if verbosity >= 1:
+	    # we want verbosity, no fields were specified, so ask for
+            # all fields (None); makes no sense with verbosity <=1, since it
+            # only prints ID, owner
+            project = None
+        else:
+            project = { 'id', 'disabled', 'type' }
+    else:
+        assert isinstance(project, set), \
+            "project: expected set of strings; got {type(set)}"
+
+    # ensure the name and the disabled fields (so we can filter on it)
+    # if we are only doing "tcf ls" to list target NAMEs, then
+    # we don't care whatsoever by the rest of the fields, so
+    # don't get them, except for disabled, to filter on it.
+    logger.info(f"original projection list: {project}")
+    if project != None:
+        project.update({ 'id', 'disabled', 'type' })
+        if verbosity >= 0:
+            project.add('interfaces.power.state')
+            project.add('owner')
+    logger.info(f"updated projection list: {project}")
+
+    # parse TARGETSPEC, if any -- because this will ask for extra
+    # fields from the inventory, so we'll have to add those to what we
+    # are asking from the server
+    # we need to decide which fields are requested by the
+    # targetspec specification
+    expressionl = [ ]
+    for spec in targetspecs:
+        expressionl.append("( " + spec + " ) ")
+        # combine expressions in the command line with OR, so
+        # something such as
+        #
+        #   $ tcf ls TARGET1 TARGET2
+        #
+        # lists both targets
+    if expressionl:
+        expression = "(" + " or ".join(expressionl) + ")"
+        logger.info(f"filter expression: {expression}")
+        expr_ast = commonl.expr_parser.precompile(expression)
+        expr_symbols = commonl.expr_parser.symbol_list(expr_ast)
+        logger.info(f"symbols from target filters: {', '.join(expr_symbols)}")
+    else:
+        logger.info("no extra symbols from target filters")
+        expr_ast = None
+        expr_symbols = []
+
+    # aah...projections -- we want the minimum amount of fields so we
+    # can pull the data as fast as possible; need the following
+    # minimum deck of fields:
+    #
+    # - id, disabled
+    #
+    # - any field we are testing ("ram.size == 32")
+    fields = project
+    if expr_symbols:		# bring anything from fields we are testing
+        if fields == None:
+            # if fields is None, keep it as None as it will pull ALL of them
+            logger.info(f"querying all fields, so not upating from filter"
+                        f" expression ({', '.join(expr_symbols)})")
+        else:
+            fields.update(expr_symbols)
+            logger.info(f"fields from filter expression: {', '.join(fields)}")
+
+    # so now we are actually querying the servers; this will
+    # initialize the servers, discover them and them query them for
+    # the target list and the minimum amount of inventory needed to
+    # filter and display
+    if fields:
+        logger.info(f"querying inventories with fields: {', '.join(fields)}")
+    else:
+        logger.info("querying inventories with all fields")
+    # FIXME: setup to an specific object and return it?
+    tcfl.targets.subsystem_setup(projections = fields)
+
+    # filter targets: because this discovery agent is created just for
+    # us, we can directly modify its lists, deleting any target that
+    # doesn't match the critera
+
+    for rtfullid in filter(
+            lambda rtfullid: not tcfl.targets.select_by_ast(
+                tcfl.targets.discovery_agent.rts_flat[rtfullid],
+                expr_ast, targets_all
+            ),
+            list(tcfl.targets.discovery_agent.rts_fullid_sorted)):
+        tcfl.targets.discovery_agent.rts_fullid_sorted.remove(rtfullid)
+        del tcfl.targets.discovery_agent.rts[rtfullid]
+        del tcfl.targets.discovery_agent.rts_flat[rtfullid]
 
 
 
