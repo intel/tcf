@@ -7,7 +7,7 @@
 #
 """
 Command line interface UI to discover and run testcases
-=======================================================
+-------------------------------------------------------
 
 The following UI commands are available (use ``--help`` on each to
 learn more about them):
