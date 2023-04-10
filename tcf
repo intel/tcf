@@ -526,6 +526,8 @@ if __name__ == "__main__":
 
     import tcfl.ui_cli_targets
     tcfl.ui_cli_targets._cmdline_setup(arg_subparsers)
+    import tcfl.ui_cli_power2
+    tcfl.ui_cli_power2._cmdline_setup(arg_subparsers)
 
     # extra stuff that is not adding to the API, just to the command
     # line interface

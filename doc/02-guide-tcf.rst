@@ -122,3 +122,4 @@ Command line interface
 ======================
 
 .. automodule:: tcfl.ui_cli_targets
+.. automodule:: tcfl.ui_cli_power2
