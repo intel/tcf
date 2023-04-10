@@ -7,6 +7,8 @@ APIs
 
 .. automodule:: tcfl.tc
 
+.. automodule:: tcfl.ui_cli
+
 Test library (utilities for testcases)
 --------------------------------------
 
