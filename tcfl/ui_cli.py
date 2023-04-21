@@ -86,7 +86,8 @@ def args_targetspec_add(
 def run_fn_on_each_targetspec(
         fn: callable, cli_args: argparse.Namespace,
         *args,
-        iface: str = None, extensions_only: list[str] = None,
+        # COMPAT: removing list[str] so we work in python 3.8
+        iface: str = None, extensions_only: list = None,
         **kwargs):
     """
     Initialize the target discovery and run a function on each target

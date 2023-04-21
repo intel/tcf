@@ -653,7 +653,8 @@ class agent_c:
         return tcis
 
 
-    def run(self, paths: list[str], manifests: list[str] = None,
+    # COMPAT: removing list[str] so we work in python 3.8
+    def run(self, paths: list, manifests: list = None,
             filter_spec = None, testcase_name = None):
 
         if manifests:

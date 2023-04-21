@@ -284,8 +284,9 @@ def select_by_ast(rt_flat: dict,
 
 
 
-def setup_by_spec(targetspecs: list[str], verbosity: int = 0,
-                  project: set[str] = None, targets_all: bool = False):
+# COMPAT: removing list[str] so we work in python 3.8
+def setup_by_spec(targetspecs: list, verbosity: int = 0,
+                  project: set = None, targets_all: bool = False):
     """
     Setup the target system and discover just targets that match a
     condition.
