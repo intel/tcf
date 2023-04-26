@@ -780,6 +780,19 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None):
       the same for an object uniquely identifed by *args* and *kwargs*
       over multiple executions in different processes.
 
+    An exception can be ignored (not cached) if it has an attribute
+    *cacheable* set to *False*:
+
+    >>> raise RuntimeError("some error we shall not cache").cacheable = False
+
+    or
+
+    >>> e = RuntimeError("some error we shall not cache")
+    >>> e.cacheable = False
+    >>> raise e
+
+    This is useful to ensure transient errors are retried insted of
+    cached (which might be valid too based on circumstances).
     """
 
     def _lru_cache_disk(fn):
@@ -806,6 +819,8 @@ def lru_cache_disk(path, max_age_s, max_entries, key_maker = None):
                         fn.cache.set_unlocked(key, pickle.dumps((r, None )))
                     return r
                 except Exception as e:
+                    if getattr(e, "cacheable", True) == False:
+                        raise
                     with fn.cache.lock():
                         fn.cache.lru_cleanup_unlocked(max_entries)
                         fn.cache.set_unlocked(key, pickle.dumps((None, e)))
