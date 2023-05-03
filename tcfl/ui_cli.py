@@ -19,6 +19,11 @@ import numbers
 
 logger = logging.getLogger("ui_cli")
 
+# when replacing an old command implementation with a new one, append
+# this in the name so we can switch them  from the environment (see
+# ../tcf handing env variable TCF_NEW_COMMANDS
+commands_old_suffix = ""
+commands_new_suffix = "2"
 
 def args_verbosity_add(ap: argparse.Namespace):
     """
