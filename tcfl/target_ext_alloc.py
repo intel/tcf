@@ -619,9 +619,9 @@ except KeyError:
 
 def _cmdline_setup(arg_subparsers):
     ap = arg_subparsers.add_parser(
-        "alloc-targets",
+        "acquire",
         help = "Allocate targets for exclusive use")
-    commonl.argparser_add_aka(arg_subparsers, "alloc-targets", "acquire")
+    commonl.argparser_add_aka(arg_subparsers, "acquire", "alloc-targets")
     ap.add_argument(
         "-a", "--all", action = "store_true", default = False,
         help = "Consider also disabled targets")
@@ -731,6 +731,9 @@ def _cmdline_setup(arg_subparsers):
         action = "store", default = [],
         help = "Allocation IDs to remove")
     ap.set_defaults(func = _cmdline_alloc_delete)
+
+
+def _cmdline_setup_intermediate(arg_subparsers):
 
     ap = arg_subparsers.add_parser(
         "guest-add",
