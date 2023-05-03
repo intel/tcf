@@ -166,7 +166,7 @@ def _target_property_get(args):
         r = target.property_get(args.property)
         if r:	# print nothing if None
             print(r)
-        
+
 
 def _target_disable(args):
     with tcfl.msgid_c("cmdline"):
@@ -288,7 +288,7 @@ if __name__ == "__main__":
     tcfl.tc.version = commonl.version_get(tcfl, "tcf")
 
     if "TCF_NEW_COMMANDS" in os.environ:
-        tcfl.ui_cli.commands_old_suffix = "-1"
+        tcfl.ui_cli.commands_old_suffix = "-old"
         tcfl.ui_cli.commands_new_suffix = ""
     else:
         tcfl.ui_cli.commands_old_suffix = ""
@@ -410,17 +410,6 @@ if __name__ == "__main__":
                     help = "User's login ID")
     ap.set_defaults(func = ttb_client.rest_login)
 
-    ap = arg_subparsers.add_parser("cookies",
-                                   help = "Show logging cookies (to feed"
-                                   " into curl, etc) maybe only for one server")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = [], help = "Target name")
-    ap.add_argument("-c","--cookiejar", action = "store_true", default = False,
-                    help = "Print in cookiejar format"
-                    " (https://curl.se/docs/http-cookies.html)")
-    ap.add_argument("-j","--json", action = "store_true", default = False,
-                    help = "Print in JSON format")
-    ap.set_defaults(func = _cookies)
 
     arg_parser_target_list = arg_subparsers.add_parser(
         f"ls{tcfl.ui_cli.commands_old_suffix}",
@@ -449,6 +438,21 @@ if __name__ == "__main__":
         "'zephyr_board and not type:\"^qemu.*\"'")
     arg_parser_target_list.set_defaults(func = ttb_client.rest_target_list)
 
+
+    arg_parser_target_release = arg_subparsers.add_parser(
+        "release", help = "Release ownership of a target")
+    arg_parser_target_release.add_argument(
+        "-f", "--force", action = "store_true", default = False,
+        help = "Force release of a target you don't own (only admins)")
+    arg_parser_target_release.add_argument(
+        "target", metavar = "TARGET", action = "store", default = None,
+        nargs = "+", help = "Target's name or URL")
+    arg_parser_target_release.set_defaults(func = ttb_client.rest_target_release)
+
+
+
+    # Semi advanced commands
+
     ap = arg_subparsers.add_parser(
         "get", help = "Return target information straight from the "
         "server formated as JSON (unlike 'list', which will add some "
@@ -461,14 +465,64 @@ if __name__ == "__main__":
                     default = None, help = "Target's name")
     ap.set_defaults(func = _target_get)
 
-    ap = arg_subparsers.add_parser(
-        "patch", help = "Store target information in the server")
+
+    ap = arg_subparsers.add_parser("property-set",
+                                   help = "Set a target's property")
     ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name")
-    ap.add_argument("data", metavar = "KEY=JSON-VALUE", nargs = "*",
-                    default = None, help = "Data items to store; if"
-                    " none, specify a JSON dictionary over stdin")
-    ap.set_defaults(func = _target_patch)
+                    default = None, help = "Target's name or URL")
+    ap.add_argument("property", metavar = "PROPERTY", action = "store",
+                    default = None, help = "Name of property to set")
+    ap.add_argument("value", metavar = "VALUE", action = "store",
+                    nargs = "?",
+                    default = None, help = "Value of property (none "
+                    "to remove it; i:INTEGER, f:FLOAT b:false or b:true,"
+                    " otherwise it is considered a string)")
+    ap.set_defaults(func = _target_property_set)
+
+
+    ap = arg_subparsers.add_parser("property-get",
+                                   help = "Get a target's property")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target's name or URL")
+    ap.add_argument("property", metavar = "PROPERTY", action = "store",
+                    default = None, help = "Name of property")
+    ap.set_defaults(func = _target_property_get)
+
+
+
+    ap = arg_subparsers.add_parser("healthcheck",
+                                   help = "Do a very basic health check")
+    ap.set_defaults(level = logging.ERROR)
+    ap.add_argument(
+        "-i", "--interface", metavar = "INTERFACE",
+        dest = "interfaces", action = "append", default = [],
+        help = "Names of interfaces to healtcheck (default all "
+        "exposed by the target)")
+    ap.add_argument(
+        "-p", "--priority", action = "store", type = int, default = 500,
+        help = "Priority (0 highest, 999 lowest)")
+    ap.add_argument(
+        "--preempt", action = "store_true", default = False,
+        help = "Enable preemption (disabled by default)")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = None, help = "Target's name or URL")
+    ap.set_defaults(func = healthcheck)
+
+
+    # advanced commands
+
+    ap = arg_subparsers.add_parser("cookies",
+                                   help = "Show logging cookies (to feed"
+                                   " into curl, etc) maybe only for one server")
+    ap.add_argument("target", metavar = "TARGET", action = "store",
+                    default = [], help = "Target name")
+    ap.add_argument("-c","--cookiejar", action = "store_true", default = False,
+                    help = "Print in cookiejar format"
+                    " (https://curl.se/docs/http-cookies.html)")
+    ap.add_argument("-j","--json", action = "store_true", default = False,
+                    help = "Print in JSON format")
+    ap.set_defaults(func = _cookies)
+
 
     ap = arg_subparsers.add_parser("enable",
                                    help = "Enable a disabled target")
@@ -485,37 +539,21 @@ if __name__ == "__main__":
                     help = "Reason why targets are disabled")
     ap.set_defaults(func = _target_disable)
 
-    ap = arg_subparsers.add_parser("property-set",
-                                   help = "Set a target's property")
+
+    ap = arg_subparsers.add_parser(
+        "patch", help = "Store target information in the server")
     ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("property", metavar = "PROPERTY", action = "store",
-                    default = None, help = "Name of property to set")
-    ap.add_argument("value", metavar = "VALUE", action = "store",
-                    nargs = "?",
-                    default = None, help = "Value of property (none "
-                    "to remove it; i:INTEGER, f:FLOAT b:false or b:true,"
-                    " otherwise it is considered a string)")
-    ap.set_defaults(func = _target_property_set)
-
-    ap = arg_subparsers.add_parser("property-get",
-                                   help = "Get a target's property")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("property", metavar = "PROPERTY", action = "store",
-                    default = None, help = "Name of property")
-    ap.set_defaults(func = _target_property_get)
+                    default = None, help = "Target's name")
+    ap.add_argument("data", metavar = "KEY=JSON-VALUE", nargs = "*",
+                    default = None, help = "Data items to store; if"
+                    " none, specify a JSON dictionary over stdin")
+    ap.set_defaults(func = _target_patch)
 
 
-    arg_parser_target_release = arg_subparsers.add_parser(
-        "release", help = "Release ownership of a target")
-    arg_parser_target_release.add_argument(
-        "-f", "--force", action = "store_true", default = False,
-        help = "Force release of a target you don't own (only admins)")
-    arg_parser_target_release.add_argument(
-        "target", metavar = "TARGET", action = "store", default = None,
-        nargs = "+", help = "Target's name or URL")
-    arg_parser_target_release.set_defaults(func = ttb_client.rest_target_release)
+    ap = arg_subparsers.add_parser("cache-flush",
+                                   help = "wipe all caches")
+    ap.set_defaults(func = _cache_flush)
+
 
     # Setup different modules and drivers
     tcfl.tc.argp_setup(arg_subparsers)
@@ -548,28 +586,6 @@ if __name__ == "__main__":
 
     import tcfl.ui_cli_testcases
     tcfl.ui_cli_testcases._cmdline_setup(arg_subparsers)
-
-    ap = arg_subparsers.add_parser("healthcheck",
-                                   help = "Do a very basic health check")
-    ap.set_defaults(level = logging.ERROR)
-    ap.add_argument(
-        "-i", "--interface", metavar = "INTERFACE",
-        dest = "interfaces", action = "append", default = [],
-        help = "Names of interfaces to healtcheck (default all "
-        "exposed by the target)")
-    ap.add_argument(
-        "-p", "--priority", action = "store", type = int, default = 500,
-        help = "Priority (0 highest, 999 lowest)")
-    ap.add_argument(
-        "--preempt", action = "store_true", default = False,
-        help = "Enable preemption (disabled by default)")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.set_defaults(func = healthcheck)
-
-    ap = arg_subparsers.add_parser("cache-flush",
-                                   help = "wipe all caches")
-    ap.set_defaults(func = _cache_flush)
 
     argcomplete.autocomplete(arg_parser)
     global args
