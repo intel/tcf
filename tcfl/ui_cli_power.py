@@ -154,7 +154,7 @@ def _cmdline_power_list(cli_args: argparse.Namespace):
         verbosity = cli_args.verbosity - cli_args.quietosity
         if verbosity < 2:
             _state = _state_to_str(state)
-            print(f"overall: {_state} ({substate})")
+            print(f"{target.id}: overall: {_state} ({substate})")
             for component, data in components.items():
                 state = data['state']
                 explicit = data.get('explicit', None)
@@ -170,12 +170,13 @@ def _cmdline_power_list(cli_args: argparse.Namespace):
         elif verbosity == 2:
             r = dict(state = state, substate = substate,
                      components = components)
-            commonl.data_dump_recursive(r, prefix = target.fullid)
+            commonl.data_dump_recursive(r, prefix = target.id)
 
         else:  # verbosity >= 2:
-            r = dict(state = state, substate = substate,
-                     components = components)
-            print(json.dumps(r, skipkeys = True, indent = 4))
+            r = { target.id: dict(state = state, substate = substate,
+                                  components = components) }
+            json.dump(r, sys.stdout, skipkeys = True, indent = 4)
+            print(",")
         sys.stdout.flush()
 
 
