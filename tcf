@@ -35,6 +35,7 @@ import tcfl.ttb_client as ttb_client
 import tcfl.tc
 import tcfl.config
 import tcfl._install
+import tcfl.ui_cli
 
 # I bet there is a better way to do this...but we need the symbol to
 # be in the logging module so that it is not included in the "function
@@ -285,6 +286,14 @@ def _cookies(args):
 
 if __name__ == "__main__":
     tcfl.tc.version = commonl.version_get(tcfl, "tcf")
+
+    if "TCF_NEW_COMMANDS" in os.environ:
+        tcfl.ui_cli.commands_old_suffix = "-1"
+        tcfl.ui_cli.commands_new_suffix = ""
+    else:
+        tcfl.ui_cli.commands_old_suffix = ""
+        tcfl.ui_cli.commands_new_suffix = "2"
+
     arg_parser = argparse.ArgumentParser()
     commonl.cmdline_log_options(arg_parser)
     # FIXME: should be in cmdline_log_options() but it does not work :/
@@ -329,6 +338,7 @@ if __name__ == "__main__":
     arg_parser.add_argument(
         "-i", "--ignore-ssl", action='store_true', default = False,
         help = "Ignore server SSL certificate")
+
     arg_parser.add_argument(
         "-e", "--environment", metavar = "KEY[=VALUE]", action='append',
         default = [],
@@ -413,10 +423,12 @@ if __name__ == "__main__":
     ap.set_defaults(func = _cookies)
 
     arg_parser_target_list = arg_subparsers.add_parser(
-        "ls", help = "List the targets; by default, in a terminal, it will "
+        f"ls{tcfl.ui_cli.commands_old_suffix}",
+        help = "List the targets; by default, in a terminal, it will "
         "print a multi-column display with '!' next to powered-on targets, "
         "and @ next to owned targets; -v adds more detail)")
-    commonl.argparser_add_aka(arg_subparsers, "ls", "list")
+    commonl.argparser_add_aka(arg_subparsers,	# FIXME: deprecate
+                              f"ls{tcfl.ui_cli.commands_old_suffix}", "list")
     arg_parser_target_list.add_argument(
         "-v", dest = "verbosity", action = "count", default = 0,
         help = "Increase information to display about the targets (-v "
