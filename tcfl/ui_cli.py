@@ -100,7 +100,7 @@ def run_fn_on_each_targetspec(
 
     This is mostly used to quickly implement CLI functionality, which
     all follows a very common pattern; see for example
-    :download:`ui_cli_power2.py`.
+    :download:`ui_cli_power.py`.
 
     :param callable fn: function to call, with the signature::
 
