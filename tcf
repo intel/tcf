@@ -456,8 +456,8 @@ if __name__ == "__main__":
     arg_parser_target_release.set_defaults(func = ttb_client.rest_target_release)
 
 
-    import tcfl.ui_cli_power2
-    tcfl.ui_cli_power2._cmdline_setup(arg_subparsers)
+    import tcfl.ui_cli_power
+    tcfl.ui_cli_power._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_power._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_images._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_console._cmdline_setup(arg_subparsers)
