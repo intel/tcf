@@ -259,7 +259,7 @@ def _cmdline_servers_discover(args):
     log_sd.warning(f"found {len(tcfl.server_c.servers)} server/s")
 
 
-def _cmdline_setup(arg_subparsers):
+def _cmdline_setup_advanced(arg_subparsers):
     ap = arg_subparsers.add_parser(
         "user-ls",
         help = "List users known to the server (note you need "
@@ -303,6 +303,10 @@ def _cmdline_setup(arg_subparsers):
                     help = "Role to drop")
     ap.set_defaults(func = _cmdline_role_drop)
 
+
+
+def _cmdline_setup(arg_subparsers):
+
     ap = arg_subparsers.add_parser(
         "servers",
         help = "List configured/discovered servers")
@@ -324,11 +328,6 @@ def _cmdline_setup(arg_subparsers):
         help = "List of targets for which we want to find server"
         " information (optional; defaults to all)")
     ap.set_defaults(func = _cmdline_servers)
-
-    ap = arg_subparsers.add_parser(
-        "servers-flush",
-        help = "Flush currently cached/known servers")
-    ap.set_defaults(func = _cmdline_servers_flush)
 
     ap = arg_subparsers.add_parser(
         "servers-discover",
@@ -372,3 +371,8 @@ def _cmdline_setup(arg_subparsers):
         help = "List of URLs or hostnames to seed discovery"
         f" [{' '.join(tcfl.server_c._seed_default.keys())}]")
     ap.set_defaults(func = _cmdline_servers_discover)
+
+    ap = arg_subparsers.add_parser(
+        "servers-flush",
+        help = "Flush currently cached/known servers")
+    ap.set_defaults(func = _cmdline_servers_flush)

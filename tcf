@@ -390,6 +390,8 @@ if __name__ == "__main__":
         "config", help = "Print information about configuration")
     ap.set_defaults(func = _config)
 
+    tcfl.tc.target_ext_users._cmdline_setup(arg_subparsers)
+
     ap = arg_subparsers.add_parser("login",
                                    help = "Login to the different servers")
     ap.add_argument("--password", "-p", metavar = "PASSWORD", action = "store",
@@ -410,6 +412,9 @@ if __name__ == "__main__":
                     help = "User's login ID")
     ap.set_defaults(func = ttb_client.rest_login)
 
+
+    import tcfl.ui_cli_targets
+    tcfl.ui_cli_targets._cmdline_setup(arg_subparsers)
 
     arg_parser_target_list = arg_subparsers.add_parser(
         f"ls{tcfl.ui_cli.commands_old_suffix}",
@@ -438,6 +443,7 @@ if __name__ == "__main__":
         "'zephyr_board and not type:\"^qemu.*\"'")
     arg_parser_target_list.set_defaults(func = ttb_client.rest_target_list)
 
+    tcfl.tc.target_ext_alloc._cmdline_setup(arg_subparsers)
 
     arg_parser_target_release = arg_subparsers.add_parser(
         "release", help = "Release ownership of a target")
@@ -449,6 +455,12 @@ if __name__ == "__main__":
         nargs = "+", help = "Target's name or URL")
     arg_parser_target_release.set_defaults(func = ttb_client.rest_target_release)
 
+
+    import tcfl.ui_cli_power2
+    tcfl.ui_cli_power2._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_power._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_images._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_console._cmdline_setup(arg_subparsers)
 
 
     # Semi advanced commands
@@ -488,7 +500,14 @@ if __name__ == "__main__":
                     default = None, help = "Name of property")
     ap.set_defaults(func = _target_property_get)
 
+    tcfl.tc.argp_setup(arg_subparsers)
 
+    tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
+    tcfl.tc.target_ext_tunnel.cmdline_setup(arg_subparsers)
+
+
+    tcfl.tc.target_ext_alloc._cmdline_setup_intermediate(arg_subparsers)
 
     ap = arg_subparsers.add_parser("healthcheck",
                                    help = "Do a very basic health check")
@@ -508,6 +527,8 @@ if __name__ == "__main__":
                     default = None, help = "Target's name or URL")
     ap.set_defaults(func = healthcheck)
 
+    tcfl.tc.target_ext_certs.cmdline_setup(arg_subparsers)
+
 
     # advanced commands
 
@@ -523,6 +544,7 @@ if __name__ == "__main__":
                     help = "Print in JSON format")
     ap.set_defaults(func = _cookies)
 
+    tcfl.tc.target_ext_users._cmdline_setup_advanced(arg_subparsers)
 
     ap = arg_subparsers.add_parser("enable",
                                    help = "Enable a disabled target")
@@ -555,29 +577,15 @@ if __name__ == "__main__":
     ap.set_defaults(func = _cache_flush)
 
 
-    # Setup different modules and drivers
-    tcfl.tc.argp_setup(arg_subparsers)
-    # imported by tcfl.tc
     tcfl.tc.pos.cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_alloc._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_buttons._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_capture.cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_certs.cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_console._cmdline_setup(arg_subparsers)
+
+
+    # pending
     tcfl.tc.target_ext_debug._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_images._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_ioc_flash_server_app._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_fastboot._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_power._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_store._cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_things._cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_tunnel.cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_users._cmdline_setup(arg_subparsers)
-
-    import tcfl.ui_cli_targets
-    tcfl.ui_cli_targets._cmdline_setup(arg_subparsers)
-    import tcfl.ui_cli_power2
-    tcfl.ui_cli_power2._cmdline_setup(arg_subparsers)
 
     # extra stuff that is not adding to the API, just to the command
     # line interface
