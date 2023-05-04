@@ -93,6 +93,7 @@ def run_fn_on_each_targetspec(
         *args,
         # COMPAT: removing list[str] so we work in python 3.8
         iface: str = None, extensions_only: list = None,
+        only_one: bool = False,
         **kwargs):
     """
     Initialize the target discovery and run a function on each target
@@ -120,7 +121,12 @@ def run_fn_on_each_targetspec(
         fn to be serialized on each target (versus default that runs
         them in parallel)
 
+    :param bool only_one: (optional; default *False*) ensure the
+      target specification resolves to a single target, complain
+      otherwise.
+
     :param *args: extra arguments for *fn*
+
     :param **kwargs: extra keywords arguments for *fn*
 
     *iface* and *extensions_only* same as :meth:`tclf.tc.target_c.create`.
@@ -146,6 +152,12 @@ def run_fn_on_each_targetspec(
         targetids = tcfl.targets.discovery_agent.rts_fullid_sorted
         if not targetids:
             logger.error(f"No targets match the specification: {cli_args.target}")
+            return 1
+        if only_one and len(targetids) > 1:
+            logger.error(
+                f"please narrow down target specification"
+                f" {cli_args.target}; it matches more than one target: "
+                + " ".join(tcfl.targets.discovery_agent.rts_fullid_sorted ))
             return 1
         if cli_args.serialize:
             threads = 1
