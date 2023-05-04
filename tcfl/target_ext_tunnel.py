@@ -15,6 +15,7 @@ import pprint
 from . import msgid_c
 import commonl
 from . import tc
+import tcfl.ui_cli
 
 class tunnel(tc.target_extension_c):
     """
@@ -290,6 +291,11 @@ class tunnel(tc.target_extension_c):
         # target is listening, has a real IP interface, etc...this is
         # a very basic healhcheck on the server side
 
+#
+# FIXME: all this is being moved to tcfl/ui_cli_tunnel.py
+#
+
+
 def _cmdline_tunnel_add(args):
     with msgid_c("cmdline"):
         target = tc.target_c.create_from_cmdline_args(args, iface = "tunnel")
@@ -314,7 +320,9 @@ def _cmdline_tunnel_list(args):
 
 
 def cmdline_setup(argsp):
-    ap = argsp.add_parser("tunnel-add", help = "create an IP tunnel")
+    ap = argsp.add_parser(
+        f"tunnel-add{tcfl.ui_cli.commands_old_suffix}",
+        help = "create an IP tunnel")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
     ap.add_argument("port", metavar = "PORT", action = "store", type = int,
@@ -329,8 +337,9 @@ def cmdline_setup(argsp):
                     "(default is the first IP address the target declares)")
     ap.set_defaults(func = _cmdline_tunnel_add)
 
-    ap = argsp.add_parser("tunnel-rm",
-                          help = "remove an existing IP tunnel")
+    ap = argsp.add_parser(
+        f"tunnel-rm{tcfl.ui_cli.commands_old_suffix}",
+        help = "remove an existing IP tunnel")
     commonl.argparser_add_aka(argsp, "tunnel-rm", "tunnel-remove")
     commonl.argparser_add_aka(argsp, "tunnel-rm", "tunnel-delete")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
@@ -347,7 +356,9 @@ def cmdline_setup(argsp):
                     "(default is the first IP address the target declares)")
     ap.set_defaults(func = _cmdline_tunnel_remove)
 
-    ap = argsp.add_parser("tunnel-ls", help = "List existing IP tunnels")
+    ap = argsp.add_parser(
+        f"tunnel-ls{tcfl.ui_cli.commands_old_suffix}",
+        help = "List existing IP tunnels")
     ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
                     default = None, help = "Target's name or URL")
     ap.set_defaults(func = _cmdline_tunnel_list)
