@@ -183,6 +183,8 @@ class tunnel(tc.target_extension_c):
         # LOCALPORT: { DATA }...}
         r = r.get("interfaces", {}).get("tunnel", {})
         for local_port, data in r.items():
+            if not isinstance(data, dict):
+                continue
             try:
                 # we get local_port as a string because it is a field
                 # name in the database (versus a value)
