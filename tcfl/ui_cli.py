@@ -17,6 +17,8 @@ import concurrent
 import logging
 import numbers
 
+import commonl
+
 logger = logging.getLogger("ui_cli")
 
 # when replacing an old command implementation with a new one, append
@@ -94,9 +96,9 @@ def run_fn_on_each_targetspec(
         # COMPAT: removing list[str] so we work in python 3.8
         iface: str = None, extensions_only: list = None,
         only_one: bool = False,
+        projections = None,
         **kwargs):
-    """
-    Initialize the target discovery and run a function on each target
+    """Initialize the target discovery and run a function on each target
     that matches a specification
 
     This is mostly used to quickly implement CLI functionality, which
@@ -125,6 +127,24 @@ def run_fn_on_each_targetspec(
       target specification resolves to a single target, complain
       otherwise.
 
+    :param list[str] projections: list of fields to download from the
+      inventory; normally this function tries to download as little a
+      possible (faster), including:
+
+      - *id*
+      - *disabled* state
+      - *type*
+
+      If an interface, was specified, also that interface is
+      downloaded:
+
+      - *interfaces.NAME*
+
+      Any extra fields (and their subfields) specified here are also
+      downloaded; eg:
+
+      >>> [ "instrumentation", "pci" ]
+
     :param *args: extra arguments for *fn*
 
     :param **kwargs: extra keywords arguments for *fn*
@@ -133,18 +153,25 @@ def run_fn_on_each_targetspec(
 
     :returns int: 0 if all functions executed ok, not 0 if any
       failed. Errors will be logged.
+
     """
     import tcfl.targets
     import tcfl.tc
 
     with tcfl.msgid_c("ui_cli"):
 
+        project = { 'id', 'disabled', 'type', 'interfaces.' + iface }
+        if projections:
+            commonl.assert_list_of_strings(projections,
+                                           "projetions", "field")
+            for projection in projections:
+                project.add(projection)
         # Discover all the targets that match the specs in the command
         # line and pull the minimal inventories as specified per
         # arguments
         tcfl.targets.setup_by_spec(
             cli_args.target, cli_args.verbosity - cli_args.quietosity,
-            project = { 'id', 'disabled', 'type' },
+            project = project,
             targets_all = cli_args.all)
 
         # FIXMEh: this should be grouped by servera, but since is not
