@@ -22,7 +22,6 @@ import time
 
 import commonl
 from . import tc
-from . import msgid_c
 
 
 
@@ -165,61 +164,3 @@ class extension(tc.target_extension_c):
                         target.report_fail(f"removed '{name}' is still listed")
                     else:
                         target.report_pass(f"removed '{name}' not listed")
-
-
-def _cmdline_certs_get(args):
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "certs")
-        if args.prefix and args.save:
-            target.certs.get(args.name, save = args.save,
-                                key_path = args.prefix + ".key",
-                                cert_path = args.prefix + ".key")
-            print(f"downloaded client certificate key"
-                  f" -> {args.prefix}.{{key,cert}}",
-                  file = sys.stderr)
-        else:
-            target.certs.get(args.name, save = args.save)
-            if args.save:
-                print(f"downloaded client certificate key"
-                      f" -> {target.id}.{args.name}.{{key,cert}}",
-                      file = sys.stderr)
-
-def _cmdline_certs_remove(args):
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "certs")
-        target.certs.remove(args.stop)
-
-def _cmdline_certs_list(args):
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "certs")
-        print("\n".join(target.certs.list()))
-
-def cmdline_setup(argsp):
-    ap = argsp.add_parser("certs-get",
-                          help = "Create a client certificate")
-    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
-                    default = None, help = "Target's name")
-    ap.add_argument("name", metavar = "NAME", action = "store",
-                    type = str, help = "Name of certificate to create")
-    ap.add_argument("--save", "-s", action = "store_true", default = False,
-                    help = "Save the certificates")
-    ap.add_argument("--prefix", "-p", metavar = "PREFIX", action = "store",
-                    default = None, type = str,
-                    help = "Prefix where to save them to"
-                    " (defaults to TARGETNAME.CERTNAME.{key,cert})")
-    ap.set_defaults(func = _cmdline_certs_get)
-
-    ap = argsp.add_parser("certs-remove",
-                          help = "Remove a client certificate")
-    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
-                    default = None, help = "Target's name")
-    ap.add_argument("name", metavar = "NAME", action = "store",
-                    type = str, help = "Name of certificate to remove")
-    ap.set_defaults(func = _cmdline_certs_remove)
-
-    ap = argsp.add_parser("certs-ls",
-                          help = "List available client certificates")
-    ap.add_argument("target", metavar = "TARGET", action = "store", type = str,
-                    default = None, help = "Target's name")
-    ap.set_defaults(func = _cmdline_certs_list)
-
