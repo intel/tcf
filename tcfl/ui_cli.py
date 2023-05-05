@@ -39,7 +39,7 @@ def args_verbosity_add(ap: argparse.Namespace):
         help = "Display more progress information")
     ap.add_argument(
         "-q", dest = "quietosity", action = "count", default = 0,
-        help = "Display more progress information less progress info")
+        help = "Display less progress information")
 
 
 
@@ -84,7 +84,7 @@ def args_targetspec_add(
         "target",
         metavar = "TARGETSPEC", action = "store",
         nargs = nargs,
-        help = "Target's names or URLs or a general target specification "
+        help = "Target's name/s or a general target specification "
         "which might include values from the inventory, etc, in single"
         "quotes (eg: 'ram.size_gib >= 2 and not type:\"^qemu.*\"')")
 
