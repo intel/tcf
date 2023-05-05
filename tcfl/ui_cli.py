@@ -64,10 +64,11 @@ def args_targetspec_add(
     ap.add_argument(
         "-a", "--all", action = "store_true", default = False,
         help = "Consider also disabled targets")
-    ap.add_argument(
-        "-s", "--serialize", action = "store_true", default = False,
-        help = "Serialize (don't parallelize) the operation on"
-        " multiple targets")
+    if targetspec_n != 1:
+        ap.add_argument(
+            "--serialize", action = "store_true", default = False,
+            help = "Serialize (don't parallelize) the operation on"
+            " multiple targets")
     if isinstance(targetspec_n, bool):
         if targetspec_n:
             nargs = "+"
@@ -187,6 +188,8 @@ def run_fn_on_each_targetspec(
                 + " ".join(tcfl.targets.discovery_agent.rts_fullid_sorted ))
             return 1
         if getattr(cli_args, "serialize", False):
+            # the serialize CLI options gets only added if the command
+            # is allowed to have more than one target
             threads = 1
         else:
             threads = len(targetids)
