@@ -125,3 +125,4 @@ Command line interface
 .. automodule:: tcfl.ui_cli_power
 .. automodule:: tcfl.ui_cli_tunnel
 .. automodule:: tcfl.ui_cli_testcases
+.. automodule:: tcfl.ui_cli_certs
