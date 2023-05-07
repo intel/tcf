@@ -11,9 +11,9 @@ Command line interface UI to to manage servers
 The following UI commands are available (use ``--help`` on each to
 learn more about them):
 
-- FIXME:
+- List available servers::
 
-
+    $ tcf servers
 
 """
 
@@ -23,16 +23,20 @@ import logging
 import sys
 
 import commonl
+import tcfl
 import tcfl.ui_cli
 
 logger = logging.getLogger("ui_cli_servers")
 
 
+def _logged_in_username(_server_name, server):
+    return server.logged_in_username()
+
 
 def _cmdline_servers(cli_args: argparse.Namespace):
+    import tcfl.targets
     # collect data in two structures, makes it easier to print at
     # different verbosity levels...yah, lazy
-    r = []
     d = {}
     servers = {}	# new stuff
     usernames = {}
@@ -50,8 +54,8 @@ def _cmdline_servers(cli_args: argparse.Namespace):
         # pull the server from rt[server], the server's URL, which is how
         # tcfl.server_c.servers indexes servers too
         for rt in tcfl.rts.values():
-            server_aka = rt['server']
-            servers[server] = tcfl.server_c.servers[server]
+            server_url = rt['server']
+            servers[server_url] = tcfl.server_c.servers[server_url]
     else:
         # no targets, so all, just init the server discovery system
         import tcfl.servers
@@ -62,20 +66,19 @@ def _cmdline_servers(cli_args: argparse.Namespace):
 
     # servers is now a dict of servers we care for, keyed by server URL
     if verbosity >= -1:
-        for server_url, server in servers.items():
-            try:
-                # FIXME: this should be parallelized
-                # we don't need this if verbosity < 0 and it takes time
-                usernames[server_url] = server.logged_in_username()
-                # FIXME: we need a base exception for errors from the API
-            except (
-                    requests.exceptions.ConnectionError,
-                    ttb_client.requests.HTTPError,
-                    urllib3.exceptions.MaxRetryError,
-                    RuntimeError
-            ) as e:
-                logging.warning("%s: can't reach server: %s", server_url, e)
-                usernames[server_url] = "n/a"
+
+        r = tcfl.servers.run_fn_on_each_server(
+            servers, _logged_in_username,
+            serialize = cli_args.serialize, traces = cli_args.traces)
+        # r now is a dict keyed by server_name of tuples usernames,
+        # exception
+        for server_name, ( username, _e ) in r.items():
+            usernames[server_name] = username if username else "n/a"
+
+    servers_sorted = {}
+    for server_url in sorted(servers.keys()):
+        servers_sorted[server_url] = servers[server_url]
+    servers = servers_sorted
 
     if verbosity < -2:		# print just the AKAs
         for server in servers.values():
@@ -134,7 +137,6 @@ def _cmdline_servers(cli_args: argparse.Namespace):
 
 
 
-
 def cmdline_setup(arg_subparser):
 
     ap = arg_subparser.add_parser(
@@ -143,5 +145,3 @@ def cmdline_setup(arg_subparser):
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap)
     ap.set_defaults(func = _cmdline_servers)
-
-    
