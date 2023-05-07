@@ -142,12 +142,6 @@ def _cmdline_role_drop(args):
 
 
 
-def _cmdline_servers_flush(_args):
-    log_sd = logging.getLogger("server-discovery")
-    log_sd.setLevel(logging.INFO)
-    tcfl.server_c.flush()
-
-
 def _cmdline_servers_discover(args):
     # adjust logging level of server-discovery
     # -qqqq -vvvvvv -> -vvv
@@ -278,8 +272,3 @@ def _cmdline_setup(arg_subparsers):
         help = "List of URLs or hostnames to seed discovery"
         f" [{' '.join(tcfl.server_c._seed_default.keys())}]")
     ap.set_defaults(func = _cmdline_servers_discover)
-
-    ap = arg_subparsers.add_parser(
-        "servers-flush",
-        help = "Flush currently cached/known servers")
-    ap.set_defaults(func = _cmdline_servers_flush)
