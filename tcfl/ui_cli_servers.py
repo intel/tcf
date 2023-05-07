@@ -15,6 +15,10 @@ learn more about them):
 
     $ tcf servers
 
+- Flush/delete list of available servers::
+
+    $ tcf servers-flush
+
 """
 
 import argparse
@@ -137,6 +141,11 @@ def _cmdline_servers(cli_args: argparse.Namespace):
 
 
 
+def _cmdline_servers_flush(_args):
+    tcfl.server_c.flush()
+
+
+
 def cmdline_setup(arg_subparser):
 
     ap = arg_subparser.add_parser(
@@ -145,3 +154,9 @@ def cmdline_setup(arg_subparser):
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap)
     ap.set_defaults(func = _cmdline_servers)
+
+    ap = arg_subparser.add_parser(
+        "servers-flush",
+        help = "Flush currently cached/known servers"
+        " (might need to servers-discover after)")
+    ap.set_defaults(func = _cmdline_servers_flush)
