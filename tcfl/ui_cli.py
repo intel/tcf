@@ -27,6 +27,7 @@ logger = logging.getLogger("ui_cli")
 commands_old_suffix = ""
 commands_new_suffix = "2"
 
+
 def args_verbosity_add(ap: argparse.Namespace):
     """
     Add command line options for verbosity control (*-v* and *-q*) to
@@ -89,6 +90,24 @@ def args_targetspec_add(
         "which might include values from the inventory, etc, in single"
         "quotes (eg: 'ram.size_gib >= 2 and not type:\"^qemu.*\"')")
 
+
+def logger_verbosity_from_cli(log, cli_args):
+    """
+    Set a loggers verbosity based on what the command line (-v and -q) said
+
+    :param log: logging object (has .setLevel)
+
+    :param argparser.Namespace: command line arguments parsed with
+      :mod:`argparse`; was given options *verbosity* and *quietosity*
+      with :func:`args_verbosity_add`
+    """
+    verbosity = cli_args.verbosity - cli_args.quietosity
+    levels = [ logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG ]
+    # now translate that to logging's module format
+    # server-discovery -> tcfl.log_sd
+    if verbosity >= len(levels):
+        verbosity = len(levels) - 1
+    log.setLevel(levels[verbosity])
 
 
 def run_fn_on_each_targetspec(
