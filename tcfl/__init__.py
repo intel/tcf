@@ -1983,6 +1983,41 @@ class server_c:
 
 
 
+    def logged_in_username(self):
+        """
+        Return the user name logged into a server
+
+        Based on the cookies, ask the server to translate the special name
+        *self* to the currently logged in user with the cookies stored.
+
+        :returns: name of the user we are logged in as
+        """
+        try:
+            r = self.send_request("GET", "users/self")
+            # this call returns a dictionary with the user name in the
+            # key name, because we asked for "self", the server will
+            # return only one, but maybe also fields with diagnostics, that
+            # start with _; filter them
+            for username in r:
+                if not username.startswith("_"):
+                    return username
+            raise error_e(
+                f"server can't translate user 'self'; got '{r}'")
+        except (
+                requests.exceptions.ConnectionError,
+                requests.exceptions.HTTPError,
+                requests.urllib3.exceptions.MaxRetryError ) as e:
+            if 'User unauthorized' in str(e):
+                # HACK, need a better way
+                return "n/a:need-login"
+            raise block_e(
+                f"server can't translate user 'self': {e}") from e
+        except Exception as e:
+            raise error_e(
+                f"server can't translate user 'self': {e}") from e
+
+
+
     def targets_get(self, target_id = None, projections = None):
         commonl.assert_none_or_list_of_strings(projections, "projections",
                                                "field name")
