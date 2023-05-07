@@ -140,48 +140,6 @@ def _cmdline_role_drop(args):
             logging.warning(f"ignoring error {e}")
 
 
-
-
-def _cmdline_servers_discover(args):
-    # adjust logging level of server-discovery
-    # -qqqq -vvvvvv -> -vvv
-    verbosity = args.verbosity - args.quietosity
-    levels = [ logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG ]
-    # now translate that to logging's module format
-    # server-discovery -> tcfl.log_sd
-    log_sd = logging.getLogger("server-discovery")
-    if verbosity >= len(levels):
-        verbosity = len(levels) - 1
-    log_sd.setLevel(levels[verbosity])
-
-    if args.flush:
-        log_sd.warning("flushing cached server list (--flush given)")
-        tcfl.server_c.flush()
-    else:
-        log_sd.warning("keeping cached server list (--flush not given)")
-    current_server_count = len(tcfl.server_c.servers)
-    log_sd.warning(f"starting with {current_server_count} server/s")
-    if log_sd.isEnabledFor(logging.DEBUG):
-        count = 0
-        for url, _server in tcfl.server_c.servers.items():
-            log_sd.debug(f"starting server[{count}]: {url}")
-            count += 1
-
-    tcfl.server_c.discover(
-        ssl_ignore = args.ssl_ignore,
-        seed_url = args.items,
-        seed_port = args.port,
-        herds_exclude = args.herd_exclude,
-        herds_include = args.herd_include,
-        loops_max = args.iterations,
-        max_cache_age = 0,	        # force discoverying all known servers
-        ignore_cache = args.flush,
-        zero_strikes_max = args.zero_strikes_max,
-        origin = "command line",
-    )
-    log_sd.warning(f"found {len(tcfl.server_c.servers)} server/s")
-
-
 def _cmdline_setup_advanced(arg_subparsers):
     ap = arg_subparsers.add_parser(
         "user-ls",
@@ -229,46 +187,4 @@ def _cmdline_setup_advanced(arg_subparsers):
 
 
 def _cmdline_setup(arg_subparsers):
-
-    ap = arg_subparsers.add_parser(
-        "servers-discover",
-        help = "Discover servers")
-    ap.add_argument(
-        "-q", dest = "quietosity", action = "count", default = 0,
-        help = "Decrease verbosity of information to display "
-        "(none is a table, -q list of shortname, url and username, "
-        "-qq the hostnames, -qqq the shortnames"
-        "; all one per line")
-    ap.add_argument(
-        "-v", dest = "verbosity", action = "count", default = 1,
-        help = "Increase verbosity of progress info [%(default)d] ")
-    ap.add_argument(
-        "--iterations", "-e", type = int, metavar = "MAX_LOOPS",
-        action = "store", default = 10,
-        help = "Maximum number of iterations [%(default)d]")
-    ap.add_argument(
-        "--zero-strikes-max", "-z", type = int, metavar = "MAX",
-        action = "store", default = 4,
-        help = "Stop after this many iterations [%(default)d] finding"
-        " no new servers")
-    ap.add_argument(
-        "--flush", "-f", action = 'store_true', default = False,
-        help = "Flush existing cached entries before")
-    ap.add_argument(
-        "--ssl-ignore", "-s", action = 'store_false', default = True,
-        help = "Default to ignore SSL validation [False]")
-    ap.add_argument(
-        "--port", "-p", action = 'store', type = int, default = 5000,
-        help = "Default port when none specified %(default)s")
-    ap.add_argument(
-        "--herd-exclude", "-x", metavar = "HERDNAME", action = 'append',
-        default = [], help = "Exclude herd (can be given multiple times)")
-    ap.add_argument(
-        "--herd-include", "-i", metavar = "HERDNAME", action = 'append',
-        default = [], help = "Include herd (can be given multiple times)")
-    ap.add_argument(
-        "items", metavar = "HOSTNAME|URL", nargs = "*",
-        action = "store", default = [],
-        help = "List of URLs or hostnames to seed discovery"
-        f" [{' '.join(tcfl.server_c._seed_default.keys())}]")
-    ap.set_defaults(func = _cmdline_servers_discover)
+    pass
