@@ -43,6 +43,7 @@ def _logged_in_username(_server_name, server):
 
 
 def _cmdline_servers(cli_args: argparse.Namespace):
+    import tcfl.servers
     import tcfl.targets
     # collect data in two structures, makes it easier to print at
     # different verbosity levels...yah, lazy
@@ -50,28 +51,9 @@ def _cmdline_servers(cli_args: argparse.Namespace):
     servers = {}	# new stuff
     usernames = {}
 
-    if cli_args.target:
-        # we are given a list of targets to look for their servers or
-        # default to all, so pass it on to initialize the inventory
-        # system so we can filter
-        tcfl.targets.setup_by_spec(
-            cli_args.target, cli_args.verbosity - cli_args.quietosity,
-            targets_all = cli_args.all)
-
-        # now for all the selected targets, let's pull their servers
-        servers = {}
-        # pull the server from rt[server], the server's URL, which is how
-        # tcfl.server_c.servers indexes servers too
-        for rt in tcfl.rts.values():
-            server_url = rt['server']
-            servers[server_url] = tcfl.server_c.servers[server_url]
-    else:
-        # no targets, so all, just init the server discovery system
-        import tcfl.servers
-        tcfl.servers.subsystem_setup()
-        servers = tcfl.server_c.servers
-
     verbosity = cli_args.verbosity - cli_args.quietosity
+    servers = tcfl.servers.by_targetspec(
+        cli_args.target, verbosity = verbosity)
 
     # servers is now a dict of servers we care for, keyed by server URL
     if verbosity >= -1:
