@@ -102,8 +102,6 @@ def cmdline_setup(argsp):
     ap = argsp.add_parser(
         f"tunnel-rm{tcfl.ui_cli.commands_new_suffix}",
         help = "remove an existing IP tunnel")
-    commonl.argparser_add_aka(argsp, "tunnel-rm", "tunnel-remove")
-    commonl.argparser_add_aka(argsp, "tunnel-rm", "tunnel-delete")
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
     ap.add_argument("port", metavar = "PORT", action = "store", type = int,
