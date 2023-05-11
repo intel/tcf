@@ -617,13 +617,6 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
                     "server can't translate user 'self'; got '%s'" % ur)
         return username
 
-    def logout(self, username = None):
-        if username:
-            self.send_request('DELETE', "users/" + username)
-        else:
-            # backwards compath
-            self.send_request('PUT', "logout")
-
     def validate_session(self, validate = False):
         if self.valid_session is None or validate:
             valid_session = False
