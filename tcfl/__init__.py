@@ -1983,6 +1983,15 @@ class server_c:
 
 
 
+    def logout(self, username = None):
+        if username:
+            self.send_request('DELETE', "users/" + username)
+        else:
+            # backwards compath
+            self.send_request('PUT', "logout")
+
+
+
     def logged_in_username(self):
         """
         Return the user name logged into a server
