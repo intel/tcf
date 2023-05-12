@@ -1982,6 +1982,17 @@ class server_c:
         logger.debug("%s: state saved", self.url)
 
 
+    def login(self, username, password):
+        try:
+            self.send_request('PUT', "login",
+                              data = {"email": username, "password": password})
+            return True
+        except requests.exceptions.HTTPError as e:
+            if e.status_code == 404:
+                logger.error("%s: login failed: %s", self.url, e)
+            return False
+
+
 
     def logout(self, username = None):
         if username:
