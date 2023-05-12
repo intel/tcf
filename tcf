@@ -393,28 +393,9 @@ if __name__ == "__main__":
     import tcfl.ui_cli_servers
     tcfl.ui_cli_servers.cmdline_setup(arg_subparsers)
 
+    import tcfl.ui_cli_users
+    tcfl.ui_cli_users.cmdline_setup(arg_subparsers)
     tcfl.tc.target_ext_users._cmdline_setup(arg_subparsers)
-
-    ap = arg_subparsers.add_parser("login",
-                                   help = "Login to the different servers")
-    ap.add_argument("--password", "-p", metavar = "PASSWORD", action = "store",
-                    default = None,
-                    help = "User's password ('ask' to get it asked on"
-                    " the terminal)")
-    ap.add_argument("-s","--split", action = "store_true", default = False,
-                    help = "Ask for different user names and passwords for"
-                    " each server")
-    ap.add_argument("-q","--quiet", action = "store_true",
-                    default = False, help = "Quiet mode. Don't ask for user or "
-                    "password and instead look for env variables like "
-                    "'TCF_{USER|PASSWORD}_${AKA}'. "
-                    "AKA is the short name of the server (defaults to the sole "
-                    "host name, without the domain).")
-    ap.add_argument("user", nargs = '?', metavar = "USERNAME",
-                    action = "store", default = None,
-                    help = "User's login ID")
-    ap.set_defaults(func = ttb_client.rest_login)
-
 
     import tcfl.ui_cli_targets
     tcfl.ui_cli_targets._cmdline_setup(arg_subparsers)
