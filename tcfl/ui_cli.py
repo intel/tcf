@@ -186,7 +186,7 @@ def run_fn_on_each_targetspec(
                 f" {cli_args.target}; it matches more than one target: "
                 + " ".join(tcfl.targets.discovery_agent.rts_fullid_sorted ))
             return 1
-        if cli_args.serialize:
+        if getattr(cli_args, "serialize", False):
             threads = 1
         else:
             threads = len(targetids)
