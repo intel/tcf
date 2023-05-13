@@ -135,6 +135,10 @@ def run_fn_on_each_server(servers: dict, fn: callable, *args,
     else:
         threads = len(servers)
 
+    results = {}
+    if threads == 0:
+        return results
+
     with concurrent.futures.ProcessPoolExecutor(threads) as executor:
         futures = {
             # for each server, queue a thread that will call
@@ -145,7 +149,6 @@ def run_fn_on_each_server(servers: dict, fn: callable, *args,
             for server_name in servers
         }
         # and as the finish, collect status (pass/fail)
-        results = {}
         for future in concurrent.futures.as_completed(futures):
             server_name = futures[future]
             try:
