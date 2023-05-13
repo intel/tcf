@@ -1,6 +1,6 @@
 #! /usr/bin/python3
 #
-# Copyright (c) 2021-23 Intel Corporation
+# Copyright (c) 2017-23 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -15,9 +15,14 @@ learn more about them):
 
     $ tcf logout
 
+- List users::
+
+    $ tcf user-ls
+
 """
 
 import argparse
+import collections
 import getpass
 import json
 import logging
@@ -171,6 +176,109 @@ def _cmdline_logout(cli_args: argparse.Namespace):
 
 
 
+def _user_list(_server_name, server,
+               cli_args: argparse.Namespace):
+    userids = cli_args.userid
+    result = {}
+    if not userids:
+        r = server.send_request("GET", "users/")
+        return r
+
+    for userid in userids:
+        result.update(server.send_request("GET", "users/" + userid))
+    return result
+
+
+def _cmdline_user_list(cli_args: argparse.Namespace):
+
+    result = tcfl.servers.run_fn_on_each_server(
+        tcfl.server_c.servers, _user_list, cli_args,
+        serialize = cli_args.serialize, traces = cli_args.traces)
+
+    # so now result is a dictionary of SERVER: ( DATA, EXCEPTION ),
+    # where DATA is dictionaries of USERNAME: USERDATA
+    #
+    # we are going to rearrange it by user, and sort it, so it becomes
+    # USER: { SERVER: USERDATA } and also report errors
+
+    r_unsorted = collections.defaultdict(dict)
+    for server_name in sorted(result.keys()):
+        data, e = result[server_name]
+        if e:
+            logging.error("%s: can't get users: %s",
+                          server_name, e)
+            continue
+        for userid, user_data in data.items():
+            r_unsorted[userid][server_name] = user_data
+
+    # sort the usernames, without taking case into account
+    r = {}
+    for userid in sorted(r_unsorted.keys(),
+                         key = str.casefold):
+        r[userid] = r_unsorted[userid]
+
+    verbosity = cli_args.verbosity - cli_args.quietosity
+    if verbosity < 0:
+        print("\n".join(r.keys()))
+    elif verbosity == 0:
+        import tabulate
+        headers = [
+            "UserID",
+            "Server",
+        ]
+        table = []
+        for userid, servers in r.items():
+            table.append([ userid, "\n".join(servers.keys()) ])
+        print(tabulate.tabulate(table, headers = headers))
+    elif cli_args.verbosity == 1:
+        import tabulate
+        headers = [
+            "UserID",
+            "Server",
+            "Roles",
+        ]
+        table = []
+        for userid, servers in r.items():
+            for server_name, user_data in servers.items():
+                rolel = []
+                for role, state in user_data.get('roles', {}).items():
+                    if state == False:
+                        rolel.append(role + " (dropped)")
+                    else:
+                        rolel.append(role)
+                table.append([
+                    userid, server_name, "\n".join(rolel) ])
+        print(tabulate.tabulate(table, headers = headers))
+    elif cli_args.verbosity == 2:
+        # This format uses periods to separate dictionary keys, so we
+        # need to make safe (period less) the username and the
+        # hostname, somehow. The username is already part of the data
+        # structure anyway, but for the server name we need to add a
+        # new field
+        #
+        # We can lose some info like this in the (unlikely) even that
+        # we have a user called hello@domain.com and another
+        # hello.domain.com...thou shall use JSON. FIXME: workaround by
+        # adding a 'seen' set and appending a counter if
+        # seen. Framework it.
+        r_safe = {}
+        for userid, servers in r.items():
+            userid_safe = commonl.name_make_safe(userid)
+            r_safe[userid_safe] = {}
+            for server_name, user_data in servers.items():
+                server_safe = commonl.name_make_safe(server_name)
+                r_safe[userid_safe][server_safe] = user_data
+                r_safe[userid_safe][server_safe]['url'] = server_name
+        commonl.data_dump_recursive(r_safe)
+    elif cli_args.verbosity == 3:
+        import pprint
+        pprint.pprint(r, indent = True)
+    elif cli_args.verbosity >= 4:
+        json.dump(r, sys.stdout,
+                  skipkeys = True, indent = True)
+
+
+
 def cmdline_setup(arg_subparser):
 
     ap = arg_subparser.add_parser(
@@ -218,3 +326,18 @@ def cmdline_setup_advanced(arg_subparser):
         help = "User to logout (defaults to current); to logout others "
         "*admin* role is needed")
     ap.set_defaults(func = _cmdline_logout)
+
+
+    ap = arg_subparser.add_parser(
+        "user-ls",
+        help = "List users known to the server (note you need "
+        "admin role privilege to list users others than your own)")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    ap.add_argument(
+        "--serialize", action = "store_true", default = False,
+        help = "Serialize (don't parallelize) the operation on"
+        " multiple targets")
+    ap.add_argument("userid", action = "store",
+                    default = None, nargs = "*",
+                    help = "Users to list (default all)")
+    ap.set_defaults(func = _cmdline_user_list)

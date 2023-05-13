@@ -580,7 +580,7 @@ def verify_str_safe(s, safe_chars = None, do_raise = True, name = "string"):
 def name_make_safe(name, safe_chars = None):
     """
     Given a filename, return the same filename will all characters not
-    in the set [-_.0-9a-zA-Z] replaced with _.
+    in the set [-_0-9a-zA-Z] replaced with _.
 
     :param str name: name to make *safe*
     :param set safe_chars: (potional) set of characters that are

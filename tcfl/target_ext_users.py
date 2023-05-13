@@ -26,75 +26,6 @@ from . import ttb_client
 from . import msgid_c
 
 
-def _user_list(rtb, userids):
-    result = {}
-    if userids:
-        for userid in userids:
-            try:
-                result.update(rtb.send_request("GET", "users/" + userid))
-            except Exception as e:
-                logging.error("%s: error getting user's info: %s", userid, e)
-    else:
-        try:
-            result.update(rtb.send_request("GET", "users/"))
-        except Exception as e:
-            logging.error("error getting all user info: %s", e)
-    return result
-
-
-def _cmdline_user_list(args):
-    with msgid_c("cmdline"):
-        threads = {}
-        tp = ttb_client._multiprocessing_pool_c(
-            processes = len(ttb_client.rest_target_brokers))
-        if not ttb_client.rest_target_brokers:
-            logging.error("E: no servers available, did you configure?")
-            return
-        for rtb in sorted(ttb_client.rest_target_brokers.values(), key = str):
-            threads[rtb] = tp.apply_async(_user_list, (rtb, args.userid))
-        tp.close()
-        tp.join()
-
-        result = {}
-        for rtb, thread in threads.items():
-            result[rtb.aka] = thread.get()
-
-    if args.verbosity == 0:
-        headers = [
-            "Server",
-            "UserID",
-        ]
-        table = []
-        for rtb, r in result.items():
-            for userid, data in r.items():
-                table.append([ rtb, userid ])
-        print((tabulate.tabulate(table, headers = headers)))
-    elif args.verbosity == 1:
-        headers = [
-            "Server",
-            "UserID",
-            "Roles",
-        ]
-        table = []
-        for rtb, r in result.items():
-            for userid, data in r.items():
-                rolel = []
-                for role, state in data.get('roles', {}).items():
-                    if state == False:
-                        rolel.append(role + " (dropped)")
-                    else:
-                        rolel.append(role)
-                table.append([
-                    rtb, userid, "\n".join(rolel) ])
-        print((tabulate.tabulate(table, headers = headers)))
-    elif args.verbosity == 2:
-        commonl.data_dump_recursive(result)
-    elif args.verbosity == 3:
-        pprint.pprint(result)
-    elif args.verbosity >= 4:
-        print(json.dumps(result, skipkeys = True, indent = 4))
-
-
 def _user_role(rtb, username, action, role):
     try:
         return rtb.send_request(
@@ -130,19 +61,6 @@ def _cmdline_role_drop(args):
 
 
 def _cmdline_setup_advanced(arg_subparsers):
-    ap = arg_subparsers.add_parser(
-        "user-ls",
-        help = "List users known to the server (note you need "
-        "admin role privilege to list users others than your own)")
-    ap.add_argument("userid", action = "store",
-                    default = None, nargs = "*",
-                    help = "Users to list (default all)")
-    ap.add_argument(
-        "-v", dest = "verbosity", action = "count", default = 0,
-        help = "Increase verbosity of information to display "
-        "(none is a table, -v table with more details, "
-        "-vv hierarchical, -vvv Python format, -vvvv JSON format)")
-    ap.set_defaults(func = _cmdline_user_list)
 
     ap = arg_subparsers.add_parser(
         "role-gain",
