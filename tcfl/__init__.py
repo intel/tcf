@@ -1878,7 +1878,7 @@ class server_c:
                                        data = data, verify = self.ssl_verify,
                                        stream = stream, timeout = ( timeout, timeout ))
                 else:
-                    raise AssertionError("{method}: unknown HTTP method" )
+                    raise AssertionError(f"{method}: unknown HTTP method" )
                 break
             except (
                     requests.exceptions.ConnectionError,
