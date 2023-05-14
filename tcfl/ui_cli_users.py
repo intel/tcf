@@ -15,6 +15,11 @@ learn more about them):
 
     $ tcf logout
 
+- Gain or drop roles::
+
+    $ tcf role-drop ROLENAME
+    $ tcf role-gain ROLENAME
+
 - List users::
 
     $ tcf user-ls
@@ -176,6 +181,52 @@ def _cmdline_logout(cli_args: argparse.Namespace):
 
 
 
+def _user_role(server_name, server,
+               cli_args: argparse.Namespace,
+               action):
+    if action == "gain":
+        action_msg = ( "gaining", "gained" )
+    elif action == "drop":
+        action_msg = ( "dropping", "dropped" )
+    else:
+        raise AssertionError(f"invalid action {action}")
+    try:
+        r = server.send_request(
+            "PUT", "users/" + cli_args.username + "/" + action + "/" + cli_args.role)
+        logger.info(
+            "%s: %s role %s for user %s",
+            server_name, action_msg[1], cli_args.role,cli_args.username)
+    except Exception as e:
+        logger.error(
+            "%s: error %s role %s for user %s: %s",
+            server_name, action_msg[0], cli_args.role,cli_args.username, e,
+            exc_info = cli_args.traces)
+        raise
+
+
+def _cmdline_role_gain(cli_args: argparse.Namespace):
+
+    tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+    verbosity = cli_args.verbosity - cli_args.quietosity
+    servers = tcfl.server_c.servers
+
+    tcfl.servers.run_fn_on_each_server(
+        servers, _user_role, cli_args, "gain",
+        serialize = cli_args.serialize, traces = cli_args.traces)
+
+
+def _cmdline_role_drop(cli_args: argparse.Namespace):
+
+    tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+    verbosity = cli_args.verbosity - cli_args.quietosity
+    servers = tcfl.server_c.servers
+
+    tcfl.servers.run_fn_on_each_server(
+        servers, _user_role, cli_args, "drop",
+        serialize = cli_args.serialize, traces = cli_args.traces)
+
+
+
 def _user_list(_server_name, server,
                cli_args: argparse.Namespace):
     userids = cli_args.userid
@@ -326,6 +377,42 @@ def cmdline_setup_advanced(arg_subparser):
         help = "User to logout (defaults to current); to logout others "
         "*admin* role is needed")
     ap.set_defaults(func = _cmdline_logout)
+
+
+    ap = arg_subparser.add_parser(
+        "role-gain",
+        help = "Gain access to a role which has been dropped")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    ap.add_argument(
+        "-u", "--username", action = "store", default = "self",
+        help = "ID of user whose role is to be dropped"
+        " (optional, defaults to yourself)")
+    ap.add_argument(
+        "--serialize", action = "store_true", default = False,
+        help = "Serialize (don't parallelize) the operation on"
+        " multiple servers")
+    ap.add_argument(
+        "role", action = "store",
+        help = "Role to gain")
+    ap.set_defaults(func = _cmdline_role_gain)
+
+
+    ap = arg_subparser.add_parser(
+        "role-drop",
+        help = "Drop access to a role")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    ap.add_argument(
+        "-u", "--username", action = "store", default = "self",
+        help = "ID of user whose role is to be dropped"
+        " (optional, defaults to yourself)")
+    ap.add_argument(
+        "--serialize", action = "store_true", default = False,
+        help = "Serialize (don't parallelize) the operation on"
+        " multiple servers")
+    ap.add_argument(
+        "role", action = "store",
+        help = "Role to drop")
+    ap.set_defaults(func = _cmdline_role_drop)
 
 
     ap = arg_subparser.add_parser(

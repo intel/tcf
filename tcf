@@ -395,7 +395,6 @@ if __name__ == "__main__":
 
     import tcfl.ui_cli_users
     tcfl.ui_cli_users.cmdline_setup(arg_subparsers)
-    tcfl.tc.target_ext_users._cmdline_setup(arg_subparsers)
 
     import tcfl.ui_cli_targets
     tcfl.ui_cli_targets._cmdline_setup(arg_subparsers)
@@ -533,7 +532,6 @@ if __name__ == "__main__":
 
     import tcfl.ui_cli_users
     tcfl.ui_cli_users.cmdline_setup_advanced(arg_subparsers)
-    tcfl.tc.target_ext_users._cmdline_setup_advanced(arg_subparsers)
 
     ap = arg_subparsers.add_parser("enable",
                                    help = "Enable a disabled target")
@@ -689,12 +687,15 @@ tcf-jobserver-run:
 
     if 'func' in args:
         if args.as_admin:
+            import tcfl.ui_cli_users
             _args = copy.copy(args)
             _args.username = "self"
             _args.role = "admin"
+            # this is quite dirty, but it'll do until we add this to
+            # the protocol
             try:
                 logi("gaining admin role per --as-admin")
-                tcfl.tc.target_ext_users._cmdline_role_gain(_args)
+                tcfl.ui_cli_users._cmdline_role_gain(_args)
                 logi("gained admin role per --as-admin")
             except Exception as e:
                 logx("can't get admin role per --as-admin")
@@ -722,7 +723,7 @@ tcf-jobserver-run:
                 _args.username = "self"
                 _args.role = "admin"
                 logi("dropping admin role per --as-admin")
-                tcfl.tc.target_ext_users._cmdline_role_drop(_args)
+                tcfl.ui_cli_users._cmdline_role_drop(_args)
     else:
         logx("No command specified")
         retval = 1
