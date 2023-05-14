@@ -9414,7 +9414,5 @@ target_c.extension_register(target_ext_things.extension, "things")
 from . import target_ext_tunnel
 target_c.extension_register(target_ext_tunnel.tunnel)
 
-from . import target_ext_users
-
 from . import pos
 target_c.extension_register(pos.extension, "pos")
