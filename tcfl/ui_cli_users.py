@@ -95,10 +95,10 @@ def _credentials_get(domain: str, aka: str, cli_args: argparse.Namespace):
 
 
 
-def _login(server_name, server, cli_args):
-    user, password = _credentials_get(server.url, server.aka, cli_args)
+def _login(_server_name, server, credentials):
+    user, password = credentials[server.aka]
     r = server.login(user, password)
-    logger.warning("%s: logged in as %s", server.url, cli_args.username)
+    logger.warning("%s: logged in as %s", server.url, user)
     return r
 
 
@@ -112,30 +112,30 @@ def _cmdline_login(cli_args: argparse.Namespace):
     verbosity = cli_args.verbosity - cli_args.quietosity
 
     logged = False
-    # we only ask on the terminal HERE!
-    if not cli_args.split and sys.stdout.isatty() and not cli_args.quiet:
-        if cli_args.username == None:
-            cli_args.username = input('Login [%s]: ' % getpass.getuser())
-        if cli_args.password in ( "ask", None):
-            cli_args.password = getpass.getpass("Password: ")
-
     servers = tcfl.server_c.servers
+    # we only ask on the terminal HERE!
+    credentials = {}
+    for server_name, server in servers.items():
+        credentials[server.aka] = \
+            _credentials_get(server.url, server.aka, cli_args)
+
     r = tcfl.servers.run_fn_on_each_server(
-        servers, _login, cli_args,
+        servers, _login, credentials,
         serialize = cli_args.serialize, traces = cli_args.traces)
     # r now is a dict keyed by server_name of tuples usernames,
     # exception
     logged_count = 0
     for server_name, ( r, e ) in r.items():
         server = servers[server_name]
+        user, _password = credentials[server.aka]
         if e:
             logger.error("%s: can't login as %s: exception: %s",
-                         server.url, cli_args.username, e)
+                         server.url, user, e)
         elif r:
             logged_count += 1
         else:
             logger.error("%s: can't login as %s: bad credentials",
-                         server.url, cli_args.username)
+                         server.url, user)
 
     if logged_count == 0:
         logger.error("Could not login to any server, "
