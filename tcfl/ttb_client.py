@@ -399,36 +399,6 @@ class rest_target_broker(object, metaclass = _rest_target_broker_mc):
         del cls._rts_cache
         cls._rts_cache = None
 
-    def tb_state_trash(self):
-        # remove the state so tb_state_save() later will not save any
-        # cookies and thus effectively log out this user from the
-        # client side standpoint.
-        self.cookies = {}
-
-    def tb_state_save(self, filepath):
-        """Save cookies in *path* so they can be loaded by when the object is
-        created.
-
-        :param path: Filename where to save to
-        :type path: str
-
-        """
-        url_safe = commonl.file_name_make_safe(self._url)
-        if not os.path.isdir(filepath):
-            logger.warning("%s: created state storage directory", filepath)
-            os.mkdir(filepath)
-        fname = os.path.join(filepath, "cookies-%s.pickle" % url_safe)
-        if self.cookies == {}:
-            logger.debug("%s: state deleted (no cookies)", self._url)
-            commonl.rm_f(fname)
-        else:
-            with os.fdopen(os.open(fname, os.O_CREAT | os.O_WRONLY, 0o600),
-                           "wb") as f, \
-                    self.lock:
-                pickle.dump(self.cookies, f, protocol = 2)
-                logger.debug("%s: state saved %s",
-                             self._url, pprint.pformat(self.cookies))
-
     # FIXME: this timeout has to be proportional to how long it takes
     # for the target to flash, which we know from the tags
     def send_request(self, method, url,
@@ -724,18 +694,6 @@ def rest_init(path, url, ignore_ssl = False, aka = None, origin = None):
     # FIXME: move this to the constructor
     rest_target_brokers[rtb.parsed_url.geturl()] = rtb
     return rtb
-
-def rest_shutdown(path):
-    """
-    Shutdown REST API, saving state in *path*.
-
-    :param path: Path to where to save state information
-    :type path: str
-    """
-    for rtb in rest_target_brokers.values():
-        rtb.tb_state_save(path)
-
-
 
 
 

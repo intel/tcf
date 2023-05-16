@@ -753,5 +753,4 @@ tcf-jobserver-run:
         logw("Don't know how to interpret retval %s (%s) as exit code"
              % (retval, type(retval)))
         retval = 1
-    ttb_client.rest_shutdown(tcfl.config.state_path)
     sys.exit(retval)
