@@ -1964,7 +1964,7 @@ class server_c:
         commonl.makedirs_p(self.state_path, reason = "server state directory")
         file_name = os.path.join(self.state_path,
                                  f"cookies-{self.url_safe}.pickle")
-        if cookies == {}:
+        if not cookies:
             logger.debug("%s: state deleted (no cookies)", self.url)
             commonl.rm_f(file_name)
             return
@@ -1976,7 +1976,7 @@ class server_c:
             # create a temporary file and replace, so the operation is
             # atomic--other proceses might have done this in
             # parallel--there would be no conflict
-            pickle.dump(self.cookies, f, protocol = 2)
+            pickle.dump(cookies, f, protocol = 2)
             f.flush()
         os.replace(f.name, file_name)
         logger.debug("%s: state saved", self.url)
