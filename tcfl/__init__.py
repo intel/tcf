@@ -1988,7 +1988,7 @@ class server_c:
                               data = {"email": username, "password": password})
             return True
         except requests.exceptions.HTTPError as e:
-            if e.status_code == 404:
+            if e.status_code // 100 != 2:
                 logger.error("%s: login failed: %s", self.url, e)
             return False
 
