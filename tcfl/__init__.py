@@ -1979,7 +1979,7 @@ class server_c:
             pickle.dump(cookies, f, protocol = 2)
             f.flush()
         os.replace(f.name, file_name)
-        logger.debug("%s: state saved", self.url)
+        logger.debug("%s: state saved in %s", self.url, file_name)
 
 
     def login(self, username, password):
