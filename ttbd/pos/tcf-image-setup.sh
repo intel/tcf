@@ -46,6 +46,7 @@ ROOT_MOUNTOPTS   use these root mount options (default to ext*'s
                  noload; use norecovery for xfs)
 
 BOOT_PARTITION   force the boot partition to be that number (1, 2, 3...)
+                 Set to 'none' if no /boot partition shall be computed
 
 BOOT_DEV         force the boot partition to be taken from a given
                  device name (this comes handy when the image has a
@@ -452,7 +453,7 @@ else
 
 fi
 
-if ! [ -z "$boot_part" ]; then
+if ! [ -z "$boot_part" ] && [ "$boot_part" != "pnone" ]; then
     # clear does this
     # 'auto' is used this a placeholder for a default option that
     # otherwise is doing no option
