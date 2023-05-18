@@ -83,6 +83,7 @@ mkfs.vfat -n KS $tmpdir/ks.drive
 mcopy -i $tmpdir/ks.drive $ksfile ::ks.cfg
 
 # Create the destination image file
+rm -f $qcowfile		# ensure it's wiped clean, otherwise randome failures abound
 qemu-img create -f qcow2 -q $qcowfile 20G
 # extract the kernel and initrd
 iso-read -i $isofile -e isolinux/vmlinuz -o $tmpdir/vmlinuz
@@ -99,16 +100,40 @@ iso-read -i $isofile -e isolinux/initrd.img -o $tmpdir/initrd.img
 #   copied the file
 # - BIOS: UEFI
 # - pass the ISO as hdd, the dest qcow as hda, the Kickstart drive as hdb
+
+vnc=${VNC:-disabled}
+if [ -z "${VNC_PORT:-}" ] && [ "$vnc" != disabled ]; then
+    for (( port = 0; port < 100; port++ )); do
+        tcp_port=$((5900 + $port))
+        if ! netstat --tcp --listening --program --numeric | grep -qw :$tcp_port; then
+            # this port is not used, so let's take it
+            export VNC_PORT=$port
+            break
+        fi
+    done
+    if [ -z "${VNC_PORT:-}" ]; then
+        echo "WARNING: can't find a free VNC port!" 1>&2
+    fi
+fi
+if [ $vnc != disabled ] && ! [ -z "${VNC_PORT:-}" ]; then
+    echo "NOTICE: using VNC port $VNC_PORT; TCP port $(($VNC_PORT + 5900))!" 1>&2
+    gfx=${GRAPHIC:--vnc :${VNC_PORT:-1} -serial stdio}
+    append="inst.text inst.ks=hd:LABEL=KS:/ks.cfg"
+else
+    gfx=${GRAPHIC:--nographic}
+    append="console=ttyS0,115200n81 inst.text inst.ks=hd:LABEL=KS:/ks.cfg"
+fi
 qemu-system-x86_64 -no-reboot \
                    -enable-kvm -cpu host -m 3072 \
                    -kernel $tmpdir/vmlinuz \
                    -initrd $tmpdir/initrd.img \
-                   -append "console=ttyS0,115200n81 inst.text inst.ks=hd:LABEL=KS:/ks.cfg" \
+                   -append "$append" \
                    -bios /usr/share/edk2/ovmf/OVMF_CODE.fd \
                    -cdrom $isofile \
-                   -nographic \
+                   ${gfx} \
                    -hda $qcowfile \
                    -hdb $tmpdir/ks.drive
 
 # done -- on EXIT, everything is wiped except for the ISO and the QCOW
 # unless you manually specified TMPDIR
+ 
