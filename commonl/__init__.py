@@ -3615,7 +3615,7 @@ class fsdb_symlink_c(fsdb_c):
                    or value == "":
                     value = b"s:" + value.encode()
                 else:
-                    value = value.encode()
+                    value = b"s:" + value.encode()
             elif isinstance(value, bytes):
                 value = b"x:" + value
             else:

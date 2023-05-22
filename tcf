@@ -156,7 +156,7 @@ def _target_property_set(args):
                                  % (value, val))
         elif value.startswith("s:"):
             # string that might start with s: or empty
-            return value.split(":", 1)[1]
+            value = value.split(":", 1)[1]
         # FIXME: use commonl.cmdline_str_to_value()
         target.property_set(args.property, value)
 
