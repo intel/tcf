@@ -119,14 +119,15 @@ if 'SSLKEYLOGFILE' in os.environ:
     sslkeylog.set_keylog(os.environ['SSLKEYLOGFILE'])
 
 
-@commonl.lru_cache_disk(
-    os.path.join(os.path.expanduser("~"), ".cache", "tcf", "_rts_get"),
-    3 * 60,	# refresh every three minutes? why? because until we
-                # all move to the second ls implementation, this
-                # contains power and ownership info that can change
-                # frequently...
-    500,	# keep max 500 entries (one per server)
-    key_maker = lambda rtb: rtb._url)
+# Caching disable; causes more problems than it fixes
+#@commonl.lru_cache_disk(
+#    os.path.join(os.path.expanduser("~"), ".cache", "tcf", "_rts_get"),
+#    3 * 60,	# refresh every three minutes? why? because until we
+#                # all move to the second ls implementation, this
+#                # contains power and ownership info that can change
+#                # frequently...
+#    500,	# keep max 500 entries (one per server)
+#    key_maker = lambda rtb: rtb._url)
 def _rts_get_cached(rtb):
     ts0 = time.time()
     try:
