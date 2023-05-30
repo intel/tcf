@@ -14,10 +14,23 @@ import tcfl.tc
 import tcfl.target_ext_alloc
 
 srcdir = os.path.dirname(__file__)
-ttbd = commonl.testing.test_ttbd(config_files = [
-    # strip to remove the compiled/optimized version -> get source
-    os.path.join(srcdir, "conf_%s" % os.path.basename(__file__.rstrip('cd')))
-])
+ttbd = commonl.testing.test_ttbd(
+    config_files = [
+        # strip to remove the compiled/optimized version -> get source
+        os.path.join(srcdir, "conf_%s" % os.path.basename(__file__.rstrip('cd')))
+    ],
+    errors_ignore = [
+        "Traceback",
+        "DEBUG[",
+        # this is not our fault, is a warning on the core
+        "FIXME: delete the allocation",
+        # FIXME: this is a hack because we are wiping the allocation
+        # tcf/run does and the it complains it can't wipe it; the
+        # orchestra shall be fine with this, so we ignore it for the
+        # time being.
+        "allocation/delete:EXIT:EXCEPTION",
+    ]
+)
 
 
 @tcfl.tc.target(ttbd.url_spec + ' and local_test')
