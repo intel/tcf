@@ -1009,7 +1009,10 @@ def _put_allocation():
     #        "group1" : [ target1, target2, target3 ... ],
     #        "group2" : [ target3, target4, target1 ... ],
     #        "group3" : [ target1, target2, target5, target6 ... ],
-    #    }
+    #    },
+    #    "endtime": "static",
+    #    "endtime": None,
+    #    "endtime": "YYYYmmddHHMMSS",
     # }
     #
     # return {
@@ -1041,6 +1044,7 @@ def _put_allocation():
     queue = data.get('queue', False)
     reason = data.get('reason', None)
     extra_data = data.get('extra_data', None)
+    endtime = data.get('endtime', None)
 
     with audit(
             "allocation/create",
@@ -1053,6 +1057,7 @@ def _put_allocation():
             reason = reason,
             groups = data['groups'],
             extra_data = extra_data,
+            endtime = endtime,
             request = flask.request) as ao:
         try:
 
@@ -1066,6 +1071,7 @@ def _put_allocation():
                 queue = queue,
                 reason = reason,
                 extra_data = extra_data,
+                endtime = endtime,
             )
             if 'allocid' in result:
                 ao.kws['allocid'] = result['allocid']

@@ -1180,7 +1180,8 @@ request form (FIXME)::
          "group1" : [ target1, target2, target3 ... ],
          "group2" : [ target3, target4, target1 ... ],
          "group3" : [ target1, target2, target5, target6 ... ],
-     }
+     },
+     "endtime": string,
   }
 
 - *groups:* one or more target group specifications
@@ -1371,6 +1372,27 @@ request form (FIXME)::
 
   the format of this is free form; the implementation may impose
   length limitations.
+
+- *endtime:* a string describing at what time the allocation shall
+  expire (in UTC):
+
+  - *None* (default): the allocation expires when it is deemed
+    idle by the server or when deleted/destroyed by API call.
+
+  - *static*: the allocation never expires, until manually
+    deleted/destroyed by API call.
+
+  - *YYYYmmddHHMMSS*: date and time when the allocation has to
+    expire, in the same format as timestamps, ie:
+
+    >>> datetime_now = datetime.datetime.utcnow()
+    >>> delta_5min = datetime.timedelta(seconds = 5 * 60)
+    >>> datetime_end = datetime_now  + delta_5min
+    >>> datetime_end.strftime("%Y%m%d%H%M%S")
+
+    If hours/minutes/seconds are not needed, set to zero, eg:
+
+    >>> "20230930000000"
 
 
 Examples

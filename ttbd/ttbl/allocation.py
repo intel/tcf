@@ -265,6 +265,37 @@ class allocation_c(commonl.fsdb_symlink_c):
     def maintenance(self, ts_now):
         #logging.error("DEBUG: %s: maint %s", self.allocid, ts_now)
 
+        # pull the endtime from the disk database
+        endtime = self.get("endtime", None)
+
+        if endtime == "static":
+            # this allocaiton is supposed to end only by API
+            # termination
+            return
+
+        if endtime != None:
+            # this is supposed to be a timestap in YYYYmmddHHMMSS (we
+            # have verified it already) -- if we are past that, snip
+            # it
+            # ts_now is datetime.datetime.now(), let's get endtime
+            # datetime format
+            ts_endtime = datetime.datetime.strptime(endtime, "%Y%m%d%H%M%S")
+            if ts_endtime > ts_now:
+                logging.info(
+                    "ALLOC: allocation %s expired @%s, deleting",
+                    self.allocid, endtime)
+            if audit:
+                # FIXME: this is really messy -- audit.record needs to be better
+                _auditor = audit("unused")
+                # it is possible there will be no user if this is
+                # timing out, in which case, calling_user will be None
+                # and the audit layer needs to handle it appropiatedly
+                _auditor.record("allocation/expired",
+                                calling_user = self.get("user"),
+                                allocid = self.allocid)
+            self.delete('expired')
+            return
+
         # Check if it has been idle for too long
         ts_last_keepalive = datetime.datetime.strptime(self.timestamp_get(),
                                                        "%Y%m%d%H%M%S")
@@ -743,7 +774,8 @@ def _run(targets, preempt):
 
 def _allocation_policy_check(
         calling_user: ttbl.user_control.User, obo_user: str, guests: list,
-        priority: int, preempt: bool, queue: bool, shared: bool):
+        priority: int, preempt: bool, queue: bool, shared: bool,
+        endtime: str):
     calling_user_roles = calling_user.role_list()
 
     # This is a quick fix -- a proper policy implementation is still
@@ -847,7 +879,7 @@ def request(groups, calling_user, obo_user, guests,
             priority = None, preempt = False,
             queue = False, shared = False,
             extra_data = None,
-            reason = None):
+            reason = None, endtime: str = None):
     """:params list(str) groups: list of groups of targets
 
     :param dict extra_data: dict of scalars with extra data, for
@@ -862,6 +894,26 @@ def request(groups, calling_user, obo_user, guests,
         >>> alloc_uuid = str(uuid.uuid4())
         >>> alloc_uuid = "a5e000a8-25ed-42a2-96c2-d9e361465367"
 
+    :param str endtime: (optional, default *None*) at what time the
+      allocation shall expire (in UTC) formatted as a string:
+
+      - *None* (default): the allocation expires when it is deemed
+        idle by the server or when deleted/destroyed by API call.
+
+      - *static*: the allocation never expires, until manually
+        deleted/destroyed by API call.
+
+      - *YYYYmmddHHMMSS*: date and time when the allocation has to
+        expire, in the same format as timestamps, ie:
+
+        >>> datetime_now = datetime.datetime.utcnow()
+        >>> delta_5min = datetime.timedelta(seconds = 5 * 60)
+        >>> datetime_end = datetime_now  + delta_5min
+        >>> datetime_end.strftime("%Y%m%d%H%M%S")
+
+        If hours/minutes/seconds are not needed, set to zero, eg:
+
+        >>> "20230930000000"
     """
 
     # FIXME: add other extra data
@@ -964,8 +1016,27 @@ def request(groups, calling_user, obo_user, guests,
     else:
         _request_extra_data_verify(extra_data)
 
+    if endtime != None:
+        assert isinstance(endtime, str), \
+            "endtime: expected date/time in string YYYYmmddHHMMSS format;" \
+            f" got {type(endtime)}"
+        if endtime != "static":
+            try:
+                dt_endtime  = datetime.datetime.strptime(endtime, "%Y%m%d%H%M%S")
+            except ValueError as e:
+                raise AssertionError(
+                    f"endtime: invalid date/time {endtime}: {e}") from e
+            dt_now = datetime.datetime.utcnow()
+            # was there no way to get the delta straight from the struct??
+            delta = dt_endtime - dt_now
+            if delta.days <= 0 and delta.seconds < 60:
+                raise AssertionError(
+                    "endtime: needs to be at least one minutes ahead"
+                    " of curent time; got {delta}s")
+
     message = _allocation_policy_check(calling_user, obo_user, guests,
-                                       priority, preempt, queue, shared)
+                                       priority, preempt, queue, shared,
+                                       endtime)
     if message:
         return {
             "state": "rejected",
@@ -985,6 +1056,8 @@ def request(groups, calling_user, obo_user, guests,
     allocdb.set("priority", priority)
     allocdb.set("user", obo_user)
     allocdb.set("creator", calling_user.get_id())
+    if endtime != None:
+        allocdb.set("endtime", endtime)
     if reason:
         if len(reason) > ttbl.config.reason_len_max:
             reason = reason[:ttbl.config.reason_len_max]
