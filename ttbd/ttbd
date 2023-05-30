@@ -1199,7 +1199,7 @@ def _put_keepalive(version = 1):
                         group_allocated_name = r['group_allocated']
                     )
                 else:
-                    result[allocid] = r['state']
+                    result[allocid] = { "state": r['state'] }
             ao.kws['result'] = result
         except Exception as e:
             flask_logi_abort(400, "%s" % e, exc_info = True)
