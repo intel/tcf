@@ -52,7 +52,7 @@ def _delete(rtb, allocid):
 def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
                    queue_timeout = None, priority = 700, preempt = False,
                    queue = True, reason = None, wait_in_queue = True,
-                   register_at = None, extra_data = None):
+                   register_at = None, extra_data = None, endtime = None):
     """:param set register_at: (optional) if given, this is a set where
       we will add the allocation ID created only if ACTIVE or QUEUED
       inmediately as we get it before doing any waiting.
@@ -74,6 +74,23 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
         >>> alloc_uuid = str(uuid.uuid4())
         >>> alloc_uuid = "a5e000a8-25ed-42a2-96c2-d9e361465367"
 
+    :param str endtime: (optional, default *None*) at what time the
+      allocation shall expire (in UTC) formatted as a string:
+
+      - *None* (default): the allocation expires when it is deemed
+        idle by the server or when deleted/destroyed by API call.
+
+      - *static*: the allocation never expires, until manually
+        deleted/destroyed by API call.
+
+      - *YYYYmmddHHMMSS*: date and time when the allocation has to
+        expire, in the same format as timestamps, ie:
+
+        >>> ts = time.strftime("%Y%m%d%H%M%S")
+
+        If hours/minutes/seconds are not needed, set to zero, eg:
+
+        >>> "20230930000000"
     """
     assert isinstance(groups, dict)
     assert register_at == None or isinstance(register_at, set)
@@ -84,6 +101,7 @@ def _alloc_targets(rtb, groups, obo = None, keepalive_period = 4,
         queue = queue,
         groups = {},
         reason = reason,
+        endtime = endtime,
     )
     if obo:
         data['obo_user'] = obo
@@ -281,7 +299,8 @@ def _cmdline_alloc_targets(args):
                                    queue = args.queue, priority = args.priority,
                                    reason = args.reason,
                                    extra_data = extra_data,
-                                   wait_in_queue = args.wait_in_queue)
+                                   wait_in_queue = args.wait_in_queue,
+                                   endtime = args.endtime)
                 ts = time.time()
                 if args.wait_in_queue:
                     print("allocation ID %s: [+%.1fs] allocated: %s" % (
@@ -671,6 +690,17 @@ def _cmdline_setup(arg_subparsers):
                     "can be casted with i:NUMBER f:FLOAT s:STRING b:BOOL")
     ap.add_argument("--uuid", action = "store_true", default = False,
                     help = "set a UUID in the allocation")
+    ap.add_argument(
+        "--endtime",
+        metavar = "YYYYmmddHHMMSS", action = "store", default = None,
+        help = "This allocation shall finish at the given UTC time;"
+        " otherwise it will expire when idle or removed with alloc-rm"
+        " or an equivalent API call (see also --static)")
+    ap.add_argument(
+        "--static",
+        action = "store_true", default = False, dest = "endtime",
+        help = "This allocation shall not expire and will last until manually"
+        " removed with alloc-rm or equivalent API call")
     ap.add_argument(
         "target", metavar = "TARGETSPEC", nargs = "+",
         action = "store", default = None,

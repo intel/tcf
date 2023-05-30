@@ -18,7 +18,8 @@ ttbd = commonl.testing.test_ttbd(
         os.path.join(srcdir, "conf_%s" % os.path.basename(__file__.rstrip('cd')))
     ],
     errors_ignore = [
-        "Traceback"
+        "Traceback",
+
     ])
 
 @tcfl.tc.target(ttbd.url_spec + ' and t0')
