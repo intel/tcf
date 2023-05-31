@@ -17,6 +17,7 @@ import string
 import subprocess
 
 import ttbl
+import ttbl.dhcp
 import ttbl.qemu
 import ttbl.dnsmasq
 
