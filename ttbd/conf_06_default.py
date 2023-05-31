@@ -34,11 +34,18 @@ if ttbl.config.defaults_enabled:
 
     index_start = 5
 
+target_local = ttbl.test_target('local')
 ttbl.config.target_add(
-    ttbl.test_target('local'),
+    target_local,
     tags = {
         "versions.server": commonl.version_get(ttbl, "ttbd"),
         "skip_cleanup": True,
         "disabled": "meant only for describing the server",
     }
+)
+target_local.interface_add(
+    "capture",
+    ttbl.capture.interface(
+        usb_devices = capture_usb_devices,
+    )
 )

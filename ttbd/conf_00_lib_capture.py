@@ -48,6 +48,7 @@ expose different audio controls that have to be set or queried.
 
 import signal
 
+import ttbl._install
 import ttbl.capture
 
 
@@ -318,3 +319,19 @@ capture_front_astream_vtop_0c76_161e = ttbl.capture.generic_stream(
     # vtop HW has Mic for an input name
     pre_commands = [ "amixer -c %(id)s-front sset Mic 75%%" ]
 )
+
+
+
+# Useful for the actual server target (local) to assist in
+# configuration/debugging: capture list of connected USB devices
+usb_device_capture_py = commonl.ttbd_locate_helper(
+    "usb-devices-capture.py",
+    ttbl._install.share_path,
+    log = logging)
+
+capture_usb_devices = ttbl.capture.generic_snapshot(
+    "%(id)s USB devices",
+    usb_device_capture_py + " %(output_file_name)s",
+    mimetype = "application/json", extension = ".json",
+)
+
