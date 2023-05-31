@@ -134,6 +134,7 @@ targets over HTTP to be controlled by the TCF client.
             'hw-healthmonitor/ttbd-hw-healthmonitor-driver-rebind.py',
             'setup-efi-grub2-elf.sh',
             "raritan-power-capture.py",
+            "usb-devices-capture.py",
         ]),
         ('@prefix@/share/tcf/ttbd',[
             'requirements.txt',
