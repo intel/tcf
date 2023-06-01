@@ -67,9 +67,14 @@ def args_targetspec_add(
         help = "Consider also disabled targets")
     if targetspec_n != 1:
         ap.add_argument(
-            "--serialize", action = "store_true", default = False,
+            "--serialize",
+            action = "store_const", dest = "parellization_factor", default = 1,
             help = "Serialize (don't parallelize) the operation on"
             " multiple targets")
+        ap.add_argument(
+            "--parallelization-factor",
+            action = "store", type = int, default = -4,
+            help = "(advanced) parallelization factor")
     if isinstance(targetspec_n, bool):
         if targetspec_n:
             nargs = "+"
