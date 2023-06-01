@@ -22,6 +22,7 @@ import concurrent.futures
 import logging
 import os
 
+import commonl
 import tcfl.ttb_client		# COMPAT: FIXME remove
 
 logger = logging.getLogger("tcfl.servers")
@@ -102,9 +103,9 @@ def _run_on_server(server_name, fn, *args,
         return None, e
 
 
-
 def run_fn_on_each_server(servers: dict, fn: callable, *args,
                           serialize: bool = False, traces: bool = False,
+                          parallelization_factor: int = -4,
                           **kwargs):
     """
     Run a function on each server in parallel
@@ -122,24 +123,22 @@ def run_fn_on_each_server(servers: dict, fn: callable, *args,
       :data:`tcfl.server_c.servers` for all servers or any other dict
       with whatever server names are chosen.
 
-    :param bool serialize: (optional, default *False*) if calls to
-      each server need to be run in a single thread or can be run in
-      parallel (default).
+    :param int parallelization_factor: (optional, default -4, run
+      four operations per processor) number of threads to use to
+      parallelize the operation; use *1* to serialize.
 
     :param bool traces: (optional, default *True*) if log messages for
       exceptions shall include stack traces.
     """
 
-    if serialize:
-        threads = 1
-    else:
-        threads = len(servers)
-
+    processes = min(
+        len(servers),
+        commonl.processes_guess(parallelization_factor))
     results = {}
-    if threads == 0:
+    if processes == 0:
         return results
 
-    with concurrent.futures.ProcessPoolExecutor(threads) as executor:
+    with concurrent.futures.ProcessPoolExecutor(processes) as executor:
         futures = {
             # for each server, queue a thread that will call
             # _fn, who will call fn taking care of exceptions
@@ -162,6 +161,7 @@ def run_fn_on_each_server(servers: dict, fn: callable, *args,
                 continue
 
         return results
+
 
 
 def subsystem_setup(*args, **kwargs):

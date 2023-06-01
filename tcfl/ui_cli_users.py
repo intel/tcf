@@ -177,7 +177,8 @@ def _cmdline_login(cli_args: argparse.Namespace):
 
     r = tcfl.servers.run_fn_on_each_server(
         servers, _login, credentials,
-        serialize = cli_args.serialize, traces = cli_args.traces)
+        parallelization_factor = cli_args.parallelization_factor,
+        traces = cli_args.traces)
     # r now is a dict keyed by server_name of tuples usernames,
     # exception
     logged_count = 0
@@ -216,7 +217,8 @@ def _cmdline_logout(cli_args: argparse.Namespace):
 
     r = tcfl.servers.run_fn_on_each_server(
         servers, _logout, cli_args,
-        serialize = cli_args.serialize, traces = cli_args.traces)
+        parallelization_factor = cli_args.parallelization_factor,
+        traces = cli_args.traces)
     # r now is a dict keyed by server_name of tuples usernames,
     # exception
     for server_name, ( _, e ) in r.items():
@@ -258,7 +260,8 @@ def _cmdline_role_gain(cli_args: argparse.Namespace):
 
     tcfl.servers.run_fn_on_each_server(
         servers, _user_role, cli_args, "gain",
-        serialize = cli_args.serialize, traces = cli_args.traces)
+        parallelization_factor = cli_args.parallelization_factor,
+        traces = cli_args.traces)
 
 
 def _cmdline_role_drop(cli_args: argparse.Namespace):
@@ -269,7 +272,8 @@ def _cmdline_role_drop(cli_args: argparse.Namespace):
 
     tcfl.servers.run_fn_on_each_server(
         servers, _user_role, cli_args, "drop",
-        serialize = cli_args.serialize, traces = cli_args.traces)
+        parallelization_factor = cli_args.parallelization_factor,
+        traces = cli_args.traces)
 
 
 
@@ -290,7 +294,8 @@ def _cmdline_user_list(cli_args: argparse.Namespace):
 
     result = tcfl.servers.run_fn_on_each_server(
         tcfl.server_c.servers, _user_list, cli_args,
-        serialize = cli_args.serialize, traces = cli_args.traces)
+        parallelization_factor = cli_args.parallelization_factor,
+        traces = cli_args.traces)
 
     # so now result is a dictionary of SERVER: ( DATA, EXCEPTION ),
     # where DATA is dictionaries of USERNAME: USERDATA
@@ -399,9 +404,14 @@ def cmdline_setup(arg_subparser):
         "AKA is the short name of the server (defaults to the sole "
         "host name, without the domain). Find it with 'tcf servers'")
     ap.add_argument(
-        "--serialize", action = "store_true", default = False,
+        "--serialize",
+        action = "store_const", dest = "parellization_factor", default = 1,
         help = "Serialize (don't parallelize) the operation on"
-        " multiple servers")
+        " multiple targets")
+    ap.add_argument(
+        "--parallelization-factor",
+        action = "store", type = int, default = -4,
+        help = "(advanced) parallelization factor")
     ap.add_argument(
         "username", nargs = '?', metavar = "USERNAME",
         action = "store", default = None,
@@ -434,9 +444,14 @@ def cmdline_setup_advanced(arg_subparser):
         help = "ID of user whose role is to be dropped"
         " (optional, defaults to yourself)")
     ap.add_argument(
-        "--serialize", action = "store_true", default = False,
+        "--serialize",
+        action = "store_const", dest = "parellization_factor", default = 1,
         help = "Serialize (don't parallelize) the operation on"
-        " multiple servers")
+        " multiple targets")
+    ap.add_argument(
+        "--parallelization-factor",
+        action = "store", type = int, default = -4,
+        help = "(advanced) parallelization factor")
     ap.add_argument(
         "role", action = "store",
         help = "Role to gain")
@@ -452,9 +467,14 @@ def cmdline_setup_advanced(arg_subparser):
         help = "ID of user whose role is to be dropped"
         " (optional, defaults to yourself)")
     ap.add_argument(
-        "--serialize", action = "store_true", default = False,
+        "--serialize",
+        action = "store_const", dest = "parellization_factor", default = 1,
         help = "Serialize (don't parallelize) the operation on"
-        " multiple servers")
+        " multiple targets")
+    ap.add_argument(
+        "--parallelization-factor",
+        action = "store", type = int, default = -4,
+        help = "(advanced) parallelization factor")
     ap.add_argument(
         "role", action = "store",
         help = "Role to drop")
@@ -467,9 +487,14 @@ def cmdline_setup_advanced(arg_subparser):
         "admin role privilege to list users others than your own)")
     tcfl.ui_cli.args_verbosity_add(ap)
     ap.add_argument(
-        "--serialize", action = "store_true", default = False,
+        "--serialize",
+        action = "store_const", dest = "parellization_factor", default = 1,
         help = "Serialize (don't parallelize) the operation on"
         " multiple targets")
+    ap.add_argument(
+        "--parallelization-factor",
+        action = "store", type = int, default = -4,
+        help = "(advanced) parallelization factor")
     ap.add_argument("userid", action = "store",
                     default = None, nargs = "*",
                     help = "Users to list (default all)")
