@@ -42,13 +42,10 @@ logger = logging.getLogger("ui_cli_users")
 
 
 
-def _credentials_get(domain: str, aka: str, cli_args: argparse.Namespace):
+def _credentials_get_global(cli_args: argparse.Namespace):
     # env general
     user_env = os.environ.get("TCF_USER", None)
     password_env = os.environ.get("TCF_PASSWORD", None)
-    # server specific
-    user_env_aka = os.environ.get("TCF_USER_" + aka, None)
-    password_env_aka = os.environ.get("TCF_PASSWORD_" + aka, None)
 
     # from commandline
     user_cmdline = cli_args.username
@@ -57,11 +54,6 @@ def _credentials_get(domain: str, aka: str, cli_args: argparse.Namespace):
     # default to what came from environment
     user = user_env
     password = password_env
-    # override with server specific from envrionment
-    if user_env_aka:
-        user = user_env_aka
-    if password_env_aka:
-        password = password_env_aka
     # override with what came from the command line
     if user_cmdline:
         user = user_cmdline
@@ -74,13 +66,66 @@ def _credentials_get(domain: str, aka: str, cli_args: argparse.Namespace):
                 "Cannot obtain login name and"
                 " -q was given (can't ask); "
                 " please specify a login name or use environment"
-                " TCF_USER[_AKA]")
+                " TCF_USER[_<AKA>]")
         if not sys.stdout.isatty():
             raise RuntimeError(
                 "Cannot obtain login name and"
                 " terminal is not a TTY (can't ask); "
                 " please specify a login name or use environment"
-                " TCF_USER[_AKA]")
+                " TCF_USER[_<AKA>]")
+        user = input(f'Login for all servers [{getpass.getuser()}]'
+                     ' (use *ask* for server-specific): ')
+        if user == "":	# default to LOGIN name
+            user = getpass.getuser()
+            print("I: defaulting to login name '{user}'")
+        elif user == "ask":
+            user = None
+
+    if user and not password:
+        if cli_args.quiet:
+            raise RuntimeError(
+                "Cannot obtain password and"
+                " -q was given (can't ask); "
+                " please specify a login name or use environment"
+                " TCF_PASSWORD[_<AKA>]")
+        if not sys.stdout.isatty():
+            raise RuntimeError(
+                "Cannot obtain password and"
+                " terminal is not a TTY (can't ask); "
+                " please specify a login name or use environment"
+                " TCF_PASSWORD[_<AKA>]")
+        password = getpass.getpass(f"Password for {user} (on all servers): ")
+    return user, password
+
+
+
+def _credentials_get(domain: str, aka: str, user: str, password: str,
+                     cli_args: argparse.Namespace):
+    # server specific
+    user_env_aka = os.environ.get("TCF_USER_" + aka, None)
+    password_env_aka = os.environ.get("TCF_PASSWORD_" + aka, None)
+
+    # override with server specific from envrionment
+    if user_env_aka:
+        user = user_env_aka
+    if password_env_aka:
+        password = password_env_aka
+    # we don't override from the commandline, since we did it in
+    # _credentials_get_global()
+
+    if not user:
+        if cli_args.quiet:
+            raise RuntimeError(
+                "Cannot obtain login name and"
+                " -q was given (can't ask); "
+                " please specify a login name or use environment"
+                " TCF_USER[_<AKA>]")
+        if not sys.stdout.isatty():
+            raise RuntimeError(
+                "Cannot obtain login name and"
+                " terminal is not a TTY (can't ask); "
+                " please specify a login name or use environment"
+                " TCF_USER[_<AKA>]")
         user = input('Login for %s [%s]: ' \
                      % (domain, getpass.getuser()))
         if user == "":	# default to LOGIN name
@@ -124,10 +169,11 @@ def _cmdline_login(cli_args: argparse.Namespace):
     logged = False
     servers = tcfl.server_c.servers
     # we only ask on the terminal HERE!
+    user, password = _credentials_get_global(cli_args)
     credentials = {}
     for server_name, server in servers.items():
         credentials[server.aka] = \
-            _credentials_get(server.url, server.aka, cli_args)
+            _credentials_get(server.url, server.aka, user, password, cli_args)
 
     r = tcfl.servers.run_fn_on_each_server(
         servers, _login, credentials,
