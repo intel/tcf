@@ -60,7 +60,8 @@ def _cmdline_servers(cli_args: argparse.Namespace):
 
         r = tcfl.servers.run_fn_on_each_server(
             servers, _logged_in_username,
-            serialize = cli_args.serialize, traces = cli_args.traces)
+            parallelization_factor = cli_args.parallelization_factor,
+            traces = cli_args.traces)
         # r now is a dict keyed by server_name of tuples usernames,
         # exception
         for server_name, ( username, _e ) in r.items():
