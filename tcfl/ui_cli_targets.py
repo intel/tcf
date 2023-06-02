@@ -243,6 +243,30 @@ def _cmdline_target_patch(cli_args: argparse.Namespace):
 
 
 
+def _target_enable(target, _cli_args):
+    target.enable()
+
+def _cmdline_target_enable(cli_args: argparse.Namespace):
+
+    # force seeing all targets, will ease confusion, since normally we
+    # want to enable disabled targets
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        _target_enable, cli_args, targets_all = True)
+
+
+
+def _target_disable(target, cli_args):
+    target.disable(cli_args.reason)
+
+def _cmdline_target_disable(cli_args: argparse.Namespace):
+
+    # force seeing all targets, will ease confusion, in case we run the
+    # command twice (trying to disable a disabled target shall just work)
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        _target_disable, cli_args, targets_all = True)
+
+
+
 def _cmdline_setup(arg_subparsers):
 
     import tcfl.ui_cli
@@ -287,3 +311,23 @@ def _cmdline_setup_advanced(arg_subparsers):
         default = None, help = "Data items to store; if"
         " none, specify a JSON dictionary over stdin")
     ap.set_defaults(func = _cmdline_target_patch)
+
+
+    ap = arg_subparsers.add_parser(
+        "enable",
+        help = "Enable disabled target/s")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap)
+    ap.set_defaults(func = _cmdline_target_enable)
+
+
+    ap = arg_subparsers.add_parser(
+        "disable",
+        help = "Disable enabled target/s")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap)
+    ap.add_argument(
+        "-r", "--reason", metavar = "REASON", action = "store",
+        default = 'disabled by the administrator',
+        help = "Reason why targets are disabled")
+    ap.set_defaults(func = _cmdline_target_disable)
