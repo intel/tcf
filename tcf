@@ -100,39 +100,6 @@ servers: {len(tcfl.ttb_client.rest_target_brokers)}""")
     # https://stackoverflow.com/questions/21318427/get-dns-search-suffix-in-python
 
 
-def _target_property_set(args):
-    with tcfl.msgid_c("cmdline"):
-        target = tcfl.tc.target_c.create_from_cmdline_args(args)
-        value = args.value
-        if not value:
-            pass	# used to unset a value
-        elif value.startswith("i:"):
-            value = int(value.split(":", 1)[1])
-        elif value.startswith("f:"):
-            value = float(value.split(":", 1)[1])
-        elif value.startswith("b:"):
-            val = value.split(":", 1)[1]
-            if val.lower() == "true":
-                value = True
-            elif val.lower() == "false":
-                value = False
-            else:
-                raise ValueError("value %s: bad boolean '%s' (true or false)"
-                                 % (value, val))
-        elif value.startswith("s:"):
-            # string that might start with s: or empty
-            value = value.split(":", 1)[1]
-        # FIXME: use commonl.cmdline_str_to_value()
-        target.property_set(args.property, value)
-
-def _target_property_get(args):
-    with tcfl.msgid_c("cmdline"):
-        target = tcfl.tc.target_c.create_from_cmdline_args(args)
-        r = target.property_get(args.property)
-        if r:	# print nothing if None
-            print(r)
-
-
 def _healthcheck(target, args):
 
     if args.interfaces == []:
@@ -373,28 +340,6 @@ if __name__ == "__main__":
     # Semi advanced commands
 
     tcfl.ui_cli_targets._cmdline_setup_advanced(arg_subparsers)
-
-    ap = arg_subparsers.add_parser("property-set",
-                                   help = "Set a target's property")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("property", metavar = "PROPERTY", action = "store",
-                    default = None, help = "Name of property to set")
-    ap.add_argument("value", metavar = "VALUE", action = "store",
-                    nargs = "?",
-                    default = None, help = "Value of property (none "
-                    "to remove it; i:INTEGER, f:FLOAT b:false or b:true,"
-                    " otherwise it is considered a string)")
-    ap.set_defaults(func = _target_property_set)
-
-
-    ap = arg_subparsers.add_parser("property-get",
-                                   help = "Get a target's property")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("property", metavar = "PROPERTY", action = "store",
-                    default = None, help = "Name of property")
-    ap.set_defaults(func = _target_property_get)
 
     tcfl.tc.argp_setup(arg_subparsers)
 

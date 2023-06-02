@@ -267,6 +267,29 @@ def _cmdline_target_disable(cli_args: argparse.Namespace):
 
 
 
+def _target_property_set(target, cli_args):
+    value = commonl.cmdline_str_to_value(cli_args.value)
+    target.property_set(cli_args.property, value)
+
+def _cmdline_target_property_set(cli_args: argparse.Namespace):
+
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        _target_property_set, cli_args, only_one = True)
+
+
+
+def _target_property_get(target, cli_args):
+    r = target.property_get(cli_args.property)
+    if r:	# print nothing if None
+        print(r)
+
+def _cmdline_target_property_get(cli_args: argparse.Namespace):
+
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        _target_property_get, cli_args, only_one = True)
+
+
+
 def _cmdline_setup(arg_subparsers):
 
     import tcfl.ui_cli
@@ -331,3 +354,30 @@ def _cmdline_setup_advanced(arg_subparsers):
         default = 'disabled by the administrator',
         help = "Reason why targets are disabled")
     ap.set_defaults(func = _cmdline_target_disable)
+
+
+    ap = arg_subparsers.add_parser(
+        "property-set",
+        help = "Set a target's property")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    ap.add_argument(
+        "property", metavar = "PROPERTY", action = "store",
+        default = None, help = "Name of property to set")
+    ap.add_argument(
+        "value", metavar = "VALUE", action = "store",
+        nargs = "?", default = None,
+        help = "Value of property (none to remove it; i:INTEGER, f:FLOAT"
+        " b:false or b:true, otherwise it is considered a string)")
+    ap.set_defaults(func = _cmdline_target_property_set)
+
+
+    ap = arg_subparsers.add_parser(
+        "property-get",
+        help = "Get a target's property")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    ap.add_argument(
+        "property", metavar = "PROPERTY", action = "store", default = None,
+        help = "Name of property to read")
+    ap.set_defaults(func = _cmdline_target_property_get)

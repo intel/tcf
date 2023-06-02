@@ -3059,6 +3059,8 @@ def cmdline_str_to_value(value):
 
     :returns: value as int, float, bool or string
     """
+    if not value:
+        return value
     if value.startswith("i:"):
         return int(value[2:])
     if value.startswith("f:"):
