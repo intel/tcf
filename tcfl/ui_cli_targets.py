@@ -20,15 +20,17 @@ learn more about them):
 
 """
 
+import argparse
+import json
 import logging
 import math
 import os
 import sys
 
 import commonl
+import tcfl.ui_cli
 
 logger = logging.getLogger("ui_cli_testcases")
-
 
 
 def _cmdline_targets_init(args):
@@ -48,6 +50,24 @@ def _cmdline_targets_init(args):
     tcfl.tc.report_driver_c.add(
         tcfl.report_jinja2.driver(args.log_dir),
         name = "jinja2")
+
+
+
+def _cmdline_target_get(cli_args: argparse.Namespace):
+
+    def _target_get(target, _cli_args):
+        projections = cli_args.project
+        server = tcfl.server_c.servers[target.rt['server']]
+        rt = server.targets_get(target_id = target.id,
+                                projections = cli_args.project)
+        # rt is a list of dicts keyed by fullid, we care only for the first
+        json.dump(rt[0][target.fullid], sys.stdout, indent = 4)
+
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        # note we scan ignoring --projections, since that we'll use
+        # later; we want to identify the target to get as soon as
+        # possible and then in _target_get() we do the stuff
+        _target_get, cli_args, only_one = True)
 
 
 
@@ -211,3 +231,19 @@ def _cmdline_setup(arg_subparsers):
         help = "consider only the given fields "
         "(default depends on verbosity")
     ap.set_defaults(func = _cmdline_ls)
+
+
+
+def _cmdline_setup_advanced(arg_subparsers):
+    ap = arg_subparsers.add_parser(
+        "get", help = "Return target information straight from the "
+        "server formated as JSON (unlike 'ls', which will add some "
+        "client fields)")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    ap.add_argument(
+        "-p", "--project", "--projection", metavar = "FIELD",
+        action = "append", type = str,
+        help = "consider only the given fields "
+        "(default depends on verbosity")
+    ap.set_defaults(func = _cmdline_target_get)
