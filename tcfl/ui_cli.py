@@ -185,7 +185,9 @@ def run_fn_on_each_targetspec(
 
     with tcfl.msgid_c("ui_cli"):
 
-        project = { 'id', 'disabled', 'type', 'interfaces.' + iface }
+        project = { 'id', 'disabled', 'type' }
+        if iface:
+            project.add('interfaces.' + iface)
         if projections:
             commonl.assert_list_of_strings(projections,
                                            "projetions", "field")
