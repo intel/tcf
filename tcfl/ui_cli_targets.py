@@ -21,6 +21,7 @@ learn more about them):
 """
 
 import argparse
+import collections
 import json
 import logging
 import math
@@ -216,6 +217,32 @@ def _cmdline_ls(cli_args):
 
 
 
+def _target_patch(target, cli_args):
+    # set data
+    data = collections.OrderedDict()	# respect user's order
+    for data_s in cli_args.data:
+        if not "=" in data_s:
+            raise AssertionError(
+                "data specification has to be in the format KEY=JSON-DATA;"
+                " got (%s) %s" % (type(data_s), data_s))
+        k, v = data_s.split("=", 1)
+        data[k] = v
+    server = tcfl.server_c.servers[target.rt['server']]
+    if data:
+        server.send_request("PATCH", "targets/" + target.id, json = data)
+    else:
+        # JSON from stdin
+        server.send_request("PATCH", "targets/" + target.id,
+                            json = json.load(sys.stdin))
+
+
+def _cmdline_target_patch(cli_args: argparse.Namespace):
+
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        _target_patch, cli_args, only_one = True)
+
+
+
 def _cmdline_setup(arg_subparsers):
 
     import tcfl.ui_cli
@@ -235,6 +262,7 @@ def _cmdline_setup(arg_subparsers):
 
 
 def _cmdline_setup_advanced(arg_subparsers):
+
     ap = arg_subparsers.add_parser(
         "get", help = "Return target information straight from the "
         "server formated as JSON (unlike 'ls', which will add some "
@@ -247,3 +275,15 @@ def _cmdline_setup_advanced(arg_subparsers):
         help = "consider only the given fields "
         "(default depends on verbosity")
     ap.set_defaults(func = _cmdline_target_get)
+
+    ap = arg_subparsers.add_parser(
+        "patch",
+        help = "Store multiple fields of data on the target's inventory"
+        " from JSON or KEY=VALUE (vs property-set just storing one)")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    ap.add_argument(
+        "data", metavar = "KEY=JSON-VALUE", nargs = "*",
+        default = None, help = "Data items to store; if"
+        " none, specify a JSON dictionary over stdin")
+    ap.set_defaults(func = _cmdline_target_patch)
