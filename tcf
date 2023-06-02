@@ -243,31 +243,6 @@ def _cache_flush(_args):
 
 
 
-def _cookies(args):
-    if '/' in args.target:
-        # cache is by full id
-        rtb = ttb_client.rest_target_broker.rts_cache[args.target]['rtb']
-    else:
-        for rt_fullid, rt in ttb_client.rest_target_broker.rts_cache.items():
-            if rt['id'] == args.target:
-                rtb = rt['rtb']
-                break
-        else:
-            raise ValueError("%s: unknown target" % args.target)
-
-    if args.json:
-        json.dump(rtb.cookies, sys.stdout, indent = 4)
-        print()
-    elif args.cookiejar:
-        # Follow https://curl.se/docs/http-cookies.html
-        # Note we don't keep the TTL field, so we set it at zero
-        for cookie, value in rtb.cookies.items():
-            print(f"{rtb.parsed_url.hostname}\tFALSE\t/\tTRUE\t0"
-                  f"\t{cookie}\t{value}")
-    else:
-        commonl._dict_print_dotted(rtb.cookies, separator = "")
-
-
 if __name__ == "__main__":
     tcfl.tc.version = commonl.version_get(tcfl, "tcf")
 
@@ -490,18 +465,7 @@ if __name__ == "__main__":
 
 
     # advanced commands
-
-    ap = arg_subparsers.add_parser("cookies",
-                                   help = "Show logging cookies (to feed"
-                                   " into curl, etc) maybe only for one server")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = [], help = "Target name")
-    ap.add_argument("-c","--cookiejar", action = "store_true", default = False,
-                    help = "Print in cookiejar format"
-                    " (https://curl.se/docs/http-cookies.html)")
-    ap.add_argument("-j","--json", action = "store_true", default = False,
-                    help = "Print in JSON format")
-    ap.set_defaults(func = _cookies)
+    tcfl.ui_cli_servers.cmdline_setup_advanced(arg_subparsers)
 
     import tcfl.ui_cli_users
     tcfl.ui_cli_users.cmdline_setup_advanced(arg_subparsers)
