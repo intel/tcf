@@ -133,22 +133,6 @@ def _target_property_get(args):
             print(r)
 
 
-def _target_disable(args):
-    with tcfl.msgid_c("cmdline"):
-        for target_name in args.target:
-            target = tcfl.tc.target_c.create_from_cmdline_args(
-                args, target_name = target_name)
-            target.disable(args.reason)
-
-def _target_enable(args):
-    with tcfl.msgid_c("cmdline"):
-        for target_name in args.target:
-            target = tcfl.tc.target_c.create_from_cmdline_args(
-                args, target_name = target_name)
-            target.enable()
-
-
-
 def _healthcheck(target, args):
 
     if args.interfaces == []:
@@ -451,26 +435,9 @@ if __name__ == "__main__":
     import tcfl.ui_cli_users
     tcfl.ui_cli_users.cmdline_setup_advanced(arg_subparsers)
 
-    ap = arg_subparsers.add_parser("enable",
-                                   help = "Enable a disabled target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = _target_enable)
-
-    ap = arg_subparsers.add_parser("disable",
-                                   help = "Disable an enabled target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.add_argument("-r", "--reason", metavar = "REASON", action = "store",
-                    default = 'disabled by the administrator',
-                    help = "Reason why targets are disabled")
-    ap.set_defaults(func = _target_disable)
-
-
     ap = arg_subparsers.add_parser("cache-flush",
                                    help = "wipe all caches")
     ap.set_defaults(func = _cache_flush)
-
 
     tcfl.tc.pos.cmdline_setup(arg_subparsers)
 
