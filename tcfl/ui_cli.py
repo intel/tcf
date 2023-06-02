@@ -205,7 +205,8 @@ def run_fn_on_each_targetspec(
         # that we are going to do it so much, (hence the meh)
         targetids = tcfl.targets.discovery_agent.rts_fullid_sorted
         if not targetids:
-            logger.error(f"No targets match the specification: {cli_args.target}")
+            logger.error(f"No targets match the specification (disabled?):"
+                         f" {''.join(cli_args.target)}")
             return 1
         if only_one and len(targetids) > 1:
             logger.error(
