@@ -179,7 +179,7 @@ class shell(tc.target_extension_c):
     """
 
     def __init__(self, target):
-        if 'console' not in target.rt['interfaces']:
+        if 'console' not in target.rt.get('interfaces', {}):
             raise self.unneeded
         tc.target_extension_c.__init__(self, target)
         self.tls = threading.local()
