@@ -69,6 +69,7 @@ def by_targetspec(targetspec: list = None, verbosity: int = 0):
 
     """
     if targetspec:
+        import tcfl.targets	# dependency loop otherwise
         # we are given a list of targets to look for their servers or
         # default to all, so pass it on to initialize the inventory
         # system so we can filter
