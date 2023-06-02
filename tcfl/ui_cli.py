@@ -121,7 +121,7 @@ def run_fn_on_each_targetspec(
         # COMPAT: removing list[str] so we work in python 3.8
         iface: str = None, extensions_only: list = None,
         only_one: bool = False,
-        projections = None,
+        projections = None, targets_all = None,
         **kwargs):
     """Initialize the target discovery and run a function on each target
     that matches a specification
@@ -196,17 +196,22 @@ def run_fn_on_each_targetspec(
         # Discover all the targets that match the specs in the command
         # line and pull the minimal inventories as specified per
         # arguments
+        if targets_all != None:
+            assert isinstance(targets_all, bool), \
+                "targets_all: expected bool; got {type(targets_all)}"
+        else:
+            targets_all = cli_args.all
         tcfl.targets.setup_by_spec(
             cli_args.target, cli_args.verbosity - cli_args.quietosity,
             project = project,
-            targets_all = cli_args.all)
+            targets_all = targets_all)
 
         # FIXMEh: this should be grouped by servera, but since is not
         # that we are going to do it so much, (hence the meh)
         targetids = tcfl.targets.discovery_agent.rts_fullid_sorted
         if not targetids:
             logger.error(f"No targets match the specification (disabled?):"
-                         f" {''.join(cli_args.target)}")
+                         f" {' '.join(cli_args.target)}")
             return 1
         if only_one and len(targetids) > 1:
             logger.error(
