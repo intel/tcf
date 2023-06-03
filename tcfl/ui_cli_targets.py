@@ -290,6 +290,13 @@ def _cmdline_target_property_get(cli_args: argparse.Namespace):
 
 
 
+def _cmdline_target_healthcheck(cli_args: argparse.Namespace):
+    import tcfl.healthcheck
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        tcfl.healthcheck._target_healthcheck, cli_args)
+
+
+
 def _cmdline_setup(arg_subparsers):
 
     import tcfl.ui_cli
@@ -381,3 +388,22 @@ def _cmdline_setup_advanced(arg_subparsers):
         "property", metavar = "PROPERTY", action = "store", default = None,
         help = "Name of property to read")
     ap.set_defaults(func = _cmdline_target_property_get)
+
+
+    ap = arg_subparsers.add_parser(
+        "healthcheck",
+        help = "Do a very basic health check")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    ap.add_argument(
+        "-i", "--interface", metavar = "INTERFACE",
+        dest = "interfaces", action = "append", default = [],
+        help = "Names of interfaces to healtcheck (default all "
+        "exposed by the target)")
+    ap.add_argument(
+        "-p", "--priority", action = "store", type = int, default = 500,
+        help = "Priority for allocation (0 highest, 999 lowest)")
+    ap.add_argument(
+        "--preempt", action = "store_true", default = False,
+        help = "Enable allocation preemption (disabled by default)")
+    tcfl.ui_cli.args_targetspec_add(ap)
+    ap.set_defaults(func = _cmdline_target_healthcheck)
