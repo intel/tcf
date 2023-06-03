@@ -209,6 +209,41 @@ class fork_function_c(multiprocessing.Process):
         return None
 
 
+def processes_guess(factor: int):
+    """Very simple parallelization count adjuster
+
+    This is meant to be passed to something as
+    *concurrent.futures.ProcessPoolExecutor*:
+
+    >>> paralellization_factor = -4
+    >>> processes = commonl.processes_guess(paralellization_factor)
+    >>> concurrent.futures.ProcessPoolExecutor(processes)
+
+    :param int factor: parallelization factor:
+
+      - positive: absolute number of threads to use; use *1* to
+        serialize.
+
+      - 0: get the best value for a CPU intensive workload; this
+        returns the amount of CPUs in the system.
+
+      - < 0: get the best value for an IO intensive workload, where we
+        can do N IO operations / CPU.
+
+    """
+    if factor == 0:
+        factor = int(os.environ.get("THREADS_GUESS", 0))
+    if factor > 0:
+        return factor
+    if factor == 0:
+        # factor for a CPU intensive workload
+        return multiprocessing.cpu_count()
+    # factor is negative; the absolute value is the intesiveness of
+    # the IO vs CPU, so how many IO we can run in parallel for each CPU
+    return -factor * multiprocessing.cpu_count()
+
+
+
 class Process(fork_c):	# COMPAT
     pass
 
@@ -3024,6 +3059,8 @@ def cmdline_str_to_value(value):
 
     :returns: value as int, float, bool or string
     """
+    if not value:
+        return value
     if value.startswith("i:"):
         return int(value[2:])
     if value.startswith("f:"):

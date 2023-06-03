@@ -20,15 +20,18 @@ learn more about them):
 
 """
 
+import argparse
+import collections
+import json
 import logging
 import math
 import os
 import sys
 
 import commonl
+import tcfl.ui_cli
 
 logger = logging.getLogger("ui_cli_testcases")
-
 
 
 def _cmdline_targets_init(args):
@@ -48,6 +51,24 @@ def _cmdline_targets_init(args):
     tcfl.tc.report_driver_c.add(
         tcfl.report_jinja2.driver(args.log_dir),
         name = "jinja2")
+
+
+
+def _cmdline_target_get(cli_args: argparse.Namespace):
+
+    def _target_get(target, _cli_args):
+        projections = cli_args.project
+        server = tcfl.server_c.servers[target.rt['server']]
+        rt = server.targets_get(target_id = target.id,
+                                projections = cli_args.project)
+        # rt is a list of dicts keyed by fullid, we care only for the first
+        json.dump(rt[0][target.fullid], sys.stdout, indent = 4)
+
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        # note we scan ignoring --projections, since that we'll use
+        # later; we want to identify the target to get as soon as
+        # possible and then in _target_get() we do the stuff
+        _target_get, cli_args, only_one = True)
 
 
 
@@ -196,6 +217,86 @@ def _cmdline_ls(cli_args):
 
 
 
+def _target_patch(target, cli_args):
+    # set data
+    data = collections.OrderedDict()	# respect user's order
+    for data_s in cli_args.data:
+        if not "=" in data_s:
+            raise AssertionError(
+                "data specification has to be in the format KEY=JSON-DATA;"
+                " got (%s) %s" % (type(data_s), data_s))
+        k, v = data_s.split("=", 1)
+        data[k] = v
+    server = tcfl.server_c.servers[target.rt['server']]
+    if data:
+        server.send_request("PATCH", "targets/" + target.id, json = data)
+    else:
+        # JSON from stdin
+        server.send_request("PATCH", "targets/" + target.id,
+                            json = json.load(sys.stdin))
+
+
+def _cmdline_target_patch(cli_args: argparse.Namespace):
+
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        _target_patch, cli_args, only_one = True)
+
+
+
+def _target_enable(target, _cli_args):
+    target.enable()
+
+def _cmdline_target_enable(cli_args: argparse.Namespace):
+
+    # force seeing all targets, will ease confusion, since normally we
+    # want to enable disabled targets
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        _target_enable, cli_args, targets_all = True)
+
+
+
+def _target_disable(target, cli_args):
+    target.disable(cli_args.reason)
+
+def _cmdline_target_disable(cli_args: argparse.Namespace):
+
+    # force seeing all targets, will ease confusion, in case we run the
+    # command twice (trying to disable a disabled target shall just work)
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        _target_disable, cli_args, targets_all = True)
+
+
+
+def _target_property_set(target, cli_args):
+    value = commonl.cmdline_str_to_value(cli_args.value)
+    target.property_set(cli_args.property, value)
+
+def _cmdline_target_property_set(cli_args: argparse.Namespace):
+
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        _target_property_set, cli_args, only_one = True)
+
+
+
+def _target_property_get(target, cli_args):
+    r = target.property_get(cli_args.property)
+    if r:	# print nothing if None
+        print(r)
+
+def _cmdline_target_property_get(cli_args: argparse.Namespace):
+
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        _target_property_get, cli_args, only_one = True)
+
+
+
+def _cmdline_target_healthcheck(cli_args: argparse.Namespace):
+    import tcfl.healthcheck
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        tcfl.healthcheck._target_healthcheck, cli_args)
+
+
+
 def _cmdline_setup(arg_subparsers):
 
     import tcfl.ui_cli
@@ -211,3 +312,98 @@ def _cmdline_setup(arg_subparsers):
         help = "consider only the given fields "
         "(default depends on verbosity")
     ap.set_defaults(func = _cmdline_ls)
+
+
+
+def _cmdline_setup_advanced(arg_subparsers):
+
+    ap = arg_subparsers.add_parser(
+        "get", help = "Return target information straight from the "
+        "server formated as JSON (unlike 'ls', which will add some "
+        "client fields)")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    ap.add_argument(
+        "-p", "--project", "--projection", metavar = "FIELD",
+        action = "append", type = str,
+        help = "consider only the given fields "
+        "(default depends on verbosity")
+    ap.set_defaults(func = _cmdline_target_get)
+
+    ap = arg_subparsers.add_parser(
+        "patch",
+        help = "Store multiple fields of data on the target's inventory"
+        " from JSON or KEY=VALUE (vs property-set just storing one)")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    ap.add_argument(
+        "data", metavar = "KEY=JSON-VALUE", nargs = "*",
+        default = None, help = "Data items to store; if"
+        " none, specify a JSON dictionary over stdin")
+    ap.set_defaults(func = _cmdline_target_patch)
+
+
+    ap = arg_subparsers.add_parser(
+        "enable",
+        help = "Enable disabled target/s")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap)
+    ap.set_defaults(func = _cmdline_target_enable)
+
+
+    ap = arg_subparsers.add_parser(
+        "disable",
+        help = "Disable enabled target/s")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap)
+    ap.add_argument(
+        "-r", "--reason", metavar = "REASON", action = "store",
+        default = 'disabled by the administrator',
+        help = "Reason why targets are disabled")
+    ap.set_defaults(func = _cmdline_target_disable)
+
+
+    ap = arg_subparsers.add_parser(
+        "property-set",
+        help = "Set a target's property")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    ap.add_argument(
+        "property", metavar = "PROPERTY", action = "store",
+        default = None, help = "Name of property to set")
+    ap.add_argument(
+        "value", metavar = "VALUE", action = "store",
+        nargs = "?", default = None,
+        help = "Value of property (none to remove it; i:INTEGER, f:FLOAT"
+        " b:false or b:true, otherwise it is considered a string)")
+    ap.set_defaults(func = _cmdline_target_property_set)
+
+
+    ap = arg_subparsers.add_parser(
+        "property-get",
+        help = "Get a target's property")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
+    ap.add_argument(
+        "property", metavar = "PROPERTY", action = "store", default = None,
+        help = "Name of property to read")
+    ap.set_defaults(func = _cmdline_target_property_get)
+
+
+    ap = arg_subparsers.add_parser(
+        "healthcheck",
+        help = "Do a very basic health check")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    ap.add_argument(
+        "-i", "--interface", metavar = "INTERFACE",
+        dest = "interfaces", action = "append", default = [],
+        help = "Names of interfaces to healtcheck (default all "
+        "exposed by the target)")
+    ap.add_argument(
+        "-p", "--priority", action = "store", type = int, default = 500,
+        help = "Priority for allocation (0 highest, 999 lowest)")
+    ap.add_argument(
+        "--preempt", action = "store_true", default = False,
+        help = "Enable allocation preemption (disabled by default)")
+    tcfl.ui_cli.args_targetspec_add(ap)
+    ap.set_defaults(func = _cmdline_target_healthcheck)

@@ -42,6 +42,47 @@ def _logged_in_username(_server_name, server):
     return server.logged_in_username()
 
 
+
+def _cookies(_server_name, server,
+             _cli_args: argparse.Namespace):
+    return server.state_load()
+
+def _cmdline_cookies(cli_args: argparse.Namespace):
+
+    tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+    verbosity = cli_args.verbosity - cli_args.quietosity
+    servers = tcfl.servers.by_targetspec(
+        cli_args.target, verbosity = verbosity)
+
+    r = tcfl.servers.run_fn_on_each_server(
+        servers, _cookies, cli_args,
+        parallelization_factor = cli_args.parallelization_factor,
+        traces = cli_args.traces)
+    # r now is a dict keyed by server_name of tuples cookies, exception
+    if cli_args.json:
+        d = {}
+        for server_name, ( cookies, _e ) in r.items():
+            d[server_name] = cookies
+        json.dump(d, sys.stdout, indent = 4)
+        print()
+    elif cli_args.cookiejar:
+        # Follow https://curl.se/docs/http-cookies.html
+        # Note we don't keep the TTL field, so we set it at zero
+        for server_name, ( cookies, _e ) in r.items():
+            for cookie, value in cookies.items():
+                print(f"{server_name}\tFALSE\t/\tTRUE\t0"
+                      f"\t{cookie}\t{value}")
+    else:
+        d = {}
+        for server_name, ( cookies, _e ) in r.items():
+            d[server_name] = cookies
+        if len(d) == 1:	# print less info if there is only one
+            commonl._dict_print_dotted(d[server_name], separator = ".")
+        else:
+            commonl._dict_print_dotted(d, separator = ".")
+
+
+
 def _cmdline_servers(cli_args: argparse.Namespace):
     import tcfl.servers
     import tcfl.targets
@@ -60,7 +101,8 @@ def _cmdline_servers(cli_args: argparse.Namespace):
 
         r = tcfl.servers.run_fn_on_each_server(
             servers, _logged_in_username,
-            serialize = cli_args.serialize, traces = cli_args.traces)
+            parallelization_factor = cli_args.parallelization_factor,
+            traces = cli_args.traces)
         # r now is a dict keyed by server_name of tuples usernames,
         # exception
         for server_name, ( username, _e ) in r.items():
@@ -231,3 +273,21 @@ def cmdline_setup(arg_subparser):
         help = "Flush currently cached/known servers"
         " (might need to servers-discover after)")
     ap.set_defaults(func = _cmdline_servers_flush)
+
+
+
+def cmdline_setup_advanced(arg_subparser):
+
+    ap = arg_subparser.add_parser(
+        "cookies",
+        help = "Show login cookies (to feed into curl, etc)")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap)
+    ap.add_argument(
+        "-c","--cookiejar", action = "store_true", default = False,
+        help = "Print in cookiejar format"
+        " (https://curl.se/docs/http-cookies.html)")
+    ap.add_argument(
+        "-j","--json", action = "store_true", default = False,
+        help = "Print in JSON format")
+    ap.set_defaults(func = _cmdline_cookies)

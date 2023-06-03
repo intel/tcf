@@ -1,33 +1,46 @@
 #! /usr/bin/env python3
 #
-# Copyright (c) 2017 Intel Corporation
+# Copyright (c) 2014-23 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+# This tool provides command line access to:
 #
-# * FIXME: Make the cookie loading thing a context, so even in the exit
-#   path we save
+# - discover / login / manage ttbd servers and users of said servers
 #
-# * join ttb_client and tcf, move all functions in ttb_client to
-#   rest_tb, as they are target broker specific
+# - managed targets exported by ttbd, so you can power cycle them,
+#   access the console, press buttons, ... (so using the ttbd REST
+#   HTTP API from the command line).
 #
-
+# - other more advanced functions, like getting cookies, etc
+#
+# This file just a multiplexor of subcommands
+#
+# Initializes the command line argument, which has a bunch of common
+# command line options and then starts importing submodules, running
+# for each their CLI setup, which creates subcommands.
+#
+# Current transitioning CLI initialization from tcfl/target_ext_*.py
+# (which are API modules) to tcfl/ui_cli_*.py, so it is clearly
+# separated what deals with CLI and what is actually API.
+#
+# When all that is done, parse the arguments, then the config files,
+# and run whatever subcommand has been specified in the command line.
+#
 
 import argparse
-import argcomplete
-import collections
 import copy
-import getpass
 import inspect
-import json
+import logging
 import os
 import platform
 import re
-import requests
 import shutil
 import sys
 import tempfile
-import traceback
+
+import argcomplete
+import requests
 
 import commonl
 import tcfl
@@ -36,20 +49,6 @@ import tcfl.tc
 import tcfl.config
 import tcfl._install
 import tcfl.ui_cli
-
-# I bet there is a better way to do this...but we need the symbol to
-# be in the logging module so that it is not included in the "function
-# that called this" by the logging's internals.
-# For debugging, levels are D2: 9, D3: 8, D4:7 ...
-import logging
-setattr(logging, "logc", logging.root.critical)
-setattr(logging, "logx", logging.root.exception)
-setattr(logging, "loge", logging.root.error)
-setattr(logging, "logw", logging.root.warning)
-setattr(logging, "logi", logging.root.info)
-setattr(logging, "logd", logging.root.debug)
-setattr(logging, "logdl", logging.root.log)
-from logging import logc, loge, logx, logw, logi, logd, logdl
 
 commonl.logging_short_level_names()
 
@@ -101,187 +100,11 @@ servers: {len(tcfl.ttb_client.rest_target_brokers)}""")
 
 
 
-def _target_get(args):
-    # pure target get w/o going through the cache
-
-    if args.projection:
-        data = { 'projections': json.dumps(args.projection) }
-    else:
-        data = None
-    rtb, rt = ttb_client._rest_target_find_by_id(args.target)
-    r = rtb.send_request("GET", "targets/" + rt['id'], data = data,
-                         raw = True)
-    # Keep the order -- even if json spec doesn't contemplate it, we
-    # use it so the client can tell (if they want) the order in which
-    # for example, power rail components are defined in interfaces.power
-    rt = json.loads(r.text, object_pairs_hook = collections.OrderedDict)
-    print(json.dumps(rt, skipkeys = True, indent = 4))
-
-def _target_patch(args):
-    # set data
-    data = collections.OrderedDict()	# respect user's order
-    for data_s in args.data:
-        if not "=" in data_s:
-            raise AssertionError(
-                "data specification has to be in the format KEY=JSON-DATA;"
-                " got (%s) %s" % (type(data_s), data_s))
-        k, v = data_s.split("=", 1)
-        data[k] = v
-    rtb, _rt = ttb_client._rest_target_find_by_id(args.target)
-    if data:
-        rtb.send_request("PATCH", "targets/" + args.target, data = data)
-    else:
-        # JSON from stdin
-        rtb.send_request("PATCH", "targets/" + args.target,
-                         json = json.loads(sys.stdin.read()))
-
-def _target_property_set(args):
-    with tcfl.msgid_c("cmdline"):
-        target = tcfl.tc.target_c.create_from_cmdline_args(args)
-        value = args.value
-        if not value:
-            pass	# used to unset a value
-        elif value.startswith("i:"):
-            value = int(value.split(":", 1)[1])
-        elif value.startswith("f:"):
-            value = float(value.split(":", 1)[1])
-        elif value.startswith("b:"):
-            val = value.split(":", 1)[1]
-            if val.lower() == "true":
-                value = True
-            elif val.lower() == "false":
-                value = False
-            else:
-                raise ValueError("value %s: bad boolean '%s' (true or false)"
-                                 % (value, val))
-        elif value.startswith("s:"):
-            # string that might start with s: or empty
-            value = value.split(":", 1)[1]
-        # FIXME: use commonl.cmdline_str_to_value()
-        target.property_set(args.property, value)
-
-def _target_property_get(args):
-    with tcfl.msgid_c("cmdline"):
-        target = tcfl.tc.target_c.create_from_cmdline_args(args)
-        r = target.property_get(args.property)
-        if r:	# print nothing if None
-            print(r)
-
-
-def _target_disable(args):
-    with tcfl.msgid_c("cmdline"):
-        for target_name in args.target:
-            target = tcfl.tc.target_c.create_from_cmdline_args(
-                args, target_name = target_name)
-            target.disable(args.reason)
-
-def _target_enable(args):
-    with tcfl.msgid_c("cmdline"):
-        for target_name in args.target:
-            target = tcfl.tc.target_c.create_from_cmdline_args(
-                args, target_name = target_name)
-            target.enable()
-
-
-
-def _healthcheck(target, args):
-
-    if args.interfaces == []:
-        # no interface list give; scan the list of interfaces the
-        # target exposes, starting with "power" (always)
-        args.interfaces.append("power")
-
-        # list extensions/interfaces w/ healthcheck
-        for attr, value in target.__dict__.items():
-            if isinstance(value, tcfl.tc.target_extension_c) \
-               and hasattr(value, "_healthcheck") \
-               and attr != "power":	# we did this first
-                args.interfaces.append(attr)
-
-
-    for interface_name in args.interfaces:
-        interface = getattr(target, interface_name, None)
-        if interface == None:
-            target.report_blck("%s: non-existing interface" % interface_name)
-            continue
-        if not isinstance(interface, tcfl.tc.target_extension_c):
-            target.report_blck(
-                "%s: interface not a real interface (type %s)"
-                % (interface_name, type(interface)))
-            continue
-
-        if interface == "power" and not hasattr(target, "power"):
-            target.report_info("WARNING: No power control interface")
-
-        target.report_info(
-            "HEALTHCHECK for %s interface" % interface_name, level = 0)
-        try:
-            interface._healthcheck()
-        except Exception as e:
-            target.report_blck(
-                "HEALTHCHECK for %s: exception" % interface_name,
-                dict(exception = e, trace = traceback.format_exc()),
-                alevel = 0)
-
-    target.report_pass("HEALTHCHECK completed")
-
-
-def healthcheck(args):
-    tcfl.tc.report_driver_c.add(		# FIXME: hack console driver
-        tcfl.report_console.driver(0, None),
-        name = "console")
-
-    with tcfl.msgid_c("cmdline"):
-        target = tcfl.tc.target_c.create_from_cmdline_args(args)
-
-        allocid = None
-        try:
-            if args.allocid == None:
-                target.report_info("allocating")
-                allocid, _state, _group_allocated = \
-                    tcfl.target_ext_alloc._alloc_targets(
-                        target.rtb, { "group": [ target.id ] },
-                        preempt = args.preempt,
-                        queue = False, priority = args.priority,
-                        reason = "healthcheck")
-                target.report_pass("allocated %s" % allocid)
-            else:
-                target.report_info("using existing allocation")
-            _healthcheck(target, args)
-        finally:
-            if allocid:
-                tcfl.target_ext_alloc._delete(target.rtb, allocid)
-
-def _cache_flush(_args):
+def _cmdline_cache_flush(_args):
     cache_path = os.path.join(os.path.expanduser("~"), ".cache", "tcf")
     print(f"I: wiping {cache_path}")
     shutil.rmtree(cache_path, ignore_errors = True)
 
-
-
-def _cookies(args):
-    if '/' in args.target:
-        # cache is by full id
-        rtb = ttb_client.rest_target_broker.rts_cache[args.target]['rtb']
-    else:
-        for rt_fullid, rt in ttb_client.rest_target_broker.rts_cache.items():
-            if rt['id'] == args.target:
-                rtb = rt['rtb']
-                break
-        else:
-            raise ValueError("%s: unknown target" % args.target)
-
-    if args.json:
-        json.dump(rtb.cookies, sys.stdout, indent = 4)
-        print()
-    elif args.cookiejar:
-        # Follow https://curl.se/docs/http-cookies.html
-        # Note we don't keep the TTL field, so we set it at zero
-        for cookie, value in rtb.cookies.items():
-            print(f"{rtb.parsed_url.hostname}\tFALSE\t/\tTRUE\t0"
-                  f"\t{cookie}\t{value}")
-    else:
-        commonl._dict_print_dotted(rtb.cookies, separator = "")
 
 
 if __name__ == "__main__":
@@ -374,6 +197,11 @@ if __name__ == "__main__":
         help = "Use this allocid to access targets")
 
     arg_parser.add_argument(
+        "-A",
+        action = "store_const", dest = "allocid", const = "any",
+        help = "Use any existing allocation")
+
+    arg_parser.add_argument(
         "-C", action = "store", default = None, metavar = "DIR",
         dest = "chdir",
         help = "Change to DIR before starting")
@@ -448,40 +276,7 @@ if __name__ == "__main__":
 
     # Semi advanced commands
 
-    ap = arg_subparsers.add_parser(
-        "get", help = "Return target information straight from the "
-        "server formated as JSON (unlike 'list', which will add some "
-        "client fields)")
-    ap.add_argument(
-        "-p", "--projection", action = "append",
-        help = "List of fields to return (*? [CHARS] or [!CHARS] supported)"
-        " as per python's fnmatch module")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name")
-    ap.set_defaults(func = _target_get)
-
-
-    ap = arg_subparsers.add_parser("property-set",
-                                   help = "Set a target's property")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("property", metavar = "PROPERTY", action = "store",
-                    default = None, help = "Name of property to set")
-    ap.add_argument("value", metavar = "VALUE", action = "store",
-                    nargs = "?",
-                    default = None, help = "Value of property (none "
-                    "to remove it; i:INTEGER, f:FLOAT b:false or b:true,"
-                    " otherwise it is considered a string)")
-    ap.set_defaults(func = _target_property_set)
-
-
-    ap = arg_subparsers.add_parser("property-get",
-                                   help = "Get a target's property")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.add_argument("property", metavar = "PROPERTY", action = "store",
-                    default = None, help = "Name of property")
-    ap.set_defaults(func = _target_property_get)
+    tcfl.ui_cli_targets._cmdline_setup_advanced(arg_subparsers)
 
     tcfl.tc.argp_setup(arg_subparsers)
 
@@ -494,75 +289,19 @@ if __name__ == "__main__":
 
     tcfl.tc.target_ext_alloc._cmdline_setup_intermediate(arg_subparsers)
 
-    ap = arg_subparsers.add_parser("healthcheck",
-                                   help = "Do a very basic health check")
-    ap.set_defaults(level = logging.ERROR)
-    ap.add_argument(
-        "-i", "--interface", metavar = "INTERFACE",
-        dest = "interfaces", action = "append", default = [],
-        help = "Names of interfaces to healtcheck (default all "
-        "exposed by the target)")
-    ap.add_argument(
-        "-p", "--priority", action = "store", type = int, default = 500,
-        help = "Priority (0 highest, 999 lowest)")
-    ap.add_argument(
-        "--preempt", action = "store_true", default = False,
-        help = "Enable preemption (disabled by default)")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.set_defaults(func = healthcheck)
-
     import tcfl.ui_cli_certs
     tcfl.ui_cli_certs.cmdline_setup(arg_subparsers)
 
 
     # advanced commands
-
-    ap = arg_subparsers.add_parser("cookies",
-                                   help = "Show logging cookies (to feed"
-                                   " into curl, etc) maybe only for one server")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = [], help = "Target name")
-    ap.add_argument("-c","--cookiejar", action = "store_true", default = False,
-                    help = "Print in cookiejar format"
-                    " (https://curl.se/docs/http-cookies.html)")
-    ap.add_argument("-j","--json", action = "store_true", default = False,
-                    help = "Print in JSON format")
-    ap.set_defaults(func = _cookies)
+    tcfl.ui_cli_servers.cmdline_setup_advanced(arg_subparsers)
 
     import tcfl.ui_cli_users
     tcfl.ui_cli_users.cmdline_setup_advanced(arg_subparsers)
 
-    ap = arg_subparsers.add_parser("enable",
-                                   help = "Enable a disabled target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.set_defaults(func = _target_enable)
-
-    ap = arg_subparsers.add_parser("disable",
-                                   help = "Disable an enabled target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    nargs = "+", default = None, help = "Target's name or URL")
-    ap.add_argument("-r", "--reason", metavar = "REASON", action = "store",
-                    default = 'disabled by the administrator',
-                    help = "Reason why targets are disabled")
-    ap.set_defaults(func = _target_disable)
-
-
-    ap = arg_subparsers.add_parser(
-        "patch", help = "Store target information in the server")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name")
-    ap.add_argument("data", metavar = "KEY=JSON-VALUE", nargs = "*",
-                    default = None, help = "Data items to store; if"
-                    " none, specify a JSON dictionary over stdin")
-    ap.set_defaults(func = _target_patch)
-
-
     ap = arg_subparsers.add_parser("cache-flush",
                                    help = "wipe all caches")
-    ap.set_defaults(func = _cache_flush)
-
+    ap.set_defaults(func = _cmdline_cache_flush)
 
     tcfl.tc.pos.cmdline_setup(arg_subparsers)
 
@@ -648,7 +387,8 @@ if __name__ == "__main__":
             #   to maintain FDs open and keep the environment.
             with tempfile.NamedTemporaryFile(suffix = '.mk', prefix = 'tcf-',
                                              delete = False) as tf:
-                logd("%s: creating makefile for jobserver run" % tf.name)
+                logging.debug("%s: creating makefile for jobserver run"
+                              % tf.name)
                 tf.write(("""\
 tcf-jobserver-run:
 \t+@%s --make-jobserver=%s %s
@@ -656,17 +396,18 @@ tcf-jobserver-run:
        join_args_for_make_shell_command(sys.argv[1:]))).encode('utf-8'))
                 tf.flush()
                 tf.seek(0)
-                logd("%s: makefile:\n%s" % (tf.name, tf.read()))
-                logi("%s: executing makefile jobserver that will re-run "
-                     "this command" % tf.name)
+                logging.debug("%s: makefile:\n%s" % (tf.name, tf.read()))
+                logging.info("%s: executing makefile jobserver that will"
+                             " re-run this command" % tf.name)
                 os.execvp("make", [ "make", "-s", "-f", tf.name, "-j%s" %
                                     args.make_j, "tcf-jobserver-run" ])
         elif args.make_jobserver == False:
-            logi("%s: not re-running under make-jobserver"
-                 % (args.make_jobserver))
+            logging.info("%s: not re-running under make-jobserver"
+                         % (args.make_jobserver))
             pass	# No jobserver wanted
         else:		# We running under the jobserver, remove the makefile
-            logd("%s: removing make-jobserver makefile" % (args.make_jobserver))
+            logging.debug("%s: removing make-jobserver makefile"
+                          % (args.make_jobserver))
             # Wipe the makefile we used to run tcf/run under a make
             # jobserver, not needed anymore.
             os.unlink(args.make_jobserver)
@@ -681,12 +422,16 @@ tcf-jobserver-run:
                      config_files = args.config_files,
                      state_dir = args.state_path,
                      ignore_ssl = args.ignore_ssl)
-    logi("state path: %s" % tcfl.config.state_path)
-    logi("share path: %s" % tcfl.config.share_path)
+    logging.info("state path: %s" % tcfl.config.state_path)
+    logging.info("share path: %s" % tcfl.config.share_path)
 
 
     if 'func' in args:
         if args.as_admin:
+            # FIXME: This has to be replaced, since it is not
+            # reentrant; need to move it to the protocol so we can
+            # tell it "run this call with these roles enabled, those
+            # roles disabled".
             import tcfl.ui_cli_users
             _args = copy.copy(args)
             _args.username = "self"
@@ -694,11 +439,11 @@ tcf-jobserver-run:
             # this is quite dirty, but it'll do until we add this to
             # the protocol
             try:
-                logi("gaining admin role per --as-admin")
+                logging.info("gaining admin role per --as-admin")
                 tcfl.ui_cli_users._cmdline_role_gain(_args)
-                logi("gained admin role per --as-admin")
+                logging.info("gained admin role per --as-admin")
             except Exception as e:
-                logx("can't get admin role per --as-admin")
+                logging.exception("can't get admin role per --as-admin")
                 raise
         try:
             retval = args.func(args)
@@ -722,10 +467,10 @@ tcf-jobserver-run:
                 _args = copy.copy(args)
                 _args.username = "self"
                 _args.role = "admin"
-                logi("dropping admin role per --as-admin")
+                logging.info("dropping admin role per --as-admin")
                 tcfl.ui_cli_users._cmdline_role_drop(_args)
     else:
-        logx("No command specified")
+        logging.exception("No command specified")
         retval = 1
 
     # Hack the different return values we can get from the APIs to a
@@ -750,7 +495,7 @@ tcf-jobserver-run:
         # just fail with exceptions
         retval = 0
     else:
-        logw("Don't know how to interpret retval %s (%s) as exit code"
-             % (retval, type(retval)))
+        logging.warning("Don't know how to interpret retval %s (%s) as"
+                        " exit code" % (retval, type(retval)))
         retval = 1
     sys.exit(retval)
