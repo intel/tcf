@@ -16,6 +16,7 @@
 import argparse
 import copy
 import inspect
+import logging
 import os
 import platform
 import re
@@ -33,20 +34,6 @@ import tcfl.tc
 import tcfl.config
 import tcfl._install
 import tcfl.ui_cli
-
-# I bet there is a better way to do this...but we need the symbol to
-# be in the logging module so that it is not included in the "function
-# that called this" by the logging's internals.
-# For debugging, levels are D2: 9, D3: 8, D4:7 ...
-import logging
-setattr(logging, "logc", logging.root.critical)
-setattr(logging, "logx", logging.root.exception)
-setattr(logging, "loge", logging.root.error)
-setattr(logging, "logw", logging.root.warning)
-setattr(logging, "logi", logging.root.info)
-setattr(logging, "logd", logging.root.debug)
-setattr(logging, "logdl", logging.root.log)
-from logging import logx, logw, logi, logd
 
 commonl.logging_short_level_names()
 
@@ -385,7 +372,8 @@ if __name__ == "__main__":
             #   to maintain FDs open and keep the environment.
             with tempfile.NamedTemporaryFile(suffix = '.mk', prefix = 'tcf-',
                                              delete = False) as tf:
-                logd("%s: creating makefile for jobserver run" % tf.name)
+                logging.debug("%s: creating makefile for jobserver run"
+                              % tf.name)
                 tf.write(("""\
 tcf-jobserver-run:
 \t+@%s --make-jobserver=%s %s
@@ -393,17 +381,18 @@ tcf-jobserver-run:
        join_args_for_make_shell_command(sys.argv[1:]))).encode('utf-8'))
                 tf.flush()
                 tf.seek(0)
-                logd("%s: makefile:\n%s" % (tf.name, tf.read()))
-                logi("%s: executing makefile jobserver that will re-run "
-                     "this command" % tf.name)
+                logging.debug("%s: makefile:\n%s" % (tf.name, tf.read()))
+                logging.info("%s: executing makefile jobserver that will"
+                             " re-run this command" % tf.name)
                 os.execvp("make", [ "make", "-s", "-f", tf.name, "-j%s" %
                                     args.make_j, "tcf-jobserver-run" ])
         elif args.make_jobserver == False:
-            logi("%s: not re-running under make-jobserver"
-                 % (args.make_jobserver))
+            logging.info("%s: not re-running under make-jobserver"
+                         % (args.make_jobserver))
             pass	# No jobserver wanted
         else:		# We running under the jobserver, remove the makefile
-            logd("%s: removing make-jobserver makefile" % (args.make_jobserver))
+            logging.debug("%s: removing make-jobserver makefile"
+                          % (args.make_jobserver))
             # Wipe the makefile we used to run tcf/run under a make
             # jobserver, not needed anymore.
             os.unlink(args.make_jobserver)
@@ -418,8 +407,8 @@ tcf-jobserver-run:
                      config_files = args.config_files,
                      state_dir = args.state_path,
                      ignore_ssl = args.ignore_ssl)
-    logi("state path: %s" % tcfl.config.state_path)
-    logi("share path: %s" % tcfl.config.share_path)
+    logging.info("state path: %s" % tcfl.config.state_path)
+    logging.info("share path: %s" % tcfl.config.share_path)
 
 
     if 'func' in args:
@@ -431,11 +420,11 @@ tcf-jobserver-run:
             # this is quite dirty, but it'll do until we add this to
             # the protocol
             try:
-                logi("gaining admin role per --as-admin")
+                logging.info("gaining admin role per --as-admin")
                 tcfl.ui_cli_users._cmdline_role_gain(_args)
-                logi("gained admin role per --as-admin")
+                logging.info("gained admin role per --as-admin")
             except Exception as e:
-                logx("can't get admin role per --as-admin")
+                logging.exception("can't get admin role per --as-admin")
                 raise
         try:
             retval = args.func(args)
@@ -459,10 +448,10 @@ tcf-jobserver-run:
                 _args = copy.copy(args)
                 _args.username = "self"
                 _args.role = "admin"
-                logi("dropping admin role per --as-admin")
+                logging.info("dropping admin role per --as-admin")
                 tcfl.ui_cli_users._cmdline_role_drop(_args)
     else:
-        logx("No command specified")
+        logging.exception("No command specified")
         retval = 1
 
     # Hack the different return values we can get from the APIs to a
@@ -487,7 +476,7 @@ tcf-jobserver-run:
         # just fail with exceptions
         retval = 0
     else:
-        logw("Don't know how to interpret retval %s (%s) as exit code"
-             % (retval, type(retval)))
+        logging.warning("Don't know how to interpret retval %s (%s) as"
+                        " exit code" % (retval, type(retval)))
         retval = 1
     sys.exit(retval)
