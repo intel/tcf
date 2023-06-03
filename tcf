@@ -265,6 +265,11 @@ if __name__ == "__main__":
         help = "Use this allocid to access targets")
 
     arg_parser.add_argument(
+        "-A",
+        action = "store_const", dest = "allocid", const = "any",
+        help = "Use any existing allocation")
+
+    arg_parser.add_argument(
         "-C", action = "store", default = None, metavar = "DIR",
         dest = "chdir",
         help = "Change to DIR before starting")
