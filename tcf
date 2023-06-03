@@ -14,20 +14,17 @@
 
 
 import argparse
-import argcomplete
-import collections
 import copy
-import getpass
 import inspect
-import json
 import os
 import platform
 import re
-import requests
 import shutil
 import sys
 import tempfile
-import traceback
+
+import argcomplete
+import requests
 
 import commonl
 import tcfl
@@ -49,7 +46,7 @@ setattr(logging, "logw", logging.root.warning)
 setattr(logging, "logi", logging.root.info)
 setattr(logging, "logd", logging.root.debug)
 setattr(logging, "logdl", logging.root.log)
-from logging import logc, loge, logx, logw, logi, logd, logdl
+from logging import logx, logw, logi, logd
 
 commonl.logging_short_level_names()
 
