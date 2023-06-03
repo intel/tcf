@@ -1,17 +1,32 @@
 #! /usr/bin/env python3
 #
-# Copyright (c) 2017 Intel Corporation
+# Copyright (c) 2014-23 Intel Corporation
 #
 # SPDX-License-Identifier: Apache-2.0
 #
+# This tool provides command line access to:
 #
-# * FIXME: Make the cookie loading thing a context, so even in the exit
-#   path we save
+# - discover / login / manage ttbd servers and users of said servers
 #
-# * join ttb_client and tcf, move all functions in ttb_client to
-#   rest_tb, as they are target broker specific
+# - managed targets exported by ttbd, so you can power cycle them,
+#   access the console, press buttons, ... (so using the ttbd REST
+#   HTTP API from the command line).
 #
-
+# - other more advanced functions, like getting cookies, etc
+#
+# This file just a multiplexor of subcommands
+#
+# Initializes the command line argument, which has a bunch of common
+# command line options and then starts importing submodules, running
+# for each their CLI setup, which creates subcommands.
+#
+# Current transitioning CLI initialization from tcfl/target_ext_*.py
+# (which are API modules) to tcfl/ui_cli_*.py, so it is clearly
+# separated what deals with CLI and what is actually API.
+#
+# When all that is done, parse the arguments, then the config files,
+# and run whatever subcommand has been specified in the command line.
+#
 
 import argparse
 import copy
@@ -413,6 +428,10 @@ tcf-jobserver-run:
 
     if 'func' in args:
         if args.as_admin:
+            # FIXME: This has to be replaced, since it is not
+            # reentrant; need to move it to the protocol so we can
+            # tell it "run this call with these roles enabled, those
+            # roles disabled".
             import tcfl.ui_cli_users
             _args = copy.copy(args)
             _args.username = "self"
