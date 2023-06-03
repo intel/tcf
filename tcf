@@ -100,73 +100,6 @@ servers: {len(tcfl.ttb_client.rest_target_brokers)}""")
     # https://stackoverflow.com/questions/21318427/get-dns-search-suffix-in-python
 
 
-def _healthcheck(target, args):
-
-    if args.interfaces == []:
-        # no interface list give; scan the list of interfaces the
-        # target exposes, starting with "power" (always)
-        args.interfaces.append("power")
-
-        # list extensions/interfaces w/ healthcheck
-        for attr, value in target.__dict__.items():
-            if isinstance(value, tcfl.tc.target_extension_c) \
-               and hasattr(value, "_healthcheck") \
-               and attr != "power":	# we did this first
-                args.interfaces.append(attr)
-
-
-    for interface_name in args.interfaces:
-        interface = getattr(target, interface_name, None)
-        if interface == None:
-            target.report_blck("%s: non-existing interface" % interface_name)
-            continue
-        if not isinstance(interface, tcfl.tc.target_extension_c):
-            target.report_blck(
-                "%s: interface not a real interface (type %s)"
-                % (interface_name, type(interface)))
-            continue
-
-        if interface == "power" and not hasattr(target, "power"):
-            target.report_info("WARNING: No power control interface")
-
-        target.report_info(
-            "HEALTHCHECK for %s interface" % interface_name, level = 0)
-        try:
-            interface._healthcheck()
-        except Exception as e:
-            target.report_blck(
-                "HEALTHCHECK for %s: exception" % interface_name,
-                dict(exception = e, trace = traceback.format_exc()),
-                alevel = 0)
-
-    target.report_pass("HEALTHCHECK completed")
-
-
-def healthcheck(args):
-    tcfl.tc.report_driver_c.add(		# FIXME: hack console driver
-        tcfl.report_console.driver(0, None),
-        name = "console")
-
-    with tcfl.msgid_c("cmdline"):
-        target = tcfl.tc.target_c.create_from_cmdline_args(args)
-
-        allocid = None
-        try:
-            if args.allocid == None:
-                target.report_info("allocating")
-                allocid, _state, _group_allocated = \
-                    tcfl.target_ext_alloc._alloc_targets(
-                        target.rtb, { "group": [ target.id ] },
-                        preempt = args.preempt,
-                        queue = False, priority = args.priority,
-                        reason = "healthcheck")
-                target.report_pass("allocated %s" % allocid)
-            else:
-                target.report_info("using existing allocation")
-            _healthcheck(target, args)
-        finally:
-            if allocid:
-                tcfl.target_ext_alloc._delete(target.rtb, allocid)
 
 def _cmdline_cache_flush(_args):
     cache_path = os.path.join(os.path.expanduser("~"), ".cache", "tcf")
@@ -356,24 +289,6 @@ if __name__ == "__main__":
 
 
     tcfl.tc.target_ext_alloc._cmdline_setup_intermediate(arg_subparsers)
-
-    ap = arg_subparsers.add_parser("healthcheck",
-                                   help = "Do a very basic health check")
-    ap.set_defaults(level = logging.ERROR)
-    ap.add_argument(
-        "-i", "--interface", metavar = "INTERFACE",
-        dest = "interfaces", action = "append", default = [],
-        help = "Names of interfaces to healtcheck (default all "
-        "exposed by the target)")
-    ap.add_argument(
-        "-p", "--priority", action = "store", type = int, default = 500,
-        help = "Priority (0 highest, 999 lowest)")
-    ap.add_argument(
-        "--preempt", action = "store_true", default = False,
-        help = "Enable preemption (disabled by default)")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name or URL")
-    ap.set_defaults(func = healthcheck)
 
     import tcfl.ui_cli_certs
     tcfl.ui_cli_certs.cmdline_setup(arg_subparsers)
