@@ -427,15 +427,18 @@ tcf-jobserver-run:
 
 
     if 'func' in args:
+        _args = copy.copy(args)
+        _args.username = "self"
+        _args.role = "admin"
+        _args.verbosity = getattr(args, "verbosity", 0)
+        _args.quietosity = getattr(args, "quietosity", 0)
+        _args.parallelization_factor = getattr(args, "parallelization_factor", -4)
         if args.as_admin:
             # FIXME: This has to be replaced, since it is not
             # reentrant; need to move it to the protocol so we can
             # tell it "run this call with these roles enabled, those
             # roles disabled".
             import tcfl.ui_cli_users
-            _args = copy.copy(args)
-            _args.username = "self"
-            _args.role = "admin"
             # this is quite dirty, but it'll do until we add this to
             # the protocol
             try:
@@ -464,9 +467,6 @@ tcf-jobserver-run:
             retval = 1
         finally:
             if args.as_admin:
-                _args = copy.copy(args)
-                _args.username = "self"
-                _args.role = "admin"
                 logging.info("dropping admin role per --as-admin")
                 tcfl.ui_cli_users._cmdline_role_drop(_args)
     else:
