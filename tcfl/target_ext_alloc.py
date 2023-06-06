@@ -698,7 +698,7 @@ def _cmdline_setup(arg_subparsers):
         " or an equivalent API call (see also --static)")
     ap.add_argument(
         "--static",
-        action = "store_true", default = False, dest = "endtime",
+        action = "store_const", const = "static", dest = "endtime",
         help = "This allocation shall not expire and will last until manually"
         " removed with alloc-rm or equivalent API call")
     ap.add_argument(
