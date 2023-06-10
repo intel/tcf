@@ -2662,7 +2662,8 @@ def console_generation_set(target, console):
 class device_resolver_c:
 
     def __init__(self, target: ttbl.test_target,
-                 spec: str, property_name: str = None):
+                 spec: str, property_name: str = None,
+                 spec_prefix: str = "usb,#"):
         """Resolve a device specification to a list of sysfs device paths,
         TTY names, etc
 
@@ -2673,6 +2674,8 @@ class device_resolver_c:
         >>> dr = ttbl.device_resolver_c(target, "usb,#8220814000,##:1.0",
         >>>                             f"instrumentation.{self.upid_index}.device_spec")
         >>> dr = ttbl.device_resolver_c(target, "usb,#203183BA85F,##__.2.3")
+        >>> dr = ttbl.device_resolver_c(target, "203183BA85F",
+        >>                              spec_prefix = "usb,#")
         >>> dr = ttbl.device_resolver_c(target, "usb,idVendor=1a86,idProduct=7523,##:1.0")
 
         Note how for most USB devices you might need to also specify
@@ -2737,6 +2740,12 @@ class device_resolver_c:
                 (*13-4.5.1.1* becomes *13-4.5*) and then add *.2.3* to
                 *13-4.5.2.3*.
 
+            - *SERIAL*: a serial number, when it doesn't contain a bus
+              prefix or anything that can be interpreted as such will
+              be prefixed with *spec_prefix* (eg: *usb,#*); this is
+              meant to simplify cases where a device will be always
+              USB, for example.
+
             A missing *VALUE* is interpreted as *True*
 
             Keys and values can be URL encoded to include weird chars
@@ -2761,6 +2770,17 @@ class device_resolver_c:
 
           >>> f"instrumentation.{self.upid_index}.device_spec")
 
+        :param str spec_prefix: (optional) when the device
+          specification has no recognizeable bus prefix, what shall be
+          added to it. eG; if the spec is just *12345* (rather than
+          *usb,#12345*) we can't tell what it is, but it is easier to
+          update.
+
+          So if the code knows that most devices for this drivers will
+          be USB, we can make it easier to specify them and set
+          @spec_prefix to *usb,#* (or *usb,serial=*) which will
+          convert the spec into *usb,#12345*.
+
         **PENDING**
 
         - expand target' kws in device spec when present
@@ -2770,9 +2790,6 @@ class device_resolver_c:
         - consider, for USB devices, automatically adding :1.0 if
           nothing is specified since drivers attach to interfaces --
           at least for TTY?
-
-        - consider taking strings that are not in the URL form or
-          BUSNAME, as a serial number as a form of backwards compat
         """
 
         assert isinstance(spec, str), \
@@ -2784,8 +2801,26 @@ class device_resolver_c:
         self.spec = spec
         self.target = target
         self.property_name = property_name
+        if spec_prefix:
+            assert isinstance(spec_prefix, str), \
+                "spec_prefix: expected string BUS,FIELDS;" \
+                f" got {type(spec_prefix)}"
+            self.spec_prefix = spec_prefix
+        else:
+            self.spec_prefix = ""
 
-
+    # Valid device spec absolute prefixes for relative specs
+    spec_prefixes_regex = re.compile(
+        "^("
+        # BUS,FIELDS...(we might support @ in the future)
+        "[0-9A-Za-z]+[,@]"
+        "|"
+        # URLs
+        "[-+a-zA-Z0-9]://"
+        "|"
+        # Local file system
+        "/dev/"
+        "])")
 
     def spec_get(self):
         """
@@ -2796,12 +2831,19 @@ class device_resolver_c:
 
         :returns: ( spec, origin )
         """
+        def _prefix_q(spec):
+            if self.spec_prefixes_regex.search(spec):
+                return spec    # absolute bus specification
+            # no BUS specification, might be just a serial, add the prefix
+            return self.spec_prefix + spec
+
         # Get the value of the spec, overriding with a property (if specified)
         if self.property_name:
             spec = self.target.property_get(self.property_name, None)
             if spec != None:
-                return spec, f"from property {self.property_name}"
-        return self.spec, "builtin"
+                return _prefix_q(spec), f"from property {self.property_name}"
+
+        return _prefix_q(self.spec), "builtin"
 
 
 
