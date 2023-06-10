@@ -645,6 +645,9 @@ class pc(ttbl.power.daemon_c,
             target.fsdb.set("vnc.vnc0.port", "%s" % (tcp_port_base + 1 - 5900))
             # this one is the raw port number
             target.fsdb.set("vnc.vnc0.tcp_port", "%s" % (tcp_port_base + 1))
+            # Allow VMC port to be accessible via server tunneling
+            target.tunnel.allowed_local_ports.add(("127.0.0.1", "tcp",
+                                                   tcp_port_base + 1))
 
         self.cmdline_extra = []
         image_keys = target.fsdb.keys("qemu-image-*")
