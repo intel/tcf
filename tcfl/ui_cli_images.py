@@ -14,8 +14,6 @@ learn more about them):
 - list destinations that can be flashed::
 
     $ tcf images-ls TARGETSPEC
-
-
 """
 import argparse
 import sys
@@ -24,13 +22,13 @@ import tcfl.ui_cli
 
 
 
-def _images_list(target, _cli_args):
+def _images_list(target):
     return target.images.list()
 
 def _cmdline_images_ls(cli_args: argparse.Namespace):
 
-    r = tcfl.ui_cli.run_fn_on_each_targetspec(
-        _images_list, cli_args,
+    r = tcfl.targets.run_fn_on_each_targetspec(
+        _images_list, cli_args.target,
         iface = "images", extensions_only = [ 'images' ])
 
     verbosity = cli_args.verbosity - cli_args.quietosity
@@ -38,16 +36,20 @@ def _cmdline_images_ls(cli_args: argparse.Namespace):
     # maybe an exception, which we don't cavre for
 
     d = {}
+    targetid = None
     for targetid, ( images, _e ) in r.items():
-        d[targetid] = images
+        if images:
+            d[targetid] = images
 
+    # note the hack, targetid falls through from the only for loop
+    # execution when len(d) == 1
     if verbosity == 0:
         if len(d) == 1:
             # there is only one, print a simple liust
             print(" ".join(d[targetid]))
         else:
             for targetid, v in d.items():
-                print(f"{targetid}: " + " ".join(d[targetid]))
+                print(f"{targetid}: " + " ".join(v))
     elif verbosity == 1:
         if len(d) == 1:
             # there is only one, print a simple liust
