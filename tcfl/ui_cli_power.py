@@ -39,6 +39,9 @@ import tcfl.ui_cli
 
 logger = logging.getLogger("ui_cli_power")
 
+# note in all these functions we pass the cli_args to
+# tcfl.ui_cli.run_fn_on_each_targetspec() twice; one for it to use it,
+# the ther one for _power_on_by_*() to use it.
 
 def _cmdline_power_on(cli_args: argparse.Namespace):
 
@@ -51,7 +54,7 @@ def _cmdline_power_on(cli_args: argparse.Namespace):
         return 0
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _power_on_by_target, cli_args,
+        _power_on_by_target, cli_args, cli_args,
         iface = "power", extensions_only = [ 'power' ])
 
 
@@ -67,7 +70,7 @@ def _cmdline_power_off(cli_args: argparse.Namespace):
         return 0
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _power_off_by_target, cli_args,
+        _power_off_by_target, cli_args, cli_args,
         iface = "power", extensions_only = [ 'power' ])
 
 
@@ -83,7 +86,7 @@ def _cmdline_power_cycle(cli_args: argparse.Namespace):
         return 0
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _power_cycle_by_target, cli_args,
+        _power_cycle_by_target, cli_args, cli_args,
         iface = "power", extensions_only = [ 'power' ])
 
 
@@ -119,7 +122,7 @@ def _cmdline_power_sequence(cli_args: argparse.Namespace):
         return 0
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _power_sequence_by_target, cli_args,
+        _power_sequence_by_target, cli_args, cli_args,
         iface = "power", extensions_only = [ 'power' ])
 
 
@@ -128,13 +131,15 @@ def _cmdline_power_get(cli_args: argparse.Namespace):
 
     def _power_get_by_target(target, _cli_args):
         r = target.power.get()
+        # this we can put it here, it won't race with others since
+        # line output is buffered
         print(f"{target.id}: {'on' if r == True else 'off'}")
         sys.stdout.flush()
 
-    return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _power_get_by_target, cli_args,
+    r = tcfl.ui_cli.run_fn_on_each_targetspec(
+        _power_get_by_target, cli_args, cli_args,
         iface = "power", extensions_only = [ 'power' ])
-
+    return r
 
 
 def _cmdline_power_list(cli_args: argparse.Namespace):
@@ -181,7 +186,7 @@ def _cmdline_power_list(cli_args: argparse.Namespace):
 
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _power_list_by_target, cli_args,
+        _power_list_by_target, cli_args, cli_args,
         iface = "power", extensions_only = [ 'power' ])
 
 
