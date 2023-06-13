@@ -27,6 +27,8 @@ import commonl
 from . import tc
 from . import ttb_client
 from . import msgid_c
+import tcfl.ui_cli
+
 
 class extension(tc.target_extension_c):
     """\
@@ -462,11 +464,6 @@ def _cmdline_images_read(args):
         target = tc.target_c.create_from_cmdline_args(args, iface = "images")
         target.images.read(args.image, args.filename, args.offset, args.bytes)
 
-def _cmdline_images_list(args):
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "images")
-        print("\n".join(target.images.list()))
-
 def _cmdline_images_flash(args):
     tc.tc_global = tc.tc_c("cmdline", "", "builtin")
     tc.report_driver_c.add(		# FIXME: hack console driver
@@ -507,13 +504,6 @@ def _cmdline_images_write(args):
         target.images.write(args.image, values)
 
 def _cmdline_setup(arg_subparser):
-    ap = arg_subparser.add_parser(
-        "images-ls",
-        help = "List supported image types")
-    commonl.argparser_add_aka(arg_subparser, "images-ls", "images-list")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target name")
-    ap.set_defaults(func = _cmdline_images_list)
 
     ap = arg_subparser.add_parser(
         "images-flash",
