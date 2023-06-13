@@ -437,6 +437,146 @@ def setup_by_spec(targetspecs: list, verbosity: int = 0,
 
 
 
+def run_fn_on_each_targetspec(
+        fn: callable, targetspecl: list,	# COMPAT: list[str]
+        *args,
+        # COMPAT: removing list[str] so we work in python 3.8
+        iface: str = None, extensions_only: list = None,
+        only_one: bool = False,
+        projections = None, targets_all = False, verbosity = 0,
+        parallelization_factor: int = -4,
+        **kwargs):
+    """Initialize the target discovery and run a function on each target
+    that matches a specification
+
+    This is mostly used to quickly implement CLI functionality, which
+    all follows a very common pattern; see for example
+    :download:`ui_cli_power.py`.
+
+    :param callable fn: function to call, with the signature::
+
+        >>> def fn(target: tcfl.tc.target_c, *args, **kwargs):
+        >>>     ...
+
+    :param bool only_one: (optional; default *False*) ensure the
+      target specification resolves to a single target, complain
+      otherwise.
+
+    :param list[str] projections: list of fields to download from the
+      inventory; normally this function tries to download as little a
+      possible (faster), including:
+
+      - *id*
+      - *disabled* state
+      - *type*
+
+      If an interface, was specified, also that interface is
+      downloaded:
+
+      - *interfaces.NAME*
+
+      Any extra fields (and their subfields) specified here are also
+      downloaded; eg:
+
+      >>> [ "instrumentation", "pci" ]
+
+    :param *args: extra arguments for *fn*
+
+    :param **kwargs: extra keywords arguments for *fn*
+
+    *iface* and *extensions_only* same as :meth:`tclf.tc.target_c.create`.
+
+    :returns int: 0 dictionary of tuples *( result, exception )* keyed
+      by *targetid*
+
+
+    Note this function is exactly the same as
+    :func:'tcfl.ui_cli.run_fn_on_each_targetspec`; however they differ
+    on the return value.
+    """
+    import tcfl.tc
+
+    assert isinstance(targets_all, bool), \
+        f"targets_all: expected bool; got {type(targets_all)}"
+
+    with tcfl.msgid_c("ui_cli"):
+
+        project = { 'id', 'disabled', 'type' }
+        if iface:
+            project.add('interfaces.' + iface)
+        if projections:
+            commonl.assert_list_of_strings(projections,
+                                           "projetions", "field")
+            for projection in projections:
+                project.add(projection)
+        # Discover all the targets that match the specs in the command
+        # line and pull the minimal inventories as specified per
+        # arguments
+        setup_by_spec(
+            targetspecl, verbosity,
+            project = project,
+            targets_all = targets_all)
+
+        # FIXMEh: this should be grouped by servera, but since is not
+        # that we are going to do it so much, (hence the meh)
+        targetids = discovery_agent.rts_fullid_sorted
+        if not targetids:
+            return {}
+
+        if only_one and len(targetids) > 1:
+            raise RuntimeError(
+                f"please narrow down target specification"
+                f" {' '.join(targetspecl)}; it matches more than one target: "
+                + " ".join(discovery_agent.rts_fullid_sorted ))
+
+        processes = min(
+            len(targetids),
+            commonl.processes_guess(parallelization_factor))
+
+        logger.warning(f"targetspec resolves to %d targets", len(targetids))
+
+        def _run_on_by_targetid(targetid, *args, **kwargs):
+            # call the function on the target; note we create a target
+            # object for the targetid and give it to the function, so
+            # they don't have to do it.
+            try:
+                target = tcfl.tc.target_c.create(
+                    targetid,
+                    iface = iface, extensions_only = extensions_only,
+                    target_discovery_agent = discovery_agent)
+                return fn(target, *args, **kwargs), None
+            except Exception as e:
+                # note we don't print/log here, we let that be done by
+                # tcl.ui_cli.run_fn_on_each_targetspec(), since that
+                # is a UI matter.
+                return None, e
+
+        results = {}
+        with concurrent.futures.ThreadPoolExecutor(processes) as executor:
+            futures = {
+                # for each target id, queue a thread that will call
+                # _run_on_by_targetid(), who will call fn taking care
+                # of exceptions
+                executor.submit(
+                    _run_on_by_targetid, targetid, *args, **kwargs): targetid
+                for targetid in targetids
+            }
+            # and as the finish, collect status (pass/fail)
+            for future in concurrent.futures.as_completed(futures):
+                targetid = futures[future]
+                try:
+                    results[targetid] = future.result()
+                except Exception as e:
+                    # this should not happens, since we catch in
+                    # _run_on_by_targetid()
+                    logger.error("%s: BUG! exception: %s", targetid, e,
+                                 exc_info = True)
+                    results[targetid] = ( None, e )
+                    continue
+        return results
+
+
+
 #: Global targets discovery agent, containing the list of discovered targets
 #:
 #: The list of target full names (*SERVER/TARGETID*):

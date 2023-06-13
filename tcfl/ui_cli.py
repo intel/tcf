@@ -18,6 +18,7 @@ import logging
 import numbers
 
 import commonl
+import tcfl.targets
 
 logger = logging.getLogger("ui_cli")
 
@@ -118,157 +119,77 @@ def logger_verbosity_from_cli(log, cli_args):
 def run_fn_on_each_targetspec(
         fn: callable, cli_args: argparse.Namespace,
         *args,
+        iface: str = None,
         # COMPAT: removing list[str] so we work in python 3.8
-        iface: str = None, extensions_only: list = None,
+        extensions_only: list = None,
         only_one: bool = False,
         projections = None, targets_all = None,
         **kwargs):
     """Initialize the target discovery and run a function on each target
     that matches a specification
 
-    This is mostly used to quickly implement CLI functionality, which
-    all follows a very common pattern; see for example
-    :download:`ui_cli_power.py`.
-
-    :param callable fn: function to call, with the signature::
-
-        >>> def fn(target: tcfl.tc.target_c, cli_args: argparse.Namespace, *args, **kwargs):
-        >>>     ...
+    See :func:'tcfl.targets.run_fn_on_each_targetspec` for arguments;
+    the only difference is this function takes most arguments as CLI
+    arguments and the return value.
 
     :param argparse.Namespace cli_args:
 
-      Initialized with :func:`args_targetspec_add`
+      Initialized with :func:`tcfl.ui_cli.args_targetspec_add`
 
       - *target*: (optional; default *all*) :ref:`target
         specifications<targetspec>`
 
       - *all*: (optional; default *False*) consider also disabled targets.
 
+      - *parallelization-factor*: (optional) how many threads to run
+        per CPU.
+
       - *serialize*: (optional; default *False*) force the execution of
         fn to be serialized on each target (versus default that runs
         them in parallel)
 
-    :param bool only_one: (optional; default *False*) ensure the
-      target specification resolves to a single target, complain
-      otherwise.
+    :returns int: result of the overall operation
 
-    :param list[str] projections: list of fields to download from the
-      inventory; normally this function tries to download as little a
-      possible (faster), including:
+      - 0 if all functions executed ok
+      - 1 some functions failed
+      - 2 all functions failed
 
-      - *id*
-      - *disabled* state
-      - *type*
-
-      If an interface, was specified, also that interface is
-      downloaded:
-
-      - *interfaces.NAME*
-
-      Any extra fields (and their subfields) specified here are also
-      downloaded; eg:
-
-      >>> [ "instrumentation", "pci" ]
-
-    :param *args: extra arguments for *fn*
-
-    :param **kwargs: extra keywords arguments for *fn*
-
-    *iface* and *extensions_only* same as :meth:`tclf.tc.target_c.create`.
-
-    :returns int: 0 if all functions executed ok, not 0 if any
-      failed. Errors will be logged.
+    will log results
 
     """
-    import tcfl.targets
-    import tcfl.tc
+    retval = 0
 
-    with tcfl.msgid_c("ui_cli"):
+    if targets_all == None:
+        targets_all = cli_args.all
 
-        project = { 'id', 'disabled', 'type' }
-        if iface:
-            project.add('interfaces.' + iface)
-        if projections:
-            commonl.assert_list_of_strings(projections,
-                                           "projetions", "field")
-            for projection in projections:
-                project.add(projection)
-        # Discover all the targets that match the specs in the command
-        # line and pull the minimal inventories as specified per
-        # arguments
-        if targets_all != None:
-            assert isinstance(targets_all, bool), \
-                "targets_all: expected bool; got {type(targets_all)}"
-        else:
-            targets_all = cli_args.all
-        tcfl.targets.setup_by_spec(
-            cli_args.target, cli_args.verbosity - cli_args.quietosity,
-            project = project,
-            targets_all = targets_all)
+    if getattr(cli_args, "serialize", False):
+        # the serialize CLI options gets only added if the command
+        # is allowed to have more than one target
+        cli_args.parallelization_factor = 1
 
-        # FIXMEh: this should be grouped by servera, but since is not
-        # that we are going to do it so much, (hence the meh)
-        targetids = tcfl.targets.discovery_agent.rts_fullid_sorted
-        if not targetids:
-            logger.error(f"No targets match the specification (disabled?):"
-                         f" {' '.join(cli_args.target)}")
-            return 1
-        if only_one and len(targetids) > 1:
-            logger.error(
-                f"please narrow down target specification"
-                f" {cli_args.target}; it matches more than one target: "
-                + " ".join(tcfl.targets.discovery_agent.rts_fullid_sorted ))
-            return 1
-        if getattr(cli_args, "serialize", False):
-            # the serialize CLI options gets only added if the command
-            # is allowed to have more than one target
-            threads = 1
-        else:
-            threads = len(targetids)
+    r = tcfl.targets.run_fn_on_each_targetspec(
+        fn, cli_args.target, *args,
+        iface = iface, extensions_only = extensions_only,
+        only_one = only_one, projections = projections,
+        targets_all = targets_all,
+        verbosity = cli_args.verbosity - cli_args.quietosity,
+        # if the args don't have parallelization factor, this is a
+        # single target operation, so serialize
+        parallelization_factor = getattr(cli_args, "parallelization_factor", 1),
+        **kwargs)
 
-        logger.warning(f"targetspec resolves to {len(targetids)} targets")
+    if not r:
+        logger.error(f"No targets match the specification (disabled?):"
+                     f" {' '.join(cli_args.target)}")
 
-        def _run_on_by_targetid(targetid):
-            # call the function on the target; note we create a target
-            # object for the targetid and give it to the function, so
-            # they don't have to do it.
-            try:
-                target = tcfl.tc.target_c.create(
-                    targetid,
-                    iface = iface, extensions_only = extensions_only,
-                    target_discovery_agent = tcfl.targets.discovery_agent)
-                return fn(target, cli_args, *args, **kwargs)
-            except Exception as e:
-                msg = str(e.args[0])
-                if targetid in msg:	# don't print target/id...
-                    logger.error(msg, exc_info = cli_args.traces)
-                else:			# ...if already there
-                    logger.error(f"{targetid}: {msg}",
-                                 exc_info = cli_args.traces)
-                return 1
-
-        result = 0
-        with concurrent.futures.ThreadPoolExecutor(threads) as executor:
-            futures = {
-                # for each target id, queue a thread that will call
-                # _run_on_by_targetid(), who will call fn taking care
-                # of exceptions
-                executor.submit(
-                    _run_on_by_targetid, targetid, *args, **kwargs): targetid
-                for targetid in targetids
-            }
-            # and as the finish, collect status (pass/fail)
-            for future in concurrent.futures.as_completed(futures):
-                targetid = futures[future]
-                try:
-                    r = future.result()
-                    if r == None:	# bleh, because fn will miss it
-                        r = 0
-                    result |= r
-                except Exception as e:
-                    # this should not happens, since we catch in
-                    # _run_on_by_targetid()
-                    logger.error(f"{targetid}: BUG! exception {e}",
-                                 exc_info = cli_args.traces)
-                    continue
-        return result
+    # r is a dictionaky of ( result, exception ) keyed by targetid
+    for targetid, ( _result, exception ) in r.items():
+        if exception != None:
+            msg = str(exception.args[0])
+            if targetid in msg:	# don't print target/id...
+                logger.error(msg, exc_info = cli_args.traces)
+            else:			# ...if already there
+                logger.error("%s: %s", targetid, msg,
+                             exc_info = cli_args.traces)
+            retval = 1
+    return retval

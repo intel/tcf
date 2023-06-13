@@ -32,7 +32,9 @@ import tcfl.ui_cli
 
 logger = logging.getLogger("ui_cli_certs")
 
-
+# note in all these functions we pass the cli_args to
+# tcfl.ui_cli.run_fn_on_each_targetspec() twice; one for it to use it,
+# the ther one for _power_on_by_*() to use it.
 
 def _cmdline_certs_get(cli_args: argparse.Namespace):
 
@@ -54,7 +56,8 @@ def _cmdline_certs_get(cli_args: argparse.Namespace):
                 logging.warning("certificates not downloaded (see --save)")
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _certs_get, cli_args, only_one = True,
+        _certs_get, cli_args, cli_args,
+        only_one = True,
         iface = "certs", extensions_only = [ "certs" ])
 
 
@@ -65,7 +68,8 @@ def _cmdline_certs_remove(cli_args: argparse.Namespace):
         target.certs.remove(cli_args.name)
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _certs_remove, cli_args, only_one = True,
+        _certs_remove, cli_args, cli_args,
+        only_one = True,
         iface = "certs", extensions_only = [ "certs" ])
 
 
@@ -75,7 +79,8 @@ def _cmdline_certs_list(cli_args: argparse.Namespace):
         print("\n".join(target.certs.list()))
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _certs_list, cli_args, only_one = True,
+        _certs_list, cli_args, cli_args,
+        only_one = True,
         iface = "certs", extensions_only = [ "certs" ])
 
 

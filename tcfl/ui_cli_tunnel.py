@@ -41,7 +41,8 @@ def _cmdline_tunnel_add(cli_args: argparse.Namespace):
         print(f"{target.rtb.parsed_url.hostname}:{server_port}")
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _tunnel_add, cli_args, only_one = True,
+        _tunnel_add, cli_args,  cli_args,
+        only_one = True,
         iface = "tunnel", extensions_only = [ "tunnel" ],
         projections = [ "interconnects" ])
 
@@ -54,7 +55,8 @@ def _cmdline_tunnel_rm(cli_args: argparse.Namespace):
             cli_args.port, cli_args.ip_addr, cli_args.protocol)
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _tunnel_rm, cli_args, only_one = True,
+        _tunnel_rm, cli_args, cli_args,
+        only_one = True,
         iface = "tunnel", extensions_only = [ "tunnel" ],
         projections = [ "interconnects" ])
 
@@ -74,7 +76,8 @@ def _cmdline_tunnel_ls(cli_args: argparse.Namespace):
                 pass	# ignore, bad data stored
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _tunnel_list_by_target, cli_args, only_one = True,
+        _tunnel_list_by_target, cli_args, cli_args,
+        only_one = True,
         iface = "tunnel", extensions_only = [ "tunnel" ],
         projections = [ "interconnects" ])
 

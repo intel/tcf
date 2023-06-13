@@ -56,7 +56,7 @@ def _cmdline_targets_init(args):
 
 def _cmdline_target_get(cli_args: argparse.Namespace):
 
-    def _target_get(target, _cli_args):
+    def _target_get(target):
         projections = cli_args.project
         server = tcfl.server_c.servers[target.rt['server']]
         rt = server.targets_get(target_id = target.id,
@@ -239,11 +239,11 @@ def _target_patch(target, cli_args):
 def _cmdline_target_patch(cli_args: argparse.Namespace):
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _target_patch, cli_args, only_one = True)
+        _target_patch, cli_args, cli_args, only_one = True)
 
 
 
-def _target_enable(target, _cli_args):
+def _target_enable(target):
     target.enable()
 
 def _cmdline_target_enable(cli_args: argparse.Namespace):
@@ -263,7 +263,7 @@ def _cmdline_target_disable(cli_args: argparse.Namespace):
     # force seeing all targets, will ease confusion, in case we run the
     # command twice (trying to disable a disabled target shall just work)
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _target_disable, cli_args, targets_all = True)
+        _target_disable, cli_args, cli_args, targets_all = True)
 
 
 
@@ -274,7 +274,7 @@ def _target_property_set(target, cli_args):
 def _cmdline_target_property_set(cli_args: argparse.Namespace):
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _target_property_set, cli_args, only_one = True)
+        _target_property_set, cli_args, cli_args, only_one = True)
 
 
 
@@ -286,14 +286,14 @@ def _target_property_get(target, cli_args):
 def _cmdline_target_property_get(cli_args: argparse.Namespace):
 
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        _target_property_get, cli_args, only_one = True)
+        _target_property_get, cli_args, cli_args, only_one = True)
 
 
 
 def _cmdline_target_healthcheck(cli_args: argparse.Namespace):
     import tcfl.healthcheck
     return tcfl.ui_cli.run_fn_on_each_targetspec(
-        tcfl.healthcheck._target_healthcheck, cli_args)
+        tcfl.healthcheck._target_healthcheck, cli_args, cli_args)
 
 
 
