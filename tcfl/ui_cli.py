@@ -192,8 +192,10 @@ def run_fn_on_each_targetspec(
     if not r:
         logger.error(f"No targets match the specification (disabled?):"
                      f" {' '.join(cli_args.target)}")
+        return 0
 
     # r is a dictionaky of ( result, exception ) keyed by targetid
+    retval = 0
     for targetid, ( _result, exception ) in r.items():
         if exception != None:
             msg = str(exception.args[0])
@@ -206,3 +208,10 @@ def run_fn_on_each_targetspec(
                 logger.error(msg + tb)
             else:			# ...if already there
                 logger.error("%s: %s" + tb, targetid, msg)
+            retval += 1
+
+    if retval == len(r):
+        return 2
+    if retval == 0:
+        return 1
+    return 0
