@@ -197,10 +197,12 @@ def run_fn_on_each_targetspec(
     for targetid, ( _result, exception ) in r.items():
         if exception != None:
             msg = str(exception.args[0])
+            if cli_args.traces:
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            else:
+                tb = ""
+
             if targetid in msg:	# don't print target/id...
-                logger.error(msg, exc_info = cli_args.traces)
+                logger.error(msg + tb)
             else:			# ...if already there
-                logger.error("%s: %s", targetid, msg,
-                             exc_info = cli_args.traces)
-            retval = 1
-    return retval
+                logger.error("%s: %s" + tb, targetid, msg)
