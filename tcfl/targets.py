@@ -436,6 +436,28 @@ def setup_by_spec(targetspecs: list, verbosity: int = 0,
         del tcfl.targets.discovery_agent.rts_flat[rtfullid]
 
 
+def _run_fn_on_targetid(
+        targetid: str, iface: str, ifaces: list, extensions_only: list,
+        fn: callable, *args, **kwargs):
+    # call the function on the target; note we create a target
+    # object for the targetid and give it to the function, so
+    # they don't have to do it.
+    #
+    # this function has to be separate (not inside
+    # run_fn_on_each_targetspec) so we can call it with thread and
+    # process pools
+    try:
+        target = tcfl.tc.target_c.create(
+            targetid,
+            iface = iface, ifaces = ifaces, extensions_only = extensions_only,
+            target_discovery_agent = discovery_agent)
+        return fn(target, *args, **kwargs), None
+    except Exception as e:
+        # note we don't print/log here, we let that be done by
+        # tcl.ui_cli.run_fn_on_each_targetspec(), since that
+        # is a UI matter.
+        return None, e
+
 
 def run_fn_on_each_targetspec(
         fn: callable, targetspecl: list,	# COMPAT: list[str]
@@ -447,6 +469,7 @@ def run_fn_on_each_targetspec(
         only_one: bool = False,
         projections = None, targets_all = False, verbosity = 0,
         parallelization_factor: int = -4,
+        pool_type: type = concurrent.futures.ThreadPoolExecutor,
         **kwargs):
     """Initialize the target discovery and run a function on each target
     that matches a specification
@@ -488,6 +511,15 @@ def run_fn_on_each_targetspec(
     :param list[str] ifaces: (optional) target must support the given
       interfaces, otherwise an exception is raised.
 
+    :param concurrent.futures._base.Executor pool_type: (optional,
+      default :class:`concurrent.futures.ThreadPoolExecutor`); what
+      kind of pool will be created to run parallel jobs
+
+      If using :class:`concurrent.futures.ProcessPoolExecutor`, it
+      requires the function *fn* to be pickable and thus it won't be
+      possible for it to be inside another function and possibly other
+      restrictions.
+
     :param *args: extra arguments for *fn*
 
     :param **kwargs: extra keywords arguments for *fn*
@@ -519,7 +551,7 @@ def run_fn_on_each_targetspec(
             project.add('interfaces.' + extension)
         if projections:
             commonl.assert_list_of_strings(projections,
-                                           "projetions", "field")
+                                           "projections", "field")
             for projection in projections:
                 project.add(projection)
         # Discover all the targets that match the specs in the command
@@ -548,30 +580,16 @@ def run_fn_on_each_targetspec(
 
         logger.warning(f"targetspec resolves to %d targets", len(targetids))
 
-        def _run_on_by_targetid(targetid, *args, **kwargs):
-            # call the function on the target; note we create a target
-            # object for the targetid and give it to the function, so
-            # they don't have to do it.
-            try:
-                target = tcfl.tc.target_c.create(
-                    targetid,
-                    iface = iface, extensions_only = extensions_only,
-                    target_discovery_agent = discovery_agent)
-                return fn(target, *args, **kwargs), None
-            except Exception as e:
-                # note we don't print/log here, we let that be done by
-                # tcl.ui_cli.run_fn_on_each_targetspec(), since that
-                # is a UI matter.
-                return None, e
-
         results = {}
-        with concurrent.futures.ThreadPoolExecutor(processes) as executor:
+        with pool_type(processes) as executor:
             futures = {
                 # for each target id, queue a thread that will call
                 # _run_on_by_targetid(), who will call fn taking care
                 # of exceptions
                 executor.submit(
-                    _run_on_by_targetid, targetid, *args, **kwargs): targetid
+                    _run_fn_on_targetid,
+                    targetid, iface, ifaces, extensions_only,
+                    fn, *args, **kwargs): targetid
                 for targetid in targetids
             }
             # and as the finish, collect status (pass/fail)
