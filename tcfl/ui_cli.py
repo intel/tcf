@@ -46,7 +46,7 @@ def args_verbosity_add(ap: argparse.Namespace):
 
 
 def args_targetspec_add(
-        ap: argparse.Namespace, targetspec_n = False):
+        ap: argparse.Namespace, targetspec_n = False, nargs = None):
     """
     Add command line options for processing target specification
     control (*TARGETSPECs*) to an argument parser
@@ -62,6 +62,15 @@ def args_targetspec_add(
 
       - integer: exactly N
 
+    :param nargs: (str, int) passed directly to
+      :meth:`argparse.ArgumentParser.add_argument`, overriding any
+      calculation made by `targetspec_n`. This is useful when we only
+      need one command line argument to specify targets but we know it
+      can fold into multiple targets that need
+      parallelization.
+
+      Usually set to *1*.
+
     """
     ap.add_argument(
         "-a", "--all", action = "store_true", default = False,
@@ -76,7 +85,9 @@ def args_targetspec_add(
             "--parallelization-factor",
             action = "store", type = int, default = -4,
             help = "(advanced) parallelization factor")
-    if isinstance(targetspec_n, bool):
+    if nargs != None:
+        nargs = nargs
+    elif isinstance(targetspec_n, bool):
         if targetspec_n:
             nargs = "+"
         else:
