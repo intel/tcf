@@ -2204,6 +2204,7 @@ class target_c(reporter_c):
     @classmethod
     def create_from_cmdline_args(
             cls, args, target_name = None, iface = None,
+            ifaces: list = None,     # COMPAT: list[str] for < python3.8
             extensions_only = None,
             # FIXME: add tcfl.targets.discovery_agent_c once import hell is fixed
             target_discovery_agent = None):
@@ -2225,7 +2226,8 @@ class target_c(reporter_c):
                 raise RuntimeError("missing 'target' argument")
             target_name = getattr(args, 'target', None)
         target = cls.create(target_name,
-                            iface = iface, extensions_only = extensions_only,
+                            iface = iface, ifaces = ifaces,
+                            extensions_only = extensions_only,
                             target_discovery_agent = target_discovery_agent)
         if args.ticket:
             target.ticket = args.ticket
@@ -2234,7 +2236,9 @@ class target_c(reporter_c):
 
 
     @staticmethod
-    def create(target_name, iface = None, extensions_only = None,
+    def create(target_name, iface = None,
+               ifaces: list = None, # COMPAT: list[str] for < python3.8
+               extensions_only = None,
                # FIXME: add tcfl.targets.discovery_agent_c once import hell is fixed
                target_discovery_agent = None):
         """
@@ -2245,6 +2249,9 @@ class target_c(reporter_c):
 
         :param str iface: (optional) target must support the given
           interface, otherwise an exception is raised.
+
+        :param list[str] ifaces: (optional) target must support the given
+          interfaces, otherwise an exception is raised.
 
         :param list extensions_only: (optional) list of extensions to
           load; if *[]*, load no extensions, if *None* load all
@@ -2281,6 +2288,11 @@ class target_c(reporter_c):
         if iface != None and not iface in target.rt.get('interfaces', []):
             raise RuntimeError("%s: target does not support the %s interface"
                                % (target_name, iface))
+        if ifaces:
+            for iface in ifaces:
+                if iface != None and not iface in target.rt.get('interfaces', []):
+                    raise RuntimeError("%s: target does not support the %s interface"
+                                       % (target_name, iface))
         target.testcase.ticket = "TICKET"
         target.ticket = target.testcase.ticket
         target.testcase.__init_shallow__(target.testcase)
