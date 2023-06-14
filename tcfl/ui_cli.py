@@ -132,6 +132,8 @@ def run_fn_on_each_targetspec(
         *args,
         iface: str = None,
         # COMPAT: removing list[str] so we work in python 3.8
+        ifaces: list = None,
+        # COMPAT: removing list[str] so we work in python 3.8
         extensions_only: list = None,
         only_one: bool = False,
         projections = None, targets_all = None,
@@ -180,7 +182,7 @@ def run_fn_on_each_targetspec(
 
     r = tcfl.targets.run_fn_on_each_targetspec(
         fn, cli_args.target, *args,
-        iface = iface, extensions_only = extensions_only,
+        iface = iface, ifaces = ifaces, extensions_only = extensions_only,
         only_one = only_one, projections = projections,
         targets_all = targets_all,
         verbosity = cli_args.verbosity - cli_args.quietosity,

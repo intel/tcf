@@ -440,8 +440,10 @@ def setup_by_spec(targetspecs: list, verbosity: int = 0,
 def run_fn_on_each_targetspec(
         fn: callable, targetspecl: list,	# COMPAT: list[str]
         *args,
+        iface: str = None,
         # COMPAT: removing list[str] so we work in python 3.8
-        iface: str = None, extensions_only: list = None,
+        ifaces: list = None,
+        extensions_only: list = None,
         only_one: bool = False,
         projections = None, targets_all = False, verbosity = 0,
         parallelization_factor: int = -4,
@@ -480,6 +482,12 @@ def run_fn_on_each_targetspec(
 
       >>> [ "instrumentation", "pci" ]
 
+    :param str iface: (optional) target must support the given
+      interface, otherwise an exception is raised.
+
+    :param list[str] ifaces: (optional) target must support the given
+      interfaces, otherwise an exception is raised.
+
     :param *args: extra arguments for *fn*
 
     :param **kwargs: extra keywords arguments for *fn*
@@ -504,6 +512,11 @@ def run_fn_on_each_targetspec(
         project = { 'id', 'disabled', 'type' }
         if iface:
             project.add('interfaces.' + iface)
+        if ifaces:
+            for _iface in ifaces:
+                project.add('interfaces.' + _iface)
+        for extension in extensions_only:
+            project.add('interfaces.' + extension)
         if projections:
             commonl.assert_list_of_strings(projections,
                                            "projetions", "field")
