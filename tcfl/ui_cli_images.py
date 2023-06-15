@@ -322,7 +322,7 @@ def _cmdline_images_flash(cli_args: argparse.Namespace):
 def _cmdline_setup(arg_subparser):
 
     ap = arg_subparser.add_parser(
-        f"images-ls{tcfl.ui_cli.commands_new_suffix}",
+        f"images-ls",
         help = "List destinations that can be flashed in this target")
     tcfl.ui_cli.args_verbosity_add(ap)
     tcfl.ui_cli.args_targetspec_add(ap)
