@@ -1843,7 +1843,7 @@ def conditional_eval(tag, kw, conditional, origin,
     except Exception as e:
         raise Exception("error evaluating %s %s "
                         "'%s' from '%s': %s"
-                        % (tag, kind, conditional, origin, e))
+                        % (tag, kind, conditional, origin, e)) from e
 
 def check_dir(path, what):
     if not os.path.isdir(path):
