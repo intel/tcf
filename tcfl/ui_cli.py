@@ -78,7 +78,7 @@ def args_targetspec_add(
     if targetspec_n != 1:
         ap.add_argument(
             "--serialize",
-            action = "store_const", dest = "parellization_factor", default = 1,
+            action = "store_const", dest = "parellization_factor", const = 1,
             help = "Serialize (don't parallelize) the operation on"
             " multiple targets")
         ap.add_argument(
