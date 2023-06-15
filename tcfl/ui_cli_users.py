@@ -405,7 +405,7 @@ def cmdline_setup(arg_subparser):
         "host name, without the domain). Find it with 'tcf servers'")
     ap.add_argument(
         "--serialize",
-        action = "store_const", dest = "parellization_factor", default = 1,
+        action = "store_const", dest = "parellization_factor", const = 1,
         help = "Serialize (don't parallelize) the operation on"
         " multiple targets")
     ap.add_argument(
@@ -445,7 +445,7 @@ def cmdline_setup_advanced(arg_subparser):
         " (optional, defaults to yourself)")
     ap.add_argument(
         "--serialize",
-        action = "store_const", dest = "parellization_factor", default = 1,
+        action = "store_const", dest = "parellization_factor", const = 1,
         help = "Serialize (don't parallelize) the operation on"
         " multiple targets")
     ap.add_argument(
@@ -468,7 +468,7 @@ def cmdline_setup_advanced(arg_subparser):
         " (optional, defaults to yourself)")
     ap.add_argument(
         "--serialize",
-        action = "store_const", dest = "parellization_factor", default = 1,
+        action = "store_const", dest = "parellization_factor", const = 1,
         help = "Serialize (don't parallelize) the operation on"
         " multiple targets")
     ap.add_argument(
@@ -488,7 +488,7 @@ def cmdline_setup_advanced(arg_subparser):
     tcfl.ui_cli.args_verbosity_add(ap)
     ap.add_argument(
         "--serialize",
-        action = "store_const", dest = "parellization_factor", default = 1,
+        action = "store_const", dest = "parellization_factor", const = 1,
         help = "Serialize (don't parallelize) the operation on"
         " multiple targets")
     ap.add_argument(
