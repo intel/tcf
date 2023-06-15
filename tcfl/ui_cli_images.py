@@ -52,6 +52,12 @@ def _cmdline_images_ls(cli_args: argparse.Namespace):
     # r now is a dict keyed by target_name and tuples of images an
     # maybe an exception, which we don't cavre for
 
+    if not r:
+        logger.error(
+            f"No targets match the specification (might be disabled, try -a):"
+            f" {' '.join(cli_args.target)}")
+        return 0
+
     d = {}
     targetid = None
     for targetid, ( images, _e ) in r.items():
@@ -242,6 +248,13 @@ def _cmdline_images_flash(cli_args: argparse.Namespace):
         ifaces = [ "images", "store" ],
         extensions_only = [ 'images', 'store' ],
         projections = projections)
+
+    if not image_spec_per_target:
+        logger.error(
+            f"No targets match the specification (might be disabled, try -a):"
+            f" {' '.join(cli_args.target)}")
+        return 0
+
     
     # image_spec_per_target is { TARGETID: ( ( DICT, UPLOAD, SOFT ), e ) }
     # DICT is the map of image files to flash on what image destination:
