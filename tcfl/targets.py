@@ -456,6 +456,15 @@ def _run_fn_on_targetid(
         # note we don't print/log here, we let that be done by
         # tcl.ui_cli.run_fn_on_each_targetspec(), since that
         # is a UI matter.
+        # FIXME: tcfl API will attach target objects to the exception
+        # attachments, which it is a nono because they can't be
+        # pickled, so let's remove them until we fix that API
+        if len(e.args) > 1:
+            attachments = e.args[1]
+            if isinstance(attachments, dict):
+                for k, v in list(attachments.items()):
+                    if isinstance(v, tcfl.tc.target_c):
+                        del attachments[k]
         return None, e
 
 

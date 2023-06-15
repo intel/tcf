@@ -2490,7 +2490,12 @@ class target_c(reporter_c):
                 raise error_e("%s: %s/%s: remote call failed: %s"
                               % (self.id, interface, call, e),
                               dict(
+                                  # FIXME: we need to stop doing this,
+                                  # since it makes the exceptions
+                                  # unpickable; replace with a
+                                  # targetid, it's all we usually need
                                   target = self,
+                                  targetid = self.fullid,
                                   server = str(self.rtb),
                                   error = str(e)
                               )) from e
