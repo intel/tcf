@@ -506,8 +506,9 @@ def _cmdline_images_write(args):
 def _cmdline_setup(arg_subparser):
 
     ap = arg_subparser.add_parser(
-        "images-flash",
-        help = "(maybe upload) and flash images in the target")
+        "images-flash-old",
+        help = "(maybe upload) and flash images in the target; "
+        " this is the original command impl, prefer new one, 'images-flash'")
     ap.add_argument("target", metavar = "TARGET", action = "store",
                     default = None, help = "Target's name or URL")
     ap.add_argument("images", metavar = "[TYPE:]FILENAME",
