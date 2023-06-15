@@ -302,8 +302,13 @@ def ast_expr(ast, env):
     elif ast[0] == "exists":
         return True if ast_sym(ast[1], env) else False
     elif ast[0] == ":":
-        return True if re.compile(ast[2]).search(ast_sym(ast[1], env)) else False
-
+        value = ast_sym(ast[1], env)
+        if not isinstance(value, ( bool, int, float, str )):
+            # not an scalar value, happens when we ask for a field
+            # that is a nested dictionary, for example -- so let's
+            # just encode it
+            value = str(value)
+        return True if re.compile(ast[2]).search(value) else False
 
 _mutex = threading.Lock()
 
