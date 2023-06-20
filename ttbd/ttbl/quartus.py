@@ -300,10 +300,10 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
             # in flash_start() call we'll map the image names to targets
             # to add these
             #
-            #'--operation=PVB;%(image.NAME)s@1',
-            #'--operation=PVB;%(image.NAME)s@2',
+            #'--operation=PV;%(image.NAME)s@1',
+            #'--operation=PV;%(image.NAME)s@2',
             #...
-            # (P)rogram (V)erify, (B)lank-check
+            # (P)rogram (V)erify, (B)lank-check [ not really needed]
             #
             # note like this we can support burning multiple images into the
             # same chain with a single call
@@ -378,7 +378,7 @@ class pgm_c(ttbl.images.flash_shell_cmd_c):
             # pass only the realtive filename, as we are going to
             # change working dir into the path (see above in
             # context[kws][file_path]
-            cmdline.append("--operation=PVB;%s@%d" % (
+            cmdline.append("--operation=PV;%s@%d" % (
                 os.path.basename(filename), target_index))
         # now set it for flash_shell_cmd_c.flash_start()
         self.cmdline = cmdline
