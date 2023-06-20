@@ -148,7 +148,7 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None):
     target.console.write("\x02\x02")	# use this iface so expecter
     time.sleep(0.3)
     target.expect("iPXE>")
-    prompt_orig = target.shell.shell_prompt_regex
+    prompt_orig = target.shell.prompt_regex
     try:
         #
         # When matching end of line, match against \r, since depends
@@ -158,7 +158,7 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None):
         #
         # FIXME: block on anything here? consider infra issues
         # on "Connection timed out", http://ipxe.org...
-        target.shell.shell_prompt_regex = "iPXE>"
+        target.shell.prompt_regex = "iPXE>"
         kws = dict(target.kws)
         boot_ic = target.kws['pos_boot_interconnect']
         mac_addr = target.kws['interconnects'][boot_ic]['mac_addr']
@@ -225,7 +225,7 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None):
         else:
             target.send("sanboot %s" % sanboot_url)
     finally:
-        target.shell.shell_prompt_regex = prompt_orig
+        target.shell.prompt_regex = prompt_orig
     
 
 #! Place where the Zephyr tree is located
