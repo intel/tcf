@@ -34,6 +34,17 @@ if ttbl.config.defaults_enabled:
 
     index_start = 5
 
+#
+# Create the local target
+#
+# The local target allows listing USB devices with:
+#
+## $ tcf capture AKA/local usb_devices
+## usb_devices: taking snapshot
+## usb_devices: downloading capture
+## usb_devices: downloaded stream log -> local.usb_devices.log.log
+## usb_devices: downloaded stream default -> local.usb_devices.default.json
+#
 target_local = ttbl.test_target('local')
 ttbl.config.target_add(
     target_local,
