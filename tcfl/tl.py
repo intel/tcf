@@ -222,6 +222,8 @@ def ipxe_sanboot_url(target, sanboot_url, dhcp = None):
         if sanboot_url == "skip":
             target.report_skip(
                 "not sanbooting since 'skip' was given as sanboot_url")
+        elif sanboot_url.endswith(".ipxe"):
+            target.send("boot %s" % sanboot_url)
         else:
             target.send("sanboot %s" % sanboot_url)
     finally:
