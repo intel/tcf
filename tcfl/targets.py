@@ -556,8 +556,11 @@ def run_fn_on_each_targetspec(
         if ifaces:
             for _iface in ifaces:
                 project.add('interfaces.' + _iface)
-        for extension in extensions_only:
-            project.add('interfaces.' + extension)
+        if extensions_only != None:
+            commonl.assert_list_of_strings(
+                extensions_only, "extensions_only", "extension")
+            for extension in extensions_only:
+                project.add('interfaces.' + extension)
         if projections:
             commonl.assert_list_of_strings(projections,
                                            "projections", "field")
