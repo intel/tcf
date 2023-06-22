@@ -2544,24 +2544,6 @@ def _cmdline_setup(arg_subparser):
     ap.set_defaults(func = _cmdline_console_setup)
 
 
-    ap = arg_subparser.add_parser("console-disable",
-                                  help = "Disable a console")
-    ap.add_argument("-c", "--console", metavar = "CONSOLE",
-                    action = "store", default = None,
-                    help = "name of console to disable")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target name")
-    ap.set_defaults(func = _cmdline_console_disable)
-
-    ap = arg_subparser.add_parser("console-enable",
-                                  help = "Enable a console")
-    ap.add_argument("-c", "--console", metavar = "CONSOLE",
-                    action = "store", default = None,
-                    help = "name of console to enable")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target name")
-    ap.set_defaults(func = _cmdline_console_enable)
-
 
     def _check_positive(value):
         try:
