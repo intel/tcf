@@ -204,7 +204,7 @@ def run_fn_on_each_targetspec(
         if exception != None:
             msg = str(exception.args[0])
             if cli_args.traces:
-                tb = "".join(traceback.format_exception(
+                tb = "\n" + "".join(traceback.format_exception(
                     type(exception), exception, exception.__traceback__))
             else:
                 tb = ""
