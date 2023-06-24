@@ -183,7 +183,19 @@ def subsystem_setup(*args, **kwargs):
     if _subsystem_setup:
         return
 
-    tcfl.config.subsystem_setup(*args, **kwargs)
+    # ok, this is a hack because at this point, tcfl.config.setup(),
+    # which is the "old way but still accepted" to initialize the API
+    # also calls this but this also calls
+    # tcfl.config.subsystem_setup(). So we need to remove ssl_ignore,
+    # which tcfl.config.subsystem_setup() doesn't take
+    # FIXME: when we move everything out of using tcfl.ttb_client()
+    # and tcfl.config.setup()/load(), this won't be needed.
+    if 'ssl_ignore' in kwargs:
+        _kwargs = dict(kwargs)
+        del _kwargs['ssl_ignore']
+    else:
+        _kwargs = kwargs
+    tcfl.config.subsystem_setup(*args, **_kwargs)
     logger.info("setting up server subsystem")
     _discover_bare(ssl_ignore = kwargs.get('ignore_ssl'))
 
