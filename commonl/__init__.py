@@ -435,7 +435,8 @@ class _Action_increase_level(argparse.Action):
             namespace.level = logging.ERROR
         namespace.level = logging_verbosity_inc(namespace.level)
 
-def log_format_compose(log_format, log_pid, log_time = False):
+def log_format_compose(log_format, log_pid,
+                       log_time = False, log_time_delta = False):
     if log_pid == True:
         log_format = log_format.replace(
             "%(levelname)s",
@@ -444,6 +445,10 @@ def log_format_compose(log_format, log_pid, log_time = False):
         log_format = log_format.replace(
             "%(levelname)s",
             "%(levelname)s/%(asctime)s", 1)
+    if log_time_delta == True:
+        log_format = log_format.replace(
+            "%(levelname)s",
+            "%(levelname)s/+%(relativeCreated)dms", 1)
     return log_format
 
 def cmdline_log_options(parser):
@@ -477,6 +482,9 @@ def cmdline_log_options(parser):
     parser.add_argument("--log-time", action = "store_true",
                         default = False,
                         help = "Print Date and time in the logs")
+    parser.add_argument("--log-time-delta", action = "store_true",
+                        default = False,
+                        help = "Print relative time in the logs")
 
 
 def kws_expand(s: str, kws: dict, nest_limit: int = 5):
