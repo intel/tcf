@@ -334,9 +334,9 @@ if __name__ == "__main__":
     if args.debug or args.log_functions:
         log_format += "::%(module)s.%(funcName)s():%(lineno)d"
     log_format += ": %(message)s"
-    log_format = commonl.log_format_compose(log_format, args.log_pid_tid, args.log_time)
+    log_format = commonl.log_format_compose(log_format, args.log_pid_tid,
+                                            args.log_time, args.log_time_delta)
     logging.basicConfig(format = log_format, level = args.level)
-
     for environment in args.environment:
         if '=' in environment:
             key, val = environment.split("=", 1)
