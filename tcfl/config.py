@@ -157,7 +157,7 @@ def load(config_path = None, config_files = None,
     """
     # FIXME: being deprecated
     subsystem_setup(config_path, config_files, state_dir)
-    tcfl.servers._discover_bare(ssl_ignore = ignore_ssl)
+    tcfl.servers.subsystem_setup(ssl_ignore = ignore_ssl)
     tcfl.msgid_c.cls_init_maybe()
 
 
