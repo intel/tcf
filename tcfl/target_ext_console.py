@@ -630,11 +630,32 @@ class extension(tc.target_extension_c):
         if 'console' not in target.rt.get('interfaces', []):
             raise self.unneeded
         self.target = target
-        # this won't change runtime, so it is ok to cache it
-        self.console_list = self.list()
+
         # this becomes a ALIAS: REAL-NAME
+        # r is:
+        #
+        ## {
+        ##     'aliases': { 'default': 'ttyS0', 'preferred': },
+        ##     'result': ['default', 'preferred', 'ttyS0', 'ssh0']
+        ## }
+        ##
+        ## self.list() returns ther esult part, basically
+        #
+        # FIXME: we can remove this call if we do add in the server
+        #        inventory:
+        #
+        #  1. the tag 'preferred: true' on the preferred console,
+        #     if any
+        #
+        #  2. the tag 'default: true' on the current default console
+        #
+        # this way, for the first initiazation we don't need to call
+        # list again, since the info is already coming from the
+        # inventory.
         r = self.target.ttbd_iface_call("console", "list", method = "GET",
                                         retry_timeout = 10)
+        # this won't change runtime, so it is ok to cache it
+        self.console_list = r.get('result', [])
         self.aliases = r['aliases']
         self._set_default()
         #: Default end of line for the different consoles
