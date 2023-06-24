@@ -51,23 +51,19 @@ from . import tc
 from . import msgid_c
 
 
-try:
-    import cv2
-    import numpy
-    import imutils
-    image_expectation_works = True
-except ImportError as e:
-    image_expectation_works = False
-
-
-
-
 #
 # implementation of the expectation to wait for an image template to
 # show up in an screenshot
 #
 
 def _template_find_gray(image_gray, template, threshold = 0.8):
+    try:
+        import cv2
+        import imutils
+        import numpy
+    except ImportError as e:
+        raise RuntimeError("Image matching won't work; need packages"
+                           " cv2, imutils, numpy") from e
     # Find a gray template on a gray image, returning a list of boxes
     # that match the template in the image
     #
@@ -91,6 +87,13 @@ def _template_find_gray(image_gray, template, threshold = 0.8):
 def _template_find(image_filename, image_rgb,
                    template_filename, template,
                    min_width = 30, min_height = 30):
+    try:
+        import cv2
+        import imutils
+        import numpy
+    except ImportError as e:
+        raise RuntimeError("Image matching won't work; need packages"
+                           " cv2, imutils, numpy") from e
     # Finds a template in an image, possibly scaling the template and
     # returning the locations where found in a resolution indendent
     # way
@@ -165,9 +168,14 @@ class _expect_image_on_screenshot_c(tc.expectation_c):
                  in_area, merge_similar, min_width, min_height,
                  poll_period, timeout, raise_on_timeout, raise_on_found,
                  name = None):
-        if not image_expectation_works:
+        try:
+            import cv2
+            import imutils
+            import numpy
+        except ImportError as e:
             raise RuntimeError("Image matching won't work; need packages"
-                               " cv2, imutils, numpy")
+                               " cv2, imutils, numpy") from e
+
         assert isinstance(target, tc.target_c)
         assert isinstance(capturer, str)
         assert in_area == None \
@@ -817,9 +825,6 @@ class extension(tc.target_extension_c):
         The rest of the arguments are described in
         :class:`tcfl.tc.expectation_c`.
         """
-        if not image_expectation_works:
-            raise RuntimeError("Image matching won't work; need packages"
-                               " cv2, imutils, numpy")
         return _expect_image_on_screenshot_c(
             self.target,
             template_image_filename, capturer,
