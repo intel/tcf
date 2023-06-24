@@ -2226,66 +2226,6 @@ def _cmdline_console_read(args):
                 fd.close()
 
 
-def _cmdline_console_list(args):
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args)
-        for console in target.console.list():
-            if console in target.console.aliases:
-                real_name = "|" + target.console.aliases[console]
-            else:
-                real_name = ""
-            size = target.console.size(console)
-            if size != None:
-                print("%s%s: %d" % (console, real_name, size))
-            else:
-                print("%s%s: disabled" % (console, real_name))
-
-
-def _cmdline_console_setup(args):
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args)
-        if args.reset:
-            r = target.console.setup(args.console)
-        elif args.parameters == []:
-            r = target.console.setup_get(args.console)
-        else:
-            parameters = {}
-            for parameter in args.parameters:
-                if ':' in parameter:
-                    key, value = parameter.split(":", 1)
-                    # try to convert to int/float or keep as string
-                    while True:
-                        try:
-                            value = int(value)
-                            break
-                        except ValueError:
-                            pass
-                        try:
-                            value = float(value)
-                            break
-                        except ValueError:
-                            pass
-                        break	# just a string or whatever it reps as
-                else:
-                    key = parameter
-                    value = True
-                parameters[key] = value
-            r = target.console.setup(args.console, **parameters)
-        for key, value in r.items():
-            print("%s: %s" % (key, value))
-
-def _cmdline_console_enable(args):
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args)
-        target.console.enable(args.console)
-
-
-def _cmdline_console_disable(args):
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(
-            args,
-            extensions_only = "console")
-        target.console.disable(args.console)
 
 def _cmdline_console_wall(args):
     # for all the targets in args.targets, query the consoles they
@@ -2526,23 +2466,6 @@ def _cmdline_setup(arg_subparser):
         help = "Maximum number of seconds to backoff wait for"
         " data (%(default)ss)")
     ap.set_defaults(func = _cmdline_console_write, crlf = None)
-
-
-    ap = arg_subparser.add_parser("console-setup",
-                                  help = "Setup a console")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target name")
-    ap.add_argument("-c", "--console", metavar = "CONSOLE",
-                    action = "store", default = None,
-                    help = "name of console to setup, or default")
-    ap.add_argument("--reset", "-r",
-                    action = "store_true", default = False,
-                    help = "reset to default values")
-    ap.add_argument("parameters", metavar = "KEY:VALUE", #action = "append",
-                    nargs = "*",
-                    help = "Parameters to set (KEY:VALUE)")
-    ap.set_defaults(func = _cmdline_console_setup)
-
 
 
     def _check_positive(value):
