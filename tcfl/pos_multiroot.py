@@ -65,21 +65,10 @@ to denote the sizes of the different partitions:
 - 50 GiB for multiple root partitions (until the disk size is exhausted)
 
 """
-import operator
-import os
-import pprint
-import random
-import re
-
-import Levenshtein
-
-import commonl
-import tcfl
-from . import pos
-from . import tc
 
 # FIXME: deprecate that _device
 def _disk_partition(target):
+    import tcfl
     # we assume we are going to work on the boot device
     device_basename = target.kws['pos_boot_dev']
     device = "/dev/" + device_basename
@@ -93,7 +82,7 @@ def _disk_partition(target):
 
     partsizes = target.kws.get('pos_partsizes', None)
     if partsizes == None:
-        raise tc.blocked_e(
+        raise tcfl.blocked_e(
             "Can't partition target, it doesn't "
             "specify pos_partsizes tag",
             { 'target': target } )
@@ -165,7 +154,8 @@ name 3 TCF-scratch \
 
 
 def _rootfs_guess_by_image(target, image, boot_dev):
-
+    import random
+    from . import pos
     # Gave a None partition, means pick our own based on a guess. We
     # know what image we want to install, so we will scan the all the
     # target's root partitions (defined in tags/properties
@@ -234,6 +224,7 @@ def _rootfs_guess_by_image(target, image, boot_dev):
     return root_part_dev
 
 def _rootfs_guess(target, image, boot_dev):
+    import tcfl
     reason = "unknown issue"
     for tries in range(3):
         tries += 1
@@ -256,7 +247,7 @@ def _rootfs_guess(target, image, boot_dev):
                 continue
             else:
                 raise
-    raise tc.blocked_e(
+    raise tcfl.blocked_e(
         "Tried too much to reinitialize the partition table to "
         "pick up a root partition? is there enough space to "
         "create root partitions?",
@@ -274,6 +265,7 @@ def mount_fs(target, image, boot_dev):
 
     :returns: name of the root partition device
     """
+    import os
     # does the disk have a partition scheme we recognize?
     pos_partsizes = target.rt['pos_partsizes']
     # the name we'll give to the boot partition; see
