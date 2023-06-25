@@ -755,34 +755,41 @@ def _cmdline_console_write(args):
                                      console = console)
 
 
-def _cmdline_console_read(args):
-    with tcfl.msgid_c("cmdline"):
-        target = tcfl.tc.target_c.create_from_cmdline_args(args)
-        # _console_get() translates aliases into a real console name
-        console = target.console._console_get(args.console)
-        offset = target.console.offset_calc(target, args.console, int(args.offset))
-        if args.output == None:
-            fd = sys.stdout.buffer
-            rawmode = False
+def _console_read(target, console: str, offset: int, output: str,
+                  follow: bool, max_backoff_wait: int, timestamp: bool):
+    console = target.console._console_get(console)
+    offset = target.console.offset_calc(target, console, offset)
+    if output == None:
+        fd = sys.stdout.buffer
+        rawmode = False
+    else:
+        fd = open(output, "wb")
+        rawmode = True
+    try:
+        # limit how much time we keep retrying due to server connection errors
+        if follow:
+            _console_read_thread_fn(target, console, fd, offset,
+                                    max_backoff_wait, False,
+                                    timestamp = timestamp,
+                                    rawmode = rawmode)
         else:
-            fd = open(args.output, "wb")
-            rawmode = True
-        try:
-            # limit how much time we keep retrying due to server connection errors
-            if args.follow:
-                _console_read_thread_fn(target, console, fd, offset,
-                                        args.max_backoff_wait, False,
-                                        timestamp = args.timestamp,
-                                        rawmode = rawmode)
-            else:
-                console_reader = _console_reader_c(
-                    target, console, fd, offset,
-                    args.max_backoff_wait, 10, timestamp = args.timestamp,
-                    rawmode = rawmode)
-                console_reader.read()
-        finally:
-            if fd != sys.stdout.buffer:
-                fd.close()
+            console_reader = _console_reader_c(
+                target, console, fd, offset,
+                max_backoff_wait, 10, timestamp = timestamp,
+                rawmode = rawmode)
+            console_reader.read()
+    finally:
+        if fd != sys.stdout.buffer:
+            fd.close()
+
+def _cmdline_console_read(cli_args: argparse.Namespace):
+
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        _console_read, cli_args,
+        cli_args.console, cli_args.offset, cli_args.output, cli_args.follow,
+        cli_args.max_backoff_wait, cli_args.timestamp,
+        only_one = True,
+        iface = "console", extensions_only = [ "console" ])
 
 
 
@@ -1052,6 +1059,8 @@ def _cmdline_setup(arg_subparser):
         "console-read",
         help = "Read from a target's console (pipe to `cat -A` to"
         " remove control chars")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
     ap.add_argument(
         "-s", "--offset", action = "store",
         dest = "offset", type = int,
@@ -1061,9 +1070,6 @@ def _cmdline_setup(arg_subparser):
         "-o", "--output", action = "store", default = None,
         metavar = "FILENAME",
         help = "Write output to FILENAME")
-    ap.add_argument(
-        "target", metavar = "TARGET", action = "store",
-        default = None, help = "Target's name")
     ap.add_argument(
         "--console", "-c", metavar = "CONSOLE",
         action = "store", default = None,
