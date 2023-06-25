@@ -5,24 +5,12 @@
 #
 
 import os
-import tcfl.app
-import tcfl.tc
 
-import tcfl.app_zephyr
-import tcfl.tc_zephyr_sanity
-
-# Zephyr-specific drivers
-tcfl.app.driver_add(tcfl.app_zephyr.app_zephyr)
-tcfl.tc.target_c.extension_register(tcfl.app_zephyr.zephyr)
-tcfl.tc.tc_c.driver_add(tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c)
-
-# Don't scan for test cases in doc directories
-tcfl.tc.tc_c.dir_ignore_add_regex("^doc$")
-tcfl.tc.tc_c.dir_ignore_add_regex("^outdir.*$")
+# Zephyr TC driver registration moved for init performance reaosns to
+# tcfl.tc.run(); will be moved to orchestrator specific config
 
 # Set Zephyr's build environment (use .setdefault() to inherit existing values)
 os.environ.setdefault('ZEPHYR_TOOLCHAIN_VARIANT', 'zephyr')
-os.environ.setdefault('USE_CCACHE', "1")
 
 #: SDK mapping table
 #:
@@ -92,9 +80,3 @@ zephyr_sdks = {
 # See change after commit  on 6/25
 #
 # dbff386b: tcf/console-write: move to new UI CLI framework for consistency
-
-# EXPERIMENT: force the max10 to delay 3 seconds boot, as we are
-# seeing too much lost early console output -- note this could be too
-# a problem in the HW setup, with this we are trying isolate possible
-# causes.
-tcfl.app_zephyr.boot_delay['max10'] = 3000

@@ -1,7 +1,4 @@
 #! /usr/bin/python3
 
-import tcfl.tc_clear_bbt
-tcfl.tc.tc_c.driver_add(tcfl.tc_clear_bbt.tc_clear_bbt_c)
-
-import tcfl.tc_jtreg
-tcfl.tc.tc_c.driver_add(tcfl.tc_jtreg.driver)
+# NOTE: testcase driver registration belongs in the orchestrator;
+# moved temporarily to tcf.tc.run()

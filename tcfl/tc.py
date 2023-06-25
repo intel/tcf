@@ -8820,6 +8820,24 @@ def _run(args):
     """
     Runs one ore more test cases
     """
+
+    # FIXME: move this to a more formal orchestrator specific config
+    import tcfl.tc_clear_bbt
+    tcfl.tc.tc_c.driver_add(tcfl.tc_clear_bbt.tc_clear_bbt_c)
+
+    import tcfl.tc_jtreg
+    tcfl.tc.tc_c.driver_add(tcfl.tc_jtreg.driver)
+
+    # Zephyr-specific drivers
+    import tcfl.app_zephyr
+    import tcfl.tc_zephyr_sanity
+    tcfl.app.driver_add(tcfl.app_zephyr.app_zephyr)
+    tcfl.tc.target_c.extension_register(tcfl.app_zephyr.zephyr)
+    tcfl.tc.tc_c.driver_add(tcfl.tc_zephyr_sanity.tc_zephyr_sanity_c)
+    tcfl.tc.tc_c.dir_ignore_add_regex("^doc$")
+    tcfl.tc.tc_c.dir_ignore_add_regex("^outdir.*$")
+
+
     _globals_init()
     if args.shard:
         try:
