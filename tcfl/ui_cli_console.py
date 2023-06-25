@@ -715,44 +715,53 @@ WARNING: Running 'console-write -i' under MS Windows
 
 
 
-def _cmdline_console_write(args):
-    with tcfl.msgid_c("cmdline"):
-        target = tcfl.tc.target_c.create_from_cmdline_args(args)
-        if args.offset == None:
-            # if interactive, give us just a little bit of the
-            # previous output; all of it becomes really confusing;
-            # none also...so just a little.
-            if args.interactive:
-                args.offset = -300
-            else:
-                args.offset = 0
-        if args.console == None:
-            args.console = target.console.default
-        # _console_get() translates aliases into a real console name
-        console = target.console._console_get(args.console)
-        if args.crlf == None:
-            # get the CRLF the server says, otherwise default to \n,
-            # which seems to work best for most
-            args.crlf = target.rt['interfaces']['console']\
-                [console].get('crlf', "\n")
-        if args.interactive:
-            _cmdline_console_write_interactive(target, console,
-                                               args.crlf, args.offset,
-                                               args.max_backoff_wait,
-                                               windows_use_msvcrt = args.msvcrt,
-                                               press_enter = args.press_enter)
-        elif args.data == []:	# no data given, so get from stdin
-            import getpass
-            while True:
-                line = getpass.getpass("")
-                if line:
-                    target.console.write(line.strip() + args.crlf,
-                                         crlf = args.crlf,
-                                         console = console)
+def _console_write(target, console: str,
+                   data: list,	# COMPAT: pre3.8, not using list[str]
+                   offset: int, crlf: str, max_backoff_wait: int,
+                   interactive: bool, press_enter: bool, msvcrt: bool):
+    if offset == None:
+        # if interactive, give us just a little bit of the
+        # previous output; all of it becomes really confusing;
+        # none also...so just a little.
+        if interactive:
+            offset = -300
         else:
-            for line in args.data:
-                target.console.write(line + args.crlf,
-                                     console = console)
+            offset = 0
+    if console == None:
+        console = target.console.default
+    # _console_get() translates aliases into a real console name
+    console = target.console._console_get(console)
+    if crlf == None:
+        # get the CRLF the server says, otherwise default to \n,
+        # which seems to work best for most
+        crlf = target.rt['interfaces']['console']\
+            [console].get('crlf', "\n")
+    if interactive:
+        _cmdline_console_write_interactive(
+            target, console, crlf, offset, max_backoff_wait,
+            windows_use_msvcrt = msvcrt, press_enter = press_enter)
+    elif data == []:	# no data given, so get from stdin
+        import getpass
+        while True:
+            line = getpass.getpass("")
+            if line:
+                # FIXME: this is attemptring to strip \r\n, but is
+                # also taking spacing...
+                target.console.write(line.rstrip() + crlf, console)
+    else:
+        for line in data:
+            target.console.write(line + crlf, console)
+
+def _cmdline_console_write(cli_args: argparse.Namespace):
+
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        _console_write, cli_args,
+        cli_args.console, cli_args.data,
+        cli_args.offset, cli_args.crlf, cli_args.max_backoff_wait,
+        cli_args.interactive, cli_args.press_enter, cli_args.msvcrt,
+        only_one = True,
+        iface = "console", extensions_only = [ "console" ])
+
 
 
 def _console_read(target, console: str, offset: int, output: str,
@@ -1095,9 +1104,8 @@ def _cmdline_setup(arg_subparser):
     ap = arg_subparser.add_parser(
         "console-write",
         help = "Write to a target's console")
-    ap.add_argument(
-        "target", metavar = "TARGET", action = "store",
-        default = None, help = "Target's name or URL")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap, targetspec_n = 1)
     ap.add_argument(
         "--console", "-c", metavar = "CONSOLE",
         action = "store", default = None,
