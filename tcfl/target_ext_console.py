@@ -70,6 +70,7 @@ import errno
 import io
 import mmap
 import numbers
+import os
 import re
 import sys
 import time
