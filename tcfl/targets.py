@@ -375,7 +375,13 @@ def setup_by_spec(targetspecs: list, verbosity: int = 0,
     if expressionl:
         expression = "(" + " or ".join(expressionl) + ")"
         logger.info(f"filter expression: {expression}")
-        expr_ast = commonl.expr_parser.precompile(expression)
+        try:
+            expr_ast = commonl.expr_parser.precompile(expression)
+        except SyntaxError as e:
+            raise RuntimeError(
+                f"compilation of target filter expression '{expression}'"
+                f" failed: {e}") from e
+
         expr_symbols = commonl.expr_parser.symbol_list(expr_ast)
         logger.info(f"symbols from target filters: {', '.join(expr_symbols)}")
     else:
