@@ -456,13 +456,6 @@ class extension(tc.target_extension_c):
 
 
 
-def _cmdline_images_read(args):
-    tc.tc_global = tc.tc_c("cmdline", "", "builtin")
-    tc.report_driver_c.add(		# FIXME: hack console driver
-        tc.report_console.driver(1, None))
-    with msgid_c("cmdline"):
-        target = tc.target_c.create_from_cmdline_args(args, iface = "images")
-        target.images.read(args.image, args.filename, args.offset, args.bytes)
 
 def _cmdline_images_flash(args):
     tc.tc_global = tc.tc_c("cmdline", "", "builtin")
@@ -506,25 +499,3 @@ def _cmdline_setup(arg_subparser):
                     help = "timeout in seconds [default taken from"
                     " what the server declares or 1m if none]")
     ap.set_defaults(func = _cmdline_images_flash)
-
-
-
-    ap = arg_subparser.add_parser(
-        "images-read",
-        help = "Read image from the target")
-    ap.add_argument("target", metavar = "TARGET", action = "store",
-                    default = None, help = "Target's name")
-    ap.add_argument("image", metavar = "TYPE",
-                    action = "store", default = None,
-                    help = "Image we are reading from")
-    ap.add_argument("filename", metavar = "FILENAME",
-                    action = "store", default = None,
-                    help = "File to create and write to")
-    ap.add_argument("-o", "--offset",
-                    action = "store", default = 0, type = int,
-                    help = "Base offset from 0 bytes to read from")
-    ap.add_argument("-b", "--bytes",
-                    action = "store", default = None, type = int,
-                    help = "Bytes to read from the image"
-                    " (Defaults to reading the whole image)")
-    ap.set_defaults(func = _cmdline_images_read)
