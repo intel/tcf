@@ -3673,13 +3673,6 @@ Fastboot
 - ``/ttb/v1/targets/TARGETNAME/fastboot/run`` *PUT*
 - ``/ttb/v1/targets/TARGETNAME/fastboot/list`` *GET*
 
-
-
-IOC_flash_server_app
-^^^^^^^^^^^^^^^^^^^^
-
-- ``/ttb/v1/targets/TARGETNAME/ioc_flash_server_app/run`` *GET*
-
 Things
 ^^^^^^
 
