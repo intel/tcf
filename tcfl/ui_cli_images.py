@@ -19,6 +19,10 @@ learn more about them):
 
     $ tcf images-flash TARGETSPEC [DEST:FILE [DEST:FILE [...]]
 
+- write partial data into a destination::
+
+    $ tcf images-write TARGETSPEC DEST OFFSET:DATA
+
 """
 import concurrent.futures
 import argparse
@@ -332,6 +336,45 @@ def _cmdline_images_flash(cli_args: argparse.Namespace):
 
 
 
+def _image_write(target, image: str, data: list):
+    values = {}
+    for item in data:
+        offset, data = item.split(":")
+        try:
+            # list of bytes
+            if re.match(r'^\[.*\]$', data):
+                import ast	# import only if needed
+                data = bytes(ast.literal_eval(data))
+            # hex value
+            elif re.match('^(0x)?[a-fA-F0-9]+$', data):
+                if data.startswith("0x"):
+                    data = data[2:]
+                data = bytes.fromhex(data)
+            # bytes string
+            elif re.match('^b[\'\"].+[\'\"]$', data):
+                data = data[2:-1].encode('utf-8')
+            # normal string
+            else:
+                data = data.encode('utf-8')
+            values[offset] = data
+        except (TypeError, ValueError) as e:
+            raise type(e)(f"value \"{data}\" must be valid bytes")
+    logger.info("writing @%s: %s", image, values)
+    target.images.write(image, values)
+
+
+def _cmdline_image_write(cli_args: argparse.Namespace):
+
+    tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        _image_write, cli_args,
+        cli_args.image, cli_args.data,
+        only_one = True,
+        iface = "images", extensions_only = [ 'images' ])
+
+
+
 def _cmdline_setup(arg_subparser):
 
     ap = arg_subparser.add_parser(
@@ -373,3 +416,24 @@ def _cmdline_setup(arg_subparser):
         " contain %%(FIELD)s strings that will be expanded from the"
         " inventory.")
     ap.set_defaults(func = _cmdline_images_flash)
+
+
+
+def _cmdline_setup_advanced(arg_subparser):
+
+    ap = arg_subparser.add_parser(
+        "images-write",
+        help = "Write data to specified offset in image")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap)
+    ap.add_argument(
+        "image", metavar = "TYPE",
+        action = "store", default = None,
+        help = "Image we are writing to (eg: bios)")
+    ap.add_argument(
+        "data", metavar = "OFFSET:DATA", nargs = '+',
+        action = "store", default = None,
+        help = "offset and data to write; the data can be specified as"
+        " a hex string (eg: 334:0f3456a1 would write bytes 0x0f 0x34"
+        " 0x56 0xa1 to offset 334) or a normal string ")
+    ap.set_defaults(func = _cmdline_image_write)
