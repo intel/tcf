@@ -336,6 +336,22 @@ def _cmdline_images_flash(cli_args: argparse.Namespace):
 
 
 
+def _images_read(target, image, filename, offset, length):
+    logger.info("reading %dB from offset %s of %s", length, offset, image)
+    target.images.read(image, filename, offset, length)
+
+def _cmdline_images_read(cli_args: argparse.Namespace):
+
+    tcfl.ui_cli.logger_verbosity_from_cli(logger, cli_args)
+
+    return tcfl.ui_cli.run_fn_on_each_targetspec(
+        _images_read, cli_args,
+        cli_args.image, cli_args.filename, cli_args.offset, cli_args.length,
+        only_one = True,
+        iface = "images", extensions_only = [ 'images' ])
+
+
+
 def _image_write(target, image: str, data: list):
     values = {}
     for item in data:
@@ -420,6 +436,30 @@ def _cmdline_setup(arg_subparser):
 
 
 def _cmdline_setup_advanced(arg_subparser):
+
+    ap = arg_subparser.add_parser(
+        "images-read",
+        help = "Read image from the target")
+    tcfl.ui_cli.args_verbosity_add(ap)
+    tcfl.ui_cli.args_targetspec_add(ap)
+    ap.add_argument(
+        "image", metavar = "TYPE",
+        action = "store", default = None,
+        help = "Image we are reading from")
+    ap.add_argument(
+        "filename", metavar = "FILENAME",
+        action = "store", default = None,
+        help = "File to create and write to")
+    ap.add_argument(
+        "-o", "--offset",
+        action = "store", default = 0, type = int,
+        help = "Base offset from 0 bytes to read from")
+    ap.add_argument(
+        "-b", "--bytes", dest = "length",
+        action = "store", default = None, type = int,
+        help = "Bytes to read from the image"
+        " (defaults to reading the whole image)")
+    ap.set_defaults(func = _cmdline_images_read)
 
     ap = arg_subparser.add_parser(
         "images-write",
