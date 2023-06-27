@@ -1082,7 +1082,6 @@ class target_c(reporter_c):
     - :py:class:`debug <tcfl.target_ext_debug.extension>`
     - :py:class:`fastboot <tcfl.target_ext_fastboot.extension>`
     - :py:class:`images <tcfl.target_ext_images.extension>`
-    - :py:class:`ioc_flash_server_app <tcfl.target_ext_ioc_flash_server_app.extension>`
     - :py:class:`power <tcfl.target_ext_power.extension>`
     - :py:class:`shell <tcfl.target_ext_shell.shell>`
     - :py:class:`ssh <tcfl.target_ext_ssh.ssh>`
@@ -9426,10 +9425,6 @@ target_c.extension_register(target_ext_images.extension, "images")
 
 from . import target_ext_input
 target_c.extension_register(target_ext_input.extension, "input")
-
-from . import target_ext_ioc_flash_server_app
-target_c.extension_register(target_ext_ioc_flash_server_app.extension,
-                            "ioc_flash_server_app")
 
 from . import target_ext_shell
 target_c.extension_register(target_ext_shell.shell)
