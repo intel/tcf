@@ -504,8 +504,9 @@ class interface(ttbl.tt_interface):
             True: 'on',
             None: 'n/a'
         }
-        while ts - ts0 < impl.timeout:
+        while ts - ts0 < impl.paranoid_get_samples * impl.timeout:
             result = impl.get(target, component)
+            ts = time.time()
             target.log.info("%s: impl power get #%d +%.2fs returned %s",
                             component, stable_count, ts - ts0, _states[result])
             results.append(result)
@@ -521,7 +522,7 @@ class interface(ttbl.tt_interface):
             ts = time.time()
         raise RuntimeError(
             "%s: power-get timed out for an stable result (+%.2fs): %s"
-            % (component, impl.timeout, " ".join(str(r) for r in results)))
+            % (component, ts - ts0, " ".join(str(r) for r in results)))
 
 
     def _get(self, target, impls = None):
@@ -1395,7 +1396,8 @@ class daemon_c(impl_c):
                         % (component, " ".join(_cmdline)))
         if self.env_add:
             env = dict(os.environ)
-            env.update(self.env_add)
+            for k, v in self.env_add.items():
+                env[k] = commonl.kws_expand(v, kws)
         else:
             env = os.environ
         if self.pidfile:
