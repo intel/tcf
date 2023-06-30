@@ -22,7 +22,7 @@ Provisioning OS: client side support for provisioning Raspberry PI
 """
 import os
 
-import pos
+import tcfl.pos
 
 # FIXME: deprecate that _device
 def _partition_p12(target):
@@ -113,10 +113,10 @@ def _mount_fs(target, _image, boot_dev):
         target.property_set('pos_reinitialize', None)
 
     root_part_dev = "/dev/mmcblk0p2"
-    pos.mount_root_part(target, root_part_dev, _partition_p12)
+    tcfl.pos.mount_root_part(target, root_part_dev, _partition_p12)
     # we don't mount /dev/mmcblk0p1 because the bootcode is quite
     # resilient and will over recover and refuse to NW boot again.
     return root_part_dev
 
-pos.capability_register('boot_config', 'raspberry_pi', _boot_config)
-pos.capability_register('mount_fs', 'raspbian', _mount_fs)
+tcfl.pos.capability_register('boot_config', 'raspberry_pi', _boot_config)
+tcfl.pos.capability_register('mount_fs', 'raspbian', _mount_fs)

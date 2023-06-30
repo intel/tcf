@@ -266,6 +266,8 @@ def mount_fs(target, image, boot_dev):
     :returns: name of the root partition device
     """
     import os
+    import tcfl.pos
+
     # does the disk have a partition scheme we recognize?
     pos_partsizes = target.rt['pos_partsizes']
     # the name we'll give to the boot partition; see
@@ -309,5 +311,5 @@ def mount_fs(target, image, boot_dev):
     target.report_info("POS: will use %s for root partition (had %s before)"
                        % (root_part_dev, image_prev))
 
-    pos.mount_root_part(target, root_part_dev, _disk_partition)
+    tcfl.pos.mount_root_part(target, root_part_dev, _disk_partition)
     return root_part_dev
