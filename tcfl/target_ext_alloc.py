@@ -40,9 +40,7 @@ def _delete(rtb, allocid):
         logging.warning("%s: %s", rtb, e)
         return
     except requests.HTTPError as e:
-        message = str(e)
-        if 'invalid allocation' not in message:
-            raise tcfl.error_e(f"{rtb}: {message}") from e
+        logging.warning("%s: %s", rtb, e)
         # FIXME: HACK: this means invalid allocation,
         # already wiped
 
