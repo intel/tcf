@@ -147,8 +147,17 @@ class discovery_agent_c:
         #
         # this accesses the *rts* data without locks, to
         # be executed sequential only
-        position = bisect.bisect_left(self.rts_fullid_sorted, fullid)
-        if not self.rts_fullid_sorted or self.rts_fullid_sorted[-1] != fullid:
+        position = bisect.bisect_right(self.rts_fullid_sorted, fullid)
+        # make sure we are not dupplicating it
+        #
+        ##  If x is already present in a, the insertion point
+        ##  will be before (to the left of) any existing
+        ##  entries.
+        #
+        # We use _right, but same thing applies -- if we the previous
+        # one is the same, then it's a dup, we don't need it.
+        #
+        if position == 0 or self.rts_fullid_sorted[position-1] != fullid:
             self.rts_fullid_sorted.insert(position, fullid)
         if rt.get('disabled', None):
             self.rts_fullid_disabled.add(fullid)
@@ -285,7 +294,7 @@ def select_by_ast(rt_flat: dict,
 
 
 # COMPAT: removing list[str] so we work in python 3.8
-def setup_by_spec(targetspecs: list, verbosity: int = 0,
+def setup_by_spec(targetspecs: list, verbosity: int = 1,
                   project: set = None, targets_all: bool = False):
     """
     Setup the target system and discover just targets that match a
@@ -427,6 +436,11 @@ def setup_by_spec(targetspecs: list, verbosity: int = 0,
     # needs the ast expression and targets_all.
 
     def _filter_rtfullid_by_ast(rtfullid):
+
+        if rtfullid not in tcfl.targets.discovery_agent.rts_flat:
+            logger.error(f"BUG/FIXME: {rtfullid} is not in rts_flat")
+            return True
+
         if tcfl.targets.select_by_ast(
                 tcfl.targets.discovery_agent.rts_flat[rtfullid],
                 expr_ast, targets_all):
@@ -438,8 +452,10 @@ def setup_by_spec(targetspecs: list, verbosity: int = 0,
                            # going to modify it
                            list(tcfl.targets.discovery_agent.rts_fullid_sorted)):
         tcfl.targets.discovery_agent.rts_fullid_sorted.remove(rtfullid)
-        del tcfl.targets.discovery_agent.rts[rtfullid]
-        del tcfl.targets.discovery_agent.rts_flat[rtfullid]
+        if rtfullid in tcfl.targets.discovery_agent.rts: # BUG/FIXME
+            del tcfl.targets.discovery_agent.rts[rtfullid]
+        if rtfullid in tcfl.targets.discovery_agent.rts_flat: # BUG/FIXME
+            del tcfl.targets.discovery_agent.rts_flat[rtfullid]
 
 
 def _run_fn_on_targetid(
