@@ -86,8 +86,11 @@ mcopy -i $tmpdir/ks.drive $ksfile ::ks.cfg
 rm -f $qcowfile		# ensure it's wiped clean, otherwise randome failures abound
 qemu-img create -f qcow2 -q $qcowfile 20G
 # extract the kernel and initrd
-iso-read -i $isofile -e isolinux/vmlinuz -o $tmpdir/vmlinuz
-iso-read -i $isofile -e isolinux/initrd.img -o $tmpdir/initrd.img
+# Live images have it in /images/pxeboot/, others in images/
+kernel_path=$(( isoinfo -J -f -i $isofile || isoinfo -R -f -i $isofile ) | grep /vmlinuz$ | head -1)
+initrd_path=$(( isoinfo -J -f -i $isofile || isoinfo -R -f -i $isofile ) | grep /initrd.img$ | head -1)
+iso-read -i $isofile -e $kernel_path -o $tmpdir/vmlinuz
+iso-read -i $isofile -e $initrd_path -o $tmpdir/initrd.img
 
 # Now QEMU launch the thing
 # - -no-reboot: exit when done instead of rebooting
@@ -123,10 +126,13 @@ else
     gfx=${GRAPHIC:--nographic}
     append="console=ttyS0,115200n81 inst.text inst.ks=hd:LABEL=KS:/ks.cfg"
 fi
+append="$append inst.stage2=cdrom"
+ls -l $tmpdir
+mv $tmpdir/initrd.img $tmpdir/initrd
 qemu-system-x86_64 -no-reboot \
                    -enable-kvm -cpu host -m 3072 \
                    -kernel $tmpdir/vmlinuz \
-                   -initrd $tmpdir/initrd.img \
+                   -initrd $tmpdir/initrd \
                    -append "$append" \
                    -bios /usr/share/edk2/ovmf/OVMF_CODE.fd \
                    -cdrom $isofile \
