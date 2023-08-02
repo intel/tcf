@@ -326,9 +326,37 @@ def _cmdline_images_flash(cli_args: argparse.Namespace):
     # check errors
     retval = 0
     for targetid, ( result, e ) in r.items():
-        image_spec = " ".join(
-            f"{k}:{v}"
-            for k, v in image_spec_per_target[targetid][0][0].items())
+        image_specl = []
+        # image_spec_per_target looks like
+        #
+        ## {
+        ##     'target1': (
+        ##         (    # destinations dict, upload images, soft flash
+        ##             {
+        ##                 'bios': '/gfs/BKC/BHS-AVC-GNR/BKC_HEALTHCHECK_A0/bios',
+        ##                 'bmc': '/gfs/BKC/BHS-AVC-GNR/BKC_HEALTHCHECK_A0/bmc'
+        ##             },
+        ##             False,
+        ##             False
+        ##         ),
+        ##         None		# exception info if any ([0] would be None)
+        ##     ),
+        ##     'target2': (
+        ##         None,
+        ##         RuntimeError('target2: target does not support the images interface')
+        ##     )
+        ## }
+        ir, ie = image_spec_per_target[targetid]
+        if ie == None and ir != None:
+            # note these ir, ie are for the result/e stored
+            # image_spec_per_target[targetid] that is different to
+            # that of the r.items() loop
+            # ir is now ( destinations dict, upload images, soft flash )
+            dest_dict = ir[0]
+            for k, v in dest_dict.items():
+                image_specl.append(f"{k}:{v}")
+        image_spec = " ".join(image_specl)
+
         if e != None:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             logger.error(
