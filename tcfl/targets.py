@@ -248,6 +248,7 @@ class discovery_agent_c:
             tcfl.rts_fullid_enabled = self.rts_fullid_enabled
 
 
+
 def select_by_ast(rt_flat: dict,
                   expr_ast: tuple, include_disabled: bool):
     """
@@ -444,7 +445,12 @@ def setup_by_spec(targetspecs: list, verbosity: int = 1,
         if tcfl.targets.select_by_ast(
                 tcfl.targets.discovery_agent.rts_flat[rtfullid],
                 expr_ast, targets_all):
+            # if the selection matches, we return False so the for
+            # loop next block does not remove it from the list, we
+            # want to keep it
             return False
+        # If the select does not match we return True so the for loop
+        # next block removes it from the list
         return True
 
     for rtfullid in filter(_filter_rtfullid_by_ast,
