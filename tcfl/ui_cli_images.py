@@ -50,6 +50,7 @@ def _cmdline_images_ls(cli_args: argparse.Namespace):
 
     r = tcfl.targets.run_fn_on_each_targetspec(
         _images_list, cli_args.target,
+        targets_all = cli_args.all,
         iface = "images", extensions_only = [ 'images' ])
 
     verbosity = cli_args.verbosity - cli_args.quietosity
@@ -249,6 +250,7 @@ def _cmdline_images_flash(cli_args: argparse.Namespace):
     # specific (eg: type)
     image_spec_per_target = tcfl.targets.run_fn_on_each_targetspec(
         _images_flash_parse, cli_args.target, image_spec,
+        targets_all = cli_args.all,
         ifaces = [ "images", "store" ],
         extensions_only = [ 'images', 'store' ],
         projections = projections)
@@ -318,6 +320,7 @@ def _cmdline_images_flash(cli_args: argparse.Namespace):
         _images_flash, cli_args.target,
         image_spec_per_target, uploaded_names, cli_args.timeout,
         pool_type = concurrent.futures.ProcessPoolExecutor,
+        targets_all = cli_args.all,
         iface = "images", extensions_only = [ 'images', 'store' ])
 
     # check errors
@@ -348,6 +351,7 @@ def _cmdline_images_read(cli_args: argparse.Namespace):
         _images_read, cli_args,
         cli_args.image, cli_args.filename, cli_args.offset, cli_args.length,
         only_one = True,
+        targets_all = cli_args.all,
         iface = "images", extensions_only = [ 'images' ])
 
 
@@ -387,6 +391,7 @@ def _cmdline_image_write(cli_args: argparse.Namespace):
         _image_write, cli_args,
         cli_args.image, cli_args.data,
         only_one = True,
+        targets_all = cli_args.all,
         iface = "images", extensions_only = [ 'images' ])
 
 
