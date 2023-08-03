@@ -899,9 +899,11 @@ def _cmdline_console_wall(cli_args: argparse.Namespace):
                     subcommand = "console-write -i --disable-press-enter"
                 else:
                     subcommand = "console-read --follow"
+                # we add -a since at this point we know we NEED the
+                # unit and if it is disabled, that's ok
                 cf.write(
                     'screen -c %s %s %s'
-                    ' --max-backoff-wait %f -c %s\n'
+                    ' --max-backoff-wait %f -a -c %s\n'
                     'title %s\n\n' % (
                         sys.argv[0], subcommand,
                         descr.target.fullid, cli_args.max_backoff_wait, descr.console, item
