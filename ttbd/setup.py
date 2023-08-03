@@ -133,6 +133,7 @@ targets over HTTP to be controlled by the TCF client.
         ('@prefix@/share/tcf', [
             'hw-healthmonitor/ttbd-hw-healthmonitor-driver-rebind.py',
             'setup-efi-grub2-elf.sh',
+            "noyito-capture.py",
             "raritan-power-capture.py",
             "usb-devices-capture.py",
         ]),
