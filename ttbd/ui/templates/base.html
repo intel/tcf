@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+  <!--
+    SPDX-License-Identifier: Apache-2.0
+    Copyright (c) 2023 Intel Corporation
+  -->
+  <title>{% block title %} {% endblock %} - ttbdweb </title>
+  <link rel='stylesheet' href="{{url_for('static', filename = 'css/style.css')}}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header>
+      <nav>
+        <ul>
+            <img src="{{url_for('static', filename = 'img/bot.svg')}}" width=40em>
+            <li><a href='/ttb-v2/ui'>ttbdweb</a></li>
+            <li><a href='/ttb-v2/ui'>targets</a></li>
+            <li><a href='/ttb-v2/ui/allocations'>allocations</a></li>
+            <li><a href='/'>help</a></li>
+              {% if g.user %}
+                <li class='nav-right'>
+                  <a class='username' href='/ttb-v2/ui/logout'>{{ g.user }}</a>
+                </li>
+              {% else %}
+                <li class='nav-right'><a href='/ttb-v2/ui/login'>login</a></li>
+              {% endif %}
+            {% block navbar %}{% endblock %}
+        </ul>
+  </nav>
+  </header>
+  <div class = 'container'>
+  <main>
+      {% block content %}{% endblock %}
+  </main>
+  </div>
+</body>
+</html>
