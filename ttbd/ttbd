@@ -654,6 +654,38 @@ def logout():
                 identity = flask_principal.AnonymousIdentity())
         return flask.jsonify({'_message': "Session closed"})
 
+@app.route(API_PREFIX + '/ui/login', methods = ['GET', 'POST'])
+def _login_ui():
+    if flask.request.method == 'POST':
+        user = flask.request.form['username']
+        password = flask.request.form['password']
+        flask.session.clear()
+        flask.session['user'] = user
+        with audit(
+            "login",
+            calling_user = flask_login.current_user._get_current_object(),
+            request = flask.request
+        ) as audit_record:
+            _ = _login(audit_record)
+        return flask.redirect(API_PREFIX + '/ui')
+
+    return flask.render_template('login.html')
+
+@app.route(API_PREFIX + '/ui/logout', methods = [ 'GET' ])
+def _logout_ui():
+    with audit("logout",
+               calling_user = flask_login.current_user._get_current_object(),
+               request = flask.request) as audit_record:
+        flask_login.current_user.wipe()
+        flask_login.logout_user()
+        for key in ('identity.name', 'identity.auth_type'):
+            flask.session.pop(key, None)
+            flask_principal.identity_changed.send(
+                flask.current_app._get_current_object(),
+                identity = flask_principal.AnonymousIdentity())
+        flask.session.clear()
+        return flask.redirect(API_PREFIX + '/ui')
+
 
 @app.route(API_PREFIX + "validate_session", methods = ['GET'])
 @flask_login.login_required
