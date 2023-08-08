@@ -1,0 +1,12 @@
+---
+- tool: datatables
+  source: https://datatables.net/
+  SPDX-License-Header: MIT
+
+- tool: jquery
+  source: https://releases.jquery.com/
+  SPDX-License-Headey: MIT
+
+- tool: highlight.js
+  source: https://highlightjs.org/
+  SPDX-License-Headey: BSD 3-Clause License
