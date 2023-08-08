@@ -74,6 +74,7 @@ import glob
 import ttbl
 import ttbl.config
 import ttbl.allocation
+import ttbl._install
 
 try:
     import systemd.daemon
@@ -103,7 +104,14 @@ setattr(logging, "logd", logging.root.debug)
 setattr(logging, "logdl", logging.root.log)
 from logging import logc, loge, logx, logw, logi, logd, logdl
 
-app = flask.Flask(__name__)
+app = flask.Flask(
+    __name__,
+    template_folder = commonl.ttbd_locate_helper(
+        'ui/templates', ttbl._install.share_path),
+    static_folder = commonl.ttbd_locate_helper(
+        'ui/static', ttbl._install.share_path),
+)
+
 API_VERSION = 2
 API_PATH = "/ttb-v"
 API_PREFIX = API_PATH + str(API_VERSION) + "/"
