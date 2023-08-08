@@ -113,12 +113,11 @@ def _target(targetid):
 
     # get power info
     p_state, p_data, p_substate = target.power._get(target)
-    state['power'] = p_state
 
     # parse all the inventory to str
     d = json.dumps(d, indent = 4)
     state = {
-        'power': p_state
+        'power': p_state,
         'owner': owner,
         'type': t,
         'mac': mac,
