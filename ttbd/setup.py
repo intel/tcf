@@ -12,6 +12,7 @@
 #
 #
 import fileinput
+import glob
 import os
 import sys
 
@@ -137,6 +138,17 @@ targets over HTTP to be controlled by the TCF client.
             "raritan-power-capture.py",
             "usb-devices-capture.py",
         ]),
+        ('@prefix@/share/tcf/ui', ['ui/source.yaml'],),
+        ('@prefix@/share/tcf/ui/templates', glob.glob('ui/templates/*'),),
+        ('@prefix@/share/tcf/ui/static/css',
+            glob.glob('ui/static/css/*'),
+        ),
+        ('@prefix@/share/tcf/ui/static/img',
+            glob.glob('ui/static/img/*'),
+        ),
+        ('@prefix@/share/tcf/ui/static/js',
+            glob.glob('ui/static/js/*'),
+        ),
         ('@prefix@/share/tcf/ttbd',[
             'requirements.txt',
         ]),
